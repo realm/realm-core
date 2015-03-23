@@ -48,7 +48,7 @@ size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) con
 {
     check_cookie();
 
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
+    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_string(column_ndx, i) == value) return i;
@@ -59,7 +59,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 {
     check_cookie();
 
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
+    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_binary(column_ndx, i) == value) return i;
@@ -76,10 +76,10 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 {
     check_cookie();
 
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
-    TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
-    TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
+    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
+    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
+    REALM_ASSERT(m_table);
+    REALM_ASSERT(column_ndx < m_table->get_column_count());
     if (m_row_indexes.size() == 0)
         return 0;
 
@@ -278,7 +278,7 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 {
     check_cookie();
 
-    TIGHTDB_ASSERT(row_ndx < m_row_indexes.size());
+    REALM_ASSERT(row_ndx < m_row_indexes.size());
 
     // Print header (will also calculate widths)
     vector<size_t> widths;
@@ -288,7 +288,7 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
     m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 uint64_t TableViewBase::outside_version() const
 {
@@ -311,7 +311,7 @@ uint64_t TableViewBase::outside_version() const
     }
 }
 
-bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
+bool TableViewBase::is_in_sync() const REALM_NOEXCEPT
 {
     check_cookie();
 
@@ -339,10 +339,10 @@ void TableView::remove(size_t ndx)
 {
     check_cookie();
 
-    TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(ndx < m_row_indexes.size());
+    REALM_ASSERT(m_table);
+    REALM_ASSERT(ndx < m_row_indexes.size());
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == outside_version();
 #endif
 
@@ -350,7 +350,7 @@ void TableView::remove(size_t ndx)
     const size_t real_ndx = size_t(m_row_indexes.get(ndx));
     m_table->remove(real_ndx);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
@@ -369,9 +369,9 @@ void TableView::remove(size_t ndx)
 
 void TableView::clear()
 {
-    TIGHTDB_ASSERT(m_table);
+    REALM_ASSERT(m_table);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == outside_version();
 #endif
 
@@ -429,7 +429,7 @@ void TableView::clear()
 
     m_row_indexes.clear();
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
@@ -442,8 +442,8 @@ void TableViewBase::sync_distinct_view(size_t column)
     m_row_indexes.clear();
     m_distinct_column_source = column;
     if (m_distinct_column_source != npos) {
-        TIGHTDB_ASSERT(m_table);
-        TIGHTDB_ASSERT(m_table->has_search_index(m_distinct_column_source));
+        REALM_ASSERT(m_table);
+        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
         if (!m_table->is_degenerate()) {
             const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
             col.get_search_index()->distinct(m_row_indexes);
@@ -451,7 +451,7 @@ void TableViewBase::sync_distinct_view(size_t column)
     }
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 void TableViewBase::do_sync() 
 {
@@ -470,7 +470,7 @@ void TableViewBase::do_sync()
     else if (!m_query.m_table) {
         // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled 
         // because it doesn't take the search parameter in count. FIXME/Todo
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
         // no valid query
         m_row_indexes.clear();
         for (size_t i = 0; i < m_table->size(); i++)
@@ -493,4 +493,4 @@ void TableViewBase::do_sync()
 
     m_last_seen_version = outside_version();
 }
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION

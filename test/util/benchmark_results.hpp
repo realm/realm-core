@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_BENCHMARK_RESULTS_HPP
-#define TIGHTDB_TEST_UTIL_BENCHMARK_RESULTS_HPP
+#ifndef REALM_TEST_UTIL_BENCHMARK_RESULTS_HPP
+#define REALM_TEST_UTIL_BENCHMARK_RESULTS_HPP
 
 #include <vector>
 #include <map>
@@ -91,4 +91,4 @@ inline BenchmarkResults::~BenchmarkResults()
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_BENCHMARK_RESULTS_HPP
+#endif // REALM_TEST_UTIL_BENCHMARK_RESULTS_HPP

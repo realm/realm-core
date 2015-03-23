@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TABLE_BASIC_HPP
-#define TIGHTDB_TABLE_BASIC_HPP
+#ifndef REALM_TABLE_BASIC_HPP
+#define REALM_TABLE_BASIC_HPP
 
 #include <stdint.h> // unint8_t etc
 #include <cstddef>
@@ -93,13 +93,13 @@ public:
 
     BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()): Table(t, alloc) {}
 
-    ~BasicTable() TIGHTDB_NOEXCEPT {}
+    ~BasicTable() REALM_NOEXCEPT {}
 
     static Ref create(Allocator& = Allocator::get_default());
 
     Ref copy(Allocator& = Allocator::get_default()) const;
 
-    static int get_column_count() TIGHTDB_NOEXCEPT
+    static int get_column_count() REALM_NOEXCEPT
     {
         return util::TypeCount<typename Spec::Columns>::value;
     }
@@ -122,8 +122,8 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() TIGHTDB_NOEXCEPT { return ColsAccessor(this); }
-    ConstColsAccessor column() const TIGHTDB_NOEXCEPT { return ConstColsAccessor(this); }
+    ColsAccessor column() REALM_NOEXCEPT { return ColsAccessor(this); }
+    ConstColsAccessor column() const REALM_NOEXCEPT { return ConstColsAccessor(this); }
 
 private:
     template<int col_idx> struct Field {
@@ -142,22 +142,22 @@ public:
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
-    RowAccessor operator[](std::size_t row_idx) TIGHTDB_NOEXCEPT
+    RowAccessor operator[](std::size_t row_idx) REALM_NOEXCEPT
     {
         return RowAccessor(std::make_pair(this, row_idx));
     }
 
-    ConstRowAccessor operator[](std::size_t row_idx) const TIGHTDB_NOEXCEPT
+    ConstRowAccessor operator[](std::size_t row_idx) const REALM_NOEXCEPT
     {
         return ConstRowAccessor(std::make_pair(this, row_idx));
     }
 
-    RowAccessor front() TIGHTDB_NOEXCEPT
+    RowAccessor front() REALM_NOEXCEPT
     {
         return RowAccessor(std::make_pair(this, 0));
     }
 
-    ConstRowAccessor front() const TIGHTDB_NOEXCEPT
+    ConstRowAccessor front() const REALM_NOEXCEPT
     {
         return ConstRowAccessor(std::make_pair(this, 0));
     }
@@ -168,12 +168,12 @@ public:
     /// to the end. Thus, <tt>table.back(rel_idx)</tt> is the same as
     /// <tt>table[table.size() + rel_idx]</tt>.
     ///
-    RowAccessor back(int rel_idx = -1) TIGHTDB_NOEXCEPT
+    RowAccessor back(int rel_idx = -1) REALM_NOEXCEPT
     {
         return RowAccessor(std::make_pair(this, size()+rel_idx));
     }
 
-    ConstRowAccessor back(int rel_idx = -1) const TIGHTDB_NOEXCEPT
+    ConstRowAccessor back(int rel_idx = -1) const REALM_NOEXCEPT
     {
         return ConstRowAccessor(std::make_pair(this, size()+rel_idx));
     }
@@ -183,7 +183,7 @@ public:
     template<class L> void add(const util::Tuple<L>& tuple)
     {
         using namespace tightdb::util;
-        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+        REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), size(), tuple);
         insert_done();
@@ -194,7 +194,7 @@ public:
     template<class L> void insert(std::size_t i, const util::Tuple<L>& tuple)
     {
         using namespace tightdb::util;
-        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+        REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), i, tuple);
         insert_done();
@@ -203,7 +203,7 @@ public:
     template<class L> void set(std::size_t i, const util::Tuple<L>& tuple)
     {
         using namespace tightdb::util;
-        TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
+        REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
     }
@@ -251,18 +251,18 @@ public:
     /// where it is desirable to be able to cast to a table type with
     /// different column names. Similar changes are needed in the Java
     /// and Objective-C language bindings.
-    template<class T> friend bool is_a(const Table&) TIGHTDB_NOEXCEPT;
+    template<class T> friend bool is_a(const Table&) REALM_NOEXCEPT;
 
     //@{
     /// These functions return null if the specified table is not
     /// compatible with the specified table type.
-    template<class T> friend BasicTableRef<T> checked_cast(TableRef) TIGHTDB_NOEXCEPT;
-    template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) TIGHTDB_NOEXCEPT;
+    template<class T> friend BasicTableRef<T> checked_cast(TableRef) REALM_NOEXCEPT;
+    template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) REALM_NOEXCEPT;
     //@}
 
     using Table::Verify;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     using Table::print;
     using Table::dump_node_structure;
 #endif
@@ -274,8 +274,8 @@ private:
     };
 
     // These are intende to be used only by accessor classes
-    Table* get_impl() TIGHTDB_NOEXCEPT { return this; }
-    const Table* get_impl() const TIGHTDB_NOEXCEPT { return this; }
+    Table* get_impl() REALM_NOEXCEPT { return this; }
+    const Table* get_impl() const REALM_NOEXCEPT { return this; }
 
     template<class Subtab> Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx)
     {
@@ -297,7 +297,7 @@ private:
         ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&*desc, dyn_col_names); // Throws
     }
 
-    static bool matches_dynamic_type(const tightdb::Spec& spec) TIGHTDB_NOEXCEPT
+    static bool matches_dynamic_type(const tightdb::Spec& spec) REALM_NOEXCEPT
     {
         using namespace tightdb::util;
         const int num_cols = util::TypeCount<typename Spec::Columns>::value;
@@ -344,7 +344,7 @@ template<class Spec> class BasicTable<Spec>::Query:
         public Spec::template ColNames<QueryCol, Query*> {
 public:
     Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
-    ~Query() TIGHTDB_NOEXCEPT {}
+    ~Query() REALM_NOEXCEPT {}
 
     Query& group() { m_impl.group(); return *this; }
 
@@ -450,7 +450,7 @@ template<> struct GetColumnTypeId<Mixed> {
 template<class Type, int col_idx> struct AddCol {
     static void exec(Descriptor* desc, const StringData* col_names)
     {
-        TIGHTDB_ASSERT(col_idx == desc->get_column_count());
+        REALM_ASSERT(col_idx == desc->get_column_count());
         desc->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]); // Throws
     }
 };
@@ -459,7 +459,7 @@ template<class Type, int col_idx> struct AddCol {
 template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
     static void exec(Descriptor* desc, const StringData* col_names)
     {
-        TIGHTDB_ASSERT(col_idx == desc->get_column_count());
+        REALM_ASSERT(col_idx == desc->get_column_count());
         DescriptorRef subdesc;
         desc->add_column(type_Table, col_names[col_idx], &subdesc); // Throws
         using namespace tightdb::util;
@@ -646,7 +646,7 @@ template<class T, int col_idx> struct AssignIntoCol<SpecBase::Subtable<T>, col_i
     {
         t->clear_subtable(col_idx, row_idx);
         // FIXME: Implement table copy when specified!
-        TIGHTDB_ASSERT(!static_cast<const T*>(util::at<col_idx>(tuple)));
+        REALM_ASSERT(!static_cast<const T*>(util::at<col_idx>(tuple)));
         static_cast<void>(tuple);
     }
 };
@@ -678,14 +678,14 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) c
 }
 
 
-template<class T> inline bool is_a(const Table& t) TIGHTDB_NOEXCEPT
+template<class T> inline bool is_a(const Table& t) REALM_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
     return T::matches_dynamic_type(tf::get_spec(t));
 }
 
 
-template<class T> inline BasicTableRef<T> checked_cast(TableRef t) TIGHTDB_NOEXCEPT
+template<class T> inline BasicTableRef<T> checked_cast(TableRef t) REALM_NOEXCEPT
 {
     if (!is_a<T>(*t))
         return BasicTableRef<T>(); // Null
@@ -693,7 +693,7 @@ template<class T> inline BasicTableRef<T> checked_cast(TableRef t) TIGHTDB_NOEXC
 }
 
 
-template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) TIGHTDB_NOEXCEPT
+template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) REALM_NOEXCEPT
 {
     if (!is_a<T>(*t))
         return BasicTableRef<const T>(); // Null
@@ -703,4 +703,4 @@ template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) TI
 
 } // namespace tightdb
 
-#endif // TIGHTDB_TABLE_BASIC_HPP
+#endif // REALM_TABLE_BASIC_HPP

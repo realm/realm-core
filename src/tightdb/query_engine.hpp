@@ -83,8 +83,8 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 */
 
-#ifndef TIGHTDB_QUERY_ENGINE_HPP
-#define TIGHTDB_QUERY_ENGINE_HPP
+#ifndef REALM_QUERY_ENGINE_HPP
+#define REALM_QUERY_ENGINE_HPP
 
 #include <string>
 #include <functional>
@@ -197,7 +197,7 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
 
 class SequentialGetterBase {
 public:
-    virtual ~SequentialGetterBase() TIGHTDB_NOEXCEPT {}
+    virtual ~SequentialGetterBase() REALM_NOEXCEPT {}
 };
 
 template<class T>class SequentialGetter : public SequentialGetterBase {
@@ -219,7 +219,7 @@ public:
         init(column);
     }
 
-    ~SequentialGetter() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~SequentialGetter() REALM_NOEXCEPT REALM_OVERRIDE {}
 
     void init(const ColType* column)
     {
@@ -227,7 +227,7 @@ public:
         m_leaf_end = 0;
     }
 
-    TIGHTDB_FORCEINLINE bool cache_next(size_t index)
+    REALM_FORCEINLINE bool cache_next(size_t index)
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
@@ -242,7 +242,7 @@ public:
     }
 
 
-    TIGHTDB_FORCEINLINE T get_next(size_t index)
+    REALM_FORCEINLINE T get_next(size_t index)
     {
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -315,7 +315,7 @@ public:
 
     size_t find_first(size_t start, size_t end);
 
-    virtual ~ParentNode() TIGHTDB_NOEXCEPT {}
+    virtual ~ParentNode() REALM_NOEXCEPT {}
 
     virtual void init(const Table& table)
     {
@@ -344,7 +344,7 @@ public:
     {
         // Sum of float column must accumulate in double
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
-        TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceColumn, float>::value &&
+        REALM_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceColumn, float>::value &&
                                                         !util::SameType<TResult, double>::value)), "");
 
         // TResult: type of query result
@@ -352,10 +352,10 @@ public:
         TSourceColumn av = (TSourceColumn)0;
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
-            TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
+            REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
         }
-        TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
+        REALM_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
         bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
         return cont;
     }
@@ -429,7 +429,7 @@ protected:
 class ListviewNode: public ParentNode {
 public:
     ListviewNode(TableView& tv) : m_max(0), m_next(0), m_size(tv.size()), m_tv(tv) { m_child = 0; m_dT = 0.0; }
-    ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {  }
+    ~ListviewNode() REALM_NOEXCEPT REALM_OVERRIDE {  }
 
     // Return the n'th table row index contained in the TableView.
     size_t tableindex(size_t n)
@@ -437,7 +437,7 @@ public:
         return to_size_t(m_tv.m_row_indexes.get(n));
     }
 
-    virtual void init(const Table& table) TIGHTDB_OVERRIDE
+    virtual void init(const Table& table) REALM_OVERRIDE
     {
         m_table = &table;
 
@@ -451,7 +451,7 @@ public:
         if (m_child) m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)  TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end)  REALM_OVERRIDE
     {
         // Simply return index of first table row which is >= start
         size_t r;
@@ -492,9 +492,9 @@ class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
     SubtableNode() {};
-    ~SubtableNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~SubtableNode() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_dD = 10.0;
         m_probes = 0;
@@ -525,10 +525,10 @@ public:
             return m_child->validate();
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
-        TIGHTDB_ASSERT(m_table);
-        TIGHTDB_ASSERT(m_child);
+        REALM_ASSERT(m_table);
+        REALM_ASSERT(m_child);
 
         for (size_t s = start; s < end; ++s) {
             const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
@@ -556,7 +556,7 @@ public:
         return new SubtableNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) TIGHTDB_OVERRIDE
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) REALM_OVERRIDE
     {
         ParentNode::translate_pointers(mapping);
         m_child2 = mapping.find(m_child2)->second;
@@ -662,9 +662,9 @@ public:
     {
         m_condition_column_idx = column;
     }
-    ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~IntegerNode() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_dD = 100.0;
         m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
@@ -674,7 +674,7 @@ public:
             m_child->init(table);
     }
 
-    void aggregate_local_prepare(Action TAction, DataType col_id) TIGHTDB_OVERRIDE
+    void aggregate_local_prepare(Action TAction, DataType col_id) REALM_OVERRIDE
     {
         m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
         m_TAction = TAction;
@@ -713,7 +713,7 @@ public:
             m_find_callback_specialized = & ThisType::template find_callback_specialization<act_CallbackIdx, int64_t>;
 
         else {
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
         }
     }
 
@@ -728,9 +728,9 @@ public:
 
     // FIXME: should be possible to move this up to IntegerNodeBase...
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column) TIGHTDB_OVERRIDE
+                           SequentialGetterBase* source_column) REALM_OVERRIDE
     {
-        TIGHTDB_ASSERT(m_conds > 0);
+        REALM_ASSERT(m_conds > 0);
         int c = TConditionFunction::condition;
         m_local_matches = 0;
         m_local_limit = local_limit;
@@ -750,7 +750,7 @@ public:
                 m_condition_column->GetBlock(s, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
                 size_t w = m_array.get_width();
-                m_dT = (w == 0 ? 1.0 / TIGHTDB_MAX_BPNODE_SIZE : w / float(bitwidth_time_unit));
+                m_dT = (w == 0 ? 1.0 / REALM_MAX_BPNODE_SIZE : w / float(bitwidth_time_unit));
             }
 
             size_t end2;
@@ -789,10 +789,10 @@ public:
         }
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         TConditionFunction condition;
-        TIGHTDB_ASSERT(m_table);
+        REALM_ASSERT(m_table);
 
         while (start < end) {
 
@@ -866,9 +866,9 @@ public:
         m_child = 0;
         m_dT = 1.0;
     }
-    ~FloatDoubleNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~FloatDoubleNode() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_dD = 100.0;
         m_table = &table;
@@ -879,7 +879,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         TConditionFunction cond;
 
@@ -913,7 +913,7 @@ protected:
 
 template <class TConditionFunction> class BinaryNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
+    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     BinaryNode(BinaryData v, size_t column)
     {
@@ -927,12 +927,12 @@ public:
         m_value = BinaryData(data, v.size());
     }
 
-    ~BinaryNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    ~BinaryNode() REALM_NOEXCEPT REALM_OVERRIDE
     {
         delete[] m_value.data();
     }
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_dD = 100.0;
         m_table = &table;
@@ -943,7 +943,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
@@ -986,7 +986,7 @@ public:
     template <Action TAction>
     int64_t find_all(Column*, size_t, size_t, size_t, size_t)
     {
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
         return 0;
     }
     StringNodeBase(StringData v, size_t column)
@@ -1003,12 +1003,12 @@ public:
         m_value = StringData(data, v.size());
     }
 
-    ~StringNodeBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    ~StringNodeBase() REALM_NOEXCEPT REALM_OVERRIDE
     {
         delete[] m_value.data();
     }
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_probes = 0;
         m_matches = 0;
@@ -1037,7 +1037,7 @@ public:
                 delete static_cast<ArrayBigBlobs*>(m_leaf);
                 goto delete_done;
         }
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
 
       delete_done:
         m_leaf = 0;
@@ -1090,7 +1090,7 @@ public:
         m_lcase = lower;
     }
 
-    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    ~StringNode() REALM_NOEXCEPT REALM_OVERRIDE
     {
         delete[] m_ucase;
         delete[] m_lcase;
@@ -1099,7 +1099,7 @@ public:
     }
 
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         clear_leaf_state();
 
@@ -1112,7 +1112,7 @@ public:
     }
 
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         TConditionFunction cond;
 
@@ -1185,12 +1185,12 @@ public:
         m_index_matches = 0;
         m_index_matches_destroy = false;
     }
-    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    ~StringNode() REALM_NOEXCEPT REALM_OVERRIDE
     {
         deallocate();
     }
 
-    void deallocate() TIGHTDB_NOEXCEPT
+    void deallocate() REALM_NOEXCEPT
     {
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
@@ -1208,7 +1208,7 @@ public:
         m_index_getter = null_ptr;
     }
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         deallocate();
         m_dD = 10.0;
@@ -1272,9 +1272,9 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
-        TIGHTDB_ASSERT(m_table);
+        REALM_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
             if (m_condition_column->has_search_index()) {
@@ -1329,7 +1329,7 @@ public:
                             m_leaf_end = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
                         else
                             m_leaf_end = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
-                        TIGHTDB_ASSERT(m_leaf);
+                        REALM_ASSERT(m_leaf);
                     }
                     size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
@@ -1364,7 +1364,7 @@ public:
     }
 
 private:
-    inline BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
+    inline BinaryData str_to_bin(const StringData& s) REALM_NOEXCEPT
     {
         return BinaryData(s.data(), s.size());
     }
@@ -1393,7 +1393,7 @@ class OrNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Column*, size_t, size_t, size_t, size_t)
     {
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
         return 0;
     }
 
@@ -1402,9 +1402,9 @@ public:
         m_dT = 50.0;
     }
 
-    ~OrNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~OrNode() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_dD = 10.0;
 
@@ -1428,7 +1428,7 @@ public:
         m_table = &table;
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         if (start >= end)
             return not_found;
@@ -1455,7 +1455,7 @@ public:
         return index;
     }
 
-    std::string validate() TIGHTDB_OVERRIDE
+    std::string validate() REALM_OVERRIDE
     {
         if (error_code != "")
             return error_code;
@@ -1481,7 +1481,7 @@ public:
         return new OrNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) TIGHTDB_OVERRIDE
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) REALM_OVERRIDE
     {
         ParentNode::translate_pointers(mapping);
         for (size_t i = 0; i < m_cond.size(); ++i)
@@ -1500,14 +1500,14 @@ class NotNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Column*, size_t, size_t, size_t, size_t)
     {
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
         return 0;
     }
 
     NotNode() {m_child = null_ptr; m_cond = null_ptr; m_dT = 50.0;}
-    ~NotNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~NotNode() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_dD = 10.0;
 
@@ -1528,9 +1528,9 @@ public:
         m_table = &table;
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE;
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE;
 
-    std::string validate() TIGHTDB_OVERRIDE
+    std::string validate() REALM_OVERRIDE
     {
         if (error_code != "")
             return error_code;
@@ -1552,7 +1552,7 @@ public:
         return new NotNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) TIGHTDB_OVERRIDE
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) REALM_OVERRIDE
     {
         ParentNode::translate_pointers(mapping);
         m_cond = mapping.find(m_cond)->second;
@@ -1590,7 +1590,7 @@ private:
 // Compare two columns with eachother row-by-row
 template <class TConditionValue, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
+    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     TwoColumnsNode(size_t column1, size_t column2)
     {
@@ -1600,12 +1600,12 @@ public:
         m_child = 0;
     }
 
-    ~TwoColumnsNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    ~TwoColumnsNode() REALM_NOEXCEPT REALM_OVERRIDE
     {
         delete[] m_value.data();
     }
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
         m_dD = 100.0;
@@ -1621,7 +1621,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         size_t s = start;
 
@@ -1643,7 +1643,7 @@ public:
             else {
                 // This is for float and double.
 
-#if 0 && defined(TIGHTDB_COMPILER_AVX)
+#if 0 && defined(REALM_COMPILER_AVX)
 // AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
 //
 // For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
@@ -1706,7 +1706,7 @@ protected:
 class ExpressionNode: public ParentNode {
 
 public:
-    ~ExpressionNode() TIGHTDB_NOEXCEPT { }
+    ~ExpressionNode() REALM_NOEXCEPT { }
 
     ExpressionNode(Expression* compare, bool auto_delete)
     {
@@ -1717,14 +1717,14 @@ public:
         m_dT = 50.0;
     }
 
-    void init(const Table& table)  TIGHTDB_OVERRIDE
+    void init(const Table& table)  REALM_OVERRIDE
     {
         m_compare->set_table();
         if (m_child)
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         size_t res = m_compare->find_first(start, end);
         return res;
@@ -1757,14 +1757,14 @@ public:
         m_dT = 50.0;
     }
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    void init(const Table& table) REALM_OVERRIDE
     {
         m_table = &table;
         if (m_child)
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
         size_t ret = tightdb::npos; // superfluous init, but gives warnings otherwise
         DataType type = m_table->get_column_type(m_origin_column);
@@ -1785,7 +1785,7 @@ public:
             }
         }
         else {
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
         }
 
         return ret;
@@ -1803,4 +1803,4 @@ public:
 
 } // namespace tightdb
 
-#endif // TIGHTDB_QUERY_ENGINE_HPP
+#endif // REALM_QUERY_ENGINE_HPP

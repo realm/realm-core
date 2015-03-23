@@ -31,14 +31,14 @@ bool Version::has_feature(Feature feature)
 {
     switch (feature) {
         case feature_Debug:
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
             return true;
 #else
             return false;
 #endif
 
         case feature_Replication:
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
             return true;
 #else
             return false;

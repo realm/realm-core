@@ -43,12 +43,12 @@ CATEGORIES:
 - Schema:
   METHODS:
   - g_typed_table_macros:
-      NAME     : TIGHTDB_TABLE_*
+      NAME     : REALM_TABLE_*
       DESCR    : >
                  This set of predefined macros is used to declare type safe table classes.
                  It is possible to declare table classes with 1 to 15 columns.
       SIGNATURE: |
-                 TIGHTDB_TABLE_*(ClassName,
+                 REALM_TABLE_*(ClassName,
                                  ColumnName, ColumnType
                                  ...)
       SUMMARY  : Declare type safe table classes.

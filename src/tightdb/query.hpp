@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_QUERY_HPP
-#define TIGHTDB_QUERY_HPP
+#ifndef REALM_QUERY_HPP
+#define REALM_QUERY_HPP
 
 #include <stdint.h>
 #include <cstdio>
@@ -27,9 +27,9 @@
 #include <string>
 #include <vector>
 
-#define TIGHTDB_MULTITHREAD_QUERY 0
+#define REALM_MULTITHREAD_QUERY 0
 
-#if TIGHTDB_MULTITHREAD_QUERY
+#if REALM_MULTITHREAD_QUERY
 // FIXME: Use our C++ thread abstraction API since it provides a much
 // higher level of encapsulation and safety.
 #include <pthread.h>
@@ -61,7 +61,7 @@ public:
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
-    ~Query() TIGHTDB_NOEXCEPT;
+    ~Query() REALM_NOEXCEPT;
     void move_assign(Query& query);
 
     Query& operator = (const Query& source);
@@ -236,7 +236,7 @@ public:
     // Deletion
     size_t  remove(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
 
-#if TIGHTDB_MULTITHREAD_QUERY
+#if REALM_MULTITHREAD_QUERY
     // Multi-threading
     TableView      find_all_multi(size_t start = 0, size_t end=size_t(-1));
     ConstTableView find_all_multi(size_t start = 0, size_t end=size_t(-1)) const;
@@ -297,7 +297,7 @@ private:
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
-    void delete_nodes() TIGHTDB_NOEXCEPT;
+    void delete_nodes() REALM_NOEXCEPT;
 
     std::string error_code;
 
@@ -324,4 +324,4 @@ inline Query& Query::not_equal(size_t column_ndx, const char* c_str, bool case_s
 
 } // namespace tightdb
 
-#endif // TIGHTDB_QUERY_HPP
+#endif // REALM_QUERY_HPP

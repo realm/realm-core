@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <iostream>
 
-#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+#ifdef REALM_SLAB_ALLOC_DEBUG
 #  include <cstdlib>
 #  include <map>
 #endif
@@ -23,13 +23,13 @@ namespace {
 // Limited to 8 bits (max 255).
 const int current_file_format_version = 2;
 
-#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+#ifdef REALM_SLAB_ALLOC_DEBUG
 map<ref_type, void*> malloc_debug_map;
 #endif
 
 class InvalidFreeSpace: std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
     {
         return "Free space tracking was lost due to out-of-memory";
     }
@@ -57,11 +57,11 @@ const SlabAlloc::Header SlabAlloc::streaming_header = {
 
 class SlabAlloc::ChunkRefEq {
 public:
-    ChunkRefEq(ref_type ref) TIGHTDB_NOEXCEPT:
+    ChunkRefEq(ref_type ref) REALM_NOEXCEPT:
         m_ref(ref)
     {
     }
-    bool operator()(const Chunk& chunk) const TIGHTDB_NOEXCEPT
+    bool operator()(const Chunk& chunk) const REALM_NOEXCEPT
     {
         return chunk.ref == m_ref;
     }
@@ -72,11 +72,11 @@ private:
 
 class SlabAlloc::ChunkRefEndEq {
 public:
-    ChunkRefEndEq(ref_type ref) TIGHTDB_NOEXCEPT:
+    ChunkRefEndEq(ref_type ref) REALM_NOEXCEPT:
         m_ref(ref)
     {
     }
-    bool operator()(const Chunk& chunk) const TIGHTDB_NOEXCEPT
+    bool operator()(const Chunk& chunk) const REALM_NOEXCEPT
     {
         return chunk.ref + chunk.size == m_ref;
     }
@@ -87,11 +87,11 @@ private:
 
 class SlabAlloc::SlabRefEndEq {
 public:
-    SlabRefEndEq(ref_type ref) TIGHTDB_NOEXCEPT:
+    SlabRefEndEq(ref_type ref) REALM_NOEXCEPT:
         m_ref(ref)
     {
     }
-    bool operator()(const Slab& slab) const TIGHTDB_NOEXCEPT
+    bool operator()(const Slab& slab) const REALM_NOEXCEPT
     {
         return slab.ref_end == m_ref;
     }
@@ -100,7 +100,7 @@ private:
 };
 
 
-void SlabAlloc::detach() TIGHTDB_NOEXCEPT
+void SlabAlloc::detach() REALM_NOEXCEPT
 {
     switch (m_attach_mode) {
         case attach_None:
@@ -115,15 +115,15 @@ void SlabAlloc::detach() TIGHTDB_NOEXCEPT
             m_file.close();
             goto found;
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
   found:
     m_attach_mode = attach_None;
 }
 
 
-SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
+SlabAlloc::~SlabAlloc() REALM_NOEXCEPT
 {
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     if (is_attached()) {
         // A shared group does not guarantee that all space is free
         if (m_attach_mode != attach_SharedFile) {
@@ -131,11 +131,11 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
             if (m_free_space_state != free_space_Invalid) {
                 if (!is_all_free()) {
                     print();
-#  ifndef TIGHTDB_SLAB_ALLOC_DEBUG
+#  ifndef REALM_SLAB_ALLOC_DEBUG
                     cerr << "To get the stack-traces of the corresponding allocations,"
-                        "first compile with TIGHTDB_SLAB_ALLOC_DEBUG defined,"
+                        "first compile with REALM_SLAB_ALLOC_DEBUG defined,"
                         "then run under Valgrind with --leak-check=full\n";
-                    TIGHTDB_TERMINATE("SlabAlloc detected a leak");
+                    REALM_TERMINATE("SlabAlloc detected a leak");
 #  endif
                 }
             }
@@ -154,9 +154,9 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
 
 MemRef SlabAlloc::do_alloc(size_t size)
 {
-    TIGHTDB_ASSERT_DEBUG(0 < size);
-    TIGHTDB_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
-    TIGHTDB_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(0 < size);
+    REALM_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    REALM_ASSERT_DEBUG(is_attached());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -184,16 +184,16 @@ MemRef SlabAlloc::do_alloc(size_t size)
                     i->ref += size;
                 }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
                 if (m_debug_out)
                     cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
                 char* addr = translate(ref);
-#ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
+#ifdef REALM_ENABLE_ALLOC_SET_ZERO
                 fill(addr, addr+size, 0);
 #endif
-#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+#ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
                 return MemRef(addr, ref);
@@ -217,7 +217,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
             new_size = min_size;
         ref = curr_ref_end;
     }
-    TIGHTDB_ASSERT_DEBUG(0 < new_size);
+    REALM_ASSERT_DEBUG(0 < new_size);
     UniquePtr<char[]> mem(new char[new_size]); // Throws
     fill(mem.get(), mem.get()+new_size, 0);
 
@@ -237,15 +237,15 @@ MemRef SlabAlloc::do_alloc(size_t size)
         m_free_space.push_back(chunk); // Throws
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     if (m_debug_out)
         cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
-#ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
+#ifdef REALM_ENABLE_ALLOC_SET_ZERO
     fill(slab.addr, slab.addr+size, 0);
 #endif
-#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+#ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
 
@@ -253,15 +253,15 @@ MemRef SlabAlloc::do_alloc(size_t size)
 }
 
 
-void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
+void SlabAlloc::do_free(ref_type ref, const char* addr) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(translate(ref), ==, addr);
+    REALM_ASSERT_3(translate(ref), ==, addr);
 
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
     chunks& free_space = read_only ? m_free_read_only : m_free_space;
 
-#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+#ifdef REALM_SLAB_ALLOC_DEBUG
     free(malloc_debug_map[ref]);
 #endif
 
@@ -270,7 +270,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
         Array::get_capacity_from_header(addr);
     ref_type ref_end = ref + size;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     if (m_debug_out)
         cerr << "Free ref: " << ref << " size: " << size << "\n";
 #endif
@@ -280,7 +280,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
     // Mutable memory cannot be freed unless it has first been allocated, and
     // any allocation puts free space tracking into the "dirty" state.
-    TIGHTDB_ASSERT_3(read_only, ||, m_free_space_state == free_space_Dirty);
+    REALM_ASSERT_3(read_only, ||, m_free_space_state == free_space_Dirty);
 
     m_free_space_state = free_space_Dirty;
 
@@ -335,13 +335,13 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
 MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
-    TIGHTDB_ASSERT_DEBUG(translate(ref) == addr);
-    TIGHTDB_ASSERT_DEBUG(0 < new_size);
-    TIGHTDB_ASSERT_DEBUG((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
+    REALM_ASSERT_DEBUG(translate(ref) == addr);
+    REALM_ASSERT_DEBUG(0 < new_size);
+    REALM_ASSERT_DEBUG((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
-    // fill with zero if TIGHTDB_ENABLE_ALLOC_SET_ZERO is defined.
+    // fill with zero if REALM_ENABLE_ALLOC_SET_ZERO is defined.
 
     // Allocate new space
     MemRef new_mem = do_alloc(new_size); // Throws
@@ -353,26 +353,26 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     // Add old segment to freelist
     do_free(ref, addr);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     if (m_debug_out) {
         cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
             "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
     }
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG
 
     return new_mem;
 }
 
-char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
+char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
 
     if (ref < m_baseline)
         return m_data + ref;
 
     typedef slabs::const_iterator iter;
     iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
-    TIGHTDB_ASSERT_DEBUG(i != m_slabs.end());
+    REALM_ASSERT_DEBUG(i != m_slabs.end());
 
     ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
     return i->addr + (ref - slab_ref);
@@ -383,14 +383,14 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
                                 bool no_create, bool skip_validate,
                                 const char* encryption_key, bool server_sync_mode)
 {
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT(!is_attached());
 
     // When 'read_only' is true, this function will throw InvalidDatabase if the
     // file exists already but is empty. This can happen if another process is
     // currently creating it. Note however, that it is only legal for multiple
     // processes to access a database file concurrently if it is done via a
     // SharedGroup, and in that case 'read_only' can never be true.
-    TIGHTDB_ASSERT(!(is_shared && read_only));
+    REALM_ASSERT(!(is_shared && read_only));
     static_cast<void>(is_shared);
 
     using namespace tightdb::util;
@@ -481,7 +481,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
 
 ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 {
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT(!is_attached());
 
     // Verify the data structures
     m_file_on_streaming_form = false; // May be updated by validate_buffer()
@@ -499,7 +499,7 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 
 void SlabAlloc::attach_empty()
 {
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT(!is_attached());
 
     m_attach_mode = attach_OwnedBuffer;
     m_data = 0; // Empty buffer
@@ -558,12 +558,12 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
 
 void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
 {
-    TIGHTDB_ASSERT(m_file_on_streaming_form);
+    REALM_ASSERT(m_file_on_streaming_form);
     Header* header = reinterpret_cast<Header*>(mutable_data);
-    TIGHTDB_ASSERT(equal(reinterpret_cast<char*>(header), reinterpret_cast<char*>(header+1),
+    REALM_ASSERT(equal(reinterpret_cast<char*>(header), reinterpret_cast<char*>(header+1),
                          reinterpret_cast<const char*>(&streaming_header)));
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
-    TIGHTDB_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
+    REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
     mapping.sync();
     header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
@@ -571,7 +571,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>&
 }
 
 
-size_t SlabAlloc::get_total_size() const TIGHTDB_NOEXCEPT
+size_t SlabAlloc::get_total_size() const REALM_NOEXCEPT
 {
     return m_slabs.empty() ? m_baseline : m_slabs.back().ref_end;
 }
@@ -598,7 +598,7 @@ void SlabAlloc::reset_free_space_tracking()
         chunk.ref = i->ref_end;
     }
 
-    TIGHTDB_ASSERT_DEBUG(is_all_free());
+    REALM_ASSERT_DEBUG(is_all_free());
 
     m_free_space_state = free_space_Clean;
 }
@@ -606,10 +606,10 @@ void SlabAlloc::reset_free_space_tracking()
 
 bool SlabAlloc::remap(size_t file_size)
 {
-    TIGHTDB_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
-    TIGHTDB_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    TIGHTDB_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
-    TIGHTDB_ASSERT_DEBUG(m_baseline <= file_size);
+    REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
+    REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    REALM_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
+    REALM_ASSERT_DEBUG(m_baseline <= file_size);
 
     void* addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
     bool addr_changed = addr != m_data;
@@ -621,7 +621,7 @@ bool SlabAlloc::remap(size_t file_size)
     // each entire slab in m_slabs)
     size_t slab_ref = file_size;
     size_t n = m_free_space.size();
-    TIGHTDB_ASSERT_DEBUG(m_slabs.size() == n);
+    REALM_ASSERT_DEBUG(m_slabs.size() == n);
     for (size_t i = 0; i < n; ++i) {
         Chunk& free_chunk = m_free_space[i];
         free_chunk.ref = slab_ref;
@@ -641,7 +641,7 @@ const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 bool SlabAlloc::is_all_free() const
 {
@@ -674,11 +674,11 @@ void SlabAlloc::Verify() const
     for (iter chunk = m_free_space.begin(); chunk != end; ++chunk) {
         slabs::const_iterator slab =
             upper_bound(m_slabs.begin(), m_slabs.end(), chunk->ref, &ref_less_than_slab_ref_end);
-        TIGHTDB_ASSERT(slab != m_slabs.end());
+        REALM_ASSERT(slab != m_slabs.end());
 
         ref_type slab_ref_end = slab->ref_end;
         ref_type chunk_ref_end = chunk->ref + chunk->size;
-        TIGHTDB_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
+        REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
     }
 }
 
@@ -734,4 +734,4 @@ void SlabAlloc::print() const
     cout << flush;
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

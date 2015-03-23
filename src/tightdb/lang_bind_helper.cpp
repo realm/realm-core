@@ -7,16 +7,16 @@ using namespace tightdb;
 
 Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, size_t col_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT(col_ndx < t->get_column_count());
+    REALM_ASSERT(col_ndx < t->get_column_count());
     ColumnTable& subtables =  t->get_column_table(col_ndx);
-    TIGHTDB_ASSERT(row_ndx < subtables.size());
+    REALM_ASSERT(row_ndx < subtables.size());
     Table* subtab = subtables.get_subtable_ptr(row_ndx);
     subtab->bind_ref();
     return subtab;
 }
 
 
-const char* LangBindHelper::get_data_type_name(DataType type) TIGHTDB_NOEXCEPT
+const char* LangBindHelper::get_data_type_name(DataType type) REALM_NOEXCEPT
 {
     switch (type) {
         case type_Int:      return "int";
@@ -31,6 +31,6 @@ const char* LangBindHelper::get_data_type_name(DataType type) TIGHTDB_NOEXCEPT
         case type_Link:     return "link";
         case type_LinkList: return "linklist";
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return "int";
 }

@@ -5,7 +5,7 @@ using namespace std;
 using namespace tightdb;
 
 // defining a table
-TIGHTDB_TABLE_2(MyTable,
+REALM_TABLE_2(MyTable,
 //              columns: types:
                 name,    String,
                 age,     Int)

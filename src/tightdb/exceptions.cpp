@@ -3,7 +3,7 @@
 
 using namespace tightdb;
 
-const char* LogicError::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     switch (m_kind) {
         case LogicError::string_too_big:

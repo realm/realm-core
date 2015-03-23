@@ -46,7 +46,7 @@ PlatformSpecificCondVar::PlatformSpecificCondVar()
 
 
 
-void PlatformSpecificCondVar::close() TIGHTDB_NOEXCEPT
+void PlatformSpecificCondVar::close() REALM_NOEXCEPT
 {
     if (m_sem) { // true if emulating a process shared condvar
         sem_close(m_sem);
@@ -58,7 +58,7 @@ void PlatformSpecificCondVar::close() TIGHTDB_NOEXCEPT
 }
 
 
-PlatformSpecificCondVar::~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT
+PlatformSpecificCondVar::~PlatformSpecificCondVar() REALM_NOEXCEPT
 {
     close();
 }
@@ -67,12 +67,12 @@ PlatformSpecificCondVar::~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT
 
 void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar)
 {
-    TIGHTDB_ASSERT(m_shared_part == 0);
+    REALM_ASSERT(m_shared_part == 0);
     close();
     m_shared_part = &shared_part;
     static_cast<void>(path);
     static_cast<void>(offset_of_condvar);
-#ifdef TIGHTDB_CONDVAR_EMULATION
+#ifdef REALM_CONDVAR_EMULATION
     m_sem = get_semaphore(path,offset_of_condvar);
 #endif
 }
@@ -90,7 +90,7 @@ sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, std::size_t offs
     magic /= 23;
     name += 'A'+(magic % 23);
     magic /= 23;
-    TIGHTDB_ASSERT(m_shared_part);
+    REALM_ASSERT(m_shared_part);
     if (m_sem == 0) {
         m_sem = sem_open(name.c_str(), O_CREAT, S_IRWXG | S_IRWXU, 0);
         // FIXME: error checking
@@ -100,12 +100,12 @@ sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, std::size_t offs
 
 
 void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
-#ifdef TIGHTDB_CONDVAR_EMULATION
+#ifdef REALM_CONDVAR_EMULATION
     shared_part.waiters = 0;
     shared_part.signal_counter = 0;
 #else
     new ((void*) &shared_part) CondVar(CondVar::process_shared_tag());
-#endif // TIGHTDB_CONDVAR_EMULATION
+#endif // REALM_CONDVAR_EMULATION
 }
 
 

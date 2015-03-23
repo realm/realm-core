@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_GROUP_SHARED_HPP
-#define TIGHTDB_GROUP_SHARED_HPP
+#ifndef REALM_GROUP_SHARED_HPP
+#define REALM_GROUP_SHARED_HPP
 
 #include <limits>
 
@@ -144,12 +144,12 @@ public:
     /// attached state by calling is_attached(). Calling any other
     /// function (except the destructor) while in the unattached state
     /// has undefined behavior.
-    SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
+    SharedGroup(unattached_tag) REALM_NOEXCEPT;
 
     // close any open database, returning to the unattached state.
-    void close() TIGHTDB_NOEXCEPT;
+    void close() REALM_NOEXCEPT;
 
-    ~SharedGroup() TIGHTDB_NOEXCEPT;
+    ~SharedGroup() REALM_NOEXCEPT;
 
     /// Attach this SharedGroup instance to the specified database
     /// file.
@@ -183,7 +183,7 @@ public:
               DurabilityLevel dlevel = durability_Full,
               bool is_backend = false, const char *encryption_key = 0);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
     /// Equivalent to calling open(Replication&) on a
     /// default constructed instance.
@@ -205,7 +205,7 @@ public:
     /// later attached to a file with a call to open(). Calling any
     /// function other than open(), is_attached(), and ~SharedGroup()
     /// on an unattached instance results in undefined behavior.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     /// Reserve disk space now to avoid allocation errors at a later
     /// point in time, and to minimize on-disk fragmentation. In some
@@ -281,7 +281,7 @@ public:
     /// Exception thrown if an attempt to lock on to a specific version fails.
     class UnreachableVersion : public std::exception {
     public:
-        const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+        const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
         {
             return "Failed to lock on to specific version";
         }
@@ -298,7 +298,7 @@ public:
     const Group& begin_read(VersionID specific_version = VersionID());
 
     /// End a read transaction. Accessors are detached.
-    void end_read() TIGHTDB_NOEXCEPT;
+    void end_read() REALM_NOEXCEPT;
 
     /// Get a version id which may be used to request a different SharedGroup
     /// to start transaction at a specific version.
@@ -314,7 +314,7 @@ public:
     void commit();
 
     /// End the current write transaction. All accessors are detached.
-    void rollback() TIGHTDB_NOEXCEPT;
+    void rollback() REALM_NOEXCEPT;
 
     /// Report the number of distinct versions currently stored in the database.
     /// Note: the database only cleans up versions as part of commit, so ending
@@ -336,7 +336,7 @@ public:
     /// 
     bool compact();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void test_ringbuf();
 #endif
 
@@ -377,15 +377,15 @@ private:
 #endif
 
     // Ring buffer managment
-    bool        ringbuf_is_empty() const TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_size() const TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_capacity() const TIGHTDB_NOEXCEPT;
-    bool        ringbuf_is_first(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void        ringbuf_remove_first() TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT;
-    ReadCount&  ringbuf_get(std::size_t ndx) TIGHTDB_NOEXCEPT;
-    ReadCount&  ringbuf_get_first() TIGHTDB_NOEXCEPT;
-    ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
+    bool        ringbuf_is_empty() const REALM_NOEXCEPT;
+    std::size_t ringbuf_size() const REALM_NOEXCEPT;
+    std::size_t ringbuf_capacity() const REALM_NOEXCEPT;
+    bool        ringbuf_is_first(std::size_t ndx) const REALM_NOEXCEPT;
+    void        ringbuf_remove_first() REALM_NOEXCEPT;
+    std::size_t ringbuf_find(uint64_t version) const REALM_NOEXCEPT;
+    ReadCount&  ringbuf_get(std::size_t ndx) REALM_NOEXCEPT;
+    ReadCount&  ringbuf_get_first() REALM_NOEXCEPT;
+    ReadCount&  ringbuf_get_last() REALM_NOEXCEPT;
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
@@ -404,7 +404,7 @@ private:
 
     // Release a specific readlock. The readlock info MUST have been obtained by a
     // call to grab_latest_readlock() or grab_specific_readlock().
-    void release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT;
+    void release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT;
 
     void do_begin_write();
     void do_commit();
@@ -423,7 +423,7 @@ private:
 
     void do_async_commits();
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
     /// Advance the current read transaction to include latest state.
     /// All accessors are retained and synchronized to the new state
@@ -476,12 +476,12 @@ public:
         m_shared_group.begin_read(); // Throws
     }
 
-    ~ReadTransaction() TIGHTDB_NOEXCEPT
+    ~ReadTransaction() REALM_NOEXCEPT
     {
         m_shared_group.end_read();
     }
 
-    bool has_table(StringData name) const TIGHTDB_NOEXCEPT
+    bool has_table(StringData name) const REALM_NOEXCEPT
     {
         return get_group().has_table(name);
     }
@@ -501,7 +501,7 @@ public:
         return get_group().get_table<T>(name); // Throws
     }
 
-    const Group& get_group() const TIGHTDB_NOEXCEPT
+    const Group& get_group() const REALM_NOEXCEPT
     {
         return m_shared_group.m_group;
     }
@@ -519,13 +519,13 @@ public:
         m_shared_group->begin_write(); // Throws
     }
 
-    ~WriteTransaction() TIGHTDB_NOEXCEPT
+    ~WriteTransaction() REALM_NOEXCEPT
     {
         if (m_shared_group)
             m_shared_group->rollback();
     }
 
-    bool has_table(StringData name) const TIGHTDB_NOEXCEPT
+    bool has_table(StringData name) const REALM_NOEXCEPT
     {
         return get_group().has_table(name);
     }
@@ -566,22 +566,22 @@ public:
         return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
 
-    Group& get_group() const TIGHTDB_NOEXCEPT
+    Group& get_group() const REALM_NOEXCEPT
     {
-        TIGHTDB_ASSERT(m_shared_group);
+        REALM_ASSERT(m_shared_group);
         return m_shared_group->m_group;
     }
 
     void commit()
     {
-        TIGHTDB_ASSERT(m_shared_group);
+        REALM_ASSERT(m_shared_group);
         m_shared_group->commit();
         m_shared_group = 0;
     }
 
-    void rollback() TIGHTDB_NOEXCEPT
+    void rollback() REALM_NOEXCEPT
     {
-        TIGHTDB_ASSERT(m_shared_group);
+        REALM_ASSERT(m_shared_group);
         m_shared_group->rollback();
         m_shared_group = 0;
     }
@@ -602,17 +602,17 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
     open(file, no_create, dlevel, false, key);
 }
 
-inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
+inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
     m_group(Group::shared_tag())
 {
 }
 
-inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
+inline bool SharedGroup::is_attached() const REALM_NOEXCEPT
 {
     return m_file_map.is_attached();
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
     m_group(Group::shared_tag())
 {
@@ -622,4 +622,4 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const
 
 } // namespace tightdb
 
-#endif // TIGHTDB_GROUP_SHARED_HPP
+#endif // REALM_GROUP_SHARED_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TYPE_LIST_HPP
-#define TIGHTDB_UTIL_TYPE_LIST_HPP
+#ifndef REALM_UTIL_TYPE_LIST_HPP
+#define REALM_UTIL_TYPE_LIST_HPP
 
 #include <tightdb/util/meta.hpp>
 
@@ -202,4 +202,4 @@ template<template<class T, int i> class Pred, int i> struct HasType<void, Pred, 
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_TYPE_LIST_HPP
+#endif // REALM_UTIL_TYPE_LIST_HPP

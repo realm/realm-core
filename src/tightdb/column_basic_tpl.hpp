@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_BASIC_TPL_HPP
-#define TIGHTDB_COLUMN_BASIC_TPL_HPP
+#ifndef REALM_COLUMN_BASIC_TPL_HPP
+#define REALM_COLUMN_BASIC_TPL_HPP
 
 // Todo: It's bad design (headers are entangled) that a Column uses query_engine.hpp which again uses Column.
 // It's the aggregate() method that calls query_engine, and a quick fix (still not optimal) could be to create
@@ -51,7 +51,7 @@ BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref)
 }
 
 template<class T>
-BasicColumn<T>::~BasicColumn() TIGHTDB_NOEXCEPT
+BasicColumn<T>::~BasicColumn() REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         delete static_cast<BasicArray<T>*>(m_array);
@@ -62,7 +62,7 @@ BasicColumn<T>::~BasicColumn() TIGHTDB_NOEXCEPT
 }
 
 template<class T>
-inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
+inline std::size_t BasicColumn<T>::size() const REALM_NOEXCEPT
 {
     if (root_is_leaf())
         return m_array->size();
@@ -71,9 +71,9 @@ inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 
 
 template<class T>
-T BasicColumn<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+T BasicColumn<T>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf())
         return static_cast<const BasicArray<T>*>(m_array)->get(ndx);
 
@@ -89,9 +89,9 @@ class BasicColumn<T>::SetLeafElem: public Array::UpdateHandler {
 public:
     Allocator& m_alloc;
     const T m_value;
-    SetLeafElem(Allocator& alloc, T value) TIGHTDB_NOEXCEPT: m_alloc(alloc), m_value(value) {}
+    SetLeafElem(Allocator& alloc, T value) REALM_NOEXCEPT: m_alloc(alloc), m_value(value) {}
     void update(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                std::size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                std::size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         BasicArray<T> leaf(m_alloc);
         leaf.init_from_mem(mem);
@@ -122,7 +122,7 @@ template<class T> inline void BasicColumn<T>::add(T value)
 template<class T> inline void BasicColumn<T>::insert(std::size_t row_ndx, T value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT_3(row_ndx, <=, size);
+    REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws
@@ -165,16 +165,16 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
 template<class T>
 class BasicColumn<T>::EraseLeafElem: public ColumnBase::EraseHandlerBase {
 public:
-    EraseLeafElem(BasicColumn<T>& column) TIGHTDB_NOEXCEPT:
+    EraseLeafElem(BasicColumn<T>& column) REALM_NOEXCEPT:
         EraseHandlerBase(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          std::size_t leaf_ndx_in_parent,
-                         std::size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                         std::size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         BasicArray<T> leaf(get_alloc());
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
-        TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
+        REALM_ASSERT_3(leaf.size(), >=, 1);
         std::size_t last_ndx = leaf.size() - 1;
         if (last_ndx == 0)
             return true;
@@ -184,17 +184,17 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT REALM_OVERRIDE
     {
         Array::destroy(leaf_mem, get_alloc()); // Shallow
     }
-    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    void replace_root_by_leaf(MemRef leaf_mem) REALM_OVERRIDE
     {
         BasicArray<T>* leaf = new BasicArray<T>(get_alloc()); // Throws
         leaf->init_from_mem(leaf_mem);
         replace_root(leaf); // Throws, but accessor ownership is passed to callee
     }
-    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    void replace_root_by_empty_leaf() REALM_OVERRIDE
     {
         util::UniquePtr<BasicArray<T> > leaf;
         leaf.reset(new BasicArray<T>(get_alloc())); // Throws
@@ -206,8 +206,8 @@ public:
 template<class T>
 void BasicColumn<T>::do_erase(std::size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_3(ndx, <, size());
-    TIGHTDB_ASSERT_3(is_last, ==, (ndx == size() - 1));
+    REALM_ASSERT_3(ndx, <, size());
+    REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
     if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->erase(ndx); // Throws
@@ -223,8 +223,8 @@ void BasicColumn<T>::do_erase(std::size_t ndx, bool is_last)
 template<class T>
 void BasicColumn<T>::do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
 
     T value = get(last_row_ndx);
     set(row_ndx, value); // Throws
@@ -258,7 +258,7 @@ template<class T> void BasicColumn<T>::do_clear()
 template<class T> class BasicColumn<T>::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
-    ref_type create_leaf(std::size_t size) TIGHTDB_OVERRIDE
+    ref_type create_leaf(std::size_t size) REALM_OVERRIDE
     {
         MemRef mem = BasicArray<T>::create_array(size, m_alloc); // Throws
         T* tp = reinterpret_cast<T*>(Array::get_data_from_header(mem.m_addr));
@@ -280,7 +280,7 @@ template<class T> class BasicColumn<T>::SliceHandler: public ColumnBase::SliceHa
 public:
     SliceHandler(Allocator& alloc): m_leaf(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+                      Allocator& target_alloc) REALM_OVERRIDE
     {
         m_leaf.init_from_mem(leaf_mem);
         return m_leaf.slice(offset, size, target_alloc); // Throws
@@ -403,7 +403,7 @@ template<class T> void BasicColumn<T>::refresh_accessor_tree(std::size_t, const 
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 template<class T>
 std::size_t BasicColumn<T>::verify_leaf(MemRef mem, Allocator& alloc)
@@ -464,14 +464,14 @@ inline void BasicColumn<T>::do_dump_node_structure(std::ostream& out, int level)
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG
 
 
 template<class T>
 std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t end) const
 {
-    TIGHTDB_ASSERT_3(begin, <=, size());
-    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_3(begin, <=, size());
+    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (root_is_leaf())
         return static_cast<BasicArray<T>*>(m_array)->
@@ -503,8 +503,8 @@ std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t e
 template<class T>
 void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::size_t end) const
 {
-    TIGHTDB_ASSERT_3(begin, <=, size());
-    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_3(begin, <=, size());
+    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (root_is_leaf()) {
         std::size_t leaf_offset = 0;
@@ -571,13 +571,13 @@ double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t l
 
 template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, std::size_t num_rows)
 {
-    TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
     ref_type new_sibling_ref;
     Array::TreeInsert<BasicColumn<T> > state;
     for (std::size_t i = 0; i != num_rows; ++i) {
         std::size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
+            REALM_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
             new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state);
         }
@@ -590,14 +590,14 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, s
                 new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
             }
         }
-        if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+        if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == tightdb::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
         }
     }
 }
 
-template<class T> TIGHTDB_FORCEINLINE
+template<class T> REALM_FORCEINLINE
 ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                      std::size_t ndx_in_parent,
                                      Allocator& alloc, std::size_t insert_ndx,
@@ -610,7 +610,7 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 }
 
 
-template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
+template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         return static_cast<const BasicArray<T>*>(m_array)->lower_bound(value);
@@ -618,7 +618,7 @@ template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const 
     return ColumnBase::lower_bound(*this, value);
 }
 
-template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
+template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         return static_cast<const BasicArray<T>*>(m_array)->upper_bound(value);
@@ -629,4 +629,4 @@ template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const 
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_BASIC_TPL_HPP
+#endif // REALM_COLUMN_BASIC_TPL_HPP

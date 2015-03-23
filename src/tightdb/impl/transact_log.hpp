@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_IMPL_TRANSACT_LOG_HPP
-#define TIGHTDB_IMPL_TRANSACT_LOG_HPP
+#ifndef REALM_IMPL_TRANSACT_LOG_HPP
+#define REALM_IMPL_TRANSACT_LOG_HPP
 
 #include <stdexcept>
 
@@ -118,8 +118,8 @@ public:
 
 class TransactLogBufferStream: public TransactLogStream {
 public:
-    void transact_log_reserve(std::size_t size, char** out_free_begin, char** out_free_end) TIGHTDB_OVERRIDE;
-    void transact_log_append(const char* data, std::size_t size, char** out_free_begin, char** out_free_end) TIGHTDB_OVERRIDE;
+    void transact_log_reserve(std::size_t size, char** out_free_begin, char** out_free_end) REALM_OVERRIDE;
+    void transact_log_append(const char* data, std::size_t size, char** out_free_begin, char** out_free_end) REALM_OVERRIDE;
 
     const char* transact_log_data() const;
 private:
@@ -223,7 +223,7 @@ private:
 
     char* reserve(std::size_t size);
     /// \param ptr Must be in the range [m_transact_log_free_begin, m_transact_log_free_end]
-    void advance(char* ptr) TIGHTDB_NOEXCEPT;
+    void advance(char* ptr) REALM_NOEXCEPT;
     void append(const char* data, std::size_t size);
 
     void string_cmd(Instruction, std::size_t col_ndx, std::size_t ndx, const char* data, std::size_t size);
@@ -296,9 +296,9 @@ public:
     void link_list_erase(const LinkView&, std::size_t link_ndx);
     void link_list_clear(const LinkView&);
 
-    void on_table_destroyed(const Table*) TIGHTDB_NOEXCEPT;
-    void on_spec_destroyed(const Spec*) TIGHTDB_NOEXCEPT;
-    void on_link_list_destroyed(const LinkView&) TIGHTDB_NOEXCEPT;
+    void on_table_destroyed(const Table*) REALM_NOEXCEPT;
+    void on_spec_destroyed(const Spec*) REALM_NOEXCEPT;
+    void on_link_list_destroyed(const LinkView&) REALM_NOEXCEPT;
 
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
@@ -333,7 +333,7 @@ public:
 
     TransactLogParser(InputStream& transact_log);
 
-    ~TransactLogParser() TIGHTDB_NOEXCEPT;
+    ~TransactLogParser() REALM_NOEXCEPT;
 
     /// See `TransactLogEncoder` for a list of methods that the `InstructionHandler` must define.
     /// parse() promises that the path passed by reference to
@@ -357,7 +357,7 @@ private:
     static const int m_max_levels = 1024;
     util::Buffer<std::size_t> m_path;
 
-    TIGHTDB_NORETURN void parser_error() const;
+    REALM_NORETURN void parser_error() const;
     template<class InstructionHandler> void do_parse(InstructionHandler&);
 
     template<class T> T read_int();
@@ -385,7 +385,7 @@ private:
 
 class TransactLogParser::BadTransactLog: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
     {
         return "Bad transaction log";
     }
@@ -398,8 +398,8 @@ public:
 inline void TransactLogBufferStream::transact_log_reserve(std::size_t n, char** inout_new_begin, char** out_new_end)
 {
     char* data = m_buffer.data();
-    TIGHTDB_ASSERT(*inout_new_begin >= data);
-    TIGHTDB_ASSERT(*inout_new_begin <= (data + m_buffer.size()));
+    REALM_ASSERT(*inout_new_begin >= data);
+    REALM_ASSERT(*inout_new_begin <= (data + m_buffer.size()));
     std::size_t size = *inout_new_begin - data;
     m_buffer.reserve_extra(size, n);
     data = m_buffer.data(); // May have changed
@@ -427,7 +427,7 @@ inline TransactLogEncoder::TransactLogEncoder(TransactLogStream& stream):
 
 inline void TransactLogEncoder::set_buffer(char* free_begin, char* free_end)
 {
-    TIGHTDB_ASSERT(free_begin <= free_end);
+    REALM_ASSERT(free_begin <= free_end);
     m_transact_log_free_begin = free_begin;
     m_transact_log_free_end   = free_end;
 }
@@ -447,10 +447,10 @@ inline char* TransactLogEncoder::reserve(std::size_t n)
     return m_transact_log_free_begin;
 }
 
-inline void TransactLogEncoder::advance(char* ptr) TIGHTDB_NOEXCEPT
+inline void TransactLogEncoder::advance(char* ptr) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(m_transact_log_free_begin <= ptr);
-    TIGHTDB_ASSERT_DEBUG(ptr <= m_transact_log_free_end);
+    REALM_ASSERT_DEBUG(m_transact_log_free_begin <= ptr);
+    REALM_ASSERT_DEBUG(ptr <= m_transact_log_free_end);
     m_transact_log_free_begin = ptr;
 }
 
@@ -506,7 +506,7 @@ inline void TransactLogEncoder::append(const char* data, std::size_t size)
 template <class T>
 char* TransactLogEncoder::encode_int(char* ptr, T value)
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
+    REALM_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
     bool negative = util::is_negative(value);
     if (negative) {
         // The following conversion is guaranteed by C++11 to never
@@ -516,7 +516,7 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     }
     // At this point 'value' is always a positive number. Also, small
     // negative numbers have been converted to small positive numbers.
-    TIGHTDB_ASSERT(!util::is_negative(value));
+    REALM_ASSERT(!util::is_negative(value));
     // One sign bit plus number of value bits
     const int num_bits = 1 + std::numeric_limits<T>::digits;
     // Only the first 7 bits are available per byte. Had it not been
@@ -525,7 +525,7 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     // number of value bits in 'unsigned').
     const int bits_per_byte = 7;
     const int max_bytes = (num_bits + (bits_per_byte-1)) / bits_per_byte;
-    TIGHTDB_STATIC_ASSERT(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
+    REALM_STATIC_ASSERT(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
     // An explicit constant maximum number of iterations is specified
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
@@ -543,7 +543,7 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
 
 inline char* TransactLogEncoder::encode_float(char* ptr, float value)
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
                           sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
                           "Unsupported 'float' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
@@ -552,7 +552,7 @@ inline char* TransactLogEncoder::encode_float(char* ptr, float value)
 
 inline char* TransactLogEncoder::encode_double(char* ptr, double value)
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
+    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
                           sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
                           "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
@@ -684,13 +684,13 @@ void TransactLogEncoder::mixed_value(const Mixed& value)
         case type_Table:
             return;
         case type_Mixed:
-            TIGHTDB_ASSERT_RELEASE(false); // Mixed in mixed?
+            REALM_ASSERT_RELEASE(false); // Mixed in mixed?
         case type_Link:
         case type_LinkList:
             // FIXME: Need to handle new link types here.
-            TIGHTDB_ASSERT_RELEASE(false);
+            REALM_ASSERT_RELEASE(false);
     }
-    TIGHTDB_ASSERT_RELEASE(false);
+    REALM_ASSERT_RELEASE(false);
 }
 
 
@@ -742,7 +742,7 @@ inline bool TransactLogEncoder::insert_column(std::size_t col_ndx, DataType type
 inline bool TransactLogEncoder::insert_link_column(std::size_t col_ndx, DataType type, StringData name,
     std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
 {
-    TIGHTDB_ASSERT(_impl::TableFriend::is_link_type(ColumnType(type)));
+    REALM_ASSERT(_impl::TableFriend::is_link_type(ColumnType(type)));
     simple_cmd(instr_InsertLinkColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
     append(name.data(), name.size()); // Throws
     append_num(link_target_table_ndx); // Throws
@@ -760,7 +760,7 @@ inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, 
         typedef _impl::DescriptorFriend df;
         std::size_t target_table_ndx = link_target_table->get_index_in_group();
         const Table& origin_table = df::get_root_table(desc);
-        TIGHTDB_ASSERT(origin_table.is_group_level());
+        REALM_ASSERT(origin_table.is_group_level());
         const Spec& target_spec = tf::get_spec(*link_target_table);
         std::size_t origin_table_ndx = origin_table.get_index_in_group();
         std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
@@ -793,10 +793,10 @@ inline void TransactLogConvenientEncoder::erase_column(const Descriptor& desc, s
         m_encoder.erase_column(col_ndx); // Throws
     }
     else { // it's a link column:
-        TIGHTDB_ASSERT(desc.is_root());
+        REALM_ASSERT(desc.is_root());
         typedef _impl::DescriptorFriend df;
         const Table& origin_table = df::get_root_table(desc);
-        TIGHTDB_ASSERT(origin_table.is_group_level());
+        REALM_ASSERT(origin_table.is_group_level());
         const Table& target_table = *tf::get_link_target_table_accessor(origin_table, col_ndx);
         std::size_t target_table_ndx = target_table.get_index_in_group();
         const Spec& target_spec = tf::get_spec(target_table);
@@ -1323,20 +1323,20 @@ inline void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
     m_encoder.link_list_clear(); // Throws
 }
 
-inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) TIGHTDB_NOEXCEPT
+inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) REALM_NOEXCEPT
 {
     if (m_selected_table == t)
         m_selected_table = 0;
 }
 
-inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
+inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) REALM_NOEXCEPT
 {
     if (m_selected_spec == s)
         m_selected_spec = 0;
 }
 
 
-inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) TIGHTDB_NOEXCEPT
+inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) REALM_NOEXCEPT
 {
     if (m_selected_link_list == &list)
         m_selected_link_list = 0;
@@ -1364,7 +1364,7 @@ inline TransactLogParser::TransactLogParser(InputStream& transact_log):
 }
 
 
-inline TransactLogParser::~TransactLogParser() TIGHTDB_NOEXCEPT
+inline TransactLogParser::~TransactLogParser() REALM_NOEXCEPT
 {
 }
 
@@ -1795,7 +1795,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             }
         }
         // coming here is not possible
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
         return;
     }
 }
@@ -1860,7 +1860,7 @@ inline void TransactLogParser::read_bytes(char* data, std::size_t size)
 
 inline float TransactLogParser::read_float()
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
                           sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
                           "Unsupported 'float' representation");
     float value;
@@ -1871,7 +1871,7 @@ inline float TransactLogParser::read_float()
 
 inline double TransactLogParser::read_double()
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
+    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
                           sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
                           "Unsupported 'double' representation");
     double value;
@@ -1955,10 +1955,10 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
         case type_Link:
         case type_LinkList:
             // FIXME: Need to handle new link types here
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
             break;
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 }
 
 
@@ -2016,4 +2016,4 @@ inline bool TransactLogParser::is_valid_link_type(int type)
 }
 }
 
-#endif // TIGHTDB_IMPL_TRANSACT_LOG_HPP
+#endif // REALM_IMPL_TRANSACT_LOG_HPP

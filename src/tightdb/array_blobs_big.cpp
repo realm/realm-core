@@ -14,7 +14,7 @@ using namespace tightdb;
 
 void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT(value.size() == 0 || value.data());
 
     ArrayBlob new_blob(m_alloc);
     new_blob.create(); // Throws
@@ -25,8 +25,8 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 
 void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_3(ndx, <, size());
-    TIGHTDB_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT_3(ndx, <, size());
+    REALM_ASSERT(value.size() == 0 || value.data());
 
     ArrayBlob blob(m_alloc);
     ref_type ref = get_as_ref(ndx);
@@ -39,8 +39,8 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 
 void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_3(ndx, <=, size());
-    TIGHTDB_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT_3(ndx, <=, size());
+    REALM_ASSERT(value.size() == 0 || value.data());
 
     ArrayBlob new_blob(m_alloc);
     new_blob.create(); // Throws
@@ -50,7 +50,7 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
 
 
 size_t ArrayBigBlobs::count(BinaryData value, bool is_string,
-                            size_t begin, size_t end) const TIGHTDB_NOEXCEPT
+                            size_t begin, size_t end) const REALM_NOEXCEPT
 {
     size_t num_matches = 0;
 
@@ -68,11 +68,11 @@ size_t ArrayBigBlobs::count(BinaryData value, bool is_string,
 
 
 size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
-                                 size_t begin, size_t end) const TIGHTDB_NOEXCEPT
+                                 size_t begin, size_t end) const REALM_NOEXCEPT
 {
     if (end == npos)
         end = m_size;
-    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
     // When strings are stored as blobs, they are always zero-terminated
     // but the value we get as input might not be.
@@ -112,10 +112,10 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
                                            TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
-    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
+    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value, add_zero_term);
         return 0; // Leaf was not split
     }
@@ -141,11 +141,11 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ArrayBigBlobs::Verify() const
 {
-    TIGHTDB_ASSERT(has_refs());
+    REALM_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
         ArrayBlob blob(m_alloc);

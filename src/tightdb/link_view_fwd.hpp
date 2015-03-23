@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_LINK_VIEW_FWD_HPP
-#define TIGHTDB_LINK_VIEW_FWD_HPP
+#ifndef REALM_LINK_VIEW_FWD_HPP
+#define REALM_LINK_VIEW_FWD_HPP
 
 #include <tightdb/util/bind_ptr.hpp>
 
@@ -30,4 +30,4 @@ typedef util::bind_ptr<const LinkView> ConstLinkViewRef;
 
 } // namespace tightdb
 
-#endif // TIGHTDB_LINK_VIEW_FWD_HPP
+#endif // REALM_LINK_VIEW_FWD_HPP

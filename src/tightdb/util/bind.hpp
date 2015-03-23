@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_BIND_HPP
-#define TIGHTDB_UTIL_BIND_HPP
+#ifndef REALM_UTIL_BIND_HPP
+#define REALM_UTIL_BIND_HPP
 
 namespace tightdb {
 
@@ -945,4 +945,4 @@ inline _impl::MemFunObjFourArgBinder2<O,A,B,C,D,E,F> bind(void (O::*mem_fun)(A,B
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_BIND_HPP
+#endif // REALM_UTIL_BIND_HPP

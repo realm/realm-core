@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ARRAY_BASIC_TPL_HPP
-#define TIGHTDB_ARRAY_BASIC_TPL_HPP
+#ifndef REALM_ARRAY_BASIC_TPL_HPP
+#define REALM_ARRAY_BASIC_TPL_HPP
 
 #include <algorithm>
 #include <limits>
@@ -30,13 +30,13 @@
 namespace tightdb {
 
 template<class T>
-inline BasicArray<T>::BasicArray(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline BasicArray<T>::BasicArray(Allocator& alloc) REALM_NOEXCEPT:
     Array(alloc)
 {
 }
 
 template<class T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT:
+inline BasicArray<T>::BasicArray(no_prealloc_tag) REALM_NOEXCEPT:
     Array(no_prealloc_tag())
 {
 }
@@ -75,7 +75,7 @@ inline void BasicArray<T>::create()
 template<class T>
 MemRef BasicArray<T>::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
@@ -100,14 +100,14 @@ inline void BasicArray<T>::add(T value)
 }
 
 
-template<class T> inline T BasicArray<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+template<class T> inline T BasicArray<T>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     return *(reinterpret_cast<const T*>(m_data) + ndx);
 }
 
 
 template<class T>
-inline T BasicArray<T>::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
+inline T BasicArray<T>::get(const char* header, std::size_t ndx) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     // FIXME: This casting assumes that T can be aliged on an 8-bype
@@ -121,7 +121,7 @@ inline T BasicArray<T>::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEP
 template<class T>
 inline void BasicArray<T>::set(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -134,7 +134,7 @@ inline void BasicArray<T>::set(std::size_t ndx, T value)
 template<class T>
 void BasicArray<T>::insert(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(ndx, <=, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -161,7 +161,7 @@ void BasicArray<T>::insert(std::size_t ndx, T value)
 template<class T>
 void BasicArray<T>::erase(std::size_t ndx)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -182,8 +182,8 @@ void BasicArray<T>::erase(std::size_t ndx)
 
 template<class T> void BasicArray<T>::truncate(std::size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(size, <=, m_size);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(size, <=, m_size);
 
     copy_on_write(); // Throws
 
@@ -223,7 +223,7 @@ std::size_t BasicArray<T>::CalcByteLen(std::size_t size, std::size_t) const
 }
 
 template<class T>
-std::size_t BasicArray<T>::CalcItemCount(std::size_t bytes, std::size_t) const TIGHTDB_NOEXCEPT
+std::size_t BasicArray<T>::CalcItemCount(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
 {
     // FIXME: ??? what about width = 0? return -1?
 
@@ -236,7 +236,7 @@ std::size_t BasicArray<T>::find(T value, std::size_t begin, std::size_t end) con
 {
     if (end == npos)
         end = m_size;
-    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
     const T* data = reinterpret_cast<const T*>(m_data);
     const T* i = std::find(data + begin, data + end, value);
     return i == data + end ? not_found : std::size_t(i - data);
@@ -267,7 +267,7 @@ std::size_t BasicArray<T>::count(T value, std::size_t begin, std::size_t end) co
 {
     if (end == npos)
         end = m_size;
-    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
     const T* data = reinterpret_cast<const T*>(m_data);
     return std::count(data + begin, data + end, value);
 }
@@ -279,7 +279,7 @@ double BasicArray<T>::sum(std::size_t begin, std::size_t end) const
 {
     if (end == npos)
         end = m_size;
-    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
     const T* data = reinterpret_cast<const T*>(m_data);
     return std::accumulate(data + begin, data + end, double(0));
 }
@@ -292,7 +292,7 @@ bool BasicArray<T>::minmax(T& result, std::size_t begin, std::size_t end) const
         end = m_size;
     if (m_size == 0)
         return false;
-    TIGHTDB_ASSERT(begin < m_size && end <= m_size && begin < end);
+    REALM_ASSERT(begin < m_size && end <= m_size && begin < end);
 
     T m = get(begin);
     ++begin;
@@ -322,10 +322,10 @@ template<class T>
 ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
-    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
+    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value);
         return 0; // Leaf was not split
     }
@@ -351,7 +351,7 @@ ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& 
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
+inline std::size_t BasicArray<T>::lower_bound(T value) const REALM_NOEXCEPT
 {
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();
@@ -359,7 +359,7 @@ inline std::size_t BasicArray<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
+inline std::size_t BasicArray<T>::upper_bound(T value) const REALM_NOEXCEPT
 {
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();
@@ -374,13 +374,13 @@ inline std::size_t BasicArray<T>::calc_aligned_byte_size(std::size_t size)
     if (size > (max_2 - header_size) / sizeof (T))
         throw std::runtime_error("Byte size overflow");
     size_t byte_size = header_size + size * sizeof (T);
-    TIGHTDB_ASSERT_3(byte_size, >, 0);
+    REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 template<class T>
 void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
@@ -413,9 +413,9 @@ void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG
 
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ARRAY_BASIC_TPL_HPP
+#endif // REALM_ARRAY_BASIC_TPL_HPP

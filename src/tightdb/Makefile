@@ -1,5 +1,5 @@
-REPLICATION_HPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.hpp)
-REPLICATION_CPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.cpp)
+REPLICATION_HPP = $(if $(REALM_ENABLE_REPLICATION),replication.hpp)
+REPLICATION_CPP = $(if $(REALM_ENABLE_REPLICATION),replication.cpp)
 
 nobase_subinclude_HEADERS = \
 util/features.h \
@@ -189,7 +189,7 @@ tightdb_import_LIBS    = libtightdb.a
 CONFIG_H = util/config.h
 CONFIG_SH = $(CONFIG_H:.h=.sh)
 EXTRA_CLEAN += $(CONFIG_H)
-ifneq ($(TIGHTDB_HAVE_CONFIG),)
+ifneq ($(REALM_HAVE_CONFIG),)
 nobase_subinclude_HEADERS += $(CONFIG_H)
 GENERATED_SOURCES += $(CONFIG_H)
 $(CONFIG_H): ../config.mk $(CONFIG_SH)

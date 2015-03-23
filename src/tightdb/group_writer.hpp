@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_GROUP_WRITER_HPP
-#define TIGHTDB_GROUP_WRITER_HPP
+#ifndef REALM_GROUP_WRITER_HPP
+#define REALM_GROUP_WRITER_HPP
 
 #include <stdint.h> // unint8_t etc
 #include <utility>
@@ -51,7 +51,7 @@ public:
     /// returned by write_group().
     void commit(ref_type new_top_ref);
 
-    std::size_t get_file_size() const TIGHTDB_NOEXCEPT;
+    std::size_t get_file_size() const REALM_NOEXCEPT;
 
     /// Write the specified chunk into free space.
     void write(const char* data, std::size_t size);
@@ -61,9 +61,9 @@ public:
     ///
     /// Returns the position in the file where the first byte was
     /// written.
-    std::size_t write_array(const char* data, std::size_t size, uint_fast32_t checksum) TIGHTDB_OVERRIDE;
+    std::size_t write_array(const char* data, std::size_t size, uint_fast32_t checksum) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void dump();
 #endif
 
@@ -116,18 +116,18 @@ private:
 
 // Implementation:
 
-inline std::size_t GroupWriter::get_file_size() const TIGHTDB_NOEXCEPT
+inline std::size_t GroupWriter::get_file_size() const REALM_NOEXCEPT
 {
     return m_file_map.get_size();
 }
 
 inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock)
 {
-    TIGHTDB_ASSERT(read_lock <= current);
+    REALM_ASSERT(read_lock <= current);
     m_current_version  = current;
     m_readlock_version = read_lock;
 }
 
 } // namespace tightdb
 
-#endif // TIGHTDB_GROUP_WRITER_HPP
+#endif // REALM_GROUP_WRITER_HPP

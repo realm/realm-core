@@ -17,65 +17,65 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_ASSERT_HPP
-#define TIGHTDB_UTIL_ASSERT_HPP
+#ifndef REALM_UTIL_ASSERT_HPP
+#define REALM_UTIL_ASSERT_HPP
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/version.hpp>
 
-#if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
-#  define TIGHTDB_ASSERTIONS_ENABLED 1
+#if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
+#  define REALM_ASSERTIONS_ENABLED 1
 #endif
 
-#define TIGHTDB_ASSERT_RELEASE(condition) \
+#define REALM_ASSERT_RELEASE(condition) \
     ((condition) ? static_cast<void>(0) : \
-    tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
+    tightdb::util::terminate(REALM_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
 
-#if TIGHTDB_ASSERTIONS_ENABLED
-#  define TIGHTDB_ASSERT(condition) TIGHTDB_ASSERT_RELEASE(condition)
+#if REALM_ASSERTIONS_ENABLED
+#  define REALM_ASSERT(condition) REALM_ASSERT_RELEASE(condition)
 #else
-#  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
+#  define REALM_ASSERT(condition) static_cast<void>(0)
 #endif
 
-#ifdef TIGHTDB_DEBUG
-#  define TIGHTDB_ASSERT_DEBUG(condition) TIGHTDB_ASSERT_RELEASE(condition)
+#ifdef REALM_DEBUG
+#  define REALM_ASSERT_DEBUG(condition) REALM_ASSERT_RELEASE(condition)
 #else
-#  define TIGHTDB_ASSERT_DEBUG(condition) static_cast<void>(0)
+#  define REALM_ASSERT_DEBUG(condition) static_cast<void>(0)
 #endif
 
 // Becase the assert is used in noexcept methods, it's a bad idea to allocate buffer space for the message
 // so therefore we must pass it to terminate which will 'cerr' it for us without needing any buffer
-#if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
-#  define TIGHTDB_ASSERT_3(left, condition, right) \
+#if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
+#  define REALM_ASSERT_3(left, condition, right) \
     ((left condition right) ? static_cast<void>(0) : \
-        tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #left #condition #right, \
+        tightdb::util::terminate(REALM_VER_CHUNK " Assertion failed: " #left #condition #right, \
                                  __FILE__, __LINE__, left, right))
 #else
-#  define TIGHTDB_ASSERT_3(left, condition, right) static_cast<void>(0)
+#  define REALM_ASSERT_3(left, condition, right) static_cast<void>(0)
 #endif
 
-#define TIGHTDB_UNREACHABLE() \
-    tightdb::util::terminate(TIGHTDB_VER_CHUNK " Unreachable code", __FILE__, __LINE__)
+#define REALM_UNREACHABLE() \
+    tightdb::util::terminate(REALM_VER_CHUNK " Unreachable code", __FILE__, __LINE__)
 
 
-#ifdef TIGHTDB_HAVE_CXX11_STATIC_ASSERT
-#  define TIGHTDB_STATIC_ASSERT(condition, message) static_assert(condition, message)
+#ifdef REALM_HAVE_CXX11_STATIC_ASSERT
+#  define REALM_STATIC_ASSERT(condition, message) static_assert(condition, message)
 #else
-#  define TIGHTDB_STATIC_ASSERT(condition, message) typedef \
+#  define REALM_STATIC_ASSERT(condition, message) typedef \
     tightdb::util::static_assert_dummy<sizeof(tightdb::util:: \
-        TIGHTDB_STATIC_ASSERTION_FAILURE<bool(condition)>)> \
-    TIGHTDB_JOIN(_tightdb_static_assert_, __LINE__) TIGHTDB_UNUSED
-#  define TIGHTDB_JOIN(x,y) TIGHTDB_JOIN2(x,y)
-#  define TIGHTDB_JOIN2(x,y) x ## y
+        REALM_STATIC_ASSERTION_FAILURE<bool(condition)>)> \
+    REALM_JOIN(_tightdb_static_assert_, __LINE__) REALM_UNUSED
+#  define REALM_JOIN(x,y) REALM_JOIN2(x,y)
+#  define REALM_JOIN2(x,y) x ## y
 namespace tightdb {
 namespace util {
-    template<bool> struct TIGHTDB_STATIC_ASSERTION_FAILURE;
-    template<> struct TIGHTDB_STATIC_ASSERTION_FAILURE<true> {};
+    template<bool> struct REALM_STATIC_ASSERTION_FAILURE;
+    template<> struct REALM_STATIC_ASSERTION_FAILURE<true> {};
     template<int> struct static_assert_dummy {};
 }
 }
 #endif
 
 
-#endif // TIGHTDB_UTIL_ASSERT_HPP
+#endif // REALM_UTIL_ASSERT_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_ERRNO_HPP
-#define TIGHTDB_UTIL_ERRNO_HPP
+#ifndef REALM_UTIL_ERRNO_HPP
+#define REALM_UTIL_ERRNO_HPP
 
 #include <string>
 

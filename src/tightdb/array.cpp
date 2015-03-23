@@ -103,7 +103,7 @@
 //   `N_t` is the total number of elements in the subtree
 //         (`total_elems_in_subtree`).
 //
-// `N_c` must always be a power of `TIGHTDB_MAX_BPNODE_SIZE`.
+// `N_c` must always be a power of `REALM_MAX_BPNODE_SIZE`.
 //
 // It is expected that `N_t` will be removed in a future version of
 // the file format. This will make it much more efficient to append
@@ -183,7 +183,7 @@ size_t bit_width(int64_t v)
 } // anonymous namespace
 
 
-void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
+void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
 {
     char* header = mem.m_addr;
 
@@ -233,7 +233,7 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 // should be changed to 'const char*', and a const_cast should be
 // added below. This would avoid the need for const_cast's in places
 // like Array::clone().
-void Array::CreateFromHeaderDirect(char* header, ref_type ref) TIGHTDB_NOEXCEPT
+void Array::CreateFromHeaderDirect(char* header, ref_type ref) REALM_NOEXCEPT
 {
     // Parse header
     // We only need limited info for direct read-only use
@@ -249,7 +249,7 @@ void Array::CreateFromHeaderDirect(char* header, ref_type ref) TIGHTDB_NOEXCEPT
 
 void Array::set_type(Type type)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     copy_on_write(); // Throws
 
@@ -272,10 +272,10 @@ void Array::set_type(Type type)
 }
 
 
-bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+bool Array::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_attached());
-    TIGHTDB_ASSERT_DEBUG(m_parent);
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(m_parent);
 
     // Array nodes that are part of the previous version of the
     // database will not be overwritten by Group::commit(). This is
@@ -295,7 +295,7 @@ bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     Array slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&slice);
@@ -314,7 +314,7 @@ MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
 
 MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     if (!has_refs())
         return slice(offset, size, target_alloc); // Throws
 
@@ -369,7 +369,7 @@ void Array::Preset(int64_t min, int64_t max, size_t count)
 }
 
 
-void Array::destroy_children(size_t offset) TIGHTDB_NOEXCEPT
+void Array::destroy_children(size_t offset) REALM_NOEXCEPT
 {
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
@@ -391,7 +391,7 @@ void Array::destroy_children(size_t offset) TIGHTDB_NOEXCEPT
 
 size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     // Ignore un-changed arrays when persisting
     if (persist && m_alloc.is_read_only(m_ref))
@@ -405,7 +405,7 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
         std::size_t size = get_byte_size();
         uint_fast32_t dummy_checksum = 0x01010101UL;
         std::size_t array_pos = out.write_array(header, size, dummy_checksum);
-        TIGHTDB_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
 
         return array_pos;
     }
@@ -434,7 +434,7 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
                 sub.init_from_ref(to_ref(value));
                 bool subrecurse = true;
                 std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
-                TIGHTDB_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
+                REALM_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
                 new_refs.add(sub_pos); // Throws
             }
         }
@@ -457,11 +457,11 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
 
 void Array::move(size_t begin, size_t end, size_t dest_begin)
 {
-    TIGHTDB_ASSERT_3(begin, <=, end);
-    TIGHTDB_ASSERT_3(end, <=, m_size);
-    TIGHTDB_ASSERT_3(dest_begin, <=, m_size);
-    TIGHTDB_ASSERT_3(end - begin, <=, m_size - dest_begin);
-    TIGHTDB_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
+    REALM_ASSERT_3(begin, <=, end);
+    REALM_ASSERT_3(end, <=, m_size);
+    REALM_ASSERT_3(dest_begin, <=, m_size);
+    REALM_ASSERT_3(end - begin, <=, m_size - dest_begin);
+    REALM_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -484,11 +484,11 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
 
 void Array::move_backward(size_t begin, size_t end, size_t dest_end)
 {
-    TIGHTDB_ASSERT_3(begin, <=, end);
-    TIGHTDB_ASSERT_3(end, <=, m_size);
-    TIGHTDB_ASSERT_3(dest_end, <=, m_size);
-    TIGHTDB_ASSERT_3(end - begin, <=, dest_end);
-    TIGHTDB_ASSERT(!(dest_end > begin && dest_end <= end)); // Required by std::copy_backward
+    REALM_ASSERT_3(begin, <=, end);
+    REALM_ASSERT_3(end, <=, m_size);
+    REALM_ASSERT_3(dest_end, <=, m_size);
+    REALM_ASSERT_3(end - begin, <=, dest_end);
+    REALM_ASSERT(!(dest_end > begin && dest_end <= end)); // Required by std::copy_backward
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -516,7 +516,7 @@ void Array::add_to_column(Column* column, int64_t value)
 
 void Array::set(size_t ndx, int64_t value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -524,7 +524,7 @@ void Array::set(size_t ndx, int64_t value)
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
         size_t width = bit_width(value);
-        TIGHTDB_ASSERT_DEBUG(width > m_width);
+        REALM_ASSERT_DEBUG(width > m_width);
         Getter old_getter = m_getter;    // Save old getter before width expansion
         alloc(m_size, width); // Throws
         set_width(width);
@@ -552,8 +552,8 @@ void Array::set_as_ref(std::size_t ndx, ref_type ref)
 // (happens a lot when returning results to TableViews)
 void Array::AddPositiveLocal(int64_t value)
 {
-    TIGHTDB_ASSERT(value >= 0);
-    TIGHTDB_ASSERT(&m_alloc == &Allocator::get_default());
+    REALM_ASSERT(value >= 0);
+    REALM_ASSERT(&m_alloc == &Allocator::get_default());
 
     if (value <= m_ubound) {
         if (m_size < m_capacity) {
@@ -570,7 +570,7 @@ void Array::AddPositiveLocal(int64_t value)
 
 void Array::insert(size_t ndx, int_fast64_t value)
 {
-    TIGHTDB_ASSERT_DEBUG(ndx <= m_size);
+    REALM_ASSERT_DEBUG(ndx <= m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -580,7 +580,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
         size_t width = bit_width(value);
-        TIGHTDB_ASSERT_DEBUG(width > m_width);
+        REALM_ASSERT_DEBUG(width > m_width);
         alloc(m_size+1, width); // Throws
         set_width(width);
     }
@@ -629,8 +629,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::truncate(size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(size, <=, m_size);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(size, <=, m_size);
 
     // FIXME: BasicArray<> currently does not work if the width is set
     // to zero, so it must override Array::truncate(). In the future
@@ -640,8 +640,8 @@ void Array::truncate(size_t size)
     // would be that the size of the array in memory would remain tiny
     // regardless of the number of elements it constains, as long as
     // all those elements are zero.
-    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
-    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
+    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
+    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
     copy_on_write(); // Throws
 
@@ -662,12 +662,12 @@ void Array::truncate(size_t size)
 
 void Array::truncate_and_destroy_children(size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(size, <=, m_size);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(size, <=, m_size);
 
     // FIXME: See FIXME in truncate().
-    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
-    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
+    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
+    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
     copy_on_write(); // Throws
 
@@ -701,7 +701,7 @@ void Array::ensure_minimum_width(int64_t value)
 
     // Make room for the new value
     size_t width = bit_width(value);
-    TIGHTDB_ASSERT_3(width, >, m_width);
+    REALM_ASSERT_3(width, >, m_width);
 
     Getter old_getter = m_getter; // Save old getter before width expansion
     alloc(m_size, width); // Throws
@@ -738,7 +738,7 @@ void Array::set_all_to_zero()
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
 size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) const
 {
-#if TIGHTDB_DEBUG
+#if REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
@@ -817,19 +817,19 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
 
 exit:
 
-    TIGHTDB_ASSERT_DEBUG(ref == ret);
+    REALM_ASSERT_DEBUG(ref == ret);
 
     return ret;
 }
 
 size_t Array::FirstSetBit(unsigned int v) const
 {
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
     unsigned long ul;
     // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
     _BitScanForward(&ul, v);
     return ul;
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
     return __builtin_clz(v);
 #else
     int r;
@@ -846,12 +846,12 @@ return r;
 
 size_t Array::FirstSetBit64(int64_t v) const
 {
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
     unsigned long ul;
     _BitScanForward64(&ul, v);
     return ul;
 
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
     return __builtin_clzll(v);
 #else
     unsigned int v0 = unsigned(v);
@@ -887,7 +887,7 @@ template<size_t width> inline int64_t LowerBits()
     else if (width == 64)
         return 0x0000000000000001ULL;
     else {
-        TIGHTDB_ASSERT_DEBUG(false);
+        REALM_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
 }
@@ -953,7 +953,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
 
     if (end == size_t(-1))
         end = m_size;
-    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
+    REALM_ASSERT(start < m_size && end <= m_size && start < end);
 
     if (m_size == 0)
         return false;
@@ -969,7 +969,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     ++start;
 
 #if 0 // We must now return both value AND index of result. SSE does not support finding index, so we've disabled it
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
@@ -1031,24 +1031,24 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
 
 bool Array::maximum(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
-    TIGHTDB_TEMPEX2(return minmax, true, m_width, (result, start, end, return_ndx));
+    REALM_TEMPEX2(return minmax, true, m_width, (result, start, end, return_ndx));
 }
 
 bool Array::minimum(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
-    TIGHTDB_TEMPEX2(return minmax, false, m_width, (result, start, end, return_ndx));
+    REALM_TEMPEX2(return minmax, false, m_width, (result, start, end, return_ndx));
 }
 
 int64_t Array::sum(size_t start, size_t end) const
 {
-    TIGHTDB_TEMPEX(return sum, m_width, (start, end));
+    REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
 template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
-    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
+    REALM_ASSERT(start < m_size && end <= m_size && start < end);
 
     if (w == 0)
         return 0;
@@ -1077,9 +1077,9 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
             if (w == 1) {
 
 /*
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(TIGHTDB_PTR_64)
+#if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
                     s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(TIGHTDB_PTR_64)
+#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
                     s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
@@ -1114,7 +1114,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
         start += sizeof (int64_t) * 8 / no0(w) * chunks;
     }
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     if (sseavx<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
@@ -1209,7 +1209,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
     return s;
 }
 
-size_t Array::count(int64_t value) const TIGHTDB_NOEXCEPT
+size_t Array::count(int64_t value) const REALM_NOEXCEPT
 {
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t count = 0;
@@ -1387,7 +1387,7 @@ size_t Array::count(int64_t value) const TIGHTDB_NOEXCEPT
 
 size_t Array::calc_aligned_byte_size(size_t size, int width)
 {
-    TIGHTDB_ASSERT(width != 0 && (width & (width - 1)) == 0); // Is a power of two
+    REALM_ASSERT(width != 0 && (width & (width - 1)) == 0); // Is a power of two
     size_t max = numeric_limits<size_t>::max();
     size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
     bool overflow;
@@ -1407,14 +1407,14 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     }
     if (overflow)
         throw runtime_error("Byte size overflow");
-    TIGHTDB_ASSERT_3(byte_size, >, 0);
+    REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    TIGHTDB_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
+    REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
 
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
     // instead. Note however, that CalcByteLen() is supposed to return
@@ -1429,7 +1429,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
     return bytes + header_size; // add room for 8 byte header
 }
 
-size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
+size_t Array::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
 {
     if (width == 0)
         return numeric_limits<size_t>::max(); // Zero width gives "infinite" space
@@ -1465,7 +1465,7 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
-    TIGHTDB_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
+    REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
 
     Array array((Array::no_prealloc_tag()));
     array.CreateFromHeaderDirect(const_cast<char*>(header));
@@ -1529,7 +1529,7 @@ void Array::copy_on_write()
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
     m_capacity = CalcItemCount(new_size, m_width);
-    TIGHTDB_ASSERT_DEBUG(m_capacity > 0);
+    REALM_ASSERT_DEBUG(m_capacity > 0);
 
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
@@ -1546,7 +1546,7 @@ void Array::copy_on_write()
 namespace {
 
 template<size_t width>
-void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
+void set_direct(char* data, size_t ndx, int_fast64_t value) REALM_NOEXCEPT
 {
     // FIXME: The code below makes the non-portable assumption that
     // negative number are represented using two's complement. See
@@ -1557,11 +1557,11 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
     // the types `int8_t`, `int16_t`, `int32_t`, and `int64_t`
     // exist. This is not guaranteed by C++03.
     if (width == 0) {
-        TIGHTDB_ASSERT_DEBUG(value == 0);
+        REALM_ASSERT_DEBUG(value == 0);
         return;
     }
     else if (width == 1) {
-        TIGHTDB_ASSERT_DEBUG(0 <= value && value <= 0x01);
+        REALM_ASSERT_DEBUG(0 <= value && value <= 0x01);
         size_t byte_ndx = ndx / 8;
         size_t bit_ndx  = ndx % 8;
         typedef unsigned char uchar;
@@ -1569,7 +1569,7 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
         *p = uchar((*p & ~(0x01 << bit_ndx)) | (int(value) & 0x01) << bit_ndx);
     }
     else if (width == 2) {
-        TIGHTDB_ASSERT_DEBUG(0 <= value && value <= 0x03);
+        REALM_ASSERT_DEBUG(0 <= value && value <= 0x03);
         size_t byte_ndx = ndx / 4;
         size_t bit_ndx  = ndx % 4 * 2;
         typedef unsigned char uchar;
@@ -1577,7 +1577,7 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
         *p = uchar((*p & ~(0x03 << bit_ndx)) | (int(value) & 0x03) << bit_ndx);
     }
     else if (width == 4) {
-        TIGHTDB_ASSERT_DEBUG(0 <= value && value <= 0x0F);
+        REALM_ASSERT_DEBUG(0 <= value && value <= 0x0F);
         size_t byte_ndx = ndx / 2;
         size_t bit_ndx  = ndx % 2 * 4;
         typedef unsigned char uchar;
@@ -1585,32 +1585,32 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
         *p = uchar((*p & ~(0x0F << bit_ndx)) | (int(value) & 0x0F) << bit_ndx);
     }
     else if (width == 8) {
-        TIGHTDB_ASSERT_DEBUG(numeric_limits<int8_t>::min() <= value &&
+        REALM_ASSERT_DEBUG(numeric_limits<int8_t>::min() <= value &&
                              value <= numeric_limits<int8_t>::max());
         *(reinterpret_cast<int8_t*>(data) + ndx) = int8_t(value);
     }
     else if (width == 16) {
-        TIGHTDB_ASSERT_DEBUG(numeric_limits<int16_t>::min() <= value &&
+        REALM_ASSERT_DEBUG(numeric_limits<int16_t>::min() <= value &&
                              value <= numeric_limits<int16_t>::max());
         *(reinterpret_cast<int16_t*>(data) + ndx) = int16_t(value);
     }
     else if (width == 32) {
-        TIGHTDB_ASSERT_DEBUG(numeric_limits<int32_t>::min() <= value &&
+        REALM_ASSERT_DEBUG(numeric_limits<int32_t>::min() <= value &&
                              value <= numeric_limits<int32_t>::max());
         *(reinterpret_cast<int32_t*>(data) + ndx) = int32_t(value);
     }
     else if (width == 64) {
-        TIGHTDB_ASSERT_DEBUG(numeric_limits<int64_t>::min() <= value &&
+        REALM_ASSERT_DEBUG(numeric_limits<int64_t>::min() <= value &&
                              value <= numeric_limits<int64_t>::max());
         *(reinterpret_cast<int64_t*>(data) + ndx) = int64_t(value);
     }
     else {
-        TIGHTDB_ASSERT_DEBUG(false);
+        REALM_ASSERT_DEBUG(false);
     }
 }
 
 template<size_t width>
-void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) TIGHTDB_NOEXCEPT
+void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) REALM_NOEXCEPT
 {
     for (size_t i = begin; i != end; ++i)
         set_direct<width>(data, i, value);
@@ -1621,8 +1621,8 @@ void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) TIGHT
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size,
                      int_fast64_t value, Allocator& alloc)
 {
-    TIGHTDB_ASSERT(value == 0 || width_type == wtype_Bits);
-    TIGHTDB_ASSERT(size  == 0 || width_type != wtype_Ignore);
+    REALM_ASSERT(value == 0 || width_type == wtype_Bits);
+    REALM_ASSERT(size  == 0 || width_type != wtype_Ignore);
 
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
@@ -1655,7 +1655,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     if (value != 0) {
         char* data = get_data_from_header(header);
         size_t begin = 0, end = size;
-        TIGHTDB_TEMPEX(fill_direct, width, (data, begin, end, value));
+        REALM_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
 
     return mem;
@@ -1666,9 +1666,9 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 // to avoid two copies.
 void Array::alloc(size_t size, size_t width)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(!m_alloc.is_read_only(m_ref));
-    TIGHTDB_ASSERT_3(m_capacity, >, 0);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(!m_alloc.is_read_only(m_ref));
+    REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = CalcByteLen(size, width);
         size_t orig_capacity_bytes = get_capacity_from_header();
@@ -1714,12 +1714,12 @@ void Array::alloc(size_t size, size_t width)
 }
 
 
-void Array::set_width(size_t width) TIGHTDB_NOEXCEPT
+void Array::set_width(size_t width) REALM_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(set_width, width, ());
+    REALM_TEMPEX(set_width, width, ());
 }
 
-template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
+template<size_t width> void Array::set_width() REALM_NOEXCEPT
 {
     if (width == 0) {
         m_lbound = 0;
@@ -1754,7 +1754,7 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
         m_ubound =  0x7FFFFFFFFFFFFFFFLL;
     }
     else {
-        TIGHTDB_ASSERT_DEBUG(false);
+        REALM_ASSERT_DEBUG(false);
     }
 
     m_width = width;
@@ -1784,14 +1784,14 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be left untouched.
-template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
+template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
     // memset(res, 0, 8*8);
 
-    if (TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
+    if (REALM_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
@@ -1828,11 +1828,11 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
             res[i] = 0;
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     for(int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = get<w>(ndx + j);
         if (res[j] != expected)
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
     }
 #endif
 
@@ -1845,7 +1845,7 @@ template<size_t width> void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
-bool Array::compare_int(const Array& a) const TIGHTDB_NOEXCEPT
+bool Array::compare_int(const Array& a) const REALM_NOEXCEPT
 {
     if (a.size() != size())
         return false;
@@ -1867,8 +1867,8 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
     size_t orig_child_ref_ndx = 1 + orig_child_ndx;
     size_t insert_ndx = orig_child_ref_ndx + 1;
 
-    TIGHTDB_ASSERT_DEBUG(insert_ndx <= size() - 1);
-    if (TIGHTDB_LIKELY(size() < 1 + TIGHTDB_MAX_BPNODE_SIZE + 1)) {
+    REALM_ASSERT_DEBUG(insert_ndx <= size() - 1);
+    if (REALM_LIKELY(size() < 1 + REALM_MAX_BPNODE_SIZE + 1)) {
         // Case 1/2: This parent has space for the new child, so it
         // does not have to be split.
         insert(insert_ndx, new_sibling_ref); // Throws
@@ -1913,8 +1913,8 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         new_sibling.add(v); // Throws
     }
     size_t new_split_offset, new_split_size;
-    if (insert_ndx - 1 >= TIGHTDB_MAX_BPNODE_SIZE) {
-        TIGHTDB_ASSERT_3(insert_ndx - 1, ==, TIGHTDB_MAX_BPNODE_SIZE);
+    if (insert_ndx - 1 >= REALM_MAX_BPNODE_SIZE) {
+        REALM_ASSERT_3(insert_ndx - 1, ==, REALM_MAX_BPNODE_SIZE);
         // Case 1/2: The split child was the last child of the parent
         // to be split. In this case the parent may or may not be on
         // the compact form.
@@ -1927,12 +1927,12 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         // parent to be split. Since this is not possible during
         // 'append', we can safely assume that the parent node is on
         // the general form.
-        TIGHTDB_ASSERT(new_offsets.is_attached());
+        REALM_ASSERT(new_offsets.is_attached());
         new_split_offset = elem_ndx_offset + state.m_split_size;
         new_split_size = to_size_t(back()/2) + 1;
-        TIGHTDB_ASSERT_3(size(), >=, 2);
+        REALM_ASSERT_3(size(), >=, 2);
         size_t num_children = size() - 2;
-        TIGHTDB_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
+        REALM_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
         // Move some refs over
         size_t child_refs_end = 1 + num_children;
         for (size_t i = insert_ndx; i != child_refs_end; ++i)
@@ -1968,10 +1968,10 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
 ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_DEBUG(leaf_size <= TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
-    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
+    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws
         return 0; // Leaf was not split
     }
@@ -1995,7 +1995,7 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void Array::print() const
 {
@@ -2010,9 +2010,9 @@ void Array::print() const
 
 void Array::Verify() const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
-    TIGHTDB_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
+    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
                    m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
 
     if (!m_parent)
@@ -2020,7 +2020,7 @@ void Array::Verify() const
 
     // Check that parent is set correctly
     ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
-    TIGHTDB_ASSERT_3(ref_in_parent, ==, m_ref);
+    REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 
 
@@ -2034,13 +2034,13 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
     node.Verify();
 
     // This node must not be a leaf
-    TIGHTDB_ASSERT_3(node.get_type(), ==, Array::type_InnerBptreeNode);
+    REALM_ASSERT_3(node.get_type(), ==, Array::type_InnerBptreeNode);
 
-    TIGHTDB_ASSERT_3(node.size(), >=, 2);
+    REALM_ASSERT_3(node.size(), >=, 2);
     size_t num_children = node.size() - 2;
 
     // Verify invar:bptree-nonempty-inner
-    TIGHTDB_ASSERT_3(num_children, >=, 1);
+    REALM_ASSERT_3(num_children, >=, 1);
 
     Allocator& alloc = node.get_alloc();
     Array offsets(alloc);
@@ -2052,11 +2052,11 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         if (general_form) {
             offsets.init_from_ref(to_ref(first_value));
             offsets.Verify();
-            TIGHTDB_ASSERT_3(offsets.get_type(), ==, Array::type_Normal);
-            TIGHTDB_ASSERT_3(offsets.size(), ==, num_children - 1);
+            REALM_ASSERT_3(offsets.get_type(), ==, Array::type_Normal);
+            REALM_ASSERT_3(offsets.size(), ==, num_children - 1);
         }
         else {
-            TIGHTDB_ASSERT(!int_cast_with_overflow_detect(first_value/2, elems_per_child));
+            REALM_ASSERT(!int_cast_with_overflow_detect(first_value/2, elems_per_child));
         }
     }
 
@@ -2071,7 +2071,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         if (child_is_leaf) {
             elems_in_child = (*leaf_verifier)(MemRef(child_header, child_ref), alloc);
             // Verify invar:bptree-nonempty-leaf
-            TIGHTDB_ASSERT_3(elems_in_child, >= , 1);
+            REALM_ASSERT_3(elems_in_child, >= , 1);
             leaf_level_of_child = 0;
         }
         else {
@@ -2082,34 +2082,34 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
             leaf_level_of_child = at<1>(r);
             // Verify invar:bptree-node-form
             bool child_on_general_form = at<2>(r);
-            TIGHTDB_ASSERT(general_form || !child_on_general_form);
+            REALM_ASSERT(general_form || !child_on_general_form);
         }
         if (i == 0)
             leaf_level_of_children = leaf_level_of_child;
         // Verify invar:bptree-leaf-depth
-        TIGHTDB_ASSERT_3(leaf_level_of_child, ==, leaf_level_of_children);
+        REALM_ASSERT_3(leaf_level_of_child, ==, leaf_level_of_children);
         // Check integrity of aggregated per-child element counts
-        TIGHTDB_ASSERT(!int_add_with_overflow_detect(num_elems, elems_in_child));
+        REALM_ASSERT(!int_add_with_overflow_detect(num_elems, elems_in_child));
         if (general_form) {
             if (i < num_children - 1)
-                TIGHTDB_ASSERT(int_equal_to(num_elems, offsets.get(i)));
+                REALM_ASSERT(int_equal_to(num_elems, offsets.get(i)));
         }
         else { // Compact form
             if (i < num_children - 1) {
-                TIGHTDB_ASSERT(elems_in_child == elems_per_child);
+                REALM_ASSERT(elems_in_child == elems_per_child);
             }
             else {
-                TIGHTDB_ASSERT(elems_in_child <= elems_per_child);
+                REALM_ASSERT(elems_in_child <= elems_per_child);
             }
         }
     }
-    TIGHTDB_ASSERT_3(leaf_level_of_children, !=, -1);
+    REALM_ASSERT_3(leaf_level_of_children, !=, -1);
     {
         int_fast64_t last_value = node.back();
-        TIGHTDB_ASSERT_3(last_value % 2, !=, 0);
+        REALM_ASSERT_3(last_value % 2, !=, 0);
         size_t total_elems = 0;
-        TIGHTDB_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
-        TIGHTDB_ASSERT_3(num_elems, ==, total_elems);
+        REALM_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
+        REALM_ASSERT_3(num_elems, ==, total_elems);
     }
     return tightdb::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
@@ -2282,7 +2282,7 @@ public:
         m_stats(stats)
     {
     }
-    void handle(ref_type, size_t allocated, size_t used) TIGHTDB_OVERRIDE
+    void handle(ref_type, size_t allocated, size_t used) REALM_OVERRIDE
     {
         m_stats.allocated += allocated;
         m_stats.used += used;
@@ -2355,14 +2355,14 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
     }
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG
 
 
 namespace {
 
 // Direct access methods
 
-template<int w> int64_t get_direct(const char* data, size_t ndx) TIGHTDB_NOEXCEPT
+template<int w> int64_t get_direct(const char* data, size_t ndx) REALM_NOEXCEPT
 {
     if (w == 0) {
         return 0;
@@ -2394,27 +2394,27 @@ template<int w> int64_t get_direct(const char* data, size_t ndx) TIGHTDB_NOEXCEP
         size_t offset = ndx * 8;
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
-    TIGHTDB_ASSERT_DEBUG(false);
+    REALM_ASSERT_DEBUG(false);
     return int64_t(-1);
 }
 
-inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NOEXCEPT
+inline int64_t get_direct(const char* data, size_t width, size_t ndx) REALM_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(return get_direct, width, (data, ndx));
+    REALM_TEMPEX(return get_direct, width, (data, ndx));
 }
 
 
 template<int width>
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t ndx) TIGHTDB_NOEXCEPT
+inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
 {
     return make_pair(to_size_t(get_direct<width>(data, ndx+0)),
                      to_size_t(get_direct<width>(data, ndx+1)));
 }
 
 inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
-                                                size_t ndx) TIGHTDB_NOEXCEPT
+                                                size_t ndx) REALM_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(return get_two, width, (data, ndx));
+    REALM_TEMPEX(return get_two, width, (data, ndx));
 }
 
 
@@ -2440,7 +2440,7 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
 template<int width>
-inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
+inline size_t lower_bound(const char* data, size_t size, int64_t value) REALM_NOEXCEPT
 {
 // The binary search used here is carefully optimized. Key trick is to use a single
 // loop controlling variable (size) instead of high/low pair, and to keep updates
@@ -2526,7 +2526,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 
 // See lower_bound()
 template<int width>
-inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
+inline size_t upper_bound(const char* data, size_t size, int64_t value) REALM_NOEXCEPT
 {
     size_t low = 0;
     while (size >= 8) {
@@ -2572,21 +2572,21 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 
 
 
-size_t Array::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
+size_t Array::lower_bound_int(int64_t value) const REALM_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(return ::lower_bound, m_width, (m_data, m_size, value));
+    REALM_TEMPEX(return ::lower_bound, m_width, (m_data, m_size, value));
 }
 
-size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
+size_t Array::upper_bound_int(int64_t value) const REALM_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(return ::upper_bound, m_width, (m_data, m_size, value));
+    REALM_TEMPEX(return ::upper_bound, m_width, (m_data, m_size, value));
 }
 
 
 void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT_3(begin, <=, size());
-    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_3(begin, <=, size());
+    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (end == npos)
         end = m_size;
@@ -2596,7 +2596,7 @@ void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t be
 
     QueryState<int64_t> state;
     state.init(act_FindAll, result, static_cast<size_t>(-1));
-    TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
+    REALM_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
     return;
 }
@@ -2606,120 +2606,120 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
 {
     if (cond == cond_Equal) {
         if (action == act_ReturnFirst) {
-            TIGHTDB_TEMPEX3(return find, Equal, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Equal, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(return find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(return find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(return find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(return find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(return find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_NotEqual) {
         if (action == act_ReturnFirst) {
-            TIGHTDB_TEMPEX3(return find, NotEqual, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, NotEqual, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(return find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(return find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(return find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(return find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(return find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_Greater) {
         if (action == act_ReturnFirst) {
-            TIGHTDB_TEMPEX3(return find, Greater, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Greater, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(return find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(return find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(return find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(return find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(return find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_Less) {
         if (action == act_ReturnFirst) {
-            TIGHTDB_TEMPEX3(return find, Less, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Less, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(return find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(return find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(return find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(return find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(return find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_None) {
         if (action == act_ReturnFirst) {
-            TIGHTDB_TEMPEX3(return find, None, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, None, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(return find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(return find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(return find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(return find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            REALM_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
-    TIGHTDB_ASSERT_DEBUG(false);
+    REALM_ASSERT_DEBUG(false);
     return false;
 
 }
@@ -2734,7 +2734,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 // Get containing array block direct through column b+-tree without instatiating any Arrays. Calling with
 // use_retval = true will return itself if leaf and avoid unneccesary header initialization.
 const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
-                             bool use_retval) const TIGHTDB_NOEXCEPT
+                             bool use_retval) const REALM_NOEXCEPT
 {
     // Reduce time overhead for cols with few entries
     if (!is_inner_bptree_node()) {
@@ -2884,7 +2884,7 @@ top:
                 }
             }
 
-            TIGHTDB_ASSERT_3(method, !=, index_FindAll_nocopy);
+            REALM_ASSERT_3(method, !=, index_FindAll_nocopy);
             return size_t(FindRes_column);
         }
 
@@ -2943,7 +2943,7 @@ namespace {
 //
 // Returns (child_ndx, ndx_in_child).
 template<int width> inline pair<size_t, size_t>
-find_child_from_offsets(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
+find_child_from_offsets(const char* offsets_header, size_t elem_ndx) REALM_NOEXCEPT
 {
     const char* offsets_data = Array::get_data_from_header(offsets_header);
     size_t offsets_size = Array::get_size_from_header(offsets_header);
@@ -2957,7 +2957,7 @@ find_child_from_offsets(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOE
 
 // Returns (child_ndx, ndx_in_child)
 inline pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t ndx,
-                                              const Allocator& alloc) TIGHTDB_NOEXCEPT
+                                              const Allocator& alloc) REALM_NOEXCEPT
 {
     size_t child_ndx;
     size_t ndx_in_child;
@@ -2976,7 +2976,7 @@ inline pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t n
         char* offsets_header = alloc.translate(offsets_ref);
         int offsets_width = Array::get_width_from_header(offsets_header);
         pair<size_t, size_t> p;
-        TIGHTDB_TEMPEX(p = find_child_from_offsets, offsets_width, (offsets_header, ndx));
+        REALM_TEMPEX(p = find_child_from_offsets, offsets_width, (offsets_header, ndx));
         child_ndx    = p.first;
         ndx_in_child = p.second;
     }
@@ -2985,7 +2985,7 @@ inline pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t n
 
 
 // Returns (child_ndx, ndx_in_child)
-inline pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) TIGHTDB_NOEXCEPT
+inline pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) REALM_NOEXCEPT
 {
     int_fast64_t first_value = node.get(0);
     return find_bptree_child(first_value, ndx, node.get_alloc());
@@ -2995,7 +2995,7 @@ inline pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) TIGHTDB_N
 // Returns (child_ref, ndx_in_child)
 template<int width>
 inline pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
-                                                const Allocator& alloc) TIGHTDB_NOEXCEPT
+                                                const Allocator& alloc) REALM_NOEXCEPT
 {
     int_fast64_t first_value = get_direct<width>(data, 0);
     pair<size_t, size_t> p = find_bptree_child(first_value, ndx, alloc);
@@ -3040,16 +3040,16 @@ inline pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
 template<class Handler>
 bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
                          Handler handler, size_t start_offset)
-    TIGHTDB_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
+    REALM_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
 {
-    TIGHTDB_ASSERT(node.is_inner_bptree_node());
+    REALM_ASSERT(node.is_inner_bptree_node());
 
     Allocator& alloc = node.get_alloc();
     Array offsets(alloc);
     size_t child_ndx = 0, child_offset = node_offset;
     size_t elems_per_child = 0;
     {
-        TIGHTDB_ASSERT_3(node.size(), >=, 1);
+        REALM_ASSERT_3(node.size(), >=, 1);
         int_fast64_t first_value = node.get(0);
         bool is_compact = first_value % 2 != 0;
         if (is_compact) {
@@ -3073,9 +3073,9 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
             }
         }
     }
-    TIGHTDB_ASSERT_3(node.size(), >=, 2);
+    REALM_ASSERT_3(node.size(), >=, 2);
     size_t num_children = node.size() - 2;
-    TIGHTDB_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
+    REALM_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
     Array::NodeInfo child_info;
     child_info.m_parent = &node;
     child_info.m_ndx_in_parent = 1 + child_ndx;
@@ -3129,15 +3129,15 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
 // calculated. With these simplification it is possible to avoid any
 // access to the `offsets` array.
 template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler handler)
-    TIGHTDB_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
+    REALM_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
 {
-    TIGHTDB_ASSERT(node.is_inner_bptree_node());
+    REALM_ASSERT(node.is_inner_bptree_node());
 
     Allocator& alloc = node.get_alloc();
     size_t child_ndx = 0;
-    TIGHTDB_ASSERT_3(node.size(), >=, 2);
+    REALM_ASSERT_3(node.size(), >=, 2);
     size_t num_children = node.size() - 2;
-    TIGHTDB_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
+    REALM_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
     Array::NodeInfo child_info;
     child_info.m_parent = &node;
     child_info.m_ndx_in_parent = 1 + child_ndx;
@@ -3168,7 +3168,7 @@ template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler
 
 
 inline void destroy_inner_bptree_node(MemRef mem, int_fast64_t first_value,
-                                      Allocator& alloc) TIGHTDB_NOEXCEPT
+                                      Allocator& alloc) REALM_NOEXCEPT
 {
     alloc.free_(mem);
     if (first_value % 2 == 0) {
@@ -3179,7 +3179,7 @@ inline void destroy_inner_bptree_node(MemRef mem, int_fast64_t first_value,
 }
 
 void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
-                                   Array::EraseHandler& handler) TIGHTDB_NOEXCEPT
+                                   Array::EraseHandler& handler) REALM_NOEXCEPT
 {
     MemRef mem_2 = mem;
     for (;;) {
@@ -3224,9 +3224,9 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
     }
     else {
         size_t child_size = Array::get_size_from_header(child_header);
-        TIGHTDB_ASSERT_3(child_size, >=, 2);
+        REALM_ASSERT_3(child_size, >=, 2);
         size_t num_grandchildren = child_size - 2;
-        TIGHTDB_ASSERT_3(num_grandchildren, >=, 1); // invar:bptree-nonempty-inner
+        REALM_ASSERT_3(num_grandchildren, >=, 1); // invar:bptree-nonempty-inner
         if (num_grandchildren > 1) {
             // This child is an inner node, and is the closest one to
             // the root that has more than one child, so make it the
@@ -3265,9 +3265,9 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
 } // anonymous namespace
 
 
-pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
+pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_inner_bptree_node());
+    REALM_ASSERT(is_inner_bptree_node());
 
     size_t ndx_2 = ndx;
     int width = int(m_width);
@@ -3275,7 +3275,7 @@ pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
 
     for (;;) {
         pair<ref_type, size_t> p;
-        TIGHTDB_TEMPEX(p = find_bptree_child, width, (data, ndx_2, m_alloc));
+        REALM_TEMPEX(p = find_bptree_child, width, (data, ndx_2, m_alloc));
         ref_type child_ref  = p.first;
         size_t ndx_in_child = p.second;
         char* child_header = m_alloc.translate(child_ref);
@@ -3295,7 +3295,7 @@ namespace {
 
 class VisitAdapter {
 public:
-    VisitAdapter(Array::VisitHandler& handler) TIGHTDB_NOEXCEPT:
+    VisitAdapter(Array::VisitHandler& handler) REALM_NOEXCEPT:
         m_handler(handler)
     {
     }
@@ -3313,7 +3313,7 @@ private:
 bool Array::visit_bptree_leaves(size_t elem_ndx_offset, size_t elems_in_tree,
                                 VisitHandler& handler)
 {
-    TIGHTDB_ASSERT(elem_ndx_offset < elems_in_tree);
+    REALM_ASSERT(elem_ndx_offset < elems_in_tree);
     size_t root_offset = 0, root_size = elems_in_tree;
     VisitAdapter adapter(handler);
     size_t start_offset = elem_ndx_offset;
@@ -3325,7 +3325,7 @@ namespace {
 
 class UpdateAdapter {
 public:
-    UpdateAdapter(Array::UpdateHandler& handler) TIGHTDB_NOEXCEPT:
+    UpdateAdapter(Array::UpdateHandler& handler) REALM_NOEXCEPT:
         m_handler(handler)
     {
     }
@@ -3350,7 +3350,7 @@ void Array::update_bptree_leaves(UpdateHandler& handler)
 
 void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
 {
-    TIGHTDB_ASSERT(is_inner_bptree_node());
+    REALM_ASSERT(is_inner_bptree_node());
 
     pair<size_t, size_t> p = find_bptree_child(*this, elem_ndx);
     size_t child_ndx    = p.first;
@@ -3373,9 +3373,9 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
 
 void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handler)
 {
-    TIGHTDB_ASSERT(root->is_inner_bptree_node());
-    TIGHTDB_ASSERT_3(root->size(), >=, 1 + 1 + 1); // invar:bptree-nonempty-inner
-    TIGHTDB_ASSERT_DEBUG(elem_ndx == npos || elem_ndx+1 != root->get_bptree_size());
+    REALM_ASSERT(root->is_inner_bptree_node());
+    REALM_ASSERT_3(root->size(), >=, 1 + 1 + 1); // invar:bptree-nonempty-inner
+    REALM_ASSERT_DEBUG(elem_ndx == npos || elem_ndx+1 != root->get_bptree_size());
 
     // Note that this function is implemented in a way that makes it
     // fully exception safe. Please be sure to keep it that way.
@@ -3396,7 +3396,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
     // Table::m_columns.
     if (destroy_root) {
         MemRef root_mem = root->get_mem();
-        TIGHTDB_ASSERT_3(root->size(), >=, 2);
+        REALM_ASSERT_3(root->size(), >=, 2);
         int_fast64_t first_value = root->get(0);
         ref_type child_ref = root->get_as_ref(1);
         Allocator& alloc = root->get_alloc();
@@ -3426,7 +3426,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
     // the root elimination process itself.
     try {
         MemRef root_mem = root->get_mem();
-        TIGHTDB_ASSERT_3(root->size(), >=, 2);
+        REALM_ASSERT_3(root->size(), >=, 2);
         int_fast64_t first_value = root->get(0);
         ref_type child_ref = root->get_as_ref(1);
         elim_superfluous_bptree_root(root, root_mem, first_value,
@@ -3488,7 +3488,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
     if (destroy_child) {
         if (num_children == 1)
             return true; // Destroy this node too
-        TIGHTDB_ASSERT_3(num_children, >=, 2);
+        REALM_ASSERT_3(num_children, >=, 2);
         child_ref = get_as_ref(child_ref_ndx);
         child_header = m_alloc.translate(child_ref);
         child_mem = MemRef(child_header, child_ref);
@@ -3544,7 +3544,7 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
 }
 
 
-int_fast64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+int_fast64_t Array::get(const char* header, size_t ndx) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
@@ -3552,7 +3552,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 }
 
 
-pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);

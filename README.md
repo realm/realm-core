@@ -183,11 +183,11 @@ Here, `PREFIX` is the installation prefix. If it is not specified, it
 defaults to `/usr/local`.
 
 Normally the TightDB version is taken to be what is returned by `git
-describe`. To override this, set `TIGHTDB_VERSION` as in the following
+describe`. To override this, set `REALM_VERSION` as in the following
 examples:
 
-    TIGHTDB_VERSION=0.1.4 sh build.sh config
-    TIGHTDB_VERSION=0.1.4 sh build.sh bin-dist all
+    REALM_VERSION=0.1.4 sh build.sh config
+    REALM_VERSION=0.1.4 sh build.sh bin-dist all
 
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
@@ -197,16 +197,16 @@ or `sh build.sh bin-dist`, as in the following example:
 
 ### Replication
 
-To enable replication in TightDB, set `TIGHTDB_ENABLE_REPLICATION` to
+To enable replication in TightDB, set `REALM_ENABLE_REPLICATION` to
 a nonempty value during configuration as in the following example:
 
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh config
+    REALM_ENABLE_REPLICATION=1 sh build.sh config
 
 When set during preparation of a distribution package, it will have
 the extra effect of including "replication" as an optional extension
 available for installation to the end-user:
 
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
+    REALM_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
 
 
@@ -273,10 +273,10 @@ Memory debugging:
 TightDB currently allows for uninitialized data to be written to a
 database file. This is not an error (technically), but it does cause
 Valgrind to report errors. To avoid these 'false positives' during
-testing and debugging, set `TIGHTDB_ENABLE_ALLOC_SET_ZERO` to a
+testing and debugging, set `REALM_ENABLE_ALLOC_SET_ZERO` to a
 nonempty value during configuration as in the following example:
 
-    TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
+    REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
 
 Packaging for OS X
@@ -378,7 +378,7 @@ During the building of a distribution package, some Markdown documents
 are converted to PDF format, and this is done using the Pandoc
 utility. See below for instructions on how to install Pandoc. On some
 platforms, however, Pandoc installation is unfeasible (e.g. Amazon
-Linux). In those cases you may set `TIGHTDB_DISABLE_MARKDOWN_CONVERT`
+Linux). In those cases you may set `REALM_DISABLE_MARKDOWN_CONVERT`
 to a nonempty value to disable the conversion to PDF.
 
 ### Linux Mint 15, 16, 17, Ubuntu 10.04, 12.04, 13.04, 13.10, 14.04

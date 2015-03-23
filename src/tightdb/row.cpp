@@ -5,7 +5,7 @@ using namespace std;
 using namespace tightdb;
 
 
-void RowBase::attach(Table* table, size_t row_ndx) TIGHTDB_NOEXCEPT
+void RowBase::attach(Table* table, size_t row_ndx) REALM_NOEXCEPT
 {
     if (table) {
         table->register_row_accessor(this);
@@ -14,7 +14,7 @@ void RowBase::attach(Table* table, size_t row_ndx) TIGHTDB_NOEXCEPT
     }
 }
 
-void RowBase::reattach(Table* table, size_t row_ndx) TIGHTDB_NOEXCEPT
+void RowBase::reattach(Table* table, size_t row_ndx) REALM_NOEXCEPT
 {
     if (m_table.get() != table) {
         if (m_table)
@@ -26,7 +26,7 @@ void RowBase::reattach(Table* table, size_t row_ndx) TIGHTDB_NOEXCEPT
     m_row_ndx = row_ndx;
 }
 
-void RowBase::impl_detach() TIGHTDB_NOEXCEPT
+void RowBase::impl_detach() REALM_NOEXCEPT
 {
     if (m_table) {
         m_table->unregister_row_accessor(this);

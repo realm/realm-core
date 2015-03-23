@@ -32,7 +32,7 @@ else
 test_util_a_LDFLAGS += -lproc
 endif
 
-mem_o_CFLAGS = -DTIGHTDB_HAVE_LIBPROCPS
+mem_o_CFLAGS = -DREALM_HAVE_LIBPROCPS
 
 endif
 

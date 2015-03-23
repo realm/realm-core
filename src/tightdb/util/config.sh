@@ -28,7 +28,7 @@ cstring_escape()
 
 }
 
-tightdb_version="$(get_config_param "TIGHTDB_VERSION")" || exit 1
+tightdb_version="$(get_config_param "REALM_VERSION")" || exit 1
 tigthdb_version_escaped="$(cstring_escape "$tightdb_version")" || exit 1
 
 install_prefix="$(get_config_param "INSTALL_PREFIX")" || exit 1
@@ -89,34 +89,34 @@ cat >"$target" <<EOF
  *
  *************************************************************************/
 
-#define TIGHTDB_VERSION "$tigthdb_version_escaped"
+#define REALM_VERSION "$tigthdb_version_escaped"
 
-#define TIGHTDB_INSTALL_PREFIX      "$install_prefix_escaped"
-#define TIGHTDB_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"
-#define TIGHTDB_INSTALL_INCLUDEDIR  "$install_includedir_escaped"
-#define TIGHTDB_INSTALL_BINDIR      "$install_bindir_escaped"
-#define TIGHTDB_INSTALL_LIBDIR      "$install_libdir_escaped"
-#define TIGHTDB_INSTALL_LIBEXECDIR  "$install_libexecdir_escaped"
+#define REALM_INSTALL_PREFIX      "$install_prefix_escaped"
+#define REALM_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"
+#define REALM_INSTALL_INCLUDEDIR  "$install_includedir_escaped"
+#define REALM_INSTALL_BINDIR      "$install_bindir_escaped"
+#define REALM_INSTALL_LIBDIR      "$install_libdir_escaped"
+#define REALM_INSTALL_LIBEXECDIR  "$install_libexecdir_escaped"
 
-#ifdef TIGHTDB_DEBUG
-#  define TIGHTDB_MAX_BPNODE_SIZE $max_bpnode_size_debug
+#ifdef REALM_DEBUG
+#  define REALM_MAX_BPNODE_SIZE $max_bpnode_size_debug
 #else
-#  define TIGHTDB_MAX_BPNODE_SIZE $max_bpnode_size
+#  define REALM_MAX_BPNODE_SIZE $max_bpnode_size
 #endif
 
 #if $enable_replication
-#  define TIGHTDB_ENABLE_REPLICATION 1
+#  define REALM_ENABLE_REPLICATION 1
 #endif
 
 #if $enable_alloc_set_zero
-#  define TIGHTDB_ENABLE_ALLOC_SET_ZERO 1
+#  define REALM_ENABLE_ALLOC_SET_ZERO 1
 #endif
 
 #if $enable_encryption
-#  define TIGHTDB_ENABLE_ENCRYPTION 1
+#  define REALM_ENABLE_ENCRYPTION 1
 #endif
 
 #if $enable_assertions
-#  define TIGHTDB_ENABLE_ASSERTIONS 1
+#  define REALM_ENABLE_ASSERTIONS 1
 #endif
 EOF

@@ -109,7 +109,7 @@ void slave(int ndx, string path)
 
 } // anonymous namespace
 
-#ifndef TIGHTDB_IOS
+#ifndef REALM_IOS
 
 // The assumption is that if multiple processes try to place an
 // exclusive lock on a file in a non-blocking fashion, then at least
@@ -140,6 +140,6 @@ TEST(File_NoSpuriousTryLockFailures)
     CHECK_EQUAL(0, results[0]);
 }
 
-#endif // TIGHTDB_IOS
+#endif // REALM_IOS
 
 #endif // TEST_FILE_LOCKS

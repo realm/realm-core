@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_TEST_ONLY_HPP
-#define TIGHTDB_TEST_UTIL_TEST_ONLY_HPP
+#ifndef REALM_TEST_UTIL_TEST_ONLY_HPP
+#define REALM_TEST_UTIL_TEST_ONLY_HPP
 
 #include "unit_test.hpp"
 
@@ -38,4 +38,4 @@ const char* get_test_only();
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_TEST_ONLY_HPP
+#endif // REALM_TEST_UTIL_TEST_ONLY_HPP

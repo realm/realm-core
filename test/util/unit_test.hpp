@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
-#define TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
+#ifndef REALM_TEST_UTIL_UNIT_TEST_HPP
+#define REALM_TEST_UTIL_UNIT_TEST_HPP
 
 #include <cmath>
 #include <cstring>
@@ -198,14 +198,14 @@ public:
     virtual void fail(const TestDetails&, const std::string& message);
     virtual void end(const TestDetails&, double elapsed_seconds);
     virtual void summary(const Summary&);
-    virtual ~Reporter() TIGHTDB_NOEXCEPT {}
+    virtual ~Reporter() REALM_NOEXCEPT {}
 };
 
 
 class Filter {
 public:
     virtual bool include(const TestDetails&) = 0;
-    virtual ~Filter() TIGHTDB_NOEXCEPT {}
+    virtual ~Filter() REALM_NOEXCEPT {}
 };
 
 
@@ -277,9 +277,9 @@ class SimpleReporter: public Reporter {
 public:
     explicit SimpleReporter(bool report_progress = false);
 
-    void begin(const TestDetails&) TIGHTDB_OVERRIDE;
-    void fail(const TestDetails&, const std::string&) TIGHTDB_OVERRIDE;
-    void summary(const Summary&) TIGHTDB_OVERRIDE;
+    void begin(const TestDetails&) REALM_OVERRIDE;
+    void fail(const TestDetails&, const std::string&) REALM_OVERRIDE;
+    void summary(const Summary&) REALM_OVERRIDE;
 
 protected:
     bool m_report_progress;
@@ -572,7 +572,7 @@ template<class T> void to_string(const T& value, std::string& str)
 inline bool TestResults::check_cond(bool cond, const char* file, long line, const char* macro_name,
                                     const char* cond_text)
 {
-    if (TIGHTDB_LIKELY(cond)) {
+    if (REALM_LIKELY(cond)) {
         check_succeeded();
     }
     else {
@@ -596,7 +596,7 @@ inline bool TestResults::check_compare(bool cond, const A& a, const B& b,
                                        const char* file, long line, const char* macro_name,
                                        const char* a_text, const char* b_text)
 {
-    if (TIGHTDB_LIKELY(cond)) {
+    if (REALM_LIKELY(cond)) {
         check_succeeded();
     }
     else {
@@ -613,7 +613,7 @@ inline bool TestResults::check_inexact_compare(bool cond, long double a, long do
                                                const char* macro_name, const char* a_text,
                                                const char* b_text, const char* eps_text)
 {
-    if (TIGHTDB_LIKELY(cond)) {
+    if (REALM_LIKELY(cond)) {
         check_succeeded();
     }
     else {
@@ -721,4 +721,4 @@ inline bool TestResults::check_definitely_greater(long double a, long double b,
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
+#endif // REALM_TEST_UTIL_UNIT_TEST_HPP

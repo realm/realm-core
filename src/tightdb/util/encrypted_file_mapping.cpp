@@ -19,7 +19,7 @@
  **************************************************************************/
 #include "encrypted_file_mapping.hpp"
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
 #include <cstdlib>
 #include <iostream>
 
@@ -36,7 +36,7 @@ namespace {
 template<typename T>
 void dlsym_cast(T& ptr, const char *name) {
     void* addr = dlsym(RTLD_DEFAULT, name);
-    TIGHTDB_ASSERT(addr);
+    REALM_ASSERT(addr);
     // This cast is forbidden by C++03, but required to work by POSIX, and
     // C++11 makes it implementation-defined specifically to support dlsym
     ptr = reinterpret_cast<T>(reinterpret_cast<size_t>(addr));
@@ -46,7 +46,7 @@ size_t cached_page_size;
 void get_page_size()
 {
     long size = sysconf(_SC_PAGESIZE);
-    TIGHTDB_ASSERT(size > 0 && size % 4096 == 0 &&
+    REALM_ASSERT(size > 0 && size % 4096 == 0 &&
                    static_cast<unsigned long>(size) < std::numeric_limits<size_t>::max());
     cached_page_size = static_cast<size_t>(size);
 }
@@ -72,7 +72,7 @@ AESCryptor::AESCryptor(const uint8_t* key) {
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #else
-#ifdef TIGHTDB_ANDROID
+#ifdef REALM_ANDROID
     // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
     // into every process with every version of Android, so we can get to it
     // with dlsym
@@ -91,7 +91,7 @@ AESCryptor::AESCryptor(const uint8_t* key) {
     memcpy(m_hmacKey, key + 32, 32);
 }
 
-AESCryptor::~AESCryptor() TIGHTDB_NOEXCEPT {
+AESCryptor::~AESCryptor() REALM_NOEXCEPT {
 #ifdef __APPLE__
     CCCryptorRelease(m_encr);
     CCCryptorRelease(m_decr);
@@ -138,7 +138,7 @@ const size_t blocks_per_metadata_block = block_size / metadata_size;
 template<typename Int>
 Int real_offset(Int pos)
 {
-    TIGHTDB_ASSERT(pos >= 0);
+    REALM_ASSERT(pos >= 0);
     const size_t index = static_cast<size_t>(pos) / block_size;
     const size_t metadata_page_count = index / blocks_per_metadata_block + 1;
     return pos + metadata_page_count * block_size;
@@ -148,7 +148,7 @@ Int real_offset(Int pos)
 template<typename Int>
 Int fake_offset(Int pos)
 {
-    TIGHTDB_ASSERT(pos >= 0);
+    REALM_ASSERT(pos >= 0);
     const size_t index = static_cast<size_t>(pos) / block_size;
     const size_t metadata_page_count = (index + blocks_per_metadata_block) / (blocks_per_metadata_block + 1);
     return pos - metadata_page_count * block_size;
@@ -157,7 +157,7 @@ Int fake_offset(Int pos)
 // get the location of the iv_table for the given data (not file) position
 off_t iv_table_pos(off_t pos)
 {
-    TIGHTDB_ASSERT(pos >= 0);
+    REALM_ASSERT(pos >= 0);
     const size_t index = static_cast<size_t>(pos) / block_size;
     const size_t metadata_block = index / blocks_per_metadata_block;
     const size_t metadata_index = index & (blocks_per_metadata_block - 1);
@@ -167,14 +167,14 @@ off_t iv_table_pos(off_t pos)
 void check_write(int fd, off_t pos, const void *data, size_t len)
 {
     ssize_t ret = pwrite(fd, data, len, pos);
-    TIGHTDB_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
+    REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
     static_cast<void>(ret);
 }
 
 size_t check_read(int fd, off_t pos, void *dst, size_t len)
 {
     ssize_t ret = pread(fd, dst, len, pos);
-    TIGHTDB_ASSERT(ret >= 0);
+    REALM_ASSERT(ret >= 0);
     return ret < 0 ? 0 : static_cast<size_t>(ret);
 }
 
@@ -182,12 +182,12 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
 
 void AESCryptor::set_file_size(off_t new_size)
 {
-    TIGHTDB_ASSERT(new_size >= 0);
+    REALM_ASSERT(new_size >= 0);
     size_t block_count = (new_size + block_size - 1) / block_size;
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
-iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT
+iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT
 {
     size_t idx = data_pos / block_size;
     if (idx < m_iv_buffer.size())
@@ -195,7 +195,7 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT
 
     size_t old_size = m_iv_buffer.size();
     size_t new_block_count = 1 + idx / blocks_per_metadata_block;
-    TIGHTDB_ASSERT(new_block_count * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
+    REALM_ASSERT(new_block_count * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
     m_iv_buffer.resize(new_block_count * blocks_per_metadata_block);
 
     for (size_t i = old_size; i < new_block_count * blocks_per_metadata_block; i += blocks_per_metadata_block) {
@@ -219,19 +219,19 @@ bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) TIGHTDB_NOEXCEPT
+bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) REALM_NOEXCEPT
 {
     try {
         return try_read(fd, pos, dst, size);
     }
     catch (...) {
         // Not recoverable since we're running in a signal handler
-        TIGHTDB_TERMINATE("corrupted database");
+        REALM_TERMINATE("corrupted database");
     }
 }
 
 bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
-    TIGHTDB_ASSERT(size % block_size == 0);
+    REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
         char buffer[block_size];
         ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, block_size);
@@ -282,9 +282,9 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
     return true;
 }
 
-void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_NOEXCEPT
+void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(size % block_size == 0);
+    REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
         iv_table& iv = get_iv_table(fd, pos);
 
@@ -301,7 +301,7 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
-        } while (TIGHTDB_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
+        } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
         check_write(fd, real_offset(pos), buffer, block_size);
@@ -313,7 +313,7 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_
 }
 
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
-                         const char* src, const char* stored_iv) TIGHTDB_NOEXCEPT
+                         const char* src, const char* stored_iv) REALM_NOEXCEPT
 {
     uint8_t iv[aes_block_size] = {0};
     memcpy(iv, stored_iv, 4);
@@ -325,8 +325,8 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
 
     size_t bytesEncrypted = 0;
     CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
-    TIGHTDB_ASSERT(err == kCCSuccess);
-    TIGHTDB_ASSERT(bytesEncrypted == block_size);
+    REALM_ASSERT(err == kCCSuccess);
+    REALM_ASSERT(bytesEncrypted == block_size);
     static_cast<void>(bytesEncrypted);
     static_cast<void>(err);
 #else
@@ -373,11 +373,11 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, siz
 , m_size(0)
 , m_page_count(0)
 , m_access(access)
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 , m_validate_buffer(new char[m_page_size])
 #endif
 {
-    TIGHTDB_ASSERT(m_blocks_per_page * block_size == m_page_size);
+    REALM_ASSERT(m_blocks_per_page * block_size == m_page_size);
     set(addr, size); // throws
     file.mappings.push_back(this);
 }
@@ -389,12 +389,12 @@ EncryptedFileMapping::~EncryptedFileMapping()
     m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
 
-char* EncryptedFileMapping::page_addr(size_t i) const TIGHTDB_NOEXCEPT
+char* EncryptedFileMapping::page_addr(size_t i) const REALM_NOEXCEPT
 {
     return reinterpret_cast<char*>(((m_first_page + i) * m_page_size));
 }
 
-void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::mark_unreadable(size_t i) REALM_NOEXCEPT
 {
     if (i >= m_page_count)
         return;
@@ -408,7 +408,7 @@ void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT
     }
 }
 
-void EncryptedFileMapping::mark_readable(size_t i) TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::mark_readable(size_t i) REALM_NOEXCEPT
 {
     if (i >= m_read_pages.size() || (m_read_pages[i] && !m_write_pages[i]))
         return;
@@ -418,18 +418,18 @@ void EncryptedFileMapping::mark_readable(size_t i) TIGHTDB_NOEXCEPT
     m_write_pages[i] = false;
 }
 
-void EncryptedFileMapping::mark_unwritable(size_t i) TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::mark_unwritable(size_t i) REALM_NOEXCEPT
 {
     if (i >= m_write_pages.size() || !m_write_pages[i])
         return;
 
-    TIGHTDB_ASSERT(m_read_pages[i]);
+    REALM_ASSERT(m_read_pages[i]);
     mprotect(page_addr(i), m_page_size, PROT_READ);
     m_write_pages[i] = false;
     // leave dirty bit set
 }
 
-bool EncryptedFileMapping::copy_read_page(size_t page) TIGHTDB_NOEXCEPT
+bool EncryptedFileMapping::copy_read_page(size_t page) REALM_NOEXCEPT
 {
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
@@ -445,7 +445,7 @@ bool EncryptedFileMapping::copy_read_page(size_t page) TIGHTDB_NOEXCEPT
     return false;
 }
 
-void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::read_page(size_t i) REALM_NOEXCEPT
 {
     char* addr = page_addr(i);
     mprotect(addr, m_page_size, PROT_READ | PROT_WRITE);
@@ -458,7 +458,7 @@ void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT
     m_write_pages[i] = false;
 }
 
-void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::write_page(size_t page) REALM_NOEXCEPT
 {
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
@@ -471,9 +471,9 @@ void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT
     m_dirty_pages[page] = true;
 }
 
-void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::validate_page(size_t page) REALM_NOEXCEPT
 {
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     if (!m_read_pages[page])
         return;
 
@@ -492,22 +492,22 @@ void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT
         std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page("
                   << page << "/" << m_page_count << ") " << m_validate_buffer.get() << " "
                   << page_addr(page) << std::endl;
-        TIGHTDB_TERMINATE("");
+        REALM_TERMINATE("");
     }
 #else
     static_cast<void>(page);
 #endif
 }
 
-void EncryptedFileMapping::validate() TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::validate() REALM_NOEXCEPT
 {
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     for (size_t i = 0; i < m_page_count; ++i)
         validate_page(i);
 #endif
 }
 
-void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::flush() REALM_NOEXCEPT
 {
     size_t start = 0;
     for (size_t i = 0; i < m_page_count; ++i) {
@@ -534,7 +534,7 @@ void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT
     validate();
 }
 
-void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::sync() REALM_NOEXCEPT
 {
     fsync(m_file.fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
@@ -548,7 +548,7 @@ void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT
     // for a discussion of this related to core data.
 }
 
-void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT
+void EncryptedFileMapping::handle_access(void* addr) REALM_NOEXCEPT
 {
     size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
 
@@ -560,15 +560,15 @@ void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT
         write_page(idx);
     }
     else {
-        TIGHTDB_TERMINATE("Attempt to write to read-only memory");
+        REALM_TERMINATE("Attempt to write to read-only memory");
     }
 }
 
 void EncryptedFileMapping::set(void* new_addr, size_t new_size)
 {
     m_file.cryptor.set_file_size(new_size);
-    TIGHTDB_ASSERT(new_size % m_page_size == 0);
-    TIGHTDB_ASSERT(new_size > 0);
+    REALM_ASSERT(new_size % m_page_size == 0);
+    REALM_ASSERT(new_size > 0);
 
     bool first_init = m_addr == 0;
 
@@ -598,14 +598,14 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size)
         mprotect(m_addr, m_page_count * m_page_size, PROT_NONE);
 }
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT
+File::SizeType encrypted_size_to_data_size(File::SizeType size) REALM_NOEXCEPT
 {
     if (size == 0)
         return 0;
     return fake_offset(size);
 }
 
-File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
+File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT
 {
     size_t ps = page_size();
     return real_offset((size + ps - 1) & ~(ps - 1));
@@ -616,12 +616,12 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
 namespace tightdb {
 namespace util {
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT
+File::SizeType encrypted_size_to_data_size(File::SizeType size) REALM_NOEXCEPT
 {
     return size;
 }
 
-File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
+File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT
 {
     return size;
 }

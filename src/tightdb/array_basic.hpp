@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ARRAY_BASIC_HPP
-#define TIGHTDB_ARRAY_BASIC_HPP
+#ifndef REALM_ARRAY_BASIC_HPP
+#define REALM_ARRAY_BASIC_HPP
 
 #include <tightdb/array.hpp>
 
@@ -28,11 +28,11 @@ namespace tightdb {
 /// types like float, double.
 template<class T> class BasicArray: public Array {
 public:
-    explicit BasicArray(Allocator&) TIGHTDB_NOEXCEPT;
-    explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
-    ~BasicArray() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    explicit BasicArray(Allocator&) REALM_NOEXCEPT;
+    explicit BasicArray(no_prealloc_tag) REALM_NOEXCEPT;
+    ~BasicArray() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    T get(std::size_t ndx) const REALM_NOEXCEPT;
     void add(T value);
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value);
@@ -55,12 +55,12 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static T get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static T get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
 
-    std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound(T value) const REALM_NOEXCEPT;
+    std::size_t upper_bound(T value) const REALM_NOEXCEPT;
 
     /// Construct a basic array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
@@ -79,7 +79,7 @@ public:
     /// using the specified target allocator.
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
@@ -87,7 +87,7 @@ private:
     std::size_t find(T target, std::size_t begin, std::size_t end) const;
 
     virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
-    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
+    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Multiply; }
 
     template<bool find_max> bool minmax(T& result, std::size_t begin, std::size_t end) const;
@@ -108,4 +108,4 @@ typedef BasicArray<double> ArrayDouble;
 
 #include <tightdb/array_basic_tpl.hpp>
 
-#endif // TIGHTDB_ARRAY_BASIC_HPP
+#endif // REALM_ARRAY_BASIC_HPP

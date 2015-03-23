@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_VERIFIED_STRING_HPP
-#define TIGHTDB_TEST_UTIL_VERIFIED_STRING_HPP
+#ifndef REALM_TEST_UTIL_VERIFIED_STRING_HPP
+#define REALM_TEST_UTIL_VERIFIED_STRING_HPP
 
 #include <cstddef>
 #include <vector>
@@ -61,4 +61,4 @@ private:
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_VERIFIED_STRING_HPP
+#endif // REALM_TEST_UTIL_VERIFIED_STRING_HPP

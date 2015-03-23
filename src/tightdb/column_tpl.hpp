@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_TPL_HPP
-#define TIGHTDB_COLUMN_TPL_HPP
+#ifndef REALM_COLUMN_TPL_HPP
+#define REALM_COLUMN_TPL_HPP
 
 #include <cstdlib>
 
@@ -101,4 +101,4 @@ template <class T, class R, Action action, class condition>
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_TPL_HPP
+#endif // REALM_COLUMN_TPL_HPP

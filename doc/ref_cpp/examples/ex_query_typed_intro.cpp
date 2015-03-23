@@ -2,7 +2,7 @@
 #include <tightdb.hpp>
 #include <assert.h>
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 

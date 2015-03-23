@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ARRAY_STRING_LONG_HPP
-#define TIGHTDB_ARRAY_STRING_LONG_HPP
+#ifndef REALM_ARRAY_STRING_LONG_HPP
+#define REALM_ARRAY_STRING_LONG_HPP
 
 #include <tightdb/array_blob.hpp>
 #include <tightdb/array_integer.hpp>
@@ -30,8 +30,8 @@ class ArrayStringLong: public Array {
 public:
     typedef StringData value_type;
 
-    explicit ArrayStringLong(Allocator&) TIGHTDB_NOEXCEPT;
-    ~ArrayStringLong() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    explicit ArrayStringLong(Allocator&) REALM_NOEXCEPT;
+    ~ArrayStringLong() REALM_NOEXCEPT REALM_OVERRIDE {}
 
     /// Create a new empty long string array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -43,15 +43,15 @@ public:
 
     //@{
     /// Overriding functions of Array
-    void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
-    void init_from_mem(MemRef) TIGHTDB_NOEXCEPT;
-    void init_from_parent() TIGHTDB_NOEXCEPT;
+    void init_from_ref(ref_type) REALM_NOEXCEPT;
+    void init_from_mem(MemRef) REALM_NOEXCEPT;
+    void init_from_parent() REALM_NOEXCEPT;
     //@}
 
-    bool is_empty() const TIGHTDB_NOEXCEPT;
-    std::size_t size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT;
 
-    StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
 
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
@@ -62,9 +62,9 @@ public:
     void destroy();
 
     std::size_t count(StringData value, std::size_t begin = 0,
-                      std::size_t end = npos) const TIGHTDB_NOEXCEPT;
+                      std::size_t end = npos) const REALM_NOEXCEPT;
     std::size_t find_first(StringData value, std::size_t begin = 0,
-                           std::size_t end = npos) const TIGHTDB_NOEXCEPT;
+                           std::size_t end = npos) const REALM_NOEXCEPT;
     void find_all(Column &result, StringData value, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
@@ -72,11 +72,11 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static StringData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+    static StringData get(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
 
-    static std::size_t get_size_from_header(const char*, Allocator&) TIGHTDB_NOEXCEPT;
+    static std::size_t get_size_from_header(const char*, Allocator&) REALM_NOEXCEPT;
 
     /// Construct a long string array of the specified size and return
     /// just the reference to the underlying memory. All elements will
@@ -87,11 +87,11 @@ public:
     /// array using the specified target allocator.
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
-    bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    bool update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
 private:
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
@@ -102,7 +102,7 @@ private:
 
 // Implementation:
 
-inline ArrayStringLong::ArrayStringLong(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline ArrayStringLong::ArrayStringLong(Allocator& alloc) REALM_NOEXCEPT:
     Array(alloc), m_offsets(alloc), m_blob(alloc)
 {
     m_offsets.set_parent(this, 0);
@@ -116,32 +116,32 @@ inline void ArrayStringLong::create()
     init_from_mem(mem);
 }
 
-inline void ArrayStringLong::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
+inline void ArrayStringLong::init_from_ref(ref_type ref) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ref);
+    REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
     init_from_mem(MemRef(header, ref));
 }
 
-inline void ArrayStringLong::init_from_parent() TIGHTDB_NOEXCEPT
+inline void ArrayStringLong::init_from_parent() REALM_NOEXCEPT
 {
     ref_type ref = get_ref_from_parent();
     init_from_ref(ref);
 }
 
-inline bool ArrayStringLong::is_empty() const TIGHTDB_NOEXCEPT
+inline bool ArrayStringLong::is_empty() const REALM_NOEXCEPT
 {
     return m_offsets.is_empty();
 }
 
-inline std::size_t ArrayStringLong::size() const TIGHTDB_NOEXCEPT
+inline std::size_t ArrayStringLong::size() const REALM_NOEXCEPT
 {
     return m_offsets.size();
 }
 
-inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ArrayStringLong::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
     std::size_t begin, end;
     if (0 < ndx) {
         // FIXME: Consider how much of a performance problem it is,
@@ -160,7 +160,7 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline void ArrayStringLong::truncate(std::size_t size)
 {
-    TIGHTDB_ASSERT_3(size, <, m_offsets.size());
+    REALM_ASSERT_3(size, <, m_offsets.size());
 
     std::size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
 
@@ -181,7 +181,7 @@ inline void ArrayStringLong::destroy()
     Array::destroy();
 }
 
-inline bool ArrayStringLong::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+inline bool ArrayStringLong::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     bool res = Array::update_from_parent(old_baseline);
     if (res) {
@@ -192,7 +192,7 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) TIGHTDB_NOE
 }
 
 inline std::size_t ArrayStringLong::get_size_from_header(const char* header,
-                                                         Allocator& alloc) TIGHTDB_NOEXCEPT
+                                                         Allocator& alloc) REALM_NOEXCEPT
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
@@ -202,4 +202,4 @@ inline std::size_t ArrayStringLong::get_size_from_header(const char* header,
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ARRAY_STRING_LONG_HPP
+#endif // REALM_ARRAY_STRING_LONG_HPP

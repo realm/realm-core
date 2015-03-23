@@ -77,7 +77,7 @@ namespace {
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !defined(__APPLE__)
-#  if TIGHTDB_ANDROID || defined DISABLE_ASYNC || defined TIGHTDB_ENABLE_ENCRYPTION
+#  if REALM_ANDROID || defined DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
 bool allow_async = true;
@@ -85,7 +85,7 @@ bool allow_async = true;
 #endif
 
 
-TIGHTDB_TABLE_4(TestTableShared,
+REALM_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
                 third,  Bool,
@@ -118,7 +118,7 @@ void writer(string path, int id)
 }
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined REALM_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, string path, int id)
 {
@@ -148,7 +148,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
             cerr << "waitpid got bad arguments" << endl;
         if (errno == ECHILD)
             cerr << "waitpid tried to wait for the wrong child: " << pid << endl;
-        TIGHTDB_TERMINATE("waitpid failed");
+        REALM_TERMINATE("waitpid failed");
     }
     bool child_exited_from_signal = WIFSIGNALED(stat_loc);
     CHECK(child_exited_from_signal);
@@ -167,7 +167,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION && !defined(TIGHTDB_ANDROID)
+#if !defined(__APPLE__) && !defined(_WIN32)&& !defined REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST(Shared_PipelinedWritesWithKills)
 {
@@ -187,7 +187,7 @@ TEST(Shared_PipelinedWritesWithKills)
     }
     int pid = fork();
     if (pid == -1)
-        TIGHTDB_TERMINATE("fork() failed");
+        REALM_TERMINATE("fork() failed");
     if (pid == 0) {
         // first writer!
         writer(path, 0);
@@ -198,7 +198,7 @@ TEST(Shared_PipelinedWritesWithKills)
             int pid2 = pid;
             pid = fork();
             if (pid == pid_t(-1))
-                TIGHTDB_TERMINATE("fork() failed");
+                REALM_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
                 _exit(0);
@@ -1089,7 +1089,7 @@ TEST(Shared_ManyReaders)
 
 namespace {
 
-TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
+REALM_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 } // anonymous namespace
 
@@ -1098,7 +1098,7 @@ TEST(Shared_WritesSpecialOrder)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_BPNODE_SIZE, but that takes a loooooong time!
+    const int num_rows = 5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
 
     {
@@ -1223,8 +1223,8 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
-#if !defined TIGHTDB_ANDROID && !defined TIGHTDB_IOS
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
+#if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
@@ -1242,7 +1242,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     for (int i = 0; i < 10; ++i) {
         pid_t pid = fork();
         if (pid == pid_t(-1))
-            TIGHTDB_TERMINATE("fork() failed");
+            REALM_TERMINATE("fork() failed");
         if (pid == 0) {
             // Child
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
@@ -1257,7 +1257,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             int options = 0;
             pid = waitpid(pid, &stat_loc, options);
             if (pid == pid_t(-1))
-                TIGHTDB_TERMINATE("waitpid() failed");
+                REALM_TERMINATE("waitpid() failed");
             bool child_exited_normaly = WIFEXITED(stat_loc);
             CHECK(child_exited_normaly);
             int child_exit_status = WEXITSTATUS(stat_loc);
@@ -1292,7 +1292,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 }
 
 #endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
@@ -1437,10 +1437,10 @@ TEST(Shared_FormerErrorCase1)
 
 namespace {
 
-TIGHTDB_TABLE_1(FormerErrorCase2_Subtable,
+REALM_TABLE_1(FormerErrorCase2_Subtable,
                 value,  Int)
 
-TIGHTDB_TABLE_1(FormerErrorCase2_Table,
+REALM_TABLE_1(FormerErrorCase2_Table,
                 bar, Subtable<FormerErrorCase2_Subtable>)
 
 } // namespace
@@ -1467,7 +1467,7 @@ TEST(Shared_FormerErrorCase2)
 
 namespace {
 
-TIGHTDB_TABLE_1(OverAllocTable,
+REALM_TABLE_1(OverAllocTable,
                 text, String)
 
 } // namespace
@@ -1604,9 +1604,9 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
         TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
         table->add_search_index(0);
-        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
             table->add_empty_row();
-        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
             table->remove(0);
         db.commit();
     }
@@ -2252,7 +2252,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-#ifndef TIGHTDB_ENABLE_ENCRYPTION // encrpted buffers aren't supported
+#ifndef REALM_ENABLE_ENCRYPTION // encrpted buffers aren't supported
     // The empty group created initially by a shared group accessor is special
     // in that it contains no nodes, and the root-ref is therefore zero. The
     // following block checks that the contents of such a file is still
@@ -2647,7 +2647,7 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 {
     // This test only makes sense when we can insert a number of rows
     // equal to the square of the maximum B+-tree node size.
-    size_t max_node_size = TIGHTDB_MAX_BPNODE_SIZE;
+    size_t max_node_size = REALM_MAX_BPNODE_SIZE;
     size_t max_node_size_squared = max_node_size;
     if (int_multiply_with_overflow_detect(max_node_size_squared, max_node_size))
         return;

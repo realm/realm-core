@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_BINARY_DATA_HPP
-#define TIGHTDB_BINARY_DATA_HPP
+#ifndef REALM_BINARY_DATA_HPP
+#define REALM_BINARY_DATA_HPP
 
 #include <cstddef>
 #include <algorithm>
@@ -38,21 +38,21 @@ namespace tightdb {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-    BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: m_data(data), m_size(size) {}
+    BinaryData() REALM_NOEXCEPT: m_data(0), m_size(0) {}
+    BinaryData(const char* data, std::size_t size) REALM_NOEXCEPT: m_data(data), m_size(size) {}
     template<std::size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
     template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
 
-#if TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
 #endif
 
-    ~BinaryData() TIGHTDB_NOEXCEPT {}
+    ~BinaryData() REALM_NOEXCEPT {}
 
-    char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
+    char operator[](std::size_t i) const REALM_NOEXCEPT { return m_data[i]; }
 
-    const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
+    const char* data() const REALM_NOEXCEPT { return m_data; }
+    std::size_t size() const REALM_NOEXCEPT { return m_size; }
 
     /// Is this a null reference?
     ///
@@ -76,31 +76,31 @@ public:
     /// makes no distinction between a null reference and a reference to the
     /// empty byte sequence. These functions and operators never look at the
     /// stored pointer if the stored size is zero.
-    bool is_null() const TIGHTDB_NOEXCEPT;
+    bool is_null() const REALM_NOEXCEPT;
 
-    friend bool operator==(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
-    friend bool operator!=(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
+    friend bool operator==(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
+    friend bool operator!=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
 
     //@{
     /// Trivial bytewise lexicographical comparison.
-    friend bool operator<(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
-    friend bool operator>(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
-    friend bool operator<=(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
-    friend bool operator>=(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
+    friend bool operator<(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
+    friend bool operator>(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
+    friend bool operator<=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
+    friend bool operator>=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
     //@}
 
-    bool begins_with(BinaryData) const TIGHTDB_NOEXCEPT;
-    bool ends_with(BinaryData) const TIGHTDB_NOEXCEPT;
-    bool contains(BinaryData) const TIGHTDB_NOEXCEPT;
+    bool begins_with(BinaryData) const REALM_NOEXCEPT;
+    bool ends_with(BinaryData) const REALM_NOEXCEPT;
+    bool contains(BinaryData) const REALM_NOEXCEPT;
 
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
 
-#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    explicit operator bool() const TIGHTDB_NOEXCEPT;
+#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    explicit operator bool() const REALM_NOEXCEPT;
 #else
     typedef const char* BinaryData::*unspecified_bool_type;
-    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+    operator unspecified_bool_type() const REALM_NOEXCEPT;
 #endif
 
 private:
@@ -118,7 +118,7 @@ template<class T, class A> inline BinaryData::BinaryData(const std::basic_string
 {
 }
 
-#if TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
 template<class T, class A> inline BinaryData::operator std::basic_string<char, T, A>() const
 {
@@ -127,53 +127,53 @@ template<class T, class A> inline BinaryData::operator std::basic_string<char, T
 
 #endif
 
-inline bool BinaryData::is_null() const TIGHTDB_NOEXCEPT
+inline bool BinaryData::is_null() const REALM_NOEXCEPT
 {
     return !m_data;
 }
 
-inline bool operator==(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+inline bool operator==(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
     return a.m_size == b.m_size && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
-inline bool operator!=(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+inline bool operator!=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
     return !(a == b);
 }
 
-inline bool operator<(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+inline bool operator<(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
     return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
                                         b.m_data, b.m_data + b.m_size);
 }
 
-inline bool operator>(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+inline bool operator>(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
     return b < a;
 }
 
-inline bool operator<=(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+inline bool operator<=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
     return !(b < a);
 }
 
-inline bool operator>=(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+inline bool operator>=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
     return !(a < b);
 }
 
-inline bool BinaryData::begins_with(BinaryData d) const TIGHTDB_NOEXCEPT
+inline bool BinaryData::begins_with(BinaryData d) const REALM_NOEXCEPT
 {
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
-inline bool BinaryData::ends_with(BinaryData d) const TIGHTDB_NOEXCEPT
+inline bool BinaryData::ends_with(BinaryData d) const REALM_NOEXCEPT
 {
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
-inline bool BinaryData::contains(BinaryData d) const TIGHTDB_NOEXCEPT
+inline bool BinaryData::contains(BinaryData d) const REALM_NOEXCEPT
 {
     return d.m_size == 0 ||
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
@@ -186,13 +186,13 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
     return out;
 }
 
-#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-inline BinaryData::operator bool() const TIGHTDB_NOEXCEPT
+#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+inline BinaryData::operator bool() const REALM_NOEXCEPT
 {
     return !is_null();
 }
 #else
-inline BinaryData::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
+inline BinaryData::operator unspecified_bool_type() const REALM_NOEXCEPT
 {
     return is_null() ? 0 : &BinaryData::m_data;
 }
@@ -200,4 +200,4 @@ inline BinaryData::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
 
 } // namespace tightdb
 
-#endif // TIGHTDB_BINARY_DATA_HPP
+#endif // REALM_BINARY_DATA_HPP

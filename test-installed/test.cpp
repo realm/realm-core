@@ -3,7 +3,7 @@
 
 using namespace tightdb;
 
-TIGHTDB_TABLE_1(TestTable,
+REALM_TABLE_1(TestTable,
                 value, Int)
 
 int main()

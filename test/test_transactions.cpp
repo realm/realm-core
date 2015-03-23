@@ -58,15 +58,15 @@ namespace {
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
               kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
-TIGHTDB_TABLE_2(MySubsubtable,
+REALM_TABLE_2(MySubsubtable,
                 value,  Int,
                 binary, Binary)
 
-TIGHTDB_TABLE_2(MySubtable,
+REALM_TABLE_2(MySubtable,
                 foo, Int,
                 bar, Subtable<MySubsubtable>)
 
-TIGHTDB_TABLE_8(MyTable,
+REALM_TABLE_8(MyTable,
                 alpha,   Int,
                 beta,    Bool,
                 gamma,   Enum<MyEnum>,

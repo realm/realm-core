@@ -455,7 +455,7 @@ TEST_EX(Failure_Pointer, failure_list, true) // Test #5, accum checks = 93 + 12 
 struct FooException {};
 
 struct BarException: exception {
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
     {
         return "bar";
     }
@@ -494,7 +494,7 @@ struct SummaryRecorder: Reporter {
         m_summary(summary)
     {
     }
-    void summary(const Summary& summary) TIGHTDB_OVERRIDE
+    void summary(const Summary& summary) REALM_OVERRIDE
     {
         m_summary = summary;
     }

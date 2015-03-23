@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_IMPL_INPUT_STREAM_HPP
-#define TIGHTDB_IMPL_INPUT_STREAM_HPP
+#ifndef REALM_IMPL_INPUT_STREAM_HPP
+#define REALM_IMPL_INPUT_STREAM_HPP
 
 namespace tightdb {
 namespace _impl {
@@ -39,4 +39,4 @@ public:
 }
 }
 
-#endif // TIGHTDB_IMPL_INPUT_STREAM_HPP
+#endif // REALM_IMPL_INPUT_STREAM_HPP

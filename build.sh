@@ -1,38 +1,38 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-# Enable tracing if TIGHTDB_SCRIPT_DEBUG is set
+# Enable tracing if REALM_SCRIPT_DEBUG is set
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
 fi
-if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
+if [ "$REALM_SCRIPT_DEBUG" ]; then
     set -x
 fi
 
 
-if ! [ "$TIGHTDB_ORIG_CWD" ]; then
-    TIGHTDB_ORIG_CWD="$(pwd)" || exit 1
+if ! [ "$REALM_ORIG_CWD" ]; then
+    REALM_ORIG_CWD="$(pwd)" || exit 1
     export ORIG_CWD
 fi
 
 dir="$(dirname "$0")" || exit 1
 cd "$dir" || exit 1
-TIGHTDB_HOME="$(pwd)" || exit 1
-export TIGHTDB_HOME
+REALM_HOME="$(pwd)" || exit 1
+export REALM_HOME
 
 MODE="$1"
 [ $# -gt 0 ] && shift
 
 # enabling replication support in core, now required for objective-c/ios
-export TIGHTDB_ENABLE_REPLICATION=1
+export REALM_ENABLE_REPLICATION=1
 
 # enable assertions in release builds by default
-if [ -z ${TIGHTDB_ENABLE_ASSERTIONS+x} ]; then
-    export TIGHTDB_ENABLE_ASSERTIONS=1
+if [ -z ${REALM_ENABLE_ASSERTIONS+x} ]; then
+    export REALM_ENABLE_ASSERTIONS=1
 fi
 
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui"
-if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
+if [ "$REALM_ENABLE_REPLICATION" ]; then
     EXTENSIONS="$EXTENSIONS replication"
 fi
 
@@ -272,7 +272,7 @@ CONFIG_MK="src/config.mk"
 
 require_config()
 {
-    cd "$TIGHTDB_HOME" || return 1
+    cd "$REALM_HOME" || return 1
     if ! [ -e "$CONFIG_MK" ]; then
         cat 1>&2 <<EOF
 ERROR: Found no configuration!
@@ -286,7 +286,7 @@ EOF
 
 auto_configure()
 {
-    cd "$TIGHTDB_HOME" || return 1
+    cd "$REALM_HOME" || return 1
     if [ -e "$CONFIG_MK" ]; then
         require_config || return 1
     else
@@ -301,7 +301,7 @@ get_config_param()
     name="$1"
     home="$2"
     if ! [ "$home" ]; then
-        home="$TIGHTDB_HOME"
+        home="$REALM_HOME"
     fi
     cd "$home" || return 1
     if ! [ -e "$CONFIG_MK" ]; then
@@ -364,11 +364,11 @@ get_dist_log_path()
     local stem temp_dir path dir files max next
     stem="$1"
     temp_dir="$2"
-    if [ "$TIGHTDB_DIST_LOG_FILE" ]; then
-        path="$TIGHTDB_DIST_LOG_FILE"
+    if [ "$REALM_DIST_LOG_FILE" ]; then
+        path="$REALM_DIST_LOG_FILE"
     else
-        if [ "$TIGHTDB_DIST_HOME" ]; then
-            dir="$TIGHTDB_DIST_HOME/log"
+        if [ "$REALM_DIST_HOME" ]; then
+            dir="$REALM_DIST_HOME/log"
         else
             dir="$temp_dir/log"
         fi
@@ -396,38 +396,38 @@ case "$MODE" in
         install_libexecdir="$($MAKE --no-print-directory prefix="$install_prefix" get-libexecdir)" || exit 1
 
         tightdb_version="unknown"
-        if [ "$TIGHTDB_VERSION" ]; then
-            tightdb_version="$TIGHTDB_VERSION"
+        if [ "$REALM_VERSION" ]; then
+            tightdb_version="$REALM_VERSION"
         elif value="$(git describe 2>/dev/null)"; then
             tightdb_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
         fi
 
         max_bpnode_size=1000
         max_bpnode_size_debug=1000
-        if [ "$TIGHTDB_MAX_BPNODE_SIZE" ]; then
-            max_bpnode_size="$TIGHTDB_MAX_BPNODE_SIZE"
+        if [ "$REALM_MAX_BPNODE_SIZE" ]; then
+            max_bpnode_size="$REALM_MAX_BPNODE_SIZE"
         fi
-        if [ "$TIGHTDB_MAX_BPNODE_SIZE_DEBUG" ]; then
-            max_bpnode_size_debug="$TIGHTDB_MAX_BPNODE_SIZE_DEBUG"
+        if [ "$REALM_MAX_BPNODE_SIZE_DEBUG" ]; then
+            max_bpnode_size_debug="$REALM_MAX_BPNODE_SIZE_DEBUG"
         fi
 
         enable_replication="no"
-        if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
+        if [ "$REALM_ENABLE_REPLICATION" ]; then
             enable_replication="yes"
         fi
 
         enable_alloc_set_zero="no"
-        if [ "$TIGHTDB_ENABLE_ALLOC_SET_ZERO" ]; then
+        if [ "$REALM_ENABLE_ALLOC_SET_ZERO" ]; then
             enable_alloc_set_zero="yes"
         fi
 
         enable_encryption="no"
-        if [ "$TIGHTDB_ENABLE_ENCRYPTION" ]; then
+        if [ "$REALM_ENABLE_ENCRYPTION" ]; then
             enable_encryption="yes"
         fi
 
         enable_assertions="no"
-        if [ "$TIGHTDB_ENABLE_ASSERTIONS" ]; then
+        if [ "$REALM_ENABLE_ASSERTIONS" ]; then
             enable_assertions="yes"
         fi
 
@@ -494,7 +494,7 @@ case "$MODE" in
         fi
 
         cat >"$CONFIG_MK" <<EOF
-TIGHTDB_VERSION       = $tightdb_version
+REALM_VERSION       = $tightdb_version
 INSTALL_PREFIX        = $install_prefix
 INSTALL_EXEC_PREFIX   = $install_exec_prefix
 INSTALL_INCLUDEDIR    = $install_includedir
@@ -522,7 +522,7 @@ EOF
 
     "clean")
         auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
             for x in $IPHONE_PLATFORMS; do
@@ -551,39 +551,39 @@ EOF
 
     "build")
         auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE || exit 1
+        export REALM_HAVE_CONFIG="1"
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE || exit 1
         echo "Done building"
         exit 0
         ;;
 
     "build-config-progs")
         auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         # FIXME: Apparently, there are fluke cases where timestamps
         # are such that <src/tightdb/util/config.h> is not recreated
         # automatically by src/tightdb/Makfile. Using --always-make is
         # a work-around.
-        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
         echo "Done building config programs"
         exit 0
         ;;
 
     "build-osx")
         auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         (
             cd src/tightdb
-            export TIGHTDB_ENABLE_FAT_BINARIES="1"
-            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
-            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            export REALM_ENABLE_FAT_BINARIES="1"
+            REALM_ENABLE_FAT_BINARIES="1" $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            REALM_ENABLE_FAT_BINARIES="1" $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
         ) || exit 1
         exit 0
         ;;
 
     "build-iphone")
         auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         iphone_sdks_avail="$(get_config_param "IPHONE_SDKS_AVAIL")" || exit 1
         if [ "$iphone_sdks_avail" != "yes" ]; then
             echo "ERROR: Required iPhone SDKs are not available" 1>&2
@@ -607,7 +607,7 @@ EOF
             cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/platforms/$platform/libtightdb.a"     || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/platforms/$platform/libtightdb-dbg.a" || exit 1
         done
-        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DTIGHTDB_CONFIG_IOS" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DREALM_CONFIG_IOS" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
         echo "Creating '$IPHONE_DIR/libtightdb-ios.a'"
         lipo "$temp_dir/platforms"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
@@ -619,11 +619,11 @@ EOF
         mkdir -p "$IPHONE_DIR/include/tightdb" || exit 1
         inst_headers="$(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers)" || exit 1
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
-        (cd "$TIGHTDB_HOME/$IPHONE_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        (cd "$REALM_HOME/$IPHONE_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         for x in "tightdb-config" "tightdb-config-dbg"; do
             echo "Creating '$IPHONE_DIR/$x'"
             y="$(printf "%s\n" "$x" | sed 's/tightdb-config/tightdb-config-ios/')" || exit 1
-            cp "src/tightdb/$y" "$TIGHTDB_HOME/$IPHONE_DIR/$x" || exit 1
+            cp "src/tightdb/$y" "$REALM_HOME/$IPHONE_DIR/$x" || exit 1
         done
         echo "Done building"
         exit 0
@@ -632,7 +632,7 @@ EOF
     "build-android")
         auto_configure || exit 1
 
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
         if [ "$android_ndk_home" = "none" ]; then
             cat 1>&2 <<EOF
@@ -648,7 +648,7 @@ EOF
         enable_encryption="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
         echo "Encryption enabled: ${enable_encryption}"
 
-        export TIGHTDB_ANDROID="1"
+        export REALM_ANDROID="1"
         mkdir -p "$ANDROID_DIR" || exit 1
         for target in $ANDROID_PLATFORMS; do
             temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
@@ -707,21 +707,21 @@ EOF
         inst_headers="$(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers)" || exit 1
         temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
-        (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        (cd "$REALM_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
 
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
         file_name="realm-core-android-$tightdb_version.tar.gz"
 
         echo "Create tar.gz file $file_name"
-        rm -f "$TIGHTDB_HOME/$file_name" || exit 1
-        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" .) || exit 1
+        rm -f "$REALM_HOME/$file_name" || exit 1
+        (cd "$REALM_HOME/$ANDROID_DIR" && tar czf "$REALM_HOME/$file_name" .) || exit 1
 
         echo "Unpacking in ../tightdb_java/$dir_name"
         mkdir -p ../tightdb_java/realm-jni/build || exit 1 # to help Mr. Jenkins
-        cp "$TIGHTDB_HOME/$file_name" ../tightdb_java/realm-jni/build
+        cp "$REALM_HOME/$file_name" ../tightdb_java/realm-jni/build
         (cd ../tightdb_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
-        (cd ../tightdb_java/$dir_name && tar xzf "$TIGHTDB_HOME/$file_name") || exit 1
+        (cd ../tightdb_java/$dir_name && tar xzf "$REALM_HOME/$file_name") || exit 1
         ;;
 
    "build-cocoa")
@@ -756,7 +756,7 @@ EOF
         cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
         cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
-        if ! [ "$TIGHTDB_DISABLE_MARKDOWN_CONVERT" ]; then
+        if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
             pandoc -f markdown -t plain -o "$tmpdir/$BASENAME/release_notes.txt" release_notes.md || exit 1
         fi
@@ -816,7 +816,7 @@ EOF
     "check-testcase"|"check-testcase-debug"|\
     "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE "$MODE" || exit 1
         echo "Test passed"
         exit 0
@@ -828,7 +828,7 @@ EOF
         check_mode="$(printf "%s\n" "$MODE" | sed 's/asan/check/')" || exit 1
         auto_configure || exit 1
         touch "$CONFIG_MK" || exit 1 # Force complete rebuild
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         error=""
         if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then
             error="1"
@@ -902,7 +902,7 @@ EOF
 
         # Other flags
         if [ -n "$DEBUG" ]; then
-            OTHER_CPLUSPLUSFLAGS="'-DTIGHTDB_DEBUG'"
+            OTHER_CPLUSPLUSFLAGS="'-DREALM_DEBUG'"
         fi
 
         # Initialize app directory
@@ -982,7 +982,7 @@ EOF
     "performance"|"benchmark"|"benchmark-"*|\
     "lcov"|"gcovr")
         auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE "$MODE" || exit 1
         exit 0
         ;;
@@ -1014,9 +1014,9 @@ EOF
 
     "get-version")
         version_file="src/tightdb/version.hpp"
-        tightdb_ver_major="$(grep ^"#define TIGHTDB_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
-        tightdb_ver_minor="$(grep ^"#define TIGHTDB_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
-        tightdb_ver_patch="$(grep ^"#define TIGHTDB_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_major="$(grep ^"#define REALM_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_minor="$(grep ^"#define REALM_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_patch="$(grep ^"#define REALM_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
         echo "$tightdb_ver_major.$tightdb_ver_minor.$tightdb_ver_patch"
         exit 0
         ;;
@@ -1029,9 +1029,9 @@ EOF
         tightdb_ver_patch="$(echo "$tightdb_version" | cut -f3 -d.)" || exit 1
 
         # update version.hpp
-        printf ",s/#define TIGHTDB_VER_MAJOR .*/#define TIGHTDB_VER_MAJOR $tightdb_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
-        printf ",s/#define TIGHTDB_VER_MINOR .*/#define TIGHTDB_VER_MINOR $tightdb_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
-        printf ",s/#define TIGHTDB_VER_PATCH .*/#define TIGHTDB_VER_PATCH $tightdb_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define REALM_VER_MAJOR .*/#define REALM_VER_MAJOR $tightdb_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $tightdb_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $tightdb_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
 
         sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
         sh build.sh release-notes-prerelease || exit 1
@@ -1060,7 +1060,7 @@ EOF
 
     "install")
         require_config || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE install-only DESTDIR="$DESTDIR" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
@@ -1071,7 +1071,7 @@ EOF
 
     "install-prod")
         require_config || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER="shared-libs,progs" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
@@ -1082,7 +1082,7 @@ EOF
 
     "install-devel")
         require_config || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER="static-libs,dev-progs,headers" || exit 1
         echo "Done installing"
         exit 0
@@ -1090,7 +1090,7 @@ EOF
 
     "uninstall")
         require_config || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE uninstall || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
@@ -1101,7 +1101,7 @@ EOF
 
     "uninstall-prod")
         require_config || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE uninstall INSTALL_FILTER="shared-libs,progs" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
@@ -1112,7 +1112,7 @@ EOF
 
     "uninstall-devel")
         require_config || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
+        export REALM_HAVE_CONFIG="1"
         $MAKE uninstall INSTALL_FILTER="static-libs,dev-progs,headers" || exit 1
         echo "Done uninstalling"
         exit 0
@@ -1246,11 +1246,11 @@ EOF
         fi
 
         VERSION="$(git describe)" || exit 1
-        if ! [ "$TIGHTDB_VERSION" ]; then
-            TIGHTDB_VERSION="$(printf "%s\n" "$VERSION" | sed 's/^v//')" || exit 1
-            export TIGHTDB_VERSION
+        if ! [ "$REALM_VERSION" ]; then
+            REALM_VERSION="$(printf "%s\n" "$VERSION" | sed 's/^v//')" || exit 1
+            export REALM_VERSION
         fi
-        NAME="tightdb-$TIGHTDB_VERSION"
+        NAME="tightdb-$REALM_VERSION"
 
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
 
@@ -1328,7 +1328,7 @@ EOF
 
             # Check state of working directories
             if [ "$(git status --porcelain)" ]; then
-                warning "Dirty working directory '../$(basename "$TIGHTDB_HOME")'"
+                warning "Dirty working directory '../$(basename "$REALM_HOME")'"
             fi
             for x in $AVAIL_EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
@@ -1392,15 +1392,15 @@ EOF
             cat >"$PKG_DIR/build" <<EOF
 #!/bin/sh
 
-TIGHTDB_ORIG_CWD="\$(pwd)" || exit 1
+REALM_ORIG_CWD="\$(pwd)" || exit 1
 export ORIG_CWD
 
 dir="\$(dirname "\$0")" || exit 1
 cd "\$dir" || exit 1
-TIGHTDB_DIST_HOME="\$(pwd)" || exit 1
-export TIGHTDB_DIST_HOME
+REALM_DIST_HOME="\$(pwd)" || exit 1
+export REALM_DIST_HOME
 
-export TIGHTDB_VERSION="$TIGHTDB_VERSION"
+export REALM_VERSION="$REALM_VERSION"
 export PREBUILT_CORE="$PREBUILT_CORE"
 export DISABLE_CHEETAH_CODE_GEN="1"
 
@@ -1548,7 +1548,7 @@ EOF
 
             if ! [ "$INTERACTIVE" ]; then
                 cat >"$PKG_DIR/README" <<EOF
-TightDB version $TIGHTDB_VERSION
+TightDB version $REALM_VERSION
 
 Configure specific extensions:    ./build  config  EXT1  [EXT2]...
 Configure all extensions:         ./build  config  all
@@ -1638,7 +1638,7 @@ EOF
                 message "Building core library"
                 PREBUILD_DIR="$TEMP_DIR/prebuild"
                 mkdir "$PREBUILD_DIR" || exit 1
-                sh "$TIGHTDB_HOME/build.sh" dist-copy "$PREBUILD_DIR" >>"$LOG_FILE" 2>&1 || exit 1
+                sh "$REALM_HOME/build.sh" dist-copy "$PREBUILD_DIR" >>"$LOG_FILE" 2>&1 || exit 1
                 (cd "$PREBUILD_DIR" && sh build.sh config && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
                 if [ "$INCLUDE_IPHONE" ]; then
@@ -1667,9 +1667,9 @@ EOF
 /test-installed
 /doc
 EOF
-                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-headers)" || exit 1
-                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-libraries)" || exit 1
-                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-programs)" || exit 1
+                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && REALM_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-headers)" || exit 1
+                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && REALM_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-libraries)" || exit 1
+                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && REALM_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-programs)" || exit 1
                 for x in $INST_HEADERS $INST_LIBS $INST_PROGS; do
                     echo "/src/tightdb/$x" >> "$TEMP_DIR/transfer/include"
                 done
@@ -1695,7 +1695,7 @@ EOF
                 fi
             else
                 message "Transferring core library to package"
-                sh "$TIGHTDB_HOME/build.sh" dist-copy "$PKG_DIR/tightdb" >>"$LOG_FILE" 2>&1 || exit 1
+                sh "$REALM_HOME/build.sh" dist-copy "$PKG_DIR/tightdb" >>"$LOG_FILE" 2>&1 || exit 1
             fi
 
             for x in $AVAIL_EXTENSIONS; do
@@ -1718,9 +1718,9 @@ EOF
             install_prefix="$TEMP_DIR/test-install"
             mkdir "$install_prefix" || exit 1
 
-            export TIGHTDB_DIST_LOG_FILE="$LOG_FILE"
-            export TIGHTDB_DIST_NONINTERACTIVE="1"
-            export TIGHTDB_TEST_INSTALL_PREFIX="$install_prefix"
+            export REALM_DIST_LOG_FILE="$LOG_FILE"
+            export REALM_DIST_NONINTERACTIVE="1"
+            export REALM_TEST_INSTALL_PREFIX="$install_prefix"
 
             error=""
             log_message "Testing './build config all'"
@@ -1764,13 +1764,13 @@ EOF
             # use the shared core library, are not, so we have to set
             # the runtime library path. Also, the core library will
             # look for `tightdbd` in the wrong place, so we have to
-            # set `TIGHTDB_ASYNC_DAEMON` too.
+            # set `REALM_ASYNC_DAEMON` too.
             if [ "$PREBUILT_CORE" ]; then
                 install_libdir="$(get_config_param "INSTALL_LIBDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
                 path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
                 export "$LD_LIBRARY_PATH_NAME"
                 install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
-                export TIGHTDB_ASYNC_DAEMON="$install_libexecdir/tightdbd"
+                export REALM_ASYNC_DAEMON="$install_libexecdir/tightdbd"
             fi
 
             log_message "Testing './build test-installed'"
@@ -1780,7 +1780,7 @@ EOF
 
             # Copy the installation test directory to allow later inspection
             INSTALL_COPY="$TEMP_DIR/test-install-copy"
-            cp -R "$TIGHTDB_TEST_INSTALL_PREFIX" "$INSTALL_COPY" || exit 1
+            cp -R "$REALM_TEST_INSTALL_PREFIX" "$INSTALL_COPY" || exit 1
 
             log_message "Testing './build uninstall'"
             if ! "$TEST_PKG_DIR/build" uninstall; then
@@ -1788,7 +1788,7 @@ EOF
             fi
 
             message "Checking that './build uninstall' leaves nothing behind"
-            REMAINING_PATHS="$(cd "$TIGHTDB_TEST_INSTALL_PREFIX" && find * \! -type d -o -ipath '*tightdb*')" || exit 1
+            REMAINING_PATHS="$(cd "$REALM_TEST_INSTALL_PREFIX" && find * \! -type d -o -ipath '*tightdb*')" || exit 1
             if [ "$REMAINING_PATHS" ]; then
                 fatal "Files and/or directories remain after uninstallation"
                 printf "%s" "$REMAINING_PATHS" >>"$LOG_FILE"
@@ -1854,7 +1854,7 @@ EOF
         fi
         LOG_FILE="$(get_dist_log_path "config" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -1873,7 +1873,7 @@ EOF
         # distribution package, we have to reconfigure the core
         # library such that it will install into the temporary
         # directory (an unfortunate and ugly kludge).
-        if [ "$PREBUILT_CORE" ] && ! [ "$TIGHTDB_TEST_INSTALL_PREFIX" ]; then
+        if [ "$PREBUILT_CORE" ] && ! [ "$REALM_TEST_INSTALL_PREFIX" ]; then
             touch ".DIST_CORE_WAS_CONFIGURED" || exit 1
         else
             if ! [ "$INTERACTIVE" ]; then
@@ -1884,11 +1884,11 @@ EOF
                 fi
             fi
             if [ "$INTERACTIVE" ]; then
-                if ! sh "build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
+                if ! sh "build.sh" config $REALM_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
                     ERROR="1"
                 fi
             else
-                if ! sh "build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX >>"$LOG_FILE" 2>&1; then
+                if ! sh "build.sh" config $REALM_TEST_INSTALL_PREFIX >>"$LOG_FILE" 2>&1; then
                     ERROR="1"
                 fi
             fi
@@ -1930,9 +1930,9 @@ EOF
                 fi
                 touch ".DIST_CXX_WAS_CONFIGURED" || exit 1
             fi
-            export TIGHTDB_DIST_INCLUDEDIR="$TIGHTDB_HOME/src"
-            export TIGHTDB_DIST_LIBDIR="$TIGHTDB_HOME/src/tightdb"
-            path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+            export REALM_DIST_INCLUDEDIR="$REALM_HOME/src"
+            export REALM_DIST_LIBDIR="$REALM_HOME/src/tightdb"
+            path_list_prepend PATH "$REALM_HOME/config-progs" || exit 1
             export PATH
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
@@ -1944,13 +1944,13 @@ EOF
                         echo "CONFIGURING Extension '$x'" | tee -a "$LOG_FILE"
                     fi
                     if [ "$INTERACTIVE" ]; then
-                        if sh "$EXT_HOME/build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
+                        if sh "$EXT_HOME/build.sh" config $REALM_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
                             touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                         else
                             ERROR="1"
                         fi
                     else
-                        if sh "$EXT_HOME/build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX >>"$LOG_FILE" 2>&1; then
+                        if sh "$EXT_HOME/build.sh" config $REALM_TEST_INSTALL_PREFIX >>"$LOG_FILE" 2>&1; then
                             touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                         else
                             echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
@@ -1963,7 +1963,7 @@ EOF
                 echo "DONE CONFIGURING" | tee -a "$LOG_FILE"
             fi
         fi
-        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             if ! [ "$INTERACTIVE" ]; then
                 if [ "$ERROR" ]; then
                     cat 1>&2 <<EOF
@@ -2024,7 +2024,7 @@ EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "DONE CLEANING" | tee -a "$LOG_FILE"
         fi
-        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if [ "$ERROR" ] && ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
         fi
         if [ "$ERROR" ]; then
@@ -2045,7 +2045,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "build" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2078,7 +2078,7 @@ EOF
                 else
                     echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                 fi
-                if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+                if ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
                     cat 1>&2 <<EOF
 
 Note: The core library could not be built. You may be missing one or
@@ -2116,7 +2116,7 @@ EOF
         else
             echo "DONE BUILDING" | tee -a "$LOG_FILE"
         fi
-        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             if ! [ "$INTERACTIVE" ]; then
                 if [ "$ERROR" ]; then
                     cat 1>&2 <<EOF
@@ -2153,14 +2153,14 @@ You need to run './build config' first.
 EOF
             exit 1
         fi
-        dist_home="$TIGHTDB_HOME"
-        if [ "$TIGHTDB_DIST_HOME" ]; then
-            dist_home="$TIGHTDB_DIST_HOME"
+        dist_home="$REALM_HOME"
+        if [ "$REALM_DIST_HOME" ]; then
+            dist_home="$REALM_DIST_HOME"
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build-iphone.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "build-iphone" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2182,7 +2182,7 @@ EOF
                 touch ".DIST_CORE_WAS_BUILT_FOR_IPHONE" || exit 1
             else
                 echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
-                if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+                if ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
                     cat 1>&2 <<EOF
 
 Note: You may be missing one or more dependencies. Check the README
@@ -2215,7 +2215,7 @@ EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "DONE BUILDING" | tee -a "$LOG_FILE"
         fi
-        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             if [ "$ERROR" ]; then
                 cat 1>&2 <<EOF
 
@@ -2261,7 +2261,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-$test_mode.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "$test_mode" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2280,11 +2280,11 @@ EOF
                 ERROR="1"
             fi
         fi
-        # We set `LD_LIBRARY_PATH` and `TIGHTDB_ASAYNC_DAEMON` here to be able
+        # We set `LD_LIBRARY_PATH` and `REALM_ASAYNC_DAEMON` here to be able
         # to test extensions before installation of the core library.
-        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"  || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$REALM_HOME/src/tightdb"  || exit 1
         export "$LD_LIBRARY_PATH_NAME"
-        export TIGHTDB_ASYNC_DAEMON="$TIGHTDB_HOME/src/tightdb/$async_daemon"
+        export REALM_ASYNC_DAEMON="$REALM_HOME/src/tightdb/$async_daemon"
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
@@ -2298,7 +2298,7 @@ EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "DONE TESTING" | tee -a "$LOG_FILE"
         fi
-        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if [ "$ERROR" ] && ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
         fi
         if [ "$ERROR" ]; then
@@ -2321,7 +2321,7 @@ EOF
         touch "$LOG_FILE" || exit 1
         chmod a+r "$LOG_FILE" || exit 1
         (
-            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2380,7 +2380,7 @@ EOF
                     fi
                 fi
             done
-            if [ "$NEED_USR_LOCAL_LIB_NOTE" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+            if [ "$NEED_USR_LOCAL_LIB_NOTE" ] && ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
                 libdir="$(get_config_param "INSTALL_LIBDIR")" || exit 1
                 cat <<EOF
 
@@ -2409,7 +2409,7 @@ EOF
             echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
-        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             if [ "$ERROR" ]; then
                 echo "Log file is here: $LOG_FILE" 1>&2
             else
@@ -2447,7 +2447,7 @@ EOF
         touch "$LOG_FILE" || exit 1
         chmod a+r "$LOG_FILE" || exit 1
         (
-            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2485,7 +2485,7 @@ EOF
         fi
         rm -f ".DIST_CORE_WAS_INSTALLED" || exit 1
         echo "DONE UNINSTALLING" | tee -a "$LOG_FILE"
-        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if [ "$ERROR" ] && ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
         fi
         if [ "$ERROR" ]; then
@@ -2506,7 +2506,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "test-installed" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2544,7 +2544,7 @@ EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "DONE TESTING" | tee -a "$LOG_FILE"
         fi
-        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+        if [ "$ERROR" ] && ! [ "$REALM_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
         fi
         if [ "$ERROR" ]; then
@@ -2635,7 +2635,7 @@ EOF
         grep -v -f "$TEMP_DIR/exclude.bre" "$TEMP_DIR/files2" >"$TEMP_DIR/files3" || exit 1
         tar czf "$TEMP_DIR/archive.tar.gz" -T "$TEMP_DIR/files3" || exit 1
         (cd "$TARGET_DIR" && tar xzmf "$TEMP_DIR/archive.tar.gz") || exit 1
-        if ! [ "$TIGHTDB_DISABLE_MARKDOWN_CONVERT" ]; then
+        if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
         fi
         exit 0
@@ -2658,12 +2658,12 @@ EOF
         git reset --hard || exit 1
         git clean -xfd || exit 1
 
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
+        REALM_MAX_BPNODE_SIZE_DEBUG="4" REALM_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-android || exit 1
         UNITTEST_ENCRYPT_ALL=yes sh build.sh check || exit 1
 
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
+        REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-android || exit 1
         sh build.sh build || exit 1
@@ -2690,27 +2690,27 @@ EOF
             echo "Bad check mode '$check_mode'" 1>&2
             exit 1
         fi
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
         exit 0
         ;;
 
     "jenkins-pipeline-coverage")
         # Run by Jenkins as part of the core pipeline whenever master changes
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         sh build.sh gcovr || exit 1
         exit 0
         ;;
 
     "jenkins-pipeline-address-sanitizer")
         # Run by Jenkins as part of the core pipeline whenever master changes.
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         sh build.sh asan-debug || exit 1
         exit 0
         ;;
 
     "jenkins-valgrind")
-        TIGHTDB_ENABLE_REPLICATION=1 TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
+        REALM_ENABLE_REPLICATION=1 REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
         sh build.sh clean || exit 1
         VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=/var/jenkins/workspace/core_valgrind/tightdb-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
         exit 0

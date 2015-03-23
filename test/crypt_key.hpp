@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_CRYPT_KEY_HPP
-#define TIGHTDB_TEST_CRYPT_KEY_HPP
+#ifndef REALM_TEST_CRYPT_KEY_HPP
+#define REALM_TEST_CRYPT_KEY_HPP
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -29,7 +29,7 @@ const char* crypt_key(bool always=false)
 {
     static const char key[] = "12345678901234567890123456789011234567890123456789012345678901";
     if (always) {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
         return key;
 #else
         return 0;
@@ -46,4 +46,4 @@ const char* crypt_key(bool always=false)
 
 } // anonymous namespace
 
-#endif // TIGHTDB_TEST_CRYPT_KEY_HPP
+#endif // REALM_TEST_CRYPT_KEY_HPP

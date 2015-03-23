@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_LANG_BIND_HELPER_HPP
-#define TIGHTDB_LANG_BIND_HELPER_HPP
+#ifndef REALM_LANG_BIND_HELPER_HPP
+#define REALM_LANG_BIND_HELPER_HPP
 
 #include <cstddef>
 
@@ -47,12 +47,12 @@ public:
     /// table accessor pointers, but if the binding/application makes a copy of
     /// such a pointer, and the copy needs to have an "independent life", then
     /// the binding/application must bind that copy using this function.
-    static void bind_table_ptr(const Table*) TIGHTDB_NOEXCEPT;
+    static void bind_table_ptr(const Table*) REALM_NOEXCEPT;
 
     /// Decrement the reference counter of the specified table accessor. The
     /// binding/application must call this function for every bound table
     /// accessor pointer object, when that pointer object ends its life.
-    static void unbind_table_ptr(const Table*) TIGHTDB_NOEXCEPT;
+    static void unbind_table_ptr(const Table*) REALM_NOEXCEPT;
 
     /// Construct a new freestanding table. The table accessor pointer is bound
     /// by the callee before it is returned (bind_table_ptr()).
@@ -113,7 +113,7 @@ public:
     static LinkView* get_linklist_ptr(Row&, std::size_t col_ndx);
     static void unbind_linklist_ptr(LinkView*);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
     /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
     static void advance_read(SharedGroup&, SharedGroup::VersionID version = SharedGroup::VersionID());
@@ -137,7 +137,7 @@ public:
     ///   type_Mixed     ->  "mixed"
     ///
     /// </pre>
-    static const char* get_data_type_name(DataType) TIGHTDB_NOEXCEPT;
+    static const char* get_data_type_name(DataType) REALM_NOEXCEPT;
 };
 
 
@@ -253,12 +253,12 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
     return table;
 }
 
-inline void LangBindHelper::unbind_table_ptr(const Table* t) TIGHTDB_NOEXCEPT
+inline void LangBindHelper::unbind_table_ptr(const Table* t) REALM_NOEXCEPT
 {
    t->unbind_ref();
 }
 
-inline void LangBindHelper::bind_table_ptr(const Table* t) TIGHTDB_NOEXCEPT
+inline void LangBindHelper::bind_table_ptr(const Table* t) REALM_NOEXCEPT
 {
    t->bind_ref();
 }
@@ -294,7 +294,7 @@ inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
    link_view->unbind_ref();
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, SharedGroup::VersionID version_id)
 {
@@ -321,4 +321,4 @@ inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
 
 } // namespace tightdb
 
-#endif // TIGHTDB_LANG_BIND_HELPER_HPP
+#endif // REALM_LANG_BIND_HELPER_HPP

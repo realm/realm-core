@@ -39,8 +39,8 @@ void ColumnLink::remove_backlinks(size_t row_ndx)
 void ColumnLink::move_last_over(size_t row_ndx, size_t last_row_ndx,
                                 bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // Remove backlinks to deleted row
     if (!broken_reciprocal_backlinks)
@@ -115,7 +115,7 @@ void ColumnLink::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ColumnLink::Verify(const Table& table, size_t col_ndx) const
 {
@@ -136,13 +136,13 @@ void ColumnLink::Verify(const Table& table, size_t col_ndx) const
         search_value.origin_row_ndx = i;
         pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         // Exactly one corresponding backlink must exist
-        TIGHTDB_ASSERT(range.second - range.first == 1);
-        TIGHTDB_ASSERT_3(range.first->target_row_ndx, ==, target_row_ndx);
+        REALM_ASSERT(range.second - range.first == 1);
+        REALM_ASSERT_3(range.first->target_row_ndx, ==, target_row_ndx);
         ++backlinks_seen;
     }
 
     // All backlinks must have been matched by a forward link
-    TIGHTDB_ASSERT_3(backlinks_seen, ==, pairs.size());
+    REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

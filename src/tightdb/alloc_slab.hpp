@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ALLOC_SLAB_HPP
-#define TIGHTDB_ALLOC_SLAB_HPP
+#ifndef REALM_ALLOC_SLAB_HPP
+#define REALM_ALLOC_SLAB_HPP
 
 #include <stdint.h> // unint8_t etc
 #include <vector>
@@ -62,7 +62,7 @@ public:
     /// Construct a slab allocator in the unattached state.
     SlabAlloc();
 
-    ~SlabAlloc() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~SlabAlloc() REALM_NOEXCEPT REALM_OVERRIDE;
 
     /// Attach this allocator to the specified file.
     ///
@@ -128,7 +128,7 @@ public:
     ///
     /// This function has no effect if the allocator is already in the
     /// detached state (idempotency).
-    void detach() TIGHTDB_NOEXCEPT;
+    void detach() REALM_NOEXCEPT;
 
     class DetachGuard;
 
@@ -138,16 +138,16 @@ public:
     /// one that is not attached using attach_buffer(), or one for
     /// which this function has already been called during the latest
     /// attachment.
-    void own_buffer() TIGHTDB_NOEXCEPT;
+    void own_buffer() REALM_NOEXCEPT;
 
     /// Returns true if, and only if this allocator is currently
     /// in the attached state.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     /// Returns true if, and only if this allocator is currently in
     /// the attached state and attachment was not established using
     /// attach_empty().
-    bool nonempty_attachment() const TIGHTDB_NOEXCEPT;
+    bool nonempty_attachment() const REALM_NOEXCEPT;
 
     /// Convert the attached file if the top-ref is not specified in
     /// the header, but in the footer, that is, if the file is on the
@@ -199,14 +199,14 @@ public:
     /// It is an error to call this function on a detached allocator,
     /// or one that was attached using attach_empty(). Doing so will
     /// result in undefined behavior.
-    std::size_t get_baseline() const TIGHTDB_NOEXCEPT;
+    std::size_t get_baseline() const REALM_NOEXCEPT;
 
     /// Get the total amount of managed memory. This is the baseline plus the
     /// sum of the sizes of the allocated slabs. It includes any free space.
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
-    std::size_t get_total_size() const TIGHTDB_NOEXCEPT;
+    std::size_t get_total_size() const REALM_NOEXCEPT;
 
     /// Mark all managed memory (except the attached file) as free
     /// space.
@@ -224,20 +224,20 @@ public:
     /// mapped byte has changed.
     bool remap(std::size_t file_size);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
-    void Verify() const TIGHTDB_OVERRIDE;
+    void Verify() const REALM_OVERRIDE;
     bool is_all_free() const;
     void print() const;
 #endif
 
 protected:
-    MemRef do_alloc(std::size_t size) TIGHTDB_OVERRIDE;
+    MemRef do_alloc(std::size_t size) REALM_OVERRIDE;
     MemRef do_realloc(ref_type, const char*, std::size_t old_size,
-                    std::size_t new_size) TIGHTDB_OVERRIDE;
+                    std::size_t new_size) REALM_OVERRIDE;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void do_free(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    char* do_translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_free(ref_type, const char*) REALM_NOEXCEPT REALM_OVERRIDE;
+    char* do_translate(ref_type) const REALM_NOEXCEPT REALM_OVERRIDE;
 
 private:
     enum AttachMode {
@@ -290,8 +290,8 @@ private:
         uint64_t m_magic_cookie;
     };
 
-    TIGHTDB_STATIC_ASSERT(sizeof (Header) == 24, "Bad header size");
-    TIGHTDB_STATIC_ASSERT(sizeof (StreamingFooter) == 16, "Bad footer size");
+    REALM_STATIC_ASSERT(sizeof (Header) == 24, "Bad header size");
+    REALM_STATIC_ASSERT(sizeof (StreamingFooter) == 16, "Bad footer size");
 
     static const Header empty_file_header;
     static const Header streaming_header;
@@ -333,7 +333,7 @@ private:
     chunks m_free_space;
     chunks m_free_read_only;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     bool m_debug_out;
 #endif
 
@@ -347,11 +347,11 @@ private:
     class ChunkRefEq;
     class ChunkRefEndEq;
     class SlabRefEndEq;
-    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) TIGHTDB_NOEXCEPT;
+    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) REALM_NOEXCEPT;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
-    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_replication = r; }
+#ifdef REALM_ENABLE_REPLICATION
+    Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
+    void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
 #endif
 
     friend class Group;
@@ -362,9 +362,9 @@ private:
 
 class SlabAlloc::DetachGuard {
 public:
-    DetachGuard(SlabAlloc& alloc) TIGHTDB_NOEXCEPT: m_alloc(&alloc) {}
-    ~DetachGuard() TIGHTDB_NOEXCEPT;
-    SlabAlloc* release() TIGHTDB_NOEXCEPT;
+    DetachGuard(SlabAlloc& alloc) REALM_NOEXCEPT: m_alloc(&alloc) {}
+    ~DetachGuard() REALM_NOEXCEPT;
+    SlabAlloc* release() REALM_NOEXCEPT;
 private:
     SlabAlloc* m_alloc;
 };
@@ -380,39 +380,39 @@ inline SlabAlloc::SlabAlloc():
     m_free_space_state(free_space_Clean)
 {
     m_baseline = 0; // Unattached
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     m_debug_out = false;
 #endif
 }
 
-inline void SlabAlloc::own_buffer() TIGHTDB_NOEXCEPT
+inline void SlabAlloc::own_buffer() REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
-    TIGHTDB_ASSERT(m_data);
-    TIGHTDB_ASSERT(!m_file.is_attached());
+    REALM_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
+    REALM_ASSERT(m_data);
+    REALM_ASSERT(!m_file.is_attached());
     m_attach_mode = attach_OwnedBuffer;
 }
 
-inline bool SlabAlloc::is_attached() const TIGHTDB_NOEXCEPT
+inline bool SlabAlloc::is_attached() const REALM_NOEXCEPT
 {
     return m_attach_mode != attach_None;
 }
 
-inline bool SlabAlloc::nonempty_attachment() const TIGHTDB_NOEXCEPT
+inline bool SlabAlloc::nonempty_attachment() const REALM_NOEXCEPT
 {
     return is_attached() && m_data;
 }
 
-inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
+inline std::size_t SlabAlloc::get_baseline() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
     return m_baseline;
 }
 
 inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
 {
-    TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    if (TIGHTDB_LIKELY(!m_file_on_streaming_form))
+    REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    if (REALM_LIKELY(!m_file_on_streaming_form))
         return;
     do_prepare_for_update(mutable_data, mapping);
 }
@@ -422,24 +422,24 @@ inline void SlabAlloc::reserve(std::size_t size)
     m_file.prealloc_if_supported(0, size);
 }
 
-inline SlabAlloc::DetachGuard::~DetachGuard() TIGHTDB_NOEXCEPT
+inline SlabAlloc::DetachGuard::~DetachGuard() REALM_NOEXCEPT
 {
     if (m_alloc)
         m_alloc->detach();
 }
 
-inline SlabAlloc* SlabAlloc::DetachGuard::release() TIGHTDB_NOEXCEPT
+inline SlabAlloc* SlabAlloc::DetachGuard::release() REALM_NOEXCEPT
 {
     SlabAlloc* alloc = m_alloc;
     m_alloc = 0;
     return alloc;
 }
 
-inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab) TIGHTDB_NOEXCEPT
+inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab) REALM_NOEXCEPT
 {
     return ref < slab.ref_end;
 }
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ALLOC_SLAB_HPP
+#endif // REALM_ALLOC_SLAB_HPP

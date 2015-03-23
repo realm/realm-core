@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
-#define TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
+#ifndef REALM_TEST_UTIL_RESOURCE_LIMITS_HPP
+#define REALM_TEST_UTIL_RESOURCE_LIMITS_HPP
 
 namespace tightdb {
 namespace test_util {
@@ -28,7 +28,7 @@ enum Resource {
     resource_NumOpenFiles
 };
 
-bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT;
+bool system_has_rlimit(Resource) REALM_NOEXCEPT;
 
 //@{
 
@@ -44,4 +44,4 @@ void set_soft_rlimit(Resource, long value);
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
+#endif // REALM_TEST_UTIL_RESOURCE_LIMITS_HPP

@@ -207,7 +207,7 @@ TEST(File_SetEncryptionKey)
     File f(path, File::mode_Write);
     const char key[64] = {0};
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
     f.set_encryption_key(key); // should not throw
 #else
     CHECK_THROW(f.set_encryption_key(key), std::runtime_error);

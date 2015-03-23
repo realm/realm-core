@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TABLE_BASIC_FWD_HPP
-#define TIGHTDB_TABLE_BASIC_FWD_HPP
+#ifndef REALM_TABLE_BASIC_FWD_HPP
+#define REALM_TABLE_BASIC_FWD_HPP
 
 namespace tightdb {
 
@@ -32,4 +32,4 @@ template<class Spec> struct IsBasicTable<const BasicTable<Spec> > { static const
 
 } // namespace tightdb
 
-#endif // TIGHTDB_TABLE_BASIC_FWD_HPP
+#endif // REALM_TABLE_BASIC_FWD_HPP

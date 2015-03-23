@@ -9,7 +9,7 @@ using namespace std;
 using namespace tightdb;
 
 // Define schema for main table
-TIGHTDB_TABLE_3(PeopleTable,
+REALM_TABLE_3(PeopleTable,
                   name,   String,
                   age,    Int,
                   hired,  Bool)

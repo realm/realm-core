@@ -32,7 +32,7 @@
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/unicode.hpp>
 
-#if TIGHTDB_HAVE_CXX11
+#if REALM_HAVE_CXX11
 #include <clocale>
 
 #ifdef _MSC_VER
@@ -50,7 +50,7 @@ namespace tightdb {
     bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
     {
         if (method == STRING_COMPARE_CPP11) {
-#ifdef TIGHTDB_HAVE_CXX11
+#ifdef REALM_HAVE_CXX11
             string l = std::locale("").name();
             // We cannot use C locale because it puts 'Z' before 'a'
             if (l == "C")
@@ -151,9 +151,9 @@ namespace tightdb {
 
     wstring utf8_to_wstring(StringData str)
     {
-#if TIGHTDB_HAVE_CXX11 && defined(_MSC_VER)
+#if REALM_HAVE_CXX11 && defined(_MSC_VER)
         // __STDC_UTF_16__ seems not to work
-        TIGHTDB_STATIC_ASSERT(sizeof(wchar_t) == 2, "Expected Windows to use utf16");
+        REALM_STATIC_ASSERT(sizeof(wchar_t) == 2, "Expected Windows to use utf16");
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utf8conv;
         auto w_result = utf8conv.from_bytes(str.data(), str.data() + str.size());
         return w_result;
@@ -161,7 +161,7 @@ namespace tightdb {
         // gcc 4.7 and 4.8 do not yet support codecvt_utf8_utf16 and wstring_convert, and note that we can NOT just use
         // setlocale() + mbstowcs() because setlocale is extremely slow and may change locale of the entire user process
         static_cast<void>(str);
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
         return L"";
 #endif
     }
@@ -229,14 +229,14 @@ namespace tightdb {
         }
         else if (string_compare_method == STRING_COMPARE_CPP11) {
             // C++11. Precise sorting in user's current locale. Arbitrary return value (silent error) for invalid utf8
-#if TIGHTDB_HAVE_CXX11
+#if REALM_HAVE_CXX11
             wstring wstring1 = utf8_to_wstring(string1);
             wstring wstring2 = utf8_to_wstring(string2);
             std::locale l = std::locale("");
             bool ret = l(wstring1, wstring2);
             return ret;
 #else
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
             return false;
 #endif
         }
@@ -246,7 +246,7 @@ namespace tightdb {
             return ret;
         }
 
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
         return false;
     }
 
@@ -355,7 +355,7 @@ namespace tightdb {
             if (n2 == 0) 
                 return false;
 
-            TIGHTDB_ASSERT(0 < n2 && n2 <= 1);
+            REALM_ASSERT(0 < n2 && n2 <= 1);
             tmp[n2] = 0;
 
             // Note: If tmp[0] == 0, it is because the string contains a

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_THREAD_HPP
-#define TIGHTDB_UTIL_THREAD_HPP
+#ifndef REALM_UTIL_THREAD_HPP
+#define REALM_UTIL_THREAD_HPP
 
 #include <exception>
 
@@ -37,7 +37,7 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/meta.hpp>
 
-#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+#ifdef REALM_HAVE_CXX11_ATOMIC
 #  include <atomic>
 #endif
 
@@ -52,7 +52,7 @@ namespace util {
 class Thread {
 public:
     Thread();
-    ~Thread() TIGHTDB_NOEXCEPT;
+    ~Thread() REALM_NOEXCEPT;
 
     template<class F> explicit Thread(F func);
 
@@ -64,7 +64,7 @@ public:
     /// details.
     template<class F> void start(F func);
 
-    bool joinable() TIGHTDB_NOEXCEPT;
+    bool joinable() REALM_NOEXCEPT;
 
     void join();
 
@@ -76,10 +76,10 @@ private:
 
     void start(entry_func_type, void* arg);
 
-    template<class> static void* entry_point(void*) TIGHTDB_NOEXCEPT;
+    template<class> static void* entry_point(void*) REALM_NOEXCEPT;
 
-    TIGHTDB_NORETURN static void create_failed(int);
-    TIGHTDB_NORETURN static void join_failed(int);
+    REALM_NORETURN static void create_failed(int);
+    REALM_NORETURN static void join_failed(int);
 };
 
 
@@ -87,7 +87,7 @@ private:
 class Mutex {
 public:
     Mutex();
-    ~Mutex() TIGHTDB_NOEXCEPT;
+    ~Mutex() REALM_NOEXCEPT;
 
     struct process_shared_tag {};
 
@@ -112,13 +112,13 @@ protected:
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
 
-    void lock() TIGHTDB_NOEXCEPT;
-    void unlock() TIGHTDB_NOEXCEPT;
+    void lock() REALM_NOEXCEPT;
+    void unlock() REALM_NOEXCEPT;
 
-    TIGHTDB_NORETURN static void init_failed(int);
-    TIGHTDB_NORETURN static void attr_init_failed(int);
-    TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
-    TIGHTDB_NORETURN static void lock_failed(int) TIGHTDB_NOEXCEPT;
+    REALM_NORETURN static void init_failed(int);
+    REALM_NORETURN static void attr_init_failed(int);
+    REALM_NORETURN static void destroy_failed(int) REALM_NOEXCEPT;
+    REALM_NORETURN static void lock_failed(int) REALM_NOEXCEPT;
 
     friend class CondVar;
     friend class PlatformSpecificCondVar;
@@ -128,8 +128,8 @@ protected:
 /// A simple mutex ownership wrapper.
 class LockGuard {
 public:
-    LockGuard(Mutex&) TIGHTDB_NOEXCEPT;
-    ~LockGuard() TIGHTDB_NOEXCEPT;
+    LockGuard(Mutex&) REALM_NOEXCEPT;
+    ~LockGuard() REALM_NOEXCEPT;
 
 private:
     Mutex& m_mutex;
@@ -145,12 +145,12 @@ struct defer_lock_tag {};
 /// locking as well as repeated unlocking and relocking.
 class UniqueLock {
 public:
-    UniqueLock(Mutex&) TIGHTDB_NOEXCEPT;
-    UniqueLock(Mutex&, defer_lock_tag) TIGHTDB_NOEXCEPT;
-    ~UniqueLock() TIGHTDB_NOEXCEPT;
+    UniqueLock(Mutex&) REALM_NOEXCEPT;
+    UniqueLock(Mutex&, defer_lock_tag) REALM_NOEXCEPT;
+    ~UniqueLock() REALM_NOEXCEPT;
 
-    void lock() TIGHTDB_NOEXCEPT;
-    void unlock() TIGHTDB_NOEXCEPT;
+    void lock() REALM_NOEXCEPT;
+    void unlock() REALM_NOEXCEPT;
 
 private:
     Mutex* m_mutex;
@@ -170,9 +170,9 @@ private:
 class RobustMutex: private Mutex {
 public:
     RobustMutex();
-    ~RobustMutex() TIGHTDB_NOEXCEPT;
+    ~RobustMutex() REALM_NOEXCEPT;
 
-    static bool is_robust_on_this_platform() TIGHTDB_NOEXCEPT;
+    static bool is_robust_on_this_platform() REALM_NOEXCEPT;
 
     class NotRecoverable;
 
@@ -192,7 +192,7 @@ public:
     /// function.
     template<class Func> void lock(Func recover_func);
 
-    void unlock() TIGHTDB_NOEXCEPT;
+    void unlock() REALM_NOEXCEPT;
 
     /// Low-level locking of robust mutex.
     ///
@@ -218,7 +218,7 @@ public:
     /// \note Most application should never call this function
     /// directly. It is called automatically when using the ordinary
     /// lock() function.
-    void mark_as_consistent() TIGHTDB_NOEXCEPT;
+    void mark_as_consistent() REALM_NOEXCEPT;
 
     /// Attempt to check if this mutex is a valid object.
     ///
@@ -230,14 +230,14 @@ public:
     /// involve undefined behavior, so it is only safe to assume that this
     /// function will run correctly when it is known that the mutex object is
     /// valid.
-    bool is_valid() TIGHTDB_NOEXCEPT;
+    bool is_valid() REALM_NOEXCEPT;
 
     friend class CondVar;
 };
 
 class RobustMutex::NotRecoverable: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
     {
         return "Failed to recover consistent state of shared memory";
     }
@@ -250,7 +250,7 @@ public:
     /// \param recover_func See RobustMutex::lock().
     template<class TFunc>
     RobustLockGuard(RobustMutex&, TFunc func);
-    ~RobustLockGuard() TIGHTDB_NOEXCEPT;
+    ~RobustLockGuard() REALM_NOEXCEPT;
 
 private:
     RobustMutex& m_mutex;
@@ -264,7 +264,7 @@ private:
 class CondVar {
 public:
     CondVar();
-    ~CondVar() TIGHTDB_NOEXCEPT;
+    ~CondVar() REALM_NOEXCEPT;
 
     struct process_shared_tag {};
 
@@ -279,24 +279,24 @@ public:
     CondVar(process_shared_tag);
 
     /// Wait for another thread to call notify() or notify_all().
-    void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
+    void wait(LockGuard& l) REALM_NOEXCEPT;
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
-    void notify() TIGHTDB_NOEXCEPT;
+    void notify() REALM_NOEXCEPT;
 
     /// Wake up every thread that is currently wating on this
     /// condition.
-    void notify_all() TIGHTDB_NOEXCEPT;
+    void notify_all() REALM_NOEXCEPT;
 
 private:
     pthread_cond_t m_impl;
 
-    TIGHTDB_NORETURN static void init_failed(int);
-    TIGHTDB_NORETURN static void attr_init_failed(int);
-    TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
+    REALM_NORETURN static void init_failed(int);
+    REALM_NORETURN static void attr_init_failed(int);
+    REALM_NORETURN static void destroy_failed(int) REALM_NOEXCEPT;
     void handle_wait_error(int error);
 };
 
@@ -330,13 +330,13 @@ template<class F> inline void Thread::start(F func)
     m_joinable = true;
 }
 
-inline Thread::~Thread() TIGHTDB_NOEXCEPT
+inline Thread::~Thread() REALM_NOEXCEPT
 {
     if (m_joinable)
         std::terminate();
 }
 
-inline bool Thread::joinable() TIGHTDB_NOEXCEPT
+inline bool Thread::joinable() REALM_NOEXCEPT
 {
     return m_joinable;
 }
@@ -345,11 +345,11 @@ inline void Thread::start(entry_func_type entry_func, void* arg)
 {
     const pthread_attr_t* attr = 0; // Use default thread attributes
     int r = pthread_create(&m_id, attr, entry_func, arg);
-    if (TIGHTDB_UNLIKELY(r != 0))
+    if (REALM_UNLIKELY(r != 0))
         create_failed(r); // Throws
 }
 
-template<class F> inline void* Thread::entry_point(void* cookie) TIGHTDB_NOEXCEPT
+template<class F> inline void* Thread::entry_point(void* cookie) REALM_NOEXCEPT
 {
     UniquePtr<F> func(static_cast<F*>(cookie));
     try {
@@ -373,74 +373,74 @@ inline Mutex::Mutex(process_shared_tag)
     init_as_process_shared(robust_if_available);
 }
 
-inline Mutex::~Mutex() TIGHTDB_NOEXCEPT
+inline Mutex::~Mutex() REALM_NOEXCEPT
 {
     int r = pthread_mutex_destroy(&m_impl);
-    if (TIGHTDB_UNLIKELY(r != 0))
+    if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
 }
 
 inline void Mutex::init_as_regular()
 {
     int r = pthread_mutex_init(&m_impl, 0);
-    if (TIGHTDB_UNLIKELY(r != 0))
+    if (REALM_UNLIKELY(r != 0))
         init_failed(r);
 }
 
-inline void Mutex::lock() TIGHTDB_NOEXCEPT
+inline void Mutex::lock() REALM_NOEXCEPT
 {
     int r = pthread_mutex_lock(&m_impl);
-    if (TIGHTDB_LIKELY(r == 0))
+    if (REALM_LIKELY(r == 0))
         return;
     lock_failed(r);
 }
 
-inline void Mutex::unlock() TIGHTDB_NOEXCEPT
+inline void Mutex::unlock() REALM_NOEXCEPT
 {
     int r = pthread_mutex_unlock(&m_impl);
-    TIGHTDB_ASSERT(r == 0);
+    REALM_ASSERT(r == 0);
     static_cast<void>(r);
 }
 
 
-inline LockGuard::LockGuard(Mutex& m) TIGHTDB_NOEXCEPT:
+inline LockGuard::LockGuard(Mutex& m) REALM_NOEXCEPT:
     m_mutex(m)
 {
     m_mutex.lock();
 }
 
-inline LockGuard::~LockGuard() TIGHTDB_NOEXCEPT
+inline LockGuard::~LockGuard() REALM_NOEXCEPT
 {
     m_mutex.unlock();
 }
 
 
-inline UniqueLock::UniqueLock(Mutex& m) TIGHTDB_NOEXCEPT:
+inline UniqueLock::UniqueLock(Mutex& m) REALM_NOEXCEPT:
     m_mutex(&m)
 {
     m_mutex->lock();
     m_is_locked = true;
 }
 
-inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) TIGHTDB_NOEXCEPT:
+inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) REALM_NOEXCEPT:
     m_mutex(&m)
 {
     m_is_locked = false;
 }
 
-inline UniqueLock::~UniqueLock() TIGHTDB_NOEXCEPT
+inline UniqueLock::~UniqueLock() REALM_NOEXCEPT
 {
     if (m_is_locked)
         m_mutex->unlock();
 }
 
-inline void UniqueLock::lock() TIGHTDB_NOEXCEPT
+inline void UniqueLock::lock() REALM_NOEXCEPT
 {
     m_mutex->lock();
     m_is_locked = true;
 }
 
-inline void UniqueLock::unlock() TIGHTDB_NOEXCEPT
+inline void UniqueLock::unlock() REALM_NOEXCEPT
 {
     m_mutex->unlock();
     m_is_locked = false;
@@ -453,7 +453,7 @@ inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
     m_mutex.lock(func);
 }
 
-inline RobustLockGuard::~RobustLockGuard() TIGHTDB_NOEXCEPT
+inline RobustLockGuard::~RobustLockGuard() REALM_NOEXCEPT
 {
     m_mutex.unlock();
 }
@@ -467,14 +467,14 @@ inline RobustMutex::RobustMutex():
     init_as_process_shared(robust_if_available);
 }
 
-inline RobustMutex::~RobustMutex() TIGHTDB_NOEXCEPT
+inline RobustMutex::~RobustMutex() REALM_NOEXCEPT
 {
 }
 
 template<class Func> inline void RobustMutex::lock(Func recover_func)
 {
     bool no_thread_has_died = low_level_lock(); // Throws
-    if (TIGHTDB_LIKELY(no_thread_has_died))
+    if (REALM_LIKELY(no_thread_has_died))
         return;
     try {
         recover_func(); // Throws
@@ -494,7 +494,7 @@ template<class Func> inline void RobustMutex::lock(Func recover_func)
     }
 }
 
-inline void RobustMutex::unlock() TIGHTDB_NOEXCEPT
+inline void RobustMutex::unlock() REALM_NOEXCEPT
 {
     Mutex::unlock();
 }
@@ -506,22 +506,22 @@ inline void RobustMutex::unlock() TIGHTDB_NOEXCEPT
 inline CondVar::CondVar()
 {
     int r = pthread_cond_init(&m_impl, 0);
-    if (TIGHTDB_UNLIKELY(r != 0))
+    if (REALM_UNLIKELY(r != 0))
         init_failed(r);
 }
 
-inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
+inline CondVar::~CondVar() REALM_NOEXCEPT
 {
     int r = pthread_cond_destroy(&m_impl);
-    if (TIGHTDB_UNLIKELY(r != 0))
+    if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
 }
 
-inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
+inline void CondVar::wait(LockGuard& l) REALM_NOEXCEPT
 {
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
-    if (TIGHTDB_UNLIKELY(r != 0))
-        TIGHTDB_TERMINATE("pthread_cond_wait() failed");
+    if (REALM_UNLIKELY(r != 0))
+        REALM_TERMINATE("pthread_cond_wait() failed");
 }
 
 template<class Func>
@@ -536,7 +536,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
         if (r == ETIMEDOUT)
             return;
     }
-    if (TIGHTDB_LIKELY(r == 0))
+    if (REALM_LIKELY(r == 0))
         return;
     handle_wait_error(r);
     try {
@@ -557,17 +557,17 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
     }
 }
 
-inline void CondVar::notify() TIGHTDB_NOEXCEPT
+inline void CondVar::notify() REALM_NOEXCEPT
 {
     int r = pthread_cond_signal(&m_impl);
-    TIGHTDB_ASSERT(r == 0);
+    REALM_ASSERT(r == 0);
     static_cast<void>(r);
 }
 
-inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
+inline void CondVar::notify_all() REALM_NOEXCEPT
 {
     int r = pthread_cond_broadcast(&m_impl);
-    TIGHTDB_ASSERT(r == 0);
+    REALM_ASSERT(r == 0);
     static_cast<void>(r);
 }
 
@@ -650,7 +650,7 @@ private:
     Atomic<T>& operator=(const Atomic<T>&);
 
     // Assumed to be naturally aligned - if not, hardware might not guarantee atomicity
-#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+#ifdef REALM_HAVE_CXX11_ATOMIC
     std::atomic<T> state;
 #elif defined(_MSC_VER)
     volatile T state;
@@ -662,7 +662,7 @@ private:
 };
 
 
-#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+#ifdef REALM_HAVE_CXX11_ATOMIC
 template<typename T>
 inline T Atomic<T>::load() const
 {
@@ -780,7 +780,7 @@ inline void Atomic<T>::store_release(T value)
     state = value;
 }
 
-#elif TIGHTDB_HAVE_AT_LEAST_GCC(4, 7) || TIGHTDB_HAVE_CLANG_FEATURE(c_atomic)
+#elif REALM_HAVE_AT_LEAST_GCC(4, 7) || REALM_HAVE_CLANG_FEATURE(c_atomic)
 // Modern non-C++11 gcc/clang implementaion
 
 template<typename T>
@@ -986,4 +986,4 @@ inline T Atomic<T>::exchange_acquire(T newvalue)
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_THREAD_HPP
+#endif // REALM_UTIL_THREAD_HPP

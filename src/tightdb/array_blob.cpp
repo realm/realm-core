@@ -8,9 +8,9 @@ using namespace tightdb;
 
 void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_3(begin, <=, end);
-    TIGHTDB_ASSERT_3(end, <=, m_size);
-    TIGHTDB_ASSERT(size == 0 || data);
+    REALM_ASSERT_3(begin, <=, end);
+    REALM_ASSERT_3(end, <=, m_size);
+    REALM_ASSERT(size == 0 || data);
 
     copy_on_write(); // Throws
 
@@ -50,11 +50,11 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ArrayBlob::Verify() const
 {
-    TIGHTDB_ASSERT(!has_refs());
+    REALM_ASSERT(!has_refs());
 }
 
 void ArrayBlob::to_dot(ostream& out, StringData title) const
@@ -88,4 +88,4 @@ void ArrayBlob::to_dot(ostream& out, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

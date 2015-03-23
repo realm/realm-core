@@ -35,8 +35,8 @@ Searching: The main finding function is:
     If callback() returns false, find() will exit, otherwise it will keep searching remaining items in array.
 */
 
-#ifndef TIGHTDB_ARRAY_HPP
-#define TIGHTDB_ARRAY_HPP
+#ifndef REALM_ARRAY_HPP
+#define REALM_ARRAY_HPP
 
 #include <cmath>
 #include <cstdlib> // std::size_t
@@ -64,7 +64,7 @@ Searching: The main finding function is:
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
 #  include <emmintrin.h> // SSE2
 #  include <tightdb/tightdb_nmmintrin.h> // SSE42
 #endif
@@ -85,7 +85,7 @@ const std::size_t npos = std::size_t(-1);
 const std::size_t not_found = npos;
 
  /* wid == 16/32 likely when accessing offsets in B tree */
-#define TIGHTDB_TEMPEX(fun, wid, arg) \
+#define REALM_TEMPEX(fun, wid, arg) \
     if (wid == 16) {fun<16> arg;} \
     else if (wid == 32) {fun<32> arg;} \
     else if (wid == 0) {fun<0> arg;} \
@@ -94,9 +94,9 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<4> arg;} \
     else if (wid == 8) {fun<8> arg;} \
     else if (wid == 64) {fun<64> arg;} \
-    else {TIGHTDB_ASSERT_DEBUG(false); fun<0> arg;}
+    else {REALM_ASSERT_DEBUG(false); fun<0> arg;}
 
-#define TIGHTDB_TEMPEX2(fun, targ, wid, arg) \
+#define REALM_TEMPEX2(fun, targ, wid, arg) \
     if (wid == 16) {fun<targ, 16> arg;} \
     else if (wid == 32) {fun<targ, 32> arg;} \
     else if (wid == 0) {fun<targ, 0> arg;} \
@@ -105,9 +105,9 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ, 4> arg;} \
     else if (wid == 8) {fun<targ, 8> arg;} \
     else if (wid == 64) {fun<targ, 64> arg;} \
-    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ, 0> arg;}
+    else {REALM_ASSERT_DEBUG(false); fun<targ, 0> arg;}
 
-#define TIGHTDB_TEMPEX3(fun, targ1, targ2, wid, arg) \
+#define REALM_TEMPEX3(fun, targ1, targ2, wid, arg) \
     if (wid == 16) {fun<targ1, targ2, 16> arg;} \
     else if (wid == 32) {fun<targ1, targ2, 32> arg;} \
     else if (wid == 0) {fun<targ1, targ2, 0> arg;} \
@@ -116,9 +116,9 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ1, targ2, 4> arg;} \
     else if (wid == 8) {fun<targ1, targ2, 8> arg;} \
     else if (wid == 64) {fun<targ1, targ2, 64> arg;} \
-    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ1, targ2, 0> arg;}
+    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, 0> arg;}
 
-#define TIGHTDB_TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
+#define REALM_TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
     if (wid == 16) {fun<targ1, targ2, 16, targ3> arg;} \
     else if (wid == 32) {fun<targ1, targ2, 32, targ3> arg;} \
     else if (wid == 0) {fun<targ1, targ2, 0, targ3> arg;} \
@@ -127,9 +127,9 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ1, targ2, 4, targ3> arg;} \
     else if (wid == 8) {fun<targ1, targ2, 8, targ3> arg;} \
     else if (wid == 64) {fun<targ1, targ2, 64, targ3> arg;} \
-    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ1, targ2, 0, targ3> arg;}
+    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, 0, targ3> arg;}
 
-#define TIGHTDB_TEMPEX5(fun, targ1, targ2, targ3, targ4, wid, arg) \
+#define REALM_TEMPEX5(fun, targ1, targ2, targ3, targ4, wid, arg) \
     if (wid == 16) {fun<targ1, targ2, targ3, targ4, 16> arg;} \
     else if (wid == 32) {fun<targ1, targ2, targ3, targ4, 32> arg;} \
     else if (wid == 0) {fun<targ1, targ2, targ3, targ4, 0> arg;} \
@@ -138,7 +138,7 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ1, targ2, targ3, targ4, 4> arg;} \
     else if (wid == 8) {fun<targ1, targ2, targ3, targ4, 8> arg;} \
     else if (wid == 64) {fun<targ1, targ2, targ3, targ4, 64> arg;} \
-    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ1, targ2, targ3, targ4, 0> arg;}
+    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, targ3, targ4, 0> arg;}
 
 
 // Pre-definitions
@@ -150,7 +150,7 @@ template<class T> class QueryState;
 namespace _impl { class ArrayWriterBase; }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 class MemStats {
 public:
     MemStats():
@@ -169,14 +169,14 @@ public:
 class ArrayParent
 {
 public:
-    virtual ~ArrayParent() TIGHTDB_NOEXCEPT {}
+    virtual ~ArrayParent() REALM_NOEXCEPT {}
 
 protected:
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
 
-    virtual ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT = 0;
+    virtual ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT = 0;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     // Used only by Array::to_dot().
     virtual std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t ndx_in_parent) const = 0;
 #endif
@@ -240,14 +240,14 @@ public:
 //    bool match(int action, std::size_t index, int64_t value, QueryState *state);
 
     /// Create an array accessor in the unattached state.
-    explicit Array(Allocator&) TIGHTDB_NOEXCEPT;
+    explicit Array(Allocator&) REALM_NOEXCEPT;
 
     // Fastest way to instantiate an array, if you just want to utilize its
     // methods
     struct no_prealloc_tag {};
-    explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
+    explicit Array(no_prealloc_tag) REALM_NOEXCEPT;
 
-    ~Array() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~Array() REALM_NOEXCEPT REALM_OVERRIDE {}
 
     enum Type {
         type_Normal,
@@ -279,14 +279,14 @@ public:
     /// Reinitialize this array accessor to point to the specified new
     /// underlying memory. This does not modify the parent reference information
     /// of this accessor.
-    void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
+    void init_from_ref(ref_type) REALM_NOEXCEPT;
 
     /// Same as init_from_ref(ref_type) but avoid the mapping of 'ref' to memory
     /// pointer.
-    void init_from_mem(MemRef) TIGHTDB_NOEXCEPT;
+    void init_from_mem(MemRef) REALM_NOEXCEPT;
 
     /// Same as `init_from_ref(get_ref_from_parent())`.
-    void init_from_parent() TIGHTDB_NOEXCEPT;
+    void init_from_parent() REALM_NOEXCEPT;
 
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
@@ -300,7 +300,7 @@ public:
     ///
     /// Returns true if, and only if the array has changed. If the array has not
     /// changed, then its children are guaranteed to also not have changed.
-    bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    bool update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
 
     /// Change the type of an already attached array node.
     ///
@@ -313,7 +313,7 @@ public:
     /// underlying memory.
     MemRef clone_deep(Allocator& target_alloc) const;
 
-    void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
+    void move_assign(Array&) REALM_NOEXCEPT; // Move semantics for assignment
 
     /// Construct an empty array of the specified type, and return just the
     /// reference to the underlying memory.
@@ -330,34 +330,34 @@ public:
                                     Allocator& target_alloc) const;
 
     // Parent tracking
-    bool has_parent() const TIGHTDB_NOEXCEPT;
-    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT;
+    bool has_parent() const REALM_NOEXCEPT;
+    ArrayParent* get_parent() const REALM_NOEXCEPT;
 
     /// Setting a new parent affects ownership of the attached array node, if
     /// any. If a non-null parent is specified, and there was no parent
     /// originally, then the caller passes ownership to the parent, and vice
     /// versa. This assumes, of course, that the change in parentship reflects a
     /// corresponding change in the list of children in the affected parents.
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT;
 
-    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT;
-    void set_ndx_in_parent(std::size_t) TIGHTDB_NOEXCEPT;
-    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
+    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT;
+    void set_ndx_in_parent(std::size_t) REALM_NOEXCEPT;
+    void adjust_ndx_in_parent(int diff) REALM_NOEXCEPT;
 
     /// Get the ref of this array as known to the parent. The caller must ensure
     /// that the parent information ('pointer to parent' and 'index in parent')
     /// is correct before calling this function.
-    ref_type get_ref_from_parent() const TIGHTDB_NOEXCEPT;
+    ref_type get_ref_from_parent() const REALM_NOEXCEPT;
 
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     /// Detach from the underlying array node. This method has no effect if the
     /// accessor is currently unattached (idempotency).
-    void detach() TIGHTDB_NOEXCEPT;
+    void detach() REALM_NOEXCEPT;
 
-    std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT;
-    Type get_type() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT;
+    Type get_type() const REALM_NOEXCEPT;
 
     // Exists for find_all() because array.hpp cannot append results directly to a Column type (incomplete class)
     static void add_to_column(Column* column, int64_t value);
@@ -376,15 +376,15 @@ public:
 
     template<std::size_t w> void set(std::size_t ndx, int64_t value);
 
-    int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    template<std::size_t w> int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
-    template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
+    int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
+    template<std::size_t w> int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
+    void get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT;
+    template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT;
 
-    ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    ref_type get_as_ref(std::size_t ndx) const REALM_NOEXCEPT;
 
-    int64_t front() const TIGHTDB_NOEXCEPT;
-    int64_t back() const TIGHTDB_NOEXCEPT;
+    int64_t front() const REALM_NOEXCEPT;
+    int64_t back() const REALM_NOEXCEPT;
 
     /// Remove the element at the specified index, and move elements at higher
     /// indexes to the next lower index.
@@ -455,7 +455,7 @@ public:
 
     // Direct access methods
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                          bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
+                          bool use_retval = false) const REALM_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
@@ -519,8 +519,8 @@ public:
     ///
     /// FIXME: It may be worth considering if overall efficiency can be improved
     /// by doing a linear search for short sequences.
-    std::size_t lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_int(int64_t value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_int(int64_t value) const REALM_NOEXCEPT;
     //@}
 
     std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
@@ -528,7 +528,7 @@ public:
     void Preset(std::size_t bitwidth, std::size_t count);
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
-    std::size_t count(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t count(int64_t value) const REALM_NOEXCEPT;
 
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = null_ptr) const;
@@ -537,52 +537,52 @@ public:
                  std::size_t* return_ndx = null_ptr) const;
 
     /// This information is guaranteed to be cached in the array accessor.
-    bool is_inner_bptree_node() const TIGHTDB_NOEXCEPT;
+    bool is_inner_bptree_node() const REALM_NOEXCEPT;
 
     /// Returns true if type is either type_HasRefs or type_InnerColumnNode.
     ///
     /// This information is guaranteed to be cached in the array accessor.
-    bool has_refs() const TIGHTDB_NOEXCEPT;
+    bool has_refs() const REALM_NOEXCEPT;
 
     /// This information is guaranteed to be cached in the array accessor.
     ///
     /// Columns and indexes can use the context bit to differentiate leaf types.
-    bool get_context_flag() const TIGHTDB_NOEXCEPT;
-    void set_context_flag(bool) TIGHTDB_NOEXCEPT;
+    bool get_context_flag() const REALM_NOEXCEPT;
+    void set_context_flag(bool) REALM_NOEXCEPT;
 
-    ref_type get_ref() const TIGHTDB_NOEXCEPT;
-    MemRef get_mem() const TIGHTDB_NOEXCEPT;
+    ref_type get_ref() const REALM_NOEXCEPT;
+    MemRef get_mem() const REALM_NOEXCEPT;
 
     /// Destroy only the array that this accessor is attached to, not the
     /// children of that array. See non-static destroy_deep() for an
     /// alternative. If this accessor is already in the detached state, this
     /// function has no effect (idempotency).
-    void destroy() TIGHTDB_NOEXCEPT;
+    void destroy() REALM_NOEXCEPT;
 
     /// Recursively destroy children (as if calling
     /// clear_and_destroy_children()), then put this accessor into the detached
     /// state (as if calling detach()), then free the allocated memory. If this
     /// accessor is already in the detached state, this function has no effect
     /// (idempotency).
-    void destroy_deep() TIGHTDB_NOEXCEPT;
+    void destroy_deep() REALM_NOEXCEPT;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
-    static void destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
+    static void destroy(ref_type ref, Allocator& alloc) REALM_NOEXCEPT;
 
     /// Destroy only the specified array node, not its children. See also
     /// destroy_deep(MemRef, Allocator&).
-    static void destroy(MemRef, Allocator&) TIGHTDB_NOEXCEPT;
+    static void destroy(MemRef, Allocator&) REALM_NOEXCEPT;
 
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
-    static void destroy_deep(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
+    static void destroy_deep(ref_type ref, Allocator& alloc) REALM_NOEXCEPT;
 
     /// Destroy the specified array node and all of its children, recursively.
     ///
     /// This is done by freeing the specified array node after calling
     /// destroy_deep() for every contained 'ref' element.
-    static void destroy_deep(MemRef, Allocator&) TIGHTDB_NOEXCEPT;
+    static void destroy_deep(MemRef, Allocator&) REALM_NOEXCEPT;
 
-    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
+    Allocator& get_alloc() const REALM_NOEXCEPT { return m_alloc; }
 
     // Serialization
 
@@ -594,7 +594,7 @@ public:
     size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
 
     /// Compare two arrays for equality.
-    bool compare_int(const Array&) const TIGHTDB_NOEXCEPT;
+    bool compare_int(const Array&) const REALM_NOEXCEPT;
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -671,13 +671,13 @@ public:
                       QueryState<int64_t>* state, Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     template<class cond2, Action action, size_t width, class Callback>
     bool FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
                  size_t baseindex, Callback callback) const;
 
     template<class cond2, Action action, size_t width, class Callback>
-    TIGHTDB_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
+    REALM_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
                                             QueryState<int64_t>* state, size_t baseindex,
                                             Callback callback) const;
 
@@ -712,10 +712,10 @@ public:
     /// the total number of elements in the subtree. The motivation
     /// for removing it, is that it will significantly improve the
     /// efficiency when inserting after, and erasing the last element.
-    std::size_t get_bptree_size() const TIGHTDB_NOEXCEPT;
+    std::size_t get_bptree_size() const REALM_NOEXCEPT;
 
     /// The root must not be a leaf.
-    static std::size_t get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT;
+    static std::size_t get_bptree_size_from_header(const char* root_header) REALM_NOEXCEPT;
 
 
     /// Find the leaf node corresponding to the specified element
@@ -738,7 +738,7 @@ public:
     /// points to the the header of the located leaf, and
     /// `ndx_in_leaf` is the local index within that leaf
     /// corresponding to the specified element index.
-    std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const TIGHTDB_NOEXCEPT;
+    std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const REALM_NOEXCEPT;
 
 
     class NodeInfo;
@@ -835,24 +835,24 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static int_fast64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static int_fast64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
 
     /// Like get(const char*, std::size_t) but gets two consecutive
     /// elements.
     static std::pair<int_least64_t, int_least64_t> get_two(const char* header,
-                                                           std::size_t ndx) TIGHTDB_NOEXCEPT;
+                                                           std::size_t ndx) REALM_NOEXCEPT;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
-    std::size_t get_width() const TIGHTDB_NOEXCEPT { return m_width; }
+    std::size_t get_width() const REALM_NOEXCEPT { return m_width; }
 
     // FIXME: Should not be mutable
     // FIXME: Should not be public
     mutable char* m_data; // Points to first byte after header
 
-    static char* get_data_from_header(char*) TIGHTDB_NOEXCEPT;
-    static char* get_header_from_data(char*) TIGHTDB_NOEXCEPT;
-    static const char* get_data_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static char* get_data_from_header(char*) REALM_NOEXCEPT;
+    static char* get_header_from_data(char*) REALM_NOEXCEPT;
+    static const char* get_data_from_header(const char*) REALM_NOEXCEPT;
 
     enum WidthType {
         wtype_Bits     = 0,
@@ -860,14 +860,14 @@ public:
         wtype_Ignore   = 2
     };
 
-    static bool get_is_inner_bptree_node_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static bool get_context_flag_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static std::size_t get_size_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_is_inner_bptree_node_from_header(const char*) REALM_NOEXCEPT;
+    static bool get_hasrefs_from_header(const char*) REALM_NOEXCEPT;
+    static bool get_context_flag_from_header(const char*) REALM_NOEXCEPT;
+    static WidthType get_wtype_from_header(const char*) REALM_NOEXCEPT;
+    static int get_width_from_header(const char*) REALM_NOEXCEPT;
+    static std::size_t get_size_from_header(const char*) REALM_NOEXCEPT;
 
-    static Type get_type_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static Type get_type_from_header(const char*) REALM_NOEXCEPT;
 
     /// Get the number of bytes currently in use by this array. This
     /// includes the array header, but it does not include allocated
@@ -876,18 +876,18 @@ public:
     ///
     /// This number is exactly the number of bytes that will be
     /// written by a non-recursive invocation of write().
-    std::size_t get_byte_size() const TIGHTDB_NOEXCEPT;
+    std::size_t get_byte_size() const REALM_NOEXCEPT;
 
     /// Get the maximum number of bytes that can be written by a
     /// non-recursive invocation of write() on an array with the
     /// specified number of elements, that is, the maximum value that
     /// can be returned by get_byte_size().
-    static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
+    static std::size_t get_max_byte_size(std::size_t num_elems) REALM_NOEXCEPT;
 
     /// FIXME: Belongs in IntegerArray
     static std::size_t calc_aligned_byte_size(std::size_t size, int width);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void print() const;
     void Verify() const;
     typedef std::size_t (*LeafVerifier)(MemRef, Allocator&);
@@ -933,46 +933,46 @@ protected:
 protected:
 //    void AddPositiveLocal(int64_t value);
 
-    void CreateFromHeaderDirect(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
+    void CreateFromHeaderDirect(char* header, ref_type = 0) REALM_NOEXCEPT;
 
     // Includes array header. Not necessarily 8-byte aligned.
     virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
 
-    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
+    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
-    bool get_is_inner_bptree_node_from_header() const TIGHTDB_NOEXCEPT;
-    bool get_hasrefs_from_header() const TIGHTDB_NOEXCEPT;
-    bool get_context_flag_from_header() const TIGHTDB_NOEXCEPT;
-    WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
-    int get_width_from_header() const TIGHTDB_NOEXCEPT;
-    std::size_t get_size_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_is_inner_bptree_node_from_header() const REALM_NOEXCEPT;
+    bool get_hasrefs_from_header() const REALM_NOEXCEPT;
+    bool get_context_flag_from_header() const REALM_NOEXCEPT;
+    WidthType get_wtype_from_header() const REALM_NOEXCEPT;
+    int get_width_from_header() const REALM_NOEXCEPT;
+    std::size_t get_size_from_header() const REALM_NOEXCEPT;
 
     // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
-    std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
+    std::size_t get_capacity_from_header() const REALM_NOEXCEPT;
 
-    void set_header_is_inner_bptree_node(bool value) TIGHTDB_NOEXCEPT;
-    void set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT;
-    void set_header_context_flag(bool value) TIGHTDB_NOEXCEPT;
-    void set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT;
-    void set_header_width(int value) TIGHTDB_NOEXCEPT;
-    void set_header_size(std::size_t value) TIGHTDB_NOEXCEPT;
-    void set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT;
+    void set_header_is_inner_bptree_node(bool value) REALM_NOEXCEPT;
+    void set_header_hasrefs(bool value) REALM_NOEXCEPT;
+    void set_header_context_flag(bool value) REALM_NOEXCEPT;
+    void set_header_wtype(WidthType value) REALM_NOEXCEPT;
+    void set_header_width(int value) REALM_NOEXCEPT;
+    void set_header_size(std::size_t value) REALM_NOEXCEPT;
+    void set_header_capacity(std::size_t value) REALM_NOEXCEPT;
 
-    static void set_header_is_inner_bptree_node(bool value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_context_flag(bool value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_width(int value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_size(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_is_inner_bptree_node(bool value, char* header) REALM_NOEXCEPT;
+    static void set_header_hasrefs(bool value, char* header) REALM_NOEXCEPT;
+    static void set_header_context_flag(bool value, char* header) REALM_NOEXCEPT;
+    static void set_header_wtype(WidthType value, char* header) REALM_NOEXCEPT;
+    static void set_header_width(int value, char* header) REALM_NOEXCEPT;
+    static void set_header_size(std::size_t value, char* header) REALM_NOEXCEPT;
+    static void set_header_capacity(std::size_t value, char* header) REALM_NOEXCEPT;
 
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs,
                             bool context_flag, WidthType width_type, int width,
-                            std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT;
+                            std::size_t size, std::size_t capacity) REALM_NOEXCEPT;
 
-    template<std::size_t width> void set_width() TIGHTDB_NOEXCEPT;
-    void set_width(std::size_t) TIGHTDB_NOEXCEPT;
+    template<std::size_t width> void set_width() REALM_NOEXCEPT;
+    void set_width(std::size_t) REALM_NOEXCEPT;
     void alloc(std::size_t count, std::size_t width);
     void copy_on_write();
 
@@ -1011,25 +1011,25 @@ protected:
     static MemRef clone(const char* header, Allocator& alloc, Allocator& target_alloc);
 
     /// Get the address of the header of this array.
-    char* get_header() TIGHTDB_NOEXCEPT;
+    char* get_header() REALM_NOEXCEPT;
 
     /// Same as get_byte_size().
-    static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static std::size_t get_byte_size_from_header(const char*) REALM_NOEXCEPT;
 
     // Undefined behavior if array is in immutable memory
-    static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static std::size_t get_capacity_from_header(const char*) REALM_NOEXCEPT;
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
+    void update_child_ref(std::size_t, ref_type) REALM_OVERRIDE;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
 
-    void destroy_children(std::size_t offset = 0) TIGHTDB_NOEXCEPT;
+    void destroy_children(std::size_t offset = 0) REALM_NOEXCEPT;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+    get_to_dot_parent(std::size_t ndx_in_parent) const REALM_OVERRIDE;
 #endif
 
 protected:
@@ -1049,7 +1049,7 @@ protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
 
@@ -1071,7 +1071,7 @@ public:
 class Array::VisitHandler {
 public:
     virtual bool visit(const NodeInfo& leaf_info) = 0;
-    virtual ~VisitHandler() TIGHTDB_NOEXCEPT {}
+    virtual ~VisitHandler() REALM_NOEXCEPT {}
 };
 
 
@@ -1079,7 +1079,7 @@ class Array::UpdateHandler {
 public:
     virtual void update(MemRef, ArrayParent*, std::size_t leaf_ndx_in_parent,
                         std::size_t elem_ndx_in_leaf) = 0;
-    virtual ~UpdateHandler() TIGHTDB_NOEXCEPT {}
+    virtual ~UpdateHandler() REALM_NOEXCEPT {}
 };
 
 
@@ -1099,7 +1099,7 @@ public:
                                  std::size_t leaf_ndx_in_parent,
                                  std::size_t elem_ndx_in_leaf) = 0;
 
-    virtual void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT = 0;
+    virtual void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT = 0;
 
     /// Must replace the current root with the specified leaf. The
     /// implementation of this function must not destroy the
@@ -1114,7 +1114,7 @@ public:
     /// it will be preceeded by a call to erase_leaf_elem().
     virtual void replace_root_by_empty_leaf() = 0;
 
-    virtual ~EraseHandler() TIGHTDB_NOEXCEPT {}
+    virtual ~EraseHandler() REALM_NOEXCEPT {}
 };
 
 
@@ -1161,7 +1161,7 @@ public:
         else if (action == act_CallbackIdx) {
         }
         else {
-            TIGHTDB_ASSERT_DEBUG(false);
+            REALM_ASSERT_DEBUG(false);
         }
     }
 
@@ -1211,7 +1211,7 @@ public:
             return false;
         }
         else {
-            TIGHTDB_ASSERT_DEBUG(false);
+            REALM_ASSERT_DEBUG(false);
         }
         return (m_limit > m_match_count);
     }
@@ -1232,7 +1232,7 @@ public:
 
     void init(Action action, Array*, size_t limit)
     {
-        TIGHTDB_STATIC_ASSERT((util::SameType<R, float>::value ||
+        REALM_STATIC_ASSERT((util::SameType<R, float>::value ||
                                util::SameType<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
@@ -1245,7 +1245,7 @@ public:
         else if (action == act_Sum)
             m_state = 0.0;
         else {
-            TIGHTDB_ASSERT_DEBUG(false);
+            REALM_ASSERT_DEBUG(false);
         }
     }
 
@@ -1255,7 +1255,7 @@ public:
         if (pattern)
             return false;
 
-        TIGHTDB_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min, "");
+        REALM_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min, "");
         ++m_match_count;
 
         if (action == act_Max) {
@@ -1273,7 +1273,7 @@ public:
         else if (action == act_Sum)
             m_state += value;
         else {
-            TIGHTDB_ASSERT_DEBUG(false);
+            REALM_ASSERT_DEBUG(false);
         }
         return (m_limit > m_match_count);
     }
@@ -1281,7 +1281,7 @@ public:
 
 
 
-inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline Array::Array(Allocator& alloc) REALM_NOEXCEPT:
     m_data(0),
     m_parent(0),
     m_ndx_in_parent(0),
@@ -1292,7 +1292,7 @@ inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT:
+inline Array::Array(no_prealloc_tag) REALM_NOEXCEPT:
     m_alloc(*static_cast<Allocator*>(0))
 {
 }
@@ -1305,25 +1305,25 @@ inline void Array::create(Type type, bool context_flag)
 }
 
 
-inline void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
+inline void Array::init_from_ref(ref_type ref) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(ref);
+    REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
     init_from_mem(MemRef(header, ref));
 }
 
 
-inline void Array::init_from_parent() TIGHTDB_NOEXCEPT
+inline void Array::init_from_parent() REALM_NOEXCEPT
 {
     ref_type ref = get_ref_from_parent();
     init_from_ref(ref);
 }
 
 
-inline Array::Type Array::get_type() const TIGHTDB_NOEXCEPT
+inline Array::Type Array::get_type() const REALM_NOEXCEPT
 {
     if (m_is_inner_bptree_node) {
-        TIGHTDB_ASSERT_DEBUG(m_has_refs);
+        REALM_ASSERT_DEBUG(m_has_refs);
         return type_InnerBptreeNode;
     }
     if (m_has_refs)
@@ -1332,25 +1332,25 @@ inline Array::Type Array::get_type() const TIGHTDB_NOEXCEPT
 }
 
 
-inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
+inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < m_size);
+    REALM_ASSERT_DEBUG(ndx < m_size);
     (this->*m_chunk_getter)(ndx, res);
 }
 
 
-inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_attached());
-    TIGHTDB_ASSERT_DEBUG(ndx < m_size);
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(ndx < m_size);
     return (this->*m_getter)(ndx);
 
 // Two ideas that are not efficient but may be worth looking into again:
 /*
-    // Assume correct width is found early in TIGHTDB_TEMPEX, which is the case for B tree offsets that
+    // Assume correct width is found early in REALM_TEMPEX, which is the case for B tree offsets that
     // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
     // if found later
-    TIGHTDB_TEMPEX(return get, (ndx));
+    REALM_TEMPEX(return get, (ndx));
 */
 /*
     // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
@@ -1362,56 +1362,56 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 */
 }
 
-inline int64_t Array::front() const TIGHTDB_NOEXCEPT
+inline int64_t Array::front() const REALM_NOEXCEPT
 {
     return get(0);
 }
 
-inline int64_t Array::back() const TIGHTDB_NOEXCEPT
+inline int64_t Array::back() const REALM_NOEXCEPT
 {
     return get(m_size - 1);
 }
 
-inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline ref_type Array::get_as_ref(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_attached());
-    TIGHTDB_ASSERT_DEBUG(m_has_refs);
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(m_has_refs);
     int64_t v = get(ndx);
     return to_ref(v);
 }
 
-inline bool Array::is_inner_bptree_node() const TIGHTDB_NOEXCEPT
+inline bool Array::is_inner_bptree_node() const REALM_NOEXCEPT
 {
     return m_is_inner_bptree_node;
 }
 
-inline bool Array::has_refs() const TIGHTDB_NOEXCEPT
+inline bool Array::has_refs() const REALM_NOEXCEPT
 {
     return m_has_refs;
 }
 
-inline bool Array::get_context_flag() const TIGHTDB_NOEXCEPT
+inline bool Array::get_context_flag() const REALM_NOEXCEPT
 {
     return m_context_flag;
 }
 
-inline void Array::set_context_flag(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_context_flag(bool value) REALM_NOEXCEPT
 {
     m_context_flag = value;
     set_header_context_flag(value);
 }
 
-inline ref_type Array::get_ref() const TIGHTDB_NOEXCEPT
+inline ref_type Array::get_ref() const REALM_NOEXCEPT
 {
     return m_ref;
 }
 
-inline MemRef Array::get_mem() const TIGHTDB_NOEXCEPT
+inline MemRef Array::get_mem() const REALM_NOEXCEPT
 {
     return MemRef(get_header_from_data(m_data), m_ref);
 }
 
-inline void Array::destroy() TIGHTDB_NOEXCEPT
+inline void Array::destroy() REALM_NOEXCEPT
 {
     if (!is_attached())
         return;
@@ -1420,7 +1420,7 @@ inline void Array::destroy() TIGHTDB_NOEXCEPT
     m_data = 0;
 }
 
-inline void Array::destroy_deep() TIGHTDB_NOEXCEPT
+inline void Array::destroy_deep() REALM_NOEXCEPT
 {
     if (!is_attached())
         return;
@@ -1473,22 +1473,22 @@ inline void Array::clear_and_destroy_children()
     truncate_and_destroy_children(0);
 }
 
-inline void Array::destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+inline void Array::destroy(ref_type ref, Allocator& alloc) REALM_NOEXCEPT
 {
     destroy(MemRef(ref, alloc), alloc);
 }
 
-inline void Array::destroy(MemRef mem, Allocator& alloc) TIGHTDB_NOEXCEPT
+inline void Array::destroy(MemRef mem, Allocator& alloc) REALM_NOEXCEPT
 {
     alloc.free_(mem);
 }
 
-inline void Array::destroy_deep(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+inline void Array::destroy_deep(ref_type ref, Allocator& alloc) REALM_NOEXCEPT
 {
     destroy_deep(MemRef(ref, alloc), alloc);
 }
 
-inline void Array::destroy_deep(MemRef mem, Allocator& alloc) TIGHTDB_NOEXCEPT
+inline void Array::destroy_deep(MemRef mem, Allocator& alloc) REALM_NOEXCEPT
 {
     if (!get_hasrefs_from_header(mem.m_addr)) {
         alloc.free_(mem);
@@ -1503,7 +1503,7 @@ inline void Array::destroy_deep(MemRef mem, Allocator& alloc) TIGHTDB_NOEXCEPT
 inline void Array::adjust(std::size_t ndx, int_fast64_t diff)
 {
     // FIXME: Should be optimized
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(ndx, <=, m_size);
     int_fast64_t v = get(ndx);
     set(ndx, int64_t(v + diff)); // Throws
 }
@@ -1529,43 +1529,43 @@ inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 
 //-------------------------------------------------
 
-inline bool Array::get_is_inner_bptree_node_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_is_inner_bptree_node_from_header(const char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x80) != 0;
 }
-inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_hasrefs_from_header(const char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x40) != 0;
 }
-inline bool Array::get_context_flag_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_context_flag_from_header(const char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x20) != 0;
 }
-inline Array::WidthType Array::get_wtype_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline Array::WidthType Array::get_wtype_from_header(const char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return WidthType((int(h[4]) & 0x18) >> 3);
 }
-inline int Array::get_width_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline int Array::get_width_from_header(const char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (1 << (int(h[4]) & 0x07)) >> 1;
 }
-inline std::size_t Array::get_size_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_size_from_header(const char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (std::size_t(h[5]) << 16) + (std::size_t(h[6]) << 8) + h[7];
 }
-inline std::size_t Array::get_capacity_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_capacity_from_header(const char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
@@ -1573,72 +1573,72 @@ inline std::size_t Array::get_capacity_from_header(const char* header) TIGHTDB_N
 }
 
 
-inline char* Array::get_data_from_header(char* header) TIGHTDB_NOEXCEPT
+inline char* Array::get_data_from_header(char* header) REALM_NOEXCEPT
 {
     return header + header_size;
 }
-inline char* Array::get_header_from_data(char* data) TIGHTDB_NOEXCEPT
+inline char* Array::get_header_from_data(char* data) REALM_NOEXCEPT
 {
     return data - header_size;
 }
-inline const char* Array::get_data_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline const char* Array::get_data_from_header(const char* header) REALM_NOEXCEPT
 {
     return get_data_from_header(const_cast<char*>(header));
 }
 
 
-inline bool Array::get_is_inner_bptree_node_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_is_inner_bptree_node_from_header() const REALM_NOEXCEPT
 {
     return get_is_inner_bptree_node_from_header(get_header_from_data(m_data));
 }
-inline bool Array::get_hasrefs_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_hasrefs_from_header() const REALM_NOEXCEPT
 {
     return get_hasrefs_from_header(get_header_from_data(m_data));
 }
-inline bool Array::get_context_flag_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_context_flag_from_header() const REALM_NOEXCEPT
 {
     return get_context_flag_from_header(get_header_from_data(m_data));
 }
-inline Array::WidthType Array::get_wtype_from_header() const TIGHTDB_NOEXCEPT
+inline Array::WidthType Array::get_wtype_from_header() const REALM_NOEXCEPT
 {
     return get_wtype_from_header(get_header_from_data(m_data));
 }
-inline int Array::get_width_from_header() const TIGHTDB_NOEXCEPT
+inline int Array::get_width_from_header() const REALM_NOEXCEPT
 {
     return get_width_from_header(get_header_from_data(m_data));
 }
-inline std::size_t Array::get_size_from_header() const TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_size_from_header() const REALM_NOEXCEPT
 {
     return get_size_from_header(get_header_from_data(m_data));
 }
-inline std::size_t Array::get_capacity_from_header() const TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_capacity_from_header() const REALM_NOEXCEPT
 {
     return get_capacity_from_header(get_header_from_data(m_data));
 }
 
 
-inline void Array::set_header_is_inner_bptree_node(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_is_inner_bptree_node(bool value, char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
 }
 
-inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_hasrefs(bool value, char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
 }
 
-inline void Array::set_header_context_flag(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_context_flag(bool value, char* header) REALM_NOEXCEPT
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
 }
 
-inline void Array::set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_wtype(WidthType value, char* header) REALM_NOEXCEPT
 {
     // Indicates how to calculate size in bytes based on width
     // 0: bits      (width/8) * size
@@ -1649,7 +1649,7 @@ inline void Array::set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXC
     h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
 }
 
-inline void Array::set_header_width(int value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_width(int value, char* header) REALM_NOEXCEPT
 {
     // Pack width in 3 bits (log2)
     int w = 0;
@@ -1657,16 +1657,16 @@ inline void Array::set_header_width(int value, char* header) TIGHTDB_NOEXCEPT
         ++w;
         value >>= 1;
     }
-    TIGHTDB_ASSERT_3(w, <, 8);
+    REALM_ASSERT_3(w, <, 8);
 
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x7) | w);
 }
 
-inline void Array::set_header_size(std::size_t value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_size(std::size_t value, char* header) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(value, <=, 0xFFFFFFL);
+    REALM_ASSERT_3(value, <=, 0xFFFFFFL);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[5] = uchar((value >> 16) & 0x000000FF);
@@ -1675,9 +1675,9 @@ inline void Array::set_header_size(std::size_t value, char* header) TIGHTDB_NOEX
 }
 
 // Note: There is a copy of this function is test_alloc.cpp
-inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_capacity(std::size_t value, char* header) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(value, <=, 0xFFFFFFL);
+    REALM_ASSERT_3(value, <=, 0xFFFFFFL);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 16) & 0x000000FF);
@@ -1687,37 +1687,37 @@ inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_
 
 
 
-inline void Array::set_header_is_inner_bptree_node(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_is_inner_bptree_node(bool value) REALM_NOEXCEPT
 {
     set_header_is_inner_bptree_node(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_hasrefs(bool value) REALM_NOEXCEPT
 {
     set_header_hasrefs(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_context_flag(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_context_flag(bool value) REALM_NOEXCEPT
 {
     set_header_context_flag(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_wtype(WidthType value) REALM_NOEXCEPT
 {
     set_header_wtype(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_width(int value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_width(int value) REALM_NOEXCEPT
 {
     set_header_width(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_size(std::size_t value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_size(std::size_t value) REALM_NOEXCEPT
 {
     set_header_size(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_capacity(std::size_t value) REALM_NOEXCEPT
 {
     set_header_capacity(value, get_header_from_data(m_data));
 }
 
 
-inline Array::Type Array::get_type_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline Array::Type Array::get_type_from_header(const char* header) REALM_NOEXCEPT
 {
     if (get_is_inner_bptree_node_from_header(header))
         return type_InnerBptreeNode;
@@ -1727,13 +1727,13 @@ inline Array::Type Array::get_type_from_header(const char* header) TIGHTDB_NOEXC
 }
 
 
-inline char* Array::get_header() TIGHTDB_NOEXCEPT
+inline char* Array::get_header() REALM_NOEXCEPT
 {
     return get_header_from_data(m_data);
 }
 
 
-inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_byte_size() const REALM_NOEXCEPT
 {
     std::size_t num_bytes = 0;
     const char* header = get_header_from_data(m_data);
@@ -1761,7 +1761,7 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
             num_bytes = m_size;
             goto found;
     }
-    TIGHTDB_ASSERT_DEBUG(false);
+    REALM_ASSERT_DEBUG(false);
 
   found:
     // Ensure 8-byte alignment
@@ -1771,14 +1771,14 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
 
     num_bytes += header_size;
 
-    TIGHTDB_ASSERT(m_alloc.is_read_only(m_ref) ||
+    REALM_ASSERT(m_alloc.is_read_only(m_ref) ||
                    num_bytes <= get_capacity_from_header(header));
 
     return num_bytes;
 }
 
 
-inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_byte_size_from_header(const char* header) REALM_NOEXCEPT
 {
     std::size_t num_bytes = 0;
     std::size_t size = get_size_from_header(header);
@@ -1800,7 +1800,7 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
             num_bytes = size;
             goto found;
     }
-    TIGHTDB_ASSERT_DEBUG(false);
+    REALM_ASSERT_DEBUG(false);
 
   found:
     // Ensure 8-byte alignment
@@ -1816,7 +1816,7 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
 
 inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has_refs,
                                bool context_flag, WidthType width_type, int width,
-                               std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT
+                               std::size_t size, std::size_t capacity) REALM_NOEXCEPT
 {
     // Note: Since the header layout contains unallocated bit and/or
     // bytes, it is important that we put the entire header into a
@@ -1840,9 +1840,9 @@ inline MemRef Array::clone_deep(Allocator& target_alloc) const
     return clone(header, m_alloc, target_alloc); // Throws
 }
 
-inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
+inline void Array::move_assign(Array& a) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(&get_alloc() == &a.get_alloc());
+    REALM_ASSERT(&get_alloc() == &a.get_alloc());
     // FIXME: Be carefull with the old parent info here. Should it be
     // copied?
 
@@ -1863,33 +1863,33 @@ inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator&
     return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
-inline bool Array::has_parent() const TIGHTDB_NOEXCEPT
+inline bool Array::has_parent() const REALM_NOEXCEPT
 {
     return m_parent != 0;
 }
 
-inline ArrayParent* Array::get_parent() const TIGHTDB_NOEXCEPT
+inline ArrayParent* Array::get_parent() const REALM_NOEXCEPT
 {
     return m_parent;
 }
 
-inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
 {
     m_parent = parent;
     m_ndx_in_parent = ndx_in_parent;
 }
 
-inline std::size_t Array::get_ndx_in_parent() const TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_ndx_in_parent() const REALM_NOEXCEPT
 {
     return m_ndx_in_parent;
 }
 
-inline void Array::set_ndx_in_parent(std::size_t ndx) TIGHTDB_NOEXCEPT
+inline void Array::set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT
 {
     m_ndx_in_parent = ndx;
 }
 
-inline void Array::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+inline void Array::adjust_ndx_in_parent(int diff) REALM_NOEXCEPT
 {
     // Note that `diff` is promoted to an unsigned type, and that
     // C++03 still guarantees the expected result regardless of the
@@ -1897,34 +1897,34 @@ inline void Array::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
     m_ndx_in_parent += diff;
 }
 
-inline ref_type Array::get_ref_from_parent() const TIGHTDB_NOEXCEPT
+inline ref_type Array::get_ref_from_parent() const REALM_NOEXCEPT
 {
     ref_type ref = m_parent->get_child_ref(m_ndx_in_parent);
     return ref;
 }
 
-inline bool Array::is_attached() const TIGHTDB_NOEXCEPT
+inline bool Array::is_attached() const REALM_NOEXCEPT
 {
     return m_data != 0;
 }
 
-inline void Array::detach() TIGHTDB_NOEXCEPT
+inline void Array::detach() REALM_NOEXCEPT
 {
     m_data = 0;
 }
 
-inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
+inline std::size_t Array::size() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
     return m_size;
 }
 
-inline bool Array::is_empty() const TIGHTDB_NOEXCEPT
+inline bool Array::is_empty() const REALM_NOEXCEPT
 {
     return size() == 0;
 }
 
-inline std::size_t Array::get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_max_byte_size(std::size_t num_elems) REALM_NOEXCEPT
 {
     int max_bytes_per_elem = 8;
     return header_size + num_elems * max_bytes_per_elem; // FIXME: Prone to overflow
@@ -1942,21 +1942,21 @@ inline void Array::update_child_ref(size_t child_ndx, ref_type new_ref)
     set(child_ndx, new_ref);
 }
 
-inline ref_type Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
+inline ref_type Array::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
 {
     return get_as_ref(child_ndx);
 }
 
-inline std::size_t Array::get_bptree_size() const TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_bptree_size() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_inner_bptree_node());
+    REALM_ASSERT_DEBUG(is_inner_bptree_node());
     int_fast64_t v = back();
     return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
-inline std::size_t Array::get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_bptree_size_from_header(const char* root_header) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
+    REALM_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
     size_t root_size = get_size_from_header(root_header);
     int_fast64_t v = get(root_header, root_size-1);
     return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
@@ -2005,7 +2005,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
     // What about the 'offsets' array? It will always be
     // present. Consider this carefully.
 
-    TIGHTDB_ASSERT_DEBUG(size() >= 1 + 1 + 1); // At least one child
+    REALM_ASSERT_DEBUG(size() >= 1 + 1 + 1); // At least one child
 
     ArrayParent& childs_parent = *this;
     std::size_t child_ref_ndx = size() - 2;
@@ -2026,7 +2026,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
         new_sibling_ref = child.bptree_append(state); // Throws
     }
 
-    if (TIGHTDB_LIKELY(!new_sibling_ref)) {
+    if (REALM_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
         adjust(size()-1, +2); // Throws
         return 0; // Child was not split, so parent was not split either
@@ -2047,7 +2047,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 template<class TreeTraits>
 ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state)
 {
-    TIGHTDB_ASSERT_3(size(), >=, 1 + 1 + 1); // At least one child
+    REALM_ASSERT_3(size(), >=, 1 + 1 + 1); // At least one child
 
     // Conversion to general form if in compact form. Since this
     // conversion will occur from root to leaf, it will maintain
@@ -2069,7 +2069,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
         // essentially a matter of using the lower vs. the upper bound
         // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
-        TIGHTDB_ASSERT_3(child_ndx, <, size() - 2);
+        REALM_ASSERT_3(child_ndx, <, size() - 2);
         std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
         elem_ndx_in_child = elem_ndx - elem_ndx_offset;
     }
@@ -2080,7 +2080,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
     char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        TIGHTDB_ASSERT_3(elem_ndx_in_child, <=, TIGHTDB_MAX_BPNODE_SIZE);
+        REALM_ASSERT_3(elem_ndx_in_child, <=, REALM_MAX_BPNODE_SIZE);
         new_sibling_ref =
             TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
@@ -2092,7 +2092,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
         new_sibling_ref = child.bptree_insert(elem_ndx_in_child, state); // Throws
     }
 
-    if (TIGHTDB_LIKELY(!new_sibling_ref)) {
+    if (REALM_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
         adjust(size()-1, +2); // Throws
         offsets.adjust(child_ndx, offsets.size(), +1);
@@ -2108,7 +2108,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 // Finding code                                                                       *
 //*************************************************************************************
 
-template<std::size_t w> int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+template<std::size_t w> int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     return get_universal<w>(m_data, ndx);
 }
@@ -2146,7 +2146,7 @@ template<std::size_t w> int64_t Array::get_universal(const char* data, std::size
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
     else {
-        TIGHTDB_ASSERT_DEBUG(false);
+        REALM_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
 }
@@ -2285,7 +2285,7 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
         return a == 0 ? 1 : 0;
     }
     else {
-        TIGHTDB_ASSERT_DEBUG(false);
+        REALM_ASSERT_DEBUG(false);
         return uint64_t(-1);
     }
 }
@@ -2296,7 +2296,7 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     cond2 c;
-    TIGHTDB_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
 
     // Test first few items with no initial time overhead
     if (start > 0) {
@@ -2346,7 +2346,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         if (action == act_CallbackIdx)
             end2 = end;
         else {
-            TIGHTDB_ASSERT_DEBUG(state->m_match_count < state->m_limit);
+            REALM_ASSERT_DEBUG(state->m_match_count < state->m_limit);
             size_t process = state->m_limit - state->m_match_count;
             end2 = end - start > process ? start + process : end;
         }
@@ -2376,9 +2376,9 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     }
 
     // finder cannot handle this bitwidth
-    TIGHTDB_ASSERT_3(m_width, !=, 0);
+    REALM_ASSERT_3(m_width, !=, 0);
 
-#if defined(TIGHTDB_COMPILER_SSE)
+#if defined(REALM_COMPILER_SSE)
     if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
     ||  (sseavx<30>() && (util::SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
 
@@ -2433,7 +2433,7 @@ template<size_t width> inline int64_t Array::LowerBits() const
     else if (width == 64)
         return 0x0000000000000001ULL;
     else {
-        TIGHTDB_ASSERT_DEBUG(false);
+        REALM_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
 }
@@ -2491,7 +2491,7 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
 
     while (eq == (((v >> (width * start)) & mask) != 0)) {
         // You must only call FindZero() if you are sure that at least 1 item matches
-        TIGHTDB_ASSERT_3(start, <=, 8 * sizeof(v));
+        REALM_ASSERT_3(start, <=, 8 * sizeof(v));
         start++;
     }
 
@@ -2691,7 +2691,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
-    TIGHTDB_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
 
     size_t ee = round_up(start, 64 / no0(width));
     ee = ee > end ? end : ee;
@@ -2766,7 +2766,7 @@ template<class cond, Action action, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                  Callback callback) const
 {
-    TIGHTDB_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
+    REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
 }
 
 template<class cond, Action action, size_t bitwidth, class Callback>
@@ -2776,7 +2776,7 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
     return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 }
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
 template<class cond2, Action action, size_t width, class Callback>
 bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
@@ -2801,7 +2801,7 @@ bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64
 // Compares packed action_data with packed data (equal, less, etc) and performs aggregate action (max, min, sum,
 // find_all, etc) on value inside action_data for first match, if any
 template<class cond2, Action action, size_t width, class Callback>
-TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
+REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     int cond = cond2::condition;
@@ -2878,14 +2878,14 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
 
     return true;
 }
-#endif //TIGHTDB_COMPILER_SSE
+#endif //REALM_COMPILER_SSE
 
 template<class cond, Action action, class Callback>
 bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                          Callback callback) const
 {
     cond c;
-    TIGHTDB_ASSERT_3(start, <=, end);
+    REALM_ASSERT_3(start, <=, end);
     if (start == end)
         return true;
 
@@ -2924,7 +2924,7 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
     }
 
     bool r;
-    TIGHTDB_TEMPEX4(r = CompareLeafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX4(r = CompareLeafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
@@ -2933,7 +2933,7 @@ template<class cond, Action action, size_t width, class Callback> bool Array::Co
 {
     size_t fw = foreign->m_width;
     bool r;
-    TIGHTDB_TEMPEX5(r = CompareLeafs4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX5(r = CompareLeafs4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
@@ -2959,7 +2959,7 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
     }
 
 
-#if defined(TIGHTDB_COMPILER_SSE)
+#if defined(REALM_COMPILER_SSE)
     if (sseavx<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed
         while (start < end && (((reinterpret_cast<size_t>(m_data) & 0xf) * 8 + start * width) % (128) != 0)) {
@@ -3115,7 +3115,7 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
     else if (cond == cond_Less)
         ret = CompareRelation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else
-        TIGHTDB_ASSERT_DEBUG(false);
+        REALM_ASSERT_DEBUG(false);
 
     return ret;
 }
@@ -3124,7 +3124,7 @@ template<bool gt, Action action, size_t bitwidth, class Callback>
 bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                             Callback callback) const
 {
-    TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
 
     size_t ee = round_up(start, 64 / no0(bitwidth));
@@ -3162,7 +3162,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
                 if ((bitwidth > 4 ? !upper : true)) {
                     // Assert that all values in chunk are positive.
-                    TIGHTDB_ASSERT(bitwidth <= 4 || ((LowerBits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
+                    REALM_ASSERT(bitwidth <= 4 || ((LowerBits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
                     idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
                 else
@@ -3201,7 +3201,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
 template<class cond> size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, null_ptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
     Finder finder = m_finder[cond::condition];
@@ -3217,4 +3217,4 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ARRAY_HPP
+#endif // REALM_ARRAY_HPP

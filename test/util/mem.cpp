@@ -5,7 +5,7 @@
 #  include <psapi.h>
 #elif defined __APPLE__
 #  include <mach/mach.h>
-#elif defined TIGHTDB_HAVE_LIBPROCPS
+#elif defined REALM_HAVE_LIBPROCPS
 // Requires libprocps (formerly known as libproc)
 #  include <proc/readproc.h>
 #endif
@@ -129,7 +129,7 @@ size_t get_mem_usage()
     // either, yet we will yse the resident size for now.
     return t_info.resident_size;
 
-#elif defined TIGHTDB_HAVE_LIBPROCPS
+#elif defined REALM_HAVE_LIBPROCPS
 
     struct proc_t usage;
     look_up_our_self(&usage);

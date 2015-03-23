@@ -18,18 +18,18 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_UTIL_ENCRYPTED_FILE_MAPPING_HPP
-#define TIGHTDB_UTIL_ENCRYPTED_FILE_MAPPING_HPP
+#ifndef REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
+#define REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 
 #include <tightdb/util/file.hpp>
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
 
 #include <vector>
 
 #ifdef __APPLE__
 #include <CommonCrypto/CommonCrypto.h>
-#elif defined(TIGHTDB_ANDROID)
+#elif defined(REALM_ANDROID)
 // OpenSSL headers aren't part of the NDK, so declare the bits we need manually
 #define AES_ENCRYPT	1
 #define AES_DECRYPT	0
@@ -59,13 +59,13 @@ struct iv_table;
 class AESCryptor {
 public:
     AESCryptor(const uint8_t* key);
-    ~AESCryptor() TIGHTDB_NOEXCEPT;
+    ~AESCryptor() REALM_NOEXCEPT;
 
     void set_file_size(off_t new_size);
 
     bool try_read(int fd, off_t pos, char* dst, size_t size);
-    bool read(int fd, off_t pos, char* dst, size_t size) TIGHTDB_NOEXCEPT;
-    void write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_NOEXCEPT;
+    bool read(int fd, off_t pos, char* dst, size_t size) REALM_NOEXCEPT;
+    void write(int fd, off_t pos, const char* src, size_t size) REALM_NOEXCEPT;
 
 private:
     enum EncryptionMode {
@@ -86,7 +86,7 @@ private:
     AES_KEY m_dctx;
 #endif
 
-#ifdef TIGHTDB_ANDROID
+#ifdef REALM_ANDROID
     // Loaded at runtime with dysym
     int (*AES_set_encrypt_key)(const unsigned char *, const int, AES_KEY *);
     int (*AES_set_decrypt_key)(const unsigned char *, const int, AES_KEY *);
@@ -105,8 +105,8 @@ private:
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
-               const char* stored_iv) TIGHTDB_NOEXCEPT;
-    iv_table& get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT;
+               const char* stored_iv) REALM_NOEXCEPT;
+    iv_table& get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT;
 };
 
 class EncryptedFileMapping;
@@ -127,14 +127,14 @@ public:
 
     // Write all dirty pages to disk and mark them read-only
     // Does not call fsync
-    void flush() TIGHTDB_NOEXCEPT;
+    void flush() REALM_NOEXCEPT;
 
     // Sync this file to disk
-    void sync() TIGHTDB_NOEXCEPT;
+    void sync() REALM_NOEXCEPT;
 
     // Handle a SEGV or BUS at the given address, which must be within this
     // object's mapping
-    void handle_access(void* addr) TIGHTDB_NOEXCEPT;
+    void handle_access(void* addr) REALM_NOEXCEPT;
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
@@ -158,28 +158,28 @@ private:
 
     File::AccessMode m_access;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     UniquePtr<char[]> m_validate_buffer;
 #endif
 
-    char* page_addr(size_t i) const TIGHTDB_NOEXCEPT;
+    char* page_addr(size_t i) const REALM_NOEXCEPT;
 
-    void mark_unreadable(size_t i) TIGHTDB_NOEXCEPT;
-    void mark_readable(size_t i) TIGHTDB_NOEXCEPT;
-    void mark_unwritable(size_t i) TIGHTDB_NOEXCEPT;
+    void mark_unreadable(size_t i) REALM_NOEXCEPT;
+    void mark_readable(size_t i) REALM_NOEXCEPT;
+    void mark_unwritable(size_t i) REALM_NOEXCEPT;
 
-    bool copy_read_page(size_t i) TIGHTDB_NOEXCEPT;
-    void read_page(size_t i) TIGHTDB_NOEXCEPT;
-    void write_page(size_t i) TIGHTDB_NOEXCEPT;
+    bool copy_read_page(size_t i) REALM_NOEXCEPT;
+    void read_page(size_t i) REALM_NOEXCEPT;
+    void write_page(size_t i) REALM_NOEXCEPT;
 
-    void validate_page(size_t i) TIGHTDB_NOEXCEPT;
-    void validate() TIGHTDB_NOEXCEPT;
+    void validate_page(size_t i) REALM_NOEXCEPT;
+    void validate() REALM_NOEXCEPT;
 };
 
 }
 }
 
-#endif // TIGHTDB_ENABLE_ENCRYPTION
+#endif // REALM_ENABLE_ENCRYPTION
 
 namespace tightdb {
 namespace util {
@@ -193,4 +193,4 @@ struct DecryptionFailed: util::File::AccessError {
 }
 }
 
-#endif // TIGHTDB_UTIL_ENCRYPTED_FILE_MAPPING_HPP
+#endif // REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP

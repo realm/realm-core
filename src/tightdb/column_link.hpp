@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_LINK_HPP
-#define TIGHTDB_COLUMN_LINK_HPP
+#ifndef REALM_COLUMN_LINK_HPP
+#define REALM_COLUMN_LINK_HPP
 
 #include <tightdb/column.hpp>
 #include <tightdb/column_linkbase.hpp>
@@ -35,7 +35,7 @@ namespace tightdb {
 class ColumnLink: public ColumnLinkBase {
 public:
     ColumnLink(Allocator&, ref_type ref); // Throws
-    ~ColumnLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~ColumnLink() REALM_NOEXCEPT REALM_OVERRIDE;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
@@ -47,8 +47,8 @@ public:
     /// `insert_link(tightdb::npos)`. set_link() returns the original link, with
     /// `tightdb::npos` indicating that it was null.
 
-    std::size_t get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    bool is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link(std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT;
     std::size_t set_link(std::size_t row_ndx, std::size_t target_row_ndx);
     void nullify_link(std::size_t row_ndx);
     void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
@@ -56,20 +56,20 @@ public:
 
     //@}
 
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void cascade_break_backlinks_to(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
-    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void cascade_break_backlinks_to(std::size_t, CascadeState&) REALM_OVERRIDE;
+    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
 #endif
 
 protected:
     friend class ColumnBackLink;
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) TIGHTDB_OVERRIDE;
+    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) REALM_OVERRIDE;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx) TIGHTDB_OVERRIDE;
+                        std::size_t new_target_row_ndx) REALM_OVERRIDE;
 
 private:
     void remove_backlinks(std::size_t row_ndx);
@@ -83,7 +83,7 @@ inline ColumnLink::ColumnLink(Allocator& alloc, ref_type ref):
 {
 }
 
-inline ColumnLink::~ColumnLink() TIGHTDB_NOEXCEPT
+inline ColumnLink::~ColumnLink() REALM_NOEXCEPT
 {
 }
 
@@ -92,13 +92,13 @@ inline ref_type ColumnLink::create(Allocator& alloc, std::size_t size)
     return Column::create(alloc, Array::type_Normal, size); // Throws
 }
 
-inline std::size_t ColumnLink::get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnLink::get_link(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     // Map zero to tightdb::npos, and `n+1` to `n`, where `n` is a target row index.
     return to_size_t(ColumnLinkBase::get(row_ndx)) - size_t(1);
 }
 
-inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline bool ColumnLink::is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     // Null is represented by zero
     return ColumnLinkBase::get(row_ndx) == 0;
@@ -153,4 +153,4 @@ inline void ColumnLink::do_update_link(std::size_t row_ndx, std::size_t,
 
 } //namespace tightdb
 
-#endif //TIGHTDB_COLUMN_LINK_HPP
+#endif //REALM_COLUMN_LINK_HPP

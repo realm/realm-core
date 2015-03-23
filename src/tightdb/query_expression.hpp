@@ -118,8 +118,8 @@ Caveats, notes and todos
 */
 
 
-#ifndef TIGHTDB_QUERY_EXPRESSION_HPP
-#define TIGHTDB_QUERY_EXPRESSION_HPP
+#ifndef REALM_QUERY_EXPRESSION_HPP
+#define REALM_QUERY_EXPRESSION_HPP
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
@@ -127,7 +127,7 @@ Caveats, notes and todos
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
 
-#define TIGHTDB_OLDQUERY_FALLBACK
+#define REALM_OLDQUERY_FALLBACK
 
 // namespace tightdb {
 
@@ -166,14 +166,14 @@ template<class T, class U> T only_numeric(U in)
 
 template<class T> int only_numeric(const StringData& in)
 {
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     static_cast<void>(in);
     return 0;
 }
 
 template<class T> StringData only_string(T in)
 {
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     static_cast<void>(in);
     return StringData();
 }
@@ -321,7 +321,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
     //
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
-#ifdef TIGHTDB_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
+#ifdef REALM_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
 
     if (column &&
@@ -363,7 +363,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return *new Compare<>' instead.
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
         }
         // Return query_engine.hpp node
         return q;
@@ -462,7 +462,7 @@ public:
     // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
     template <class Cond> Query create2 (const Subexpr2<R>& right)
     {
-#ifdef TIGHTDB_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
+#ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
         // Test if expressions are of type Columns. Other possibilities are Value and Operator.
         const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
@@ -486,7 +486,7 @@ public:
                 else if (util::SameType<Cond, GreaterEqual>::value)
                     q.greater_equal_int(left_col->m_column, right_col->m_column);
                 else {
-                    TIGHTDB_ASSERT(false);
+                    REALM_ASSERT(false);
                 }
             }
             else if (util::SameType<L, float>::value) {
@@ -503,7 +503,7 @@ public:
                 else if (util::SameType<Cond, GreaterEqual>::value)
                     q.greater_equal_float(left_col->m_column, right_col->m_column);
                 else {
-                    TIGHTDB_ASSERT(false);
+                    REALM_ASSERT(false);
                 }
             }
             else if (util::SameType<L, double>::value) {
@@ -520,11 +520,11 @@ public:
                 else if (util::SameType<Cond, GreaterEqual>::value)
                     q.greater_equal_double(left_col->m_column, right_col->m_column);
                 else {
-                    TIGHTDB_ASSERT(false);
+                    REALM_ASSERT(false);
                 }
             }
             else {
-                TIGHTDB_ASSERT(false);
+                REALM_ASSERT(false);
             }
             // Return query_engine.hpp node
             return q;
@@ -637,7 +637,7 @@ public:
         destination.import(*this);
     }
 
-    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right)
+    template <class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
     {
         TOperator o;
         size_t vals = minimum(left->m_values, right->m_values);
@@ -645,7 +645,7 @@ public:
             m_v[t] = o(left->m_v[t], right->m_v[t]);
     }
 
-    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* value)
+    template <class TOperator> REALM_FORCEINLINE void fun(const Value* value)
     {
         TOperator o;
         for (size_t t = 0; t < value->m_values; t++)
@@ -654,7 +654,7 @@ public:
 
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
-    template<class D> TIGHTDB_FORCEINLINE void export2(ValueBase& destination) const
+    template<class D> REALM_FORCEINLINE void export2(ValueBase& destination) const
     {
         // export2 is also instantiated for impossible conversions like T = StringData, D = int64_t. These are never
         // performed at runtime but still result in compiler errors. We therefore introduce EitherIsString which turns
@@ -669,36 +669,36 @@ public:
         }
     }
 
-    TIGHTDB_FORCEINLINE void export_bool(ValueBase& destination) const
+    REALM_FORCEINLINE void export_bool(ValueBase& destination) const
     {
         export2<bool>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void export_int64_t(ValueBase& destination) const
+    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const
     {
         export2<int64_t>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void export_float(ValueBase& destination) const
+    REALM_FORCEINLINE void export_float(ValueBase& destination) const
     {
         export2<float>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void export_int(ValueBase& destination) const
+    REALM_FORCEINLINE void export_int(ValueBase& destination) const
     {
         export2<int>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void export_double(ValueBase& destination) const
+    REALM_FORCEINLINE void export_double(ValueBase& destination) const
     {
         export2<double>(destination);
     }
-    TIGHTDB_FORCEINLINE void export_StringData(ValueBase& destination) const
+    REALM_FORCEINLINE void export_StringData(ValueBase& destination) const
     {
         export2<StringData>(destination); 
     }
 
-    TIGHTDB_FORCEINLINE void import(const ValueBase& source)
+    REALM_FORCEINLINE void import(const ValueBase& source)
     {
         if (util::SameType<T, int>::value)
             source.export_int(*this);
@@ -713,11 +713,11 @@ public:
         else if (util::SameType<T, StringData>::value)
             source.export_StringData(*this);
         else
-            TIGHTDB_ASSERT_DEBUG(false);
+            REALM_ASSERT_DEBUG(false);
     }
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
-    template <class TCond> TIGHTDB_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
+    template <class TCond> REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
     {
         TCond c;
 
@@ -731,12 +731,12 @@ public:
         }
         else if (left->from_link && right->from_link) {
             // Many-to-many links not supported yet. Need to specify behaviour
-            TIGHTDB_ASSERT_DEBUG(false);
+            REALM_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
             // Right values come from link. Left must come from single row. Semantics: Match if at least 1 
             // linked-to-value fulfills the condition
-            TIGHTDB_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
+            REALM_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
                 if (c(left->m_v[0], right->m_v[r]))
                     return 0;
@@ -744,7 +744,7 @@ public:
         }
         else if (left->from_link && !right->from_link) {
             // Same as above, right left values coming from links
-            TIGHTDB_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
+            REALM_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
                 if (c(left->m_v[l], right->m_v[0]))
                     return 0;
@@ -1065,7 +1065,7 @@ public:
     {
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table;
-        TIGHTDB_ASSERT(m_link_map.m_table->get_column_type(column) == type_String);
+        REALM_ASSERT(m_link_map.m_table->get_column_type(column) == type_String);
     }
 
     Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column(column)
@@ -1313,7 +1313,7 @@ private:
     {
         static_cast<void>(index);
         static_cast<void>(destination);
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
     }
 
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
@@ -1411,7 +1411,7 @@ public:
 
             if (util::SameType<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
                 Value<T> v;
-                TIGHTDB_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
+                REALM_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
                 // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
                 sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
                 destination.import(v);
@@ -1521,7 +1521,7 @@ public:
         const Table* r = m_right.get_table();
 
         // Queries do not support multiple different tables; all tables must be the same.
-        TIGHTDB_ASSERT(l == null_ptr || r == null_ptr || l == r);
+        REALM_ASSERT(l == null_ptr || r == null_ptr || l == r);
 
         // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
@@ -1589,7 +1589,7 @@ public:
         const Table* r = m_right.get_table();
 
         // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
-        TIGHTDB_ASSERT(l == null_ptr || r == null_ptr || l == r);
+        REALM_ASSERT(l == null_ptr || r == null_ptr || l == r);
 
         // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
@@ -1629,5 +1629,5 @@ private:
 
 
 //}
-#endif // TIGHTDB_QUERY_EXPRESSION_HPP
+#endif // REALM_QUERY_EXPRESSION_HPP
 

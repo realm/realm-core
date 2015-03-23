@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DATETIME_HPP
-#define TIGHTDB_DATETIME_HPP
+#ifndef REALM_DATETIME_HPP
+#define REALM_DATETIME_HPP
 
 #include <ctime>
 #include <ostream>
@@ -28,23 +28,23 @@ namespace tightdb {
 
 class DateTime {
 public:
-    DateTime() TIGHTDB_NOEXCEPT: m_time(0) {}
+    DateTime() REALM_NOEXCEPT: m_time(0) {}
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
-    DateTime(std::time_t d) TIGHTDB_NOEXCEPT : m_time(d) {}
+    DateTime(std::time_t d) REALM_NOEXCEPT : m_time(d) {}
 
-    ~DateTime() TIGHTDB_NOEXCEPT {}
+    ~DateTime() REALM_NOEXCEPT {}
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
-    std::time_t get_datetime() const TIGHTDB_NOEXCEPT { return m_time; }
+    std::time_t get_datetime() const REALM_NOEXCEPT { return m_time; }
 
-    friend bool operator==(const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
-    friend bool operator!=(const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
-    friend bool operator< (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
-    friend bool operator<= (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
-    friend bool operator> (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
-    friend bool operator>= (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
+    friend bool operator==(const DateTime&, const DateTime&) REALM_NOEXCEPT;
+    friend bool operator!=(const DateTime&, const DateTime&) REALM_NOEXCEPT;
+    friend bool operator< (const DateTime&, const DateTime&) REALM_NOEXCEPT;
+    friend bool operator<= (const DateTime&, const DateTime&) REALM_NOEXCEPT;
+    friend bool operator> (const DateTime&, const DateTime&) REALM_NOEXCEPT;
+    friend bool operator>= (const DateTime&, const DateTime&) REALM_NOEXCEPT;
 
     /// Construct from broken down local time.
     ///
@@ -73,7 +73,7 @@ public:
 private:
     // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed 
     // because DateTime is internally stored in an int64_t column.
-    operator time_t() TIGHTDB_NOEXCEPT;
+    operator time_t() REALM_NOEXCEPT;
 
 
 private:
@@ -85,37 +85,37 @@ private:
 
 // Implementation:
 
-inline bool operator==(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+inline bool operator==(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
 {
     return a.m_time == b.m_time;
 }
 
-inline bool operator!=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+inline bool operator!=(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
 {
     return a.m_time != b.m_time;
 }
 
-inline bool operator<(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+inline bool operator<(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
 {
     return a.m_time < b.m_time;
 }
 
-inline bool operator<=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+inline bool operator<=(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
 {
     return a.m_time <= b.m_time;
 }
 
-inline bool operator>(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+inline bool operator>(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
 {
     return a.m_time > b.m_time;
 }
 
-inline bool operator>=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+inline bool operator>=(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
 {
     return a.m_time >= b.m_time;
 }
 
-inline DateTime::operator time_t() TIGHTDB_NOEXCEPT
+inline DateTime::operator time_t() REALM_NOEXCEPT
 {
     return m_time;
 }
@@ -146,5 +146,5 @@ inline std::time_t DateTime::assemble(int year, int month, int day, int hours, i
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DATETIME_HPP
+#endif // REALM_DATETIME_HPP
 

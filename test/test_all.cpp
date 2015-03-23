@@ -112,24 +112,24 @@ void fix_async_daemon_path()
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
-#  ifdef TIGHTDB_DEBUG
+#  ifdef REALM_DEBUG
         async_daemon = "tightdbd-dbg-noinst";
 #  else
         async_daemon = "tightdbd-noinst";
 #  endif
     }
     else {
-#  ifdef TIGHTDB_COVER
+#  ifdef REALM_COVER
         async_daemon = "../src/tightdb/tightdbd-cov-noinst";
 #  else
-#    ifdef TIGHTDB_DEBUG
+#    ifdef REALM_DEBUG
         async_daemon = "../src/tightdb/tightdbd-dbg-noinst";
 #    else
         async_daemon = "../src/tightdb/tightdbd-noinst";
 #    endif
 #  endif
     }
-    setenv("TIGHTDB_ASYNC_DAEMON", async_daemon, 0);
+    setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
 #endif // _WIN32
 }
 
@@ -141,13 +141,13 @@ void display_build_config()
     const char* with_replication =
         Version::has_feature(feature_Replication) ? "Enabled" : "Disabled";
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
 #else
     const char* compiler_sse = "No";
 #endif
 
-#ifdef TIGHTDB_COMPILER_AVX
+#ifdef REALM_COMPILER_AVX
     const char* compiler_avx = "Yes";
 #else
     const char* compiler_avx = "No";
@@ -164,7 +164,7 @@ void display_build_config()
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"
-        "TIGHTDB_MAX_BPNODE_SIZE = "<<TIGHTDB_MAX_BPNODE_SIZE<<"\n"
+        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -186,11 +186,11 @@ public:
     {
     }
 
-    ~CustomReporter() TIGHTDB_NOEXCEPT
+    ~CustomReporter() REALM_NOEXCEPT
     {
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) TIGHTDB_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) REALM_OVERRIDE
     {
         result r;
         r.m_test_name = details.test_name;
@@ -199,7 +199,7 @@ public:
         SimpleReporter::end(details, elapsed_seconds);
     }
 
-    void summary(const Summary& summary) TIGHTDB_OVERRIDE
+    void summary(const Summary& summary) REALM_OVERRIDE
     {
         SimpleReporter::summary(summary);
 
@@ -281,7 +281,7 @@ bool run_tests()
     // Set up reporter
     ofstream xml_file;
     bool xml;
-#ifdef TIGHTDB_MOBILE
+#ifdef REALM_MOBILE
     xml = true;
 #else
     const char* xml_str = getenv("UNITTEST_XML");

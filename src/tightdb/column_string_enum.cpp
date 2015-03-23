@@ -32,12 +32,12 @@ ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys
 {
 }
 
-ColumnStringEnum::~ColumnStringEnum() TIGHTDB_NOEXCEPT
+ColumnStringEnum::~ColumnStringEnum() REALM_NOEXCEPT
 {
     delete m_search_index;
 }
 
-void ColumnStringEnum::destroy() TIGHTDB_NOEXCEPT
+void ColumnStringEnum::destroy() REALM_NOEXCEPT
 {
     m_keys.destroy();
     Column::destroy();
@@ -45,12 +45,12 @@ void ColumnStringEnum::destroy() TIGHTDB_NOEXCEPT
         m_search_index->destroy();
 }
 
-void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT
 {
     m_keys.get_root_array()->adjust_ndx_in_parent(diff);
 }
 
-void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+void ColumnStringEnum::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
     m_keys.update_from_parent(old_baseline);
@@ -60,7 +60,7 @@ void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 void ColumnStringEnum::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, Column::size());
+    REALM_ASSERT_3(ndx, <, Column::size());
 
     // Update search index
     // (it is important here that we do it before actually setting
@@ -103,7 +103,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
 
 void ColumnStringEnum::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_3(ndx, <, Column::size());
+    REALM_ASSERT_3(ndx, <, Column::size());
 
     // Update search index
     // (it is important here that we do it before actually setting
@@ -118,8 +118,8 @@ void ColumnStringEnum::do_erase(size_t ndx, bool is_last)
 
 void ColumnStringEnum::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
 
     if (m_search_index) {
         // remove the value to be overwritten from index
@@ -184,8 +184,8 @@ void ColumnStringEnum::find_all(Column& res, size_t key_ndx, size_t begin, size_
 
 FindRes ColumnStringEnum::find_all_indexref(StringData value, size_t& dst) const
 {
-//    TIGHTDB_ASSERT(value.m_data); fixme
-    TIGHTDB_ASSERT(m_search_index);
+//    REALM_ASSERT(value.m_data); fixme
+    REALM_ASSERT(m_search_index);
 
     return m_search_index->find_all(value, dst);
 }
@@ -256,7 +256,7 @@ bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 
 StringIndex* ColumnStringEnum::create_search_index()
 {
-    TIGHTDB_ASSERT(!m_search_index);
+    REALM_ASSERT(!m_search_index);
 
     UniquePtr<StringIndex> index;
     index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
@@ -275,7 +275,7 @@ StringIndex* ColumnStringEnum::create_search_index()
 }
 
 
-void ColumnStringEnum::destroy_search_index() TIGHTDB_NOEXCEPT
+void ColumnStringEnum::destroy_search_index() REALM_NOEXCEPT
 {
     delete m_search_index;
     m_search_index = 0;
@@ -285,21 +285,21 @@ void ColumnStringEnum::destroy_search_index() TIGHTDB_NOEXCEPT
 void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent,
                                             size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
-    TIGHTDB_ASSERT(!m_search_index);
+    REALM_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
                                      !allow_duplicate_valaues, m_array->get_alloc()); // Throws
 }
 
 
-void ColumnStringEnum::set_search_index_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+void ColumnStringEnum::set_search_index_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 {
     m_search_index->set_allow_duplicate_values(allow);
 }
 
 
-void ColumnStringEnum::install_search_index(StringIndex* index) TIGHTDB_NOEXCEPT
+void ColumnStringEnum::install_search_index(StringIndex* index) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_search_index);
+    REALM_ASSERT(!m_search_index);
 
     index->set_target(this, &get_string);
     m_search_index = index; // we now own this index
@@ -322,7 +322,7 @@ void ColumnStringEnum::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ColumnStringEnum::Verify() const
 {
@@ -341,15 +341,15 @@ void ColumnStringEnum::Verify(const Table& table, size_t col_ndx) const
 {
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    TIGHTDB_ASSERT_3(m_keys.get_root_array()->get_ndx_in_parent(), ==, spec.get_enumkeys_ndx(col_ndx));
+    REALM_ASSERT_3(m_keys.get_root_array()->get_ndx_in_parent(), ==, spec.get_enumkeys_ndx(col_ndx));
 
     Column::Verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     bool has_search_index = (attr & col_attr_Indexed) != 0;
-    TIGHTDB_ASSERT_3(has_search_index, ==, bool(m_search_index));
+    REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
     if (has_search_index) {
-        TIGHTDB_ASSERT_3(m_search_index->get_root_array()->get_ndx_in_parent(), ==,
+        REALM_ASSERT_3(m_search_index->get_root_array()->get_ndx_in_parent(), ==,
                        m_array->get_ndx_in_parent() + 1);
     }
 }
@@ -391,4 +391,4 @@ void ColumnStringEnum::do_dump_node_structure(ostream& out, int level) const
     m_search_index->do_dump_node_structure(out, level+1);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

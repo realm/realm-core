@@ -134,7 +134,7 @@ void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
     m_selected_link_list = &list;
 }
 
-TIGHTDB_NORETURN
+REALM_NORETURN
 void TransactLogParser::parser_error() const
 {
     throw BadTransactLog();

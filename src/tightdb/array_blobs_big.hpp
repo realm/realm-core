@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ARRAY_BIG_BLOBS_HPP
-#define TIGHTDB_ARRAY_BIG_BLOBS_HPP
+#ifndef REALM_ARRAY_BIG_BLOBS_HPP
+#define REALM_ARRAY_BIG_BLOBS_HPP
 
 #include <tightdb/array_blob.hpp>
 
@@ -29,9 +29,9 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
-    explicit ArrayBigBlobs(Allocator&) TIGHTDB_NOEXCEPT;
+    explicit ArrayBigBlobs(Allocator&) REALM_NOEXCEPT;
 
-    BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void add(BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -41,9 +41,9 @@ public:
     void destroy();
 
     std::size_t count(BinaryData value, bool is_string = false, std::size_t begin = 0,
-                      std::size_t end = npos) const TIGHTDB_NOEXCEPT;
+                      std::size_t end = npos) const REALM_NOEXCEPT;
     std::size_t find_first(BinaryData value, bool is_string = false, std::size_t begin = 0,
-                           std::size_t end = npos) const TIGHTDB_NOEXCEPT;
+                           std::size_t end = npos) const REALM_NOEXCEPT;
     void find_all(Column& result, BinaryData value, bool is_string = false,
                   std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos);
@@ -52,7 +52,7 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+    static BinaryData get(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
@@ -61,11 +61,11 @@ public:
     /// Those that return a string, discard the terminating zero from
     /// the stored value. Those that accept a string argument, add a
     /// terminating zero before storing the value.
-    StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
     void add_string(StringData value);
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
-    static StringData get_string(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+    static StringData get_string(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
     ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
     //@}
 
@@ -81,7 +81,7 @@ public:
     /// array using the specified target allocator.
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void Verify() const;
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
@@ -91,12 +91,12 @@ public:
 
 // Implementation:
 
-inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc) REALM_NOEXCEPT:
     Array(alloc)
 {
 }
 
-inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     ref_type ref = get_as_ref(ndx);
     const char* blob_header = get_alloc().translate(ref);
@@ -106,7 +106,7 @@ inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
-                                     Allocator& alloc) TIGHTDB_NOEXCEPT
+                                     Allocator& alloc) REALM_NOEXCEPT
 {
     ref_type blob_ref = to_ref(Array::get(header, ndx));
     const char* blob_header = alloc.translate(blob_ref);
@@ -137,7 +137,7 @@ inline void ArrayBigBlobs::destroy()
     Array::destroy_deep();
 }
 
-inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const REALM_NOEXCEPT
 {
     BinaryData bin = get(ndx);
     return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
@@ -165,7 +165,7 @@ inline void ArrayBigBlobs::insert_string(std::size_t ndx, StringData value)
 }
 
 inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
-                                            Allocator& alloc) TIGHTDB_NOEXCEPT
+                                            Allocator& alloc) REALM_NOEXCEPT
 {
     BinaryData bin = get(header, ndx, alloc);
     return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
@@ -194,4 +194,4 @@ inline MemRef ArrayBigBlobs::slice(std::size_t offset, std::size_t size,
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ARRAY_BIG_BLOBS_HPP
+#endif // REALM_ARRAY_BIG_BLOBS_HPP

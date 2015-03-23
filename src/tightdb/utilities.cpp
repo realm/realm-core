@@ -6,7 +6,7 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/unicode.hpp>
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
 #  ifdef _MSC_VER
 #    include <intrin.h>
 #  endif
@@ -15,14 +15,14 @@
 
 namespace {
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
 #  if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
-#    if defined TIGHTDB_COMPILER_AVX && defined __GNUC__
+#    if defined REALM_COMPILER_AVX && defined __GNUC__
 #      define _XCR_XFEATURE_ENABLED_MASK 0
 
 inline unsigned long long _xgetbv(unsigned index)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 4)
+#if REALM_HAVE_AT_LEAST_GCC(4, 4)
     unsigned int eax, edx;
     __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
     return (static_cast<unsigned long long>(edx) << 32) | eax;
@@ -49,7 +49,7 @@ string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 
 void cpuid_init()
 {
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     int cret;
 #  ifdef _MSC_VER
     int CPUInfo[4];
@@ -175,7 +175,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     t->remainder = 0;
 
     while (len >= 8) {
-#ifdef TIGHTDB_X86_OR_X64
+#ifdef REALM_X86_OR_X64
         t->a_val += (*reinterpret_cast<unsigned long long*>(data)) * t->b_val;
 #else
         unsigned long long l = 0;

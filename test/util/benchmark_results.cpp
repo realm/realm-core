@@ -67,7 +67,7 @@ string format_change(double baseline, double input, BenchmarkResults::ChangeType
         case BenchmarkResults::change_RiseFactor:
             return format_rise_factor(baseline, input);
     }
-    TIGHTDB_UNREACHABLE();
+    REALM_UNREACHABLE();
 }
 
 } // anonymous namespace

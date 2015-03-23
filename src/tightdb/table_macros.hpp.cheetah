@@ -38,15 +38,15 @@ directiveStartToken = %
  *
  *************************************************************************/
 
-#ifndef TIGHTDB_TABLE_MACROS_HPP
-#define TIGHTDB_TABLE_MACROS_HPP
+#ifndef REALM_TABLE_MACROS_HPP
+#define REALM_TABLE_MACROS_HPP
 
 #include <tightdb/table_basic.hpp>
 
 
 %for $i in range($max_cols)
 %set $num_cols = $i + 1
-#define TIGHTDB_TABLE_${num_cols}(Table%slurp
+#define REALM_TABLE_${num_cols}(Table%slurp
 %for $j in range($num_cols)
 , name${j+1}, type${j+1}%slurp
 %end for
@@ -70,7 +70,7 @@ ${j+1}%slurp
 %for $j in range($num_cols)
         typename Col<$j>::type name${j+1}; \
 %end for
-        ColNames(Init i) TIGHTDB_NOEXCEPT: %slurp
+        ColNames(Init i) REALM_NOEXCEPT: %slurp
 %for $j in range($num_cols)
 %if 0 < $j
 , %slurp
@@ -81,7 +81,7 @@ name${j+1}%slurp
  {} \
     }; \
  \
-    static void dyn_col_names(tightdb::StringData* names) TIGHTDB_NOEXCEPT \
+    static void dyn_col_names(tightdb::StringData* names) REALM_NOEXCEPT \
     { \
 %for $j in range($num_cols)
         names[$j] = tightdb::StringData(#name${j+1}, sizeof #name${j+1} - 1); \
@@ -140,4 +140,4 @@ typedef ::tightdb::BasicTable<Table##Spec> Table;
 
 
 %end for
-#endif // TIGHTDB_TABLE_MACROS_HPP
+#endif // REALM_TABLE_MACROS_HPP

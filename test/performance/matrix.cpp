@@ -27,7 +27,7 @@ const size_t rounds = 1000;
 //const size_t row_count = 128*10; // should be divisible by 128
 //const size_t rounds = 1;
 
-TIGHTDB_TABLE_11(TestTable,
+REALM_TABLE_11(TestTable,
                 bits_0,    Int,
                 bits_1,    Int,
                 bits_2,    Int,
@@ -193,7 +193,7 @@ public:
 
 int main()
 {
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     cout << "Running Debug Build\n";
 #else
     cout << "Running Release Build\n";

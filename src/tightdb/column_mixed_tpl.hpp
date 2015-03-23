@@ -27,36 +27,36 @@ inline ColumnMixed::ColumnMixed(Allocator& alloc, ref_type ref,
 }
 
 inline void ColumnMixed::adj_acc_insert_rows(std::size_t row_ndx,
-                                             std::size_t num_rows) TIGHTDB_NOEXCEPT
+                                             std::size_t num_rows) REALM_NOEXCEPT
 {
     m_data->adj_acc_insert_rows(row_ndx, num_rows);
 }
 
-inline void ColumnMixed::adj_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
 {
     m_data->adj_acc_erase_row(row_ndx);
 }
 
 inline void ColumnMixed::adj_acc_move_over(std::size_t from_row_ndx,
-                                           std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
+                                           std::size_t to_row_ndx) REALM_NOEXCEPT
 {
     m_data->adj_acc_move_over(from_row_ndx, to_row_ndx);
 }
 
-inline void ColumnMixed::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
     m_data->adj_acc_clear_root_table();
 }
 
-inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_types->size());
+    REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
         return 0;
     return m_data->get_as_ref(row_ndx);
 }
 
-inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     ref_type top_ref = get_subtable_ref(row_ndx);
     if (top_ref == 0)
@@ -64,19 +64,19 @@ inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_ndx) const TIG
     return _impl::TableFriend::get_size_from_ref(top_ref, m_data->get_alloc());
 }
 
-inline Table* ColumnMixed::get_subtable_accessor(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline Table* ColumnMixed::get_subtable_accessor(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     return m_data->get_subtable_accessor(row_ndx);
 }
 
-inline void ColumnMixed::discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT
 {
     m_data->discard_subtable_accessor(row_ndx);
 }
 
 inline Table* ColumnMixed::get_subtable_ptr(std::size_t row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_types->size());
+    REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
         return 0;
     return m_data->get_subtable_ptr(row_ndx); // Throws
@@ -87,7 +87,7 @@ inline const Table* ColumnMixed::get_subtable_ptr(std::size_t subtable_ndx) cons
     return const_cast<ColumnMixed*>(this)->get_subtable_ptr(subtable_ndx);
 }
 
-inline void ColumnMixed::discard_child_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnMixed::discard_child_accessors() REALM_NOEXCEPT
 {
     m_data->discard_child_accessors();
 }
@@ -97,11 +97,11 @@ inline void ColumnMixed::discard_child_accessors() TIGHTDB_NOEXCEPT
 // Getters
 //
 
-#define TIGHTDB_BIT63 0x8000000000000000ULL
+#define REALM_BIT63 0x8000000000000000ULL
 
-inline int64_t ColumnMixed::get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t ColumnMixed::get_value(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(ndx, <, m_types->size());
 
     // Shift the unsigned value right - ensuring 0 gets in from left.
     // Shifting signed integers right doesn't ensure 0's.
@@ -109,7 +109,7 @@ inline int64_t ColumnMixed::get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return int64_t(value);
 }
 
-inline int64_t ColumnMixed::get_int(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t ColumnMixed::get_int(std::size_t ndx) const REALM_NOEXCEPT
 {
     // Get first 63 bits of the integer value
     int64_t value = get_value(ndx);
@@ -118,69 +118,69 @@ inline int64_t ColumnMixed::get_int(std::size_t ndx) const TIGHTDB_NOEXCEPT
     MixedColType col_type = MixedColType(m_types->get(ndx));
     if (col_type == mixcol_IntNeg) {
         // FIXME: Bad cast of result of '|' from unsigned to signed
-        value |= TIGHTDB_BIT63; // set sign bit (63)
+        value |= REALM_BIT63; // set sign bit (63)
     }
     else {
-        TIGHTDB_ASSERT_3(col_type, ==, mixcol_Int);
+        REALM_ASSERT_3(col_type, ==, mixcol_Int);
     }
     return value;
 }
 
-inline bool ColumnMixed::get_bool(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline bool ColumnMixed::get_bool(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(m_types->get(ndx), ==, mixcol_Bool);
+    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Bool);
 
     return (get_value(ndx) != 0);
 }
 
-inline DateTime ColumnMixed::get_datetime(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline DateTime ColumnMixed::get_datetime(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(m_types->get(ndx), ==, mixcol_Date);
+    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Date);
 
     return DateTime(std::time_t(get_value(ndx)));
 }
 
-inline float ColumnMixed::get_float(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline float ColumnMixed::get_float(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559, "'float' is not IEEE");
-    TIGHTDB_STATIC_ASSERT((sizeof (float) * CHAR_BIT == 32), "Assume 32 bit float.");
-    TIGHTDB_ASSERT_3(m_types->get(ndx), ==, mixcol_Float);
+    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559, "'float' is not IEEE");
+    REALM_STATIC_ASSERT((sizeof (float) * CHAR_BIT == 32), "Assume 32 bit float.");
+    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Float);
 
     return type_punning<float>(get_value(ndx));
 }
 
-inline double ColumnMixed::get_double(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline double ColumnMixed::get_double(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<double>::is_iec559, "'double' is not IEEE");
-    TIGHTDB_STATIC_ASSERT((sizeof (double) * CHAR_BIT == 64), "Assume 64 bit double.");
+    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559, "'double' is not IEEE");
+    REALM_STATIC_ASSERT((sizeof (double) * CHAR_BIT == 64), "Assume 64 bit double.");
 
     int64_t int_val = get_value(ndx);
 
     // restore 'sign'-bit from the column-type
     MixedColType col_type = MixedColType(m_types->get(ndx));
     if (col_type == mixcol_DoubleNeg)
-        int_val |= TIGHTDB_BIT63; // set sign bit (63)
+        int_val |= REALM_BIT63; // set sign bit (63)
     else {
-        TIGHTDB_ASSERT_3(col_type, ==, mixcol_Double);
+        REALM_ASSERT_3(col_type, ==, mixcol_Double);
     }
     return type_punning<double>(int_val);
 }
 
-inline StringData ColumnMixed::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ColumnMixed::get_string(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
-    TIGHTDB_ASSERT_3(m_types->get(ndx), ==, mixcol_String);
-    TIGHTDB_ASSERT(m_binary_data);
+    REALM_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_String);
+    REALM_ASSERT(m_binary_data);
 
     std::size_t data_ndx = std::size_t(int64_t(m_data->get(ndx)) >> 1);
     return m_binary_data->get_string(data_ndx);
 }
 
-inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
-    TIGHTDB_ASSERT_3(m_types->get(ndx), ==, mixcol_Binary);
-    TIGHTDB_ASSERT(m_binary_data);
+    REALM_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Binary);
+    REALM_ASSERT(m_binary_data);
 
     std::size_t data_ndx = std::size_t(uint64_t(m_data->get(ndx)) >> 1);
     return m_binary_data->get(data_ndx);
@@ -195,10 +195,10 @@ inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const TIGHTDB_NOEXCEP
 
 inline void ColumnMixed::set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(ndx, <, m_types->size());
 
     // If sign-bit is set in value, 'store' it in the column-type
-    MixedColType coltype = ((value & TIGHTDB_BIT63) == 0) ? pos_type : neg_type;
+    MixedColType coltype = ((value & REALM_BIT63) == 0) ? pos_type : neg_type;
 
     // Remove refs or binary data (sets type to double)
     clear_value_and_discard_subtab_acc(ndx, coltype); // Throws
@@ -221,7 +221,7 @@ inline void ColumnMixed::set_double(std::size_t ndx, double value)
 
 inline void ColumnMixed::set_value(std::size_t ndx, int64_t value, MixedColType coltype)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(ndx, <, m_types->size());
 
     // Remove refs or binary data (sets type to float)
     clear_value_and_discard_subtab_acc(ndx, coltype); // Throws
@@ -249,7 +249,7 @@ inline void ColumnMixed::set_datetime(std::size_t ndx, DateTime value)
 
 inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(ndx, <, m_types->size());
     typedef _impl::TableFriend tf;
     ref_type ref;
     if (t) {
@@ -293,7 +293,7 @@ inline void ColumnMixed::insert_pos_neg(std::size_t ndx, int_fast64_t value, Mix
                                         MixedColType neg_type)
 {
     // 'store' the sign-bit in the integer-type
-    MixedColType type = (value & TIGHTDB_BIT63) == 0 ? pos_type : neg_type;
+    MixedColType type = (value & REALM_BIT63) == 0 ? pos_type : neg_type;
     int_fast64_t types_value = type;
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     int_fast64_t data_value =  1 + (value << 1);
@@ -384,7 +384,7 @@ inline void ColumnMixed::clear()
 }
 
 inline std::size_t ColumnMixed::get_size_from_ref(ref_type root_ref,
-                                                  Allocator& alloc) TIGHTDB_NOEXCEPT
+                                                  Allocator& alloc) REALM_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
     ref_type types_ref = to_ref(Array::get(root_header, 0));
@@ -430,7 +430,7 @@ inline void ColumnMixed::clear(std::size_t num_rows, bool)
     do_clear(num_rows); // Throws
 }
 
-inline void ColumnMixed::mark(int type) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::mark(int type) REALM_NOEXCEPT
 {
     m_data->mark(type);
 }
@@ -441,7 +441,7 @@ inline void ColumnMixed::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
     m_types->refresh_accessor_tree(col_ndx, spec); // Throws
     m_data->refresh_accessor_tree(col_ndx, spec); // Throws
     if (m_binary_data) {
-        TIGHTDB_ASSERT_3(m_array->size(), ==, 3);
+        REALM_ASSERT_3(m_array->size(), ==, 3);
         m_binary_data->refresh_accessor_tree(col_ndx, spec); // Throws
         return;
     }

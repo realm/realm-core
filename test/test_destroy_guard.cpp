@@ -66,37 +66,37 @@ public:
         m_baseline = 8;
     }
 
-    ~FooAlloc() TIGHTDB_NOEXCEPT
+    ~FooAlloc() REALM_NOEXCEPT
     {
     }
 
-    MemRef do_alloc(size_t size) TIGHTDB_OVERRIDE
+    MemRef do_alloc(size_t size) REALM_OVERRIDE
     {
         ref_type ref = m_offset;
         char*& addr = m_map[ref]; // Throws
-        TIGHTDB_ASSERT(!addr);
+        REALM_ASSERT(!addr);
         addr = new char[size]; // Throws
         m_offset += size;
         return MemRef(addr, ref);
     }
 
-    void do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void do_free(ref_type ref, const char* addr) REALM_NOEXCEPT REALM_OVERRIDE
     {
         typedef map<ref_type, char*>::iterator iter;
         iter i = m_map.find(ref);
-        TIGHTDB_ASSERT(i != m_map.end());
+        REALM_ASSERT(i != m_map.end());
         char* addr_2 = i->second;
-        TIGHTDB_ASSERT(addr_2 == addr);
+        REALM_ASSERT(addr_2 == addr);
         static_cast<void>(addr_2);
         m_map.erase(i);
         delete[] addr;
     }
 
-    char* do_translate(ref_type ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    char* do_translate(ref_type ref) const REALM_NOEXCEPT REALM_OVERRIDE
     {
         typedef map<ref_type, char*>::const_iterator iter;
         iter i = m_map.find(ref);
-        TIGHTDB_ASSERT(i != m_map.end());
+        REALM_ASSERT(i != m_map.end());
         char* addr = i->second;
         return addr;
     }
@@ -117,8 +117,8 @@ public:
         m_map.clear();
     }
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE
     {
     }
 #endif

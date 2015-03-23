@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_MIXED_HPP
-#define TIGHTDB_COLUMN_MIXED_HPP
+#ifndef REALM_COLUMN_MIXED_HPP
+#define REALM_COLUMN_MIXED_HPP
 
 #include <limits>
 
@@ -60,31 +60,31 @@ public:
     /// table. Otherwise you should pass zero.
     ColumnMixed(Allocator&, ref_type, Table* table, std::size_t column_ndx);
 
-    ~ColumnMixed() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~ColumnMixed() REALM_NOEXCEPT REALM_OVERRIDE;
 
-    DataType get_type(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_types->size(); }
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    DataType get_type(std::size_t ndx) const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT { return m_types->size(); }
+    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    int64_t get_int(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    bool get_bool(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    DateTime get_datetime(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    float get_float(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    double get_double(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    BinaryData get_binary(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get_int(std::size_t ndx) const REALM_NOEXCEPT;
+    bool get_bool(std::size_t ndx) const REALM_NOEXCEPT;
+    DateTime get_datetime(std::size_t ndx) const REALM_NOEXCEPT;
+    float get_float(std::size_t ndx) const REALM_NOEXCEPT;
+    double get_double(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
+    BinaryData get_binary(std::size_t ndx) const REALM_NOEXCEPT;
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.
-    ref_type get_subtable_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    ref_type get_subtable_ref(std::size_t row_ndx) const REALM_NOEXCEPT;
 
     /// The returned size is zero if the specified row does not
     /// contain a subtable.
-    std::size_t get_subtable_size(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_subtable_size(std::size_t row_ndx) const REALM_NOEXCEPT;
 
-    Table* get_subtable_accessor(std::size_t row_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Table* get_subtable_accessor(std::size_t row_ndx) const REALM_NOEXCEPT REALM_OVERRIDE;
 
-    void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT REALM_OVERRIDE;
 
     /// If the value at the specified index is a subtable, return a
     /// pointer to that accessor for that subtable. Otherwise return
@@ -122,33 +122,33 @@ public:
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
 
-    void discard_child_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() REALM_NOEXCEPT;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) REALM_NOEXCEPT;
 
     // Overriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+                   _impl::OutputStream&) const REALM_OVERRIDE;
 
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_clear_root_table() REALM_NOEXCEPT REALM_OVERRIDE;
+    void mark(int) REALM_NOEXCEPT REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
-    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE;
+    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
 #endif
 
 private:
@@ -188,7 +188,7 @@ private:
     /// For string and binary data types, the bytes are stored here.
     ColumnBinary* m_binary_data;
 
-    std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
 
     void do_erase(std::size_t row_ndx, bool is_last);
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
@@ -201,7 +201,7 @@ private:
     void clear_value_and_discard_subtab_acc(std::size_t ndx, MixedColType new_type);
 
     // Get/set/insert 64-bit values in m_data/m_types
-    int64_t get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get_value(std::size_t ndx) const REALM_NOEXCEPT;
     void set_value(std::size_t ndx, int64_t value, MixedColType);
     void set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 
@@ -210,12 +210,12 @@ private:
     void insert_pos_neg(std::size_t ndx, int_fast64_t value, MixedColType pos_type,
                         MixedColType neg_type);
 
-    void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_discard_child_accessors() REALM_NOEXCEPT REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void do_verify(const Table*, std::size_t col_ndx) const;
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t,
-                     std::ostream&) const TIGHTDB_OVERRIDE {} // Not used
+                     std::ostream&) const REALM_OVERRIDE {} // Not used
 #endif
 };
 
@@ -227,11 +227,11 @@ public:
     {
     }
 
-    ~RefsColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~RefsColumn() REALM_NOEXCEPT REALM_OVERRIDE {}
 
     using ColumnSubtableParent::get_subtable_ptr;
 
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
     friend class ColumnMixed;
 };
@@ -244,4 +244,4 @@ public:
 #include <tightdb/column_mixed_tpl.hpp>
 
 
-#endif // TIGHTDB_COLUMN_MIXED_HPP
+#endif // REALM_COLUMN_MIXED_HPP

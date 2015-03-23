@@ -27,7 +27,7 @@
 
 #include <tightdb/util/errno.hpp>
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
 
 #include "encrypted_file_mapping.hpp"
 
@@ -56,10 +56,10 @@ bool handle_access(void *addr);
 
 #if defined(__x86_64__) || defined(__arm64__)
 typedef int64_t NativeCodeType;
-#define TIGHTDB_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
+#define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
 #else
 typedef int32_t NativeCodeType;
-#define TIGHTDB_EXCEPTION_BEHAVIOR EXCEPTION_STATE_IDENTITY
+#define REALM_EXCEPTION_BEHAVIOR EXCEPTION_STATE_IDENTITY
 #endif
 
 // These structures and the message IDs mostly defined by the .def files included
@@ -141,7 +141,7 @@ thread_state_flavor_t old_flavor;
 void check_error(kern_return_t kr)
 {
     if (kr != KERN_SUCCESS)
-        TIGHTDB_TERMINATE(mach_error_string(kr));
+        REALM_TERMINATE(mach_error_string(kr));
 }
 
 void send_mach_msg(mach_msg_header_t *msg)
@@ -160,7 +160,7 @@ void send_reply(const RaiseStateIdentityRequest<CodeType>& request, kern_return_
     bzero(&reply, sizeof reply);
 
     mach_msg_size_t state_size = request.state.old_stateCnt * sizeof request.state.old_state[0];
-    TIGHTDB_ASSERT_3(sizeof(reply.new_state), >=, state_size);
+    REALM_ASSERT_3(sizeof(reply.new_state), >=, state_size);
 
     reply.Head.msgh_bits = MACH_MSGH_BITS(MACH_MSGH_BITS_REMOTE(request.head.msgh_bits), 0);
     reply.Head.msgh_remote_port = request.head.msgh_remote_port;
@@ -189,7 +189,7 @@ void copy_state(ForwardType<ForwardCodeType>& forward,
                 typename ForwardType<ForwardCodeType>::has_state = 0)
 {
     mach_msg_size_t state_size = request.state.old_stateCnt * sizeof request.state.old_state[0];
-    TIGHTDB_ASSERT_3(sizeof(forward.state.old_state), >=, state_size);
+    REALM_ASSERT_3(sizeof(forward.state.old_state), >=, state_size);
 
     forward.state.flavor = old_flavor;
     if (old_flavor == request.state.flavor) {
@@ -311,7 +311,7 @@ void handle_exception()
             convert_and_forward_message<RaiseStateRequest, int64_t>(request, msg_RequestStateIdentity);
             return;
         default:
-            TIGHTDB_TERMINATE("Unsupported exception behavior");
+            REALM_TERMINATE("Unsupported exception behavior");
     }
 }
 
@@ -347,7 +347,7 @@ void install_handler()
     kr = task_swap_exception_ports(mach_task_self(),
                                    EXC_MASK_BAD_ACCESS,
                                    exception_port,
-                                   TIGHTDB_EXCEPTION_BEHAVIOR,
+                                   REALM_EXCEPTION_BEHAVIOR,
                                    MACHINE_THREAD_STATE,
                                    &old_mask,
                                    &old_count,
@@ -355,8 +355,8 @@ void install_handler()
                                    &old_behavior,
                                    &old_flavor);
     check_error(kr);
-    TIGHTDB_ASSERT_3(old_mask, ==, EXC_MASK_BAD_ACCESS);
-    TIGHTDB_ASSERT_3(old_count, ==, 1);
+    REALM_ASSERT_3(old_mask, ==, EXC_MASK_BAD_ACCESS);
+    REALM_ASSERT_3(old_count, ==, 1);
 
     new Thread(exception_handler_loop);
 }
@@ -380,7 +380,7 @@ void signal_handler(int code, siginfo_t* info, void* ctx)
         else if (old_segv.sa_handler)
             old_segv.sa_handler(code);
         else
-            TIGHTDB_TERMINATE("Segmentation fault");
+            REALM_TERMINATE("Segmentation fault");
     }
     else if (code == SIGBUS) {
         if (old_bus.sa_sigaction)
@@ -388,10 +388,10 @@ void signal_handler(int code, siginfo_t* info, void* ctx)
         else if (old_bus.sa_handler)
             old_bus.sa_handler(code);
         else
-            TIGHTDB_TERMINATE("Segmentation fault");
+            REALM_TERMINATE("Segmentation fault");
     }
     else
-        TIGHTDB_TERMINATE("Segmentation fault");
+        REALM_TERMINATE("Segmentation fault");
 }
 
 void install_handler()
@@ -406,9 +406,9 @@ void install_handler()
         action.sa_flags = SA_SIGINFO;
 
         if (sigaction(SIGSEGV, &action, &old_segv) != 0)
-            TIGHTDB_TERMINATE("sigaction SEGV failed");
+            REALM_TERMINATE("sigaction SEGV failed");
         if (sigaction(SIGBUS, &action, &old_bus) != 0)
-            TIGHTDB_TERMINATE("sigaction SIGBUS");
+            REALM_TERMINATE("sigaction SIGBUS");
     }
 }
 
@@ -588,8 +588,8 @@ void* mmap_anon(size_t size)
 namespace tightdb {
 namespace util {
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
-size_t round_up_to_page_size(size_t size) TIGHTDB_NOEXCEPT
+#ifdef REALM_ENABLE_ENCRYPTION
+size_t round_up_to_page_size(size_t size) REALM_NOEXCEPT
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
@@ -597,7 +597,7 @@ size_t round_up_to_page_size(size_t size) TIGHTDB_NOEXCEPT
 
 void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_key)
 {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
         size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
@@ -606,7 +606,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_
     }
     else
 #else
-    TIGHTDB_ASSERT(!encryption_key);
+    REALM_ASSERT(!encryption_key);
     static_cast<void>(encryption_key);
 #endif
     {
@@ -628,9 +628,9 @@ void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
-void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
+void munmap(void* addr, size_t size) REALM_NOEXCEPT
 {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
     if(::munmap(addr, size) != 0) {
@@ -641,7 +641,7 @@ void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 
 void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size)
 {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
     {
         SpinLockGuard lock(mapping_lock);
         size_t rounded_old_size = round_up_to_page_size(old_size);
@@ -684,7 +684,7 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 
 void msync(void* addr, size_t size)
 {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
         SpinLockGuard lock(mapping_lock);
         if (mapping_and_addr* m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {

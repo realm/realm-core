@@ -58,7 +58,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
 }
 
 
-size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
+size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const REALM_NOEXCEPT
 {
     uint64_t value = Column::get_uint(row_ndx);
 
@@ -74,19 +74,19 @@ size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
+size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const REALM_NOEXCEPT
 {
     uint64_t value = Column::get_uint(row_ndx);
-    TIGHTDB_ASSERT_3(value, !=, 0);
+    REALM_ASSERT_3(value, !=, 0);
 
     size_t origin_row_ndx;
     if ((value & 1) != 0) {
-        TIGHTDB_ASSERT_3(backlink_ndx, ==, 0);
+        REALM_ASSERT_3(backlink_ndx, ==, 0);
         origin_row_ndx = to_size_t(value >> 1);
     }
     else {
         ref_type ref = to_ref(value);
-        TIGHTDB_ASSERT_3(backlink_ndx, <, ColumnBase::get_size_from_ref(ref, get_alloc()));
+        REALM_ASSERT_3(backlink_ndx, <, ColumnBase::get_size_from_ref(ref, get_alloc()));
         // FIXME: Optimize with direct access (that is, avoid creation of a
         // Column instance, since that implies dynamic allocation).
         Column backlink_list(get_alloc(), ref); // Throws
@@ -100,12 +100,12 @@ size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const T
 void ColumnBackLink::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     uint64_t value = Column::get_uint(row_ndx);
-    TIGHTDB_ASSERT_3(value, !=, 0);
+    REALM_ASSERT_3(value, !=, 0);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if ((value & 1) != 0) {
-        TIGHTDB_ASSERT_3(to_size_t(value >> 1), ==, origin_row_ndx);
+        REALM_ASSERT_3(to_size_t(value >> 1), ==, origin_row_ndx);
         Column::set(row_ndx, 0);
         return;
     }
@@ -117,7 +117,7 @@ void ColumnBackLink::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
     backlink_list.set_parent(this, row_ndx);
     int_fast64_t value_2 = int_fast64_t(origin_row_ndx);
     size_t backlink_ndx = backlink_list.find_first(value_2);
-    TIGHTDB_ASSERT_3(backlink_ndx, !=, not_found);
+    REALM_ASSERT_3(backlink_ndx, !=, not_found);
     size_t num_links = backlink_list.size();
     bool is_last = backlink_ndx + 1 == num_links;
     backlink_list.erase(backlink_ndx, is_last);
@@ -154,10 +154,10 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
                                      size_t new_origin_row_ndx)
 {
     uint64_t value = Column::get_uint(row_ndx);
-    TIGHTDB_ASSERT_3(value, !=, 0);
+    REALM_ASSERT_3(value, !=, 0);
 
     if ((value & 1) != 0) {
-        TIGHTDB_ASSERT_3(to_size_t(value >> 1), ==, old_origin_row_ndx);
+        REALM_ASSERT_3(to_size_t(value >> 1), ==, old_origin_row_ndx);
         uint64_t value_2 = new_origin_row_ndx << 1 | 1;
         Column::set_uint(row_ndx, value_2);
         return;
@@ -169,7 +169,7 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
     backlink_list.set_parent(this, row_ndx);
     int_fast64_t value_2 = int_fast64_t(old_origin_row_ndx);
     size_t backlink_ndx = backlink_list.find_first(value_2);
-    TIGHTDB_ASSERT_3(backlink_ndx, !=, not_found);
+    REALM_ASSERT_3(backlink_ndx, !=, not_found);
     int_fast64_t value_3 = int_fast64_t(new_origin_row_ndx);
     backlink_list.set(backlink_ndx, value_3);
 }
@@ -207,14 +207,14 @@ void ColumnBackLink::erase(size_t, bool)
 {
     // This operation is not available for unordered tables, and only unordered
     // tables may have link columns.
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 }
 
 
 void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx, bool)
 {
-    TIGHTDB_ASSERT_DEBUG(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT_DEBUG(last_row_ndx + 1 == size());
+    REALM_ASSERT_DEBUG(row_ndx <= last_row_ndx);
+    REALM_ASSERT_DEBUG(last_row_ndx + 1 == size());
 
     // Nullify all links pointing to the row being deleted
     bool do_destroy = true;
@@ -273,13 +273,13 @@ void ColumnBackLink::update_child_ref(size_t child_ndx, ref_type new_ref)
 }
 
 
-ref_type ColumnBackLink::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
+ref_type ColumnBackLink::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
 {
     return Column::get_as_ref(child_ndx);
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -288,7 +288,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     leaf.Verify();
-    TIGHTDB_ASSERT(leaf.has_refs());
+    REALM_ASSERT(leaf.has_refs());
     return leaf.size();
 }
 
@@ -298,7 +298,7 @@ void ColumnBackLink::Verify() const
 {
     if (root_is_leaf()) {
         m_array->Verify();
-        TIGHTDB_ASSERT(m_array->has_refs());
+        REALM_ASSERT(m_array->has_refs());
         return;
     }
 
@@ -310,14 +310,14 @@ void ColumnBackLink::Verify(const Table& table, size_t col_ndx) const
     Column::Verify(table, col_ndx);
 
     // Check that the origin column specifies the right target
-    TIGHTDB_ASSERT(&m_origin_column->get_target_table() == &table);
-    TIGHTDB_ASSERT(&m_origin_column->get_backlink_column() == this);
+    REALM_ASSERT(&m_origin_column->get_target_table() == &table);
+    REALM_ASSERT(&m_origin_column->get_backlink_column() == this);
 
     // Check that m_origin_table is the table specified by the spec
     size_t origin_table_ndx = m_origin_table->get_index_in_group();
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    TIGHTDB_ASSERT_3(origin_table_ndx, ==, spec.get_opposite_link_table_ndx(col_ndx));
+    REALM_ASSERT_3(origin_table_ndx, ==, spec.get_opposite_link_table_ndx(col_ndx));
 }
 
 
@@ -343,4 +343,4 @@ pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) c
     return make_pair(p.first.m_ref, p.second);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

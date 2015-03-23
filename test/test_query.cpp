@@ -50,90 +50,90 @@ using namespace tightdb::test_util;
 
 namespace {
 
-    TIGHTDB_TABLE_2(TwoIntTable,
+    REALM_TABLE_2(TwoIntTable,
         first, Int,
         second, Int)
 
-        TIGHTDB_TABLE_1(SingleStringTable,
+        REALM_TABLE_1(SingleStringTable,
         first, String)
 
-        TIGHTDB_TABLE_3(TripleTable,
+        REALM_TABLE_3(TripleTable,
         first, String,
         second, String,
         third, Int)
 
-        TIGHTDB_TABLE_1(OneIntTable,
+        REALM_TABLE_1(OneIntTable,
         first, Int)
 
-        TIGHTDB_TABLE_2(TupleTableType,
+        REALM_TABLE_2(TupleTableType,
         first, Int,
         second, String)
 
-        TIGHTDB_TABLE_5(DateIntStringFloatDouble,
+        REALM_TABLE_5(DateIntStringFloatDouble,
         first, Int,
         second, String,
         third, DateTime,
         fourth, Float,
         fifth, Double)
 
-        TIGHTDB_TABLE_2(TupleTableTypeBin,
+        REALM_TABLE_2(TupleTableTypeBin,
         first, Int,
         second, Binary)
 
-        TIGHTDB_TABLE_2(BoolTupleTable,
+        REALM_TABLE_2(BoolTupleTable,
         first, Int,
         second, Bool)
 
-        TIGHTDB_TABLE_5(PeopleTable,
+        REALM_TABLE_5(PeopleTable,
         name, String,
         age, Int,
         male, Bool,
         hired, DateTime,
         photo, Binary)
 
-        TIGHTDB_TABLE_2(FloatTable,
+        REALM_TABLE_2(FloatTable,
         col_float, Float,
         col_double, Double)
 
-        TIGHTDB_TABLE_3(FloatTable3,
+        REALM_TABLE_3(FloatTable3,
         col_float, Float,
         col_double, Double,
         col_int, Int)
 
-        TIGHTDB_TABLE_3(PHPMinimumCrash,
+        REALM_TABLE_3(PHPMinimumCrash,
         firstname, String,
         lastname, String,
         salary, Int)
 
-        TIGHTDB_TABLE_3(TableViewSum,
+        REALM_TABLE_3(TableViewSum,
         col_float, Float,
         col_double, Double,
         col_int, Int)
 
-        TIGHTDB_TABLE_5(GATable,
+        REALM_TABLE_5(GATable,
         user_id, String,
         country, String,
         build, String,
         event_1, Int,
         event_2, Int)
 
-        TIGHTDB_TABLE_2(PeopleTable2,
+        REALM_TABLE_2(PeopleTable2,
         name, String,
         age, Int)
 
-        TIGHTDB_TABLE_5(ThreeColTable,
+        REALM_TABLE_5(ThreeColTable,
         first, Int,
         second, Float,
         third, Double,
         fourth, Bool,
         fifth, String)
 
-        TIGHTDB_TABLE_3(Books,
+        REALM_TABLE_3(Books,
         title, String,
         author, String,
         pages, Int)
 
-        TIGHTDB_TABLE_3(Types,
+        REALM_TABLE_3(Types,
         ints, Int,
         strings, String,
         doubles, Double)
@@ -169,7 +169,7 @@ TEST(Query_Count)
 {
     // Intended to test QueryState::match<pattern = true>(); which is only triggered if:
     // * Table size is large enough to have SSE-aligned or bithack-aligned rows (this requires
-    //   TIGHTDB_MAX_BPNODE_SIZE > [some large number]!)
+    //   REALM_MAX_BPNODE_SIZE > [some large number]!)
     // * You're doing a 'count' which is currently the only operation that uses 'pattern', and
     // * There exists exactly 1 condition (if there is 0 conditions, it will fallback to column::count
     //   and if there exists > 1 conditions, 'pattern' is currently not supported - but could easily be
@@ -181,7 +181,7 @@ TEST(Query_Count)
         table.add_column(type_Int, "i");
 
         size_t count = 0;
-        size_t rows = random.draw_int_mod(5 * TIGHTDB_MAX_BPNODE_SIZE); // to cross some leaf boundaries
+        size_t rows = random.draw_int_mod(5 * REALM_MAX_BPNODE_SIZE); // to cross some leaf boundaries
 
         for (size_t i = 0; i < rows; ++i) {
             table.add_empty_row();
@@ -585,7 +585,7 @@ TEST(Query_NextGenSyntaxMonkey0)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++)
     {
-        const size_t rows = 1 + random.draw_int_mod(2 * TIGHTDB_MAX_BPNODE_SIZE);
+        const size_t rows = 1 + random.draw_int_mod(2 * REALM_MAX_BPNODE_SIZE);
         Table table;
 
         // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
@@ -642,7 +642,7 @@ TEST(Query_NextGenSyntaxMonkey)
     for (int iter = 1; iter < 10 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
-            1 + random.draw_int_mod<size_t>(TIGHTDB_MAX_BPNODE_SIZE * 20 *
+            1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
             (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
@@ -977,7 +977,7 @@ TEST(Query_MergeQueriesMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 0; iter < 5; iter++) {
-        const size_t rows = TIGHTDB_MAX_BPNODE_SIZE * 4;
+        const size_t rows = REALM_MAX_BPNODE_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1155,7 +1155,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 0; iter < 5; iter++) {
-        const size_t rows = TIGHTDB_MAX_BPNODE_SIZE * 4;
+        const size_t rows = REALM_MAX_BPNODE_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1695,7 +1695,7 @@ TEST(Query_StrIndexCrash)
 
         size_t eights = 0;
 
-        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 2; ++i) {
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
             int v = random.draw_int_mod(10);
             if (v == 8) {
                 eights++;
@@ -1745,8 +1745,8 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
     table.add_column(type_Double, "fifth");
     table.add_column(type_Double, "sixth");
 
-#ifdef TIGHTDB_DEBUG
-    for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 5; i++) {
+#ifdef REALM_DEBUG
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE * 5; i++) {
 #else
     for (int i = 0; i < 50000; i++) {
 #endif
@@ -2178,12 +2178,12 @@ TEST(Query_OnTableView_where)
         OneIntTable oti;
         size_t cnt1 = 0;
         size_t cnt0 = 0;
-        size_t limit = random.draw_int_max(TIGHTDB_MAX_BPNODE_SIZE * 10);
+        size_t limit = random.draw_int_max(REALM_MAX_BPNODE_SIZE * 10);
 
-        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10);
-        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10 - lbound);
+        size_t lbound = random.draw_int_mod(REALM_MAX_BPNODE_SIZE * 10);
+        size_t ubound = lbound + random.draw_int_mod(REALM_MAX_BPNODE_SIZE * 10 - lbound);
 
-        for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 10; i++) {
+        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 10; i++) {
             int v = random.draw_int_mod(3);
 
             if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
@@ -2212,7 +2212,7 @@ TEST(Query_StrIndex3)
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     for (int N = 0; N < 4; N++) {
 #else
     for (int N = 0; N < 20; N++) {
@@ -2223,20 +2223,20 @@ TEST(Query_StrIndex3)
         size_t row = 0;
 
         size_t n = 0;
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
         for (int i = 0; i < 4; i++) {
 #else
         for (int i = 0; i < 20; i++) {
 #endif
             // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
             // edge case)
-            int f1 = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE) / 2 + 1;
-            int f2 = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE) / 2 + 1;
+            int f1 = random.draw_int_mod(REALM_MAX_BPNODE_SIZE) / 2 + 1;
+            int f2 = random.draw_int_mod(REALM_MAX_BPNODE_SIZE) / 2 + 1;
             bool longstrings = random.chance(1, 5);
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above probability,
             // plus a remainder (edge case)
-            for (int j = 0; j < TIGHTDB_MAX_BPNODE_SIZE * 2 + TIGHTDB_MAX_BPNODE_SIZE / 5; j++) {
+            for (int j = 0; j < REALM_MAX_BPNODE_SIZE * 2 + REALM_MAX_BPNODE_SIZE / 5; j++) {
                 if (random.chance(1, f1)) {
                     if (random.chance(1, f2)) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
@@ -2349,7 +2349,7 @@ TEST(Query_StrEnum)
     for (int i = 0; i < 100; ++i) {
         ttt.clear();
         aa = 0;
-        for (size_t t = 0; t < TIGHTDB_MAX_BPNODE_SIZE * 2; ++t) {
+        for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE * 2; ++t) {
             if (random.chance(1, 3)) {
                 ttt.add(1, "AA");
                 ++aa;
@@ -2369,7 +2369,7 @@ TEST(Query_StrIndex)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     size_t itera = 4;
     size_t iterb = 100;
 #else
@@ -2793,7 +2793,7 @@ TEST(Query_DoubleCoordinates)
         table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
 
     size_t c = q.count();
-    TIGHTDB_ASSERT(c == expected);
+    REALM_ASSERT(c == expected);
     static_cast<void>(c);
 
     //    }
@@ -3802,7 +3802,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         table.add_column(type_Int, "second1");
 
         // Add random data to table
-        for (size_t t = 0; t < 2 * TIGHTDB_MAX_BPNODE_SIZE; t++) {
+        for (size_t t = 0; t < 2 * REALM_MAX_BPNODE_SIZE; t++) {
             table.add_empty_row();
             int64_t val1 = rand() % 5;
             table.set_int(0, t, val1);
@@ -4125,7 +4125,7 @@ TEST(Query_FindNextBackwards)
     TupleTableType ttt;
 
     // Create multiple leaves
-    for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 4; i++) {
+    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; i++) {
         ttt.add(6, "X");
         ttt.add(7, "X");
     }
@@ -4134,8 +4134,8 @@ TEST(Query_FindNextBackwards)
 
     // Check if leaf caching works correctly in the case you go backwards. 'res' result is not so important
     // in this test; this test tests if we assert errorneously. Next test (TestQueryFindRandom) is more exhaustive
-    size_t res = q.find(TIGHTDB_MAX_BPNODE_SIZE * 2);
-    CHECK_EQUAL(TIGHTDB_MAX_BPNODE_SIZE * 2, res);
+    size_t res = q.find(REALM_MAX_BPNODE_SIZE * 2);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 2, res);
     res = q.find(0);
     CHECK_EQUAL(0, res);
 }
@@ -4148,14 +4148,14 @@ TEST(Query_FindRandom)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     TupleTableType ttt;
-    int64_t search = TIGHTDB_MAX_BPNODE_SIZE / 2;
-    size_t rows = TIGHTDB_MAX_BPNODE_SIZE * 20;
+    int64_t search = REALM_MAX_BPNODE_SIZE / 2;
+    size_t rows = REALM_MAX_BPNODE_SIZE * 20;
 
     // Create multiple leaves
     for (size_t i = 0; i < rows; i++) {
         // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
         // a fair probability of happening
-        ttt.add(random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE), "X");
+        ttt.add(random.draw_int_mod(REALM_MAX_BPNODE_SIZE), "X");
     }
 
     TupleTableType::Query q = ttt.where().first.equal(search);
@@ -4836,7 +4836,7 @@ TEST(Query_SyntaxCheck)
     // when is becomes available.
     /*
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-    #ifdef TIGHTDB_DEBUG
+    #ifdef REALM_DEBUG
     s = q7.Verify();
     CHECK(s != "");
     #endif
@@ -5177,7 +5177,7 @@ TEST(Query_Avg2)
 TEST(Query_OfByOne)
 {
     TupleTableType t;
-    for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 2; ++i) {
+    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
         t.add(1, "a");
     }
 
@@ -5188,19 +5188,19 @@ TEST(Query_OfByOne)
     t[0].first = 1; // reset
 
     // Before split
-    t[TIGHTDB_MAX_BPNODE_SIZE - 1].first = 0;
+    t[REALM_MAX_BPNODE_SIZE - 1].first = 0;
     res = t.where().first.equal(0).find();
-    CHECK_EQUAL(TIGHTDB_MAX_BPNODE_SIZE - 1, res);
-    t[TIGHTDB_MAX_BPNODE_SIZE - 1].first = 1; // reset
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE - 1, res);
+    t[REALM_MAX_BPNODE_SIZE - 1].first = 1; // reset
 
     // After split
-    t[TIGHTDB_MAX_BPNODE_SIZE].first = 0;
+    t[REALM_MAX_BPNODE_SIZE].first = 0;
     res = t.where().first.equal(0).find();
-    CHECK_EQUAL(TIGHTDB_MAX_BPNODE_SIZE, res);
-    t[TIGHTDB_MAX_BPNODE_SIZE].first = 1; // reset
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE, res);
+    t[REALM_MAX_BPNODE_SIZE].first = 1; // reset
 
     // Before end
-    const size_t last_pos = (TIGHTDB_MAX_BPNODE_SIZE * 2) - 1;
+    const size_t last_pos = (REALM_MAX_BPNODE_SIZE * 2) - 1;
     t[last_pos].first = 0;
     res = t.where().first.equal(0).find();
     CHECK_EQUAL(last_pos, res);
@@ -5224,11 +5224,11 @@ TEST(Query_Const)
 
 namespace {
 
-    TIGHTDB_TABLE_2(PhoneTable,
+    REALM_TABLE_2(PhoneTable,
         type, String,
         number, String)
 
-        TIGHTDB_TABLE_4(EmployeeTable,
+        REALM_TABLE_4(EmployeeTable,
         name, String,
         age, Int,
         hired, Bool,
@@ -5358,7 +5358,7 @@ TEST(Query_AggregateSortedView)
     Table table;
     table.add_column(type_Double, "col");
 
-    const int count = TIGHTDB_MAX_BPNODE_SIZE * 2;
+    const int count = REALM_MAX_BPNODE_SIZE * 2;
     table.add_empty_row(count);
     for (int i = 0; i < count; ++i)
         table.set_double(0, i, i + 1); // no 0s to reduce chance of passing by coincidence
@@ -5372,10 +5372,10 @@ TEST(Query_AggregateSortedView)
 }
 
 namespace {
-    TIGHTDB_TABLE_1(TestQuerySub,
+    REALM_TABLE_1(TestQuerySub,
         age, Int)
 
-        TIGHTDB_TABLE_9(TestQueryAllTypes,
+        REALM_TABLE_9(TestQueryAllTypes,
         bool_col, Bool,
         int_col, Int,
         float_col, Float,

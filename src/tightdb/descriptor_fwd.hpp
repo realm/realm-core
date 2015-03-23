@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DESCRIPTOR_FWD_HPP
-#define TIGHTDB_DESCRIPTOR_FWD_HPP
+#ifndef REALM_DESCRIPTOR_FWD_HPP
+#define REALM_DESCRIPTOR_FWD_HPP
 
 #include <tightdb/util/bind_ptr.hpp>
 
@@ -31,4 +31,4 @@ typedef util::bind_ptr<const Descriptor> ConstDescriptorRef;
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DESCRIPTOR_FWD_HPP
+#endif // REALM_DESCRIPTOR_FWD_HPP

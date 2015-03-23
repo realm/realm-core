@@ -1,5 +1,5 @@
-#ifndef TIGHTDB_TEST_UTIL_MISC_HPP
-#define TIGHTDB_TEST_UTIL_MISC_HPP
+#ifndef REALM_TEST_UTIL_MISC_HPP
+#define REALM_TEST_UTIL_MISC_HPP
 
 #include <string>
 
@@ -12,4 +12,4 @@ bool equal_without_cr(std::string s1, std::string s2);
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_MISC_HPP
+#endif // REALM_TEST_UTIL_MISC_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_BASIC_HPP
-#define TIGHTDB_COLUMN_BASIC_HPP
+#ifndef REALM_COLUMN_BASIC_HPP
+#define REALM_COLUMN_BASIC_HPP
 
 #include <tightdb/column.hpp>
 #include <tightdb/array_basic.hpp>
@@ -44,12 +44,12 @@ class BasicColumn : public ColumnBase, public ColumnTemplate<T> {
 public:
     typedef T value_type;
     BasicColumn(Allocator&, ref_type);
-    ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~BasicColumn() REALM_NOEXCEPT REALM_OVERRIDE;
 
-    std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    std::size_t size() const REALM_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    T get(std::size_t ndx) const REALM_NOEXCEPT;
     void add(T value = T());
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value = T());
@@ -79,8 +79,8 @@ public:
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order.
-    std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound(T value) const REALM_NOEXCEPT;
+    std::size_t upper_bound(T value) const REALM_NOEXCEPT;
     //@{
 
     /// Compare two columns for equality.
@@ -90,25 +90,25 @@ public:
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+                   _impl::OutputStream&) const REALM_OVERRIDE;
 
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void Verify() const;
-    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
 #endif
 
 protected:
     T get_val(size_t row) const { return get(row); }
 
 private:
-    std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
 
     /// \param row_ndx Must be `tightdb::npos` if appending.
     void do_insert(std::size_t row_ndx, T value, std::size_t num_rows);
@@ -130,10 +130,10 @@ private:
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void do_clear();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const TIGHTDB_OVERRIDE;
+                     std::ostream&) const REALM_OVERRIDE;
     static void leaf_dumper(MemRef, Allocator&, std::ostream&, int level);
 #endif
 
@@ -149,4 +149,4 @@ private:
 #include <tightdb/column_basic_tpl.hpp>
 
 
-#endif // TIGHTDB_COLUMN_BASIC_HPP
+#endif // REALM_COLUMN_BASIC_HPP

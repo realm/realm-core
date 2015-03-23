@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_VERIFIED_INTEGER_HPP
-#define TIGHTDB_TEST_UTIL_VERIFIED_INTEGER_HPP
+#ifndef REALM_TEST_UTIL_VERIFIED_INTEGER_HPP
+#define REALM_TEST_UTIL_VERIFIED_INTEGER_HPP
 
 #include <cstddef>
 #include <vector>
@@ -78,4 +78,4 @@ inline VerifiedInteger::VerifiedInteger(Random& random):
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_VERIFIED_INTEGER_HPP
+#endif // REALM_TEST_UTIL_VERIFIED_INTEGER_HPP

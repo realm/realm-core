@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
-#define TIGHTDB_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
+#ifndef REALM_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
+#define REALM_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
 
 #include <tightdb/exceptions.hpp>
 
@@ -27,4 +27,4 @@
 #define CHECK_LOGIC_ERROR(expr, error_kind) \
     CHECK_THROW_EX(expr, tightdb::LogicError, e.kind() == error_kind)
 
-#endif // TIGHTDB_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
+#endif // REALM_TEST_UTIL_CHECK_LOGIC_ERROR_HPP

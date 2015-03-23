@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_HPP
-#define TIGHTDB_COLUMN_HPP
+#ifndef REALM_COLUMN_HPP
+#define REALM_COLUMN_HPP
 
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // std::size_t
@@ -64,7 +64,7 @@ class ColumnBase {
 public:
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
-    std::size_t size() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT;
 
     /// \throw LogicError Thrown if this column is not string valued.
     virtual void set_string(std::size_t row_ndx, StringData value);
@@ -99,37 +99,37 @@ public:
     virtual void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
                                 bool broken_reciprocal_backlinks) = 0;
 
-    virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
+    virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
 
     // Returns true if, and only if this column is an AdaptiveStringColumn.
-    virtual bool is_string_col() const TIGHTDB_NOEXCEPT;
+    virtual bool is_string_col() const REALM_NOEXCEPT;
 
-    virtual void destroy() TIGHTDB_NOEXCEPT;
+    virtual void destroy() REALM_NOEXCEPT;
 
-    virtual ~ColumnBase() TIGHTDB_NOEXCEPT {};
+    virtual ~ColumnBase() REALM_NOEXCEPT {};
 
     // Search index
-    virtual bool has_search_index() const TIGHTDB_NOEXCEPT;
+    virtual bool has_search_index() const REALM_NOEXCEPT;
     virtual StringIndex* create_search_index();
-    virtual void destroy_search_index() TIGHTDB_NOEXCEPT;
-    virtual const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
-    virtual StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
+    virtual void destroy_search_index() REALM_NOEXCEPT;
+    virtual const StringIndex* get_search_index() const REALM_NOEXCEPT;
+    virtual StringIndex* get_search_index() REALM_NOEXCEPT;
     virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                                       bool allow_duplicate_values);
-    virtual void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT;
+    virtual void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
-    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
+    Allocator& get_alloc() const REALM_NOEXCEPT { return m_array->get_alloc(); }
 
     /// Returns the 'ref' of the root array.
-    ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_array->get_ref(); }
+    ref_type get_ref() const REALM_NOEXCEPT { return m_array->get_ref(); }
 
     //@{
     /// Returns the array node at the root of this column, but note
     /// that there is no guarantee that this node is an inner B+-tree
     /// node or a leaf. This is the case for a MixedColumn in
     /// particular.
-    Array* get_root_array() TIGHTDB_NOEXCEPT { return m_array; }
-    const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
+    Array* get_root_array() REALM_NOEXCEPT { return m_array; }
+    const Array* get_root_array() const REALM_NOEXCEPT { return m_array; }
     //@}
 
     /// Provides access to the leaf that contains the element at the
@@ -148,17 +148,17 @@ public:
     /// be accessed through the returned const-qualified reference,
     /// and never directly through the specfied fallback accessor.
     const Array& get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                          Array& fallback) const TIGHTDB_NOEXCEPT;
+                          Array& fallback) const REALM_NOEXCEPT;
 
     // FIXME: Is almost identical to get_leaf(), but uses ill-defined
     // aspects of the Array API. Should be eliminated.
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                          bool use_retval = false) const TIGHTDB_NOEXCEPT;
+                          bool use_retval = false) const REALM_NOEXCEPT;
 
     inline void detach(void);
-    inline bool is_attached(void) const TIGHTDB_NOEXCEPT;
+    inline bool is_attached(void) const REALM_NOEXCEPT;
 
-    static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+    static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) REALM_NOEXCEPT;
 
     // These assume that the right column compile-time type has been
     // figured out.
@@ -169,12 +169,12 @@ public:
     virtual ref_type write(std::size_t slice_offset, std::size_t slice_size,
                            std::size_t table_size, _impl::OutputStream&) const = 0;
 
-    void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    void set_parent(ArrayParent*, std::size_t ndx_in_parent) REALM_NOEXCEPT;
 
     /// Called in the context of Group::commit() and
     /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
     /// table and link list accessors stay valid across a commit.
-    virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    virtual void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
 
     //@{
 
@@ -193,25 +193,25 @@ public:
 
     //@}
 
-    void discard_child_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() REALM_NOEXCEPT;
 
     /// For columns that are able to contain subtables, this function returns
     /// the pointer to the subtable accessor at the specified row index if it
     /// exists, otherwise it returns null. For other column types, this function
     /// returns null.
-    virtual Table* get_subtable_accessor(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    virtual Table* get_subtable_accessor(std::size_t row_ndx) const REALM_NOEXCEPT;
 
     /// Detach and remove the subtable accessor at the specified row if it
     /// exists. For column types that are unable to contain subtable, this
     /// function does nothing.
-    virtual void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT;
 
-    virtual void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    virtual void adj_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
+    virtual void adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
     /// See Table::adj_acc_move_over()
     virtual void adj_acc_move_over(std::size_t from_row_ndx,
-                                   std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
-    virtual void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
+                                   std::size_t to_row_ndx) REALM_NOEXCEPT;
+    virtual void adj_acc_clear_root_table() REALM_NOEXCEPT;
 
     enum {
         mark_Recursive   = 0x01,
@@ -219,9 +219,9 @@ public:
         mark_LinkOrigins = 0x04
     };
 
-    virtual void mark(int type) TIGHTDB_NOEXCEPT;
+    virtual void mark(int type) REALM_NOEXCEPT;
 
-    virtual void bump_link_origin_table_version() TIGHTDB_NOEXCEPT;
+    virtual void bump_link_origin_table_version() REALM_NOEXCEPT;
 
     /// Refresh the dirty part of the accessor subtree rooted at this column
     /// accessor.
@@ -245,7 +245,7 @@ public:
     ///    (`m_array->m_ndx_in_parent`) is valid.
     virtual void refresh_accessor_tree(std::size_t new_col_ndx, const Spec&) = 0;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void Verify() const = 0;
     virtual void Verify(const Table&, std::size_t col_ndx) const;
@@ -259,25 +259,25 @@ protected:
     // const-violating moving copy constructor.
     mutable Array* m_array;
 
-    ColumnBase(Array* root = 0) TIGHTDB_NOEXCEPT;
+    ColumnBase(Array* root = 0) REALM_NOEXCEPT;
 
-    virtual std::size_t do_get_size() const TIGHTDB_NOEXCEPT = 0;
+    virtual std::size_t do_get_size() const REALM_NOEXCEPT = 0;
 
     // Must not assume more than minimal consistency (see
     // AccessorConsistencyLevels).
-    virtual void do_discard_child_accessors() TIGHTDB_NOEXCEPT {}
+    virtual void do_discard_child_accessors() REALM_NOEXCEPT {}
 
     //@{
     /// \tparam L Any type with an appropriate `value_type`, %size(),
     /// and %get() members.
     template<class L, class T>
-    std::size_t lower_bound(const L& list, T value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound(const L& list, T value) const REALM_NOEXCEPT;
     template<class L, class T>
-    std::size_t upper_bound(const L& list, T value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound(const L& list, T value) const REALM_NOEXCEPT;
     //@}
 
     // Node functions
-    bool root_is_leaf() const TIGHTDB_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
+    bool root_is_leaf() const REALM_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
 
     template <class T, class R, Action action, class condition>
     R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1),
@@ -293,7 +293,7 @@ protected:
     class CreateHandler {
     public:
         virtual ref_type create_leaf(std::size_t size) = 0;
-        ~CreateHandler() TIGHTDB_NOEXCEPT {}
+        ~CreateHandler() REALM_NOEXCEPT {}
     };
 
     static ref_type create(Allocator&, std::size_t size, CreateHandler&);
@@ -302,13 +302,13 @@ protected:
     public:
         virtual MemRef slice_leaf(MemRef leaf_mem, std::size_t offset, std::size_t size,
                                   Allocator& target_alloc) = 0;
-        ~SliceHandler() TIGHTDB_NOEXCEPT {}
+        ~SliceHandler() REALM_NOEXCEPT {}
     };
 
     static ref_type write(const Array* root, std::size_t slice_offset, std::size_t slice_size,
                           std::size_t table_size, SliceHandler&, _impl::OutputStream&);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     class LeafToDot;
     virtual void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                              std::ostream&) const = 0;
@@ -330,11 +330,11 @@ struct ColumnBase::CascadeState {
         std::size_t table_ndx; ///< Index within group of a group-level table.
         std::size_t row_ndx;
 
-        bool operator==(const row&) const TIGHTDB_NOEXCEPT;
-        bool operator!=(const row&) const TIGHTDB_NOEXCEPT;
+        bool operator==(const row&) const REALM_NOEXCEPT;
+        bool operator!=(const row&) const REALM_NOEXCEPT;
 
         /// Trivial lexicographic order
-        bool operator<(const row&) const TIGHTDB_NOEXCEPT;
+        bool operator<(const row&) const REALM_NOEXCEPT;
     };
 
     typedef std::vector<row> row_set;
@@ -370,9 +370,9 @@ struct ColumnBase::CascadeState {
 
 class ColumnBase::EraseHandlerBase: public Array::EraseHandler {
 protected:
-    EraseHandlerBase(ColumnBase& column) TIGHTDB_NOEXCEPT: m_column(column) {}
-    ~EraseHandlerBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-    Allocator& get_alloc() TIGHTDB_NOEXCEPT;
+    EraseHandlerBase(ColumnBase& column) REALM_NOEXCEPT: m_column(column) {}
+    ~EraseHandlerBase() REALM_NOEXCEPT REALM_OVERRIDE {}
+    Allocator& get_alloc() REALM_NOEXCEPT;
     void replace_root(Array* leaf); // Ownership passed
 private:
     ColumnBase& m_column;
@@ -392,29 +392,29 @@ public:
     int64_t get_val(size_t row) const { return get(row); }
 
     Column(Allocator&, ref_type);
-    inline bool has_search_index() const TIGHTDB_NOEXCEPT;
+    inline bool has_search_index() const REALM_NOEXCEPT;
     struct unattached_root_tag {};
     Column(unattached_root_tag, Allocator&);
 
     struct move_tag {};
-    Column(move_tag, Column&) TIGHTDB_NOEXCEPT;
+    Column(move_tag, Column&) REALM_NOEXCEPT;
 
-    ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void destroy() TIGHTDB_NOEXCEPT;
+    ~Column() REALM_NOEXCEPT REALM_OVERRIDE;
+    void destroy() REALM_NOEXCEPT;
     void move_assign(Column&);
-    bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
+    bool IsIntColumn() const REALM_NOEXCEPT { return true; }
 
-    std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    std::size_t size() const REALM_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     // Getting and setting values
-    int_fast64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    int_fast64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
+    int_fast64_t get(std::size_t ndx) const REALM_NOEXCEPT;
+    ref_type get_as_ref(std::size_t ndx) const REALM_NOEXCEPT;
+    int_fast64_t back() const REALM_NOEXCEPT { return get(size()-1); }
     void set(std::size_t ndx, int_fast64_t value);
     void set_uint(std::size_t ndx, uint64_t value);
     void set_as_ref(std::size_t ndx, ref_type ref);
-    uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
     void adjust(std::size_t ndx, int_fast64_t diff);
     void add(int_fast64_t value = 0);
     void insert(std::size_t ndx, int_fast64_t value = 0);
@@ -446,56 +446,56 @@ public:
 
     void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues);
     StringIndex* create_search_index();
-    StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
-    const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
-    void destroy_search_index() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    StringIndex* get_search_index() REALM_NOEXCEPT;
+    const StringIndex* get_search_index() const REALM_NOEXCEPT;
+    void destroy_search_index() REALM_NOEXCEPT REALM_OVERRIDE;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to ordinary integer comparison.
-    std::size_t lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_int(int64_t value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_int(int64_t value) const REALM_NOEXCEPT;
     //@}
 
     // return first element E for which E >= target or return -1 if none. Array must be sorted
     size_t find_gte(int64_t target, size_t start) const;
 
     /// Compare two columns for equality.
-    bool compare_int(const Column&) const TIGHTDB_NOEXCEPT;
+    bool compare_int(const Column&) const REALM_NOEXCEPT;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
                            std::size_t size = 0, int_fast64_t value = 0);
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+                   _impl::OutputStream&) const REALM_OVERRIDE;
 
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-    void update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT;
+    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void update_from_parent(size_t old_baseline) REALM_NOEXCEPT;
 
     /// \param row_ndx Must be `tightdb::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE;
     using ColumnBase::Verify;
-    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
     MemStats stats() const;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
 #endif
 
 protected:
-    Column(ArrayInteger* root = 0) TIGHTDB_NOEXCEPT;
+    Column(ArrayInteger* root = 0) REALM_NOEXCEPT;
 
     ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array); }
     const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array); }
 
-    std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
 
     void do_erase(std::size_t row_ndx, bool is_last);
 
@@ -509,9 +509,9 @@ protected:
     /// Array::type_HasRefs.
     void do_clear();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const TIGHTDB_OVERRIDE;
+                     std::ostream&) const REALM_OVERRIDE;
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
 
@@ -538,12 +538,12 @@ private:
 
 // Implementation:
 
-inline std::size_t ColumnBase::size() const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnBase::size() const REALM_NOEXCEPT
 {
     return do_get_size();
 }
 
-inline ColumnBase::ColumnBase(Array* root) TIGHTDB_NOEXCEPT:
+inline ColumnBase::ColumnBase(Array* root) REALM_NOEXCEPT:
     m_array(root)
 {
 }
@@ -553,23 +553,23 @@ inline void ColumnBase::detach()
     m_array->detach();
 }
 
-inline bool ColumnBase::is_attached() const TIGHTDB_NOEXCEPT
+inline bool ColumnBase::is_attached() const REALM_NOEXCEPT
 {
     return m_array->is_attached();
 }
 
-inline bool ColumnBase::is_string_col() const TIGHTDB_NOEXCEPT
+inline bool ColumnBase::is_string_col() const REALM_NOEXCEPT
 {
     return false;
 }
 
-inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
+inline void ColumnBase::destroy() REALM_NOEXCEPT
 {
     if (m_array)
         m_array->destroy_deep();
 }
 
-inline bool ColumnBase::has_search_index() const TIGHTDB_NOEXCEPT
+inline bool ColumnBase::has_search_index() const REALM_NOEXCEPT
 {
     return get_search_index() != null_ptr;
 }
@@ -579,16 +579,16 @@ inline StringIndex* ColumnBase::create_search_index()
     return null_ptr;
 }
 
-inline void ColumnBase::destroy_search_index() TIGHTDB_NOEXCEPT
+inline void ColumnBase::destroy_search_index() REALM_NOEXCEPT
 {
 }
 
-inline const StringIndex* ColumnBase::get_search_index() const TIGHTDB_NOEXCEPT
+inline const StringIndex* ColumnBase::get_search_index() const REALM_NOEXCEPT
 {
     return null_ptr;
 }
 
-inline StringIndex* ColumnBase::get_search_index() TIGHTDB_NOEXCEPT
+inline StringIndex* ColumnBase::get_search_index() REALM_NOEXCEPT
 {
     return null_ptr;
 }
@@ -597,21 +597,21 @@ inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t
 {
 }
 
-inline void ColumnBase::set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT
+inline void ColumnBase::set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT
 {
 }
 
-inline bool ColumnBase::CascadeState::row::operator==(const row& r) const TIGHTDB_NOEXCEPT
+inline bool ColumnBase::CascadeState::row::operator==(const row& r) const REALM_NOEXCEPT
 {
     return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
 }
 
-inline bool ColumnBase::CascadeState::row::operator!=(const row& r) const TIGHTDB_NOEXCEPT
+inline bool ColumnBase::CascadeState::row::operator!=(const row& r) const REALM_NOEXCEPT
 {
     return !(*this == r);
 }
 
-inline bool ColumnBase::CascadeState::row::operator<(const row& r) const TIGHTDB_NOEXCEPT
+inline bool ColumnBase::CascadeState::row::operator<(const row& r) const REALM_NOEXCEPT
 {
     return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
 }
@@ -623,58 +623,58 @@ inline ColumnBase::CascadeState::CascadeState():
 {
 }
 
-inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnBase::discard_child_accessors() REALM_NOEXCEPT
 {
     do_discard_child_accessors();
 }
 
-inline Table* ColumnBase::get_subtable_accessor(std::size_t) const TIGHTDB_NOEXCEPT
+inline Table* ColumnBase::get_subtable_accessor(std::size_t) const REALM_NOEXCEPT
 {
     return 0;
 }
 
-inline void ColumnBase::discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::discard_subtable_accessor(std::size_t) REALM_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_acc_erase_row(std::size_t) REALM_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::mark(int) TIGHTDB_NOEXCEPT
+inline void ColumnBase::mark(int) REALM_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::bump_link_origin_table_version() TIGHTDB_NOEXCEPT
+inline void ColumnBase::bump_link_origin_table_version() REALM_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+inline void ColumnBase::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
 {
     m_array->set_parent(parent, ndx_in_parent);
 }
 
 inline const Array& ColumnBase::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                                         Array& fallback) const TIGHTDB_NOEXCEPT
+                                         Array& fallback) const REALM_NOEXCEPT
 {
     if (!m_array->is_inner_bptree_node()) {
         ndx_in_leaf = ndx;
@@ -687,7 +687,7 @@ inline const Array& ColumnBase::get_leaf(std::size_t ndx, std::size_t& ndx_in_le
 }
 
 inline const Array* ColumnBase::GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                                         bool use_retval) const TIGHTDB_NOEXCEPT
+                                         bool use_retval) const REALM_NOEXCEPT
 {
     return m_array->GetBlock(ndx, arr, off, use_retval);
 }
@@ -702,7 +702,7 @@ inline std::size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& a
 }
 
 template<class L, class T>
-std::size_t ColumnBase::lower_bound(const L& list, T value) const TIGHTDB_NOEXCEPT
+std::size_t ColumnBase::lower_bound(const L& list, T value) const REALM_NOEXCEPT
 {
     std::size_t i = 0;
     std::size_t size = list.size();
@@ -722,7 +722,7 @@ std::size_t ColumnBase::lower_bound(const L& list, T value) const TIGHTDB_NOEXCE
 }
 
 template<class L, class T>
-std::size_t ColumnBase::upper_bound(const L& list, T value) const TIGHTDB_NOEXCEPT
+std::size_t ColumnBase::upper_bound(const L& list, T value) const REALM_NOEXCEPT
 {
     size_t i = 0;
     size_t size = list.size();
@@ -742,7 +742,7 @@ std::size_t ColumnBase::upper_bound(const L& list, T value) const TIGHTDB_NOEXCE
 }
 
 
-inline Allocator& ColumnBase::EraseHandlerBase::get_alloc() TIGHTDB_NOEXCEPT
+inline Allocator& ColumnBase::EraseHandlerBase::get_alloc() REALM_NOEXCEPT
 {
     return m_column.m_array->get_alloc();
 }
@@ -765,7 +765,7 @@ inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHan
     return build(&rest_size, fixed_height, alloc, handler);
 }
 
-inline bool Column::has_search_index() const TIGHTDB_NOEXCEPT
+inline bool Column::has_search_index() const REALM_NOEXCEPT
 {
     return m_search_index;
 }
@@ -783,7 +783,7 @@ inline Column::Column(unattached_root_tag, Allocator& alloc) : m_search_index(nu
 
 }
 
-inline Column::Column(move_tag, Column& col) TIGHTDB_NOEXCEPT
+inline Column::Column(move_tag, Column& col) REALM_NOEXCEPT
 {
     m_array = col.m_array;
     col.m_array = 0;
@@ -791,21 +791,21 @@ inline Column::Column(move_tag, Column& col) TIGHTDB_NOEXCEPT
     col.m_search_index = 0;
 }
 
-inline Column::Column(ArrayInteger* root) TIGHTDB_NOEXCEPT:
+inline Column::Column(ArrayInteger* root) REALM_NOEXCEPT:
     ColumnBase(root), m_search_index(null_ptr)
 {
 }
 
-inline std::size_t Column::size() const TIGHTDB_NOEXCEPT
+inline std::size_t Column::size() const REALM_NOEXCEPT
 {
     if (root_is_leaf())
         return m_array->size();
     return m_array->get_bptree_size();
 }
 
-inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int_fast64_t Column::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(ndx < size());
     if (!m_array->is_inner_bptree_node())
         return array()->get(ndx);
 
@@ -815,12 +815,12 @@ inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return ArrayInteger::get(leaf_header, ndx_in_leaf);
 }
 
-inline ref_type Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline ref_type Column::get_as_ref(std::size_t ndx) const REALM_NOEXCEPT
 {
     return to_ref(get(ndx));
 }
 
-inline uint64_t Column::get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline uint64_t Column::get_uint(std::size_t ndx) const REALM_NOEXCEPT
 {
     return static_cast<uint64_t>(get(ndx));
 }
@@ -835,7 +835,7 @@ inline void Column::add(int_fast64_t value)
 inline void Column::insert(std::size_t row_ndx, int_fast64_t value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT_3(row_ndx, <=, size);
+    REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws
@@ -885,7 +885,7 @@ inline void Column::clear(std::size_t, bool)
     do_clear(); // Throws
 }
 
-TIGHTDB_FORCEINLINE
+REALM_FORCEINLINE
 ref_type Column::leaf_insert(MemRef leaf_mem, ArrayParent& parent, std::size_t ndx_in_parent,
                              Allocator& alloc, std::size_t insert_ndx,
                              Array::TreeInsert<Column>& state)
@@ -897,7 +897,7 @@ ref_type Column::leaf_insert(MemRef leaf_mem, ArrayParent& parent, std::size_t n
 }
 
 
-inline std::size_t Column::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
+inline std::size_t Column::lower_bound_int(int64_t value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         return array()->lower_bound(value);
@@ -905,7 +905,7 @@ inline std::size_t Column::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
     return ColumnBase::lower_bound(*this, value);
 }
 
-inline std::size_t Column::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
+inline std::size_t Column::upper_bound_int(int64_t value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         return array()->upper_bound(value);
@@ -936,4 +936,4 @@ inline size_t Column::find_gte(int64_t target, size_t start) const
 // Templates
 #include <tightdb/column_tpl.hpp>
 
-#endif // TIGHTDB_COLUMN_HPP
+#endif // REALM_COLUMN_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_NUMBER_NAMES_HPP
-#define TIGHTDB_TEST_UTIL_NUMBER_NAMES_HPP
+#ifndef REALM_TEST_UTIL_NUMBER_NAMES_HPP
+#define REALM_TEST_UTIL_NUMBER_NAMES_HPP
 
 #include <cstddef>
 #include <string>
@@ -61,4 +61,4 @@ std::string number_name(std::size_t n)
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_NUMBER_NAMES_HPP
+#endif // REALM_TEST_UTIL_NUMBER_NAMES_HPP

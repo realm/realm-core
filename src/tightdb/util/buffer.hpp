@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_BUFFER_HPP
-#define TIGHTDB_UTIL_BUFFER_HPP
+#ifndef REALM_UTIL_BUFFER_HPP
+#define REALM_UTIL_BUFFER_HPP
 
 #include <cstddef>
 #include <algorithm>
@@ -38,16 +38,16 @@ namespace util {
 /// size.
 template<class T> class Buffer {
 public:
-    Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    Buffer() REALM_NOEXCEPT: m_data(0), m_size(0) {}
     Buffer(std::size_t size);
-    ~Buffer() TIGHTDB_NOEXCEPT {}
+    ~Buffer() REALM_NOEXCEPT {}
 
-    T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
-    const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
+    T& operator[](std::size_t i) REALM_NOEXCEPT { return m_data[i]; }
+    const T& operator[](std::size_t i) const REALM_NOEXCEPT { return m_data[i]; }
 
-    T* data() TIGHTDB_NOEXCEPT { return m_data.get(); }
-    const T* data() const TIGHTDB_NOEXCEPT { return m_data.get(); }
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
+    T* data() REALM_NOEXCEPT { return m_data.get(); }
+    const T* data() const REALM_NOEXCEPT { return m_data.get(); }
+    std::size_t size() const REALM_NOEXCEPT { return m_size; }
 
     /// Discards the original contents.
     void set_size(std::size_t new_size);
@@ -66,9 +66,9 @@ public:
 
     void reserve_extra(std::size_t used_size, std::size_t min_extra_capacity);
 
-    T* release() TIGHTDB_NOEXCEPT;
+    T* release() REALM_NOEXCEPT;
 
-    friend void swap(Buffer&a, Buffer&b) TIGHTDB_NOEXCEPT
+    friend void swap(Buffer&a, Buffer&b) REALM_NOEXCEPT
     {
         using std::swap;
         swap(a.m_data, b.m_data);
@@ -86,17 +86,17 @@ private:
 /// size, and is automatically expanded in progressively larger steps.
 template<class T> class AppendBuffer {
 public:
-    AppendBuffer() TIGHTDB_NOEXCEPT;
-    ~AppendBuffer() TIGHTDB_NOEXCEPT {}
+    AppendBuffer() REALM_NOEXCEPT;
+    ~AppendBuffer() REALM_NOEXCEPT {}
 
     /// Returns the current size of the buffer.
-    std::size_t size() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT;
 
     /// Gives read and write access to the elements.
-    T* data() TIGHTDB_NOEXCEPT;
+    T* data() REALM_NOEXCEPT;
 
     /// Gives read access the elements.
-    const T* data() const TIGHTDB_NOEXCEPT;
+    const T* data() const REALM_NOEXCEPT;
 
     /// Append the specified elements. This increases the size of this
     /// buffer by \a size. If the caller has previously requested a
@@ -118,7 +118,7 @@ public:
     void reserve(std::size_t min_capacity);
 
     /// Set the size to zero. The capacity remains unchanged.
-    void clear() TIGHTDB_NOEXCEPT;
+    void clear() REALM_NOEXCEPT;
 
 private:
     util::Buffer<char> m_buffer;
@@ -132,7 +132,7 @@ private:
 
 class BufferSizeOverflow: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
     {
         return "Buffer size overflow";
     }
@@ -163,12 +163,12 @@ template<class T> inline void Buffer<T>::reserve(std::size_t used_size,
                                                  std::size_t min_capacity)
 {
     std::size_t current_capacity = m_size;
-    if (TIGHTDB_LIKELY(current_capacity >= min_capacity))
+    if (REALM_LIKELY(current_capacity >= min_capacity))
         return;
     std::size_t new_capacity = current_capacity;
-    if (TIGHTDB_UNLIKELY(int_multiply_with_overflow_detect(new_capacity, 2)))
+    if (REALM_UNLIKELY(int_multiply_with_overflow_detect(new_capacity, 2)))
         new_capacity = std::numeric_limits<std::size_t>::max();
-    if (TIGHTDB_UNLIKELY(new_capacity < min_capacity))
+    if (REALM_UNLIKELY(new_capacity < min_capacity))
         new_capacity = min_capacity;
     resize(new_capacity, 0, used_size, 0); // Throws
 }
@@ -177,33 +177,33 @@ template<class T> inline void Buffer<T>::reserve_extra(std::size_t used_size,
                                                        std::size_t min_extra_capacity)
 {
     std::size_t min_capacity = used_size;
-    if (TIGHTDB_UNLIKELY(int_add_with_overflow_detect(min_capacity, min_extra_capacity)))
+    if (REALM_UNLIKELY(int_add_with_overflow_detect(min_capacity, min_extra_capacity)))
         throw BufferSizeOverflow();
     reserve(used_size, min_capacity); // Throws
 }
 
-template<class T> inline T* Buffer<T>::release() TIGHTDB_NOEXCEPT
+template<class T> inline T* Buffer<T>::release() REALM_NOEXCEPT
 {
     m_size = 0;
     return m_data.release();
 }
 
 
-template<class T> inline AppendBuffer<T>::AppendBuffer() TIGHTDB_NOEXCEPT: m_size(0)
+template<class T> inline AppendBuffer<T>::AppendBuffer() REALM_NOEXCEPT: m_size(0)
 {
 }
 
-template<class T> inline std::size_t AppendBuffer<T>::size() const TIGHTDB_NOEXCEPT
+template<class T> inline std::size_t AppendBuffer<T>::size() const REALM_NOEXCEPT
 {
     return m_size;
 }
 
-template<class T> inline T* AppendBuffer<T>::data() TIGHTDB_NOEXCEPT
+template<class T> inline T* AppendBuffer<T>::data() REALM_NOEXCEPT
 {
     return m_buffer.data();
 }
 
-template<class T> inline const T* AppendBuffer<T>::data() const TIGHTDB_NOEXCEPT
+template<class T> inline const T* AppendBuffer<T>::data() const REALM_NOEXCEPT
 {
     return m_buffer.data();
 }
@@ -226,7 +226,7 @@ template<class T> inline void AppendBuffer<T>::resize(std::size_t size)
     m_size = size;
 }
 
-template<class T> inline void AppendBuffer<T>::clear() TIGHTDB_NOEXCEPT
+template<class T> inline void AppendBuffer<T>::clear() REALM_NOEXCEPT
 {
     m_size = 0;
 }
@@ -235,4 +235,4 @@ template<class T> inline void AppendBuffer<T>::clear() TIGHTDB_NOEXCEPT
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_BUFFER_HPP
+#endif // REALM_UTIL_BUFFER_HPP

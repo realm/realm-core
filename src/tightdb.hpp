@@ -17,12 +17,12 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_HPP
-#define TIGHTDB_HPP
+#ifndef REALM_HPP
+#define REALM_HPP
 
 #include <tightdb/group_shared.hpp>
 #include <tightdb/table_macros.hpp>
 #include <tightdb/descriptor.hpp>
 #include <tightdb/link_view.hpp>
 
-#endif // TIGHTDB_HPP
+#endif // REALM_HPP

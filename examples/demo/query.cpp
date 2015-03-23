@@ -3,7 +3,7 @@
 using namespace tightdb;
 using namespace std;
 
-TIGHTDB_TABLE_3(People,
+REALM_TABLE_3(People,
                 name, String,
                 age,  Int,
                 hired, Bool)

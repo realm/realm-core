@@ -64,13 +64,13 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-TIGHTDB_TABLE_4(TestTableGroup,
+REALM_TABLE_4(TestTableGroup,
                 first,  String,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
 
-TIGHTDB_TABLE_3(TestTableGroup2,
+REALM_TABLE_3(TestTableGroup2,
                 first,  Mixed,
                 second, Subtable<TestTableGroup>,
                 third,  Subtable<TestTableGroup>)
@@ -767,7 +767,7 @@ TEST(Group_Serialize1)
         table->add("", 30, true, Wed);
         table->add("",  9, true, Wed);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
         to_disk.Verify();
 #endif
 
@@ -794,7 +794,7 @@ TEST(Group_Serialize1)
 
         // Verify that both changed correctly
         CHECK(*table == *t);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
         to_disk.Verify();
         from_disk.Verify();
 #endif
@@ -822,7 +822,7 @@ TEST(Group_Serialize2)
     table2->add("hey",  0, true, Tue);
     table2->add("hello", 3232, false, Sun);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_disk.Verify();
 #endif
 
@@ -838,7 +838,7 @@ TEST(Group_Serialize2)
     CHECK(*table1 == *t1);
     CHECK(*table2 == *t2);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_disk.Verify();
     from_disk.Verify();
 #endif
@@ -855,7 +855,7 @@ TEST(Group_Serialize3)
     table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_disk.Verify();
 #endif
 
@@ -868,7 +868,7 @@ TEST(Group_Serialize3)
 
     // Verify that original values are there
     CHECK(*table == *t);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_disk.Verify();
     from_disk.Verify();
 #endif
@@ -891,7 +891,7 @@ TEST(Group_Serialize_Mem)
     table->add("", 30, true, Wed);
     table->add("",  9, true, Wed);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_mem.Verify();
 #endif
 
@@ -907,7 +907,7 @@ TEST(Group_Serialize_Mem)
 
     // Verify that original values are there
     CHECK(*table == *t);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_mem.Verify();
     from_mem.Verify();
 #endif
@@ -944,7 +944,7 @@ TEST(Group_Serialize_Optimized)
 
     table->optimize();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_mem.Verify();
 #endif
 
@@ -966,7 +966,7 @@ TEST(Group_Serialize_Optimized)
     const size_t res = table->column().first.find_first("search_target");
     CHECK_EQUAL(table->size()-1, res);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     to_mem.Verify();
     from_mem.Verify();
 #endif
@@ -1039,7 +1039,7 @@ TEST(Group_Persist)
     // Write changes to file
     db.commit();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     db.Verify();
 #endif
 
@@ -1060,7 +1060,7 @@ TEST(Group_Persist)
     // Write changes to file
     db.commit();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     db.Verify();
 #endif
 
@@ -1728,8 +1728,8 @@ TEST(Group_Commit_Update_Integer_Index)
 
 
 
-#ifdef TIGHTDB_DEBUG
-#ifdef TIGHTDB_TO_DOT
+#ifdef REALM_DEBUG
+#ifdef REALM_TO_DOT
 
 TEST(Group_ToDot)
 {
@@ -1834,7 +1834,7 @@ TEST(Group_ToDot)
     fs.close();
 }
 
-#endif // TIGHTDB_TO_DOT
-#endif // TIGHTDB_DEBUG
+#endif // REALM_TO_DOT
+#endif // REALM_DEBUG
 
 #endif // TEST_GROUP

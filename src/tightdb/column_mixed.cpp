@@ -9,7 +9,7 @@ using namespace tightdb;
 using namespace tightdb::util;
 
 
-ColumnMixed::~ColumnMixed() TIGHTDB_NOEXCEPT
+ColumnMixed::~ColumnMixed() REALM_NOEXCEPT
 {
     delete m_types;
     delete m_data;
@@ -18,7 +18,7 @@ ColumnMixed::~ColumnMixed() TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+void ColumnMixed::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     if (!m_array->update_from_parent(old_baseline))
         return;
@@ -37,14 +37,14 @@ void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     UniquePtr<ColumnBinary> binary_data;
     top.reset(new Array(alloc)); // Throws
     top->init_from_ref(ref);
-    TIGHTDB_ASSERT(top->size() == 2 || top->size() == 3);
+    REALM_ASSERT(top->size() == 2 || top->size() == 3);
     ref_type types_ref = top->get_as_ref(0);
     ref_type data_ref  = top->get_as_ref(1);
     types.reset(new Column(alloc, types_ref)); // Throws
     types->set_parent(&*top, 0);
     data.reset(new RefsColumn(alloc, data_ref, table, column_ndx)); // Throws
     data->set_parent(&*top, 1);
-    TIGHTDB_ASSERT_3(types->size(), ==, data->size());
+    REALM_ASSERT_3(types->size(), ==, data->size());
 
     // Binary data column with values that does not fit in data column is only
     // there if needed
@@ -68,7 +68,7 @@ void ColumnMixed::ensure_binary_data_column()
 
     ref_type ref = ColumnBinary::create(m_array->get_alloc()); // Throws
     m_binary_data = new ColumnBinary(m_array->get_alloc(), ref); // Throws
-    TIGHTDB_ASSERT_3(m_array->size(), ==, 2);
+    REALM_ASSERT_3(m_array->size(), ==, 2);
     m_array->add(ref); // Throws
     m_binary_data->set_parent(m_array, 2);
 }
@@ -76,7 +76,7 @@ void ColumnMixed::ensure_binary_data_column()
 
 ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType new_type)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_types->size());
+    REALM_ASSERT_3(row_ndx, <, m_types->size());
 
     MixedColType old_type = MixedColType(m_types->get(row_ndx));
     switch (old_type) {
@@ -115,7 +115,7 @@ ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType 
         case mixcol_Mixed:
             break;
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 
   carry_on:
     if (old_type != new_type)
@@ -128,7 +128,7 @@ ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType 
 
 void ColumnMixed::do_erase(size_t row_ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_types->size());
+    REALM_ASSERT_3(row_ndx, <, m_types->size());
 
     // Remove refs or binary data
     clear_value(row_ndx, mixcol_Int); // Throws
@@ -140,8 +140,8 @@ void ColumnMixed::do_erase(size_t row_ndx, bool is_last)
 
 void ColumnMixed::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // Remove refs or binary data
     clear_value(row_ndx, mixcol_Int); // Throws
@@ -164,9 +164,9 @@ void ColumnMixed::do_clear(size_t num_rows)
 }
 
 
-DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
+DataType ColumnMixed::get_type(size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
     switch (coltype) {
         case mixcol_IntNeg:    return type_Int;
@@ -178,7 +178,7 @@ DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
 
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(ndx, <, m_types->size());
     ensure_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
@@ -211,7 +211,7 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 
 void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(ndx, <, m_types->size());
     ensure_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
@@ -284,7 +284,7 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
             case type_Mixed:
             case type_Link:
             case type_LinkList:
-                TIGHTDB_ASSERT(false);
+                REALM_ASSERT(false);
                 break;
         }
     }
@@ -292,7 +292,7 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
 }
 
 
-void ColumnMixed::do_discard_child_accessors() TIGHTDB_NOEXCEPT
+void ColumnMixed::do_discard_child_accessors() REALM_NOEXCEPT
 {
     discard_child_accessors();
 }
@@ -388,7 +388,7 @@ ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ColumnMixed::Verify() const
 {
@@ -406,7 +406,7 @@ void ColumnMixed::Verify(const Table& table, size_t col_ndx) const
         if (v == 0 || v & 0x1)
             continue;
         ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
-        TIGHTDB_ASSERT_3(subtable->get_parent_row_index(), ==, i);
+        REALM_ASSERT_3(subtable->get_parent_row_index(), ==, i);
         subtable->Verify();
     }
 }
@@ -427,7 +427,7 @@ void ColumnMixed::do_verify(const Table* table, size_t col_ndx) const
     // types and refs should be in sync
     size_t types_len = m_types->size();
     size_t refs_len  = m_data->size();
-    TIGHTDB_ASSERT_3(types_len, ==, refs_len);
+    REALM_ASSERT_3(types_len, ==, refs_len);
 }
 
 void ColumnMixed::to_dot(ostream& out, StringData title) const
@@ -463,4 +463,4 @@ void ColumnMixed::do_dump_node_structure(ostream& out, int level) const
     m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

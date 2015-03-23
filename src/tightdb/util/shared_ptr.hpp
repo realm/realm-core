@@ -1,5 +1,5 @@
-#ifndef TIGHTDB_SHARED_PTR_HPP
-#define TIGHTDB_SHARED_PTR_HPP
+#ifndef REALM_SHARED_PTR_HPP
+#define REALM_SHARED_PTR_HPP
 
 #include <cstdlib> // std::size_t
 

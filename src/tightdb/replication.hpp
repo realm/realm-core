@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_REPLICATION_HPP
-#define TIGHTDB_REPLICATION_HPP
+#ifndef REALM_REPLICATION_HPP
+#define REALM_REPLICATION_HPP
 
 #include <algorithm>
 #include <limits>
@@ -101,7 +101,7 @@ public:
     /// keep the commit log management in sync with what versions can possibly be interesting
     /// in the future.
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
-        TIGHTDB_NOEXCEPT;
+        REALM_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
@@ -113,21 +113,21 @@ public:
     /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally'
     /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
     virtual void get_commit_entries(version_type from_version, version_type to_version,
-                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+                                    BinaryData* logs_buffer) REALM_NOEXCEPT;
 
     /// Set the latest version that is known to be received and accepted by the
     /// server. All later versions are guaranteed to be available to the caller
     /// of get_commit_entries(). This function is guaranteed to have no effect,
     /// if the specified version is earlier than a version, that has already
     /// been set.
-    virtual void set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_synced(version_type version) REALM_NOEXCEPT;
 
     /// Get the value set by last call to 'set_last_version_synced'
     /// If 'end_version_number' is non null, a limit to version numbering is returned.
     /// The limit returned is the version number of the latest commit.
     /// If sync versioning is disabled, the last version seen locally is returned.
     virtual version_type get_last_version_synced(version_type* end_version_number = 0)
-        TIGHTDB_NOEXCEPT;
+        REALM_NOEXCEPT;
 
     /// Submit a transact log directly into the system bypassing the normal
     /// collection of replication entries. This is used to add a transactlog
@@ -168,7 +168,7 @@ public:
     /// data to the transaction log has failed or has been
     /// interrupted. It must also be called after a failed or
     /// interrupted call to commit_write_transact().
-    void rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT;
+    void rollback_write_transact(SharedGroup&) REALM_NOEXCEPT;
 
     /// Interrupt any blocking call to a function in this class. This
     /// function may be called asyncronously from any thread, but it
@@ -187,13 +187,13 @@ public:
     /// after having received an interruption indication, calls
     /// rollback_write_transact() and then clear_interrupt(), it may
     /// resume normal operation through this Replication instance.
-    void interrupt() TIGHTDB_NOEXCEPT;
+    void interrupt() REALM_NOEXCEPT;
 
     /// May be called by a client to reset this replication instance
     /// after an interrupted transaction. It is not an error to call
     /// this function in a situation where no interruption has
     /// occured.
-    void clear_interrupt() TIGHTDB_NOEXCEPT;
+    void clear_interrupt() REALM_NOEXCEPT;
 
     /// Called by the local coordinator to apply a transaction log
     /// received from another local coordinator.
@@ -207,7 +207,7 @@ public:
     static void apply_transact_log(InputStream& transact_log, Group& target,
                                    std::ostream* apply_log = 0);
 
-    virtual ~Replication() TIGHTDB_NOEXCEPT {}
+    virtual ~Replication() REALM_NOEXCEPT {}
 
 protected:
     Replication();
@@ -224,22 +224,22 @@ protected:
     /// the end of payload data in the transaction log.
     virtual version_type do_commit_write_transact(SharedGroup&, version_type orig_version) = 0;
 
-    virtual void do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT = 0;
+    virtual void do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT = 0;
 
-    virtual void do_interrupt() TIGHTDB_NOEXCEPT = 0;
+    virtual void do_interrupt() REALM_NOEXCEPT = 0;
 
-    virtual void do_clear_interrupt() TIGHTDB_NOEXCEPT = 0;
+    virtual void do_clear_interrupt() REALM_NOEXCEPT = 0;
 
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
-    static Group& get_group(SharedGroup&) TIGHTDB_NOEXCEPT;
+    static Group& get_group(SharedGroup&) REALM_NOEXCEPT;
 
     // Part of a temporary ugly hack to avoid generating new
     // transaction logs during application of ones that have olready
     // been created elsewhere. See
     // ReplicationImpl::do_begin_write_transact() in
     // tightdb/replication/simplified/provider.cpp for more on this.
-    static void set_replication(Group&, Replication*) TIGHTDB_NOEXCEPT;
+    static void set_replication(Group&, Replication*) REALM_NOEXCEPT;
 
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
@@ -251,7 +251,7 @@ protected:
 
 class Replication::Interrupted: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
     {
         return "Interrupted";
     }
@@ -260,7 +260,7 @@ public:
 
 class TrivialReplication: public Replication {
 public:
-    ~TrivialReplication() TIGHTDB_NOEXCEPT {}
+    ~TrivialReplication() REALM_NOEXCEPT {}
 
 protected:
     typedef Replication::version_type version_type;
@@ -278,14 +278,14 @@ private:
     const std::string m_database_file;
     util::Buffer<char> m_transact_log_buffer;
 
-    std::string do_get_database_path() TIGHTDB_OVERRIDE;
-    void do_begin_write_transact(SharedGroup&) TIGHTDB_OVERRIDE;
-    version_type do_commit_write_transact(SharedGroup&, version_type orig_version) TIGHTDB_OVERRIDE;
-    void do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
-    void transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
+    std::string do_get_database_path() REALM_OVERRIDE;
+    void do_begin_write_transact(SharedGroup&) REALM_OVERRIDE;
+    version_type do_commit_write_transact(SharedGroup&, version_type orig_version) REALM_OVERRIDE;
+    void do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT REALM_OVERRIDE;
+    void do_interrupt() REALM_NOEXCEPT REALM_OVERRIDE;
+    void do_clear_interrupt() REALM_NOEXCEPT REALM_OVERRIDE;
+    void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) REALM_OVERRIDE;
+    void transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end) REALM_OVERRIDE;
     void internal_transact_log_reserve(std::size_t, char** new_begin, char** new_end);
 
     std::size_t transact_log_size();
@@ -320,15 +320,15 @@ inline void Replication::stop_logging()
 {
 }
 
-inline void Replication::set_last_version_seen_locally(version_type) TIGHTDB_NOEXCEPT
+inline void Replication::set_last_version_seen_locally(version_type) REALM_NOEXCEPT
 {
 }
 
-inline void Replication::set_last_version_synced(version_type) TIGHTDB_NOEXCEPT
+inline void Replication::set_last_version_synced(version_type) REALM_NOEXCEPT
 {
 }
 
-inline Replication::version_type Replication::get_last_version_synced(version_type*) TIGHTDB_NOEXCEPT
+inline Replication::version_type Replication::get_last_version_synced(version_type*) REALM_NOEXCEPT
 {
     return 0;
 }
@@ -336,13 +336,13 @@ inline Replication::version_type Replication::get_last_version_synced(version_ty
 inline void Replication::submit_transact_log(BinaryData)
 {
     // Unimplemented!
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 }
 
-inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) TIGHTDB_NOEXCEPT
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) REALM_NOEXCEPT
 {
     // Unimplemented!
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 }
 
 inline void Replication::begin_write_transact(SharedGroup& sg)
@@ -357,17 +357,17 @@ Replication::commit_write_transact(SharedGroup& sg, version_type orig_version)
     return do_commit_write_transact(sg, orig_version);
 }
 
-inline void Replication::rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
+inline void Replication::rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT
 {
     do_rollback_write_transact(sg);
 }
 
-inline void Replication::interrupt() TIGHTDB_NOEXCEPT
+inline void Replication::interrupt() REALM_NOEXCEPT
 {
     do_interrupt();
 }
 
-inline void Replication::clear_interrupt() TIGHTDB_NOEXCEPT
+inline void Replication::clear_interrupt() REALM_NOEXCEPT
 {
     do_clear_interrupt();
 }
@@ -399,4 +399,4 @@ inline void TrivialReplication::internal_transact_log_reserve(std::size_t n, cha
 
 } // namespace tightdb
 
-#endif // TIGHTDB_REPLICATION_HPP
+#endif // REALM_REPLICATION_HPP

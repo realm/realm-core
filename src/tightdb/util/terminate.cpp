@@ -33,7 +33,7 @@
 
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
-extern "C" TIGHTDB_NORETURN TIGHTDB_NOINLINE
+extern "C" REALM_NORETURN REALM_NOINLINE
 void please_report_this_error_to_help_at_realm_dot_io() {
     std::abort();
 }
@@ -49,7 +49,7 @@ void nslog(const char *message) {
 }
 #endif
 
-TIGHTDB_NORETURN void terminate_internal(std::stringstream& ss) TIGHTDB_NOEXCEPT
+REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
 {
 
 #if defined(__APPLE__)
@@ -63,7 +63,7 @@ TIGHTDB_NORETURN void terminate_internal(std::stringstream& ss) TIGHTDB_NOEXCEPT
 #endif
 
     ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     std::cerr << ss.rdbuf();
 #endif
 

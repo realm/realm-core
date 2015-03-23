@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_IMPL_OUTPUT_STREAM_HPP
-#define TIGHTDB_IMPL_OUTPUT_STREAM_HPP
+#ifndef REALM_IMPL_OUTPUT_STREAM_HPP
+#define REALM_IMPL_OUTPUT_STREAM_HPP
 
 #include <cstddef>
 #include <ostream>
@@ -36,13 +36,13 @@ namespace _impl {
 class OutputStream: public ArrayWriterBase {
 public:
     OutputStream(std::ostream&);
-    ~OutputStream() TIGHTDB_NOEXCEPT;
+    ~OutputStream() REALM_NOEXCEPT;
 
-    size_t get_pos() const TIGHTDB_NOEXCEPT;
+    size_t get_pos() const REALM_NOEXCEPT;
 
     void write(const char* data, size_t size);
 
-    size_t write_array(const char* data, size_t size, uint_fast32_t checksum) TIGHTDB_OVERRIDE;
+    size_t write_array(const char* data, size_t size, uint_fast32_t checksum) REALM_OVERRIDE;
 private:
     std::size_t m_pos;
     std::ostream& m_out;
@@ -60,11 +60,11 @@ inline OutputStream::OutputStream(std::ostream& out):
 {
 }
 
-inline OutputStream::~OutputStream() TIGHTDB_NOEXCEPT
+inline OutputStream::~OutputStream() REALM_NOEXCEPT
 {
 }
 
-inline std::size_t OutputStream::get_pos() const TIGHTDB_NOEXCEPT
+inline std::size_t OutputStream::get_pos() const REALM_NOEXCEPT
 {
     return m_pos;
 }
@@ -73,4 +73,4 @@ inline std::size_t OutputStream::get_pos() const TIGHTDB_NOEXCEPT
 } // namespace _impl
 } // namespace tightdb
 
-#endif // TIGHTDB_IMPL_OUTPUT_STREAM_HPP
+#endif // REALM_IMPL_OUTPUT_STREAM_HPP

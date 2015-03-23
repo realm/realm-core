@@ -15,7 +15,7 @@ void RowIndexes::sort(size_t column, bool ascending)
 // Sort according to multiple columns, user specified order on each column
 void RowIndexes::sort(std::vector<size_t> columns, std::vector<bool> ascending)
 {
-    TIGHTDB_ASSERT(columns.size() == ascending.size());
+    REALM_ASSERT(columns.size() == ascending.size());
     m_auto_sort = true;
     m_sorting_predicate = Sorter(columns, ascending);
     re_sort();

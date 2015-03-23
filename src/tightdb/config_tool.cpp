@@ -52,24 +52,24 @@ void flush()
 void emit_flags()
 {
     if (emit_cflags) {
-#ifdef TIGHTDB_HAVE_CONFIG
-        emit_flags("-DTIGHTDB_HAVE_CONFIG");
+#ifdef REALM_HAVE_CONFIG
+        emit_flags("-DREALM_HAVE_CONFIG");
 #endif
-#ifdef TIGHTDB_DEBUG
-        emit_flags("-DTIGHTDB_DEBUG");
+#ifdef REALM_DEBUG
+        emit_flags("-DREALM_DEBUG");
 #endif
     }
 
 
     if (emit_ldflags) {
-#ifdef TIGHTDB_CONFIG_IOS
-#  ifdef TIGHTDB_DEBUG
+#ifdef REALM_CONFIG_IOS
+#  ifdef REALM_DEBUG
         emit_flags("-ltightdb-ios-dbg");
 #  else
         emit_flags("-ltightdb-ios");
 #  endif
 #else
-#  ifdef TIGHTDB_DEBUG
+#  ifdef REALM_DEBUG
         emit_flags("-ltightdb-dbg");
 #  else
         emit_flags("-ltightdb");
@@ -191,25 +191,25 @@ int main(int argc, char* argv[])
             emit_flags();
             break;
         case func_ShowVersion:
-            cout << TIGHTDB_VERSION "\n";
+            cout << REALM_VERSION "\n";
             break;
         case func_ShowPrefix:
-            cout << TIGHTDB_INSTALL_PREFIX "\n";
+            cout << REALM_INSTALL_PREFIX "\n";
             break;
         case func_ShowExecPrefix:
-            cout << TIGHTDB_INSTALL_EXEC_PREFIX "\n";
+            cout << REALM_INSTALL_EXEC_PREFIX "\n";
             break;
         case func_ShowIncludedir:
-            cout << TIGHTDB_INSTALL_INCLUDEDIR "\n";
+            cout << REALM_INSTALL_INCLUDEDIR "\n";
             break;
         case func_ShowBindir:
-            cout << TIGHTDB_INSTALL_BINDIR "\n";
+            cout << REALM_INSTALL_BINDIR "\n";
             break;
         case func_ShowLibdir:
-            cout << TIGHTDB_INSTALL_LIBDIR "\n";
+            cout << REALM_INSTALL_LIBDIR "\n";
             break;
         case func_ShowLibexecdir:
-            cout << TIGHTDB_INSTALL_LIBEXECDIR "\n";
+            cout << REALM_INSTALL_LIBEXECDIR "\n";
             break;
     }
 }

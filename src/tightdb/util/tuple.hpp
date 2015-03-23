@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TUPLE_HPP
-#define TIGHTDB_UTIL_TUPLE_HPP
+#ifndef REALM_UTIL_TUPLE_HPP
+#define REALM_UTIL_TUPLE_HPP
 
 #include <ostream>
 
@@ -176,4 +176,4 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_TUPLE_HPP
+#endif // REALM_UTIL_TUPLE_HPP

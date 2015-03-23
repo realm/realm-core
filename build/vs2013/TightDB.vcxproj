@@ -254,7 +254,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\win32;..\..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TIGHTDB_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -262,7 +262,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -277,7 +277,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>src;src\win32;src\win32\pthread;test\UnitTest++\src;UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TIGHTDB_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -285,7 +285,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -300,7 +300,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>test\UnitTest++\src;UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TIGHTDB_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -326,7 +326,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\win32;..\..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TIGHTDB_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -335,7 +335,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -358,7 +358,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\win32;..\..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TIGHTDB_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -367,7 +367,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -389,7 +389,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>TIGHTDB_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -421,7 +421,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
     </ClCompile>
@@ -508,7 +508,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>

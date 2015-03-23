@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_STRING_BUFFER_HPP
-#define TIGHTDB_UTIL_STRING_BUFFER_HPP
+#ifndef REALM_UTIL_STRING_BUFFER_HPP
+#define REALM_UTIL_STRING_BUFFER_HPP
 
 #include <cstddef>
 #include <cstring>
@@ -36,36 +36,36 @@ namespace util {
 // std::string be used as a contiguous mutable buffer?
 class StringBuffer {
 public:
-    StringBuffer() TIGHTDB_NOEXCEPT;
-    ~StringBuffer() TIGHTDB_NOEXCEPT {}
+    StringBuffer() REALM_NOEXCEPT;
+    ~StringBuffer() REALM_NOEXCEPT {}
 
     std::string str() const;
 
     /// Returns the current size of the string in this buffer. This
     /// size does not include the terminating zero.
-    std::size_t size() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT;
 
     /// Gives read and write access to the bytes of this buffer. The
     /// caller may read and write from *c_str() up to, but not
     /// including, *(c_str()+size()).
-    char* data() TIGHTDB_NOEXCEPT;
+    char* data() REALM_NOEXCEPT;
 
     /// Gives read access to the bytes of this buffer. The caller may
     /// read from *c_str() up to, but not including,
     /// *(c_str()+size()).
-    const char* data() const TIGHTDB_NOEXCEPT;
+    const char* data() const REALM_NOEXCEPT;
 
     /// Guarantees that the returned string is zero terminated, that
     /// is, *(c_str()+size()) is zero. The caller may read from
     /// *c_str() up to and including *(c_str()+size()), the caller may
     /// write from *c_str() up to, but not including,
     /// *(c_str()+size()).
-    char* c_str() TIGHTDB_NOEXCEPT;
+    char* c_str() REALM_NOEXCEPT;
 
     /// Guarantees that the returned string is zero terminated, that
     /// is, *(c_str()+size()) is zero. The caller may read from
     /// *c_str() up to and including *(c_str()+size()).
-    const char* c_str() const TIGHTDB_NOEXCEPT;
+    const char* c_str() const REALM_NOEXCEPT;
 
     void append(const std::string&);
 
@@ -93,7 +93,7 @@ public:
     void reserve(std::size_t min_capacity);
 
     /// Set size to zero. The capacity remains unchanged.
-    void clear() TIGHTDB_NOEXCEPT;
+    void clear() REALM_NOEXCEPT;
 
 private:
     util::Buffer<char> m_buffer;
@@ -109,7 +109,7 @@ private:
 
 // Implementation:
 
-inline StringBuffer::StringBuffer() TIGHTDB_NOEXCEPT: m_size(0)
+inline StringBuffer::StringBuffer() REALM_NOEXCEPT: m_size(0)
 {
 }
 
@@ -118,28 +118,28 @@ inline std::string StringBuffer::str() const
     return std::string(m_buffer.data(), m_size);
 }
 
-inline std::size_t StringBuffer::size() const TIGHTDB_NOEXCEPT
+inline std::size_t StringBuffer::size() const REALM_NOEXCEPT
 {
     return m_size;
 }
 
-inline char* StringBuffer::data() TIGHTDB_NOEXCEPT
+inline char* StringBuffer::data() REALM_NOEXCEPT
 {
     return m_buffer.data();
 }
 
-inline const char* StringBuffer::data() const TIGHTDB_NOEXCEPT
+inline const char* StringBuffer::data() const REALM_NOEXCEPT
 {
     return m_buffer.data();
 }
 
-inline char* StringBuffer::c_str() TIGHTDB_NOEXCEPT
+inline char* StringBuffer::c_str() REALM_NOEXCEPT
 {
     char* d = data();
     return d ? d : &m_zero;
 }
 
-inline const char* StringBuffer::c_str() const TIGHTDB_NOEXCEPT
+inline const char* StringBuffer::c_str() const REALM_NOEXCEPT
 {
     const char* d = data();
     return d ? d : &m_zero;
@@ -172,7 +172,7 @@ inline void StringBuffer::resize(std::size_t size)
     m_buffer[size] = 0;
 }
 
-inline void StringBuffer::clear() TIGHTDB_NOEXCEPT
+inline void StringBuffer::clear() REALM_NOEXCEPT
 {
     if (m_buffer.size() == 0)
         return;
@@ -184,4 +184,4 @@ inline void StringBuffer::clear() TIGHTDB_NOEXCEPT
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_STRING_BUFFER_HPP
+#endif // REALM_UTIL_STRING_BUFFER_HPP

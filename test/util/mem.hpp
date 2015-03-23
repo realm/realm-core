@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_MEM_HPP
-#define TIGHTDB_TEST_UTIL_MEM_HPP
+#ifndef REALM_TEST_UTIL_MEM_HPP
+#define REALM_TEST_UTIL_MEM_HPP
 
 #include <cstddef>
 
@@ -40,4 +40,4 @@ std::size_t get_mem_usage();
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_MEM_HPP
+#endif // REALM_TEST_UTIL_MEM_HPP

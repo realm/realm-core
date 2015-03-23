@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_TEST_PATH_HPP
-#define TIGHTDB_TEST_UTIL_TEST_PATH_HPP
+#ifndef REALM_TEST_UTIL_TEST_PATH_HPP
+#define REALM_TEST_UTIL_TEST_PATH_HPP
 
 #include <string>
 
@@ -61,7 +61,7 @@ void set_test_resource_path(const std::string&);
 class TestPathGuard {
 public:
     TestPathGuard(const std::string& path);
-    ~TestPathGuard() TIGHTDB_NOEXCEPT;
+    ~TestPathGuard() REALM_NOEXCEPT;
     operator std::string() const
     {
         return m_path;
@@ -87,4 +87,4 @@ public:
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_TEST_PATH_HPP
+#endif // REALM_TEST_UTIL_TEST_PATH_HPP

@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_EXCEPTIONS_HPP
-#define TIGHTDB_EXCEPTIONS_HPP
+#ifndef REALM_EXCEPTIONS_HPP
+#define REALM_EXCEPTIONS_HPP
 
 #include <stdexcept>
 
@@ -31,7 +31,7 @@ namespace tightdb {
 /// exist.
 class NoSuchTable: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
 };
 
 
@@ -39,7 +39,7 @@ public:
 /// already in use.
 class TableNameInUse: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
 };
 
 
@@ -47,7 +47,7 @@ public:
 // columns, unless those link columns are part of the table itself.
 class CrossTableLinkTarget: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
 };
 
 
@@ -55,7 +55,7 @@ public:
 /// does not match a particular other table type (dynamic or static).
 class DescriptorMismatch: public std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
 };
 
 
@@ -110,8 +110,8 @@ public:
 
     LogicError(ErrorKind message);
 
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
-    ErrorKind kind() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
+    ErrorKind kind() const REALM_NOEXCEPT_OR_NOTHROW;
 private:
     ErrorKind m_kind;
 };
@@ -119,22 +119,22 @@ private:
 
 // Implementation:
 
-inline const char* NoSuchTable::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+inline const char* NoSuchTable::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "No such table exists";
 }
 
-inline const char* TableNameInUse::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+inline const char* TableNameInUse::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "The specified table name is already in use";
 }
 
-inline const char* CrossTableLinkTarget::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+inline const char* CrossTableLinkTarget::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "Table is target of cross-table link columns";
 }
 
-inline const char* DescriptorMismatch::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+inline const char* DescriptorMismatch::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "Table descriptor mismatch";
 }
@@ -144,7 +144,7 @@ inline LogicError::LogicError(LogicError::ErrorKind kind):
 {
 }
 
-inline LogicError::ErrorKind LogicError::kind() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+inline LogicError::ErrorKind LogicError::kind() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return m_kind;
 }
@@ -152,4 +152,4 @@ inline LogicError::ErrorKind LogicError::kind() const TIGHTDB_NOEXCEPT_OR_NOTHRO
 
 } // namespace tightdb
 
-#endif // TIGHTDB_EXCEPTIONS_HPP
+#endif // REALM_EXCEPTIONS_HPP

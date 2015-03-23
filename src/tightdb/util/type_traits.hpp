@@ -17,15 +17,15 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TYPE_TRAITS_HPP
-#define TIGHTDB_UTIL_TYPE_TRAITS_HPP
+#ifndef REALM_UTIL_TYPE_TRAITS_HPP
+#define REALM_UTIL_TYPE_TRAITS_HPP
 
 #include <stdint.h>
 #include <climits>
 #include <cwchar>
 #include <limits>
 
-#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+#ifdef REALM_HAVE_CXX11_TYPE_TRAITS
 #  include <type_traits>
 #endif
 
@@ -78,7 +78,7 @@ template<class T> struct RemovePointer<T* const volatile> { typedef T type; };
 /// Member `value` is true if, and only if the specified type is an
 /// integral type. Same as `std::is_integral` in C++11, however,
 /// implementation-defined extended integer types are recognized only
-/// when TIGHTDB_HAVE_CXX11_TYPE_TRAITS is defined.
+/// when REALM_HAVE_CXX11_TYPE_TRAITS is defined.
 template<class T> struct IsIntegral;
 
 
@@ -135,7 +135,7 @@ template<int bits> struct FastestUnsigned;
 
 namespace _impl {
 
-#ifndef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+#ifndef REALM_HAVE_CXX11_TYPE_TRAITS
 
 template<class T> struct is_int { static const bool value = false; };
 template<> struct is_int<bool>               { static const bool value = true; };
@@ -157,7 +157,7 @@ template<> struct is_float<float>       { static const bool value = true; };
 template<> struct is_float<double>      { static const bool value = true; };
 template<> struct is_float<long double> { static const bool value = true; };
 
-#endif // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+#endif // !REALM_HAVE_CXX11_TYPE_TRAITS
 
 } // namespace _impl
 
@@ -166,7 +166,7 @@ namespace util {
 
 
 template<class T> struct IsIntegral {
-#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+#ifdef REALM_HAVE_CXX11_TYPE_TRAITS
     static const bool value = std::is_integral<T>::value;
 #else
     static const bool value = _impl::is_int<typename RemoveCV<T>::type>::value;
@@ -175,7 +175,7 @@ template<class T> struct IsIntegral {
 
 
 template<class T> struct IsFloatingPoint {
-#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+#ifdef REALM_HAVE_CXX11_TYPE_TRAITS
     static const bool value = std::is_floating_point<T>::value;
 #else
     static const bool value = _impl::is_float<typename RemoveCV<T>::type>::value;
@@ -183,7 +183,7 @@ template<class T> struct IsFloatingPoint {
 };
 
 
-#ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
+#ifdef REALM_HAVE_CXX11_DECLTYPE
 template<class T> struct Promote {
     typedef decltype(+T()) type; // FIXME: This is not performing floating-point promotion.
 };
@@ -229,7 +229,7 @@ private:
     typedef CondType<cond_3, long,             type_2>::type type_3;
     typedef CondType<cond_4, unsigned,         type_3>::type type_4;
     typedef CondType<cond_5, int,              type_4>::type type_5;
-    TIGHTDB_STATIC_ASSERT(!(SameType<type_5, void>::value), "Failed to promote `wchar_t`");
+    REALM_STATIC_ASSERT(!(SameType<type_5, void>::value), "Failed to promote `wchar_t`");
 public:
     typedef type_5 type;
 };
@@ -251,10 +251,10 @@ template<> struct Promote<unsigned long long> { typedef unsigned long long type;
 template<> struct Promote<float> { typedef double type; };
 template<> struct Promote<double> { typedef double type; };
 template<> struct Promote<long double> { typedef long double type; };
-#endif // !TIGHTDB_HAVE_CXX11_DECLTYPE
+#endif // !REALM_HAVE_CXX11_DECLTYPE
 
 
-#ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
+#ifdef REALM_HAVE_CXX11_DECLTYPE
 template<class A, class B> struct ArithBinOpType {
     typedef decltype(A()+B()) type;
 };
@@ -284,16 +284,16 @@ private:
 public:
     typedef typename CondType<EitherTypeIs<long double, A, B>::value, long double, type_7>::type type;
 };
-#endif // !TIGHTDB_HAVE_CXX11_DECLTYPE
+#endif // !REALM_HAVE_CXX11_DECLTYPE
 
 
 template<class A, class B> struct ChooseWidestInt {
 private:
     typedef std::numeric_limits<A> lim_a;
     typedef std::numeric_limits<B> lim_b;
-    TIGHTDB_STATIC_ASSERT(lim_a::is_specialized && lim_b::is_specialized,
+    REALM_STATIC_ASSERT(lim_a::is_specialized && lim_b::is_specialized,
                           "std::numeric_limits<> must be specialized for both types");
-    TIGHTDB_STATIC_ASSERT(lim_a::is_integer && lim_b::is_integer,
+    REALM_STATIC_ASSERT(lim_a::is_integer && lim_b::is_integer,
                           "Both types must be integers");
 public:
     typedef typename CondType<(lim_a::digits >= lim_b::digits), A, B>::type type;
@@ -322,7 +322,7 @@ private:
     };
 public:
     typedef typename FindType<types, dummy<bits>::template pred>::type type;
-    TIGHTDB_STATIC_ASSERT(!(SameType<type, void>::value), "No unsigned type is that wide");
+    REALM_STATIC_ASSERT(!(SameType<type, void>::value), "No unsigned type is that wide");
 };
 
 
@@ -337,4 +337,4 @@ public:
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_TYPE_TRAITS_HPP
+#endif // REALM_UTIL_TYPE_TRAITS_HPP

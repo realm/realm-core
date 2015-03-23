@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_FILE_HPP
-#define TIGHTDB_UTIL_FILE_HPP
+#ifndef REALM_UTIL_FILE_HPP
+#define REALM_UTIL_FILE_HPP
 
 #include <cstddef>
 #include <stdint.h>
@@ -96,9 +96,9 @@ public:
 
     /// Create an instance that is not initially attached to an open
     /// file.
-    File() TIGHTDB_NOEXCEPT;
+    File() REALM_NOEXCEPT;
 
-    ~File() TIGHTDB_NOEXCEPT;
+    ~File() REALM_NOEXCEPT;
 
     /// Calling this function on an instance that is already attached
     /// to an open file has undefined behavior.
@@ -113,11 +113,11 @@ public:
     /// This function is idempotent, that is, it is valid to call it
     /// regardless of whether this instance currently is attached to
     /// an open file.
-    void close() TIGHTDB_NOEXCEPT;
+    void close() REALM_NOEXCEPT;
 
     /// Check whether this File instance is currently attached to an
     /// open file.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     enum AccessMode {
         access_ReadOnly,
@@ -278,7 +278,7 @@ public:
 
     /// Release a previously acquired lock on this file. This function
     /// is idempotent.
-    void unlock() TIGHTDB_NOEXCEPT;
+    void unlock() REALM_NOEXCEPT;
 
     /// Set the encryption key used for this file. Must be called before any
     /// mappings are created or any data is read from or written to the file.
@@ -335,7 +335,7 @@ public:
 
     /// Unmap the specified address range which must have been
     /// previously returned by map().
-    static void unmap(void* addr, std::size_t size) TIGHTDB_NOEXCEPT;
+    static void unmap(void* addr, std::size_t size) REALM_NOEXCEPT;
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete. The specified
@@ -449,12 +449,12 @@ private:
         void* m_addr;
         std::size_t m_size;
 
-        MapBase() TIGHTDB_NOEXCEPT;
-        ~MapBase() TIGHTDB_NOEXCEPT;
+        MapBase() REALM_NOEXCEPT;
+        ~MapBase() REALM_NOEXCEPT;
 
         void map(const File&, AccessMode, std::size_t size, int map_flags);
         void remap(const File&, AccessMode, std::size_t size, int map_flags);
-        void unmap() TIGHTDB_NOEXCEPT;
+        void unmap() REALM_NOEXCEPT;
         void sync();
     };
 };
@@ -464,7 +464,7 @@ private:
 class File::ExclusiveLock {
 public:
     ExclusiveLock(File& f): m_file(f) { f.lock_exclusive(); }
-    ~ExclusiveLock() TIGHTDB_NOEXCEPT { m_file.unlock(); }
+    ~ExclusiveLock() REALM_NOEXCEPT { m_file.unlock(); }
 private:
     File& m_file;
 };
@@ -472,7 +472,7 @@ private:
 class File::SharedLock {
 public:
     SharedLock(File& f): m_file(f) { f.lock_shared(); }
-    ~SharedLock() TIGHTDB_NOEXCEPT { m_file.unlock(); }
+    ~SharedLock() REALM_NOEXCEPT { m_file.unlock(); }
 private:
     File& m_file;
 };
@@ -502,9 +502,9 @@ public:
 
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
-    Map() TIGHTDB_NOEXCEPT;
+    Map() REALM_NOEXCEPT;
 
-    ~Map() TIGHTDB_NOEXCEPT;
+    ~Map() REALM_NOEXCEPT;
 
     /// See File::map().
     ///
@@ -518,7 +518,7 @@ public:
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
     /// currently attached to a memory mapped file.
-    void unmap() TIGHTDB_NOEXCEPT;
+    void unmap() REALM_NOEXCEPT;
 
     /// See File::remap().
     ///
@@ -537,23 +537,23 @@ public:
 
     /// Check whether this Map instance is currently attached to a
     /// memory mapped file.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     /// Returns a pointer to the beginning of the memory mapped file,
     /// or null if this instance is not currently attached.
-    T* get_addr() const TIGHTDB_NOEXCEPT;
+    T* get_addr() const REALM_NOEXCEPT;
 
     /// Returns the size of the mapped region, or zero if this
     /// instance does not currently refer to a memory mapped
     /// file. When this instance refers to a memory mapped file, the
     /// returned value will always be identical to the size passed to
     /// the constructor or to map().
-    std::size_t get_size() const TIGHTDB_NOEXCEPT;
+    std::size_t get_size() const REALM_NOEXCEPT;
 
     /// Release the currently attached memory mapped file from this
     /// Map instance. The address range may then be unmapped later by
     /// a call to File::unmap().
-    T* release() TIGHTDB_NOEXCEPT;
+    T* release() REALM_NOEXCEPT;
 
     friend class UnmapGuard;
 };
@@ -561,9 +561,9 @@ public:
 
 class File::CloseGuard {
 public:
-    CloseGuard(File& f) TIGHTDB_NOEXCEPT: m_file(&f) {}
-    ~CloseGuard()  TIGHTDB_NOEXCEPT { if (m_file) m_file->close(); }
-    void release() TIGHTDB_NOEXCEPT { m_file = 0; }
+    CloseGuard(File& f) REALM_NOEXCEPT: m_file(&f) {}
+    ~CloseGuard()  REALM_NOEXCEPT { if (m_file) m_file->close(); }
+    void release() REALM_NOEXCEPT { m_file = 0; }
 private:
     File* m_file;
 };
@@ -571,9 +571,9 @@ private:
 
 class File::UnlockGuard {
 public:
-    UnlockGuard(File& f) TIGHTDB_NOEXCEPT: m_file(&f) {}
-    ~UnlockGuard()  TIGHTDB_NOEXCEPT { if (m_file) m_file->unlock(); }
-    void release() TIGHTDB_NOEXCEPT { m_file = 0; }
+    UnlockGuard(File& f) REALM_NOEXCEPT: m_file(&f) {}
+    ~UnlockGuard()  REALM_NOEXCEPT { if (m_file) m_file->unlock(); }
+    void release() REALM_NOEXCEPT { m_file = 0; }
 private:
     File* m_file;
 };
@@ -581,9 +581,9 @@ private:
 
 class File::UnmapGuard {
 public:
-    template<class T> UnmapGuard(Map<T>& m) TIGHTDB_NOEXCEPT: m_map(&m) {}
-    ~UnmapGuard()  TIGHTDB_NOEXCEPT { if (m_map) m_map->unmap(); }
-    void release() TIGHTDB_NOEXCEPT { m_map = 0; }
+    template<class T> UnmapGuard(Map<T>& m) REALM_NOEXCEPT: m_map(&m) {}
+    ~UnmapGuard()  REALM_NOEXCEPT { if (m_map) m_map->unmap(); }
+    void release() REALM_NOEXCEPT { m_map = 0; }
 private:
     MapBase* m_map;
 };
@@ -602,9 +602,9 @@ private:
     File& m_file;
     UniquePtr<char[]> const m_buffer;
 
-    int_type overflow(int_type) TIGHTDB_OVERRIDE;
-    int sync() TIGHTDB_OVERRIDE;
-    pos_type seekpos(pos_type, std::ios_base::openmode) TIGHTDB_OVERRIDE;
+    int_type overflow(int_type) REALM_OVERRIDE;
+    int sync() REALM_OVERRIDE;
+    pos_type seekpos(pos_type, std::ios_base::openmode) REALM_OVERRIDE;
     void flush();
 
     // Disable copying
@@ -630,7 +630,7 @@ inline File::File(const std::string& path, Mode m)
     open(path, m);
 }
 
-inline File::File() TIGHTDB_NOEXCEPT
+inline File::File() REALM_NOEXCEPT
 {
 #ifdef _WIN32
     m_handle = 0;
@@ -639,7 +639,7 @@ inline File::File() TIGHTDB_NOEXCEPT
 #endif
 }
 
-inline File::~File() TIGHTDB_NOEXCEPT
+inline File::~File() REALM_NOEXCEPT
 {
     close();
 }
@@ -681,7 +681,7 @@ inline void File::open(const std::string& path, bool& was_created)
     }
 }
 
-inline bool File::is_attached() const TIGHTDB_NOEXCEPT
+inline bool File::is_attached() const REALM_NOEXCEPT
 {
 #ifdef _WIN32
     return (m_handle != NULL);
@@ -710,25 +710,25 @@ inline bool File::try_lock_shared()
     return lock(false, true);
 }
 
-inline File::MapBase::MapBase() TIGHTDB_NOEXCEPT
+inline File::MapBase::MapBase() REALM_NOEXCEPT
 {
     m_addr = 0;
 }
 
-inline File::MapBase::~MapBase() TIGHTDB_NOEXCEPT
+inline File::MapBase::~MapBase() REALM_NOEXCEPT
 {
     unmap();
 }
 
 inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
-    TIGHTDB_ASSERT(!m_addr);
+    REALM_ASSERT(!m_addr);
 
     m_addr = f.map(a, size, map_flags);
     m_size = size;
 }
 
-inline void File::MapBase::unmap() TIGHTDB_NOEXCEPT
+inline void File::MapBase::unmap() REALM_NOEXCEPT
 {
     if (!m_addr) return;
     File::unmap(m_addr, m_size);
@@ -737,7 +737,7 @@ inline void File::MapBase::unmap() TIGHTDB_NOEXCEPT
 
 inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
 {
-    TIGHTDB_ASSERT(m_addr);
+    REALM_ASSERT(m_addr);
 
     m_addr = f.remap(m_addr, m_size, a, size, map_flags);
     m_size = size;
@@ -745,7 +745,7 @@ inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, 
 
 inline void File::MapBase::sync()
 {
-    TIGHTDB_ASSERT(m_addr);
+    REALM_ASSERT(m_addr);
 
     File::sync_map(m_addr, m_size);
 }
@@ -756,9 +756,9 @@ inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size, int map_
     map(f, a, size, map_flags);
 }
 
-template<class T> inline File::Map<T>::Map() TIGHTDB_NOEXCEPT {}
+template<class T> inline File::Map<T>::Map() REALM_NOEXCEPT {}
 
-template<class T> inline File::Map<T>::~Map() TIGHTDB_NOEXCEPT {}
+template<class T> inline File::Map<T>::~Map() REALM_NOEXCEPT {}
 
 template<class T>
 inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags)
@@ -767,7 +767,7 @@ inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int m
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::unmap() TIGHTDB_NOEXCEPT
+template<class T> inline void File::Map<T>::unmap() REALM_NOEXCEPT
 {
     MapBase::unmap();
 }
@@ -784,22 +784,22 @@ template<class T> inline void File::Map<T>::sync()
     MapBase::sync();
 }
 
-template<class T> inline bool File::Map<T>::is_attached() const TIGHTDB_NOEXCEPT
+template<class T> inline bool File::Map<T>::is_attached() const REALM_NOEXCEPT
 {
     return (m_addr != NULL);
 }
 
-template<class T> inline T* File::Map<T>::get_addr() const TIGHTDB_NOEXCEPT
+template<class T> inline T* File::Map<T>::get_addr() const REALM_NOEXCEPT
 {
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline std::size_t File::Map<T>::get_size() const TIGHTDB_NOEXCEPT
+template<class T> inline std::size_t File::Map<T>::get_size() const REALM_NOEXCEPT
 {
     return m_addr ? m_size : 0;
 }
 
-template<class T> inline T* File::Map<T>::release() TIGHTDB_NOEXCEPT
+template<class T> inline T* File::Map<T>::release() REALM_NOEXCEPT
 {
     T* addr = static_cast<T*>(m_addr);
     m_addr = 0;
@@ -860,4 +860,4 @@ inline void File::Streambuf::flush()
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_FILE_HPP
+#endif // REALM_UTIL_FILE_HPP

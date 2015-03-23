@@ -53,7 +53,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
 }
 
 
-ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
+ColumnBinary::~ColumnBinary() REALM_NOEXCEPT
 {
     delete m_array;
 }
@@ -65,10 +65,10 @@ struct SetLeafElem: Array::UpdateHandler {
     Allocator& m_alloc;
     const BinaryData m_value;
     const bool m_add_zero_term;
-    SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) TIGHTDB_NOEXCEPT:
+    SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) REALM_NOEXCEPT:
         m_alloc(alloc), m_value(value), m_add_zero_term(add_zero_term) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         bool is_big = Array::get_context_flag_from_header(mem.m_addr);
         if (is_big) {
@@ -100,7 +100,7 @@ struct SetLeafElem: Array::UpdateHandler {
 
 void ColumnBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_3(ndx, <, size());
+    REALM_ASSERT_3(ndx, <, size());
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
     if (root_is_leaf) {
@@ -138,13 +138,13 @@ bool ColumnBinary::compare_binary(const ColumnBinary& c) const
 
 void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_term, size_t num_rows)
 {
-    TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
     ref_type new_sibling_ref;
     InsertState state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
+            REALM_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             bool is_big = upgrade_root_leaf(value.size()); // Throws
             if (!is_big) {
                 // Small blobs root leaf
@@ -170,7 +170,7 @@ void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
                 new_sibling_ref = m_array->bptree_insert(row_ndx_2, state);
             }
         }
-        if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+        if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == tightdb::npos;
             introduce_new_root(new_sibling_ref, state, is_append);
         }
@@ -212,11 +212,11 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 
 class ColumnBinary::EraseLeafElem: public ColumnBase::EraseHandlerBase {
 public:
-    EraseLeafElem(ColumnBinary& column) TIGHTDB_NOEXCEPT:
+    EraseLeafElem(ColumnBinary& column) REALM_NOEXCEPT:
         EraseHandlerBase(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                         size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
@@ -224,7 +224,7 @@ public:
             ArrayBinary leaf(get_alloc());
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
-            TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
+            REALM_ASSERT_3(leaf.size(), >=, 1);
             size_t last_ndx = leaf.size() - 1;
             if (last_ndx == 0)
                 return true;
@@ -238,7 +238,7 @@ public:
         ArrayBigBlobs leaf(get_alloc());
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
-        TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
+        REALM_ASSERT_3(leaf.size(), >=, 1);
         size_t last_ndx = leaf.size() - 1;
         if (last_ndx == 0)
             return true;
@@ -248,11 +248,11 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT REALM_OVERRIDE
     {
         Array::destroy_deep(leaf_mem, get_alloc());
     }
-    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    void replace_root_by_leaf(MemRef leaf_mem) REALM_OVERRIDE
     {
         Array* leaf;
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
@@ -270,7 +270,7 @@ public:
         }
         replace_root(leaf); // Throws, but accessor ownership is passed to callee
     }
-    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    void replace_root_by_empty_leaf() REALM_OVERRIDE
     {
         UniquePtr<ArrayBinary> leaf;
         leaf.reset(new ArrayBinary(get_alloc())); // Throws
@@ -281,8 +281,8 @@ public:
 
 void ColumnBinary::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_3(ndx, <, size());
-    TIGHTDB_ASSERT_3(is_last, ==, (ndx == size() - 1));
+    REALM_ASSERT_3(ndx, <, size());
+    REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
     if (root_is_leaf) {
@@ -308,8 +308,8 @@ void ColumnBinary::do_erase(size_t ndx, bool is_last)
 
 void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // FIXME: ExceptionSafety: The current implementation of this
     // function is not exception-safe, and it is hard to see how to
@@ -373,7 +373,7 @@ void ColumnBinary::do_clear()
 
 bool ColumnBinary::upgrade_root_leaf(size_t value_size)
 {
-    TIGHTDB_ASSERT(root_is_leaf());
+    REALM_ASSERT(root_is_leaf());
 
     bool is_big = m_array->get_context_flag();
     if (is_big)
@@ -399,7 +399,7 @@ bool ColumnBinary::upgrade_root_leaf(size_t value_size)
 class ColumnBinary::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
-    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    ref_type create_leaf(size_t size) REALM_OVERRIDE
     {
         MemRef mem = ArrayBinary::create_array(size, m_alloc); // Throws
         return mem.m_ref;
@@ -419,7 +419,7 @@ class ColumnBinary::SliceHandler: public ColumnBase::SliceHandler {
 public:
     SliceHandler(Allocator& alloc): m_alloc(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+                      Allocator& target_alloc) REALM_OVERRIDE
     {
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
@@ -556,7 +556,7 @@ void ColumnBinary::refresh_accessor_tree(size_t, const Spec&)
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -664,4 +664,4 @@ void ColumnBinary::do_dump_node_structure(ostream& out, int level) const
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

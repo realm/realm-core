@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_STRING_ENUM_HPP
-#define TIGHTDB_COLUMN_STRING_ENUM_HPP
+#ifndef REALM_COLUMN_STRING_ENUM_HPP
+#define REALM_COLUMN_STRING_ENUM_HPP
 
 #include <tightdb/column_string.hpp>
 
@@ -54,10 +54,10 @@ public:
     typedef StringData value_type;
 
     ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref);
-    ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~ColumnStringEnum() REALM_NOEXCEPT REALM_OVERRIDE;
+    void destroy() REALM_NOEXCEPT REALM_OVERRIDE;
 
-    int compare_values(size_t row1, size_t row2) const TIGHTDB_OVERRIDE
+    int compare_values(size_t row1, size_t row2) const REALM_OVERRIDE
     {
         StringData a = get(row1);
         StringData b = get(row2);
@@ -66,7 +66,7 @@ public:
         return utf8_compare(a, b) ? 1 : -1;
     }
 
-    StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, StringData value);
     void add(StringData value = StringData());
     void insert(std::size_t ndx, StringData value = StringData());
@@ -88,34 +88,34 @@ public:
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to StringData::operator<().
-    std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_string(StringData value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
     //@}
 
-    void set_string(std::size_t, StringData) TIGHTDB_OVERRIDE;
+    void set_string(std::size_t, StringData) REALM_OVERRIDE;
 
-    void adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
+    void adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT;
 
     // Search index
-    bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
-    const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
+    bool has_search_index() const REALM_NOEXCEPT REALM_OVERRIDE;
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) REALM_OVERRIDE;
+    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT REALM_OVERRIDE;
+    StringIndex* get_search_index() REALM_NOEXCEPT;
+    const StringIndex* get_search_index() const REALM_NOEXCEPT;
     StringIndex* create_search_index();
-    void install_search_index(StringIndex*) TIGHTDB_NOEXCEPT;
-    void destroy_search_index() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void install_search_index(StringIndex*) REALM_NOEXCEPT;
+    void destroy_search_index() REALM_NOEXCEPT REALM_OVERRIDE;
 
     // Compare two string columns for equality
     bool compare_string(const AdaptiveStringColumn&) const;
     bool compare_string(const ColumnStringEnum&) const;
 
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
     std::size_t GetKeyNdx(StringData value) const;
     std::size_t GetKeyNdxOrAdd(StringData value);
@@ -123,11 +123,11 @@ public:
     AdaptiveStringColumn& get_keys();
     const AdaptiveStringColumn& get_keys() const;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
-    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE;
+    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
 #endif
 
 private:
@@ -161,9 +161,9 @@ private:
 
 // Implementation:
 
-inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ColumnStringEnum::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, Column::size());
+    REALM_ASSERT_3(ndx, <, Column::size());
     std::size_t key_ndx = to_size_t(Column::get(ndx));
     return m_keys.get(key_ndx);
 }
@@ -178,7 +178,7 @@ inline void ColumnStringEnum::add(StringData value)
 inline void ColumnStringEnum::insert(std::size_t row_ndx, StringData value)
 {
     std::size_t size = this->size();
-    TIGHTDB_ASSERT_3(row_ndx, <=, size);
+    REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t num_rows = 1;
     bool is_append = row_ndx == size;
     do_insert(row_ndx, value, num_rows, is_append); // Throws
@@ -227,12 +227,12 @@ inline void ColumnStringEnum::clear(std::size_t, bool)
     do_clear(); // Throws
 }
 
-inline std::size_t ColumnStringEnum::lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnStringEnum::lower_bound_string(StringData value) const REALM_NOEXCEPT
 {
     return ColumnBase::lower_bound(*this, value);
 }
 
-inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const REALM_NOEXCEPT
 {
     return ColumnBase::upper_bound(*this, value);
 }
@@ -242,17 +242,17 @@ inline void ColumnStringEnum::set_string(std::size_t row_ndx, StringData value)
     set(row_ndx, value); // Throws
 }
 
-inline bool ColumnStringEnum::has_search_index() const TIGHTDB_NOEXCEPT
+inline bool ColumnStringEnum::has_search_index() const REALM_NOEXCEPT
 {
     return m_search_index != 0;
 }
 
-inline StringIndex* ColumnStringEnum::get_search_index() TIGHTDB_NOEXCEPT
+inline StringIndex* ColumnStringEnum::get_search_index() REALM_NOEXCEPT
 {
     return m_search_index;
 }
 
-inline const StringIndex* ColumnStringEnum::get_search_index() const TIGHTDB_NOEXCEPT
+inline const StringIndex* ColumnStringEnum::get_search_index() const REALM_NOEXCEPT
 {
     return m_search_index;
 }
@@ -270,4 +270,4 @@ inline const AdaptiveStringColumn& ColumnStringEnum::get_keys() const
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_STRING_ENUM_HPP
+#endif // REALM_COLUMN_STRING_ENUM_HPP

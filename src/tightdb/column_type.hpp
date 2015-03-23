@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_TYPE_HPP
-#define TIGHTDB_COLUMN_TYPE_HPP
+#ifndef REALM_COLUMN_TYPE_HPP
+#define REALM_COLUMN_TYPE_HPP
 
 namespace tightdb {
 
@@ -66,4 +66,4 @@ enum ColumnAttr {
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_TYPE_HPP
+#endif // REALM_COLUMN_TYPE_HPP

@@ -10,7 +10,7 @@ using namespace tightdb::util;
 
 namespace {
 
-void get_child(Array& parent, size_t child_ref_ndx, Array& child) TIGHTDB_NOEXCEPT
+void get_child(Array& parent, size_t child_ref_ndx, Array& child) REALM_NOEXCEPT
 {
     ref_type child_ref = parent.get_as_ref(child_ref_ndx);
     child.init_from_ref(child_ref);
@@ -26,7 +26,7 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) TIGHTDB_NOEXCE
 // allow users to do so until the index is fixed (which requires a breaking
 // change to how values are indexed). Once the bug is fixed, validate_value()
 // should be removed.
-void StringIndex::validate_value(int64_t) const TIGHTDB_NOEXCEPT
+void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
 {
     // no-op: All ints are valid
 }
@@ -58,9 +58,9 @@ ArrayInteger* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 }
 
 
-void StringIndex::set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT
+void StringIndex::set_target(void* target_column, StringGetter get_func) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(target_column);
+    REALM_ASSERT(target_column);
     m_target_column = target_column;
     m_get_func      = get_func;
 }
@@ -85,7 +85,7 @@ void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t of
 
 void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 {
-    TIGHTDB_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
+    REALM_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
@@ -94,7 +94,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
     Allocator& alloc = m_array->get_alloc();
     ArrayInteger values(alloc);
     get_child(*m_array, 0, values);
-    TIGHTDB_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size()+1);
 
     size_t ins_pos = values.lower_bound(key);
     if (ins_pos == values.size()) {
@@ -104,11 +104,11 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
         return;
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     // Since we only use this for moving existing values to new
     // subindexes, there should never be an existing match.
     key_type k = key_type(values.get(ins_pos));
-    TIGHTDB_ASSERT(k != key);
+    REALM_ASSERT(k != key);
 #endif
 
     // If key is not present we add it at the correct location
@@ -148,7 +148,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             return;
         }
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 }
 
 
@@ -159,7 +159,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         // Get subnode table
         ArrayInteger offsets(alloc);
         get_child(*m_array, 0, offsets);
-        TIGHTDB_ASSERT(m_array->size() == offsets.size()+1);
+        REALM_ASSERT(m_array->size() == offsets.size()+1);
 
         // Find the subnode containing the item
         size_t node_ndx = offsets.lower_bound(key);
@@ -189,7 +189,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         }
 
         // If there is room, just update node directly
-        if (offsets.size() < TIGHTDB_MAX_BPNODE_SIZE) {
+        if (offsets.size() < REALM_MAX_BPNODE_SIZE) {
             if (nc.type == NodeChange::split) {
                 NodeInsertSplit(node_ndx, nc.ref2);
             }
@@ -217,7 +217,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         switch (node_ndx) {
             case 0:             // insert before
                 return NodeChange(NodeChange::insert_before, new_node.get_ref());
-            case TIGHTDB_MAX_BPNODE_SIZE: // insert after
+            case REALM_MAX_BPNODE_SIZE: // insert after
                 if (nc.type == NodeChange::split)
                     return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
                 return NodeChange(NodeChange::insert_after, new_node.get_ref());
@@ -237,10 +237,10 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         // Is there room in the list?
         ArrayInteger old_offsets(m_array->get_alloc());
         get_child(*m_array, 0, old_offsets);
-        TIGHTDB_ASSERT(m_array->size() == old_offsets.size()+1);
+        REALM_ASSERT(m_array->size() == old_offsets.size()+1);
 
         size_t count = old_offsets.size();
-        bool noextend = count >= TIGHTDB_MAX_BPNODE_SIZE;
+        bool noextend = count >= REALM_MAX_BPNODE_SIZE;
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
@@ -279,23 +279,23 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
     }
 
-    TIGHTDB_ASSERT(false); // never reach here
+    REALM_ASSERT(false); // never reach here
     return NodeChange::none;
 }
 
 
 void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 {
-    TIGHTDB_ASSERT(!root_is_leaf());
-    TIGHTDB_ASSERT(new_ref);
+    REALM_ASSERT(!root_is_leaf());
+    REALM_ASSERT(new_ref);
 
     Allocator& alloc = m_array->get_alloc();
     ArrayInteger offsets(alloc);
     get_child(*m_array, 0, offsets);
 
-    TIGHTDB_ASSERT(m_array->size() == offsets.size()+1);
-    TIGHTDB_ASSERT(ndx < offsets.size());
-    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT(m_array->size() == offsets.size()+1);
+    REALM_ASSERT(ndx < offsets.size());
+    REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE);
 
     // Get sublists
     size_t refs_ndx = ndx+1; // first entry in refs points to offsets
@@ -318,16 +318,16 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 
 void StringIndex::NodeInsert(size_t ndx, size_t ref)
 {
-    TIGHTDB_ASSERT(ref);
-    TIGHTDB_ASSERT(!root_is_leaf());
+    REALM_ASSERT(ref);
+    REALM_ASSERT(!root_is_leaf());
 
     Allocator& alloc = m_array->get_alloc();
     Array offsets(alloc);
     get_child(*m_array, 0, offsets);
-    TIGHTDB_ASSERT(m_array->size() == offsets.size()+1);
+    REALM_ASSERT(m_array->size() == offsets.size()+1);
 
-    TIGHTDB_ASSERT(ndx <= offsets.size());
-    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT(ndx <= offsets.size());
+    REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE);
 
     StringIndex col(ref, 0, 0, m_target_column, m_get_func,
                     m_deny_duplicate_values, alloc);
@@ -340,13 +340,13 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
 
 bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, StringData value, bool noextend)
 {
-    TIGHTDB_ASSERT(root_is_leaf());
+    REALM_ASSERT(root_is_leaf());
 
     // Get subnode table
     Allocator& alloc = m_array->get_alloc();
     ArrayInteger values(alloc);
     get_child(*m_array, 0, values);
-    TIGHTDB_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size()+1);
 
     size_t ins_pos = values.lower_bound(key);
     if (ins_pos == values.size()) {
@@ -495,7 +495,7 @@ void StringIndex::distinct(Column& result) const
 
 void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
 {
-    TIGHTDB_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
+    REALM_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
 
     Allocator& alloc = array()->get_alloc();
     const size_t count = array()->size();
@@ -542,7 +542,7 @@ void StringIndex::clear()
 {
     Array values(m_array->get_alloc());
     get_child(*m_array, 0, values);
-    TIGHTDB_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size()+1);
 
     values.clear();
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
@@ -559,14 +559,14 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     Allocator& alloc = array()->get_alloc();
     ArrayInteger values(alloc);
     get_child(*array(), 0, values);
-    TIGHTDB_ASSERT(array()->size() == values.size()+1);
+    REALM_ASSERT(array()->size() == values.size()+1);
 
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
 
     const size_t pos = values.lower_bound(key);
     const size_t pos_refs = pos + 1; // first entry in refs points to offsets
-    TIGHTDB_ASSERT(pos != values.size());
+    REALM_ASSERT(pos != values.size());
 
     if (array()->is_inner_bptree_node()) {
         ref_type ref = array()->get_as_ref(pos_refs);
@@ -589,7 +589,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     else {
         int64_t ref = array()->get(pos_refs);
         if (ref & 1) {
-            TIGHTDB_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
+            REALM_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
             values.erase(pos);
             array()->erase(pos_refs);
         }
@@ -610,7 +610,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
                 Column sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(array(), pos_refs);
                 size_t r = sub.find_first(row_ndx);
-                TIGHTDB_ASSERT(r != not_found);
+                REALM_ASSERT(r != not_found);
                 bool is_last = r == sub.size() - 1;
                 sub.erase(r, is_last);
 
@@ -630,14 +630,14 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     Allocator& alloc = array()->get_alloc();
     ArrayInteger values(alloc);
     get_child(*array(), 0, values);
-    TIGHTDB_ASSERT(array()->size() == values.size()+1);
+    REALM_ASSERT(array()->size() == values.size()+1);
 
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
 
     size_t pos = values.lower_bound(key);
     size_t pos_refs = pos + 1; // first entry in refs points to offsets
-    TIGHTDB_ASSERT(pos != values.size());
+    REALM_ASSERT(pos != values.size());
 
     if (array()->is_inner_bptree_node()) {
         ref_type ref = array()->get_as_ref(pos_refs);
@@ -648,7 +648,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     else {
         int64_t ref = array()->get(pos_refs);
         if (ref & 1) {
-            TIGHTDB_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
+            REALM_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
             size_t shifted = (new_row_ndx << 1) + 1; // shift to indicate literal
             array()->set(pos_refs, shifted);
         }
@@ -663,7 +663,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 Column sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(array(), pos_refs);
                 size_t r = sub.find_first(row_ndx);
-                TIGHTDB_ASSERT(r != not_found);
+                REALM_ASSERT(r != not_found);
                 sub.set(r, new_row_ndx);
             }
         }
@@ -673,12 +673,12 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
 namespace {
 
-bool has_duplicate_values(const Array& node) TIGHTDB_NOEXCEPT
+bool has_duplicate_values(const Array& node) REALM_NOEXCEPT
 {
     Allocator& alloc = node.get_alloc();
     Array child(alloc);
     size_t n = node.size();
-    TIGHTDB_ASSERT(n >= 1);
+    REALM_ASSERT(n >= 1);
     if (node.is_inner_bptree_node()) {
         // Inner node
         for (size_t i = 1; i < n; ++i) {
@@ -719,7 +719,7 @@ bool has_duplicate_values(const Array& node) TIGHTDB_NOEXCEPT
 } // anonymous namespace
 
 
-bool StringIndex::has_duplicate_values() const TIGHTDB_NOEXCEPT
+bool StringIndex::has_duplicate_values() const REALM_NOEXCEPT
 {
     return ::has_duplicate_values(*m_array);
 }
@@ -733,20 +733,20 @@ bool StringIndex::is_empty() const
 
 void StringIndex::NodeAddKey(ref_type ref)
 {
-    TIGHTDB_ASSERT(ref);
-    TIGHTDB_ASSERT(!root_is_leaf());
+    REALM_ASSERT(ref);
+    REALM_ASSERT(!root_is_leaf());
 
     Allocator& alloc = m_array->get_alloc();
     ArrayInteger offsets(alloc);
     get_child(*m_array, 0, offsets);
-    TIGHTDB_ASSERT(m_array->size() == offsets.size()+1);
-    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_BPNODE_SIZE+1);
+    REALM_ASSERT(m_array->size() == offsets.size()+1);
+    REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE+1);
 
     Array new_top(alloc);
     ArrayInteger new_offsets(alloc);
     new_top.init_from_ref(ref);
     new_offsets.init_from_ref(new_top.get_as_ref(0));
-    TIGHTDB_ASSERT(!new_offsets.is_empty());
+    REALM_ASSERT(!new_offsets.is_empty());
 
     int64_t key = new_offsets.back();
     offsets.add(key);
@@ -754,7 +754,7 @@ void StringIndex::NodeAddKey(ref_type ref)
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void StringIndex::Verify() const
 {
@@ -777,7 +777,7 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
         find_all(results, value);
 
         size_t ndx = results.find_first(i);
-        TIGHTDB_ASSERT(ndx != not_found);
+        REALM_ASSERT(ndx != not_found);
         results.clear();
     }
     results.destroy(); // clean-up
@@ -791,7 +791,7 @@ void StringIndex::dump_node_structure(const Array& node, ostream& out, int level
     Array subnode(alloc);
 
     size_t node_size = node.size();
-    TIGHTDB_ASSERT(node_size >= 1);
+    REALM_ASSERT(node_size >= 1);
 
     bool node_is_leaf = !node.is_inner_bptree_node();
     if (node_is_leaf) {
@@ -893,7 +893,7 @@ void StringIndex::array_to_dot(ostream& out, const Array& array)
     Allocator& alloc = array.get_alloc();
     ArrayInteger offsets(alloc);
     get_child(const_cast<Array&>(array), 0, offsets);
-    TIGHTDB_ASSERT(array.size() == offsets.size()+1);
+    REALM_ASSERT(array.size() == offsets.size()+1);
     ref_type ref  = array.get_ref();
 
     if (array.is_inner_bptree_node()) {
@@ -970,4 +970,4 @@ void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title
 }
 
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

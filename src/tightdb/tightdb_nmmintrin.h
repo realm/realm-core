@@ -1,5 +1,5 @@
-#ifndef TIGHTDB_NMMINTRIN_H
-#define TIGHTDB_NMMINTRIN_H
+#ifndef REALM_NMMINTRIN_H
+#define REALM_NMMINTRIN_H
 
 /*
     We must support runtime detection of CPU support of SSE when distributing TightDB as a closed source library.
@@ -14,14 +14,14 @@
 
 #ifndef _MSC_VER
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     #include <emmintrin.h> // SSE2 (using __m128i)
 #endif
 
 namespace tightdb {
 
 #if 0
-#ifdef TIGHTDB_COMPILER_AVX
+#ifdef REALM_COMPILER_AVX
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__));
 typedef double __m256d __attribute__((__vector_size__(32), __may_alias__));
 
@@ -71,7 +71,7 @@ static inline int movemask_cmp_ps(__m256* y1, __m256* y2, int op)
     else if (op == _CMP_GT_OQ)
         return movemask_cmp_ps<_CMP_GT_OQ>(y1, y2);
 
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return 0;
 }
 
@@ -91,7 +91,7 @@ static inline int movemask_cmp_pd(__m256d* y1, __m256d* y2, int op)
     else if (op == _CMP_GT_OQ)
         return movemask_cmp_pd<_CMP_GT_OQ>(y1, y2);
 
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return 0;
 }
 

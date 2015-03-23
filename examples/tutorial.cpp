@@ -7,7 +7,7 @@ using namespace tightdb;
 // @@Example: create_table @@
 
 // defining a table
-TIGHTDB_TABLE_3(MyTable,
+REALM_TABLE_3(MyTable,
 //              columns: types:
                 name,    String,
                 age,     Int,

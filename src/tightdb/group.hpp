@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_GROUP_HPP
-#define TIGHTDB_GROUP_HPP
+#ifndef REALM_GROUP_HPP
+#define REALM_GROUP_HPP
 
 #include <string>
 #include <vector>
@@ -96,9 +96,9 @@ public:
     /// is_attached(). Calling any other method (except the
     /// destructor) while in the unattached state has undefined
     /// behavior.
-    Group(unattached_tag) TIGHTDB_NOEXCEPT;
+    Group(unattached_tag) REALM_NOEXCEPT;
 
-    ~Group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~Group() REALM_NOEXCEPT REALM_OVERRIDE;
 
     /// Attach this Group instance to the specified database file.
     ///
@@ -216,11 +216,11 @@ public:
     /// attached to a file with a call to open(). Calling any method
     /// other than open(), and is_attached() on an unattached instance
     /// results in undefined behavior.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     /// Returns true if, and only if the number of tables in this
     /// group is zero.
-    bool is_empty() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT;
 
     /// Returns the number of tables in this group.
     std::size_t size() const;
@@ -306,8 +306,8 @@ public:
 
     static const std::size_t max_table_name_length = 63;
 
-    bool has_table(StringData name) const TIGHTDB_NOEXCEPT;
-    std::size_t find_table(StringData name) const TIGHTDB_NOEXCEPT;
+    bool has_table(StringData name) const REALM_NOEXCEPT;
+    std::size_t find_table(StringData name) const REALM_NOEXCEPT;
     StringData get_table_name(std::size_t table_ndx) const;
 
     TableRef get_table(std::size_t index);
@@ -395,7 +395,7 @@ public:
     /// Compare two groups for inequality. See operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
     void print() const;
     void print_free() const;
@@ -428,15 +428,15 @@ private:
     bool m_is_attached;
 
     struct shared_tag {};
-    Group(shared_tag) TIGHTDB_NOEXCEPT;
+    Group(shared_tag) REALM_NOEXCEPT;
 
     // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&); // Disable copying
 
-    void init_array_parents() TIGHTDB_NOEXCEPT;
-    void detach() TIGHTDB_NOEXCEPT;
-    void detach_but_retain_data() TIGHTDB_NOEXCEPT;
-    void complete_detach() TIGHTDB_NOEXCEPT;
+    void init_array_parents() REALM_NOEXCEPT;
+    void detach() REALM_NOEXCEPT;
+    void detach_but_retain_data() REALM_NOEXCEPT;
+    void complete_detach() REALM_NOEXCEPT;
 
     /// Add free-space versioning nodes, if they do not already exist. Othewise,
     /// set the version to zero on all free space chunks. This must be done
@@ -444,7 +444,7 @@ private:
     void reset_free_space_versions();
 
     void reattach_from_retained_data();
-    bool may_reattach_if_same_version() const TIGHTDB_NOEXCEPT;
+    bool may_reattach_if_same_version() const REALM_NOEXCEPT;
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -453,25 +453,25 @@ private:
     /// that exists across Group::commit() will remain valid. This
     /// function is not appropriate for use in conjunction with
     /// commits via shared group.
-    void update_refs(ref_type top_ref, std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    void update_refs(ref_type top_ref, std::size_t old_baseline) REALM_NOEXCEPT;
 
     /// Reinitialize group for a new read or write transaction.
     void init_for_transact(ref_type new_top_ref, std::size_t new_file_size);
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
+    void update_child_ref(std::size_t, ref_type) REALM_OVERRIDE;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
 
     // Overriding method in Table::Parent
-    StringData get_child_name(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    StringData get_child_name(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
 
     // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void child_accessor_destroyed(Table*) REALM_NOEXCEPT REALM_OVERRIDE;
 
     // Overriding method in Table::Parent
-    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Group* get_parent_group() REALM_NOEXCEPT REALM_OVERRIDE;
 
     class TableWriter;
     class DefaultTableWriter;
@@ -484,7 +484,7 @@ private:
 
     /// Attach this accessor instance to a preexisting underlying node
     /// structure.
-    void init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT;
+    void init_from_ref(ref_type top_ref) REALM_NOEXCEPT;
 
     typedef void (*DescSetter)(Table&);
     typedef bool (*DescMatcher)(const Spec&);
@@ -501,17 +501,17 @@ private:
     std::size_t create_table(StringData name); // Returns index of new table
     Table* create_table_accessor(std::size_t table_ndx);
 
-    void detach_table_accessors() TIGHTDB_NOEXCEPT;
+    void detach_table_accessors() REALM_NOEXCEPT;
 
-    void mark_all_table_accessors() TIGHTDB_NOEXCEPT;
+    void mark_all_table_accessors() REALM_NOEXCEPT;
 
     void write(const std::string& file, const char* encryption_key, 
                uint_fast64_t version_number) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* get_replication() const TIGHTDB_NOEXCEPT;
-    void set_replication(Replication*) TIGHTDB_NOEXCEPT;
+#ifdef REALM_ENABLE_REPLICATION
+    Replication* get_replication() const REALM_NOEXCEPT;
+    void set_replication(Replication*) REALM_NOEXCEPT;
     class TransactAdvancer;
     class TransactReverser;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
@@ -520,9 +520,9 @@ private:
     void refresh_dirty_accessors();
 #endif
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+    get_to_dot_parent(std::size_t ndx_in_parent) const REALM_OVERRIDE;
 #endif
 
     friend class Table;
@@ -570,7 +570,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
     open(buffer, take_ownership); // Throws
 }
 
-inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
+inline Group::Group(unattached_tag) REALM_NOEXCEPT:
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
@@ -578,12 +578,12 @@ inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
     init_array_parents();
 }
 
-inline Group* Group::get_parent_group() TIGHTDB_NOEXCEPT
+inline Group* Group::get_parent_group() REALM_NOEXCEPT
 {
     return this;
 }
 
-inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
+inline Group::Group(shared_tag) REALM_NOEXCEPT:
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true), m_is_attached(false)
@@ -591,48 +591,48 @@ inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
     init_array_parents();
 }
 
-inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
+inline bool Group::is_attached() const REALM_NOEXCEPT
 {
     return m_is_attached;
 }
 
-inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
+inline bool Group::is_empty() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_table_names.is_empty();
 }
 
 inline std::size_t Group::size() const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_table_names.size();
 }
 
 inline StringData Group::get_table_name(std::size_t table_ndx) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     if (table_ndx >= m_table_names.size())
         throw LogicError(LogicError::table_index_out_of_range);
     return m_table_names.get(table_ndx);
 }
 
-inline bool Group::has_table(StringData name) const TIGHTDB_NOEXCEPT
+inline bool Group::has_table(StringData name) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     std::size_t ndx = m_table_names.find_first(name);
     return ndx != not_found;
 }
 
-inline std::size_t Group::find_table(StringData name) const TIGHTDB_NOEXCEPT
+inline std::size_t Group::find_table(StringData name) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     std::size_t ndx = m_table_names.find_first(name);
     return ndx;
 }
 
 inline TableRef Group::get_table(std::size_t table_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = 0; // Do not check descriptor
     Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return TableRef(table);
@@ -640,7 +640,7 @@ inline TableRef Group::get_table(std::size_t table_ndx)
 
 inline ConstTableRef Group::get_table(std::size_t table_ndx) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = 0; // Do not check descriptor
     const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return ConstTableRef(table);
@@ -648,7 +648,7 @@ inline ConstTableRef Group::get_table(std::size_t table_ndx) const
 
 inline TableRef Group::get_table(StringData name)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = 0; // Do not check descriptor
     Table* table = do_get_table(name, desc_matcher); // Throws
     return TableRef(table);
@@ -656,7 +656,7 @@ inline TableRef Group::get_table(StringData name)
 
 inline ConstTableRef Group::get_table(StringData name) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = 0; // Do not check descriptor
     const Table* table = do_get_table(name, desc_matcher); // Throws
     return ConstTableRef(table);
@@ -664,7 +664,7 @@ inline ConstTableRef Group::get_table(StringData name) const
 
 inline TableRef Group::add_table(StringData name, bool require_unique_name)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     DescSetter desc_setter = 0; // Do not add any columns
     Table* table = do_add_table(name, desc_setter, require_unique_name); // Throws
     return TableRef(table);
@@ -672,7 +672,7 @@ inline TableRef Group::add_table(StringData name, bool require_unique_name)
 
 inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = 0; // Do not check descriptor
     DescSetter desc_setter = 0; // Do not add any columns
     Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
@@ -681,8 +681,8 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 
 template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx)
 {
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    TIGHTDB_ASSERT(is_attached());
+    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = &T::matches_dynamic_type;
     Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return BasicTableRef<T>(static_cast<T*>(table));
@@ -690,8 +690,8 @@ template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx
 
 template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t table_ndx) const
 {
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    TIGHTDB_ASSERT(is_attached());
+    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = &T::matches_dynamic_type;
     const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return BasicTableRef<const T>(static_cast<const T*>(table));
@@ -699,8 +699,8 @@ template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t tab
 
 template<class T> inline BasicTableRef<T> Group::get_table(StringData name)
 {
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    TIGHTDB_ASSERT(is_attached());
+    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = &T::matches_dynamic_type;
     Table* table = do_get_table(name, desc_matcher); // Throws
     return BasicTableRef<T>(static_cast<T*>(table));
@@ -708,8 +708,8 @@ template<class T> inline BasicTableRef<T> Group::get_table(StringData name)
 
 template<class T> inline BasicTableRef<const T> Group::get_table(StringData name) const
 {
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    TIGHTDB_ASSERT(is_attached());
+    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = &T::matches_dynamic_type;
     const Table* table = do_get_table(name, desc_matcher); // Throws
     return BasicTableRef<const T>(static_cast<const T*>(table));
@@ -718,8 +718,8 @@ template<class T> inline BasicTableRef<const T> Group::get_table(StringData name
 template<class T>
 inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_name)
 {
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    TIGHTDB_ASSERT(is_attached());
+    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    REALM_ASSERT(is_attached());
     DescSetter desc_setter = &T::set_dynamic_type;
     Table* table = do_add_table(name, desc_setter, require_unique_name); // Throws
     return BasicTableRef<T>(static_cast<T*>(table));
@@ -727,8 +727,8 @@ inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_na
 
 template<class T> inline BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
 {
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    TIGHTDB_ASSERT(is_attached());
+    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = &T::matches_dynamic_type;
     DescSetter desc_setter = &T::set_dynamic_type;
     Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
@@ -767,7 +767,7 @@ void Group::to_json(S& out, std::size_t link_depth,
     out << "}";
 }
 
-inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
+inline void Group::init_array_parents() REALM_NOEXCEPT
 {
     m_table_names.set_parent(&m_top, 0);
     m_tables.set_parent(&m_top, 1);
@@ -778,7 +778,7 @@ inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
     // Seventh slot is "database version" (a.k.a. transaction number)
 }
 
-inline bool Group::may_reattach_if_same_version() const TIGHTDB_NOEXCEPT
+inline bool Group::may_reattach_if_same_version() const REALM_NOEXCEPT
 {
     return m_top.is_attached();
 }
@@ -788,17 +788,17 @@ inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
     m_tables.set(child_ndx, new_ref);
 }
 
-inline ref_type Group::get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT
+inline ref_type Group::get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT
 {
     return m_tables.get_as_ref(child_ndx);
 }
 
-inline StringData Group::get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT
+inline StringData Group::get_child_name(std::size_t child_ndx) const REALM_NOEXCEPT
 {
     return m_table_names.get(child_ndx);
 }
 
-inline void Group::child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT
+inline void Group::child_accessor_destroyed(Table*) REALM_NOEXCEPT
 {
     // Ignore
 }
@@ -807,7 +807,7 @@ class Group::TableWriter {
 public:
     virtual std::size_t write_names(_impl::OutputStream&) = 0;
     virtual std::size_t write_tables(_impl::OutputStream&) = 0;
-    virtual ~TableWriter() TIGHTDB_NOEXCEPT {}
+    virtual ~TableWriter() REALM_NOEXCEPT {}
 };
 
 inline const Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher) const
@@ -820,19 +820,19 @@ inline const Table* Group::do_get_table(StringData name, DescMatcher desc_matche
     return const_cast<Group*>(this)->do_get_table(name, desc_matcher); // Throws
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
-inline Replication* Group::get_replication() const TIGHTDB_NOEXCEPT
+inline Replication* Group::get_replication() const REALM_NOEXCEPT
 {
     return m_alloc.get_replication();
 }
 
-inline void Group::set_replication(Replication* repl) TIGHTDB_NOEXCEPT
+inline void Group::set_replication(Replication* repl) REALM_NOEXCEPT
 {
     m_alloc.set_replication(repl);
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Group class.
@@ -882,20 +882,20 @@ public:
         return *table;
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    static Replication* get_replication(const Group& group) TIGHTDB_NOEXCEPT
+#ifdef REALM_ENABLE_REPLICATION
+    static Replication* get_replication(const Group& group) REALM_NOEXCEPT
     {
         return group.get_replication();
     }
 
-    static void set_replication(Group& group, Replication* repl) TIGHTDB_NOEXCEPT
+    static void set_replication(Group& group, Replication* repl) REALM_NOEXCEPT
     {
         group.set_replication(repl);
     }
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 };
 
 
 } // namespace tightdb
 
-#endif // TIGHTDB_GROUP_HPP
+#endif // REALM_GROUP_HPP

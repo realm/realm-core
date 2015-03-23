@@ -18,13 +18,13 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_UTIL_PLATFORM_SPECIFIC_CONDVAR
-#define TIGHTDB_UTIL_PLATFORM_SPECIFIC_CONDVAR
+#ifndef REALM_UTIL_PLATFORM_SPECIFIC_CONDVAR
+#define REALM_UTIL_PLATFORM_SPECIFIC_CONDVAR
 
 // Enable this only on platforms where it might be needed
 // currently none!
 //#ifdef __APPLE__
-//#define TIGHTDB_CONDVAR_EMULATION
+//#define REALM_CONDVAR_EMULATION
 //#endif
 
 #include <tightdb/util/thread.hpp>
@@ -41,7 +41,7 @@ namespace util {
 
 /// Condition variable for use in synchronization monitors.
 /// This condition variable uses emulation based on semaphores
-/// for the inter-process case, if enabled by TIGHTDB_CONDVAR_EMULATION.
+/// for the inter-process case, if enabled by REALM_CONDVAR_EMULATION.
 /// Compared to a good pthread implemenation, the emulation carries an 
 /// overhead of at most 2 task switches for every waiter notified during 
 /// notify() or notify_all().
@@ -60,7 +60,7 @@ namespace util {
 class PlatformSpecificCondVar {
 public:
     PlatformSpecificCondVar();
-    ~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT;
+    ~PlatformSpecificCondVar() REALM_NOEXCEPT;
 
     /// To use the PlatformSpecificCondVar, you also must place a structure of type
     /// PlatformSpecificCondVar::SharedPart in memory shared by multiple processes
@@ -69,7 +69,7 @@ public:
     /// the shared part using PlatformSpecificCondVar::init_shared_part(), but only before
     /// first use and only when you have exclusive access to the shared part.
 
-#ifdef TIGHTDB_CONDVAR_EMULATION
+#ifdef REALM_CONDVAR_EMULATION
     struct SharedPart {
         uint64_t signal_counter;
         uint32_t waiters;
@@ -90,18 +90,18 @@ public:
     static void init_shared_part(SharedPart& shared_part);
 
     /// Wait for another thread to call notify() or notify_all().
-    void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
+    void wait(LockGuard& l) REALM_NOEXCEPT;
 
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
     /// If any threads are waiting for this condition, wake up at least one.
-    void notify() TIGHTDB_NOEXCEPT;
+    void notify() REALM_NOEXCEPT;
 
     /// Wake up every thread that is currently waiting on this condition.
-    void notify_all() TIGHTDB_NOEXCEPT;
+    void notify_all() REALM_NOEXCEPT;
 
     /// Cleanup and release system resources if possible. 
-    void close() TIGHTDB_NOEXCEPT;
+    void close() REALM_NOEXCEPT;
 
     /// For platforms imposing naming restrictions on system resources,
     /// a prefix can be set. This must be done before setting any SharedParts.
@@ -126,10 +126,10 @@ private:
 // Implementation:
 
 
-inline void PlatformSpecificCondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
+inline void PlatformSpecificCondVar::wait(LockGuard& l) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
+    REALM_ASSERT(m_shared_part);
+#ifdef REALM_CONDVAR_EMULATION
     m_shared_part->waiters++;
     uint64_t my_counter = m_shared_part->signal_counter;
     l.m_mutex.unlock();
@@ -162,8 +162,8 @@ inline void PlatformSpecificCondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 template<class Func>
 inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
+    REALM_ASSERT(m_shared_part);
+#ifdef REALM_CONDVAR_EMULATION
     m_shared_part->waiters++;
     uint64_t my_counter = m_shared_part->signal_counter;
     m.unlock();
@@ -172,7 +172,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
         int r;
 #ifdef __APPLE__
         // no timeout support on apple
-        TIGHTDB_ASSERT(tp == 0);
+        REALM_ASSERT(tp == 0);
         static_cast<void>(tp);
 #else
         if (tp) {
@@ -205,10 +205,10 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
 
 
 
-inline void PlatformSpecificCondVar::notify() TIGHTDB_NOEXCEPT
+inline void PlatformSpecificCondVar::notify() REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
+    REALM_ASSERT(m_shared_part);
+#ifdef REALM_CONDVAR_EMULATION
     m_shared_part->signal_counter++;
     if (m_shared_part->waiters) {
         sem_post(m_sem);
@@ -223,10 +223,10 @@ inline void PlatformSpecificCondVar::notify() TIGHTDB_NOEXCEPT
 
 
 
-inline void PlatformSpecificCondVar::notify_all() TIGHTDB_NOEXCEPT
+inline void PlatformSpecificCondVar::notify_all() REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
+    REALM_ASSERT(m_shared_part);
+#ifdef REALM_CONDVAR_EMULATION
     m_shared_part->signal_counter++;
     while (m_shared_part->waiters) {
         sem_post(m_sem);

@@ -17,8 +17,8 @@
 * from TightDB Incorporated.
 *
 **************************************************************************/
-#ifndef TIGHTDB_UTIL_UNICODE_HPP
-#define TIGHTDB_UTIL_UNICODE_HPP
+#ifndef REALM_UTIL_UNICODE_HPP
+#define REALM_UTIL_UNICODE_HPP
 
 #include <stdint.h>
 #include <string>
@@ -28,7 +28,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/utilities.hpp>
 
-#if TIGHTDB_HAVE_CXX11
+#if REALM_HAVE_CXX11
     #include <locale>
 #endif
 
@@ -151,4 +151,4 @@ namespace tightdb {
 
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_UTF8_HPP
+#endif // REALM_UTIL_UTF8_HPP

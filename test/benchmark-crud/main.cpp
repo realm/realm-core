@@ -17,7 +17,7 @@ using namespace tightdb::test_util;
 
 namespace {
 
-TIGHTDB_TABLE_1(IntTable,
+REALM_TABLE_1(IntTable,
                 i, Int)
 
 

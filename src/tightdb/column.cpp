@@ -25,7 +25,7 @@ void ColumnBase::set_string(size_t, StringData)
     throw LogicError(LogicError::type_mismatch);
 }
 
-void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+void ColumnBase::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
 }
@@ -43,14 +43,14 @@ void ColumnBase::cascade_break_backlinks_to_all_rows(size_t, CascadeState&)
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ColumnBase::Verify(const Table&, size_t) const
 {
     Verify();
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG
 
 
 namespace {
@@ -60,7 +60,7 @@ struct GetSizeFromRef {
     Allocator& m_alloc;
     size_t m_size;
     GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
-    template<class Col> void call() TIGHTDB_NOEXCEPT
+    template<class Col> void call() REALM_NOEXCEPT
     {
         m_size = Col::get_size_from_ref(m_ref, m_alloc);
     }
@@ -102,14 +102,14 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_BackLink:
             break;
     }
-    TIGHTDB_ASSERT_DEBUG(false);
+    REALM_ASSERT_DEBUG(false);
 }
 
 
 class TreeWriter {
 public:
-    TreeWriter(_impl::OutputStream&) TIGHTDB_NOEXCEPT;
-    ~TreeWriter() TIGHTDB_NOEXCEPT;
+    TreeWriter(_impl::OutputStream&) REALM_NOEXCEPT;
+    ~TreeWriter() REALM_NOEXCEPT;
 
     void add_leaf_ref(ref_type child_ref, size_t elems_in_child, ref_type* is_last);
 
@@ -123,13 +123,13 @@ private:
 class TreeWriter::ParentLevel {
 public:
     ParentLevel(Allocator&, _impl::OutputStream&, size_t max_elems_per_child);
-    ~ParentLevel() TIGHTDB_NOEXCEPT;
+    ~ParentLevel() REALM_NOEXCEPT;
 
     void add_child_ref(ref_type child_ref, size_t elems_in_child,
                        bool leaf_or_compact, ref_type* is_last);
 
 private:
-    const size_t m_max_elems_per_child; // A power of `TIGHTDB_MAX_BPNODE_SIZE`
+    const size_t m_max_elems_per_child; // A power of `REALM_MAX_BPNODE_SIZE`
     size_t m_elems_in_parent; // Zero if reinitialization is needed
     bool m_is_on_general_form; // Defined only when m_elems_in_parent > 0
     Array m_main;
@@ -139,13 +139,13 @@ private:
 };
 
 
-inline TreeWriter::TreeWriter(_impl::OutputStream& out) TIGHTDB_NOEXCEPT:
+inline TreeWriter::TreeWriter(_impl::OutputStream& out) REALM_NOEXCEPT:
     m_alloc(Allocator::get_default()),
     m_out(out)
 {
 }
 
-inline TreeWriter::~TreeWriter() TIGHTDB_NOEXCEPT
+inline TreeWriter::~TreeWriter() REALM_NOEXCEPT
 {
 }
 
@@ -157,7 +157,7 @@ void TreeWriter::add_leaf_ref(ref_type leaf_ref, size_t elems_in_leaf, ref_type*
             return;
         }
         m_last_parent_level.reset(new ParentLevel(m_alloc, m_out,
-                                                  TIGHTDB_MAX_BPNODE_SIZE)); // Throws
+                                                  REALM_MAX_BPNODE_SIZE)); // Throws
     }
     bool leaf_or_compact = true;
     m_last_parent_level->add_child_ref(leaf_ref, elems_in_leaf,
@@ -176,7 +176,7 @@ inline TreeWriter::ParentLevel::ParentLevel(Allocator& alloc, _impl::OutputStrea
     m_main.create(Array::type_InnerBptreeNode); // Throws
 }
 
-inline TreeWriter::ParentLevel::~ParentLevel() TIGHTDB_NOEXCEPT
+inline TreeWriter::ParentLevel::~ParentLevel() REALM_NOEXCEPT
 {
     m_offsets.destroy(); // Shallow
     m_main.destroy(); // Shallow
@@ -187,7 +187,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
 {
     bool force_general_form = !leaf_or_compact ||
         (elems_in_child != m_max_elems_per_child &&
-         m_main.size() != 1 + TIGHTDB_MAX_BPNODE_SIZE - 1 &&
+         m_main.size() != 1 + REALM_MAX_BPNODE_SIZE - 1 &&
          !is_last);
 
     // Add the incoming child to this inner node
@@ -210,7 +210,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             m_offsets.add(v); // Throws
         }
         m_elems_in_parent += elems_in_child;
-        if (!is_last && m_main.size() < 1 + TIGHTDB_MAX_BPNODE_SIZE)
+        if (!is_last && m_main.size() < 1 + REALM_MAX_BPNODE_SIZE)
           return;
     }
     else { // First child in this node
@@ -255,7 +255,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             Allocator& alloc = m_main.get_alloc();
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (int_multiply_with_overflow_detect(next_level_elems_per_child,
-                                                  TIGHTDB_MAX_BPNODE_SIZE))
+                                                  REALM_MAX_BPNODE_SIZE))
                 throw runtime_error("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
                                                       next_level_elems_per_child)); // Throws
@@ -282,7 +282,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
 
 
 size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
-                                              Allocator& alloc) TIGHTDB_NOEXCEPT
+                                              Allocator& alloc) REALM_NOEXCEPT
 {
     GetSizeFromRef op(ref, alloc);
     col_type_deleg(op, type);
@@ -294,7 +294,7 @@ class ColumnBase::WriteSliceHandler: public Array::VisitHandler {
 public:
     WriteSliceHandler(size_t offset, size_t size, Allocator& alloc,
                       ColumnBase::SliceHandler &slice_handler,
-                      _impl::OutputStream& out) TIGHTDB_NOEXCEPT:
+                      _impl::OutputStream& out) REALM_NOEXCEPT:
         m_begin(offset), m_end(offset + size),
         m_leaf_cache(alloc),
         m_slice_handler(slice_handler),
@@ -303,16 +303,16 @@ public:
         m_top_ref(0)
     {
     }
-    ~WriteSliceHandler() TIGHTDB_NOEXCEPT
+    ~WriteSliceHandler() REALM_NOEXCEPT
     {
     }
-    bool visit(const Array::NodeInfo& leaf_info) TIGHTDB_OVERRIDE
+    bool visit(const Array::NodeInfo& leaf_info) REALM_OVERRIDE
     {
         size_t size = leaf_info.m_size, pos;
         size_t leaf_begin = leaf_info.m_offset;
         size_t leaf_end   = leaf_begin + size;
-        TIGHTDB_ASSERT_3(leaf_begin, <=, m_end);
-        TIGHTDB_ASSERT_3(leaf_end, >=, m_begin);
+        REALM_ASSERT_3(leaf_begin, <=, m_end);
+        REALM_ASSERT_3(leaf_end, >=, m_begin);
         bool no_slicing = leaf_begin >= m_begin && leaf_end <= m_end;
         if (no_slicing) {
             m_leaf_cache.init_from_mem(leaf_info.m_mem);
@@ -339,7 +339,7 @@ public:
         m_tree_writer.add_leaf_ref(ref, size, is_last); // Throws
         return !is_last;
     }
-    ref_type get_top_ref() const TIGHTDB_NOEXCEPT
+    ref_type get_top_ref() const REALM_NOEXCEPT
     {
         return m_top_ref;
     }
@@ -356,7 +356,7 @@ private:
 ref_type ColumnBase::write(const Array* root, size_t slice_offset, size_t slice_size,
                            size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
 {
-    TIGHTDB_ASSERT(root->is_inner_bptree_node());
+    REALM_ASSERT(root->is_inner_bptree_node());
 
     size_t offset = slice_offset;
     if (slice_size == 0)
@@ -397,7 +397,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
         is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
-    TIGHTDB_ASSERT(!compact_form || is_append);
+    REALM_ASSERT(!compact_form || is_append);
     if (compact_form) {
         // FIXME: Dangerous cast here (unsigned -> signed)
         int_fast64_t v = state.m_split_offset; // elems_per_child
@@ -428,7 +428,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 {
     size_t rest_size = *rest_size_ptr;
     size_t orig_rest_size = rest_size;
-    size_t leaf_size = min(size_t(TIGHTDB_MAX_BPNODE_SIZE), rest_size);
+    size_t leaf_size = min(size_t(REALM_MAX_BPNODE_SIZE), rest_size);
     rest_size -= leaf_size;
     ref_type node = handler.create_leaf(leaf_size);
     size_t height = 1;
@@ -447,7 +447,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(v); // Throws
                 node = 0;
                 size_t num_children = 1;
-                while (rest_size > 0 && num_children != TIGHTDB_MAX_BPNODE_SIZE) {
+                while (rest_size > 0 && num_children != REALM_MAX_BPNODE_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
                         int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
@@ -476,7 +476,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
     }
 }
 
-void Column::destroy() TIGHTDB_NOEXCEPT
+void Column::destroy() REALM_NOEXCEPT
 {
     if (m_search_index) {
         static_cast<StringIndex*>(m_search_index)->destroy();
@@ -486,7 +486,7 @@ void Column::destroy() TIGHTDB_NOEXCEPT
         m_array->destroy_deep();
 }
 
-Column::~Column() TIGHTDB_NOEXCEPT
+Column::~Column() REALM_NOEXCEPT
 {
     if (m_search_index) {
         //static_cast<StringIndex*>(m_search_index)->destroy();
@@ -507,7 +507,7 @@ void Column::move_assign(Column& col)
     col.m_search_index = null_ptr;
 }
 
-void Column::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+void Column::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
 
@@ -520,10 +520,10 @@ namespace {
 struct SetLeafElem: Array::UpdateHandler {
     Array m_leaf;
     const int_fast64_t m_value;
-    SetLeafElem(Allocator& alloc, int_fast64_t value) TIGHTDB_NOEXCEPT:
+    SetLeafElem(Allocator& alloc, int_fast64_t value) REALM_NOEXCEPT:
         m_leaf(alloc), m_value(value) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
@@ -534,10 +534,10 @@ struct SetLeafElem: Array::UpdateHandler {
 struct AdjustLeafElem: Array::UpdateHandler {
     Array m_leaf;
     const int_fast64_t m_value;
-    AdjustLeafElem(Allocator& alloc, int_fast64_t value) TIGHTDB_NOEXCEPT:
+    AdjustLeafElem(Allocator& alloc, int_fast64_t value) REALM_NOEXCEPT:
     m_leaf(alloc), m_value(value) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
@@ -549,7 +549,7 @@ struct AdjustLeafElem: Array::UpdateHandler {
 
 void Column::set(size_t ndx, int64_t value)
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(ndx < size());
 
     if (m_search_index) {
         static_cast<StringIndex*>(m_search_index)->set(ndx, value);
@@ -580,7 +580,7 @@ void Column::set_as_ref(size_t ndx, ref_type ref)
 
 void Column::adjust(size_t ndx, int_fast64_t diff)
 {
-    TIGHTDB_ASSERT_3(ndx, <, size());
+    REALM_ASSERT_3(ndx, <, size());
 
     if (!m_array->is_inner_bptree_node()) {
         array()->adjust(ndx, diff); // Throws
@@ -692,9 +692,9 @@ namespace {
 template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
     ArrayInteger m_leaf;
     const int_fast64_t m_limit, m_diff;
-    AdjustHandler(Allocator& alloc, int_fast64_t limit, int_fast64_t diff) TIGHTDB_NOEXCEPT:
+    AdjustHandler(Allocator& alloc, int_fast64_t limit, int_fast64_t diff) REALM_NOEXCEPT:
         m_leaf(alloc), m_limit(limit), m_diff(diff) {}
-    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t) TIGHTDB_OVERRIDE
+    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t) REALM_OVERRIDE
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
@@ -753,7 +753,7 @@ namespace {
 
 StringIndex* Column::create_search_index()
 {
-    TIGHTDB_ASSERT(!m_search_index);
+    REALM_ASSERT(!m_search_index);
     UniquePtr<StringIndex> index;
     StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
     index.reset(si);
@@ -771,17 +771,17 @@ StringIndex* Column::create_search_index()
     return m_search_index;
 }
 
-StringIndex* Column::get_search_index() TIGHTDB_NOEXCEPT
+StringIndex* Column::get_search_index() REALM_NOEXCEPT
 {
     return m_search_index;
 }
 
-const StringIndex* Column::get_search_index() const TIGHTDB_NOEXCEPT
+const StringIndex* Column::get_search_index() const REALM_NOEXCEPT
 {
     return m_search_index;
 }
 
-void Column::destroy_search_index() TIGHTDB_NOEXCEPT
+void Column::destroy_search_index() REALM_NOEXCEPT
 {
     delete m_search_index;
     m_search_index = 0;
@@ -790,15 +790,15 @@ void Column::destroy_search_index() TIGHTDB_NOEXCEPT
 void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
     size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
-    TIGHTDB_ASSERT(!m_search_index);
+    REALM_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
         !allow_duplicate_valaues, m_array->get_alloc()); // Throws
 }
 
 size_t Column::find_first(int64_t value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT_3(begin, <=, size());
-    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_3(begin, <=, size());
+    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos)
         return static_cast<StringIndex*>(m_search_index)->find_first(value);
@@ -832,8 +832,8 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
 
 void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT_3(begin, <=, size());
-    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_3(begin, <=, size());
+    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == size_t(-1))
         return static_cast<StringIndex*>(m_search_index)->find_all(result, value);
@@ -864,7 +864,7 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
 }
 
 
-bool Column::compare_int(const Column& c) const TIGHTDB_NOEXCEPT
+bool Column::compare_int(const Column& c) const REALM_NOEXCEPT
 {
     size_t n = size();
     if (c.size() != n)
@@ -879,14 +879,14 @@ bool Column::compare_int(const Column& c) const TIGHTDB_NOEXCEPT
 
 void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
 {
-    TIGHTDB_ASSERT_DEBUG(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT_DEBUG(row_ndx == tightdb::npos || row_ndx < size());
 
     ref_type new_sibling_ref;
     Array::TreeInsert<Column> state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT_DEBUG(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
+            REALM_ASSERT_DEBUG(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             new_sibling_ref = m_array->bptree_leaf_insert(row_ndx_2, value, state); // Throws
         }
         else {
@@ -898,7 +898,7 @@ void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
                 new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
             }
         }
-        if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+        if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == tightdb::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
         }
@@ -918,15 +918,15 @@ class Column::EraseLeafElem: public EraseHandlerBase {
 public:
     Array m_leaf;
     bool m_leaves_have_refs;
-    EraseLeafElem(Column& column) TIGHTDB_NOEXCEPT:
+    EraseLeafElem(Column& column) REALM_NOEXCEPT:
         EraseHandlerBase(column), m_leaf(get_alloc()),
         m_leaves_have_refs(false) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                         size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         m_leaf.init_from_mem(leaf_mem);
-        TIGHTDB_ASSERT_3(m_leaf.size(), >=, 1);
+        REALM_ASSERT_3(m_leaf.size(), >=, 1);
         size_t last_ndx = m_leaf.size() - 1;
         if (last_ndx == 0) {
             m_leaves_have_refs = m_leaf.has_refs();
@@ -939,20 +939,20 @@ public:
         m_leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT REALM_OVERRIDE
     {
         // FIXME: Seems like this would cause file space leaks if
         // m_leaves_have_refs is true, but consider carefully how
         // m_leaves_have_refs get its value.
         get_alloc().free_(leaf_mem);
     }
-    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    void replace_root_by_leaf(MemRef leaf_mem) REALM_OVERRIDE
     {
         Array* leaf = new Array(get_alloc()); // Throws
         leaf->init_from_mem(leaf_mem);
         replace_root(leaf); // Throws, but callee takes ownership of accessor
     }
-    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    void replace_root_by_empty_leaf() REALM_OVERRIDE
     {
         UniquePtr<Array> leaf(new Array(get_alloc())); // Throws
         leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
@@ -964,8 +964,8 @@ public:
 
 void Column::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < size());
-    TIGHTDB_ASSERT_DEBUG(is_last == (ndx == size()-1));
+    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
 
     if (m_search_index)
         static_cast<StringIndex*>(m_search_index)->erase<StringData>(ndx, is_last);
@@ -983,8 +983,8 @@ void Column::do_erase(size_t ndx, bool is_last)
 
 void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_DEBUG(last_row_ndx + 1 == size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_DEBUG(last_row_ndx + 1 == size());
 
     if (m_search_index) {
         // remove the value to be overwritten from index
@@ -1035,7 +1035,7 @@ class Column::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Array::Type leaf_type, int_fast64_t value, Allocator& alloc):
         m_leaf_type(leaf_type), m_value(value), m_alloc(alloc) {}
-    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    ref_type create_leaf(size_t size) REALM_OVERRIDE
     {
         bool context_flag = false;
         MemRef mem = ArrayInteger::create_array(m_leaf_type, context_flag, size,
@@ -1059,7 +1059,7 @@ class Column::SliceHandler: public ColumnBase::SliceHandler {
 public:
     SliceHandler(Allocator& alloc): m_leaf(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+                      Allocator& target_alloc) REALM_OVERRIDE
     {
         m_leaf.init_from_mem(leaf_mem);
         return m_leaf.slice_and_clone_children(offset, size, target_alloc); // Throws
@@ -1102,7 +1102,7 @@ void Column::refresh_accessor_tree(size_t, const Spec&)
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -1132,7 +1132,7 @@ public:
     const ColumnBase& m_column;
     LeafToDot(const ColumnBase& column): m_column(column) {}
     void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                ostream& out) TIGHTDB_OVERRIDE
+                ostream& out) REALM_OVERRIDE
     {
         m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);
     }
@@ -1214,4 +1214,4 @@ void Column::dump_node_structure(const Array& root,  ostream& out, int level)
     root.dump_bptree_structure(out, level, &leaf_dumper);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_WILDCARD_HPP
-#define TIGHTDB_TEST_UTIL_WILDCARD_HPP
+#ifndef REALM_TEST_UTIL_WILDCARD_HPP
+#define REALM_TEST_UTIL_WILDCARD_HPP
 
 #include <cstddef>
 #include <cstring>
@@ -36,16 +36,16 @@ class wildcard_pattern {
 public:
     explicit wildcard_pattern(const std::string& text);
 
-    bool match(const char* begin, const char* end) const TIGHTDB_NOEXCEPT;
+    bool match(const char* begin, const char* end) const REALM_NOEXCEPT;
 
-    bool match(const char* c_str) const TIGHTDB_NOEXCEPT;
+    bool match(const char* c_str) const REALM_NOEXCEPT;
 
 private:
     std::string m_text;
 
     struct card {
         std::size_t m_offset, m_size;
-        card(std::size_t begin, std::size_t end) TIGHTDB_NOEXCEPT;
+        card(std::size_t begin, std::size_t end) REALM_NOEXCEPT;
     };
 
     // Must contain at least one card. The first, and the last card
@@ -61,14 +61,14 @@ private:
 
 // Implementation
 
-inline bool wildcard_pattern::match(const char* c_str) const TIGHTDB_NOEXCEPT
+inline bool wildcard_pattern::match(const char* c_str) const REALM_NOEXCEPT
 {
     const char* begin = c_str;
     const char* end   = begin + std::strlen(c_str);
     return match(begin, end);
 }
 
-inline wildcard_pattern::card::card(std::size_t begin, std::size_t end) TIGHTDB_NOEXCEPT
+inline wildcard_pattern::card::card(std::size_t begin, std::size_t end) REALM_NOEXCEPT
 {
     m_offset = begin;
     m_size   = end - begin;
@@ -78,4 +78,4 @@ inline wildcard_pattern::card::card(std::size_t begin, std::size_t end) TIGHTDB_
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_WILDCARD_HPP
+#endif // REALM_TEST_UTIL_WILDCARD_HPP

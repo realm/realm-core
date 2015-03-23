@@ -112,18 +112,18 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
             return;
         }
     }
-    TIGHTDB_ASSERT_DEBUG(false);
+    REALM_ASSERT_DEBUG(false);
 }
 
 
-AdaptiveStringColumn::~AdaptiveStringColumn() TIGHTDB_NOEXCEPT
+AdaptiveStringColumn::~AdaptiveStringColumn() REALM_NOEXCEPT
 {
     delete m_array;
     delete m_search_index;
 }
 
 
-void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
+void AdaptiveStringColumn::destroy() REALM_NOEXCEPT
 {
     ColumnBase::destroy();
     if (m_search_index)
@@ -131,9 +131,9 @@ void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
 }
 
 
-StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
+StringData AdaptiveStringColumn::get(size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(ndx < size());
 
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -175,7 +175,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 StringIndex* AdaptiveStringColumn::create_search_index()
 {
-    TIGHTDB_ASSERT(!m_search_index);
+    REALM_ASSERT(!m_search_index);
 
     UniquePtr<StringIndex> index;
     index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
@@ -194,7 +194,7 @@ StringIndex* AdaptiveStringColumn::create_search_index()
 }
 
 
-void AdaptiveStringColumn::destroy_search_index() TIGHTDB_NOEXCEPT
+void AdaptiveStringColumn::destroy_search_index() REALM_NOEXCEPT
 {
     delete m_search_index;
     m_search_index = 0;
@@ -204,19 +204,19 @@ void AdaptiveStringColumn::destroy_search_index() TIGHTDB_NOEXCEPT
 void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
                                                 size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
-    TIGHTDB_ASSERT(!m_search_index);
+    REALM_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
                                      !allow_duplicate_valaues, m_array->get_alloc()); // Throws
 }
 
 
-void AdaptiveStringColumn::set_search_index_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+void AdaptiveStringColumn::set_search_index_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 {
     m_search_index->set_allow_duplicate_values(allow);
 }
 
 
-void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -255,11 +255,11 @@ public:
     Allocator& m_alloc;
     const StringData m_value;
 
-    SetLeafElem(Allocator& alloc, StringData value) TIGHTDB_NOEXCEPT:
+    SetLeafElem(Allocator& alloc, StringData value) REALM_NOEXCEPT:
         m_alloc(alloc), m_value(value) {}
 
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         bool long_strings = Array::get_hasrefs_from_header(mem.m_addr);
         if (long_strings) {
@@ -321,7 +321,7 @@ public:
 
 void AdaptiveStringColumn::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(ndx < size());
 
     // We must modify the search index before modifying the column, because we
     // need to be able to abort the operation if the modification of the search
@@ -355,7 +355,7 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
                 return;
             }
         }
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
     }
 
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
@@ -365,11 +365,11 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
 
 class AdaptiveStringColumn::EraseLeafElem: public ColumnBase::EraseHandlerBase {
 public:
-    EraseLeafElem(AdaptiveStringColumn& column) TIGHTDB_NOEXCEPT:
+    EraseLeafElem(AdaptiveStringColumn& column) REALM_NOEXCEPT:
         EraseHandlerBase(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+                         size_t elem_ndx_in_leaf) REALM_OVERRIDE
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
@@ -377,7 +377,7 @@ public:
             ArrayString leaf(get_alloc());
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
-            TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
+            REALM_ASSERT_3(leaf.size(), >=, 1);
             size_t last_ndx = leaf.size() - 1;
             if (last_ndx == 0)
                 return true;
@@ -393,7 +393,7 @@ public:
             ArrayStringLong leaf(get_alloc());
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
-            TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
+            REALM_ASSERT_3(leaf.size(), >=, 1);
             size_t last_ndx = leaf.size() - 1;
             if (last_ndx == 0)
                 return true;
@@ -407,7 +407,7 @@ public:
         ArrayBigBlobs leaf(get_alloc());
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
-        TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
+        REALM_ASSERT_3(leaf.size(), >=, 1);
         size_t last_ndx = leaf.size() - 1;
         if (last_ndx == 0)
             return true;
@@ -417,11 +417,11 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT REALM_OVERRIDE
     {
         Array::destroy_deep(leaf_mem, get_alloc());
     }
-    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    void replace_root_by_leaf(MemRef leaf_mem) REALM_OVERRIDE
     {
         Array* leaf;
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
@@ -448,7 +448,7 @@ public:
         }
         replace_root(leaf); // Throws, but accessor ownership is passed to callee
     }
-    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    void replace_root_by_empty_leaf() REALM_OVERRIDE
     {
         UniquePtr<ArrayString> leaf;
         leaf.reset(new ArrayString(get_alloc())); // Throws
@@ -459,8 +459,8 @@ public:
 
 void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_3(ndx, <, size());
-    TIGHTDB_ASSERT_3(is_last, ==, (ndx == size() - 1));
+    REALM_ASSERT_3(ndx, <, size());
+    REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
     // Update search index
     // (it is important here that we do it before actually setting
@@ -501,8 +501,8 @@ void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
 
 void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // FIXME: ExceptionSafety: The current implementation of this
     // function is not exception-safe, and it is hard to see how to
@@ -646,7 +646,7 @@ size_t AdaptiveStringColumn::count(StringData value) const
     while (begin < end) {
         pair<MemRef, size_t> p = m_array->get_bptree_leaf(begin);
         MemRef leaf_mem = p.first;
-        TIGHTDB_ASSERT_3(p.second, ==, 0);
+        REALM_ASSERT_3(p.second, ==, 0);
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
             // Small strings
@@ -680,8 +680,8 @@ size_t AdaptiveStringColumn::count(StringData value) const
 
 size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT_3(begin, <=, size());
-    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_3(begin, <=, size());
+    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos)
         return m_search_index->find_first(value); // Throws
@@ -762,8 +762,8 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 
 void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT_3(begin, <=, size());
-    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_3(begin, <=, size());
+    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos) {
         m_search_index->find_all(result, value); // Throws
@@ -846,13 +846,13 @@ namespace {
 struct BinToStrAdaptor {
     typedef StringData value_type;
     const ArrayBigBlobs& m_big_blobs;
-    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) TIGHTDB_NOEXCEPT: m_big_blobs(big_blobs) {}
-    ~BinToStrAdaptor() TIGHTDB_NOEXCEPT {}
-    size_t size() const TIGHTDB_NOEXCEPT
+    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) REALM_NOEXCEPT: m_big_blobs(big_blobs) {}
+    ~BinToStrAdaptor() REALM_NOEXCEPT {}
+    size_t size() const REALM_NOEXCEPT
     {
         return m_big_blobs.size();
     }
-    StringData get(size_t ndx) const TIGHTDB_NOEXCEPT
+    StringData get(size_t ndx) const REALM_NOEXCEPT
     {
         return m_big_blobs.get_string(ndx);
     }
@@ -860,7 +860,7 @@ struct BinToStrAdaptor {
 
 } // anonymous namespace
 
-size_t AdaptiveStringColumn::lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+size_t AdaptiveStringColumn::lower_bound_string(StringData value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -884,7 +884,7 @@ size_t AdaptiveStringColumn::lower_bound_string(StringData value) const TIGHTDB_
     return ColumnBase::lower_bound(*this, value);
 }
 
-size_t AdaptiveStringColumn::upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+size_t AdaptiveStringColumn::upper_bound_string(StringData value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -911,8 +911,8 @@ size_t AdaptiveStringColumn::upper_bound_string(StringData value) const TIGHTDB_
 
 FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) const
 {
-    TIGHTDB_ASSERT(value.data());
-    TIGHTDB_ASSERT(m_search_index);
+    REALM_ASSERT(value.data());
+    REALM_ASSERT(m_search_index);
 
     return m_search_index->find_all(value, dst);
 }
@@ -949,7 +949,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     for (size_t i = 0; i != n; ++i) {
         StringData v = get(i);
         size_t pos = keys.lower_bound_string(v);
-        TIGHTDB_ASSERT_3(pos, !=, keys.size());
+        REALM_ASSERT_3(pos, !=, keys.size());
         values.add(pos); // Throws
     }
 
@@ -998,13 +998,13 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
 
 void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
-    TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
     ref_type new_sibling_ref;
     Array::TreeInsert<AdaptiveStringColumn> state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
+            REALM_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
             switch (leaf_type) {
                 case leaf_type_Small: {
@@ -1027,7 +1027,7 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
                     goto insert_done;
                 }
             }
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
         }
 
         // Non-leaf root
@@ -1040,7 +1040,7 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
         }
 
       insert_done:
-        if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+        if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == tightdb::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
         }
@@ -1104,7 +1104,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 
 AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t value_size)
 {
-    TIGHTDB_ASSERT(root_is_leaf());
+    REALM_ASSERT(root_is_leaf());
 
     bool long_strings = m_array->has_refs();
     if (long_strings) {
@@ -1166,7 +1166,7 @@ AdaptiveStringColumn::LeafType
 AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool use_retval) const
 {
     static_cast<void>(use_retval);
-    TIGHTDB_ASSERT_3(use_retval, ==, false); // retval optimization not supported. See Array on how to implement
+    REALM_ASSERT_3(use_retval, ==, false); // retval optimization not supported. See Array on how to implement
 
     Allocator& alloc = m_array->get_alloc();
     if (root_is_leaf()) {
@@ -1215,7 +1215,7 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
 class AdaptiveStringColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
-    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    ref_type create_leaf(size_t size) REALM_OVERRIDE
     {
         MemRef mem = ArrayString::create_array(size, m_alloc); // Throws
         return mem.m_ref;
@@ -1235,7 +1235,7 @@ class AdaptiveStringColumn::SliceHandler: public ColumnBase::SliceHandler {
 public:
     SliceHandler(Allocator& alloc): m_alloc(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+                      Allocator& target_alloc) REALM_OVERRIDE
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
@@ -1420,7 +1420,7 @@ void AdaptiveStringColumn::refresh_root_accessor()
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -1494,9 +1494,9 @@ void AdaptiveStringColumn::Verify(const Table& table, size_t col_ndx) const
     const Spec& spec = tf::get_spec(table);
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     bool has_search_index = (attr & col_attr_Indexed) != 0;
-    TIGHTDB_ASSERT_3(has_search_index, ==, bool(m_search_index));
+    REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
     if (has_search_index) {
-        TIGHTDB_ASSERT(m_search_index->get_root_array()->get_ndx_in_parent() ==
+        REALM_ASSERT(m_search_index->get_root_array()->get_ndx_in_parent() ==
                        m_array->get_ndx_in_parent() + 1);
     }
 }
@@ -1589,4 +1589,4 @@ void AdaptiveStringColumn::do_dump_node_structure(ostream& out, int level) const
     m_search_index->do_dump_node_structure(out, level+1);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

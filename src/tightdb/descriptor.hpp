@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DESCRIPTOR_HPP
-#define TIGHTDB_DESCRIPTOR_HPP
+#ifndef REALM_DESCRIPTOR_HPP
+#define REALM_DESCRIPTOR_HPP
 
 #include <cstddef>
 
@@ -67,26 +67,26 @@ namespace _impl { class DescriptorFriend; }
 class Descriptor {
 public:
     /// Get the number of columns in the associated tables.
-    std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
+    std::size_t get_column_count() const REALM_NOEXCEPT;
 
     /// Get the type of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    DataType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType get_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
 
     /// Get the name of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    StringData get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    StringData get_column_name(std::size_t column_ndx) const REALM_NOEXCEPT;
 
     /// Search for a column with the specified name.
     ///
     /// This function finds the first column with the specified name,
     /// and returns its index. If there are no such columns, it
     /// returns `not_found`.
-    std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
+    std::size_t get_column_index(StringData name) const REALM_NOEXCEPT;
 
     //@{
 
@@ -283,8 +283,8 @@ public:
     /// the parent descriptor.
     ///
     /// \sa is_root()
-    DescriptorRef get_parent() TIGHTDB_NOEXCEPT;
-    ConstDescriptorRef get_parent() const TIGHTDB_NOEXCEPT;
+    DescriptorRef get_parent() REALM_NOEXCEPT;
+    ConstDescriptorRef get_parent() const REALM_NOEXCEPT;
     //@}
 
     //@{
@@ -292,8 +292,8 @@ public:
     ///
     /// \sa get_parent()
     /// \sa is_root()
-    TableRef get_root_table() TIGHTDB_NOEXCEPT;
-    ConstTableRef get_root_table() const TIGHTDB_NOEXCEPT;
+    TableRef get_root_table() REALM_NOEXCEPT;
+    ConstTableRef get_root_table() const REALM_NOEXCEPT;
     //@}
 
     /// Is this a root descriptor?
@@ -319,7 +319,7 @@ public:
     /// dynamic type descriptor.
     ///
     /// \sa Table::has_shared_type()
-    bool is_root() const TIGHTDB_NOEXCEPT;
+    bool is_root() const REALM_NOEXCEPT;
 
     /// Determine whether this accessor is still attached.
     ///
@@ -339,7 +339,7 @@ public:
     /// accessor becomes detached, or if the corresponding subtable
     /// column is removed. A descriptor accessor does not get detached
     /// under any other circumstances.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     //@{
     /// Compare two table descriptors. Two descriptors are equal if,
@@ -348,8 +348,8 @@ public:
     ///
     /// The consequences of comparing a detached descriptor are
     /// undefined.
-    bool operator==(const Descriptor&) const TIGHTDB_NOEXCEPT;
-    bool operator!=(const Descriptor&) const TIGHTDB_NOEXCEPT;
+    bool operator==(const Descriptor&) const REALM_NOEXCEPT;
+    bool operator!=(const Descriptor&) const REALM_NOEXCEPT;
     //@}
 
     /// If the specified column is optimized to store only unique values, then
@@ -358,7 +358,7 @@ public:
     /// debugging purposes.
     std::size_t get_num_unique_values(std::size_t column_ndx) const;
 
-    ~Descriptor() TIGHTDB_NOEXCEPT;
+    ~Descriptor() REALM_NOEXCEPT;
 
 
 private:
@@ -384,10 +384,10 @@ private:
     typedef std::vector<subdesc_entry> subdesc_map;
     mutable subdesc_map m_subdesc_map;
 
-    Descriptor() TIGHTDB_NOEXCEPT;
+    Descriptor() REALM_NOEXCEPT;
 
-    void bind_ref() const TIGHTDB_NOEXCEPT;
-    void unbind_ref() const TIGHTDB_NOEXCEPT;
+    void bind_ref() const REALM_NOEXCEPT;
+    void unbind_ref() const REALM_NOEXCEPT;
 
     // Called by the root table if this becomes the root
     // descriptor. Otherwise it is called by the descriptor that
@@ -411,7 +411,7 @@ private:
     // When the specified spec is the spec of the root table, the
     // parent must be specified as null. When the specified spec is
     // not the root spec, a proper parent must be specified.
-    void attach(Table*, Descriptor* parent, Spec*) TIGHTDB_NOEXCEPT;
+    void attach(Table*, Descriptor* parent, Spec*) REALM_NOEXCEPT;
 
     // Detach accessor from underlying descriptor. Caller must ensure
     // that a reference count exists upon return, for example by
@@ -426,16 +426,16 @@ private:
     // returns, is_attached() will return false.
     //
     // Not idempotent.
-    void detach() TIGHTDB_NOEXCEPT;
+    void detach() REALM_NOEXCEPT;
 
     // Recursively detach all subtable descriptor accessors that
     // exist, that is, all subtable descriptor accessors that have
     // this descriptor as ancestor.
-    void detach_subdesc_accessors() TIGHTDB_NOEXCEPT;
+    void detach_subdesc_accessors() REALM_NOEXCEPT;
 
     // Remove the entry from m_subdesc_map that refers to the
     // specified subtable descriptor. It must be there.
-    void remove_subdesc_entry(Descriptor* subdesc) const TIGHTDB_NOEXCEPT;
+    void remove_subdesc_entry(Descriptor* subdesc) const REALM_NOEXCEPT;
 
     // Record the path in terms of subtable column indexes from the
     // root descriptor to this descriptor. If this descriptor is a
@@ -443,15 +443,15 @@ private:
     // too long to fit in the specified buffer. Otherwise the path
     // indexes will be stored between `begin_2`and `end`, where
     // `begin_2` is the returned pointer.
-    std::size_t* record_subdesc_path(std::size_t* begin, std::size_t* end) const TIGHTDB_NOEXCEPT;
+    std::size_t* record_subdesc_path(std::size_t* begin, std::size_t* end) const REALM_NOEXCEPT;
 
     // Returns a pointer to the accessor of the specified
     // subdescriptor if that accessor exists, otherwise this function
     // return null.
-    Descriptor* get_subdesc_accessor(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+    Descriptor* get_subdesc_accessor(std::size_t column_ndx) REALM_NOEXCEPT;
 
-    void adj_insert_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
-    void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
+    void adj_insert_column(std::size_t col_ndx) REALM_NOEXCEPT;
+    void adj_erase_column(std::size_t col_ndx) REALM_NOEXCEPT;
 
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
@@ -463,27 +463,27 @@ private:
 
 // Implementation:
 
-inline std::size_t Descriptor::get_column_count() const TIGHTDB_NOEXCEPT
+inline std::size_t Descriptor::get_column_count() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_spec->get_public_column_count();
 }
 
-inline StringData Descriptor::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData Descriptor::get_column_name(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_spec->get_column_name(ndx);
 }
 
-inline DataType Descriptor::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline DataType Descriptor::get_column_type(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_spec->get_public_column_type(ndx);
 }
 
-inline std::size_t Descriptor::get_column_index(StringData name) const TIGHTDB_NOEXCEPT
+inline std::size_t Descriptor::get_column_index(StringData name) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_spec->get_column_index(name);
 }
 
@@ -498,9 +498,9 @@ inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, Str
                                       DescriptorRef* subdesc)
 {
     typedef _impl::TableFriend tf;
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(column_ndx, <=, get_column_count());
-    TIGHTDB_ASSERT(!tf::is_link_type(ColumnType(type)));
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(column_ndx, <=, get_column_count());
+    REALM_ASSERT(!tf::is_link_type(ColumnType(type)));
 
     Table* link_target_table = 0;
     tf::insert_column(*this, column_ndx, type, name, link_target_table); // Throws
@@ -520,13 +520,13 @@ inline std::size_t Descriptor::add_column_link(DataType type, StringData name, T
 inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type, StringData name,
                                            Table& target, LinkType link_type)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(column_ndx, <=, get_column_count());
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
-    TIGHTDB_ASSERT(tf::is_link_type(ColumnType(type)));
+    REALM_ASSERT(tf::is_link_type(ColumnType(type)));
     // Both origin and target must be group-level tables
-    TIGHTDB_ASSERT(is_root() && get_root_table()->is_group_level());
-    TIGHTDB_ASSERT(target.is_group_level());
+    REALM_ASSERT(is_root() && get_root_table()->is_group_level());
+    REALM_ASSERT(target.is_group_level());
 
     tf::insert_column(*this, column_ndx, type, name, &target); // Throws
     adj_insert_column(column_ndx);
@@ -536,7 +536,7 @@ inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type
 
 inline void Descriptor::remove_column(std::size_t column_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
     tf::erase_column(*this, column_ndx); // Throws
     adj_erase_column(column_ndx);
@@ -544,17 +544,17 @@ inline void Descriptor::remove_column(std::size_t column_ndx)
 
 inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
     tf::rename_column(*this, column_ndx, name); // Throws
 }
 
 inline void Descriptor::set_link_type(std::size_t column_ndx, LinkType link_type)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(column_ndx, <=, get_column_count());
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
-    TIGHTDB_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_ndx))));
+    REALM_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_ndx))));
     tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
 }
 
@@ -563,56 +563,56 @@ inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) 
     return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
 }
 
-inline DescriptorRef Descriptor::get_parent() TIGHTDB_NOEXCEPT
+inline DescriptorRef Descriptor::get_parent() REALM_NOEXCEPT
 {
     return m_parent;
 }
 
-inline ConstDescriptorRef Descriptor::get_parent() const TIGHTDB_NOEXCEPT
+inline ConstDescriptorRef Descriptor::get_parent() const REALM_NOEXCEPT
 {
     return const_cast<Descriptor*>(this)->get_parent();
 }
 
-inline TableRef Descriptor::get_root_table() TIGHTDB_NOEXCEPT
+inline TableRef Descriptor::get_root_table() REALM_NOEXCEPT
 {
     return m_root_table;
 }
 
-inline ConstTableRef Descriptor::get_root_table() const TIGHTDB_NOEXCEPT
+inline ConstTableRef Descriptor::get_root_table() const REALM_NOEXCEPT
 {
     return const_cast<Descriptor*>(this)->get_root_table();
 }
 
-inline bool Descriptor::is_root() const TIGHTDB_NOEXCEPT
+inline bool Descriptor::is_root() const REALM_NOEXCEPT
 {
     return !m_parent;
 }
 
-inline Descriptor::Descriptor() TIGHTDB_NOEXCEPT: m_ref_count(0)
+inline Descriptor::Descriptor() REALM_NOEXCEPT: m_ref_count(0)
 {
 }
 
-inline void Descriptor::bind_ref() const TIGHTDB_NOEXCEPT
+inline void Descriptor::bind_ref() const REALM_NOEXCEPT
 {
     ++m_ref_count;
 }
 
-inline void Descriptor::unbind_ref() const TIGHTDB_NOEXCEPT
+inline void Descriptor::unbind_ref() const REALM_NOEXCEPT
 {
     if (--m_ref_count == 0)
         delete this;
 }
 
-inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) TIGHTDB_NOEXCEPT
+inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!is_attached());
-    TIGHTDB_ASSERT(!table->has_shared_type());
+    REALM_ASSERT(!is_attached());
+    REALM_ASSERT(!table->has_shared_type());
     m_root_table.reset(table);
     m_parent.reset(parent);
     m_spec = spec;
 }
 
-inline bool Descriptor::is_attached() const TIGHTDB_NOEXCEPT
+inline bool Descriptor::is_attached() const REALM_NOEXCEPT
 {
     return bool(m_root_table);
 }
@@ -623,14 +623,14 @@ inline Descriptor::subdesc_entry::subdesc_entry(std::size_t n, Descriptor* d):
 {
 }
 
-inline bool Descriptor::operator==(const Descriptor& d) const TIGHTDB_NOEXCEPT
+inline bool Descriptor::operator==(const Descriptor& d) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(d.is_attached());
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(d.is_attached());
     return *m_spec == *d.m_spec;
 }
 
-inline bool Descriptor::operator!=(const Descriptor& d) const TIGHTDB_NOEXCEPT
+inline bool Descriptor::operator!=(const Descriptor& d) const REALM_NOEXCEPT
 {
     return !(*this == d);
 }
@@ -645,54 +645,54 @@ public:
     }
 
     static void attach(Descriptor& desc, Table* table, Descriptor* parent, Spec* spec)
-        TIGHTDB_NOEXCEPT
+        REALM_NOEXCEPT
     {
         desc.attach(table, parent, spec);
     }
 
-    static void detach(Descriptor& desc) TIGHTDB_NOEXCEPT
+    static void detach(Descriptor& desc) REALM_NOEXCEPT
     {
         desc.detach();
     }
 
-    static Table& get_root_table(Descriptor& desc) TIGHTDB_NOEXCEPT
+    static Table& get_root_table(Descriptor& desc) REALM_NOEXCEPT
     {
         return *desc.m_root_table;
     }
 
-    static const Table& get_root_table(const Descriptor& desc) TIGHTDB_NOEXCEPT
+    static const Table& get_root_table(const Descriptor& desc) REALM_NOEXCEPT
     {
         return *desc.m_root_table;
     }
 
-    static Spec& get_spec(Descriptor& desc) TIGHTDB_NOEXCEPT
+    static Spec& get_spec(Descriptor& desc) REALM_NOEXCEPT
     {
         return *desc.m_spec;
     }
 
-    static const Spec& get_spec(const Descriptor& desc) TIGHTDB_NOEXCEPT
+    static const Spec& get_spec(const Descriptor& desc) REALM_NOEXCEPT
     {
         return *desc.m_spec;
     }
 
     static std::size_t* record_subdesc_path(const Descriptor& desc, std::size_t* begin,
-                                            std::size_t* end) TIGHTDB_NOEXCEPT
+                                            std::size_t* end) REALM_NOEXCEPT
     {
         return desc.record_subdesc_path(begin, end);
     }
 
     static Descriptor* get_subdesc_accessor(Descriptor& desc, std::size_t column_ndx)
-        TIGHTDB_NOEXCEPT
+        REALM_NOEXCEPT
     {
         return desc.get_subdesc_accessor(column_ndx);
     }
 
-    static void adj_insert_column(Descriptor& desc, std::size_t col_ndx) TIGHTDB_NOEXCEPT
+    static void adj_insert_column(Descriptor& desc, std::size_t col_ndx) REALM_NOEXCEPT
     {
         desc.adj_insert_column(col_ndx);
     }
 
-    static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) TIGHTDB_NOEXCEPT
+    static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) REALM_NOEXCEPT
     {
         desc.adj_erase_column(col_ndx);
     }
@@ -700,4 +700,4 @@ public:
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DESCRIPTOR_HPP
+#endif // REALM_DESCRIPTOR_HPP

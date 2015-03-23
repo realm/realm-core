@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_BINARY_HPP
-#define TIGHTDB_COLUMN_BINARY_HPP
+#ifndef REALM_COLUMN_BINARY_HPP
+#define REALM_COLUMN_BINARY_HPP
 
 #include <tightdb/column.hpp>
 #include <tightdb/array_binary.hpp>
@@ -36,12 +36,12 @@ public:
     typedef BinaryData value_type;
 
     ColumnBinary(Allocator&, ref_type);
-    ~ColumnBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~ColumnBinary() REALM_NOEXCEPT REALM_OVERRIDE;
 
-    std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    std::size_t size() const REALM_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
 
     void add(BinaryData value = BinaryData());
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -51,7 +51,7 @@ public:
     void clear();
 
     // Requires that the specified entry was inserted as StringData.
-    StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
 
     void add_string(StringData value);
     void set_string(std::size_t ndx, StringData value);
@@ -62,27 +62,27 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) REALM_NOEXCEPT;
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+                   _impl::OutputStream&) const REALM_OVERRIDE;
 
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
 #endif
 
 private:
-    std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
 
     /// \param row_ndx Must be `tightdb::npos` if appending.
     void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
@@ -110,9 +110,9 @@ private:
     /// blobs' leaf upon return.
     bool upgrade_root_leaf(std::size_t value_size);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const TIGHTDB_OVERRIDE;
+                     std::ostream&) const REALM_OVERRIDE;
 #endif
 
     friend class Array;
@@ -124,7 +124,7 @@ private:
 
 // Implementation
 
-inline std::size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
+inline std::size_t ColumnBinary::size() const  REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
@@ -141,7 +141,7 @@ inline std::size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
     return m_array->get_bptree_size();
 }
 
-inline void ColumnBinary::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+inline void ColumnBinary::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
@@ -160,9 +160,9 @@ inline void ColumnBinary::update_from_parent(std::size_t old_baseline) TIGHTDB_N
     m_array->update_from_parent(old_baseline);
 }
 
-inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline BinaryData ColumnBinary::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
@@ -189,10 +189,10 @@ inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, alloc);
 }
 
-inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ColumnBinary::get_string(std::size_t ndx) const REALM_NOEXCEPT
 {
     BinaryData bin = get(ndx);
-    TIGHTDB_ASSERT_3(0, <, bin.size());
+    REALM_ASSERT_3(0, <, bin.size());
     return StringData(bin.data(), bin.size()-1);
 }
 
@@ -214,7 +214,7 @@ inline void ColumnBinary::add(BinaryData value)
 inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT_3(row_ndx, <=, size);
+    REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     bool add_zero_term = false;
     std::size_t num_rows = 1;
@@ -278,7 +278,7 @@ inline void ColumnBinary::add_string(StringData value)
 inline void ColumnBinary::insert_string(std::size_t row_ndx, StringData value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT_3(row_ndx, <=, size);
+    REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     BinaryData value_2(value.data(), value.size());
     bool add_zero_term = false;
@@ -287,7 +287,7 @@ inline void ColumnBinary::insert_string(std::size_t row_ndx, StringData value)
 }
 
 inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) TIGHTDB_NOEXCEPT
+                                                   Allocator& alloc) REALM_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
@@ -306,4 +306,4 @@ inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_BINARY_HPP
+#endif // REALM_COLUMN_BINARY_HPP

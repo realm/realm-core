@@ -11,7 +11,7 @@
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/util/encrypted_file_mapping.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #  include <tightdb/commit_log.hpp>
 #  include <tightdb/util/bind.hpp>
@@ -145,17 +145,17 @@ TEST(LangBindHelper_LinkView)
 }
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 namespace {
 
-TIGHTDB_TABLE_4(TestTableShared,
+REALM_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
                 third,  Bool,
                 fourth, String)
 
-TIGHTDB_TABLE_1(TestTableInts,
+REALM_TABLE_1(TestTableInts,
                 first,  Int)
 
 
@@ -169,7 +169,7 @@ public:
     {
     }
 
-    ~ShortCircuitTransactLogManager() TIGHTDB_NOEXCEPT
+    ~ShortCircuitTransactLogManager() REALM_NOEXCEPT
     {
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
@@ -178,7 +178,7 @@ public:
     }
 
     void handle_transact_log(const char* data, size_t size, Replication::version_type new_version)
-        TIGHTDB_OVERRIDE
+        REALM_OVERRIDE
     {
         UniquePtr<char[]> log(new char[size]); // Throws
         copy(data, data+size, log.get());
@@ -187,7 +187,7 @@ public:
     }
 
     void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
-        TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+        REALM_NOEXCEPT REALM_OVERRIDE
     {
         size_t n = to_version - from_version;
         for (size_t i = 0; i != n; ++i) {
@@ -587,7 +587,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(type_Table, other->get_column_type(2));
     CHECK_EQUAL(1, other->size());
 
-    size_t leaf_x4    = 4 * TIGHTDB_MAX_BPNODE_SIZE;
+    size_t leaf_x4    = 4 * REALM_MAX_BPNODE_SIZE;
     size_t leaf_x4p16 = leaf_x4 + 16;
 
     // Change root type in various string columns (including mixed)
@@ -5965,11 +5965,11 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
             LangBindHelper::promote_to_write(sg);
             TableRef o = group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
-            TIGHTDB_ASSERT(o2);
+            REALM_ASSERT(o2);
             LangBindHelper::rollback_and_continue_as_read(sg);
             TableRef o3 = group->get_table("nullermand");
-            TIGHTDB_ASSERT(!o3);
-            TIGHTDB_ASSERT(o2->is_attached() == false);
+            REALM_ASSERT(!o3);
+            REALM_ASSERT(o2->is_attached() == false);
         }
 
         TableRef origin = group->get_table("origin");
@@ -6035,13 +6035,13 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
         // rollback of group level table delete
         LangBindHelper::promote_to_write(sg);
         TableRef o2 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o2);
+        REALM_ASSERT(o2);
         group->remove_table("a_table");
         TableRef o3 = group->get_table("a_table");
-        TIGHTDB_ASSERT(!o3);
+        REALM_ASSERT(!o3);
         LangBindHelper::rollback_and_continue_as_read(sg);
         TableRef o4 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o4);
+        REALM_ASSERT(o4);
     }
     group->Verify();
 }
@@ -6577,10 +6577,10 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
     }
 }
 
-#ifndef TIGHTDB_ENABLE_ENCRYPTION
+#ifndef REALM_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
-#if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS)
+#if !defined(REALM_ANDROID) && !defined(REALM_IOS)
 // fork should not be used on android or ios.
 
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
@@ -6683,12 +6683,12 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         sg.end_read();
     }
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
     if (crypt_key())
         // Encrypted files are always at least a 4096 byte header plus an encrypted page
         CHECK_LESS_EQUAL(File(path).get_size(), page_size() + 4096);
     else
-#endif // TIGHTDB_ENABLE_ENCRYPTION
+#endif // REALM_ENABLE_ENCRYPTION
         CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
 }
 
@@ -6945,7 +6945,7 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
 }
 
 
-TIGHTDB_TABLE_1(MyTable, first,  Int)
+REALM_TABLE_1(MyTable, first,  Int)
 
 
 TEST(LangBindHelper_VersionControl)
@@ -7144,7 +7144,7 @@ TEST(LangBindHelper_MixedCommitSizes)
     }
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 
 #endif
 

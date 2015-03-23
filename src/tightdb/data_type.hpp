@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DATA_TYPE_HPP
-#define TIGHTDB_DATA_TYPE_HPP
+#ifndef REALM_DATA_TYPE_HPP
+#define REALM_DATA_TYPE_HPP
 
 namespace tightdb {
 
@@ -48,4 +48,4 @@ enum LinkType {
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DATA_TYPE_HPP
+#endif // REALM_DATA_TYPE_HPP

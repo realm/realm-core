@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_META_HPP
-#define TIGHTDB_UTIL_META_HPP
+#ifndef REALM_UTIL_META_HPP
+#define REALM_UTIL_META_HPP
 
 namespace tightdb {
 namespace util {
@@ -41,4 +41,4 @@ template<class T> struct EitherTypeIs<T,T,T> { static const bool value = true; }
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_META_HPP
+#endif // REALM_UTIL_META_HPP

@@ -12,7 +12,7 @@ using namespace tightdb;
 
 namespace {
 
-TIGHTDB_TABLE_2(MyTable,
+REALM_TABLE_2(MyTable,
                 number, Int,
                 text, String)
 

@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
     int pid = fork();
     if (pid == 0) { // in daemon process:
 
-#ifdef TIGHTDB_ENABLE_LOGFILE
+#ifdef REALM_ENABLE_LOGFILE
         cerr << "Daemon starting" << endl;
 #endif
         SharedGroup::unattached_tag tag;

@@ -3,7 +3,7 @@
 #include <tightdb.hpp>
 #include <assert.h>
 
-TIGHTDB_TABLE_3(Books,
+REALM_TABLE_3(Books,
                 title,  String,
                 author, String,
                 pages, Int)

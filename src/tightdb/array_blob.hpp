@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ARRAY_BLOB_HPP
-#define TIGHTDB_ARRAY_BLOB_HPP
+#ifndef REALM_ARRAY_BLOB_HPP
+#define REALM_ARRAY_BLOB_HPP
 
 #include <tightdb/array.hpp>
 
@@ -27,10 +27,10 @@ namespace tightdb {
 
 class ArrayBlob: public Array {
 public:
-    explicit ArrayBlob(Allocator&) TIGHTDB_NOEXCEPT;
-    ~ArrayBlob() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    explicit ArrayBlob(Allocator&) REALM_NOEXCEPT;
+    ~ArrayBlob() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    const char* get(std::size_t pos) const TIGHTDB_NOEXCEPT;
+    const char* get(std::size_t pos) const REALM_NOEXCEPT;
 
     void add(const char* data, std::size_t size, bool add_zero_term = false);
     void insert(std::size_t pos, const char* data, std::size_t size, bool add_zero_term = false);
@@ -42,7 +42,7 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static const char* get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
+    static const char* get(const char* header, std::size_t pos) REALM_NOEXCEPT;
 
     /// Create a new empty blob (binary) array and attach this
     /// accessor to it. This does not modify the parent reference
@@ -57,16 +57,16 @@ public:
     /// initialized to zero.
     static MemRef create_array(std::size_t size, Allocator&);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void Verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:
-    std::size_t CalcByteLen(std::size_t count, std::size_t width) const TIGHTDB_OVERRIDE;
+    std::size_t CalcByteLen(std::size_t count, std::size_t width) const REALM_OVERRIDE;
     std::size_t CalcItemCount(std::size_t bytes,
-                              std::size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    WidthType GetWidthType() const TIGHTDB_OVERRIDE { return wtype_Ignore; }
+                              std::size_t width) const REALM_NOEXCEPT REALM_OVERRIDE;
+    WidthType GetWidthType() const REALM_OVERRIDE { return wtype_Ignore; }
 };
 
 
@@ -75,12 +75,12 @@ private:
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline ArrayBlob::ArrayBlob(Allocator& alloc) REALM_NOEXCEPT:
     Array(alloc)
 {
 }
 
-inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT
+inline const char* ArrayBlob::get(std::size_t pos) const REALM_NOEXCEPT
 {
     return m_data + pos;
 }
@@ -103,7 +103,7 @@ inline void ArrayBlob::erase(std::size_t begin, std::size_t end)
     replace(begin, end, data, size);
 }
 
-inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
+inline const char* ArrayBlob::get(const char* header, std::size_t pos) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     return data + pos;
@@ -128,7 +128,7 @@ inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const
     return header_size + count;
 }
 
-inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) const TIGHTDB_NOEXCEPT
+inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
 {
     return bytes - header_size;
 }
@@ -136,4 +136,4 @@ inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) cons
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ARRAY_BLOB_HPP
+#endif // REALM_ARRAY_BLOB_HPP

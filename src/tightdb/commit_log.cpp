@@ -28,7 +28,7 @@
 #include <tightdb/commit_log.hpp>
 
 #include <tightdb/replication.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 typedef uint_fast64_t version_type;
 
@@ -73,27 +73,27 @@ class WriteLogCollector: public Replication {
 public:
     WriteLogCollector(string database_name, bool server_synchronization_mode,
                       const char* encryption_key);
-    ~WriteLogCollector() TIGHTDB_NOEXCEPT;
-    string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
-    void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
+    ~WriteLogCollector() REALM_NOEXCEPT;
+    string do_get_database_path() REALM_OVERRIDE { return m_database_name; }
+    void do_begin_write_transact(SharedGroup& sg) REALM_OVERRIDE;
     version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version)
-        TIGHTDB_OVERRIDE;
-    void do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
-    void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
-    void transact_log_reserve(size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
-    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
+        REALM_OVERRIDE;
+    void do_rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT REALM_OVERRIDE;
+    void do_interrupt() REALM_NOEXCEPT REALM_OVERRIDE {};
+    void do_clear_interrupt() REALM_NOEXCEPT REALM_OVERRIDE {};
+    void transact_log_reserve(size_t size, char** new_begin, char** new_end) REALM_OVERRIDE;
+    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) REALM_OVERRIDE;
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     virtual void submit_transact_log(BinaryData);
-    virtual void stop_logging() TIGHTDB_OVERRIDE;
-    virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
+    virtual void stop_logging() REALM_OVERRIDE;
+    virtual void reset_log_management(version_type last_version) REALM_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
-        TIGHTDB_NOEXCEPT;
-    virtual void set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
+        REALM_NOEXCEPT;
+    virtual void set_last_version_synced(version_type last_seen_version_number) REALM_NOEXCEPT;
     virtual version_type get_last_version_synced(version_type* newest_version_number)
-        TIGHTDB_NOEXCEPT;
+        REALM_NOEXCEPT;
     virtual void get_commit_entries(version_type from_version, version_type to_version,
-                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+                                    BinaryData* logs_buffer) REALM_NOEXCEPT;
 
 protected:
     // file and memory mappings are always multiples of this size
@@ -461,7 +461,7 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast6
 
 // Public methods:
 
-WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT
+WriteLogCollector::~WriteLogCollector() REALM_NOEXCEPT
 {
 }
 
@@ -498,7 +498,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 
         // Verify that end of the commit range is equal to or after 'last_version'
         // TODO: This most likely should throw an exception ?
-        TIGHTDB_ASSERT_3(last_version, <=, preamble->end_commit_range);
+        REALM_ASSERT_3(last_version, <=, preamble->end_commit_range);
 
         if (last_version <= preamble->end_commit_range) {
             if (last_version < preamble->begin_newest_commit_range) {
@@ -510,7 +510,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             }
             // writepoint is somewhere in the active file.
             // We scan from the start to find it.
-            TIGHTDB_ASSERT_3(last_version, >=, preamble->begin_newest_commit_range);
+            REALM_ASSERT_3(last_version, >=, preamble->begin_newest_commit_range);
             CommitLogMetadata* active_log = get_active_log(preamble);
             remap_if_needed(*active_log);
             version_type current_version;
@@ -539,7 +539,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 }
 
 
-void WriteLogCollector::set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT
+void WriteLogCollector::set_last_version_synced(version_type version) REALM_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -553,7 +553,7 @@ void WriteLogCollector::set_last_version_synced(version_type version) TIGHTDB_NO
 
 
 version_type WriteLogCollector::get_last_version_synced(version_type* end_version_number)
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -567,7 +567,7 @@ version_type WriteLogCollector::get_last_version_synced(version_type* end_versio
 
 
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number)
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -579,13 +579,13 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
 
 
 void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
-                                           BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
+                                           BinaryData* logs_buffer) REALM_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     const CommitLogPreamble* preamble = get_preamble();
-    TIGHTDB_ASSERT_3(from_version, >=, preamble->begin_oldest_commit_range);
-    TIGHTDB_ASSERT_3(to_version, <=, preamble->end_commit_range);
+    REALM_ASSERT_3(from_version, >=, preamble->begin_oldest_commit_range);
+    REALM_ASSERT_3(to_version, <=, preamble->end_commit_range);
 
     // - make sure the files are open and mapped, possibly update stale mappings
     remap_if_needed(m_log_a);
@@ -666,7 +666,7 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
     char* data = m_transact_log_buffer.data();
     uint_fast64_t size = write_position() - data;
     version_type from_version = internal_submit_log(data,size);
-    TIGHTDB_ASSERT_3(from_version, == , orig_version);
+    REALM_ASSERT_3(from_version, == , orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
     return new_version;
@@ -680,7 +680,7 @@ void WriteLogCollector::do_begin_write_transact(SharedGroup&)
 }
 
 
-void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
+void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT
 {
     // forward transaction log buffer
     sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), write_position());
@@ -737,4 +737,4 @@ Replication* makeWriteLogCollector(string database_name,
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION

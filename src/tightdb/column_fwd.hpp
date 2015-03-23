@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_FWD_HPP
-#define TIGHTDB_COLUMN_FWD_HPP
+#ifndef REALM_COLUMN_FWD_HPP
+#define REALM_COLUMN_FWD_HPP
 
 namespace tightdb {
 
@@ -38,4 +38,4 @@ class ColumnLinkList;
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_FWD_HPP
+#endif // REALM_COLUMN_FWD_HPP

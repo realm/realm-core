@@ -1,5 +1,5 @@
-#ifndef TIGHTDB_VIEWS_HPP
-#define TIGHTDB_VIEWS_HPP
+#ifndef REALM_VIEWS_HPP
+#define REALM_VIEWS_HPP
 
 #include <tightdb/column.hpp>
 #include <tightdb/column_string_enum.hpp>
@@ -12,14 +12,14 @@ class RowIndexes
 {
 public:
     RowIndexes(Column::unattached_root_tag urt, tightdb::Allocator& alloc) : 
-#ifdef TIGHTDB_COOKIE_CHECK
+#ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected), 
 #endif
         m_row_indexes(urt, alloc), m_auto_sort(false) 
     {}
 
     RowIndexes(Column::move_tag mt, Column& col) : 
-#ifdef TIGHTDB_COOKIE_CHECK
+#ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected),
 #endif      
         m_row_indexes(mt, col), m_auto_sort(false) 
@@ -27,7 +27,7 @@ public:
 
     virtual ~RowIndexes() 
     {
-#ifdef TIGHTDB_COOKIE_CHECK
+#ifdef REALM_COOKIE_CHECK
         cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
 #endif
     }
@@ -44,8 +44,8 @@ public:
 
     void check_cookie() const
     {
-#ifdef TIGHTDB_COOKIE_CHECK
-        TIGHTDB_ASSERT_RELEASE(cookie == cookie_expected);
+#ifdef REALM_COOKIE_CHECK
+        REALM_ASSERT_RELEASE(cookie == cookie_expected);
 #endif
     }
 
@@ -82,7 +82,7 @@ public:
             for (size_t i = 0; i < m_column_indexes.size(); i++) {
                 const ColumnBase& cb = row_indexes->get_column_base(m_column_indexes[i]);
                 const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
-                TIGHTDB_ASSERT(ctb);
+                REALM_ASSERT(ctb);
                 if (const ColumnStringEnum* cse = dynamic_cast<const ColumnStringEnum*>(&cb))
                     m_string_enum_columns[i] = cse;
                 else
@@ -105,7 +105,7 @@ public:
     // Re-sort view according to last used criterias
     void re_sort();
 
-#ifdef TIGHTDB_COOKIE_CHECK
+#ifdef REALM_COOKIE_CHECK
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
     uint64_t cookie;
 #endif
@@ -115,4 +115,4 @@ public:
     bool m_auto_sort;
 };
 
-#endif // TIGHTDB_VIEWS_HPP
+#endif // REALM_VIEWS_HPP

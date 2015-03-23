@@ -3,8 +3,8 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
 
-#if TIGHTDB_HAVE_AT_LEAST_GCC(3,2)
-#  define TIGHTDB_HAVE_CXXABI_DEMANGLE
+#if REALM_HAVE_AT_LEAST_GCC(3,2)
+#  define REALM_HAVE_CXXABI_DEMANGLE
 #  include <cxxabi.h>
 #endif
 
@@ -35,7 +35,7 @@ namespace test_util {
 // http://autoconf-archive.cryp.to.
 string demangle(const string& mangled_name)
 {
-#ifdef TIGHTDB_HAVE_CXXABI_DEMANGLE
+#ifdef REALM_HAVE_CXXABI_DEMANGLE
     int status = 0;
     UniquePtr<char[], Free> buffer(abi::__cxa_demangle(mangled_name.c_str(), 0, 0, &status));
     if (!buffer)

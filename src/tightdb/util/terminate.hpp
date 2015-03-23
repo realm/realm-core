@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TERMINATE_HPP
-#define TIGHTDB_UTIL_TERMINATE_HPP
+#ifndef REALM_UTIL_TERMINATE_HPP
+#define REALM_UTIL_TERMINATE_HPP
 
 #include <sstream>
 #include <cstdlib>
@@ -26,20 +26,20 @@
 #include <stdint.h>
 #include <tightdb/util/features.h>
 
-#define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
+#define REALM_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
 
 namespace tightdb {
 namespace util {
-TIGHTDB_NORETURN void terminate_internal(std::stringstream&) TIGHTDB_NOEXCEPT;
+REALM_NORETURN void terminate_internal(std::stringstream&) REALM_NOEXCEPT;
 
-TIGHTDB_NORETURN inline void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT {
+REALM_NORETURN inline void terminate(const char* message, const char* file, long line) REALM_NOEXCEPT {
     std::stringstream ss;
     ss << file << ":" << line << ": " << message << "\n";
     terminate_internal(ss);
 }
 
 template <typename T1, typename T2>
-TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2) TIGHTDB_NOEXCEPT {
+REALM_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2) REALM_NOEXCEPT {
     std::stringstream ss;
     ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << "]\n";
     terminate_internal(ss);
@@ -48,4 +48,4 @@ TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_TERMINATE_HPP
+#endif // REALM_UTIL_TERMINATE_HPP

@@ -16,12 +16,12 @@ std::string get_errno_msg(const char* prefix, int err)
 
 #if defined _WIN32 // Windows version <stdlib.h>
 
-    if (TIGHTDB_LIKELY(0 <= err || err < _sys_nerr)) {
+    if (REALM_LIKELY(0 <= err || err < _sys_nerr)) {
         buffer.append_c_str(_sys_errlist[err]);
         return buffer.str();
     }
 
-#elif _GNU_SOURCE && !TIGHTDB_ANDROID // GNU specific version <string.h>
+#elif _GNU_SOURCE && !REALM_ANDROID // GNU specific version <string.h>
 
     // Note that Linux provides the GNU specific version even though
     // it sets _POSIX_C_SOURCE >= 200112L.
@@ -38,7 +38,7 @@ std::string get_errno_msg(const char* prefix, int err)
     size_t offset = buffer.size();
     size_t max_msg_size = 256;
     buffer.resize(offset + max_msg_size);
-    if (TIGHTDB_LIKELY(strerror_r(err, buffer.data()+offset, max_msg_size) == 0))
+    if (REALM_LIKELY(strerror_r(err, buffer.data()+offset, max_msg_size) == 0))
         return buffer.str();
     buffer.resize(offset);
 

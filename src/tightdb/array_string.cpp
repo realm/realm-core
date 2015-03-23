@@ -37,8 +37,8 @@ size_t round_up(size_t size)
 
 void ArrayString::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
-    TIGHTDB_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -48,12 +48,12 @@ void ArrayString::set(size_t ndx, StringData value)
         if (value.size() == 0 && m_width == 0)
             return;
 
-        TIGHTDB_ASSERT_3(0, <, value.size());
+        REALM_ASSERT_3(0, <, value.size());
 
         // Calc min column width
         size_t new_width = ::round_up(value.size());
 
-        TIGHTDB_ASSERT_3(value.size(), <, new_width);
+        REALM_ASSERT_3(value.size(), <, new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -92,15 +92,15 @@ void ArrayString::set(size_t ndx, StringData value)
         m_width = new_width;
     }
 
-    TIGHTDB_ASSERT_3(0, <, m_width);
+    REALM_ASSERT_3(0, <, m_width);
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
     char* end   = begin + (m_width-1);
     begin = copy(value.data(), value.data()+value.size(), begin);
     fill(begin, end, 0); // Pad with zero bytes
-    TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-    TIGHTDB_ASSERT(end - begin < max_width);
+    REALM_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
+    REALM_ASSERT(end - begin < max_width);
     int pad_size = int(end - begin);
     *end = char(pad_size);
 }
@@ -108,8 +108,8 @@ void ArrayString::set(size_t ndx, StringData value)
 
 void ArrayString::insert(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
-    TIGHTDB_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    REALM_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -127,7 +127,7 @@ void ArrayString::insert(size_t ndx, StringData value)
 
         // Move values after insertion point (may expand)
         if (ndx != m_size) {
-            if (TIGHTDB_UNLIKELY(m_width < new_width)) {
+            if (REALM_UNLIKELY(m_width < new_width)) {
                 char* const new_begin = base + ndx*new_width + new_width;
                 if (0 < m_width) {
                     // Expand the old values
@@ -172,15 +172,15 @@ void ArrayString::insert(size_t ndx, StringData value)
             char* pad_begin = copy(value.data(), value.data()+value.size(), new_begin);
             --new_end;
             fill(pad_begin, new_end, 0); // Pad with zero bytes
-            TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-            TIGHTDB_ASSERT(new_end - pad_begin < max_width);
+            REALM_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
+            REALM_ASSERT(new_end - pad_begin < max_width);
             int pad_size = int(new_end - pad_begin);
             *new_end = char(pad_size);
             new_end = new_begin;
         }
 
         // Expand values before insertion point
-        if (TIGHTDB_UNLIKELY(m_width < new_width)) {
+        if (REALM_UNLIKELY(m_width < new_width)) {
             if (0 < m_width) {
                 while (new_end != base) {
                     *--new_end = char(*--old_end + (new_width-m_width));
@@ -215,7 +215,7 @@ void ArrayString::insert(size_t ndx, StringData value)
 
 void ArrayString::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -241,7 +241,7 @@ size_t ArrayString::CalcByteLen(size_t count, size_t width) const
     return header_size + (count * width);
 }
 
-size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
+size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
 {
     if (width == 0) return size_t(-1); // zero-width gives infinite space
 
@@ -249,7 +249,7 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEX
     return bytes_without_header / width;
 }
 
-size_t ArrayString::count(StringData value, size_t begin, size_t end) const TIGHTDB_NOEXCEPT
+size_t ArrayString::count(StringData value, size_t begin, size_t end) const REALM_NOEXCEPT
 {
     size_t num_matches = 0;
 
@@ -265,11 +265,11 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const TIGH
     return num_matches;
 }
 
-size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const TIGHTDB_NOEXCEPT
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const REALM_NOEXCEPT
 {
     if (end == size_t(-1))
         end = m_size;
-    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
     if (m_width == 0)
         return value.size() == 0 && begin < end ? begin : size_t(-1);
@@ -282,7 +282,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         const char* data = m_data + (m_width-1);
         for (size_t i = begin; i != end; ++i) {
             size_t size = (m_width-1) - data[i * m_width];
-            if (TIGHTDB_UNLIKELY(size == 0))
+            if (REALM_UNLIKELY(size == 0))
                 return i;
         }
     }
@@ -291,12 +291,12 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
             const char* data = m_data + (i * m_width);
             size_t j = 0;
             for (;;) {
-                if (TIGHTDB_LIKELY(data[j] != value[j]))
+                if (REALM_LIKELY(data[j] != value[j]))
                     break;
                 ++j;
-                if (TIGHTDB_UNLIKELY(j == value.size())) {
+                if (REALM_UNLIKELY(j == value.size())) {
                     size_t size = (m_width-1) - data[m_width-1];
-                    if (TIGHTDB_LIKELY(size == value.size()))
+                    if (REALM_LIKELY(size == value.size()))
                         return i;
                     break;
                 }
@@ -320,7 +320,7 @@ void ArrayString::find_all(Column& result, StringData value, size_t add_offset,
     }
 }
 
-bool ArrayString::compare_string(const ArrayString& c) const TIGHTDB_NOEXCEPT
+bool ArrayString::compare_string(const ArrayString& c) const REALM_NOEXCEPT
 {
     if (c.size() != size())
         return false;
@@ -336,9 +336,9 @@ bool ArrayString::compare_string(const ArrayString& c) const TIGHTDB_NOEXCEPT
 ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
     if (leaf_size < ndx) ndx = leaf_size;
-    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
+    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws
         return 0; // Leaf was not split
     }
@@ -364,7 +364,7 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
 
 MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
@@ -382,7 +382,7 @@ MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) c
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ArrayString::string_stats() const
 {
@@ -439,4 +439,4 @@ void ArrayString::to_dot(ostream& out, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

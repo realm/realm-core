@@ -69,17 +69,17 @@ public:
     {
     }
 
-    ~XmlReporter() TIGHTDB_NOEXCEPT
+    ~XmlReporter() REALM_NOEXCEPT
     {
     }
 
-    void begin(const TestDetails& details) TIGHTDB_OVERRIDE
+    void begin(const TestDetails& details) REALM_OVERRIDE
     {
         test& t = m_tests[details.test_index];
         t.m_details = details;
     }
 
-    void fail(const TestDetails& details, const string& message) TIGHTDB_OVERRIDE
+    void fail(const TestDetails& details, const string& message) REALM_OVERRIDE
     {
         failure f;
         f.m_details = details;
@@ -88,13 +88,13 @@ public:
         t.m_failures.push_back(f);
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) TIGHTDB_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) REALM_OVERRIDE
     {
         test& t = m_tests[details.test_index];
         t.m_elapsed_seconds = elapsed_seconds;
     }
 
-    void summary(const Summary& summary) TIGHTDB_OVERRIDE
+    void summary(const Summary& summary) REALM_OVERRIDE
     {
         m_out <<
             "<?xml version=\"1.0\"?>\n"
@@ -194,11 +194,11 @@ public:
             m_include.push_back(wildcard_pattern("*"));
     }
 
-    ~WildcardFilter() TIGHTDB_NOEXCEPT
+    ~WildcardFilter() REALM_NOEXCEPT
     {
     }
 
-    bool include(const TestDetails& details) TIGHTDB_OVERRIDE
+    bool include(const TestDetails& details) REALM_OVERRIDE
     {
         const char* name = details.test_name;
         typedef patterns::const_iterator iter;
@@ -547,7 +547,7 @@ public:
             m_patterns.push_back(wildcard_pattern(*i));
     }
 
-    ~state() TIGHTDB_NOEXCEPT
+    ~state() REALM_NOEXCEPT
     {
     }
 

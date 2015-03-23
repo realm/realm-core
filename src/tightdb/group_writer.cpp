@@ -27,8 +27,8 @@ size_t GroupWriter::write_group()
     ArrayInteger& flengths   = m_group.m_free_lengths;
     ArrayInteger& fversions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
-    TIGHTDB_ASSERT_3(fpositions.size(), ==, flengths.size());
-    TIGHTDB_ASSERT(!is_shared || fversions.size() == flengths.size());
+    REALM_ASSERT_3(fpositions.size(), ==, flengths.size());
+    REALM_ASSERT(!is_shared || fversions.size() == flengths.size());
 
     // Recursively write all changed arrays (but not 'top' and free-lists yet,
     // as they a going to change along the way.) If free space is available in
@@ -113,14 +113,14 @@ size_t GroupWriter::write_group()
     // deduction of the actually used space from the reserved chunk,) will not
     // change the byte-size of those arrays.
     size_t reserve_pos = to_size_t(fpositions.get(reserve_ndx));
-    TIGHTDB_ASSERT_3(reserve_size, >, max_free_space_needed);
+    REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     fpositions.ensure_minimum_width(reserve_pos + max_free_space_needed); // Throws
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = fpositions.get_byte_size();
     size_t free_sizes_size     = flengths.get_byte_size();
     size_t free_versions_size  = is_shared ? fversions.get_byte_size() : 0;
-    TIGHTDB_ASSERT(!is_shared ||
+    REALM_ASSERT(!is_shared ||
                    Array::get_wtype_from_header(Array::get_header_from_data(fversions.m_data)) ==
                    Array::wtype_Bits);
 
@@ -145,7 +145,7 @@ size_t GroupWriter::write_group()
     // Get final sizes
     size_t top_byte_size = top.get_byte_size();
     size_t end_pos = top_pos + top_byte_size;
-    TIGHTDB_ASSERT_3(end_pos, <=, reserve_pos + max_free_space_needed);
+    REALM_ASSERT_3(end_pos, <=, reserve_pos + max_free_space_needed);
 
     // Deduct the used space from the reserved chunk. Note that we have made
     // sure that the remaining size is never zero. Also, by the call to
@@ -153,7 +153,7 @@ size_t GroupWriter::write_group()
     // fpositions has the capacity to store the new larger value without
     // reallocation.
     size_t rest = reserve_pos + reserve_size - end_pos;
-    TIGHTDB_ASSERT_3(rest, >, 0);
+    REALM_ASSERT_3(rest, >, 0);
     fpositions.set(reserve_ndx, end_pos); // Throws
     flengths.set(reserve_ndx, rest); // Throws
 
@@ -222,7 +222,7 @@ void GroupWriter::merge_free_space()
 
 size_t GroupWriter::get_free_space(size_t size)
 {
-    TIGHTDB_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+    REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
 
     pair<size_t, size_t> p = reserve_free_space(size);
 
@@ -235,7 +235,7 @@ size_t GroupWriter::get_free_space(size_t size)
     size_t chunk_ndx  = p.first;
     size_t chunk_pos  = to_size_t(positions.get(chunk_ndx));
     size_t chunk_size = p.second;
-    TIGHTDB_ASSERT_3(chunk_size, >=, size);
+    REALM_ASSERT_3(chunk_size, >=, size);
 
     size_t rest = chunk_size - size;
     if (rest > 0) {
@@ -325,8 +325,8 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         if (!in_use) {
             size_t last_pos  = to_size_t(positions.back());
             size_t last_size = to_size_t(lengths.back());
-            TIGHTDB_ASSERT_3(last_size, <, extend_size);
-            TIGHTDB_ASSERT_3(last_pos + last_size, <=, logical_file_size);
+            REALM_ASSERT_3(last_size, <, extend_size);
+            REALM_ASSERT_3(last_pos + last_size, <=, logical_file_size);
             if (last_pos + last_size == logical_file_size) {
                 extend_last_chunk = true;
                 last_chunk_size = last_size;
@@ -345,7 +345,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // compromise between minimizing fragmentation (maximizing
     // performance) and minimizing over-allocation.
     size_t stop_doubling_size = 128 * (1024*1024L); // = 128 MiB
-    TIGHTDB_ASSERT_3(stop_doubling_size % 8, ==, 0);
+    REALM_ASSERT_3(stop_doubling_size % 8, ==, 0);
 
     size_t new_file_size = logical_file_size;
     while (new_file_size < min_file_size) {
@@ -353,9 +353,9 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
             // The file contains at least a header, so the size can never
             // be zero. We need this to ensure that the number of
             // iterations will be finite.
-            TIGHTDB_ASSERT_3(new_file_size, !=, 0);
+            REALM_ASSERT_3(new_file_size, !=, 0);
             // Be sure that the doubling does not overflow
-            TIGHTDB_ASSERT_3(stop_doubling_size, <=, numeric_limits<size_t>::max() / 2);
+            REALM_ASSERT_3(stop_doubling_size, <=, numeric_limits<size_t>::max() / 2);
             new_file_size *= 2;
         }
         else {
@@ -368,7 +368,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
-    TIGHTDB_ASSERT_3(new_file_size % 8, ==, 0);
+    REALM_ASSERT_3(new_file_size % 8, ==, 0);
 
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can
@@ -384,11 +384,11 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     if (extend_last_chunk) {
         --chunk_ndx;
         chunk_size += last_chunk_size;
-        TIGHTDB_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
         lengths.set(chunk_ndx, chunk_size);
     }
     else { // Else add new free space
-        TIGHTDB_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
         positions.add(logical_file_size);
         lengths.add(chunk_size);
         if (is_shared)
@@ -406,7 +406,7 @@ void GroupWriter::write(const char* data, size_t size)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
-    TIGHTDB_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
+    REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
 
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
@@ -418,11 +418,11 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
-    TIGHTDB_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
+    REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
 
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
     copy(cksum_bytes, cksum_bytes+4, dest_addr);
     copy(data+4, data+size, dest_addr+4);
@@ -438,11 +438,11 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
 
 void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 {
-    TIGHTDB_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
-    TIGHTDB_ASSERT_3(pos + size, <=, m_file_map.get_size());
+    REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
+    REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = m_file_map.get_addr() + pos;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     uint_fast32_t dummy_checksum = 0x01010101UL;
     const char* cksum_bytes = reinterpret_cast<const char*>(&dummy_checksum);
     copy(cksum_bytes, cksum_bytes+4, dest_addr);
@@ -486,7 +486,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void GroupWriter::dump()
 {

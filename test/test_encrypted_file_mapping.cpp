@@ -37,7 +37,7 @@
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
 
 using namespace tightdb::util;
 
@@ -152,5 +152,5 @@ TEST(EncryptedFile_LargePages)
     close(fd);
 }
 
-#endif // TIGHTDB_ENABLE_ENCRYPTION
+#endif // REALM_ENABLE_ENCRYPTION
 #endif // TEST_ENCRYPTED_FILE_MAPPING

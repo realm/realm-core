@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_TIMER_HPP
-#define TIGHTDB_TEST_UTIL_TIMER_HPP
+#ifndef REALM_TEST_UTIL_TIMER_HPP
+#define REALM_TEST_UTIL_TIMER_HPP
 
 #include <stdint.h>
 #include <ostream>
@@ -97,4 +97,4 @@ inline std::ostream& operator<<(std::ostream& out, const Timer& timer)
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_TIMER_HPP
+#endif // REALM_TEST_UTIL_TIMER_HPP

@@ -63,7 +63,7 @@ const char* DataTypeToText(DataType t)
     else if(t == type_Mixed)
         return "Mixed";
     else {
-        TIGHTDB_ASSERT(true);
+        REALM_ASSERT(true);
         return "";
     }
 }
@@ -412,7 +412,7 @@ vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataTyp
         else if(types1[t] == type_Bool && types2[t] == type_Bool)
             res.push_back(type_Bool);
         else
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
     }
     return res;
 }
@@ -676,7 +676,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                 else if(scheme[col] == type_Bool)
                     table.set_bool(col, imported_rows, parse_bool<true>(payload[row][col].c_str(), &success));
                 else
-                    TIGHTDB_ASSERT(false);
+                    REALM_ASSERT(false);
 
                 if(!success) {
                     // Remove all columns so that user can call csv_import() on it again

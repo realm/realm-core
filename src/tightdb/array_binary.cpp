@@ -11,7 +11,7 @@ using namespace std;
 using namespace tightdb;
 
 
-void ArrayBinary::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
+void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
 {
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0), blob_ref = get_as_ref(1);
@@ -22,7 +22,7 @@ void ArrayBinary::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 
 void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT(value.size() == 0 || value.data());
 
     m_blob.add(value.data(), value.size(), add_zero_term);
     size_t stored_size = value.size();
@@ -36,8 +36,8 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
 
 void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
-    TIGHTDB_ASSERT_3(value.size(), == 0 ||, value.data());
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t current_end = to_size_t(m_offsets.get(ndx));
@@ -51,8 +51,8 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 
 void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_3(ndx, <=, m_offsets.size());
-    TIGHTDB_ASSERT_3(value.size(), == 0 ||, value.data());
+    REALM_ASSERT_3(ndx, <=, m_offsets.size());
+    REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
     size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
@@ -66,7 +66,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
 
 void ArrayBinary::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t end = to_size_t(m_offsets.get(ndx));
@@ -76,7 +76,7 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 }
 
-BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
+BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
     pair<int_least64_t, int_least64_t> p = get_two(header, 0);
     const char* offsets_header = alloc.translate(to_ref(p.first));
@@ -99,10 +99,10 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
                                          TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
-    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
+    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value, add_zero_term); // Throws
         return 0; // Leaf was not split
     }
@@ -158,7 +158,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
 
 MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     ArrayBinary slice(target_alloc);
     _impl::ShallowArrayDestroyGuard dg(&slice);
@@ -174,7 +174,7 @@ MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) c
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ArrayBinary::to_dot(ostream& out, bool, StringData title) const
 {
@@ -193,4 +193,4 @@ void ArrayBinary::to_dot(ostream& out, bool, StringData title) const
     out << "}" << endl;
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

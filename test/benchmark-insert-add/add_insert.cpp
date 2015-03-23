@@ -19,7 +19,7 @@ enum Mode {
     mode_UseTable
 };
 
-TIGHTDB_TABLE_5(TestTable,
+REALM_TABLE_5(TestTable,
                 x,  Int,
                 s1, String,
                 b,  Bool,

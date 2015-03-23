@@ -37,7 +37,7 @@ using namespace tightdb;
 #define DB_NAME "benchmark"
 
 
-TIGHTDB_TABLE_2(TestTable,
+REALM_TABLE_2(TestTable,
                 x, Int,
                 y, Int)
 

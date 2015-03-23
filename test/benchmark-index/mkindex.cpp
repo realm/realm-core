@@ -5,7 +5,7 @@
 using namespace tightdb;
 using namespace std;
 
-TIGHTDB_TABLE_7(IndexTable,
+REALM_TABLE_7(IndexTable,
                 s1, String,
                 n1, Int,
                 n2, Int,

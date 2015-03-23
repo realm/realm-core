@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_THREAD_WRAPPER_HPP
-#define TIGHTDB_TEST_UTIL_THREAD_WRAPPER_HPP
+#ifndef REALM_TEST_UTIL_THREAD_WRAPPER_HPP
+#define REALM_TEST_UTIL_THREAD_WRAPPER_HPP
 
 #include <exception>
 #include <string>
@@ -93,4 +93,4 @@ private:
 } // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TEST_UTIL_THREAD_WRAPPER_HPP
+#endif // REALM_TEST_UTIL_THREAD_WRAPPER_HPP

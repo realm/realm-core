@@ -58,7 +58,7 @@ TestPathGuard::TestPathGuard(const string& path):
     File::try_remove(m_path);
 }
 
-TestPathGuard::~TestPathGuard() TIGHTDB_NOEXCEPT
+TestPathGuard::~TestPathGuard() REALM_NOEXCEPT
 {
     if (keep_files)
         return;

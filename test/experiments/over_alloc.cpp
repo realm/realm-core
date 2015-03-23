@@ -8,7 +8,7 @@ using namespace std;
 
 namespace {
 
-TIGHTDB_TABLE_1(MyTable,
+REALM_TABLE_1(MyTable,
                 text, String)
 
 } // namespace

@@ -31,8 +31,8 @@ using namespace tightdb;
 void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,
                                     bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
+    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // Remove backlinks to the delete row
     if (!broken_reciprocal_backlinks) {
@@ -220,7 +220,7 @@ void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, s
 
 LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, size());
+    REALM_ASSERT_3(row_ndx, <, size());
 
     // Check if we already have a linkview for this row
     typedef list_accessors::const_iterator iter;
@@ -245,7 +245,7 @@ void ColumnLinkList::update_child_ref(size_t child_ndx, ref_type new_ref)
 }
 
 
-ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
+ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
 {
     return ColumnLinkBase::get_as_ref(child_ndx);
 }
@@ -263,7 +263,7 @@ void ColumnLinkList::to_json_row(size_t row_ndx, ostream& out) const
 }
 
 
-void ColumnLinkList::discard_child_accessors() TIGHTDB_NOEXCEPT
+void ColumnLinkList::discard_child_accessors() REALM_NOEXCEPT
 {
     typedef list_accessors::const_iterator iter;
     iter end = m_list_accessors.end();
@@ -284,7 +284,7 @@ void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void ColumnLinkList::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
 {
     ColumnLinkBase::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
@@ -293,19 +293,19 @@ void ColumnLinkList::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) T
 }
 
 
-void ColumnLinkList::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
     ColumnLinkBase::adj_acc_clear_root_table();
     discard_child_accessors();
 }
 
 template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
 {
     size_t i = 0, n = m_list_accessors.size();
     while (i < n) {
         list_entry& e = m_list_accessors[i];
-        if (TIGHTDB_UNLIKELY(e.m_row_ndx == to_row_ndx)) {
+        if (REALM_UNLIKELY(e.m_row_ndx == to_row_ndx)) {
             // Must hold a counted reference while detaching
             LinkViewRef list(e.m_list);
             list->detach();
@@ -315,7 +315,7 @@ void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) TIGHT
             m_list_accessors.pop_back();
         }
         else {
-            if (TIGHTDB_UNLIKELY(e.m_row_ndx == from_row_ndx)) {
+            if (REALM_UNLIKELY(e.m_row_ndx == from_row_ndx)) {
                 e.m_row_ndx = to_row_ndx;
                 if (fix_ndx_in_parent)
                     e.m_list->set_origin_row_index(to_row_ndx);
@@ -326,7 +326,7 @@ void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) TIGHT
 }
 
 
-void ColumnLinkList::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+void ColumnLinkList::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     if (!m_array->update_from_parent(old_baseline))
         return;
@@ -338,7 +338,7 @@ void ColumnLinkList::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -347,7 +347,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     leaf.Verify();
-    TIGHTDB_ASSERT(leaf.has_refs());
+    REALM_ASSERT(leaf.has_refs());
     return leaf.size();
 }
 
@@ -357,7 +357,7 @@ void ColumnLinkList::Verify() const
 {
     if (root_is_leaf()) {
         m_array->Verify();
-        TIGHTDB_ASSERT(m_array->has_refs());
+        REALM_ASSERT(m_array->has_refs());
         return;
     }
 
@@ -392,12 +392,12 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
         pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         for (iter j = range.first; j != range.second; ++j)
             links_2.insert(j->target_row_ndx);
-        TIGHTDB_ASSERT(links_1 == links_2);
+        REALM_ASSERT(links_1 == links_2);
         backlinks_seen += links_2.size();
     }
 
     // All backlinks must have been matched by a forward link
-    TIGHTDB_ASSERT_3(backlinks_seen, ==, pairs.size());
+    REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
 }
 
 
@@ -407,4 +407,4 @@ pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) c
     return make_pair(p.first.m_ref, p.second);
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

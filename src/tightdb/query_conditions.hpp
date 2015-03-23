@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_QUERY_CONDITIONS_HPP
-#define TIGHTDB_QUERY_CONDITIONS_HPP
+#ifndef REALM_QUERY_CONDITIONS_HPP
+#define REALM_QUERY_CONDITIONS_HPP
 
 #include <stdint.h>
 #include <string>
@@ -230,4 +230,4 @@ template <> struct CompareLess<StringData>
 
 } // namespace tightdb
 
-#endif // TIGHTDB_QUERY_CONDITIONS_HPP
+#endif // REALM_QUERY_CONDITIONS_HPP

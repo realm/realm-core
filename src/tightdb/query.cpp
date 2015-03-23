@@ -18,7 +18,7 @@ Query::Query() : m_view(null_ptr)
 
 Query::Query(Table& table, RowIndexes* tv) : m_table(table.get_table_ref()), m_view(tv)
 {
-    TIGHTDB_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
@@ -27,13 +27,13 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     m_view(lv.get()),
     m_source_link_view(lv)
 {
-    TIGHTDB_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
 Query::Query(const Table& table, RowIndexes* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv)
 {
-    TIGHTDB_ASSERT_DEBUG(m_view == null_ptr ||m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == null_ptr ||m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
@@ -43,7 +43,7 @@ void Query::Create()
     first.reserve(16);
     update.push_back(0);
     update_override.push_back(0);
-    TIGHTDB_ASSERT_3(first.capacity(), >, first.size()); // see above fixme
+    REALM_ASSERT_3(first.capacity(), >, first.size()); // see above fixme
     first.push_back(0);
     pending_not.push_back(false);
     do_delete = true;
@@ -78,7 +78,7 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 
 Query& Query::operator = (const Query& source)
 {
-    TIGHTDB_ASSERT(source.do_delete);
+    REALM_ASSERT(source.do_delete);
 
     if (this != &source) {
         // free destination object
@@ -121,12 +121,12 @@ Query& Query::operator = (const Query& source)
     return *this;
 }
 
-Query::~Query() TIGHTDB_NOEXCEPT
+Query::~Query() REALM_NOEXCEPT
 {
     delete_nodes();
 }
 
-void Query::delete_nodes() TIGHTDB_NOEXCEPT
+void Query::delete_nodes() REALM_NOEXCEPT
 {
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
@@ -545,9 +545,9 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 
 size_t Query::peek_tableview(size_t tv_index) const
 {
-    TIGHTDB_ASSERT(m_view);
-    TIGHTDB_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
-    TIGHTDB_ASSERT_3(tv_index, <, m_view->size());
+    REALM_ASSERT(m_view);
+    REALM_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_3(tv_index, <, m_view->size());
 
     size_t tablerow = m_view->m_row_indexes.get(tv_index);
 
@@ -783,7 +783,7 @@ Query& Query::group()
 {
     update.push_back(0);
     update_override.push_back(0);
-    TIGHTDB_ASSERT_3(first.capacity(), >, first.size()); // see fixme in ::Create()
+    REALM_ASSERT_3(first.capacity(), >, first.size()); // see fixme in ::Create()
     first.push_back(0);
     pending_not.push_back(false);
     return *this;
@@ -914,7 +914,7 @@ size_t Query::find(size_t begin)
     if (m_table->is_degenerate())
         return not_found;
 
-    TIGHTDB_ASSERT_3(begin, <=, m_table->size());
+    REALM_ASSERT_3(begin, <=, m_table->size());
 
     Init(*m_table);
 
@@ -947,7 +947,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
     if (limit == 0 || m_table->is_degenerate())
         return;
 
-    TIGHTDB_ASSERT_3(start, <=, m_table->size());
+    REALM_ASSERT_3(start, <=, m_table->size());
 
     Init(*m_table);
 
@@ -1071,7 +1071,7 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
     }
 }
 
-#if TIGHTDB_MULTITHREAD_QUERY
+#if REALM_MULTITHREAD_QUERY
 TableView Query::find_all_multi(size_t start, size_t end)
 {
     (void)start;
@@ -1134,7 +1134,7 @@ int Query::set_threads(unsigned int threadcount)
     for (size_t i = 0; i < threadcount; ++i) {
         int r = pthread_create(&threads[i], null_ptr, query_thread, (void*)&ts);
         if (r != 0)
-            TIGHTDB_ASSERT(false); //todo
+            REALM_ASSERT(false); //todo
     }
     m_threadcount = threadcount;
     return 0;
@@ -1199,7 +1199,7 @@ void* Query::query_thread(void* arg)
     return 0;
 }
 
-#endif // TIGHTDB_MULTITHREADQUERY
+#endif // REALM_MULTITHREADQUERY
 
 string Query::validate()
 {
@@ -1283,7 +1283,7 @@ Query& Query::and_query(Query q)
 {
     // This transfers ownership of the nodes from q to this, so both q and this
     // must currently own their nodes
-    TIGHTDB_ASSERT(do_delete && q.do_delete);
+    REALM_ASSERT(do_delete && q.do_delete);
 
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);
@@ -1299,7 +1299,7 @@ Query& Query::and_query(Query q)
     all_nodes.insert( all_nodes.end(), q.all_nodes.begin(), q.all_nodes.end() );
 
     if (q.m_source_link_view) {
-        TIGHTDB_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
+        REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
         m_source_link_view = q.m_source_link_view;
     }
 

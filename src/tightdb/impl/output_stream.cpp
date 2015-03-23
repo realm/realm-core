@@ -41,7 +41,7 @@ size_t OutputStream::write_array(const char* data, size_t size, uint_fast32_t ch
     size_t size_1 = size;
     size_t pos = m_pos;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
     m_out.write(cksum_bytes, 4);
     data_1 += 4;

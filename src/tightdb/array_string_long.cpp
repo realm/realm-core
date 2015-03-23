@@ -12,7 +12,7 @@ using namespace std;
 using namespace tightdb;
 
 
-void ArrayStringLong::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
+void ArrayStringLong::init_from_mem(MemRef mem) REALM_NOEXCEPT
 {
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0), blob_ref = get_as_ref(1);
@@ -33,7 +33,7 @@ void ArrayStringLong::add(StringData value)
 
 void ArrayStringLong::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
@@ -47,7 +47,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
 
 void ArrayStringLong::insert(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <=, m_offsets.size());
+    REALM_ASSERT_3(ndx, <=, m_offsets.size());
 
     size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     bool add_zero_term = true;
@@ -59,7 +59,7 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
 
 void ArrayStringLong::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
@@ -70,7 +70,7 @@ void ArrayStringLong::erase(size_t ndx)
 }
 
 size_t ArrayStringLong::count(StringData value, size_t begin,
-                              size_t end) const TIGHTDB_NOEXCEPT
+                              size_t end) const REALM_NOEXCEPT
 {
     size_t num_matches = 0;
 
@@ -87,12 +87,12 @@ size_t ArrayStringLong::count(StringData value, size_t begin,
 }
 
 size_t ArrayStringLong::find_first(StringData value, size_t begin,
-                                   size_t end) const TIGHTDB_NOEXCEPT
+                                   size_t end) const REALM_NOEXCEPT
 {
     size_t n = m_offsets.size();
     if (end == npos)
         end = n;
-    TIGHTDB_ASSERT(begin <= n && end <= n && begin <= end);
+    REALM_ASSERT(begin <= n && end <= n && begin <= end);
 
     size_t begin_2 = 0 < begin ? to_size_t(m_offsets.get(begin-1)) : 0;
     for (size_t i = begin; i < end; ++i) {
@@ -121,7 +121,7 @@ void ArrayStringLong::find_all(Column& result, StringData value, size_t add_offs
 }
 
 
-StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
+StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
     pair<int_least64_t, int_least64_t> p = get_two(header, 0);
     ref_type offsets_ref = to_ref(p.first);
@@ -151,10 +151,10 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
 ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
-    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
+    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws
         return 0; // Leaf was not split
     }
@@ -210,7 +210,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
 
 MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_alloc) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     ArrayStringLong slice(target_alloc);
     _impl::ShallowArrayDestroyGuard dg(&slice);
@@ -226,7 +226,7 @@ MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_allo
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void ArrayStringLong::to_dot(ostream& out, StringData title) const
 {
@@ -245,4 +245,4 @@ void ArrayStringLong::to_dot(ostream& out, StringData title) const
     out << "}" << endl;
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

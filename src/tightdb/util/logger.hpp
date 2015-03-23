@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_LOGGER_HPP
-#define TIGHTDB_UTIL_LOGGER_HPP
+#ifndef REALM_UTIL_LOGGER_HPP
+#define REALM_UTIL_LOGGER_HPP
 
 #include <string>
 #include <sstream>
@@ -39,7 +39,7 @@ namespace util {
 ///    logger.log_with_tuple("c=%3, a=%1, b=%2", (tuple(), a, b, c));
 class Logger {
 public:
-#ifdef TIGHTDB_HAVE_CXX11_VARIADIC_TEMPLATES
+#ifdef REALM_HAVE_CXX11_VARIADIC_TEMPLATES
 
     template<class... Params> void log(const char* message, Params... params)
     {
@@ -158,7 +158,7 @@ private:
         do_log(state.m_message);
     }
 
-#ifdef TIGHTDB_HAVE_CXX11_VARIADIC_TEMPLATES
+#ifdef REALM_HAVE_CXX11_VARIADIC_TEMPLATES
     template<class Param, class... Params>
     void log_impl(State& state, const T& param, Params... params)
     {
@@ -185,7 +185,7 @@ protected:
     Logger* const m_base_logger;
     Mutex m_mutex;
 
-    void do_log(const std::string& msg) TIGHTDB_OVERRIDE
+    void do_log(const std::string& msg) REALM_OVERRIDE
     {
         LockGuard l(m_mutex);
         Logger::do_log(m_base_logger, msg);
@@ -203,7 +203,7 @@ protected:
     const std::string m_prefix;
     Logger* const m_base_logger;
 
-    void do_log(const std::string& msg) TIGHTDB_OVERRIDE
+    void do_log(const std::string& msg) REALM_OVERRIDE
     {
         Logger::do_log(m_base_logger, m_prefix + msg);
     }
@@ -213,4 +213,4 @@ protected:
 } // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTIL_LOGGER_HPP
+#endif // REALM_UTIL_LOGGER_HPP

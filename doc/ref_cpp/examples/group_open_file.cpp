@@ -5,7 +5,7 @@
 
 using namespace tightdb;
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 

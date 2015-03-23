@@ -1,7 +1,7 @@
 #include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/spec.hpp>
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
 
@@ -9,9 +9,9 @@ using namespace std;
 using namespace tightdb;
 
 
-Spec::~Spec() TIGHTDB_NOEXCEPT
+Spec::~Spec() REALM_NOEXCEPT
 {
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (m_top.is_attached()) {
         if (Replication* repl = m_top.get_alloc().get_replication())
             repl->on_spec_destroyed(this);
@@ -20,11 +20,11 @@ Spec::~Spec() TIGHTDB_NOEXCEPT
 }
 
 
-void Spec::init(MemRef mem) TIGHTDB_NOEXCEPT
+void Spec::init(MemRef mem) REALM_NOEXCEPT
 {
     m_top.init_from_mem(mem);
     size_t top_size = m_top.size();
-    TIGHTDB_ASSERT(top_size >= 3 && top_size <= 5);
+    REALM_ASSERT(top_size >= 3 && top_size <= 5);
 
     m_types.init_from_ref(m_top.get_as_ref(0));
     m_types.set_parent(&m_top, 0);
@@ -50,7 +50,7 @@ void Spec::init(MemRef mem) TIGHTDB_NOEXCEPT
 }
 
 
-void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+void Spec::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     if (!m_top.update_from_parent(old_baseline))
         return;
@@ -111,10 +111,10 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
 
 void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, ColumnAttr attr)
 {
-    TIGHTDB_ASSERT(column_ndx <= m_types.size());
+    REALM_ASSERT(column_ndx <= m_types.size());
 
     // Backlinks should always be appended to end
-    TIGHTDB_ASSERT(column_ndx == m_types.size() || type != col_type_BackLink);
+    REALM_ASSERT(column_ndx == m_types.size() || type != col_type_BackLink);
 
     if (type != col_type_BackLink) // backlinks do not have names
         m_names.insert(column_ndx, name); // Throws
@@ -176,7 +176,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
 
 void Spec::erase_column(size_t column_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < m_types.size());
+    REALM_ASSERT(column_ndx < m_types.size());
     typedef _impl::TableFriend tf;
 
     // If the column is a subtable column, we have to delete
@@ -212,7 +212,7 @@ void Spec::erase_column(size_t column_ndx)
     }
 
     // Delete the actual name and type entries
-    TIGHTDB_ASSERT((column_ndx >= m_names.size()) == (type == col_type_BackLink));
+    REALM_ASSERT((column_ndx >= m_names.size()) == (type == col_type_BackLink));
     if (type != col_type_BackLink)
         m_names.erase(column_ndx); // Throws
     m_types.erase(column_ndx);  // Throws
@@ -220,10 +220,10 @@ void Spec::erase_column(size_t column_ndx)
 }
 
 
-size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_subspec_ndx(size_t column_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx <= get_column_count());
-    TIGHTDB_ASSERT(column_ndx == get_column_count() ||
+    REALM_ASSERT(column_ndx <= get_column_count());
+    REALM_ASSERT(column_ndx == get_column_count() ||
                    get_column_type(column_ndx) == col_type_Table    ||
                    get_column_type(column_ndx) == col_type_Link     ||
                    get_column_type(column_ndx) == col_type_LinkList ||
@@ -248,7 +248,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                   ArrayParent*& keys_parent, size_t& keys_ndx)
 {
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_String);
+    REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 
     // Create the enumkeys list if needed
     if (!m_enumkeys.is_attached()) {
@@ -276,7 +276,7 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
 }
 
 
-size_t Spec::get_enumkeys_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_enumkeys_ndx(size_t column_ndx) const REALM_NOEXCEPT
 {
     // The enumkeys array only keep info for stringEnum columns
     // so we need to count up to it's position
@@ -290,7 +290,7 @@ size_t Spec::get_enumkeys_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 
 
 ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
-                                size_t* keys_ndx) TIGHTDB_NOEXCEPT
+                                size_t* keys_ndx) REALM_NOEXCEPT
 {
     size_t enumkeys_ndx = get_enumkeys_ndx(column_ndx);
 
@@ -304,10 +304,10 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
 }
 
 
-size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
+    REALM_ASSERT(column_ndx < get_column_count());
+    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
                    get_column_type(column_ndx) == col_type_LinkList ||
                    get_column_type(column_ndx) == col_type_BackLink);
 
@@ -315,7 +315,7 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const TIGHTDB_NOEXCE
     // subspecs array
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     int64_t tagged_value = m_subspecs.get(subspec_ndx);
-    TIGHTDB_ASSERT(tagged_value != 0); // can't retrieve it if never set
+    REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     uint64_t table_ref = uint64_t(tagged_value) >> 1;
     return table_ref;
@@ -324,8 +324,8 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const TIGHTDB_NOEXCE
 
 void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
+    REALM_ASSERT(column_ndx < get_column_count());
+    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
                    get_column_type(column_ndx) == col_type_LinkList ||
                    get_column_type(column_ndx) == col_type_BackLink);
 
@@ -339,8 +339,8 @@ void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
 
 void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx)
 {
-    TIGHTDB_ASSERT(backlink_col_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
+    REALM_ASSERT(backlink_col_ndx < get_column_count());
+    REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
     size_t tagged_ndx = (origin_col_ndx << 1) + 1;
@@ -350,15 +350,15 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
 }
 
 
-size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(backlink_col_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
+    REALM_ASSERT(backlink_col_ndx < get_column_count());
+    REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
 
     // Origin column is stored as second tagged int in the subspecs array
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
     int64_t tagged_value = m_subspecs.get(subspec_ndx+1);
-    TIGHTDB_ASSERT(tagged_value != 0); // can't retrieve it if never set
+    REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     size_t origin_col_ndx = size_t(uint64_t(tagged_value) >> 1);
     return origin_col_ndx;
@@ -366,7 +366,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const TIGHTDB_NOEXCE
 
 
 size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     size_t backlinks_column_start = m_names.size();
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
@@ -384,14 +384,14 @@ size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx
         }
     }
 
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return not_found;
 }
 
 
-DataType Spec::get_public_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
+DataType Spec::get_public_column_type(size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    REALM_ASSERT(ndx < get_column_count());
 
     ColumnType type = get_column_type(ndx);
 
@@ -418,14 +418,14 @@ size_t Spec::get_column_ndx_in_parent(size_t column_ndx) const
 }
 
 
-void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const TIGHTDB_NOEXCEPT
+void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const REALM_NOEXCEPT
 {
     info.m_column_ref_ndx = get_column_ndx_in_parent(column_ndx);
     info.m_has_search_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
 }
 
 
-bool Spec::operator==(const Spec& spec) const TIGHTDB_NOEXCEPT
+bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
 {
     if (!m_types.compare_int(spec.m_types))
         return false;
@@ -435,17 +435,17 @@ bool Spec::operator==(const Spec& spec) const TIGHTDB_NOEXCEPT
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void Spec::Verify() const
 {
-    TIGHTDB_ASSERT(m_names.size() == get_public_column_count());
-    TIGHTDB_ASSERT(m_types.size()  == get_column_count());
-    TIGHTDB_ASSERT(m_attr.size()  == get_column_count());
+    REALM_ASSERT(m_names.size() == get_public_column_count());
+    REALM_ASSERT(m_types.size()  == get_column_count());
+    REALM_ASSERT(m_attr.size()  == get_column_count());
 
-    TIGHTDB_ASSERT(m_types.get_ref()  == m_top.get_as_ref(0));
-    TIGHTDB_ASSERT(m_names.get_ref() == m_top.get_as_ref(1));
-    TIGHTDB_ASSERT(m_attr.get_ref()  == m_top.get_as_ref(2));
+    REALM_ASSERT(m_types.get_ref()  == m_top.get_as_ref(0));
+    REALM_ASSERT(m_names.get_ref() == m_top.get_as_ref(1));
+    REALM_ASSERT(m_attr.get_ref()  == m_top.get_as_ref(2));
 }
 
 
@@ -471,7 +471,7 @@ void Spec::to_dot(ostream& out, StringData) const
     }
 
     if (have_subspecs) {
-        TIGHTDB_ASSERT(m_subspecs.is_attached());
+        REALM_ASSERT(m_subspecs.is_attached());
         m_subspecs.to_dot(out, "subspecs");
 
         Allocator& alloc = m_top.get_alloc();
@@ -494,4 +494,4 @@ void Spec::to_dot(ostream& out, StringData) const
     out << "}" << endl;
 }
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

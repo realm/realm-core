@@ -11,7 +11,7 @@ using namespace tightdb::util;
 
 namespace {
 
-TIGHTDB_TABLE_2(Alpha,
+REALM_TABLE_2(Alpha,
                 foo, Int,
                 bar, Int)
 

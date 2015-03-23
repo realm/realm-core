@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef TIGHTDB_IMPL_DESTROY_GUARD_HPP
-#define TIGHTDB_IMPL_DESTROY_GUARD_HPP
+#ifndef REALM_IMPL_DESTROY_GUARD_HPP
+#define REALM_IMPL_DESTROY_GUARD_HPP
 
 #include <tightdb/util/features.h>
 #include <tightdb/array.hpp>
@@ -34,17 +34,17 @@ namespace _impl {
 /// `DeepArrayDestroyGuard` for an alternative.
 template<class T> class DestroyGuard {
 public:
-    DestroyGuard() TIGHTDB_NOEXCEPT;
+    DestroyGuard() REALM_NOEXCEPT;
 
-    DestroyGuard(T*) TIGHTDB_NOEXCEPT;
+    DestroyGuard(T*) REALM_NOEXCEPT;
 
-    ~DestroyGuard() TIGHTDB_NOEXCEPT;
+    ~DestroyGuard() REALM_NOEXCEPT;
 
-    void reset(T*) TIGHTDB_NOEXCEPT;
+    void reset(T*) REALM_NOEXCEPT;
 
-    T* get() const TIGHTDB_NOEXCEPT;
+    T* get() const REALM_NOEXCEPT;
 
-    T* release() TIGHTDB_NOEXCEPT;
+    T* release() REALM_NOEXCEPT;
 
 private:
     T* m_ptr;
@@ -57,17 +57,17 @@ typedef DestroyGuard<Array> ShallowArrayDestroyGuard;
 /// is not null when the guard is destroyed.
 class DeepArrayDestroyGuard {
 public:
-    DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT;
+    DeepArrayDestroyGuard() REALM_NOEXCEPT;
 
-    DeepArrayDestroyGuard(Array*) TIGHTDB_NOEXCEPT;
+    DeepArrayDestroyGuard(Array*) REALM_NOEXCEPT;
 
-    ~DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT;
+    ~DeepArrayDestroyGuard() REALM_NOEXCEPT;
 
-    void reset(Array*) TIGHTDB_NOEXCEPT;
+    void reset(Array*) REALM_NOEXCEPT;
 
-    Array* get() const TIGHTDB_NOEXCEPT;
+    Array* get() const REALM_NOEXCEPT;
 
-    Array* release() TIGHTDB_NOEXCEPT;
+    Array* release() REALM_NOEXCEPT;
 
 private:
     Array* m_ptr;
@@ -78,17 +78,17 @@ private:
 /// (`ref`) is not zero when the guard is destroyed.
 class DeepArrayRefDestroyGuard {
 public:
-    DeepArrayRefDestroyGuard(Allocator&) TIGHTDB_NOEXCEPT;
+    DeepArrayRefDestroyGuard(Allocator&) REALM_NOEXCEPT;
 
-    DeepArrayRefDestroyGuard(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+    DeepArrayRefDestroyGuard(ref_type, Allocator&) REALM_NOEXCEPT;
 
-    ~DeepArrayRefDestroyGuard() TIGHTDB_NOEXCEPT;
+    ~DeepArrayRefDestroyGuard() REALM_NOEXCEPT;
 
-    void reset(ref_type) TIGHTDB_NOEXCEPT;
+    void reset(ref_type) REALM_NOEXCEPT;
 
-    ref_type get() const TIGHTDB_NOEXCEPT;
+    ref_type get() const REALM_NOEXCEPT;
 
-    ref_type release() TIGHTDB_NOEXCEPT;
+    ref_type release() REALM_NOEXCEPT;
 
 private:
     ref_type m_ref;
@@ -103,35 +103,35 @@ private:
 
 // DestroyGuard<T>
 
-template<class T> inline DestroyGuard<T>::DestroyGuard() TIGHTDB_NOEXCEPT:
+template<class T> inline DestroyGuard<T>::DestroyGuard() REALM_NOEXCEPT:
     m_ptr(0)
 {
 }
 
-template<class T> inline DestroyGuard<T>::DestroyGuard(T* ptr) TIGHTDB_NOEXCEPT:
+template<class T> inline DestroyGuard<T>::DestroyGuard(T* ptr) REALM_NOEXCEPT:
     m_ptr(ptr)
 {
 }
 
-template<class T> inline DestroyGuard<T>::~DestroyGuard() TIGHTDB_NOEXCEPT
+template<class T> inline DestroyGuard<T>::~DestroyGuard() REALM_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy();
 }
 
-template<class T> inline void DestroyGuard<T>::reset(T* ptr) TIGHTDB_NOEXCEPT
+template<class T> inline void DestroyGuard<T>::reset(T* ptr) REALM_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy();
     m_ptr = ptr;
 }
 
-template<class T> inline T* DestroyGuard<T>::get() const TIGHTDB_NOEXCEPT
+template<class T> inline T* DestroyGuard<T>::get() const REALM_NOEXCEPT
 {
     return m_ptr;
 }
 
-template<class T> inline T* DestroyGuard<T>::release() TIGHTDB_NOEXCEPT
+template<class T> inline T* DestroyGuard<T>::release() REALM_NOEXCEPT
 {
     T* ptr = m_ptr;
     m_ptr = 0;
@@ -141,35 +141,35 @@ template<class T> inline T* DestroyGuard<T>::release() TIGHTDB_NOEXCEPT
 
 // DeepArrayDestroyGuard
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT:
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() REALM_NOEXCEPT:
     m_ptr(0)
 {
 }
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) TIGHTDB_NOEXCEPT:
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) REALM_NOEXCEPT:
     m_ptr(ptr)
 {
 }
 
-inline DeepArrayDestroyGuard::~DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT
+inline DeepArrayDestroyGuard::~DeepArrayDestroyGuard() REALM_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy_deep();
 }
 
-inline void DeepArrayDestroyGuard::reset(Array* ptr) TIGHTDB_NOEXCEPT
+inline void DeepArrayDestroyGuard::reset(Array* ptr) REALM_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy_deep();
     m_ptr = ptr;
 }
 
-inline Array* DeepArrayDestroyGuard::get() const TIGHTDB_NOEXCEPT
+inline Array* DeepArrayDestroyGuard::get() const REALM_NOEXCEPT
 {
     return m_ptr;
 }
 
-inline Array* DeepArrayDestroyGuard::release() TIGHTDB_NOEXCEPT
+inline Array* DeepArrayDestroyGuard::release() REALM_NOEXCEPT
 {
     Array* ptr = m_ptr;
     m_ptr = 0;
@@ -179,38 +179,38 @@ inline Array* DeepArrayDestroyGuard::release() TIGHTDB_NOEXCEPT
 
 // DeepArrayRefDestroyGuard
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) REALM_NOEXCEPT:
     m_ref(0),
     m_alloc(alloc)
 {
 }
 
 inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref,
-                                                          Allocator& alloc) TIGHTDB_NOEXCEPT:
+                                                          Allocator& alloc) REALM_NOEXCEPT:
     m_ref(ref),
     m_alloc(alloc)
 {
 }
 
-inline DeepArrayRefDestroyGuard::~DeepArrayRefDestroyGuard() TIGHTDB_NOEXCEPT
+inline DeepArrayRefDestroyGuard::~DeepArrayRefDestroyGuard() REALM_NOEXCEPT
 {
     if (m_ref)
         Array::destroy_deep(m_ref, m_alloc);
 }
 
-inline void DeepArrayRefDestroyGuard::reset(ref_type ref) TIGHTDB_NOEXCEPT
+inline void DeepArrayRefDestroyGuard::reset(ref_type ref) REALM_NOEXCEPT
 {
     if (m_ref)
         Array::destroy_deep(m_ref, m_alloc);
     m_ref = ref;
 }
 
-inline ref_type DeepArrayRefDestroyGuard::get() const TIGHTDB_NOEXCEPT
+inline ref_type DeepArrayRefDestroyGuard::get() const REALM_NOEXCEPT
 {
     return m_ref;
 }
 
-inline ref_type DeepArrayRefDestroyGuard::release() TIGHTDB_NOEXCEPT
+inline ref_type DeepArrayRefDestroyGuard::release() REALM_NOEXCEPT
 {
     ref_type ref = m_ref;
     m_ref = 0;
@@ -221,4 +221,4 @@ inline ref_type DeepArrayRefDestroyGuard::release() TIGHTDB_NOEXCEPT
 } // namespace _impl
 } // namespace tightdb
 
-#endif // TIGHTDB_IMPL_DESTROY_GUARD_HPP
+#endif // REALM_IMPL_DESTROY_GUARD_HPP

@@ -31,7 +31,7 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
 
@@ -44,7 +44,7 @@
 #  include <windows.h>
 #endif
 
-//#define TIGHTDB_ENABLE_LOGFILE
+//#define REALM_ENABLE_LOGFILE
 
 
 using namespace std;
@@ -199,7 +199,7 @@ public:
         uint32_t next;
     };
 
-    Ringbuffer() TIGHTDB_NOEXCEPT
+    Ringbuffer() REALM_NOEXCEPT
     {
         entries = init_readers_size;
         for (int i=0; i < init_readers_size; i++) {
@@ -241,7 +241,7 @@ public:
         cout << "--- Done" << endl;
     }
 
-    void expand_to(uint_fast32_t new_entries)  TIGHTDB_NOEXCEPT
+    void expand_to(uint_fast32_t new_entries)  REALM_NOEXCEPT
     {
         // cout << "expanding to " << new_entries << endl;
         // dump();
@@ -258,7 +258,7 @@ public:
         // dump();
     }
 
-    static size_t compute_required_space(uint_fast32_t num_entries)  TIGHTDB_NOEXCEPT
+    static size_t compute_required_space(uint_fast32_t num_entries)  REALM_NOEXCEPT
     {
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
@@ -266,56 +266,56 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const  TIGHTDB_NOEXCEPT
+    uint_fast32_t get_num_entries() const  REALM_NOEXCEPT
     {
         return entries;
     }
 
-    uint_fast32_t last() const  TIGHTDB_NOEXCEPT
+    uint_fast32_t last() const  REALM_NOEXCEPT
     {
         return put_pos.load_acquire();
     }
 
-    const ReadCount& get(uint_fast32_t idx) const  TIGHTDB_NOEXCEPT
+    const ReadCount& get(uint_fast32_t idx) const  REALM_NOEXCEPT
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const  TIGHTDB_NOEXCEPT
+    const ReadCount& get_last() const  REALM_NOEXCEPT
     {
         return get(last());
     }
 
-    const ReadCount& get_oldest() const  TIGHTDB_NOEXCEPT
+    const ReadCount& get_oldest() const  REALM_NOEXCEPT
     {
         return get(old_pos);
     }
 
-    bool is_full() const  TIGHTDB_NOEXCEPT
+    bool is_full() const  REALM_NOEXCEPT
     {
         uint_fast32_t idx = get(last()).next;
         return idx == old_pos;
     }
 
-    uint_fast32_t next() const  TIGHTDB_NOEXCEPT
+    uint_fast32_t next() const  REALM_NOEXCEPT
     { // do not call this if the buffer is full!
         uint_fast32_t idx = get(last()).next;
         return idx;
     }
 
-    ReadCount& get_next()  TIGHTDB_NOEXCEPT
+    ReadCount& get_next()  REALM_NOEXCEPT
     {
-        TIGHTDB_ASSERT(!is_full());
+        REALM_ASSERT(!is_full());
         return data[ next() ];
     }
 
-    void use_next()  TIGHTDB_NOEXCEPT
+    void use_next()  REALM_NOEXCEPT
     {
         atomic_dec(get_next().count); // .store_release(0);
         put_pos.store_release(next());
     }
 
-    void cleanup()  TIGHTDB_NOEXCEPT
+    void cleanup()  REALM_NOEXCEPT
     {   // invariant: entry held by put_pos has count > 1.
         // cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
@@ -402,7 +402,7 @@ struct SharedGroup::SharedInfo
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
     SharedInfo(DurabilityLevel);
-    ~SharedInfo() TIGHTDB_NOEXCEPT {}
+    ~SharedInfo() REALM_NOEXCEPT {}
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
@@ -480,14 +480,14 @@ void spawn_daemon(const string& file)
         for (i=m-1;i>=0;--i)
             close(i);
         i = ::open("/dev/null",O_RDWR);
-#ifdef TIGHTDB_ENABLE_LOGFILE
+#ifdef REALM_ENABLE_LOGFILE
         // FIXME: Do we want to always open the log file? Should it be configurable?
         i = ::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = dup(i);
 #endif
         i = dup(i); static_cast<void>(i);
-#ifdef TIGHTDB_ENABLE_LOGFILE
+#ifdef REALM_ENABLE_LOGFILE
         cerr << "Detaching" << endl;
 #endif
         // detach from current session:
@@ -496,19 +496,19 @@ void spawn_daemon(const string& file)
         // start commit daemon executable
         // Note that getenv (which is not thread safe) is called in a
         // single threaded context. This is ensured by the fork above.
-        const char* async_daemon = getenv("TIGHTDB_ASYNC_DAEMON");
+        const char* async_daemon = getenv("REALM_ASYNC_DAEMON");
         if (!async_daemon) {
 #ifndef TIGTHDB_DEBUG
-            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
+            async_daemon = REALM_INSTALL_LIBEXECDIR "/tightdbd";
 #else
-            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
+            async_daemon = REALM_INSTALL_LIBEXECDIR "/tightdbd-dbg";
 #endif
         }
         execl(async_daemon, async_daemon, file.c_str(), static_cast<char*>(0));
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
-#if TIGHTDB_ANDROID
+#if REALM_ANDROID
         _exit(1);
 #else
         _Exit(1);
@@ -576,7 +576,7 @@ void spawn_daemon(const string& file) {}
 void SharedGroup::open(const string& path, bool no_create_file,
                        DurabilityLevel dlevel, bool is_backend, const char* key)
 {
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT(!is_attached());
 
     m_db_path = path;
     m_key = key;
@@ -617,12 +617,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
             throw runtime_error("Lock file too large");
         
         // Compile time validate the alignment of the first three fields in SharedInfo
-        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
-        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
-        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
+        REALM_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
+        REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
+        REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
 
         // If this ever triggers we are on a really weird architecture 
-        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
+        REALM_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
 
         // we need to have the size_of_mutex, size_of_condvar and init_complete
         // fields available before we can check for compatibility
@@ -690,7 +690,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // If replication is enabled, we need to ask it whether we're in server-sync mode
             // and check that the database is operated in the same mode.
             bool server_sync_mode = false;
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl)
                 server_sync_mode = repl->is_in_server_synchronization_mode();
@@ -722,11 +722,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     if (top.size() <= 5) {
                         // the database wasn't written by shared group, so no versioning info
                         version = 1;
-                        TIGHTDB_ASSERT(! server_sync_mode);
+                        REALM_ASSERT(! server_sync_mode);
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
-                        TIGHTDB_ASSERT(top.size() == 7);
+                        REALM_ASSERT(top.size() == 7);
                         version = top.get(6) / 2;
                         // In case this was written by an older version of shared group, it
                         // will have version 0. Version 0 is not a legal initial version, so
@@ -739,7 +739,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     // the database was just created, no metadata has been written yet.
                     version = 1;
                 }
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
                 // If replication is enabled, we need to inform it of the latest version,
                 // allowing it to discard any surplus log entries
                 repl = _impl::GroupFriend::get_replication(m_group);
@@ -749,7 +749,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
 #ifndef _WIN32
                 if (key) {
-                    TIGHTDB_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+                    REALM_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint64_t(getpid());
                 }
 #endif
@@ -880,7 +880,7 @@ bool SharedGroup::compact()
 
     // update the versioning info to match
     Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(info->readers.get_last());
-    TIGHTDB_ASSERT(rc.version == info->latest_version_number);
+    REALM_ASSERT(rc.version == info->latest_version_number);
     rc.filesize = file_size;
     rc.current_top = top_ref;
     return true;
@@ -892,11 +892,11 @@ uint_fast64_t SharedGroup::get_number_of_versions()
     RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
     return info->number_of_versions;
 }
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* key)
 {
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT(!is_attached());
     string file = repl.get_database_path();
     bool no_create   = false;
     bool is_backend  = false;
@@ -907,12 +907,12 @@ void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* ke
 
 #endif
 
-SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
+SharedGroup::~SharedGroup() REALM_NOEXCEPT
 {
     close();
 }
 
-void SharedGroup::close() TIGHTDB_NOEXCEPT
+void SharedGroup::close() REALM_NOEXCEPT
 {
     if (!is_attached())
         return;
@@ -945,7 +945,7 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
                 }
                 catch(...) {} // ignored on purpose.
             }
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
             // If replication is enabled, we need to stop log management:
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl)
@@ -1020,7 +1020,7 @@ void SharedGroup::do_async_commits()
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
             shutdown = true;
-#ifdef TIGHTDB_ENABLE_LOGFILE
+#ifdef REALM_ENABLE_LOGFILE
             cerr << "Lock file removed, initiating shutdown" << endl;
 #endif
         }
@@ -1033,7 +1033,7 @@ void SharedGroup::do_async_commits()
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
             grab_latest_readlock(next_readlock, is_same);
             if (is_same && (shutdown || info->num_participants == 1)) {
-#ifdef TIGHTDB_ENABLE_LOGFILE
+#ifdef REALM_ENABLE_LOGFILE
                 cerr << "Daemon exiting nicely" << endl << endl;
 #endif
                 release_readlock(next_readlock);
@@ -1046,14 +1046,14 @@ void SharedGroup::do_async_commits()
 
         if (!is_same) {
 
-#ifdef TIGHTDB_ENABLE_LOGFILE
+#ifdef REALM_ENABLE_LOGFILE
             cerr << "Syncing from version " << m_readlock.m_version
                  << " to " << next_readlock.m_version << endl;
 #endif
             GroupWriter writer(m_group);
             writer.commit(next_readlock.m_top_ref);
 
-#ifdef TIGHTDB_ENABLE_LOGFILE
+#ifdef REALM_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
 #endif
         }
@@ -1158,7 +1158,7 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
 
 const Group& SharedGroup::begin_read(VersionID specific_version)
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+    REALM_ASSERT(m_transact_stage == transact_Ready);
 
     bool same_version_as_before;
     if (specific_version.version) {
@@ -1189,7 +1189,7 @@ const Group& SharedGroup::begin_read(VersionID specific_version)
 }
 
 
-void SharedGroup::release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT
+void SharedGroup::release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT
 {
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
@@ -1197,13 +1197,13 @@ void SharedGroup::release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT
 }
 
 
-void SharedGroup::end_read() TIGHTDB_NOEXCEPT
+void SharedGroup::end_read() REALM_NOEXCEPT
 {
     if (!m_group.is_attached())
         return;
 
-    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-    TIGHTDB_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
+    REALM_ASSERT(m_transact_stage == transact_Reading);
+    REALM_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
 
     release_readlock(m_readlock);
 
@@ -1212,13 +1212,13 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     m_transact_stage = transact_Ready;
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 void SharedGroup::promote_to_write()
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+    REALM_ASSERT(m_transact_stage == transact_Reading);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication()) {
         repl->begin_write_transact(*this); // Throws
         try {
@@ -1244,7 +1244,7 @@ void SharedGroup::promote_to_write()
 
 void SharedGroup::advance_read(VersionID specific_version)
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+    REALM_ASSERT(m_transact_stage == transact_Reading);
 
     ReadLockInfo old_readlock = m_readlock;
     bool same_as_before;
@@ -1302,13 +1302,13 @@ void SharedGroup::advance_read(VersionID specific_version)
     release_readlock(old_readlock);
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 
 Group& SharedGroup::begin_write()
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+    REALM_ASSERT(m_transact_stage == transact_Ready);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication())
         repl->begin_write_transact(*this); // Throws
 #endif
@@ -1318,7 +1318,7 @@ Group& SharedGroup::begin_write()
         begin_read(0);
     }
     catch (...) {
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = m_group.get_replication())
             repl->rollback_write_transact(*this);
 #endif
@@ -1370,7 +1370,7 @@ void SharedGroup::commit()
 }
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 void SharedGroup::commit_and_continue_as_read()
 {
@@ -1419,12 +1419,12 @@ void SharedGroup::do_rollback_and_continue_as_read(const char* begin, const char
 
 
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 
 
 void SharedGroup::do_commit()
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
+    REALM_ASSERT(m_transact_stage == transact_Writing);
 
     // FIXME: This fails when replication is enabled and the first transaction
     // in a lock-file session is rolled back (aborted), because then the first
@@ -1445,7 +1445,7 @@ void SharedGroup::do_commit()
 
     {
         uint_fast64_t new_version;
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         // It is essential that if Replication::commit_write_transact() fails,
         // then the transaction is not completed. In that case, a subsequent
         // call to rollback() must still roll the transaction back.
@@ -1485,7 +1485,7 @@ void SharedGroup::do_commit()
 }
 
 
-void SharedGroup::rollback() TIGHTDB_NOEXCEPT
+void SharedGroup::rollback() REALM_NOEXCEPT
 {
     // FIXME: This method must work correctly even if it is called after a
     // failed call to commit(). A failed call to commit() is any that returns to
@@ -1493,9 +1493,9 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
     // not handle all cases.
 
     if (m_group.is_attached()) {
-        TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
+        REALM_ASSERT(m_transact_stage == transact_Writing);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = m_group.get_replication())
             repl->rollback_write_transact(*this);
 #endif
@@ -1577,7 +1577,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         // If replication is enabled, we need to propagate knowledge of the earliest 
         // available version:
         Replication* repl = _impl::GroupFriend::get_replication(m_group);
@@ -1588,8 +1588,8 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     }
 
     // Do the actual commit
-    TIGHTDB_ASSERT(m_group.m_top.is_attached());
-    TIGHTDB_ASSERT(readlock_version <= new_version);
+    REALM_ASSERT(m_group.m_top.is_attached());
+    REALM_ASSERT(readlock_version <= new_version);
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
     out.set_versions(new_version, readlock_version);
@@ -1639,7 +1639,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 
 void SharedGroup::reserve(size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     // FIXME: There is currently no synchronization between this and
     // concurrent commits in progress. This is so because it is
     // believed that the OS guarantees race free behavior when

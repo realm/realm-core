@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_INDEX_STRING_HPP
-#define TIGHTDB_INDEX_STRING_HPP
+#ifndef REALM_INDEX_STRING_HPP
+#define REALM_INDEX_STRING_HPP
 
 #include <iostream>
 
@@ -31,7 +31,7 @@ namespace tightdb {
 // by making Column convert its integers to strings by calling to_str().
 template <class T> inline StringData to_str(T& value)
 {
-    TIGHTDB_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
+    REALM_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
     const char* c = reinterpret_cast<const char*>(&value);
     return StringData(c, sizeof(T));
 }
@@ -53,8 +53,8 @@ public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
                 StringGetter get_func, bool allow_duplicate_values, Allocator&);
-    ~StringIndex() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-    void set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT;
+    ~StringIndex() REALM_NOEXCEPT REALM_OVERRIDE {}
+    void set_target(void* target_column, StringGetter get_func) REALM_NOEXCEPT;
 
     bool is_empty() const;
 
@@ -95,22 +95,22 @@ public:
     using Column::clear;
 
     void distinct(Column& result) const;
-    bool has_duplicate_values() const TIGHTDB_NOEXCEPT;
+    bool has_duplicate_values() const REALM_NOEXCEPT;
 
     /// By default, duplicate values are allowed.
-    void set_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT;
+    void set_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE;
     void verify_entries(const AdaptiveStringColumn& column) const;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
     void to_dot() const { to_dot(std::cerr); }
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
     typedef int32_t key_type;
 
-    static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
+    static key_type create_key(StringData) REALM_NOEXCEPT;
 
 private:
     void* m_target_column;
@@ -134,7 +134,7 @@ private:
     void adjust_row_indexes(size_t min_row_ndx, int diff);
 
     void validate_value(StringData data) const;
-    void validate_value(int64_t value) const TIGHTDB_NOEXCEPT;
+    void validate_value(int64_t value) const REALM_NOEXCEPT;
 
     struct NodeChange {
         size_t ref1;
@@ -158,7 +158,7 @@ private:
 
     void NodeAddKey(ref_type ref);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     static void dump_node_structure(const Array& node, std::ostream&, int level);
     void to_dot_2(std::ostream&, StringData title = StringData()) const;
     static void array_to_dot(std::ostream&, const Array&);
@@ -187,7 +187,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t n
     m_get_func(get_func),
     m_deny_duplicate_values(deny_duplicate_values)
 {
-    TIGHTDB_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
+    REALM_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
     set_parent(parent, ndx_in_parent);
 }
 
@@ -199,7 +199,7 @@ inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
 {
 }
 
-inline void StringIndex::set_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+inline void StringIndex::set_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 {
     m_deny_duplicate_values = !allow;
 }
@@ -209,7 +209,7 @@ inline void StringIndex::set_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
 // range-lookups and iterate in order, etc, as future features. This, however, makes the same
 // features slower for string indexes. Todo, we should reverse the order conditionally, depending
 // on the column type.
-inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOEXCEPT
+inline StringIndex::key_type StringIndex::create_key(StringData str) REALM_NOEXCEPT
 {
     key_type key = 0;
 
@@ -266,7 +266,7 @@ template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.
 
-    if (TIGHTDB_LIKELY(new_value2 != old_value)) {
+    if (REALM_LIKELY(new_value2 != old_value)) {
         size_t offset = 0; // First key from beginning of string
         insert_with_offset(row_ndx, new_value2, offset); // Throws
 
@@ -284,7 +284,7 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 
     // Collapse top nodes with single item
     while (!root_is_leaf()) {
-        TIGHTDB_ASSERT(array()->size() > 1); // node cannot be empty
+        REALM_ASSERT(array()->size() > 1); // node cannot be empty
         if (array()->size() > 2)
             break;
 
@@ -302,4 +302,4 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 
 } //namespace tightdb
 
-#endif // TIGHTDB_INDEX_STRING_HPP
+#endif // REALM_INDEX_STRING_HPP

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_STRING_HPP
-#define TIGHTDB_STRING_HPP
+#ifndef REALM_STRING_HPP
+#define REALM_STRING_HPP
 
 #include <cstddef>
 #include <algorithm>
@@ -75,24 +75,24 @@ namespace tightdb {
 class StringData {
 public:
     /// Construct a null reference.
-    StringData() TIGHTDB_NOEXCEPT;
+    StringData() REALM_NOEXCEPT;
 
     /// If \a data is 'null', \a size must be zero.
-    StringData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT;
+    StringData(const char* data, std::size_t size) REALM_NOEXCEPT;
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
 
     /// Initialize from a zero terminated C style string. Pass null to construct
     /// a null reference.
-    StringData(const char* c_str) TIGHTDB_NOEXCEPT;
+    StringData(const char* c_str) REALM_NOEXCEPT;
 
-    ~StringData() TIGHTDB_NOEXCEPT;
+    ~StringData() REALM_NOEXCEPT;
 
-    char operator[](std::size_t i) const TIGHTDB_NOEXCEPT;
+    char operator[](std::size_t i) const REALM_NOEXCEPT;
 
-    const char* data() const TIGHTDB_NOEXCEPT;
-    std::size_t size() const TIGHTDB_NOEXCEPT;
+    const char* data() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT;
 
     /// Is this a null reference?
     ///
@@ -116,40 +116,40 @@ public:
     /// makes no distinction between a null reference and a reference to the
     /// empty string. These functions and operators never look at the stored
     /// pointer if the stored size is zero.
-    bool is_null() const TIGHTDB_NOEXCEPT;
+    bool is_null() const REALM_NOEXCEPT;
 
-    friend bool operator==(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
-    friend bool operator!=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator==(const StringData&, const StringData&) REALM_NOEXCEPT;
+    friend bool operator!=(const StringData&, const StringData&) REALM_NOEXCEPT;
 
     //@{
     /// Trivial bytewise lexicographical comparison.
-    friend bool operator<(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
-    friend bool operator>(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
-    friend bool operator<=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
-    friend bool operator>=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator<(const StringData&, const StringData&) REALM_NOEXCEPT;
+    friend bool operator>(const StringData&, const StringData&) REALM_NOEXCEPT;
+    friend bool operator<=(const StringData&, const StringData&) REALM_NOEXCEPT;
+    friend bool operator>=(const StringData&, const StringData&) REALM_NOEXCEPT;
     //@}
 
-    bool begins_with(StringData) const TIGHTDB_NOEXCEPT;
-    bool ends_with(StringData) const TIGHTDB_NOEXCEPT;
-    bool contains(StringData) const TIGHTDB_NOEXCEPT;
+    bool begins_with(StringData) const REALM_NOEXCEPT;
+    bool ends_with(StringData) const REALM_NOEXCEPT;
+    bool contains(StringData) const REALM_NOEXCEPT;
 
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
     /// size().
-    StringData prefix(std::size_t n) const TIGHTDB_NOEXCEPT;
-    StringData suffix(std::size_t n) const TIGHTDB_NOEXCEPT;
-    StringData substr(std::size_t i, std::size_t n) const TIGHTDB_NOEXCEPT;
-    StringData substr(std::size_t i) const TIGHTDB_NOEXCEPT;
+    StringData prefix(std::size_t n) const REALM_NOEXCEPT;
+    StringData suffix(std::size_t n) const REALM_NOEXCEPT;
+    StringData substr(std::size_t i, std::size_t n) const REALM_NOEXCEPT;
+    StringData substr(std::size_t i) const REALM_NOEXCEPT;
     //@}
 
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
 
-#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    explicit operator bool() const TIGHTDB_NOEXCEPT;
+#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    explicit operator bool() const REALM_NOEXCEPT;
 #else
     typedef const char* StringData::*unspecified_bool_type;
-    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+    operator unspecified_bool_type() const REALM_NOEXCEPT;
 #endif
 
 private:
@@ -161,17 +161,17 @@ private:
 
 // Implementation:
 
-inline StringData::StringData() TIGHTDB_NOEXCEPT:
+inline StringData::StringData() REALM_NOEXCEPT:
     m_data(0),
     m_size(0)
 {
 }
 
-inline StringData::StringData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT:
+inline StringData::StringData(const char* data, std::size_t size) REALM_NOEXCEPT:
     m_data(data),
     m_size(size)
 {
-    TIGHTDB_ASSERT_DEBUG(data || size == 0);
+    REALM_ASSERT_DEBUG(data || size == 0);
 }
 
 template<class T, class A> inline StringData::StringData(const std::basic_string<char, T, A>& s):
@@ -185,7 +185,7 @@ template<class T, class A> inline StringData::operator std::basic_string<char, T
     return std::basic_string<char, T, A>(m_data, m_size);
 }
 
-inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
+inline StringData::StringData(const char* c_str) REALM_NOEXCEPT:
     m_data(c_str),
     m_size(0)
 {
@@ -193,93 +193,93 @@ inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
         m_size = std::char_traits<char>::length(c_str);
 }
 
-inline StringData::~StringData() TIGHTDB_NOEXCEPT
+inline StringData::~StringData() REALM_NOEXCEPT
 {
 }
 
-inline char StringData::operator[](std::size_t i) const TIGHTDB_NOEXCEPT
+inline char StringData::operator[](std::size_t i) const REALM_NOEXCEPT
 {
     return m_data[i];
 }
 
-inline const char* StringData::data() const TIGHTDB_NOEXCEPT
+inline const char* StringData::data() const REALM_NOEXCEPT
 {
     return m_data;
 }
 
-inline std::size_t StringData::size() const TIGHTDB_NOEXCEPT
+inline std::size_t StringData::size() const REALM_NOEXCEPT
 {
     return m_size;
 }
 
-inline bool StringData::is_null() const TIGHTDB_NOEXCEPT
+inline bool StringData::is_null() const REALM_NOEXCEPT
 {
     return !m_data;
 }
 
-inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+inline bool operator==(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
     return a.m_size == b.m_size && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
-inline bool operator!=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+inline bool operator!=(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
     return !(a == b);
 }
 
-inline bool operator<(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+inline bool operator<(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
     return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
                                         b.m_data, b.m_data + b.m_size);
 }
 
-inline bool operator>(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+inline bool operator>(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
     return b < a;
 }
 
-inline bool operator<=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+inline bool operator<=(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
     return !(b < a);
 }
 
-inline bool operator>=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+inline bool operator>=(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
     return !(a < b);
 }
 
-inline bool StringData::begins_with(StringData d) const TIGHTDB_NOEXCEPT
+inline bool StringData::begins_with(StringData d) const REALM_NOEXCEPT
 {
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
-inline bool StringData::ends_with(StringData d) const TIGHTDB_NOEXCEPT
+inline bool StringData::ends_with(StringData d) const REALM_NOEXCEPT
 {
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
-inline bool StringData::contains(StringData d) const TIGHTDB_NOEXCEPT
+inline bool StringData::contains(StringData d) const REALM_NOEXCEPT
 {
     return d.m_size == 0 ||
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
-inline StringData StringData::prefix(std::size_t n) const TIGHTDB_NOEXCEPT
+inline StringData StringData::prefix(std::size_t n) const REALM_NOEXCEPT
 {
     return substr(0,n);
 }
 
-inline StringData StringData::suffix(std::size_t n) const TIGHTDB_NOEXCEPT
+inline StringData StringData::suffix(std::size_t n) const REALM_NOEXCEPT
 {
     return substr(m_size - n);
 }
 
-inline StringData StringData::substr(std::size_t i, std::size_t n) const TIGHTDB_NOEXCEPT
+inline StringData StringData::substr(std::size_t i, std::size_t n) const REALM_NOEXCEPT
 {
     return StringData(m_data + i, n);
 }
 
-inline StringData StringData::substr(std::size_t i) const TIGHTDB_NOEXCEPT
+inline StringData StringData::substr(std::size_t i) const REALM_NOEXCEPT
 {
     return substr(i, m_size - i);
 }
@@ -292,13 +292,13 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const S
     return out;
 }
 
-#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-inline StringData::operator bool() const TIGHTDB_NOEXCEPT
+#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+inline StringData::operator bool() const REALM_NOEXCEPT
 {
     return !is_null();
 }
 #else
-inline StringData::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
+inline StringData::operator unspecified_bool_type() const REALM_NOEXCEPT
 {
     return is_null() ? 0 : &StringData::m_data;
 }
@@ -306,4 +306,4 @@ inline StringData::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
 
 } // namespace tightdb
 
-#endif // TIGHTDB_STRING_HPP
+#endif // REALM_STRING_HPP

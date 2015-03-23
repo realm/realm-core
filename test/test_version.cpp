@@ -41,10 +41,10 @@ using namespace tightdb;
 
 TEST(Version_General)
 {
-    CHECK_EQUAL(TIGHTDB_VER_MAJOR, Version::get_major());
-    CHECK_EQUAL(TIGHTDB_VER_MINOR, Version::get_minor());
-    CHECK_EQUAL(TIGHTDB_VER_PATCH, Version::get_patch());
-    CHECK_EQUAL(TIGHTDB_VER_PATCH, Version::get_patch());
+    CHECK_EQUAL(REALM_VER_MAJOR, Version::get_major());
+    CHECK_EQUAL(REALM_VER_MINOR, Version::get_minor());
+    CHECK_EQUAL(REALM_VER_PATCH, Version::get_patch());
+    CHECK_EQUAL(REALM_VER_PATCH, Version::get_patch());
 
     CHECK_EQUAL(true, Version::is_at_least(0,0,0));
     CHECK_EQUAL(true, Version::is_at_least(0,1,5));

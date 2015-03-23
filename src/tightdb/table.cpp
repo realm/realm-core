@@ -25,7 +25,7 @@
 #include <tightdb/index_string.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/link_view.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
 
@@ -281,7 +281,7 @@ template<> struct ColumnTypeTraits3<DateTime> {
 
 size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
-    TIGHTDB_ASSERT(!has_shared_type());
+    REALM_ASSERT(!has_shared_type());
     return get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
@@ -299,7 +299,7 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 
 
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
-                                 size_t origin_col_ndx) const TIGHTDB_NOEXCEPT
+                                 size_t origin_col_ndx) const REALM_NOEXCEPT
 {
     size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
@@ -309,7 +309,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
 
 
 size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx,
-                           size_t backlink_ndx) const TIGHTDB_NOEXCEPT
+                           size_t backlink_ndx) const REALM_NOEXCEPT
 {
     size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
@@ -319,7 +319,7 @@ size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_co
 
 
 void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_table,
-                                          size_t backlink_col_ndx) TIGHTDB_NOEXCEPT
+                                          size_t backlink_col_ndx) REALM_NOEXCEPT
 {
     ColumnLinkBase& link_col = get_column_link_base(link_col_ndx);
     ColumnBackLink& backlink_col = target_table.get_column_backlink(backlink_col_ndx);
@@ -330,7 +330,7 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
 }
 
 
-size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     size_t sum = 0;
     size_t col_ndx_begin = m_spec.get_public_column_count();
@@ -379,7 +379,7 @@ void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
         typedef _impl::GroupFriend gf;
         Table& table = gf::get_table(group, i->table_ndx);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = table.get_repl()) {
             bool move_last_over = true;
             repl->erase_row(&table, i->row_ndx, move_last_over); // Throws
@@ -394,36 +394,36 @@ void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
 void Table::insert_column(size_t col_ndx, DataType type, StringData name,
                           DescriptorRef* subdesc)
 {
-    TIGHTDB_ASSERT(!has_shared_type());
+    REALM_ASSERT(!has_shared_type());
     get_descriptor()->insert_column(col_ndx, type, name, subdesc); // Throws
 }
 
 
 void Table::remove_column(size_t col_ndx)
 {
-    TIGHTDB_ASSERT(!has_shared_type());
+    REALM_ASSERT(!has_shared_type());
     get_descriptor()->remove_column(col_ndx); // Throws
 }
 
 
 void Table::rename_column(size_t col_ndx, StringData name)
 {
-    TIGHTDB_ASSERT(!has_shared_type());
+    REALM_ASSERT(!has_shared_type());
     get_descriptor()->rename_column(col_ndx, name); // Throws
 }
 
 
 DescriptorRef Table::get_descriptor()
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     if (has_shared_type()) {
         ArrayParent* array_parent = m_columns.get_parent();
-        TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
+        REALM_ASSERT(dynamic_cast<Parent*>(array_parent));
         Parent* table_parent = static_cast<Parent*>(array_parent);
         size_t col_ndx = 0;
         Table* parent = table_parent->get_parent_table(&col_ndx);
-        TIGHTDB_ASSERT(parent);
+        REALM_ASSERT(parent);
         return parent->get_descriptor()->get_subdescriptor(col_ndx); // Throws
     }
 
@@ -511,14 +511,14 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent,
 {
     m_mark = false;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     m_version = 0;
 #endif
 
     // Load from allocated memory
     m_top.set_parent(parent, ndx_in_parent);
     m_top.init_from_ref(top_ref);
-    TIGHTDB_ASSERT_3(m_top.size(), ==, 2);
+    REALM_ASSERT_3(m_top.size(), ==, 2);
 
     size_t spec_ndx_in_parent = 0;
     m_spec.set_parent(&m_top, spec_ndx_in_parent);
@@ -541,7 +541,7 @@ void Table::init(ConstSubspecRef shared_spec, ArrayParent* parent_column, size_t
 {
     m_mark = false;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     m_version = 0;
 #endif
 
@@ -568,7 +568,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
         m_column_ndx(i), m_type(t)
     {
     }
-    void update(const ColumnTable& subtables, Array& subcolumns) TIGHTDB_OVERRIDE
+    void update(const ColumnTable& subtables, Array& subcolumns) REALM_OVERRIDE
     {
         size_t row_ndx = subcolumns.get_ndx_in_parent();
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
@@ -578,7 +578,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
         subcolumns.insert(m_column_ndx, column_ref); // Throws
         dg.release();
     }
-    void update_accessor(Table& table) TIGHTDB_OVERRIDE
+    void update_accessor(Table& table) REALM_OVERRIDE
     {
         table.adj_insert_column(m_column_ndx); // Throws
         table.refresh_column_accessors(m_column_ndx); // Throws
@@ -596,13 +596,13 @@ struct Table::EraseSubtableColumns: SubtableUpdater {
         m_column_ndx(i)
     {
     }
-    void update(const ColumnTable&, Array& subcolumns) TIGHTDB_OVERRIDE
+    void update(const ColumnTable&, Array& subcolumns) REALM_OVERRIDE
     {
         ref_type column_ref = to_ref(subcolumns.get(m_column_ndx));
         subcolumns.erase(m_column_ndx); // Throws
         Array::destroy_deep(column_ref, subcolumns.get_alloc());
     }
-    void update_accessor(Table& table) TIGHTDB_OVERRIDE
+    void update_accessor(Table& table) REALM_OVERRIDE
     {
         table.adj_erase_column(m_column_ndx);
         table.refresh_column_accessors(m_column_ndx);
@@ -615,10 +615,10 @@ private:
 
 
 struct Table::RenameSubtableColumns: SubtableUpdater {
-    void update(const ColumnTable&, Array&) TIGHTDB_OVERRIDE
+    void update(const ColumnTable&, Array&) REALM_OVERRIDE
     {
     }
-    void update_accessor(Table& table) TIGHTDB_OVERRIDE
+    void update_accessor(Table& table) REALM_OVERRIDE
     {
         bool bump_global = false;
         table.bump_version(bump_global);
@@ -629,14 +629,14 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
 void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
                              StringData name, Table* link_target_table)
 {
-    TIGHTDB_ASSERT(desc.is_attached());
+    REALM_ASSERT(desc.is_attached());
 
-    if (TIGHTDB_UNLIKELY(name.size() > Descriptor::max_column_name_length))
+    if (REALM_UNLIKELY(name.size() > Descriptor::max_column_name_length))
         throw LogicError(LogicError::column_name_too_long);
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::get_root_table(desc);
-    TIGHTDB_ASSERT(!root_table.has_shared_type());
+    REALM_ASSERT(!root_table.has_shared_type());
 
     if (desc.is_root()) {
         root_table.bump_version();
@@ -652,7 +652,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
         }
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
         repl->insert_column(desc, col_ndx, type, name, link_target_table); // Throws
 #endif
@@ -661,12 +661,12 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
 void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
 {
-    TIGHTDB_ASSERT(desc.is_attached());
+    REALM_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::get_root_table(desc);
-    TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT_3(col_ndx, <, desc.get_column_count());
+    REALM_ASSERT(!root_table.has_shared_type());
+    REALM_ASSERT_3(col_ndx, <, desc.get_column_count());
 
     // For root tables, it is possible that the column to be removed is the last
     // column that is not a backlink column. If there are no backlink columns,
@@ -685,7 +685,7 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
             root_table.clear(); // Throws
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
         repl->erase_column(desc, col_ndx); // Throws
 #endif
@@ -708,12 +708,12 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
 
 void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 {
-    TIGHTDB_ASSERT(desc.is_attached());
+    REALM_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::get_root_table(desc);
-    TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT_3(col_ndx, <, desc.get_column_count());
+    REALM_ASSERT(!root_table.has_shared_type());
+    REALM_ASSERT_3(col_ndx, <, desc.get_column_count());
 
     Spec& spec = df::get_spec(desc);
     spec.rename_column(col_ndx, name); // Throws
@@ -729,7 +729,7 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
         }
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
         repl->rename_column(desc, col_ndx, name); // Throws
 #endif
@@ -739,7 +739,7 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
                                Table* link_target_table)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <=, m_spec.get_public_column_count());
+    REALM_ASSERT_3(col_ndx, <=, m_spec.get_public_column_count());
 
     do_insert_root_column(col_ndx, ColumnType(type), name); // Throws
     adj_insert_column(col_ndx); // Throws
@@ -771,7 +771,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
 
 void Table::erase_root_column(size_t col_ndx)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, m_spec.get_public_column_count());
+    REALM_ASSERT_3(col_ndx, <, m_spec.get_public_column_count());
 
     // For link columns we need to erase the backlink column first in case the
     // target table is the same as the origin table (because the backlink column
@@ -847,7 +847,7 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
     ColumnLinkBase& col = get_column_link_base(col_ndx);
     col.set_weak_links(weak_links);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_link_type(this, col_ndx, link_type); // Throws
 #endif
@@ -868,7 +868,7 @@ void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_nd
 void Table::erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx)
 {
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    TIGHTDB_ASSERT_3(backlink_col_ndx, !=, tightdb::not_found);
+    REALM_ASSERT_3(backlink_col_ndx, !=, tightdb::not_found);
     do_erase_root_column(backlink_col_ndx); // Throws
     adj_erase_column(backlink_col_ndx);
     refresh_column_accessors(backlink_col_ndx); // Throws
@@ -898,7 +898,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 }
 
 
-void Table::register_row_accessor(RowBase* row) const TIGHTDB_NOEXCEPT
+void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
     row->m_prev = 0;
     row->m_next = m_row_accessors;
@@ -908,7 +908,7 @@ void Table::register_row_accessor(RowBase* row) const TIGHTDB_NOEXCEPT
 }
 
 
-void Table::unregister_row_accessor(RowBase* row) const TIGHTDB_NOEXCEPT
+void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
     if (row->m_prev) {
         row->m_prev->m_next = row->m_next;
@@ -921,7 +921,7 @@ void Table::unregister_row_accessor(RowBase* row) const TIGHTDB_NOEXCEPT
 }
 
 
-void Table::discard_row_accessors() TIGHTDB_NOEXCEPT
+void Table::discard_row_accessors() REALM_NOEXCEPT
 {
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
@@ -939,7 +939,7 @@ void Table::update_subtables(Descriptor& desc, SubtableUpdater* updater)
     for (;;) {
         typedef _impl::DescriptorFriend df;
         begin = df::record_subdesc_path(desc, begin, end);
-        if (TIGHTDB_LIKELY(begin)) {
+        if (REALM_LIKELY(begin)) {
             Table& root_table = df::get_root_table(desc);
             root_table.update_subtables(begin, end, updater); // Throws
             return;
@@ -957,10 +957,10 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
                              SubtableUpdater* updater)
 {
     size_t col_path_size = col_path_end - col_path_begin;
-    TIGHTDB_ASSERT_3(col_path_size, >=, 1);
+    REALM_ASSERT_3(col_path_size, >=, 1);
 
     size_t col_ndx = *col_path_begin;
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
 
     ColumnTable& subtables = get_column_table(col_ndx); // Throws
     size_t num_rows = size();
@@ -1026,7 +1026,7 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     if (col_path_begin == col_path_end) {
         updater.update(*this); // Throws
@@ -1037,14 +1037,14 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
     size_t col_ndx = col_path_begin[0];
     // If this table is not a degenerate subtable, then `col_ndx` must be a
     // valid index into `m_cols`.
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
 
     // Early-out if this accessor refers to a degenerate subtable
     if (m_cols.empty())
         return;
 
     if (ColumnBase* col = m_cols[col_ndx]) {
-        TIGHTDB_ASSERT(dynamic_cast<ColumnTable*>(col));
+        REALM_ASSERT(dynamic_cast<ColumnTable*>(col));
         ColumnTable* col_2 = static_cast<ColumnTable*>(col);
         col_2->update_table_accessors(col_path_begin+1, col_path_end, updater); // Throws
     }
@@ -1056,7 +1056,7 @@ void Table::create_degen_subtab_columns()
     // Creates columns as well as column accessors for a degenerate
     // subtable. When done, that subtable is no longer degenerate.
 
-    TIGHTDB_ASSERT(!m_columns.is_attached());
+    REALM_ASSERT(!m_columns.is_attached());
 
     m_columns.create(Array::type_HasRefs); // Throws
     m_columns.update_parent(); // Throws
@@ -1071,7 +1071,7 @@ void Table::create_degen_subtab_columns()
 
         // So far, only root tables can have search indexes, and this is not a
         // root table.
-        TIGHTDB_ASSERT_3(m_spec.get_column_attr(i), ==, col_attr_None);
+        REALM_ASSERT_3(m_spec.get_column_attr(i), ==, col_attr_None);
     }
 
     m_cols.resize(num_cols);
@@ -1079,13 +1079,13 @@ void Table::create_degen_subtab_columns()
 }
 
 
-void Table::detach() TIGHTDB_NOEXCEPT
+void Table::detach() REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.m_top.detach();
@@ -1106,7 +1106,7 @@ void Table::detach() TIGHTDB_NOEXCEPT
 }
 
 
-void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
+void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 {
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
@@ -1123,7 +1123,7 @@ void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
 
 
 void Table::move_registered_view(const TableViewBase* old_addr,
-                                 const TableViewBase* new_addr) TIGHTDB_NOEXCEPT
+                                 const TableViewBase* new_addr) REALM_NOEXCEPT
 {
     typedef views::iterator iter;
     iter end = m_views.end();
@@ -1133,11 +1133,11 @@ void Table::move_registered_view(const TableViewBase* old_addr,
             return;
         }
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 }
 
 
-void Table::discard_views() TIGHTDB_NOEXCEPT
+void Table::discard_views() REALM_NOEXCEPT
 {
     typedef views::const_iterator iter;
     iter end = m_views.end();
@@ -1147,7 +1147,7 @@ void Table::discard_views() TIGHTDB_NOEXCEPT
 }
 
 
-void Table::discard_child_accessors() TIGHTDB_NOEXCEPT
+void Table::discard_child_accessors() REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -1163,7 +1163,7 @@ void Table::discard_child_accessors() TIGHTDB_NOEXCEPT
 }
 
 
-void Table::discard_desc_accessor() TIGHTDB_NOEXCEPT
+void Table::discard_desc_accessor() REALM_NOEXCEPT
 {
     if (m_descriptor) {
         // Must hold a reliable reference count while detaching
@@ -1239,13 +1239,13 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             // These have no function yet and are therefore unexpected.
             break;
     }
-    TIGHTDB_ASSERT(col);
+    REALM_ASSERT(col);
     col->set_parent(&m_columns, ndx_in_parent);
     return col;
 }
 
 
-void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
+void Table::destroy_column_accessors() REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -1260,7 +1260,7 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 }
 
 
-Table::~Table() TIGHTDB_NOEXCEPT
+Table::~Table() REALM_NOEXCEPT
 {
     // Whenever this is not a free-standing table, the destructor must be able
     // to operate without assuming more than minimal accessor consistency This
@@ -1269,11 +1269,11 @@ Table::~Table() TIGHTDB_NOEXCEPT
 
     if (!is_attached()) {
         // This table has been detached.
-        TIGHTDB_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT_3(m_ref_count, ==, 0);
         return;
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.m_top.detach();
@@ -1284,9 +1284,9 @@ Table::~Table() TIGHTDB_NOEXCEPT
         // reference counting, so we must let the parent know about the demise
         // of this subtable.
         ArrayParent* parent = m_columns.get_parent();
-        TIGHTDB_ASSERT(parent);
-        TIGHTDB_ASSERT_3(m_ref_count, ==, 0);
-        TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+        REALM_ASSERT(parent);
+        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
         m_cols.clear();
@@ -1297,8 +1297,8 @@ Table::~Table() TIGHTDB_NOEXCEPT
     if (ArrayParent* parent = m_top.get_parent()) {
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
-        TIGHTDB_ASSERT_3(m_ref_count, ==, 0);
-        TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
         m_cols.clear();
@@ -1326,10 +1326,10 @@ Table::~Table() TIGHTDB_NOEXCEPT
 }
 
 
-bool Table::has_search_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
+bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
 {
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
-    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         return false;
     const ColumnBase& col = get_column_base(col_ndx);
     return col.has_search_index();
@@ -1338,19 +1338,19 @@ bool Table::has_search_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
 
 void Table::add_search_index(size_t col_ndx)
 {
-    if (TIGHTDB_UNLIKELY(!is_attached()))
+    if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (TIGHTDB_UNLIKELY(has_shared_type()))
+    if (REALM_UNLIKELY(has_shared_type()))
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     if (has_search_index(col_ndx))
         return;
 
-    TIGHTDB_ASSERT(!m_primary_key);
+    REALM_ASSERT(!m_primary_key);
 
     Spec::ColumnInfo info;
     m_spec.get_column_info(col_ndx, info);
@@ -1376,7 +1376,7 @@ void Table::add_search_index(size_t col_ndx)
 
     refresh_column_accessors(col_ndx+1); // Throws
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->add_search_index(this, col_ndx); // Throws
 #endif
@@ -1385,16 +1385,16 @@ void Table::add_search_index(size_t col_ndx)
 
 void Table::remove_search_index(size_t col_ndx)
 {
-    if (TIGHTDB_UNLIKELY(!is_attached()))
+    if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (TIGHTDB_UNLIKELY(has_shared_type()))
+    if (REALM_UNLIKELY(has_shared_type()))
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if (TIGHTDB_UNLIKELY(m_primary_key))
+    if (REALM_UNLIKELY(m_primary_key))
         throw LogicError(LogicError::is_primary_key);
 
     if (!has_search_index(col_ndx))
@@ -1412,14 +1412,14 @@ void Table::remove_search_index(size_t col_ndx)
     m_columns.erase(col_ndx + 1);
     refresh_column_accessors(col_ndx + 1); // Throws
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->remove_search_index(this, col_ndx); // Throws
 #endif
 }
 
 
-bool Table::has_primary_key() const TIGHTDB_NOEXCEPT
+bool Table::has_primary_key() const REALM_NOEXCEPT
 {
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
     size_t n = m_cols.size();
@@ -1434,19 +1434,19 @@ bool Table::has_primary_key() const TIGHTDB_NOEXCEPT
 
 bool Table::try_add_primary_key(size_t col_ndx)
 {
-    if (TIGHTDB_UNLIKELY(!is_attached()))
+    if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (TIGHTDB_UNLIKELY(has_shared_type()))
+    if (REALM_UNLIKELY(has_shared_type()))
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (TIGHTDB_UNLIKELY(has_primary_key()))
+    if (REALM_UNLIKELY(has_primary_key()))
         throw LogicError(LogicError::has_primary_key);
 
-    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if (TIGHTDB_UNLIKELY(!has_search_index(col_ndx)))
+    if (REALM_UNLIKELY(!has_search_index(col_ndx)))
         throw LogicError(LogicError::no_search_index);
 
     // FIXME: Also check that there are no null values
@@ -1477,14 +1477,14 @@ bool Table::try_add_primary_key(size_t col_ndx)
     else {
         // Impossible case, because we know that a search index was already
         // added.
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
     }
 
     int attr = m_spec.get_column_attr(col_ndx);
     attr |= col_attr_Unique | col_attr_PrimaryKey;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->add_primary_key(this, col_ndx); // Throws
 #endif
@@ -1495,10 +1495,10 @@ bool Table::try_add_primary_key(size_t col_ndx)
 
 void Table::remove_primary_key()
 {
-    if (TIGHTDB_UNLIKELY(!is_attached()))
+    if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (TIGHTDB_UNLIKELY(has_shared_type()))
+    if (REALM_UNLIKELY(has_shared_type()))
         throw LogicError(LogicError::wrong_kind_of_table);
 
     size_t num_cols = m_cols.size();
@@ -1522,10 +1522,10 @@ void Table::remove_primary_key()
                 index.set_allow_duplicate_values(true);
             }
             else {
-                TIGHTDB_ASSERT(false);
+                REALM_ASSERT(false);
             }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
             if (Replication* repl = get_repl())
                 repl->remove_primary_key(this); // Throws
 #endif
@@ -1578,24 +1578,24 @@ void Table::remove_primary_key()
 // Note: get_subtable_ptr() has now been collapsed to one version, but
 // the suggested change will still be a significant improvement.
 
-const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnBase& Table::get_column_base(size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < m_spec.get_column_count());
-    TIGHTDB_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
+    REALM_ASSERT_DEBUG(ndx < m_spec.get_column_count());
+    REALM_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
     return *m_cols[ndx];
 }
 
 
 ColumnBase& Table::get_column_base(size_t ndx)
 {
-    TIGHTDB_ASSERT_DEBUG(ndx < m_spec.get_column_count());
+    REALM_ASSERT_DEBUG(ndx < m_spec.get_column_count());
     instantiate_before_change();
-    TIGHTDB_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
+    REALM_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
     return *m_cols[ndx];
 }
 
 
-const Column& Table::get_column(size_t ndx) const TIGHTDB_NOEXCEPT
+const Column& Table::get_column(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<Column, col_type_Int>(ndx);
 }
@@ -1605,7 +1605,7 @@ Column& Table::get_column(size_t ndx)
     return get_column<Column, col_type_Int>(ndx);
 }
 
-const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const TIGHTDB_NOEXCEPT
+const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<AdaptiveStringColumn, col_type_String>(ndx);
 }
@@ -1615,7 +1615,7 @@ AdaptiveStringColumn& Table::get_column_string(size_t ndx)
     return get_column<AdaptiveStringColumn, col_type_String>(ndx);
 }
 
-const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
 }
@@ -1625,7 +1625,7 @@ ColumnStringEnum& Table::get_column_string_enum(size_t ndx)
     return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
 }
 
-const ColumnFloat& Table::get_column_float(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnFloat& Table::get_column_float(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnFloat, col_type_Float>(ndx);
 }
@@ -1635,7 +1635,7 @@ ColumnFloat& Table::get_column_float(size_t ndx)
     return get_column<ColumnFloat, col_type_Float>(ndx);
 }
 
-const ColumnDouble& Table::get_column_double(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnDouble& Table::get_column_double(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnDouble, col_type_Double>(ndx);
 }
@@ -1645,7 +1645,7 @@ ColumnDouble& Table::get_column_double(size_t ndx)
     return get_column<ColumnDouble, col_type_Double>(ndx);
 }
 
-const ColumnBinary& Table::get_column_binary(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnBinary& Table::get_column_binary(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnBinary, col_type_Binary>(ndx);
 }
@@ -1655,7 +1655,7 @@ ColumnBinary& Table::get_column_binary(size_t ndx)
     return get_column<ColumnBinary, col_type_Binary>(ndx);
 }
 
-const ColumnTable &Table::get_column_table(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnTable &Table::get_column_table(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnTable, col_type_Table>(ndx);
 }
@@ -1665,7 +1665,7 @@ ColumnTable &Table::get_column_table(size_t ndx)
     return get_column<ColumnTable, col_type_Table>(ndx);
 }
 
-const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnMixed& Table::get_column_mixed(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnMixed, col_type_Mixed>(ndx);
 }
@@ -1675,10 +1675,10 @@ ColumnMixed& Table::get_column_mixed(size_t ndx)
     return get_column<ColumnMixed, col_type_Mixed>(ndx);
 }
 
-const ColumnLinkBase& Table::get_column_link_base(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnLinkBase& Table::get_column_link_base(size_t ndx) const REALM_NOEXCEPT
 {
     const ColumnBase& col_base = get_column_base(ndx);
-    TIGHTDB_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
+    REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
                    m_spec.get_column_type(ndx) == col_type_LinkList);
     const ColumnLinkBase& col_link_base = static_cast<const ColumnLinkBase&>(col_base);
     return col_link_base;
@@ -1687,13 +1687,13 @@ const ColumnLinkBase& Table::get_column_link_base(size_t ndx) const TIGHTDB_NOEX
 ColumnLinkBase& Table::get_column_link_base(size_t ndx)
 {
     ColumnBase& col_base = get_column_base(ndx);
-    TIGHTDB_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
+    REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
                    m_spec.get_column_type(ndx) == col_type_LinkList);
     ColumnLinkBase& col_link_base = static_cast<ColumnLinkBase&>(col_base);
     return col_link_base;
 }
 
-const ColumnLink& Table::get_column_link(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnLink& Table::get_column_link(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnLink, col_type_Link>(ndx);
 }
@@ -1703,7 +1703,7 @@ ColumnLink& Table::get_column_link(size_t ndx)
     return get_column<ColumnLink, col_type_Link>(ndx);
 }
 
-const ColumnLinkList& Table::get_column_link_list(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnLinkList& Table::get_column_link_list(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnLinkList, col_type_LinkList>(ndx);
 }
@@ -1713,7 +1713,7 @@ ColumnLinkList& Table::get_column_link_list(size_t ndx)
     return get_column<ColumnLinkList, col_type_LinkList>(ndx);
 }
 
-const ColumnBackLink& Table::get_column_backlink(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnBackLink& Table::get_column_backlink(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<ColumnBackLink, col_type_BackLink>(ndx);
 }
@@ -1728,11 +1728,11 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, 
 {
     ColumnType real_col_type = get_real_column_type(ndx);
     if (col_type == col_type_Int) {
-        TIGHTDB_ASSERT(real_col_type == col_type_Int || real_col_type == col_type_Bool ||
+        REALM_ASSERT(real_col_type == col_type_Int || real_col_type == col_type_Bool ||
                        real_col_type == col_type_DateTime);
     }
     else {
-        TIGHTDB_ASSERT_3(col_type, ==, real_col_type);
+        REALM_ASSERT_3(col_type, ==, real_col_type);
     }
     static_cast<void>(column);
     static_cast<void>(ndx);
@@ -1741,13 +1741,13 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, 
 
 
 size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                Allocator& alloc) TIGHTDB_NOEXCEPT
+                                Allocator& alloc) REALM_NOEXCEPT
 {
     ColumnType first_col_type = ColumnType();
     if (!Spec::get_first_column_type_from_ref(spec_ref, alloc, first_col_type))
         return 0;
     const char* columns_header = alloc.translate(columns_ref);
-    TIGHTDB_ASSERT_3(Array::get_size_from_header(columns_header), !=, 0);
+    REALM_ASSERT_3(Array::get_size_from_header(columns_header), !=, 0);
     ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
     size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc);
     return size;
@@ -1812,7 +1812,7 @@ ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc
         case col_type_Reserved4:
             break;
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return 0;
 }
 
@@ -1879,9 +1879,9 @@ ref_type Table::clone(Allocator& alloc) const
 
 void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_DEBUG(row_ndx <= m_size);
-    TIGHTDB_ASSERT_DEBUG(num_rows <= numeric_limits<size_t>::max() - row_ndx);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_DEBUG(row_ndx <= m_size);
+    REALM_ASSERT_DEBUG(num_rows <= numeric_limits<size_t>::max() - row_ndx);
     bump_version();
 
     size_t num_cols = m_spec.get_column_count();
@@ -1894,7 +1894,7 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         adj_row_acc_insert_rows(row_ndx, num_rows);
     m_size += num_rows;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_empty_rows(this, row_ndx, num_rows); // Throws
 #endif
@@ -1903,10 +1903,10 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 
 void Table::remove(size_t row_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(row_ndx, <, m_size);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl()) {
         bool move_last_over = false;
         repl->erase_row(this, row_ndx, move_last_over); // Throws
@@ -1935,12 +1935,12 @@ void Table::do_remove(size_t row_ndx)
 
 void Table::move_last_over(size_t row_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(row_ndx, <, m_size);
 
     size_t table_ndx = get_index_in_group();
     if (table_ndx == tightdb::npos) {
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl()) {
             bool move_last_over = true;
             repl->erase_row(this, row_ndx, move_last_over); // Throws
@@ -1984,9 +1984,9 @@ void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
 
 void Table::clear()
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->clear_table(this); // Throws
 #endif
@@ -2029,15 +2029,15 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
 
 void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
-    TIGHTDB_ASSERT_3(row_ndx, <=, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
+    REALM_ASSERT_3(row_ndx, <=, m_size);
 
     ColumnTable& subtables = get_column_table(col_ndx);
     subtables.insert(row_ndx, table);
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_table(this, col_ndx, row_ndx); // Throws
 #endif
@@ -2046,16 +2046,16 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     bump_version();
 
     ColumnTable& subtables = get_column_table(col_ndx);
     subtables.set(row_ndx, table);
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_table(this, col_ndx, row_ndx); // Throws
 #endif
@@ -2064,15 +2064,15 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 
 void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Mixed);
-    TIGHTDB_ASSERT_3(row_ndx, <=, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Mixed);
+    REALM_ASSERT_3(row_ndx, <=, m_size);
 
     ColumnMixed& mixed_col = get_column_mixed(col_ndx);
     mixed_col.insert_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copuing insertion of non-empty tables.
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
 #endif
@@ -2081,28 +2081,28 @@ void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t
 
 void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Mixed);
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Mixed);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     bump_version();
 
     ColumnMixed& mixed_col = get_column_mixed(col_ndx);
     mixed_col.set_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
 #endif
 }
 
 
-Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
     // valid index into `m_cols`.
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
     // The column accessor may not exist yet, but in that case the subtable
     // accessor cannot exist either. Column accessors are missing only during
     // certian operations such as the the updating of the accessor tree when a
@@ -2115,31 +2115,31 @@ Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEX
 }
 
 
-Table* Table::get_link_target_table_accessor(size_t col_ndx) TIGHTDB_NOEXCEPT
+Table* Table::get_link_target_table_accessor(size_t col_ndx) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     // So far, link columns can only exist in group-level tables, so this table
     // cannot be degenerate.
-    TIGHTDB_ASSERT(m_columns.is_attached());
-    TIGHTDB_ASSERT_3(col_ndx, <, m_cols.size());
+    REALM_ASSERT(m_columns.is_attached());
+    REALM_ASSERT_3(col_ndx, <, m_cols.size());
     if (ColumnBase* col = m_cols[col_ndx]) {
-        TIGHTDB_ASSERT(dynamic_cast<ColumnLinkBase*>(col));
+        REALM_ASSERT(dynamic_cast<ColumnLinkBase*>(col));
         return &static_cast<ColumnLinkBase*>(col)->get_target_table();
     }
     return 0;
 }
 
 
-void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
     // valid index into `m_cols`.
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
     if (ColumnBase* col = m_cols[col_ndx])
         col->discard_subtable_accessor(row_ndx);
 }
@@ -2147,8 +2147,8 @@ void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NO
 
 Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(row_ndx, <, m_size);
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
@@ -2159,15 +2159,15 @@ Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
         ColumnMixed& subtables = get_column_mixed(col_ndx);
         return subtables.get_subtable_ptr(row_ndx); // Throws
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return 0;
 }
 
 
-size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(row_ndx, <, m_size);
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
@@ -2178,15 +2178,15 @@ size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const TIGHTDB_NO
         const ColumnMixed& subtables = get_column_mixed(col_ndx);
         return subtables.get_subtable_size(row_ndx);
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return 0;
 }
 
 
 void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(row_ndx, <=, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(row_ndx, <=, m_size);
     bump_version();
 
     ColumnType type = get_real_column_type(col_ndx);
@@ -2194,7 +2194,7 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
         ColumnTable& subtables = get_column_table(col_ndx);
         subtables.set(row_ndx, 0);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
             repl->set_table(this, col_ndx, row_ndx); // Throws
 #endif
@@ -2203,23 +2203,23 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
         ColumnMixed& subtables = get_column_mixed(col_ndx);
         subtables.set_subtable(row_ndx, 0);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
             repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
 #endif
     }
     else {
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
     }
 }
 
 
-const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
+const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     if (ArrayParent* array_parent = real_top.get_parent()) {
-        TIGHTDB_ASSERT_DEBUG(dynamic_cast<Parent*>(array_parent));
+        REALM_ASSERT_DEBUG(dynamic_cast<Parent*>(array_parent));
         Parent* table_parent = static_cast<Parent*>(array_parent);
         return table_parent->get_parent_table(column_ndx_out);
     }
@@ -2227,9 +2227,9 @@ const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_N
 }
 
 
-size_t Table::get_parent_row_index() const TIGHTDB_NOEXCEPT
+size_t Table::get_parent_row_index() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     Parent* parent = static_cast<Parent*>(real_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
@@ -2241,9 +2241,9 @@ size_t Table::get_parent_row_index() const TIGHTDB_NOEXCEPT
 }
 
 
-Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
+Group* Table::get_parent_group() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     if (!m_top.is_attached())
         return 0; // Subtable with shared descriptor
     Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
@@ -2256,9 +2256,9 @@ Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
 }
 
 
-size_t Table::get_index_in_group() const TIGHTDB_NOEXCEPT
+size_t Table::get_index_in_group() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     if (!m_top.is_attached())
         return tightdb::npos; // Subtable with shared descriptor
     Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
@@ -2271,10 +2271,10 @@ size_t Table::get_index_in_group() const TIGHTDB_NOEXCEPT
 }
 
 
-int64_t Table::get_int(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+int64_t Table::get_int(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const Column& column = get_column(col_ndx);
     return column.get(ndx);
@@ -2282,14 +2282,14 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     Column& column = get_column(col_ndx);
     column.set(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value); // Throws
 #endif
@@ -2297,22 +2297,22 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 
 void Table::add_int(size_t col_ndx, int64_t value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Int);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Int);
     bump_version();
     get_column(col_ndx).adjust(value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->add_int_to_column(this, col_ndx, value); // Throws
 #endif
 }
 
-bool Table::get_bool(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const Column& column = get_column(col_ndx);
     return column.get(ndx) != 0;
@@ -2320,25 +2320,25 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
+    REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     Column& column = get_column(col_ndx);
     column.set(ndx, value ? 1 : 0);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_bool(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
-DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const Column& column = get_column(col_ndx);
     return time_t(column.get(ndx));
@@ -2346,15 +2346,15 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
+    REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     Column& column = get_column(col_ndx);
     column.set(ndx, int64_t(value.get_datetime()));
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_date_time(this, col_ndx, ndx, value); // Throws
 #endif
@@ -2362,23 +2362,23 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 
 void Table::insert_int(size_t col_ndx, size_t ndx, int64_t value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <= , m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <= , m_size);
 
     Column& column = get_column(col_ndx);
     column.insert(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_int(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
 
-float Table::get_float(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+float Table::get_float(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const ColumnFloat& column = get_column_float(col_ndx);
     return column.get(ndx);
@@ -2386,14 +2386,14 @@ float Table::get_float(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_float(size_t col_ndx, size_t ndx, float value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     ColumnFloat& column = get_column_float(col_ndx);
     column.set(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_float(this, col_ndx, ndx, value); // Throws
 #endif
@@ -2401,23 +2401,23 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value)
 
 void Table::insert_float(size_t col_ndx, size_t ndx, float value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <=, m_size);
 
     ColumnFloat& column = get_column_float(col_ndx);
     column.insert(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_float(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
 
-double Table::get_double(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+double Table::get_double(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const ColumnDouble& column = get_column_double(col_ndx);
     return column.get(ndx);
@@ -2425,14 +2425,14 @@ double Table::get_double(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_double(size_t col_ndx, size_t ndx, double value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     ColumnDouble& column = get_column_double(col_ndx);
     column.set(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_double(this, col_ndx, ndx, value); // Throws
 #endif
@@ -2440,23 +2440,23 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value)
 
 void Table::insert_double(size_t col_ndx, size_t ndx, double value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <= , m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <= , m_size);
 
     ColumnDouble& column = get_column_double(col_ndx);
     column.insert(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_double(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
 
-StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+StringData Table::get_string(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, m_columns.size());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(ndx, <, m_size);
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
@@ -2464,24 +2464,24 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         return column.get(ndx);
     }
 
-    TIGHTDB_ASSERT_3(type, ==, col_type_StringEnum);
+    REALM_ASSERT_3(type, ==, col_type_StringEnum);
     const ColumnStringEnum& column = get_column_string_enum(col_ndx);
     return column.get(ndx);
 }
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 {
-    if (TIGHTDB_UNLIKELY(value.size() > max_string_size))
+    if (REALM_UNLIKELY(value.size() > max_string_size))
         throw LogicError(LogicError::string_too_big);
-    if (TIGHTDB_UNLIKELY(!is_attached()))
+    if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
-    if (TIGHTDB_UNLIKELY(ndx >= m_size))
+    if (REALM_UNLIKELY(ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
     // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
     // column, however, the previous row index check guarantees that `m_size >
     // 0`, and since `m_size` is also zero for a degenerate subtable, the table
     // cannot be degenerate if we got this far.
-    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     bump_version();
@@ -2489,7 +2489,7 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_string(this, col_ndx, ndx, value); // Throws
 #endif
@@ -2497,10 +2497,10 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 
 void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
 {
-    if (TIGHTDB_UNLIKELY(value.size() > max_string_size))
+    if (REALM_UNLIKELY(value.size() > max_string_size))
         throw LogicError(LogicError::string_too_big);
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <=, m_size);
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
@@ -2508,22 +2508,22 @@ void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
         column.insert(ndx, value);
     }
     else {
-        TIGHTDB_ASSERT_3(type, ==, col_type_StringEnum);
+        REALM_ASSERT_3(type, ==, col_type_StringEnum);
         ColumnStringEnum& column = get_column_string_enum(col_ndx);
         column.insert(ndx, value);
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_string(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
 
-BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, m_columns.size());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const ColumnBinary& column = get_column_binary(col_ndx);
     return column.get(ndx);
@@ -2531,16 +2531,16 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 {
-    if (TIGHTDB_UNLIKELY(value.size() > max_binary_size))
+    if (REALM_UNLIKELY(value.size() > max_binary_size))
         throw LogicError(LogicError::binary_too_big);
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     ColumnBinary& column = get_column_binary(col_ndx);
     column.set(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_binary(this, col_ndx, ndx, value); // Throws
 #endif
@@ -2548,25 +2548,25 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 
 void Table::insert_binary(size_t col_ndx, size_t ndx, BinaryData value)
 {
-    if (TIGHTDB_UNLIKELY(value.size() > max_binary_size))
+    if (REALM_UNLIKELY(value.size() > max_binary_size))
         throw LogicError(LogicError::binary_too_big);
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <=, m_size);
 
     ColumnBinary& column = get_column_binary(col_ndx);
     column.insert(ndx, value);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_binary(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
 
-Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, m_columns.size());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const ColumnMixed& column = get_column_mixed(col_ndx);
 
@@ -2593,14 +2593,14 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         case type_LinkList:
             break;
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
     return Mixed(int64_t(0));
 }
 
-DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, m_columns.size());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(ndx, <, m_size);
 
     const ColumnMixed& column = get_column_mixed(col_ndx);
     return column.get_type(ndx);
@@ -2608,8 +2608,8 @@ DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEP
 
 void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     ColumnMixed& column = get_column_mixed(col_ndx);
@@ -2632,12 +2632,12 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
             column.set_double(ndx, value.get_double());
             break;
         case type_String:
-            if (TIGHTDB_UNLIKELY(value.get_string().size() > max_string_size))
+            if (REALM_UNLIKELY(value.get_string().size() > max_string_size))
                 throw LogicError(LogicError::string_too_big);
             column.set_string(ndx, value.get_string());
             break;
         case type_Binary:
-            if (TIGHTDB_UNLIKELY(value.get_binary().size() > max_binary_size))
+            if (REALM_UNLIKELY(value.get_binary().size() > max_binary_size))
                 throw LogicError(LogicError::binary_too_big);
             column.set_binary(ndx, value.get_binary());
             break;
@@ -2647,11 +2647,11 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
         case type_Mixed:
         case type_Link:
         case type_LinkList:
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
             break;
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_mixed(this, col_ndx, ndx, value); // Throws
 #endif
@@ -2659,8 +2659,8 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 
 void Table::insert_mixed(size_t col_ndx, size_t ndx, Mixed value)
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <=, m_size);
 
     ColumnMixed& column = get_column_mixed(col_ndx);
     DataType type = value.get_type();
@@ -2682,12 +2682,12 @@ void Table::insert_mixed(size_t col_ndx, size_t ndx, Mixed value)
             column.insert_double(ndx, value.get_double());
             break;
         case type_String:
-            if (TIGHTDB_UNLIKELY(value.get_string().size() > max_string_size))
+            if (REALM_UNLIKELY(value.get_string().size() > max_string_size))
                 throw LogicError(LogicError::string_too_big);
             column.insert_string(ndx, value.get_string());
             break;
         case type_Binary:
-            if (TIGHTDB_UNLIKELY(value.get_binary().size() > max_binary_size))
+            if (REALM_UNLIKELY(value.get_binary().size() > max_binary_size))
                 throw LogicError(LogicError::binary_too_big);
             column.insert_binary(ndx, value.get_binary());
             break;
@@ -2697,25 +2697,25 @@ void Table::insert_mixed(size_t col_ndx, size_t ndx, Mixed value)
         case type_Mixed:
         case type_Link:
         case type_LinkList:
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
             break;
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_mixed(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
 
-size_t Table::get_link(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+size_t Table::get_link(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     const ColumnLink& column = get_column_link(col_ndx);
     return column.get_link(row_ndx);
 }
 
-TableRef Table::get_link_target(size_t col_ndx) TIGHTDB_NOEXCEPT
+TableRef Table::get_link_target(size_t col_ndx) REALM_NOEXCEPT
 {
     ColumnLinkBase& column = get_column_link_base(col_ndx);
     return column.get_target_table().get_table_ref();
@@ -2723,10 +2723,10 @@ TableRef Table::get_link_target(size_t col_ndx) TIGHTDB_NOEXCEPT
 
 void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(row_ndx, <, m_size);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_link(this, col_ndx, row_ndx, target_row_ndx); // Throws
 #endif
@@ -2758,7 +2758,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 // Replication instruction 'set_link' calls this function directly.
 size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     ColumnLink& col = get_column_link(col_ndx);
     size_t old_target_row_ndx = col.set_link(row_ndx, target_row_ndx);
     bump_version();
@@ -2768,12 +2768,12 @@ size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 
 void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, ==, m_size); // can only append to unorded tables
+    REALM_ASSERT_3(row_ndx, ==, m_size); // can only append to unorded tables
 
     ColumnLink& column = get_column_link(col_ndx);
     column.insert_link(row_ndx, target_row_ndx);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl()) {
         size_t link = 1 + target_row_ndx;
         repl->insert_link(this, col_ndx, row_ndx, link); // Throws
@@ -2784,12 +2784,12 @@ void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 
 void Table::insert_linklist(size_t col_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, ==, m_size); // can only append to unorded tables
+    REALM_ASSERT_3(row_ndx, ==, m_size); // can only append to unorded tables
 
     ColumnLinkList& column = get_column_link_list(col_ndx);
     column.insert(row_ndx);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->insert_link_list(this, col_ndx, row_ndx); // Throws
 #endif
@@ -2797,30 +2797,30 @@ void Table::insert_linklist(size_t col_ndx, size_t row_ndx)
 
 ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     const ColumnLinkList& column = get_column_link_list(col_ndx);
     return column.get(row_ndx);
 }
 
 LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     // FIXME: this looks wrong! It should instead be the modifying operations of
     // LinkView that bump the change count of the containing table.
     ColumnLinkList& column = get_column_link_list(col_ndx);
     return column.get(row_ndx);
 }
 
-bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     const ColumnLinkList& column = get_column_link_list(col_ndx);
     return !column.has_links(row_ndx);
 }
 
-size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, m_size);
+    REALM_ASSERT_3(row_ndx, <, m_size);
     const ColumnLinkList& column = get_column_link_list(col_ndx);
     return column.get_link_count(row_ndx);
 }
@@ -2850,7 +2850,7 @@ void Table::insert_done()
         }
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->row_insert_complete(this); // Throws
 #endif
@@ -2885,7 +2885,7 @@ size_t Table::count_double(size_t col_ndx, double value) const
 }
 size_t Table::count_string(size_t col_ndx, StringData value) const
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < get_column_count());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < get_column_count());
 
     if (!m_columns.is_attached())
         return 0;
@@ -2896,7 +2896,7 @@ size_t Table::count_string(size_t col_ndx, StringData value) const
         return column.count(value);
     }
     else {
-        TIGHTDB_ASSERT_3(type, ==, col_type_StringEnum);
+        REALM_ASSERT_3(type, ==, col_type_StringEnum);
         const ColumnStringEnum& column = get_column_string_enum(col_ndx);
         return column.count(value);
     }
@@ -3081,7 +3081,7 @@ void Table::reveal_primary_key() const
                 m_primary_key = col_2.get_search_index();
                 return;
             }
-            TIGHTDB_ASSERT(false);
+            REALM_ASSERT(false);
             return;
         }
     }
@@ -3091,10 +3091,10 @@ void Table::reveal_primary_key() const
 
 size_t Table::do_find_pkey_int(int_fast64_t) const
 {
-    if (TIGHTDB_UNLIKELY(!is_attached()))
+    if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (TIGHTDB_UNLIKELY(!m_primary_key))
+    if (REALM_UNLIKELY(!m_primary_key))
         reveal_primary_key(); // Throws
 
     // FIXME: Implement this when integer indexes become available. For now, all
@@ -3105,10 +3105,10 @@ size_t Table::do_find_pkey_int(int_fast64_t) const
 
 size_t Table::do_find_pkey_string(StringData value) const
 {
-    if (TIGHTDB_UNLIKELY(!is_attached()))
+    if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (TIGHTDB_UNLIKELY(!m_primary_key))
+    if (REALM_UNLIKELY(!m_primary_key))
         reveal_primary_key(); // Throws
 
     // FIXME: In case of datatype mismatch throw LogicError::type_mismatch. For
@@ -3121,8 +3121,8 @@ size_t Table::do_find_pkey_string(StringData value) const
 
 template<class T> size_t Table::find_first(size_t col_ndx, T value) const
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnTypeTraits3<T>::ct_id_real);
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnTypeTraits3<T>::ct_id_real);
 
     if (!m_columns.is_attached())
         return not_found;
@@ -3151,8 +3151,8 @@ size_t Table::find_first_bool(size_t col_ndx, bool value) const
 
 size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    TIGHTDB_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
 
     if (!m_columns.is_attached())
         return not_found;
@@ -3174,7 +3174,7 @@ size_t Table::find_first_double(size_t col_ndx, double value) const
 
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     if (!m_columns.is_attached())
         return not_found;
 
@@ -3183,7 +3183,7 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
         const AdaptiveStringColumn& column = get_column_string(col_ndx);
         return column.find_first(value);
     }
-    TIGHTDB_ASSERT_3(type, ==, col_type_StringEnum);
+    REALM_ASSERT_3(type, ==, col_type_StringEnum);
     const ColumnStringEnum& column = get_column_string_enum(col_ndx);
     return column.find_first(value);
 }
@@ -3287,7 +3287,7 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 
 TableView Table::get_distinct_view(size_t col_ndx)
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
 
     TableView tv(*this);
     tv.sync_distinct_view(col_ndx);
@@ -3388,12 +3388,12 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result,
                       const Column* viewrefs) const
 {
-    TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
-    TIGHTDB_ASSERT_3(group_by_column, <, m_columns.size());
-    TIGHTDB_ASSERT_3(aggr_column, <, m_columns.size());
+    REALM_ASSERT(result.is_empty() && result.get_column_count() == 0);
+    REALM_ASSERT_3(group_by_column, <, m_columns.size());
+    REALM_ASSERT_3(aggr_column, <, m_columns.size());
 
-    TIGHTDB_ASSERT_3(get_column_type(group_by_column), ==, type_String);
-    TIGHTDB_ASSERT(op == aggr_count || get_column_type(aggr_column) == type_Int);
+    REALM_ASSERT_3(get_column_type(group_by_column), ==, type_String);
+    REALM_ASSERT(op == aggr_count || get_column_type(aggr_column) == type_Int);
 
     // Add columns to result table
     result.add_column(type_String, get_column_name(group_by_column));
@@ -3626,7 +3626,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
 TableView Table::get_range_view(size_t begin, size_t end)
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || end < size());
+    REALM_ASSERT(!m_columns.is_attached() || end < size());
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
@@ -3644,57 +3644,57 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 
 
-size_t Table::lower_bound_int(size_t col_ndx, int64_t value) const TIGHTDB_NOEXCEPT
+size_t Table::lower_bound_int(size_t col_ndx, int64_t value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
 }
 
-size_t Table::upper_bound_int(size_t col_ndx, int64_t value) const TIGHTDB_NOEXCEPT
+size_t Table::upper_bound_int(size_t col_ndx, int64_t value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
 }
 
-size_t Table::lower_bound_bool(size_t col_ndx, bool value) const TIGHTDB_NOEXCEPT
+size_t Table::lower_bound_bool(size_t col_ndx, bool value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
 }
 
-size_t Table::upper_bound_bool(size_t col_ndx, bool value) const TIGHTDB_NOEXCEPT
+size_t Table::upper_bound_bool(size_t col_ndx, bool value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
 }
 
-size_t Table::lower_bound_float(size_t col_ndx, float value) const TIGHTDB_NOEXCEPT
+size_t Table::lower_bound_float(size_t col_ndx, float value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_float(col_ndx).lower_bound(value);
 }
 
-size_t Table::upper_bound_float(size_t col_ndx, float value) const TIGHTDB_NOEXCEPT
+size_t Table::upper_bound_float(size_t col_ndx, float value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_float(col_ndx).upper_bound(value);
 }
 
-size_t Table::lower_bound_double(size_t col_ndx, double value) const TIGHTDB_NOEXCEPT
+size_t Table::lower_bound_double(size_t col_ndx, double value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_double(col_ndx).lower_bound(value);
 }
 
-size_t Table::upper_bound_double(size_t col_ndx, double value) const TIGHTDB_NOEXCEPT
+size_t Table::upper_bound_double(size_t col_ndx, double value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_double(col_ndx).upper_bound(value);
 }
 
-size_t Table::lower_bound_string(size_t col_ndx, StringData value) const TIGHTDB_NOEXCEPT
+size_t Table::lower_bound_string(size_t col_ndx, StringData value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     if (!m_columns.is_attached())
         return 0;
 
@@ -3703,14 +3703,14 @@ size_t Table::lower_bound_string(size_t col_ndx, StringData value) const TIGHTDB
         const AdaptiveStringColumn& column = get_column_string(col_ndx);
         return column.lower_bound_string(value);
     }
-    TIGHTDB_ASSERT_3(type, ==, col_type_StringEnum);
+    REALM_ASSERT_3(type, ==, col_type_StringEnum);
     const ColumnStringEnum& column = get_column_string_enum(col_ndx);
     return column.lower_bound_string(value);
 }
 
-size_t Table::upper_bound_string(size_t col_ndx, StringData value) const TIGHTDB_NOEXCEPT
+size_t Table::upper_bound_string(size_t col_ndx, StringData value) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     if (!m_columns.is_attached())
         return 0;
 
@@ -3719,7 +3719,7 @@ size_t Table::upper_bound_string(size_t col_ndx, StringData value) const TIGHTDB
         const AdaptiveStringColumn& column = get_column_string(col_ndx);
         return column.upper_bound_string(value);
     }
-    TIGHTDB_ASSERT_3(type, ==, col_type_StringEnum);
+    REALM_ASSERT_3(type, ==, col_type_StringEnum);
     const ColumnStringEnum& column = get_column_string_enum(col_ndx);
     return column.upper_bound_string(value);
 }
@@ -3787,7 +3787,7 @@ void Table::optimize()
         }
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->optimize_table(this); // Throws
 #endif
@@ -3797,7 +3797,7 @@ void Table::optimize()
 class Table::SliceWriter: public Group::TableWriter {
 public:
     SliceWriter(const Table& table, StringData table_name,
-                size_t offset, size_t size) TIGHTDB_NOEXCEPT:
+                size_t offset, size_t size) REALM_NOEXCEPT:
         m_table(table),
         m_table_name(table_name),
         m_offset(offset),
@@ -3805,7 +3805,7 @@ public:
     {
     }
 
-    size_t write_names(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    size_t write_names(_impl::OutputStream& out) REALM_OVERRIDE
     {
         Allocator& alloc = Allocator::get_default();
         ArrayString table_names(alloc);
@@ -3816,7 +3816,7 @@ public:
         return pos;
     }
 
-    size_t write_tables(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    size_t write_tables(_impl::OutputStream& out) REALM_OVERRIDE
     {
         Allocator& alloc = Allocator::get_default();
 
@@ -3908,9 +3908,9 @@ void Table::write(ostream& out, size_t offset, size_t size, StringData override_
 }
 
 
-void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+void Table::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
@@ -4083,7 +4083,7 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
                 case type_Mixed:
                 case type_Link:
                 case type_LinkList:
-                    TIGHTDB_ASSERT(false);
+                    REALM_ASSERT(false);
                     break;
                 }
             }
@@ -4192,7 +4192,7 @@ void Table::to_string(ostream& out, size_t limit) const
 
 void Table::row_to_string(size_t row_ndx, ostream& out) const
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, size());
+    REALM_ASSERT_3(row_ndx, <, size());
 
     // Print header (will also calculate widths)
     vector<size_t> widths;
@@ -4300,7 +4300,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                         case type_Mixed:
                         case type_Link:
                         case type_LinkList:
-                            TIGHTDB_ASSERT(false);
+                            REALM_ASSERT(false);
                             break;
                     }
                 }
@@ -4431,7 +4431,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                         case type_Mixed:
                         case type_Link:
                         case type_LinkList:
-                            TIGHTDB_ASSERT(false);
+                            REALM_ASSERT(false);
                             break;
                     }
                 }
@@ -4467,10 +4467,10 @@ bool Table::compare_rows(const Table& t) const
     // become available.
 
     size_t n = get_column_count();
-    TIGHTDB_ASSERT_3(t.get_column_count(), ==, n);
+    REALM_ASSERT_3(t.get_column_count(), ==, n);
     for (size_t i = 0; i != n; ++i) {
         ColumnType type = get_real_column_type(i);
-        TIGHTDB_ASSERT(type == col_type_String     ||
+        REALM_ASSERT(type == col_type_String     ||
                        type == col_type_StringEnum ||
                        type == t.get_real_column_type(i));
 
@@ -4507,7 +4507,7 @@ bool Table::compare_rows(const Table& t) const
                         return false;
                 }
                 else {
-                    TIGHTDB_ASSERT_3(type2, ==, col_type_StringEnum);
+                    REALM_ASSERT_3(type2, ==, col_type_StringEnum);
                     const ColumnStringEnum& c2 = t.get_column_string_enum(i);
                     if (!c2.compare_string(c1))
                         return false;
@@ -4523,7 +4523,7 @@ bool Table::compare_rows(const Table& t) const
                         return false;
                 }
                 else {
-                    TIGHTDB_ASSERT_3(type2, ==, col_type_String);
+                    REALM_ASSERT_3(type2, ==, col_type_String);
                     const AdaptiveStringColumn& c2 = t.get_column_string(i);
                     if (!c1.compare_string(c2))
                         return false;
@@ -4570,23 +4570,23 @@ bool Table::compare_rows(const Table& t) const
             case col_type_Reserved4:
                 break;
         }
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
     }
     return true;
 }
 
 
-const Array* Table::get_column_root(size_t col_ndx) const TIGHTDB_NOEXCEPT
+const Array* Table::get_column_root(size_t col_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
     return m_cols[col_ndx]->get_root_array();
 }
 
 
 pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
 
     const ColumnBase* col = m_cols[col_ndx];
 
@@ -4597,32 +4597,32 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
         enum_root = c->get_keys().get_root_array();
     }
     else {
-        TIGHTDB_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));
+        REALM_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));
     }
 
     return make_pair(root, enum_root);
 }
 
 
-StringData Table::Parent::get_child_name(size_t) const TIGHTDB_NOEXCEPT
+StringData Table::Parent::get_child_name(size_t) const REALM_NOEXCEPT
 {
     return StringData();
 }
 
 
-Group* Table::Parent::get_parent_group() TIGHTDB_NOEXCEPT
+Group* Table::Parent::get_parent_group() REALM_NOEXCEPT
 {
     return 0;
 }
 
 
-Table* Table::Parent::get_parent_table(size_t*) TIGHTDB_NOEXCEPT
+Table* Table::Parent::get_parent_table(size_t*) REALM_NOEXCEPT
 {
     return 0;
 }
 
 
-void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4639,7 +4639,7 @@ void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEP
 }
 
 
-void Table::adj_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+void Table::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4657,7 +4657,7 @@ void Table::adj_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 
 
 void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4673,7 +4673,7 @@ void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
 }
 
 
-void Table::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+void Table::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4689,7 +4689,7 @@ void Table::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 }
 
 
-void Table::adj_acc_clear_nonroot_table() TIGHTDB_NOEXCEPT
+void Table::adj_acc_clear_nonroot_table() REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4701,7 +4701,7 @@ void Table::adj_acc_clear_nonroot_table() TIGHTDB_NOEXCEPT
 }
 
 
-void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4715,7 +4715,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOE
 }
 
 
-void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4738,7 +4738,7 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 
 
 void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4765,25 +4765,25 @@ void Table::adj_insert_column(size_t col_ndx)
     // means in particular that it cannot access the underlying node
     // structure. See AccessorConsistencyLevels.
 
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     bool not_degenerate = m_columns.is_attached();
     if (not_degenerate) {
-        TIGHTDB_ASSERT_3(col_ndx, <=, m_cols.size());
+        REALM_ASSERT_3(col_ndx, <=, m_cols.size());
         m_cols.insert(m_cols.begin() + col_ndx, 0); // Throws
     }
 }
 
 
-void Table::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
+void Table::adj_erase_column(size_t col_ndx) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     bool not_degenerate = m_columns.is_attached();
     if (not_degenerate) {
-        TIGHTDB_ASSERT_3(col_ndx, <, m_cols.size());
+        REALM_ASSERT_3(col_ndx, <, m_cols.size());
         if (ColumnBase* col = m_cols[col_ndx])
             delete col;
         m_cols.erase(m_cols.begin() + col_ndx);
@@ -4791,7 +4791,7 @@ void Table::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::recursive_mark() TIGHTDB_NOEXCEPT
+void Table::recursive_mark() REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4807,15 +4807,15 @@ void Table::recursive_mark() TIGHTDB_NOEXCEPT
 }
 
 
-void Table::mark_link_target_tables(size_t col_ndx_begin) TIGHTDB_NOEXCEPT
+void Table::mark_link_target_tables(size_t col_ndx_begin) REALM_NOEXCEPT
 {
     // Beyond the constraints on the specified column index, this function must
     // assume no more than minimal consistency of the accessor hierarchy. This
     // means in particular that it cannot access the underlying node
     // structure. See AccessorConsistencyLevels.
 
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx_begin <= m_cols.size());
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx_begin <= m_cols.size());
     size_t n = m_cols.size();
     for (size_t i = col_ndx_begin; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
@@ -4824,14 +4824,14 @@ void Table::mark_link_target_tables(size_t col_ndx_begin) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::mark_opposite_link_tables() TIGHTDB_NOEXCEPT
+void Table::mark_opposite_link_tables() REALM_NOEXCEPT
 {
     // Beyond the constraints on the specified column index, this function must
     // assume no more than minimal consistency of the accessor hierarchy. This
     // means in particular that it cannot access the underlying node
     // structure. See AccessorConsistencyLevels.
 
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     size_t n = m_cols.size();
     for (size_t i = 0; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
@@ -4842,7 +4842,7 @@ void Table::mark_opposite_link_tables() TIGHTDB_NOEXCEPT
 
 void Table::refresh_accessor_tree()
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     if (m_top.is_attached()) {
         // Root table (free-standing table, group-level table, or subtable with
@@ -4857,7 +4857,7 @@ void Table::refresh_accessor_tree()
 
         // If the underlying table was degenerate, then `m_cols` must still be
         // empty.
-        TIGHTDB_ASSERT(m_columns.is_attached() || m_cols.empty());
+        REALM_ASSERT(m_columns.is_attached() || m_cols.empty());
 
         ref_type columns_ref = m_columns.get_ref_from_parent();
         if (columns_ref != 0) {
@@ -4957,7 +4957,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
         bool has_search_index = (attr & col_attr_Indexed)    != 0;
         bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
-        TIGHTDB_ASSERT(has_search_index || !is_primary_key);
+        REALM_ASSERT(has_search_index || !is_primary_key);
         if (has_search_index) {
             bool allow_duplicate_values = !is_primary_key;
             if (col->has_search_index()) {
@@ -4987,11 +4987,11 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 }
 
 
-bool Table::is_cross_table_link_target() const TIGHTDB_NOEXCEPT
+bool Table::is_cross_table_link_target() const REALM_NOEXCEPT
 {
     size_t n = m_cols.size();
     for (size_t i = m_spec.get_public_column_count(); i < n; ++i) {
-        TIGHTDB_ASSERT(dynamic_cast<ColumnBackLink*>(m_cols[i]));
+        REALM_ASSERT(dynamic_cast<ColumnBackLink*>(m_cols[i]));
         ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(*m_cols[i]);
         Table& origin = backlink_col.get_origin_table();
         if (&origin != this)
@@ -5001,11 +5001,11 @@ bool Table::is_cross_table_link_target() const TIGHTDB_NOEXCEPT
 }
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 void Table::Verify() const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     if (!m_columns.is_attached())
         return; // Accessor for degenerate subtable
 
@@ -5019,22 +5019,22 @@ void Table::Verify() const
     {
         for (RowBase* row = m_row_accessors; row; row = row->m_next) {
             // Check that it is attached to this table
-            TIGHTDB_ASSERT_3(row->m_table.get(), ==, this);
+            REALM_ASSERT_3(row->m_table.get(), ==, this);
             // Check that its row index is not out of bounds
-            TIGHTDB_ASSERT_3(row->m_row_ndx, <, size());
+            REALM_ASSERT_3(row->m_row_ndx, <, size());
         }
     }
 
     // Verify column accessors
     {
         size_t n = m_spec.get_column_count();
-        TIGHTDB_ASSERT_3(n, ==, m_cols.size());
+        REALM_ASSERT_3(n, ==, m_cols.size());
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
             std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
-            TIGHTDB_ASSERT_3(ndx_in_parent, ==, column.get_root_array()->get_ndx_in_parent());
+            REALM_ASSERT_3(ndx_in_parent, ==, column.get_root_array()->get_ndx_in_parent());
             column.Verify(*this, i);
-            TIGHTDB_ASSERT_3(column.size(), ==, m_size);
+            REALM_ASSERT_3(column.size(), ==, m_size);
         }
     }
 }
@@ -5107,7 +5107,7 @@ void Table::print() const
             case col_type_StringEnum:
                 cout << "String     "; break;
             default:
-                TIGHTDB_ASSERT(false);
+                REALM_ASSERT(false);
         }
     }
     cout << "\n";
@@ -5149,7 +5149,7 @@ void Table::print() const
                     break;
                 }
                 default:
-                    TIGHTDB_ASSERT(false);
+                    REALM_ASSERT(false);
             }
         }
         cout << "\n";
@@ -5184,4 +5184,4 @@ void Table::dump_node_structure(ostream& out, int level) const
 }
 
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

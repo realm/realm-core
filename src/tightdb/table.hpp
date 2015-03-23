@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TABLE_HPP
-#define TIGHTDB_TABLE_HPP
+#ifndef REALM_TABLE_HPP
+#define REALM_TABLE_HPP
 
 #include <algorithm>
 #include <map>
@@ -57,7 +57,7 @@ typedef Link LinkList;
 
 namespace _impl { class TableFriend; }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 class Replication;
 #endif
 
@@ -79,7 +79,7 @@ class Replication;
 /// level). This could be done in a very efficient manner.
 ///
 /// FIXME: When compiling in debug mode, all public non-static table functions
-/// should TIGHTDB_ASSERT(is_attached()).
+/// should REALM_ASSERT(is_attached()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -104,7 +104,7 @@ public:
     /// dynamic lifetime, use Table::copy() instead.
     Table(const Table&, Allocator& = Allocator::get_default());
 
-    ~Table() TIGHTDB_NOEXCEPT;
+    ~Table() REALM_NOEXCEPT;
 
     /// Construct a new freestanding top-level table with dynamic lifetime.
     static TableRef create(Allocator& = Allocator::get_default());
@@ -146,22 +146,22 @@ public:
     /// undefined behaviour and is considered an error on behalf of the
     /// application. Note that even Table::is_attached() is disallowed in this
     /// case.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     /// Get the name of this table, if it has one. Only group-level tables have
     /// names. For a table of any other kind, this function returns the empty
     /// string.
-    StringData get_name() const TIGHTDB_NOEXCEPT;
+    StringData get_name() const REALM_NOEXCEPT;
 
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
     /// These functions behave as if they were called on the descriptor returned
     /// by get_descriptor().
-    std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
-    DataType    get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    StringData  get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
+    std::size_t get_column_count() const REALM_NOEXCEPT;
+    DataType    get_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
+    StringData  get_column_name(std::size_t column_ndx) const REALM_NOEXCEPT;
+    std::size_t get_column_index(StringData name) const REALM_NOEXCEPT;
     //@}
 
     //@{
@@ -230,10 +230,10 @@ public:
     ///
     /// \param column_ndx The index of a column of this table.
 
-    bool has_search_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    bool has_search_index(std::size_t column_ndx) const REALM_NOEXCEPT;
     void add_search_index(std::size_t column_ndx);
     void remove_search_index(std::size_t column_ndx);
-    bool has_primary_key() const TIGHTDB_NOEXCEPT;
+    bool has_primary_key() const REALM_NOEXCEPT;
     bool try_add_primary_key(std::size_t column_ndx);
     void remove_primary_key();
 
@@ -318,29 +318,29 @@ public:
     ///
     /// \sa get_descriptor()
     /// \sa Descriptor::is_root()
-    bool has_shared_type() const TIGHTDB_NOEXCEPT;
+    bool has_shared_type() const REALM_NOEXCEPT;
 
 
-    template<class T> Columns<T> column(std::size_t column); // FIXME: Should this one have been declared TIGHTDB_NOEXCEPT?
+    template<class T> Columns<T> column(std::size_t column); // FIXME: Should this one have been declared REALM_NOEXCEPT?
 
     // Table size and deletion
-    bool is_empty() const TIGHTDB_NOEXCEPT;
-    std::size_t size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT;
 
     typedef BasicRowExpr<Table> RowExpr;
     typedef BasicRowExpr<const Table> ConstRowExpr;
 
-    RowExpr get(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    ConstRowExpr get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    RowExpr get(std::size_t row_ndx) REALM_NOEXCEPT;
+    ConstRowExpr get(std::size_t row_ndx) const REALM_NOEXCEPT;
 
-    RowExpr front() TIGHTDB_NOEXCEPT;
-    ConstRowExpr front() const TIGHTDB_NOEXCEPT;
+    RowExpr front() REALM_NOEXCEPT;
+    ConstRowExpr front() const REALM_NOEXCEPT;
 
-    RowExpr back() TIGHTDB_NOEXCEPT;
-    ConstRowExpr back() const TIGHTDB_NOEXCEPT;
+    RowExpr back() REALM_NOEXCEPT;
+    ConstRowExpr back() const REALM_NOEXCEPT;
 
-    RowExpr operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    ConstRowExpr operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    RowExpr operator[](std::size_t row_ndx) REALM_NOEXCEPT;
+    ConstRowExpr operator[](std::size_t row_ndx) const REALM_NOEXCEPT;
 
 
     //@{
@@ -409,24 +409,24 @@ public:
     //@}
 
     // Get cell values
-    int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    bool        get_bool(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    DateTime    get_datetime(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    float       get_float(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    double      get_double(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    StringData  get_string(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    BinaryData  get_binary(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool        get_bool(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    DateTime    get_datetime(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    float       get_float(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    double      get_double(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    StringData  get_string(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    BinaryData  get_binary(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
     LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
     ConstLinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx) const;
-    std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
 
-    TableRef get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
-    ConstTableRef get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    TableRef get_link_target(std::size_t column_ndx) REALM_NOEXCEPT;
+    ConstTableRef get_link_target(std::size_t column_ndx) const REALM_NOEXCEPT;
 
     template<class T>
     typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
@@ -487,15 +487,15 @@ public:
     TableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx);
     ConstTableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx) const;
     std::size_t get_subtable_size(std::size_t column_ndx, std::size_t row_ndx)
-        const TIGHTDB_NOEXCEPT;
+        const REALM_NOEXCEPT;
     void clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
     // Backlinks
     std::size_t get_backlink_count(std::size_t row_ndx, const Table& origin,
-                                   std::size_t origin_col_ndx) const TIGHTDB_NOEXCEPT;
+                                   std::size_t origin_col_ndx) const REALM_NOEXCEPT;
     std::size_t get_backlink(std::size_t row_ndx, const Table& origin,
                              std::size_t origin_col_ndx, std::size_t backlink_ndx) const
-        TIGHTDB_NOEXCEPT;
+        REALM_NOEXCEPT;
 
 
     //@{
@@ -515,20 +515,20 @@ public:
     /// attached to a subtable, then `*column_ndx_out` will retain its original
     /// value upon return.
 
-    TableRef get_parent_table(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
-    ConstTableRef get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
-    std::size_t get_parent_row_index() const TIGHTDB_NOEXCEPT;
+    TableRef get_parent_table(std::size_t* column_ndx_out = 0) REALM_NOEXCEPT;
+    ConstTableRef get_parent_table(std::size_t* column_ndx_out = 0) const REALM_NOEXCEPT;
+    std::size_t get_parent_row_index() const REALM_NOEXCEPT;
 
     //@}
 
 
     /// Only group-level unordered tables can be used as origins or targets of
     /// links.
-    bool is_group_level() const TIGHTDB_NOEXCEPT;
+    bool is_group_level() const REALM_NOEXCEPT;
 
     /// If this table is a group-level table, then this function returns the
     /// index of this table within the group. Otherwise it returns tightdb::npos.
-    std::size_t get_index_in_group() const TIGHTDB_NOEXCEPT;
+    std::size_t get_index_in_group() const REALM_NOEXCEPT;
 
     // Aggregate functions
     std::size_t count_int(std::size_t column_ndx, int64_t value) const;
@@ -657,16 +657,16 @@ public:
     ///
     /// The string versions assume that the column is sorted according
     /// to StringData::operator<().
-    std::size_t lower_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_bool(std::size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT;
-    std::size_t lower_bound_float(std::size_t column_ndx, float value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_float(std::size_t column_ndx, float value) const TIGHTDB_NOEXCEPT;
-    std::size_t lower_bound_double(std::size_t column_ndx, double value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_double(std::size_t column_ndx, double value) const TIGHTDB_NOEXCEPT;
-    std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_int(std::size_t column_ndx, int64_t value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_int(std::size_t column_ndx, int64_t value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_bool(std::size_t column_ndx, bool value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_float(std::size_t column_ndx, float value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_float(std::size_t column_ndx, float value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_double(std::size_t column_ndx, double value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_double(std::size_t column_ndx, double value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const REALM_NOEXCEPT;
     //@}
 
     // Queries
@@ -744,10 +744,10 @@ public:
     /// where it takes up a minimal amout of space. This function returns true
     /// if, and only if the table accessor is attached to such a subtable. This
     /// function is mainly intended for debugging purposes.
-    bool is_degenerate() const TIGHTDB_NOEXCEPT;
+    bool is_degenerate() const REALM_NOEXCEPT;
 
     // Debug
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
@@ -857,7 +857,7 @@ private:
     /// Table::refresh_accessor_tree().
     mutable bool m_mark;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     mutable uint_fast64_t m_version;
 #endif
 
@@ -876,7 +876,7 @@ private:
     /// when a change is made to the table. When calling recursively (following links
     /// or going to the parent table), the parameter should be set to false to correctly
     /// prune traversal.
-    void bump_version(bool bump_global = true) const TIGHTDB_NOEXCEPT;
+    void bump_version(bool bump_global = true) const REALM_NOEXCEPT;
 
     /// Disable copying assignment.
     ///
@@ -953,14 +953,14 @@ private:
 
     void create_degen_subtab_columns();
     ColumnBase* create_column_accessor(ColumnType, std::size_t col_ndx, std::size_t ndx_in_parent);
-    void destroy_column_accessors() TIGHTDB_NOEXCEPT;
+    void destroy_column_accessors() REALM_NOEXCEPT;
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
 
     // Support function for conversions
     void to_string_header(std::ostream& out, std::vector<std::size_t>& widths) const;
@@ -994,81 +994,81 @@ private:
     // kind of change generally happens when a modifying table
     // operation fails, and also when one transaction is ended and a
     // new one is started.
-    void detach() TIGHTDB_NOEXCEPT;
+    void detach() REALM_NOEXCEPT;
 
     /// Detach and remove all attached row, link list, and subtable
     /// accessors. This function does not discard the descriptor accessor, if
     /// any, and it does not discard column accessors either.
-    void discard_child_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() REALM_NOEXCEPT;
 
-    void discard_row_accessors() TIGHTDB_NOEXCEPT;
+    void discard_row_accessors() REALM_NOEXCEPT;
 
     // Detach the type descriptor accessor if it exists.
-    void discard_desc_accessor() TIGHTDB_NOEXCEPT;
+    void discard_desc_accessor() REALM_NOEXCEPT;
 
-    void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
-    void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
+    void bind_ref() const REALM_NOEXCEPT { ++m_ref_count; }
+    void unbind_ref() const REALM_NOEXCEPT { if (--m_ref_count == 0) delete this; }
 
     void register_view(const TableViewBase* view);
-    void unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT;
+    void unregister_view(const TableViewBase* view) REALM_NOEXCEPT;
     void move_registered_view(const TableViewBase* old_addr,
-                              const TableViewBase* new_addr) TIGHTDB_NOEXCEPT;
-    void discard_views() TIGHTDB_NOEXCEPT;
+                              const TableViewBase* new_addr) REALM_NOEXCEPT;
+    void discard_views() REALM_NOEXCEPT;
 
-    void register_row_accessor(RowBase*) const TIGHTDB_NOEXCEPT;
-    void unregister_row_accessor(RowBase*) const TIGHTDB_NOEXCEPT;
+    void register_row_accessor(RowBase*) const REALM_NOEXCEPT;
+    void unregister_row_accessor(RowBase*) const REALM_NOEXCEPT;
 
     class UnbindGuard;
 
-    ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnType get_real_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
 
     /// If this table is a group-level table, the parent group is returned,
     /// otherwise null is returned.
-    Group* get_parent_group() const TIGHTDB_NOEXCEPT;
+    Group* get_parent_group() const REALM_NOEXCEPT;
 
-    const Array* get_column_root(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    const Array* get_column_root(std::size_t col_ndx) const REALM_NOEXCEPT;
     std::pair<const Array*, const Array*> get_string_column_roots(std::size_t col_ndx) const
-        TIGHTDB_NOEXCEPT;
+        REALM_NOEXCEPT;
 
-    const ColumnBase& get_column_base(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnBase& get_column_base(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnBase& get_column_base(std::size_t column_ndx);
     template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
-    template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
     Column& get_column(std::size_t column_ndx);
-    const Column& get_column(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const Column& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnFloat& get_column_float(std::size_t column_ndx);
-    const ColumnFloat& get_column_float(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnFloat& get_column_float(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnDouble& get_column_double(std::size_t column_ndx);
-    const ColumnDouble& get_column_double(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnDouble& get_column_double(std::size_t column_ndx) const REALM_NOEXCEPT;
     AdaptiveStringColumn& get_column_string(std::size_t column_ndx);
-    const AdaptiveStringColumn& get_column_string(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const AdaptiveStringColumn& get_column_string(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnBinary& get_column_binary(std::size_t column_ndx);
-    const ColumnBinary& get_column_binary(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnBinary& get_column_binary(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnStringEnum& get_column_string_enum(std::size_t column_ndx);
-    const ColumnStringEnum& get_column_string_enum(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnStringEnum& get_column_string_enum(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnTable& get_column_table(std::size_t column_ndx);
-    const ColumnTable& get_column_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnTable& get_column_table(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnMixed& get_column_mixed(std::size_t column_ndx);
-    const ColumnMixed& get_column_mixed(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    const ColumnLinkBase& get_column_link_base(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnMixed& get_column_mixed(std::size_t column_ndx) const REALM_NOEXCEPT;
+    const ColumnLinkBase& get_column_link_base(std::size_t ndx) const REALM_NOEXCEPT;
     ColumnLinkBase& get_column_link_base(std::size_t ndx);
-    const ColumnLink& get_column_link(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnLink& get_column_link(std::size_t ndx) const REALM_NOEXCEPT;
     ColumnLink& get_column_link(std::size_t ndx);
-    const ColumnLinkList& get_column_link_list(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnLinkList& get_column_link_list(std::size_t ndx) const REALM_NOEXCEPT;
     ColumnLinkList& get_column_link_list(std::size_t ndx);
-    const ColumnBackLink& get_column_backlink(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnBackLink& get_column_backlink(std::size_t ndx) const REALM_NOEXCEPT;
     ColumnBackLink& get_column_backlink(std::size_t ndx);
 
     void instantiate_before_change();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type,
                               std::size_t ndx) const;
 
-    static std::size_t get_size_from_ref(ref_type top_ref, Allocator&) TIGHTDB_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type top_ref, Allocator&) REALM_NOEXCEPT;
     static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator&) TIGHTDB_NOEXCEPT;
+                                         Allocator&) REALM_NOEXCEPT;
 
-    const Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
-    Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
+    const Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) const REALM_NOEXCEPT;
+    Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) REALM_NOEXCEPT;
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
@@ -1092,12 +1092,12 @@ private:
     ref_type clone(Allocator&) const;
 
     /// True for `col_type_Link` and `col_type_LinkList`.
-    static bool is_link_type(ColumnType) TIGHTDB_NOEXCEPT;
+    static bool is_link_type(ColumnType) REALM_NOEXCEPT;
 
     void connect_opposite_link_columns(std::size_t link_col_ndx, Table& target_table,
-                                       std::size_t backlink_col_ndx) TIGHTDB_NOEXCEPT;
+                                       std::size_t backlink_col_ndx) REALM_NOEXCEPT;
 
-    std::size_t get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_num_strong_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT;
 
     //@{
 
@@ -1185,14 +1185,14 @@ private:
 
     // Precondition: 1 <= end - begin
     std::size_t* record_subtable_path(std::size_t* begin,
-                                      std::size_t* end) const TIGHTDB_NOEXCEPT;
+                                      std::size_t* end) const REALM_NOEXCEPT;
 
     /// Check if an accessor exists for the specified subtable. If it does,
     /// return a pointer to it, otherwise return null. This function assumes
     /// that the specified column index in a valid index into `m_cols` but does
     /// not otherwise assume more than minimal accessor consistency (see
     /// AccessorConsistencyLevels.)
-    Table* get_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    Table* get_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) REALM_NOEXCEPT;
 
     /// Unless the column accessor is missing, this function returns the
     /// accessor for the target table of the specified link-type column. The
@@ -1204,12 +1204,12 @@ private:
     /// specified column index in a valid index into `m_cols` and that the
     /// column is a link-type column. Beyond that, it assume nothing more than
     /// minimal accessor consistency (see AccessorConsistencyLevels.)
-    Table* get_link_target_table_accessor(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
+    Table* get_link_target_table_accessor(std::size_t col_ndx) REALM_NOEXCEPT;
 
-    void discard_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void discard_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) REALM_NOEXCEPT;
 
-    void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    void adj_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
+    void adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1242,31 +1242,31 @@ private:
     /// promote the state of the accessors from Minimal Consistency into
     /// Structural Correspondence, so it must be able to execute without
     /// accessing the underlying array nodes.
-    void adj_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT;
 
-    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
-    void adj_acc_clear_nonroot_table() TIGHTDB_NOEXCEPT;
-    void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_acc_clear_root_table() REALM_NOEXCEPT;
+    void adj_acc_clear_nonroot_table() REALM_NOEXCEPT;
+    void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
+    void adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
-    void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT;
 
     void adj_insert_column(std::size_t col_ndx);
-    void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
+    void adj_erase_column(std::size_t col_ndx) REALM_NOEXCEPT;
 
-    bool is_marked() const TIGHTDB_NOEXCEPT;
-    void mark() TIGHTDB_NOEXCEPT;
-    void unmark() TIGHTDB_NOEXCEPT;
-    void recursive_mark() TIGHTDB_NOEXCEPT;
-    void mark_link_target_tables(std::size_t col_ndx_begin) TIGHTDB_NOEXCEPT;
-    void mark_opposite_link_tables() TIGHTDB_NOEXCEPT;
+    bool is_marked() const REALM_NOEXCEPT;
+    void mark() REALM_NOEXCEPT;
+    void unmark() REALM_NOEXCEPT;
+    void recursive_mark() REALM_NOEXCEPT;
+    void mark_link_target_tables(std::size_t col_ndx_begin) REALM_NOEXCEPT;
+    void mark_opposite_link_tables() REALM_NOEXCEPT;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* get_repl() TIGHTDB_NOEXCEPT;
+#ifdef REALM_ENABLE_REPLICATION
+    Replication* get_repl() REALM_NOEXCEPT;
 #endif
 
-    void set_ndx_in_parent(std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT;
 
     /// Refresh the part of the accessor tree that is rooted at this
     /// table. Subtable accessors will be refreshed only if they are marked
@@ -1305,9 +1305,9 @@ private:
 
     void refresh_column_accessors(std::size_t col_ndx_begin = 0);
 
-    bool is_cross_table_link_target() const TIGHTDB_NOEXCEPT;
+    bool is_cross_table_link_target() const REALM_NOEXCEPT;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
 
@@ -1332,14 +1332,14 @@ private:
 
 class Table::Parent: public ArrayParent {
 public:
-    ~Parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~Parent() REALM_NOEXCEPT REALM_OVERRIDE {}
 
 protected:
-    virtual StringData get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT;
+    virtual StringData get_child_name(std::size_t child_ndx) const REALM_NOEXCEPT;
 
     /// If children are group-level tables, then this function returns the
     /// group. Otherwise it returns null.
-    virtual Group* get_parent_group() TIGHTDB_NOEXCEPT;
+    virtual Group* get_parent_group() REALM_NOEXCEPT;
 
     /// If children are subtables, then this function returns the
     /// parent table. Otherwise it returns null.
@@ -1347,17 +1347,17 @@ protected:
     /// If \a column_ndx_out is not null, this function must assign the index of
     /// the column within the parent table to `*column_ndx_out` when , and only
     /// when this table parent is a column in a parent table.
-    virtual Table* get_parent_table(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
+    virtual Table* get_parent_table(std::size_t* column_ndx_out = 0) REALM_NOEXCEPT;
 
     /// Must be called whenever a child table accessor is about to be destroyed.
     ///
     /// Note that the argument is a pointer to the child Table rather than its
     /// `ndx_in_parent` property. This is because only minimal accessor
     /// consistency can be assumed by this function.
-    virtual void child_accessor_destroyed(Table* child) TIGHTDB_NOEXCEPT = 0;
+    virtual void child_accessor_destroyed(Table* child) REALM_NOEXCEPT = 0;
 
     virtual std::size_t* record_subtable_path(std::size_t* begin,
-                                              std::size_t* end) TIGHTDB_NOEXCEPT;
+                                              std::size_t* end) REALM_NOEXCEPT;
 
     friend class Table;
 };
@@ -1369,9 +1369,9 @@ protected:
 // Implementation:
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
-inline void Table::bump_version(bool bump_global) const TIGHTDB_NOEXCEPT
+inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
 {
     if (bump_global) {
         // This is only set on initial entry through an operation on the same
@@ -1397,14 +1397,14 @@ inline void Table::bump_version(bool bump_global) const TIGHTDB_NOEXCEPT
     }
 }
 
-#else // TIGHTDB_ENABLE_REPLICATION
+#else // REALM_ENABLE_REPLICATION
 
-inline void Table::bump_version(bool) const TIGHTDB_NOEXCEPT
+inline void Table::bump_version(bool) const REALM_NOEXCEPT
 {
     // No-op when replication is disabled at compile time
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 
 inline void Table::remove_last()
 {
@@ -1417,7 +1417,7 @@ inline void Table::register_view(const TableViewBase* view)
     m_views.push_back(view);
 }
 
-inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
+inline bool Table::is_attached() const REALM_NOEXCEPT
 {
     // Note that it is not possible to tie the state of attachment of a table to
     // the state of attachment of m_top, because tables with shared spec do not
@@ -1431,104 +1431,104 @@ inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
     return m_columns.has_parent();
 }
 
-inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
+inline StringData Table::get_name() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     ArrayParent* parent = real_top.get_parent();
     if (!parent)
         return StringData();
     std::size_t index_in_parent = real_top.get_ndx_in_parent();
-    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+    REALM_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->get_child_name(index_in_parent);
 }
 
-inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
+inline std::size_t Table::get_column_count() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_spec.get_public_column_count();
 }
 
-inline StringData Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData Table::get_column_name(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, get_column_count());
     return m_spec.get_column_name(ndx);
 }
 
-inline std::size_t Table::get_column_index(StringData name) const TIGHTDB_NOEXCEPT
+inline std::size_t Table::get_column_index(StringData name) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return m_spec.get_column_index(name);
 }
 
-inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline ColumnType Table::get_real_column_type(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_spec.get_column_count());
+    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
     return m_spec.get_column_type(ndx);
 }
 
-inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline DataType Table::get_column_type(std::size_t ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_spec.get_column_count());
+    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
     return m_spec.get_public_column_type(ndx);
 }
 
 template<class Col, ColumnType col_type> inline Col& Table::get_column(std::size_t ndx)
 {
     ColumnBase& col = get_column_base(ndx);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(typeid(Col) == typeid(col));
+    REALM_ASSERT(typeid(Col) == typeid(col));
     return static_cast<Col&>(col);
 }
 
 template<class Col, ColumnType col_type>
-inline const Col& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline const Col& Table::get_column(std::size_t ndx) const REALM_NOEXCEPT
 {
     const ColumnBase& col = get_column_base(ndx);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(typeid(Col) == typeid(col));
+    REALM_ASSERT(typeid(Col) == typeid(col));
     return static_cast<const Col&>(col);
 }
 
-inline bool Table::has_shared_type() const TIGHTDB_NOEXCEPT
+inline bool Table::has_shared_type() const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     return !m_top.is_attached();
 }
 
 
 class Table::UnbindGuard {
 public:
-    UnbindGuard(Table* table) TIGHTDB_NOEXCEPT: m_table(table)
+    UnbindGuard(Table* table) REALM_NOEXCEPT: m_table(table)
     {
     }
 
-    ~UnbindGuard() TIGHTDB_NOEXCEPT
+    ~UnbindGuard() REALM_NOEXCEPT
     {
         if (m_table)
             m_table->unbind_ref();
     }
 
-    Table& operator*() const TIGHTDB_NOEXCEPT
+    Table& operator*() const REALM_NOEXCEPT
     {
         return *m_table;
     }
 
-    Table* operator->() const TIGHTDB_NOEXCEPT
+    Table* operator->() const REALM_NOEXCEPT
     {
         return m_table;
     }
 
-    Table* get() const TIGHTDB_NOEXCEPT
+    Table* get() const REALM_NOEXCEPT
     {
         return m_table;
     }
 
-    Table* release() TIGHTDB_NOEXCEPT
+    Table* release() REALM_NOEXCEPT
     {
         Table* table = m_table;
         m_table = 0;
@@ -1618,54 +1618,54 @@ inline Table& Table::link(size_t link_column)
     return *this;
 }
 
-inline bool Table::is_empty() const TIGHTDB_NOEXCEPT
+inline bool Table::is_empty() const REALM_NOEXCEPT
 {
     return m_size == 0;
 }
 
-inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
+inline std::size_t Table::size() const REALM_NOEXCEPT
 {
     return m_size;
 }
 
-inline Table::RowExpr Table::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline Table::RowExpr Table::get(std::size_t row_ndx) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, size());
+    REALM_ASSERT_3(row_ndx, <, size());
     return RowExpr(this, row_ndx);
 }
 
-inline Table::ConstRowExpr Table::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline Table::ConstRowExpr Table::get(std::size_t row_ndx) const REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(row_ndx, <, size());
+    REALM_ASSERT_3(row_ndx, <, size());
     return ConstRowExpr(this, row_ndx);
 }
 
-inline Table::RowExpr Table::front() TIGHTDB_NOEXCEPT
+inline Table::RowExpr Table::front() REALM_NOEXCEPT
 {
     return get(0);
 }
 
-inline Table::ConstRowExpr Table::front() const TIGHTDB_NOEXCEPT
+inline Table::ConstRowExpr Table::front() const REALM_NOEXCEPT
 {
     return get(0);
 }
 
-inline Table::RowExpr Table::back() TIGHTDB_NOEXCEPT
+inline Table::RowExpr Table::back() REALM_NOEXCEPT
 {
     return get(m_size-1);
 }
 
-inline Table::ConstRowExpr Table::back() const TIGHTDB_NOEXCEPT
+inline Table::ConstRowExpr Table::back() const REALM_NOEXCEPT
 {
     return get(m_size-1);
 }
 
-inline Table::RowExpr Table::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline Table::RowExpr Table::operator[](std::size_t row_ndx) REALM_NOEXCEPT
 {
     return get(row_ndx);
 }
 
-inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const REALM_NOEXCEPT
 {
     return get(row_ndx);
 }
@@ -1703,12 +1703,12 @@ inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
     insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
 }
 
-inline bool Table::is_null_link(std::size_t col_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline bool Table::is_null_link(std::size_t col_ndx, std::size_t row_ndx) const REALM_NOEXCEPT
 {
     return get_link(col_ndx, row_ndx) == tightdb::npos;
 }
 
-inline ConstTableRef Table::get_link_target(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline ConstTableRef Table::get_link_target(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return const_cast<Table*>(this)->get_link_target(col_ndx);
 }
@@ -1734,17 +1734,17 @@ inline ConstTableRef Table::get_subtable(std::size_t column_ndx, std::size_t row
     return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
 }
 
-inline ConstTableRef Table::get_parent_table(std::size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
+inline ConstTableRef Table::get_parent_table(std::size_t* column_ndx_out) const REALM_NOEXCEPT
 {
     return ConstTableRef(get_parent_table_ptr(column_ndx_out));
 }
 
-inline TableRef Table::get_parent_table(std::size_t* column_ndx_out) TIGHTDB_NOEXCEPT
+inline TableRef Table::get_parent_table(std::size_t* column_ndx_out) REALM_NOEXCEPT
 {
     return TableRef(get_parent_table_ptr(column_ndx_out));
 }
 
-inline bool Table::is_group_level() const TIGHTDB_NOEXCEPT
+inline bool Table::is_group_level() const REALM_NOEXCEPT
 {
     return bool(get_parent_group());
 }
@@ -1795,7 +1795,7 @@ inline bool Table::operator!=(const Table& t) const
     return !(*this == t); // Throws
 }
 
-inline bool Table::is_degenerate() const TIGHTDB_NOEXCEPT
+inline bool Table::is_degenerate() const REALM_NOEXCEPT
 {
     return !m_columns.is_attached();
 }
@@ -1810,7 +1810,7 @@ inline void Table::set_into_mixed(Table* parent, std::size_t col_ndx, std::size_
     parent->insert_mixed_subtable(col_ndx, row_ndx, this);
 }
 
-inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) REALM_NOEXCEPT
 {
     const char* top_header = alloc.translate(top_ref);
     std::pair<int_least64_t, int_least64_t> p = Array::get_two(top_header, 0);
@@ -1818,32 +1818,32 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     return get_size_from_ref(spec_ref, columns_ref, alloc);
 }
 
-inline Table* Table::get_parent_table_ptr(std::size_t* column_ndx_out) TIGHTDB_NOEXCEPT
+inline Table* Table::get_parent_table_ptr(std::size_t* column_ndx_out) REALM_NOEXCEPT
 {
     const Table* parent = const_cast<const Table*>(this)->get_parent_table_ptr(column_ndx_out);
     return const_cast<Table*>(parent);
 }
 
-inline bool Table::is_link_type(ColumnType col_type) TIGHTDB_NOEXCEPT
+inline bool Table::is_link_type(ColumnType col_type) REALM_NOEXCEPT
 {
     return col_type == col_type_Link || col_type == col_type_LinkList;
 }
 
 inline std::size_t* Table::record_subtable_path(std::size_t* begin,
-                                                std::size_t* end) const TIGHTDB_NOEXCEPT
+                                                std::size_t* end) const REALM_NOEXCEPT
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     std::size_t index_in_parent = real_top.get_ndx_in_parent();
-    TIGHTDB_ASSERT_3(begin, <, end);
+    REALM_ASSERT_3(begin, <, end);
     *begin++ = index_in_parent;
     ArrayParent* parent = real_top.get_parent();
-    TIGHTDB_ASSERT(parent);
-    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+    REALM_ASSERT(parent);
+    REALM_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 
 inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
-                                                        std::size_t*) TIGHTDB_NOEXCEPT
+                                                        std::size_t*) REALM_NOEXCEPT
 {
     return begin;
 }
@@ -1859,29 +1859,29 @@ typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::si
     return (*typed_table)[row_pos_in_target];
 }
 
-inline bool Table::is_marked() const TIGHTDB_NOEXCEPT
+inline bool Table::is_marked() const REALM_NOEXCEPT
 {
     return m_mark;
 }
 
-inline void Table::mark() TIGHTDB_NOEXCEPT
+inline void Table::mark() REALM_NOEXCEPT
 {
     m_mark = true;
 }
 
-inline void Table::unmark() TIGHTDB_NOEXCEPT
+inline void Table::unmark() REALM_NOEXCEPT
 {
     m_mark = false;
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-inline Replication* Table::get_repl() TIGHTDB_NOEXCEPT
+#ifdef REALM_ENABLE_REPLICATION
+inline Replication* Table::get_repl() REALM_NOEXCEPT
 {
     return m_top.get_alloc().get_replication();
 }
 #endif
 
-inline void Table::set_ndx_in_parent(std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+inline void Table::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
 {
     if (m_top.is_attached()) {
         // Root table (independent descriptor)
@@ -1949,43 +1949,43 @@ public:
     }
 
     static void set_top_parent(Table& table, ArrayParent* parent,
-                               std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+                               std::size_t ndx_in_parent) REALM_NOEXCEPT
     {
         table.m_top.set_parent(parent, ndx_in_parent);
     }
 
-    static void update_from_parent(Table& table, std::size_t old_baseline) TIGHTDB_NOEXCEPT
+    static void update_from_parent(Table& table, std::size_t old_baseline) REALM_NOEXCEPT
     {
         table.update_from_parent(old_baseline);
     }
 
-    static void detach(Table& table) TIGHTDB_NOEXCEPT
+    static void detach(Table& table) REALM_NOEXCEPT
     {
         table.detach();
     }
 
-    static void discard_row_accessors(Table& table) TIGHTDB_NOEXCEPT
+    static void discard_row_accessors(Table& table) REALM_NOEXCEPT
     {
         table.discard_row_accessors();
     }
 
-    static void discard_child_accessors(Table& table) TIGHTDB_NOEXCEPT
+    static void discard_child_accessors(Table& table) REALM_NOEXCEPT
     {
         table.discard_child_accessors();
     }
 
     static void discard_subtable_accessor(Table& table, std::size_t col_ndx, std::size_t row_ndx)
-        TIGHTDB_NOEXCEPT
+        REALM_NOEXCEPT
     {
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
 
-    static void bind_ref(Table& table) TIGHTDB_NOEXCEPT
+    static void bind_ref(Table& table) REALM_NOEXCEPT
     {
         table.bind_ref();
     }
 
-    static void unbind_ref(Table& table) TIGHTDB_NOEXCEPT
+    static void unbind_ref(Table& table) REALM_NOEXCEPT
     {
         table.unbind_ref();
     }
@@ -1995,23 +1995,23 @@ public:
         return a.compare_rows(b); // Throws
     }
 
-    static std::size_t get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+    static std::size_t get_size_from_ref(ref_type ref, Allocator& alloc) REALM_NOEXCEPT
     {
         return Table::get_size_from_ref(ref, alloc);
     }
 
     static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator& alloc) TIGHTDB_NOEXCEPT
+                                         Allocator& alloc) REALM_NOEXCEPT
     {
         return Table::get_size_from_ref(spec_ref, columns_ref, alloc);
     }
 
-    static Spec& get_spec(Table& table) TIGHTDB_NOEXCEPT
+    static Spec& get_spec(Table& table) REALM_NOEXCEPT
     {
         return table.m_spec;
     }
 
-    static const Spec& get_spec(const Table& table) TIGHTDB_NOEXCEPT
+    static const Spec& get_spec(const Table& table) REALM_NOEXCEPT
     {
         return table.m_spec;
     }
@@ -2045,7 +2045,7 @@ public:
     }
 
     static std::size_t get_num_strong_backlinks(const Table& table,
-                                                std::size_t row_ndx) TIGHTDB_NOEXCEPT
+                                                std::size_t row_ndx) REALM_NOEXCEPT
     {
         return table.get_num_strong_backlinks(row_ndx);
     }
@@ -2062,7 +2062,7 @@ public:
     }
 
     static std::size_t* record_subtable_path(const Table& table, std::size_t* begin,
-                                             std::size_t* end) TIGHTDB_NOEXCEPT
+                                             std::size_t* end) REALM_NOEXCEPT
     {
         return table.record_subtable_path(begin, end);
     }
@@ -2088,52 +2088,52 @@ public:
         table.do_set_link_type(column_ndx, link_type); // Throws
     }
 
-    static void clear_root_table_desc(const Table& root_table) TIGHTDB_NOEXCEPT
+    static void clear_root_table_desc(const Table& root_table) REALM_NOEXCEPT
     {
-        TIGHTDB_ASSERT(!root_table.has_shared_type());
+        REALM_ASSERT(!root_table.has_shared_type());
         root_table.m_descriptor = 0;
     }
 
     static Table* get_subtable_accessor(Table& table, std::size_t col_ndx,
-                                        std::size_t row_ndx) TIGHTDB_NOEXCEPT
+                                        std::size_t row_ndx) REALM_NOEXCEPT
     {
         return table.get_subtable_accessor(col_ndx, row_ndx);
     }
 
     static const Table* get_link_target_table_accessor(const Table& table,
-                                                       std::size_t col_ndx) TIGHTDB_NOEXCEPT
+                                                       std::size_t col_ndx) REALM_NOEXCEPT
     {
         return const_cast<Table&>(table).get_link_target_table_accessor(col_ndx);
     }
 
-    static Table* get_link_target_table_accessor(Table& table, std::size_t col_ndx) TIGHTDB_NOEXCEPT
+    static Table* get_link_target_table_accessor(Table& table, std::size_t col_ndx) REALM_NOEXCEPT
     {
         return table.get_link_target_table_accessor(col_ndx);
     }
 
     static void adj_acc_insert_rows(Table& table, std::size_t row_ndx,
-                                    std::size_t num_rows) TIGHTDB_NOEXCEPT
+                                    std::size_t num_rows) REALM_NOEXCEPT
     {
         table.adj_acc_insert_rows(row_ndx, num_rows);
     }
 
-    static void adj_acc_erase_row(Table& table, std::size_t row_ndx) TIGHTDB_NOEXCEPT
+    static void adj_acc_erase_row(Table& table, std::size_t row_ndx) REALM_NOEXCEPT
     {
         table.adj_acc_erase_row(row_ndx);
     }
 
     static void adj_acc_move_over(Table& table, std::size_t from_row_ndx,
-                                  std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
+                                  std::size_t to_row_ndx) REALM_NOEXCEPT
     {
         table.adj_acc_move_over(from_row_ndx, to_row_ndx);
     }
 
-    static void adj_acc_clear_root_table(Table& table) TIGHTDB_NOEXCEPT
+    static void adj_acc_clear_root_table(Table& table) REALM_NOEXCEPT
     {
         table.adj_acc_clear_root_table();
     }
 
-    static void adj_acc_clear_nonroot_table(Table& table) TIGHTDB_NOEXCEPT
+    static void adj_acc_clear_nonroot_table(Table& table) REALM_NOEXCEPT
     {
         table.adj_acc_clear_nonroot_table();
     }
@@ -2149,42 +2149,42 @@ public:
         table.adj_insert_column(num_cols); // Throws
     }
 
-    static void adj_erase_column(Table& table, std::size_t col_ndx) TIGHTDB_NOEXCEPT
+    static void adj_erase_column(Table& table, std::size_t col_ndx) REALM_NOEXCEPT
     {
         table.adj_erase_column(col_ndx);
     }
 
-    static bool is_marked(const Table& table) TIGHTDB_NOEXCEPT
+    static bool is_marked(const Table& table) REALM_NOEXCEPT
     {
         return table.is_marked();
     }
 
-    static void mark(Table& table) TIGHTDB_NOEXCEPT
+    static void mark(Table& table) REALM_NOEXCEPT
     {
         table.mark();
     }
 
-    static void unmark(Table& table) TIGHTDB_NOEXCEPT
+    static void unmark(Table& table) REALM_NOEXCEPT
     {
         table.unmark();
     }
 
-    static void recursive_mark(Table& table) TIGHTDB_NOEXCEPT
+    static void recursive_mark(Table& table) REALM_NOEXCEPT
     {
         table.recursive_mark();
     }
 
-    static void mark_link_target_tables(Table& table, std::size_t col_ndx_begin) TIGHTDB_NOEXCEPT
+    static void mark_link_target_tables(Table& table, std::size_t col_ndx_begin) REALM_NOEXCEPT
     {
         table.mark_link_target_tables(col_ndx_begin);
     }
 
-    static void mark_opposite_link_tables(Table& table) TIGHTDB_NOEXCEPT
+    static void mark_opposite_link_tables(Table& table) REALM_NOEXCEPT
     {
         table.mark_opposite_link_tables();
     }
 
-    static Descriptor* get_root_table_desc_accessor(Table& root_table) TIGHTDB_NOEXCEPT
+    static Descriptor* get_root_table_desc_accessor(Table& root_table) REALM_NOEXCEPT
     {
         return root_table.m_descriptor;
     }
@@ -2201,23 +2201,23 @@ public:
         table.refresh_accessor_tree(); // Throws
     }
 
-    static void set_ndx_in_parent(Table& table, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+    static void set_ndx_in_parent(Table& table, std::size_t ndx_in_parent) REALM_NOEXCEPT
     {
         table.set_ndx_in_parent(ndx_in_parent);
     }
 
     static void set_shared_subspec_ndx_in_parent(Table& table, std::size_t spec_ndx_in_parent)
-        TIGHTDB_NOEXCEPT
+        REALM_NOEXCEPT
     {
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }
 
-    static bool is_link_type(ColumnType type) TIGHTDB_NOEXCEPT
+    static bool is_link_type(ColumnType type) REALM_NOEXCEPT
     {
         return Table::is_link_type(type);
     }
 
-    static void bump_version(Table& table, bool bump_global = true) TIGHTDB_NOEXCEPT
+    static void bump_version(Table& table, bool bump_global = true) REALM_NOEXCEPT
     {
         table.bump_version(bump_global);
     }
@@ -2227,8 +2227,8 @@ public:
         return table.is_cross_table_link_target();
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    static Replication* get_repl(Table& table) TIGHTDB_NOEXCEPT
+#ifdef REALM_ENABLE_REPLICATION
+    static Replication* get_repl(Table& table) REALM_NOEXCEPT
     {
         return table.get_repl();
     }
@@ -2238,4 +2238,4 @@ public:
 
 } // namespace tightdb
 
-#endif // TIGHTDB_TABLE_HPP
+#endif // REALM_TABLE_HPP

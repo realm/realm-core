@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_TABLE_HPP
-#define TIGHTDB_COLUMN_TABLE_HPP
+#ifndef REALM_COLUMN_TABLE_HPP
+#define REALM_COLUMN_TABLE_HPP
 
 #include <vector>
 
@@ -33,30 +33,30 @@ namespace tightdb {
 /// Base class for any type of column that can contain subtables.
 class ColumnSubtableParent: public Column, public Table::Parent {
 public:
-    void discard_child_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() REALM_NOEXCEPT;
 
-    ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~ColumnSubtableParent() REALM_NOEXCEPT REALM_OVERRIDE;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    Table* get_subtable_accessor(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Table* get_subtable_accessor(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
 
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void discard_subtable_accessor(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
+    void adj_acc_clear_root_table() REALM_NOEXCEPT REALM_OVERRIDE;
+    void mark(int) REALM_NOEXCEPT REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
-    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE;
+    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
 #endif
 
 protected:
@@ -69,33 +69,33 @@ protected:
     std::size_t m_column_ndx;
 
     struct SubtableMap {
-        ~SubtableMap() TIGHTDB_NOEXCEPT {}
-        bool empty() const TIGHTDB_NOEXCEPT { return m_entries.empty(); }
-        Table* find(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT;
+        ~SubtableMap() REALM_NOEXCEPT {}
+        bool empty() const REALM_NOEXCEPT { return m_entries.empty(); }
+        Table* find(std::size_t subtable_ndx) const REALM_NOEXCEPT;
         void add(std::size_t subtable_ndx, Table*);
         // Returns true if, and only if at least one entry was detached and
         // removed from the map.
-        bool detach_and_remove_all() TIGHTDB_NOEXCEPT;
+        bool detach_and_remove_all() REALM_NOEXCEPT;
         // Returns true if, and only if the entry was found and removed, and it
         // was the last entry in the map.
-        bool detach_and_remove(std::size_t subtable_ndx) TIGHTDB_NOEXCEPT;
+        bool detach_and_remove(std::size_t subtable_ndx) REALM_NOEXCEPT;
         // Returns true if, and only if the entry was found and removed, and it
         // was the last entry in the map.
-        bool remove(Table*) TIGHTDB_NOEXCEPT;
-        void update_from_parent(std::size_t old_baseline) const TIGHTDB_NOEXCEPT;
+        bool remove(Table*) REALM_NOEXCEPT;
+        void update_from_parent(std::size_t old_baseline) const REALM_NOEXCEPT;
         template<bool fix_ndx_in_parent>
-        void adj_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+        void adj_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
-        template<bool fix_ndx_in_parent> bool adj_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+        template<bool fix_ndx_in_parent> bool adj_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
         bool adj_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx)
-            TIGHTDB_NOEXCEPT;
+            REALM_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
-        void recursive_mark() TIGHTDB_NOEXCEPT;
+        void recursive_mark() REALM_NOEXCEPT;
         void refresh_accessor_tree(std::size_t spec_ndx_in_parent);
     private:
         struct entry {
@@ -130,16 +130,16 @@ protected:
     Table* get_subtable_ptr(std::size_t subtable_ndx);
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
+    void update_child_ref(std::size_t, ref_type) REALM_OVERRIDE;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
 
     // Overriding method in Table::Parent
-    Table* get_parent_table(std::size_t*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Table* get_parent_table(std::size_t*) REALM_NOEXCEPT REALM_OVERRIDE;
 
     // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void child_accessor_destroyed(Table*) REALM_NOEXCEPT REALM_OVERRIDE;
 
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
@@ -152,7 +152,7 @@ protected:
     ref_type clone_table_columns(const Table*);
 
     std::size_t* record_subtable_path(std::size_t* begin,
-                                      std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+                                      std::size_t* end) REALM_NOEXCEPT REALM_OVERRIDE;
 
     void update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                                 _impl::TableFriend::AccessorUpdater&);
@@ -160,9 +160,9 @@ protected:
     /// \param row_ndx Must be `tightdb::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+    get_to_dot_parent(std::size_t ndx_in_parent) const REALM_OVERRIDE;
 #endif
 
     friend class Table;
@@ -183,9 +183,9 @@ public:
     /// table. Otherwise you should pass zero.
     ColumnTable(Allocator&, ref_type, Table* table, std::size_t column_ndx);
 
-    ~ColumnTable() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~ColumnTable() REALM_NOEXCEPT REALM_OVERRIDE {}
 
-    std::size_t get_subtable_size(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_subtable_size(std::size_t ndx) const REALM_NOEXCEPT;
 
     /// Get a pointer to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
@@ -209,28 +209,28 @@ public:
 
     using ColumnSubtableParent::insert;
 
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
 
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
 #endif
 
 private:
     mutable std::size_t m_subspec_ndx; // Unknown if equal to `npos`
 
-    std::size_t get_subspec_ndx() const TIGHTDB_NOEXCEPT;
+    std::size_t get_subspec_ndx() const REALM_NOEXCEPT;
 
-    void destroy_subtable(std::size_t ndx) TIGHTDB_NOEXCEPT;
+    void destroy_subtable(std::size_t ndx) REALM_NOEXCEPT;
 
-    void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_discard_child_accessors() REALM_NOEXCEPT REALM_OVERRIDE;
 };
 
 
@@ -280,7 +280,7 @@ inline void ColumnSubtableParent::clear(std::size_t, bool)
     m_array->set_type(Array::type_HasRefs);
 }
 
-inline void ColumnSubtableParent::mark(int type) TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::mark(int type) REALM_NOEXCEPT
 {
     if (type & mark_Recursive)
         m_subtable_map.recursive_mark();
@@ -293,7 +293,7 @@ inline void ColumnSubtableParent::refresh_accessor_tree(std::size_t col_ndx, con
 }
 
 inline void ColumnSubtableParent::adj_acc_insert_rows(std::size_t row_ndx,
-                                                      std::size_t num_rows) TIGHTDB_NOEXCEPT
+                                                      std::size_t num_rows) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -303,7 +303,7 @@ inline void ColumnSubtableParent::adj_acc_insert_rows(std::size_t row_ndx,
     m_subtable_map.adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows);
 }
 
-inline void ColumnSubtableParent::adj_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -317,7 +317,7 @@ inline void ColumnSubtableParent::adj_acc_erase_row(std::size_t row_ndx) TIGHTDB
 }
 
 inline void ColumnSubtableParent::adj_acc_move_over(std::size_t from_row_ndx,
-                                                    std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
+                                                    std::size_t to_row_ndx) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -331,7 +331,7 @@ inline void ColumnSubtableParent::adj_acc_move_over(std::size_t from_row_ndx,
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -342,7 +342,7 @@ inline void ColumnSubtableParent::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 }
 
 inline Table* ColumnSubtableParent::get_subtable_accessor(std::size_t row_ndx) const
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -352,7 +352,7 @@ inline Table* ColumnSubtableParent::get_subtable_accessor(std::size_t row_ndx) c
     return subtable;
 }
 
-inline void ColumnSubtableParent::discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -374,7 +374,7 @@ inline void ColumnSubtableParent::SubtableMap::add(std::size_t subtable_ndx, Tab
 
 template<bool fix_ndx_in_parent>
 void ColumnSubtableParent::SubtableMap::adj_insert_rows(std::size_t row_ndx, std::size_t num_rows)
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     typedef entries::iterator iter;
     iter end = m_entries.end();
@@ -389,7 +389,7 @@ void ColumnSubtableParent::SubtableMap::adj_insert_rows(std::size_t row_ndx, std
 }
 
 template<bool fix_ndx_in_parent>
-bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
     typedef entries::iterator iter;
@@ -402,7 +402,7 @@ bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) TIGHT
                 tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
         }
         else if (i->m_subtable_ndx == row_ndx) {
-            TIGHTDB_ASSERT(erase == end); // Subtable accessors are unique
+            REALM_ASSERT(erase == end); // Subtable accessors are unique
             erase = i;
         }
     }
@@ -421,7 +421,7 @@ bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) TIGHT
 
 template<bool fix_ndx_in_parent>
 bool ColumnSubtableParent::SubtableMap::adj_move_over(std::size_t from_row_ndx,
-                                                      std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
+                                                      std::size_t to_row_ndx) REALM_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
 
@@ -435,7 +435,7 @@ bool ColumnSubtableParent::SubtableMap::adj_move_over(std::size_t from_row_ndx,
 
     while (i < n) {
         entry& e = m_entries[i];
-        if (TIGHTDB_UNLIKELY(e.m_subtable_ndx == to_row_ndx)) {
+        if (REALM_UNLIKELY(e.m_subtable_ndx == to_row_ndx)) {
             // Must hold a counted reference while detaching
             TableRef table(e.m_table);
             tf::detach(*table);
@@ -445,7 +445,7 @@ bool ColumnSubtableParent::SubtableMap::adj_move_over(std::size_t from_row_ndx,
             m_entries.pop_back();
         }
         else {
-            if (TIGHTDB_UNLIKELY(e.m_subtable_ndx == from_row_ndx)) {
+            if (REALM_UNLIKELY(e.m_subtable_ndx == from_row_ndx)) {
                 e.m_subtable_ndx = to_row_ndx;
                 if (fix_ndx_in_parent)
                     tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
@@ -469,19 +469,19 @@ inline void ColumnSubtableParent::update_child_ref(std::size_t child_ndx, ref_ty
     set(child_ndx, new_ref);
 }
 
-inline ref_type ColumnSubtableParent::get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT
+inline ref_type ColumnSubtableParent::get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT
 {
     return get_as_ref(child_ndx);
 }
 
-inline void ColumnSubtableParent::discard_child_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::discard_child_accessors() REALM_NOEXCEPT
 {
     bool last_entry_removed = m_subtable_map.detach_and_remove_all();
     if (last_entry_removed && m_table)
         _impl::TableFriend::unbind_ref(*m_table);
 }
 
-inline ColumnSubtableParent::~ColumnSubtableParent() TIGHTDB_NOEXCEPT
+inline ColumnSubtableParent::~ColumnSubtableParent() REALM_NOEXCEPT
 {
     discard_child_accessors();
 }
@@ -502,7 +502,7 @@ inline ref_type ColumnSubtableParent::create(Allocator& alloc, std::size_t size)
 }
 
 inline std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
-                                                               std::size_t* end) TIGHTDB_NOEXCEPT
+                                                               std::size_t* end) REALM_NOEXCEPT
 {
     if (end == begin)
         return 0; // Error, not enough space in buffer
@@ -554,9 +554,9 @@ inline void ColumnTable::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
     m_subtable_map.refresh_accessor_tree(m_subspec_ndx); // Throws
 }
 
-inline std::size_t ColumnTable::get_subspec_ndx() const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnTable::get_subspec_ndx() const REALM_NOEXCEPT
 {
-    if (TIGHTDB_UNLIKELY(m_subspec_ndx == tightdb::npos)) {
+    if (REALM_UNLIKELY(m_subspec_ndx == tightdb::npos)) {
         typedef _impl::TableFriend tf;
         const Spec& spec = tf::get_spec(*m_table);
         m_subspec_ndx = spec.get_subspec_ndx(m_column_ndx);
@@ -567,4 +567,4 @@ inline std::size_t ColumnTable::get_subspec_ndx() const TIGHTDB_NOEXCEPT
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_TABLE_HPP
+#endif // REALM_COLUMN_TABLE_HPP

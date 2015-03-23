@@ -395,9 +395,9 @@ template<class String16> String16 utf8_to_utf16(const string& s)
     Char16* out_begin = utf16_buf.get();
     Char16* out_end = out_begin + utf16_buf_size;
     bool valid_utf8 = Xcode::to_utf16(in_begin, in_end, out_begin, out_end);
-    TIGHTDB_ASSERT(valid_utf8);
+    REALM_ASSERT(valid_utf8);
     static_cast<void>(valid_utf8);
-    TIGHTDB_ASSERT(in_begin == in_end);
+    REALM_ASSERT(in_begin == in_end);
     return String16(utf16_buf.get(), out_begin);
 }
 
@@ -415,9 +415,9 @@ template<class String16> string utf16_to_utf8(const String16& s)
     char* out_begin = utf8_buf.get();
     char* out_end = out_begin + utf8_buf_size;
     bool valid_utf16 = Xcode::to_utf8(in_begin, in_end, out_begin, out_end);
-    TIGHTDB_ASSERT(valid_utf16);
+    REALM_ASSERT(valid_utf16);
     static_cast<void>(valid_utf16);
-    TIGHTDB_ASSERT(in_begin == in_end);
+    REALM_ASSERT(in_begin == in_end);
     return string(utf8_buf.get(), out_begin);
 }
 

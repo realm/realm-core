@@ -64,7 +64,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id)
         m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, int64_t>;
 
     else {
-        TIGHTDB_ASSERT(false);
+        REALM_ASSERT(false);
     }
 }
 
@@ -161,7 +161,7 @@ size_t NotNode::find_first_covers_known(size_t start, size_t end)
 {
     // CASE: start-end covers the known range
     // [    ######    ]
-    TIGHTDB_ASSERT_DEBUG(start <= m_known_range_start && end >= m_known_range_end);
+    REALM_ASSERT_DEBUG(start <= m_known_range_start && end >= m_known_range_end);
     size_t result = find_first_loop(start, m_known_range_start);
     if (result != not_found) {
         update_known(start, m_known_range_end, result);
@@ -181,7 +181,7 @@ size_t NotNode::find_first_covers_known(size_t start, size_t end)
 
 size_t NotNode::find_first_covered_by_known(size_t start, size_t end)
 {
-    TIGHTDB_ASSERT_DEBUG(start >= m_known_range_start && end <= m_known_range_end);
+    REALM_ASSERT_DEBUG(start >= m_known_range_start && end <= m_known_range_end);
     // CASE: the known range covers start-end
     // ###[#####]###
     if (m_first_in_known_range != not_found) {
@@ -199,7 +199,7 @@ size_t NotNode::find_first_covered_by_known(size_t start, size_t end)
 
 size_t NotNode::find_first_overlap_lower(size_t start, size_t end)
 {
-    TIGHTDB_ASSERT_DEBUG(start < m_known_range_start && end >= m_known_range_start && end <= m_known_range_end);
+    REALM_ASSERT_DEBUG(start < m_known_range_start && end >= m_known_range_start && end <= m_known_range_end);
     static_cast<void>(end);
     // CASE: partial overlap, lower end
     // [   ###]#####
@@ -214,7 +214,7 @@ size_t NotNode::find_first_overlap_lower(size_t start, size_t end)
 
 size_t NotNode::find_first_overlap_upper(size_t start, size_t end)
 {
-    TIGHTDB_ASSERT_DEBUG(start <= m_known_range_end && start >= m_known_range_start && end > m_known_range_end);
+    REALM_ASSERT_DEBUG(start <= m_known_range_end && start >= m_known_range_start && end > m_known_range_end);
     // CASE: partial overlap, upper end
     // ####[###    ]
     size_t result;
@@ -237,7 +237,7 @@ size_t NotNode::find_first_overlap_upper(size_t start, size_t end)
 
 size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 {
-    TIGHTDB_ASSERT_DEBUG((start < m_known_range_start && end < m_known_range_start) || (start > m_known_range_end && end > m_known_range_end));
+    REALM_ASSERT_DEBUG((start < m_known_range_start && end < m_known_range_start) || (start > m_known_range_end && end > m_known_range_end));
     // CASE: no overlap
     // ### [    ]   or    [    ] ####
     // if input is a larger range, discard and replace with results.

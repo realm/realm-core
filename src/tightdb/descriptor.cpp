@@ -33,7 +33,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 
 size_t Descriptor::get_num_unique_values(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     ColumnType col_type = m_spec->get_column_type(column_ndx);
     if (col_type != col_type_StringEnum)
         return 0;
@@ -43,7 +43,7 @@ size_t Descriptor::get_num_unique_values(size_t column_ndx) const
 }
 
 
-Descriptor::~Descriptor() TIGHTDB_NOEXCEPT
+Descriptor::~Descriptor() REALM_NOEXCEPT
 {
     if (!is_attached())
         return;
@@ -59,9 +59,9 @@ Descriptor::~Descriptor() TIGHTDB_NOEXCEPT
 }
 
 
-void Descriptor::detach() TIGHTDB_NOEXCEPT
+void Descriptor::detach() REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     detach_subdesc_accessors();
     if (m_parent) {
         delete m_spec;
@@ -71,7 +71,7 @@ void Descriptor::detach() TIGHTDB_NOEXCEPT
 }
 
 
-void Descriptor::detach_subdesc_accessors() TIGHTDB_NOEXCEPT
+void Descriptor::detach_subdesc_accessors() REALM_NOEXCEPT
 {
     if (!m_subdesc_map.empty()) {
         typedef subdesc_map::const_iterator iter;
@@ -86,7 +86,7 @@ void Descriptor::detach_subdesc_accessors() TIGHTDB_NOEXCEPT
 }
 
 
-void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const TIGHTDB_NOEXCEPT
+void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const REALM_NOEXCEPT
 {
     typedef subdesc_map::iterator iter;
     iter end = m_subdesc_map.end();
@@ -96,18 +96,18 @@ void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const TIGHTDB_NOEXCEP
             return;
         }
     }
-    TIGHTDB_ASSERT(false);
+    REALM_ASSERT(false);
 }
 
 
-size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT
+size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const REALM_NOEXCEPT
 {
     size_t* begin_2 = end;
     const Descriptor* desc = this;
     for (;;) {
         if (desc->is_root())
             return begin_2;
-        if (TIGHTDB_UNLIKELY(begin_2 == begin))
+        if (REALM_UNLIKELY(begin_2 == begin))
             return 0; // Not enough space in path buffer
         const Descriptor* parent = desc->m_parent.get();
         size_t column_ndx = not_found;
@@ -119,16 +119,16 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const TIGHTD
                 break;
             }
         }
-        TIGHTDB_ASSERT_3(column_ndx, !=, not_found);
+        REALM_ASSERT_3(column_ndx, !=, not_found);
         *--begin_2 = column_ndx;
         desc = parent;
     }
 }
 
 
-Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) TIGHTDB_NOEXCEPT
+Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) REALM_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     typedef subdesc_map::iterator iter;
     iter end = m_subdesc_map.end();
@@ -140,7 +140,7 @@ Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) TIGHTDB_NOEXCEPT
 }
 
 
-void Descriptor::adj_insert_column(size_t col_ndx) TIGHTDB_NOEXCEPT
+void Descriptor::adj_insert_column(size_t col_ndx) REALM_NOEXCEPT
 {
     // Adjust the column indexes of subdescriptor accessors at higher
     // column indexes.
@@ -153,7 +153,7 @@ void Descriptor::adj_insert_column(size_t col_ndx) TIGHTDB_NOEXCEPT
 }
 
 
-void Descriptor::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
+void Descriptor::adj_erase_column(size_t col_ndx) REALM_NOEXCEPT
 {
     // If it exists, remove and detach the subdescriptor accessor
     // associated with the removed column. Also adjust the column

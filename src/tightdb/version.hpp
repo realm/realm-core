@@ -17,22 +17,22 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_VERSION_HPP
-#define TIGHTDB_VERSION_HPP
+#ifndef REALM_VERSION_HPP
+#define REALM_VERSION_HPP
 
 #include <string>
 #include <sstream>
 
-#define TIGHTDB_VER_MAJOR 0
-#define TIGHTDB_VER_MINOR 88
-#define TIGHTDB_VER_PATCH 6
-#define TIGHTDB_PRODUCT_NAME "realm-core"
+#define REALM_VER_MAJOR 0
+#define REALM_VER_MINOR 88
+#define REALM_VER_PATCH 6
+#define REALM_PRODUCT_NAME "realm-core"
 
-#define TIGHTDB_QUOTE2(X) #X
-#define TIGHTDB_QUOTE(X) TIGHTDB_QUOTE2(X)
+#define REALM_QUOTE2(X) #X
+#define REALM_QUOTE(X) REALM_QUOTE2(X)
 
-#define TIGHTDB_VER_STRING TIGHTDB_QUOTE(TIGHTDB_VER_MAJOR) "." TIGHTDB_QUOTE(TIGHTDB_VER_MINOR) "." TIGHTDB_QUOTE(TIGHTDB_VER_PATCH)
-#define TIGHTDB_VER_CHUNK "[" TIGHTDB_PRODUCT_NAME "-" TIGHTDB_VER_STRING "]"
+#define REALM_VER_STRING REALM_QUOTE(REALM_VER_MAJOR) "." REALM_QUOTE(REALM_VER_MINOR) "." REALM_QUOTE(REALM_VER_PATCH)
+#define REALM_VER_CHUNK "[" REALM_PRODUCT_NAME "-" REALM_VER_STRING "]"
 
 namespace tightdb {
 
@@ -43,9 +43,9 @@ enum Feature {
 
 class Version {
 public:
-    static int get_major() { return TIGHTDB_VER_MAJOR; }
-    static int get_minor() { return TIGHTDB_VER_MINOR; }
-    static int get_patch() { return TIGHTDB_VER_PATCH; }
+    static int get_major() { return REALM_VER_MAJOR; }
+    static int get_minor() { return REALM_VER_MINOR; }
+    static int get_patch() { return REALM_VER_PATCH; }
     static std::string get_version();
     static bool is_at_least(int major, int minor, int patch);
     static bool has_feature(Feature feature);
@@ -54,4 +54,4 @@ public:
 
 } // namespace tightdb
 
-#endif // TIGHTDB_VERSION_HPP
+#endif // REALM_VERSION_HPP

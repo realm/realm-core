@@ -18,8 +18,8 @@
  *
 ***************************************************************************/
 
-#ifndef TIGHTDB_ARRAY_WRITER_HPP
-#define TIGHTDB_ARRAY_WRITER_HPP
+#ifndef REALM_ARRAY_WRITER_HPP
+#define REALM_ARRAY_WRITER_HPP
 
 namespace tightdb {
 namespace _impl {
@@ -39,4 +39,4 @@ public:
 } // namespace impl_
 } // namespace tightdb
 
-#endif // TIGHTDB_ARRAY_WRITER_HPP
+#endif // REALM_ARRAY_WRITER_HPP

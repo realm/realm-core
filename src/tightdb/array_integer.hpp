@@ -18,8 +18,8 @@
  *
 ***************************************************************************/
 
-#ifndef TIGHTDB_ARRAY_INTEGER_HPP
-#define TIGHTDB_ARRAY_INTEGER_HPP
+#ifndef REALM_ARRAY_INTEGER_HPP
+#define REALM_ARRAY_INTEGER_HPP
 
 #include <tightdb/array.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
@@ -30,9 +30,9 @@ class ArrayInteger: public Array {
 public:
     typedef int64_t value_type;
 
-    explicit ArrayInteger(no_prealloc_tag) TIGHTDB_NOEXCEPT;
-    explicit ArrayInteger(Allocator&) TIGHTDB_NOEXCEPT;
-    ~ArrayInteger() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    explicit ArrayInteger(no_prealloc_tag) REALM_NOEXCEPT;
+    explicit ArrayInteger(Allocator&) REALM_NOEXCEPT;
+    ~ArrayInteger() REALM_NOEXCEPT REALM_OVERRIDE {}
 
     /// Construct an array of the specified type and size, and return just the
     /// reference to the underlying memory. All elements will be initialized to
@@ -43,9 +43,9 @@ public:
     void add(int64_t value);
     void set(std::size_t ndx, int64_t value);
     void set_uint(std::size_t ndx, uint64_t value);
-    int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    static int64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
+    uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
+    static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
 
     /// Add \a diff to the element at the specified index.
     void adjust(std::size_t ndx, int_fast64_t diff);
@@ -57,12 +57,12 @@ public:
     /// limit.
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
-    int64_t operator[](std::size_t ndx) const TIGHTDB_NOEXCEPT { return get(ndx); }
-    int64_t front() const TIGHTDB_NOEXCEPT;
-    int64_t back() const TIGHTDB_NOEXCEPT;
+    int64_t operator[](std::size_t ndx) const REALM_NOEXCEPT { return get(ndx); }
+    int64_t front() const REALM_NOEXCEPT;
+    int64_t back() const REALM_NOEXCEPT;
 
-    std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound(int64_t value) const REALM_NOEXCEPT;
+    std::size_t upper_bound(int64_t value) const REALM_NOEXCEPT;
 
     std::vector<int64_t> ToVector() const;
 
@@ -74,12 +74,12 @@ private:
 
 // Implementation:
 
-inline ArrayInteger::ArrayInteger(Array::no_prealloc_tag) TIGHTDB_NOEXCEPT:
+inline ArrayInteger::ArrayInteger(Array::no_prealloc_tag) REALM_NOEXCEPT:
     Array(Array::no_prealloc_tag())
 {
 }
 
-inline ArrayInteger::ArrayInteger(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline ArrayInteger::ArrayInteger(Allocator& alloc) REALM_NOEXCEPT:
     Array(alloc)
 {
 }
@@ -95,17 +95,17 @@ inline void ArrayInteger::add(int64_t value)
     Array::add(value);
 }
 
-inline int64_t ArrayInteger::get(size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t ArrayInteger::get(size_t ndx) const REALM_NOEXCEPT
 {
     return Array::get(ndx);
 }
 
-inline uint64_t ArrayInteger::get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline uint64_t ArrayInteger::get_uint(std::size_t ndx) const REALM_NOEXCEPT
 {
     return get(ndx);
 }
 
-inline int64_t ArrayInteger::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+inline int64_t ArrayInteger::get(const char* header, size_t ndx) REALM_NOEXCEPT
 {
     return Array::get(header, ndx);
 }
@@ -128,12 +128,12 @@ inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value)
 }
 
 
-inline int64_t ArrayInteger::front() const TIGHTDB_NOEXCEPT
+inline int64_t ArrayInteger::front() const REALM_NOEXCEPT
 {
     return Array::front();
 }
 
-inline int64_t ArrayInteger::back() const TIGHTDB_NOEXCEPT
+inline int64_t ArrayInteger::back() const REALM_NOEXCEPT
 {
     return Array::back();
 }
@@ -153,12 +153,12 @@ inline void ArrayInteger::adjust_ge(int_fast64_t limit, int_fast64_t diff)
     Array::adjust_ge(limit, diff);
 }
 
-inline std::size_t ArrayInteger::lower_bound(int64_t value) const TIGHTDB_NOEXCEPT
+inline std::size_t ArrayInteger::lower_bound(int64_t value) const REALM_NOEXCEPT
 {
     return lower_bound_int(value);
 }
 
-inline std::size_t ArrayInteger::upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
+inline std::size_t ArrayInteger::upper_bound(int64_t value) const REALM_NOEXCEPT
 {
     return upper_bound_int(value);
 }
@@ -166,4 +166,4 @@ inline std::size_t ArrayInteger::upper_bound(int64_t value) const TIGHTDB_NOEXCE
 
 }
 
-#endif // TIGHTDB_ARRAY_INTEGER_HPP
+#endif // REALM_ARRAY_INTEGER_HPP

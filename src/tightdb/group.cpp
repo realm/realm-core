@@ -15,7 +15,7 @@
 #include <tightdb/column_backlink.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
 
@@ -39,7 +39,7 @@ Initialization initialization;
 
 void Group::open(const string& file_path, const char* encryption_key, OpenMode mode)
 {
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT(!is_attached());
     bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
@@ -64,8 +64,8 @@ void Group::open(const string& file_path, const char* encryption_key, OpenMode m
 
 void Group::open(BinaryData buffer, bool take_ownership)
 {
-    TIGHTDB_ASSERT(!is_attached());
-    TIGHTDB_ASSERT(buffer.data());
+    REALM_ASSERT(!is_attached());
+    REALM_ASSERT(buffer.data());
     // FIXME: Why do we have to pass a const-unqualified data pointer
     // to SlabAlloc::attach_buffer()? It seems unnecessary given that
     // the data is going to become the immutable part of its managed
@@ -89,7 +89,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
 
 void Group::create(bool add_free_versions)
 {
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT(!is_attached());
 
     size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
 
@@ -126,14 +126,14 @@ void Group::create(bool add_free_versions)
 }
 
 
-void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
+void Group::init_from_ref(ref_type top_ref) REALM_NOEXCEPT
 {
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
-    TIGHTDB_ASSERT_3(top_size, >=, 3);
+    REALM_ASSERT_3(top_size, >=, 3);
 
     // Logical file size must not exceed actual file size
-    TIGHTDB_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
+    REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
 
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
@@ -145,12 +145,12 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     // tracking, and files that are accessed via a stan-along Group do
     // not need version information for free-space tracking.
     if (top_size > 3) {
-        TIGHTDB_ASSERT_3(top_size, >=, 5);
+        REALM_ASSERT_3(top_size, >=, 5);
         m_free_positions.init_from_parent();
         m_free_lengths.init_from_parent();
 
         if (m_is_shared && top_size > 5) {
-            TIGHTDB_ASSERT_3(top_size, >= , 7);
+            REALM_ASSERT_3(top_size, >= , 7);
             m_free_versions.init_from_parent();
             // Note that the seventh slot is the database version
             // (a.k.a. transaction count,) which is not yet used for
@@ -162,10 +162,10 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 
 void Group::reset_free_space_versions()
 {
-    TIGHTDB_ASSERT(m_top.is_attached());
-    TIGHTDB_ASSERT(m_is_attached);
+    REALM_ASSERT(m_top.is_attached());
+    REALM_ASSERT(m_is_attached);
     if (m_free_versions.is_attached()) {
-        TIGHTDB_ASSERT_3(m_top.size(), ==, 7);
+        REALM_ASSERT_3(m_top.size(), ==, 7);
         // If free space tracking is enabled
         // we just have to reset it
         m_free_versions.set_all_to_zero(); // Throws
@@ -178,14 +178,14 @@ void Group::reset_free_space_versions()
         // FIXME: There is a risk that these are already allocated,
         // and that would cause a leak. This could happen if an
         // earlier commit attempt failed.
-        TIGHTDB_ASSERT(!m_free_positions.is_attached());
-        TIGHTDB_ASSERT(!m_free_lengths.is_attached());
+        REALM_ASSERT(!m_free_positions.is_attached());
+        REALM_ASSERT(!m_free_lengths.is_attached());
         m_free_positions.create(Array::type_Normal); // Throws
         m_free_lengths.create(Array::type_Normal); // Throws
         m_top.add(m_free_positions.get_ref()); // Throws
         m_top.add(m_free_lengths.get_ref()); // Throws
     }
-    TIGHTDB_ASSERT_3(m_top.size(), >=, 5);
+    REALM_ASSERT_3(m_top.size(), >=, 5);
 
     // Files that have never been modified via SharedGroup do not
     // have version tracking for the free lists
@@ -193,7 +193,7 @@ void Group::reset_free_space_versions()
         // FIXME: There is a risk that this one is already allocated,
         // and that would cause a leak. This could happen if an
         // earlier commit attempt failed.
-        TIGHTDB_ASSERT(!m_free_versions.is_attached());
+        REALM_ASSERT(!m_free_versions.is_attached());
         m_free_versions.create(Array::type_Normal); // Throws
         size_t n = m_free_positions.size();
         for (size_t i = 0; i != n; ++i)
@@ -205,11 +205,11 @@ void Group::reset_free_space_versions()
         // is set in GroupWriter::write().
         m_top.add(0);
     }
-    TIGHTDB_ASSERT_3(m_top.size(), >=, 7);
+    REALM_ASSERT_3(m_top.size(), >=, 7);
 }
 
 
-Group::~Group() TIGHTDB_NOEXCEPT
+Group::~Group() REALM_NOEXCEPT
 {
     if (!is_attached()) {
         if (m_top.is_attached())
@@ -218,7 +218,7 @@ Group::~Group() TIGHTDB_NOEXCEPT
     }
     detach_table_accessors();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     // Recursively deletes entire tree. The destructor in
     // the allocator will verify that all has been deleted.
     m_top.destroy_deep();
@@ -230,7 +230,7 @@ Group::~Group() TIGHTDB_NOEXCEPT
 }
 
 
-void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
+void Group::detach_table_accessors() REALM_NOEXCEPT
 {
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
@@ -244,14 +244,14 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 }
 
 
-void Group::detach() TIGHTDB_NOEXCEPT
+void Group::detach() REALM_NOEXCEPT
 {
     detach_but_retain_data();
     complete_detach();
 }
 
 
-void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
+void Group::detach_but_retain_data() REALM_NOEXCEPT
 {
     m_is_attached = false;
     detach_table_accessors();
@@ -259,7 +259,7 @@ void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
 }
 
 
-void Group::complete_detach() TIGHTDB_NOEXCEPT
+void Group::complete_detach() REALM_NOEXCEPT
 {
     m_top.detach();
     m_tables.detach();
@@ -272,7 +272,7 @@ void Group::complete_detach() TIGHTDB_NOEXCEPT
 
 Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
 {
-    TIGHTDB_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
+    REALM_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
 
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
@@ -343,14 +343,14 @@ Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
 
 size_t Group::create_table(StringData name)
 {
-    if (TIGHTDB_UNLIKELY(name.size() > max_table_name_length))
+    if (REALM_UNLIKELY(name.size() > max_table_name_length))
         throw LogicError(LogicError::table_name_too_long);
 
     using namespace _impl;
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
     size_t ndx = m_tables.size();
-    TIGHTDB_ASSERT_3(ndx, ==, m_table_names.size());
+    REALM_ASSERT_3(ndx, ==, m_table_names.size());
     m_tables.add(ref); // Throws
     m_table_names.add(name); // Throws
 
@@ -358,7 +358,7 @@ size_t Group::create_table(StringData name)
     if (!m_table_accessors.empty())
         m_table_accessors.push_back(0); // Throws
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
         repl->insert_group_level_table(ndx, ndx, name); // Throws
 #endif
@@ -369,7 +369,7 @@ size_t Group::create_table(StringData name)
 
 Table* Group::create_table_accessor(size_t table_ndx)
 {
-    TIGHTDB_ASSERT(m_table_accessors.empty() || table_ndx < m_table_accessors.size());
+    REALM_ASSERT(m_table_accessors.empty() || table_ndx < m_table_accessors.size());
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
@@ -420,7 +420,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
 
 void Group::remove_table(StringData name)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -430,7 +430,7 @@ void Group::remove_table(StringData name)
 
 void Group::remove_table(size_t table_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     TableRef table = get_table(table_ndx);
 
     // In principle we could remove a table even if it is the target of link
@@ -469,13 +469,13 @@ void Group::remove_table(size_t table_ndx)
             ColumnType type = last_spec.get_column_type(i);
             if (tf::is_link_type(type)) {
                 ColumnBase& col = tf::get_column(*last_table, i);
-                TIGHTDB_ASSERT(dynamic_cast<ColumnLinkBase*>(&col));
+                REALM_ASSERT(dynamic_cast<ColumnLinkBase*>(&col));
                 ColumnLinkBase& link_col = static_cast<ColumnLinkBase&>(col);
                 opposite_table = &link_col.get_target_table();
             }
             else if (type == col_type_BackLink) {
                 ColumnBase& col = tf::get_column(*last_table, i);
-                TIGHTDB_ASSERT(dynamic_cast<ColumnBackLink*>(&col));
+                REALM_ASSERT(dynamic_cast<ColumnBackLink*>(&col));
                 ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(col);
                 opposite_table = &backlink_col.get_origin_table();
             }
@@ -516,7 +516,7 @@ void Group::remove_table(size_t table_ndx)
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
         repl->erase_group_level_table(table_ndx, last_ndx+1); // Throws
 #endif
@@ -525,7 +525,7 @@ void Group::remove_table(size_t table_ndx)
 
 void Group::rename_table(StringData name, StringData new_name, bool require_unique_name)
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -535,8 +535,8 @@ void Group::rename_table(StringData name, StringData new_name, bool require_uniq
 
 void Group::rename_table(size_t table_ndx, StringData new_name, bool require_unique_name)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(m_tables.size(), ==, m_table_names.size());
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     if (require_unique_name && has_table(new_name))
@@ -553,11 +553,11 @@ public:
         m_group(group)
     {
     }
-    size_t write_names(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    size_t write_names(_impl::OutputStream& out) REALM_OVERRIDE
     {
         return m_group.m_table_names.write(out); // Throws
     }
-    size_t write_tables(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    size_t write_tables(_impl::OutputStream& out) REALM_OVERRIDE
     {
         return m_group.m_tables.write(out); // Throws
     }
@@ -572,7 +572,7 @@ void Group::write(ostream& out, bool pad) const
 
 void Group::write(ostream& out, bool pad, uint_fast64_t version_number) const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
     write(out, table_writer, pad, version_number); // Throws
 }
@@ -596,7 +596,7 @@ void Group::write(const string& path, const char* encryption_key, uint_fast64_t 
 
 BinaryData Group::write_to_mem() const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     // Get max possible size of buffer
     //
@@ -691,14 +691,14 @@ void Group::write(ostream& out, TableWriter& table_writer,
     // Write the top array
     bool recurse = false;
     top.write(out_2, recurse); // Throws
-    TIGHTDB_ASSERT_3(out_2.get_pos(), ==, final_file_size);
+    REALM_ASSERT_3(out_2.get_pos(), ==, final_file_size);
 
     top.destroy(); // Shallow
 
     // encryption will pad the file to a multiple of the page, so ensure the
     // footer is aligned to the end of a page
     if (pad_for_encryption) {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
         size_t unrounded_size = final_file_size + sizeof(SlabAlloc::StreamingFooter);
         size_t rounded_size = round_up_to_page_size(unrounded_size);
         if (rounded_size != unrounded_size) {
@@ -718,7 +718,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
 
 void Group::commit()
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     // GroupWriter::write_group() needs free-space tracking
     // information, so if the attached database does not contain it,
@@ -726,9 +726,9 @@ void Group::commit()
     // database files created by Group::write() do not have free-space
     // tracking information.
     if (m_free_positions.is_attached()) {
-        TIGHTDB_ASSERT_3(m_top.size(), >=, 5);
+        REALM_ASSERT_3(m_top.size(), >=, 5);
         if (m_top.size() > 5) {
-            TIGHTDB_ASSERT_3(m_top.size(), >=, 7);
+            REALM_ASSERT_3(m_top.size(), >=, 7);
             // Delete free-list version information and database
             // version (a.k.a. transaction number)
             Array::destroy(m_top.get_as_ref(5), m_top.get_alloc());
@@ -736,7 +736,7 @@ void Group::commit()
         }
     }
     else {
-        TIGHTDB_ASSERT_3(m_top.size(), ==, 3);
+        REALM_ASSERT_3(m_top.size(), ==, 3);
         m_free_positions.create(Array::type_Normal);
         m_free_lengths.create(Array::type_Normal);
         m_top.add(m_free_positions.get_ref());
@@ -776,11 +776,11 @@ void Group::commit()
 }
 
 
-void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
+void Group::update_refs(ref_type top_ref, size_t old_baseline) REALM_NOEXCEPT
 {
     // After Group::commit() we will always have free space tracking
     // info.
-    TIGHTDB_ASSERT_3(m_top.size(), >=, 5);
+    REALM_ASSERT_3(m_top.size(), >=, 5);
 
     // Array nodes that are part of the previous version of the
     // database will not be overwritten by Group::commit(). This is
@@ -819,15 +819,15 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 
 void Group::reattach_from_retained_data()
 {
-    TIGHTDB_ASSERT(!is_attached());
-    TIGHTDB_ASSERT(m_top.is_attached());
+    REALM_ASSERT(!is_attached());
+    REALM_ASSERT(m_top.is_attached());
     m_is_attached = true;
 }
 
 void Group::init_for_transact(ref_type new_top_ref, size_t new_file_size)
 {
-    TIGHTDB_ASSERT_3(new_top_ref, <, new_file_size);
-    TIGHTDB_ASSERT(!is_attached());
+    REALM_ASSERT_3(new_top_ref, <, new_file_size);
+    REALM_ASSERT(!is_attached());
 
     if (m_top.is_attached())
         complete_detach();
@@ -911,7 +911,7 @@ void Group::to_string(ostream& out) const
 }
 
 
-void Group::mark_all_table_accessors() TIGHTDB_NOEXCEPT
+void Group::mark_all_table_accessors() REALM_NOEXCEPT
 {
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
@@ -923,7 +923,7 @@ void Group::mark_all_table_accessors() TIGHTDB_NOEXCEPT
 }
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 namespace {
 
@@ -936,7 +936,7 @@ public:
             m_curr_buf_remaining_size = m_logs_begin->size();
     }
 
-    ~MultiLogInputStream() TIGHTDB_OVERRIDE
+    ~MultiLogInputStream() REALM_OVERRIDE
     {
     }
 
@@ -965,7 +965,7 @@ public:
         }
     }
 
-    virtual size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
+    virtual size_t next_block(const char*& begin, const char*& end) REALM_OVERRIDE
     {
         while (m_logs_begin < m_logs_end) {
             size_t result = m_logs_begin->size();
@@ -989,13 +989,13 @@ private:
 
 class MarkDirtyUpdater: public _impl::TableFriend::AccessorUpdater {
 public:
-    void update(Table& table) TIGHTDB_OVERRIDE
+    void update(Table& table) REALM_OVERRIDE
     {
         typedef _impl::TableFriend tf;
         tf::mark(table);
     }
 
-    void update_parent(Table& table) TIGHTDB_OVERRIDE
+    void update_parent(Table& table) REALM_OVERRIDE
     {
         typedef _impl::TableFriend tf;
         tf::mark(table);
@@ -1013,14 +1013,14 @@ public:
     {
     }
 
-    void update(Table& table) TIGHTDB_OVERRIDE
+    void update(Table& table) REALM_OVERRIDE
     {
         typedef _impl::TableFriend tf;
         tf::adj_insert_column(table, m_col_ndx); // Throws
         tf::mark_link_target_tables(table, m_col_ndx+1);
     }
 
-    void update_parent(Table&) TIGHTDB_OVERRIDE
+    void update_parent(Table&) REALM_OVERRIDE
     {
     }
 
@@ -1036,14 +1036,14 @@ public:
     {
     }
 
-    void update(Table& table) TIGHTDB_OVERRIDE
+    void update(Table& table) REALM_OVERRIDE
     {
         typedef _impl::TableFriend tf;
         tf::adj_erase_column(table, m_col_ndx);
         tf::mark_link_target_tables(table, m_col_ndx);
     }
 
-    void update_parent(Table&) TIGHTDB_OVERRIDE
+    void update_parent(Table&) REALM_OVERRIDE
     {
     }
 
@@ -1070,10 +1070,10 @@ public:
     {
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
+    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) REALM_NOEXCEPT
     {
-        TIGHTDB_ASSERT_3(table_ndx, <=, num_tables);
-        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+        REALM_ASSERT_3(table_ndx, <=, num_tables);
+        REALM_ASSERT(m_group.m_table_accessors.empty() ||
                        m_group.m_table_accessors.size() == num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
@@ -1092,10 +1092,10 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
+    bool erase_group_level_table(size_t table_ndx, size_t num_tables) REALM_NOEXCEPT
     {
-        TIGHTDB_ASSERT_3(table_ndx, <, num_tables);
-        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+        REALM_ASSERT_3(table_ndx, <, num_tables);
+        REALM_ASSERT(m_group.m_table_accessors.empty() ||
                        m_group.m_table_accessors.size() == num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
@@ -1122,14 +1122,14 @@ public:
         return true;
     }
 
-    bool rename_group_level_table(size_t, StringData) TIGHTDB_NOEXCEPT
+    bool rename_group_level_table(size_t, StringData) REALM_NOEXCEPT
     {
         // No-op since table names are properties of the group, and the group
         // accessor is always refreshed
         return true;
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t* path) TIGHTDB_NOEXCEPT
+    bool select_table(size_t group_level_ndx, int levels, const size_t* path) REALM_NOEXCEPT
     {
         m_table.reset();
         if (group_level_ndx < m_group.m_table_accessors.size()) {
@@ -1156,7 +1156,7 @@ public:
     }
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t last_row_ndx,
-                           bool unordered) TIGHTDB_NOEXCEPT
+                           bool unordered) REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (unordered) {
@@ -1173,11 +1173,11 @@ public:
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
+    bool erase_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) REALM_NOEXCEPT
     {
         if (unordered) {
             // unordered removal of multiple rows is not supported (and not needed) currently.
-            TIGHTDB_ASSERT_3(num_rows, ==, 1);
+            REALM_ASSERT_3(num_rows, ==, 1);
             typedef _impl::TableFriend tf;
             if (m_table)
                 tf::adj_acc_move_over(*m_table, tbl_sz, row_ndx);
@@ -1192,7 +1192,7 @@ public:
         return true;
     }
 
-    bool clear_table() TIGHTDB_NOEXCEPT
+    bool clear_table() REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (m_table)
@@ -1200,70 +1200,70 @@ public:
         return true;
     }
 
-    bool insert_int(size_t col_ndx, size_t row_ndx, size_t tbl_sz, int_fast64_t) TIGHTDB_NOEXCEPT
+    bool insert_int(size_t col_ndx, size_t row_ndx, size_t tbl_sz, int_fast64_t) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_bool(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool) TIGHTDB_NOEXCEPT
+    bool insert_bool(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_float(size_t col_ndx, size_t row_ndx, size_t tbl_sz, float) TIGHTDB_NOEXCEPT
+    bool insert_float(size_t col_ndx, size_t row_ndx, size_t tbl_sz, float) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_double(size_t col_ndx, size_t row_ndx, size_t tbl_sz, double) TIGHTDB_NOEXCEPT
+    bool insert_double(size_t col_ndx, size_t row_ndx, size_t tbl_sz, double) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_string(size_t col_ndx, size_t row_ndx, size_t tbl_sz, StringData) TIGHTDB_NOEXCEPT
+    bool insert_string(size_t col_ndx, size_t row_ndx, size_t tbl_sz, StringData) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_binary(size_t col_ndx, size_t row_ndx, size_t tbl_sz, BinaryData) TIGHTDB_NOEXCEPT
+    bool insert_binary(size_t col_ndx, size_t row_ndx, size_t tbl_sz, BinaryData) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_date_time(size_t col_ndx, size_t row_ndx, size_t tbl_sz, DateTime) TIGHTDB_NOEXCEPT
+    bool insert_date_time(size_t col_ndx, size_t row_ndx, size_t tbl_sz, DateTime) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_table(size_t col_ndx, size_t row_ndx, size_t tbl_sz) TIGHTDB_NOEXCEPT
+    bool insert_table(size_t col_ndx, size_t row_ndx, size_t tbl_sz) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_mixed(size_t col_ndx, size_t row_ndx, size_t tbl_sz, const Mixed&) TIGHTDB_NOEXCEPT
+    bool insert_mixed(size_t col_ndx, size_t row_ndx, size_t tbl_sz, const Mixed&) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_link(size_t col_ndx, size_t row_ndx, size_t tbl_sz, size_t) TIGHTDB_NOEXCEPT
+    bool insert_link(size_t col_ndx, size_t row_ndx, size_t tbl_sz, size_t) REALM_NOEXCEPT
     {
         // The marking dirty of the target table is handled by
         // insert_empty_rows() regardless of whether the link column is the
@@ -1273,54 +1273,54 @@ public:
        return true;
     }
 
-    bool insert_link_list(size_t col_ndx, size_t row_ndx, size_t tbl_sz) TIGHTDB_NOEXCEPT
+    bool insert_link_list(size_t col_ndx, size_t row_ndx, size_t tbl_sz) REALM_NOEXCEPT
     {
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool row_insert_complete() TIGHTDB_NOEXCEPT
+    bool row_insert_complete() REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_int(size_t, size_t, int_fast64_t) TIGHTDB_NOEXCEPT
+    bool set_int(size_t, size_t, int_fast64_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_bool(size_t, size_t, bool) TIGHTDB_NOEXCEPT
+    bool set_bool(size_t, size_t, bool) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_float(size_t, size_t, float) TIGHTDB_NOEXCEPT
+    bool set_float(size_t, size_t, float) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_double(size_t, size_t, double) TIGHTDB_NOEXCEPT
+    bool set_double(size_t, size_t, double) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_string(size_t, size_t, StringData) TIGHTDB_NOEXCEPT
+    bool set_string(size_t, size_t, StringData) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_binary(size_t, size_t, BinaryData) TIGHTDB_NOEXCEPT
+    bool set_binary(size_t, size_t, BinaryData) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_date_time(size_t, size_t, DateTime) TIGHTDB_NOEXCEPT
+    bool set_date_time(size_t, size_t, DateTime) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    bool set_table(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1332,7 +1332,7 @@ public:
         return true;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (m_table)
@@ -1340,7 +1340,7 @@ public:
         return true;
     }
 
-    bool set_link(size_t col_ndx, size_t, size_t) TIGHTDB_NOEXCEPT
+    bool set_link(size_t col_ndx, size_t, size_t) REALM_NOEXCEPT
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1367,12 +1367,12 @@ public:
         return true;
     }
 
-    bool add_int_to_column(size_t, int_fast64_t) TIGHTDB_NOEXCEPT
+    bool add_int_to_column(size_t, int_fast64_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool optimize_table() TIGHTDB_NOEXCEPT
+    bool optimize_table() REALM_NOEXCEPT
     {
         return true; // No-op
     }
@@ -1381,7 +1381,7 @@ public:
     {
         m_desc.reset();
         if (m_table) {
-            TIGHTDB_ASSERT(!m_table->has_shared_type());
+            REALM_ASSERT(!m_table->has_shared_type());
             typedef _impl::TableFriend tf;
             Descriptor* desc = tf::get_root_table_desc_accessor(*m_table);
             int i = 0;
@@ -1469,37 +1469,37 @@ public:
         return true;
     }
 
-    bool rename_column(size_t, StringData) TIGHTDB_NOEXCEPT
+    bool rename_column(size_t, StringData) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool add_search_index(size_t) TIGHTDB_NOEXCEPT
+    bool add_search_index(size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool remove_search_index(size_t) TIGHTDB_NOEXCEPT
+    bool remove_search_index(size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool add_primary_key(size_t) TIGHTDB_NOEXCEPT
+    bool add_primary_key(size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool remove_primary_key() TIGHTDB_NOEXCEPT
+    bool remove_primary_key() REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool set_link_type(size_t, LinkType) TIGHTDB_NOEXCEPT
+    bool set_link_type(size_t, LinkType) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
+    bool select_link_list(size_t col_ndx, size_t) REALM_NOEXCEPT
     {
         // See comments on link handling in TransactAdvancer::set_link().
         typedef _impl::TableFriend tf;
@@ -1510,27 +1510,27 @@ public:
         return true; // No-op
     }
 
-    bool link_list_set(size_t, size_t) TIGHTDB_NOEXCEPT
+    bool link_list_set(size_t, size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool link_list_insert(size_t, size_t) TIGHTDB_NOEXCEPT
+    bool link_list_insert(size_t, size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool link_list_move(size_t, size_t) TIGHTDB_NOEXCEPT
+    bool link_list_move(size_t, size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool link_list_erase(size_t) TIGHTDB_NOEXCEPT
+    bool link_list_erase(size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool link_list_clear() TIGHTDB_NOEXCEPT
+    bool link_list_clear() REALM_NOEXCEPT
     {
         return true; // No-op
     }
@@ -1945,7 +1945,7 @@ private:
 
     size_t transact_log_size() const
     {
-        TIGHTDB_ASSERT_3(m_encoder.write_position(), >=, m_buffer.transact_log_data());
+        REALM_ASSERT_3(m_encoder.write_position(), >=, m_buffer.transact_log_data());
         return m_encoder.write_position() - m_buffer.transact_log_data();
     }
 
@@ -2025,10 +2025,10 @@ void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
     refresh_dirty_accessors();
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -2043,11 +2043,11 @@ public:
     }
     void add_immutable(ref_type ref, size_t size)
     {
-        TIGHTDB_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
-        TIGHTDB_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
-        TIGHTDB_ASSERT_3(size, >, 0);
-        TIGHTDB_ASSERT_3(ref, >=, m_ref_begin);
-        TIGHTDB_ASSERT_3(size, <=, m_immutable_ref_end - ref);
+        REALM_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(size, >, 0);
+        REALM_ASSERT_3(ref, >=, m_ref_begin);
+        REALM_ASSERT_3(size, <=, m_immutable_ref_end - ref);
         Chunk chunk;
         chunk.ref  = ref;
         chunk.size = size;
@@ -2055,11 +2055,11 @@ public:
     }
     void add_mutable(ref_type ref, size_t size)
     {
-        TIGHTDB_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
-        TIGHTDB_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
-        TIGHTDB_ASSERT_3(size, >, 0);
-        TIGHTDB_ASSERT_3(ref, >=, m_immutable_ref_end);
-        TIGHTDB_ASSERT_3(size, <=, m_mutable_ref_end - ref);
+        REALM_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(size, >, 0);
+        REALM_ASSERT_3(ref, >=, m_immutable_ref_end);
+        REALM_ASSERT_3(size, <=, m_mutable_ref_end - ref);
         Chunk chunk;
         chunk.ref  = ref;
         chunk.size = size;
@@ -2067,11 +2067,11 @@ public:
     }
     void add(ref_type ref, size_t size)
     {
-        TIGHTDB_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
-        TIGHTDB_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
-        TIGHTDB_ASSERT_3(size, >, 0);
-        TIGHTDB_ASSERT_3(ref, >=, m_ref_begin);
-        TIGHTDB_ASSERT(size <= (ref < m_baseline ? m_immutable_ref_end : m_mutable_ref_end) - ref);
+        REALM_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(size, >, 0);
+        REALM_ASSERT_3(ref, >=, m_ref_begin);
+        REALM_ASSERT(size <= (ref < m_baseline ? m_immutable_ref_end : m_mutable_ref_end) - ref);
         Chunk chunk;
         chunk.ref  = ref;
         chunk.size = size;
@@ -2081,7 +2081,7 @@ public:
     {
         m_chunks.insert(m_chunks.end(), verifier.m_chunks.begin(), verifier.m_chunks.end());
     }
-    void handle(ref_type ref, size_t allocated, size_t) TIGHTDB_OVERRIDE
+    void handle(ref_type ref, size_t allocated, size_t) REALM_OVERRIDE
     {
         add(ref, allocated);
     }
@@ -2096,7 +2096,7 @@ public:
         if (i_1 != end) {
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
-                TIGHTDB_ASSERT_3(prev_ref_end, <=, i_2->ref);
+                REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
                 if (i_2->ref == prev_ref_end) {
                     i_1->size += i_2->size; // Merge
                 }
@@ -2113,9 +2113,9 @@ public:
     }
     void check_total_coverage()
     {
-        TIGHTDB_ASSERT_3(m_chunks.size(), ==, 1);
-        TIGHTDB_ASSERT_3(m_chunks.front().ref, ==, m_ref_begin);
-        TIGHTDB_ASSERT_3(m_chunks.front().size, ==, m_mutable_ref_end - m_ref_begin);
+        REALM_ASSERT_3(m_chunks.size(), ==, 1);
+        REALM_ASSERT_3(m_chunks.front().ref, ==, m_ref_begin);
+        REALM_ASSERT_3(m_chunks.front().size, ==, m_mutable_ref_end - m_ref_begin);
     }
 private:
     struct Chunk {
@@ -2134,7 +2134,7 @@ private:
 
 void Group::Verify() const
 {
-    TIGHTDB_ASSERT(is_attached());
+    REALM_ASSERT(is_attached());
 
     m_alloc.Verify();
 
@@ -2143,7 +2143,7 @@ void Group::Verify() const
         size_t n = m_tables.size();
         for (size_t i = 0; i != n; ++i) {
             ConstTableRef table = get_table(i);
-            TIGHTDB_ASSERT_3(table->get_index_in_group(), ==, i);
+            REALM_ASSERT_3(table->get_index_in_group(), ==, i);
             table->Verify();
         }
     }
@@ -2164,9 +2164,9 @@ void Group::Verify() const
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     if (m_free_positions.is_attached()) {
         size_t n = m_free_positions.size();
-        TIGHTDB_ASSERT_3(n, ==, m_free_lengths.size());
+        REALM_ASSERT_3(n, ==, m_free_lengths.size());
         if (m_free_versions.is_attached())
-            TIGHTDB_ASSERT_3(n, ==, m_free_versions.size());
+            REALM_ASSERT_3(n, ==, m_free_versions.size());
         for (size_t i = 0; i != n; ++i) {
             ref_type ref  = to_ref(m_free_positions.get(i));
             size_t size = to_size_t(m_free_lengths.get(i));
@@ -2208,7 +2208,7 @@ void Group::Verify() const
     // file size, but the physical file size, there is a potential gap of
     // unusable ref-space between the logical file size and the baseline. We
     // need to take that into account here.
-    TIGHTDB_ASSERT_3(immutable_ref_end, <=, baseline);
+    REALM_ASSERT_3(immutable_ref_end, <=, baseline);
     if (immutable_ref_end < baseline) {
         ref_type ref = immutable_ref_end;
         size_t size = baseline - immutable_ref_end;
@@ -2327,4 +2327,4 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 }
 */
 
-#endif // TIGHTDB_DEBUG
+#endif // REALM_DEBUG

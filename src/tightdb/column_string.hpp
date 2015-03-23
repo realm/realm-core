@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_COLUMN_STRING_HPP
-#define TIGHTDB_COLUMN_STRING_HPP
+#ifndef REALM_COLUMN_STRING_HPP
+#define REALM_COLUMN_STRING_HPP
 
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array_string.hpp>
@@ -49,14 +49,14 @@ public:
     typedef StringData value_type;
 
     AdaptiveStringColumn(Allocator&, ref_type);
-    ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ~AdaptiveStringColumn() REALM_NOEXCEPT REALM_OVERRIDE;
 
-    void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void destroy() REALM_NOEXCEPT REALM_OVERRIDE;
 
-    std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    std::size_t size() const REALM_NOEXCEPT;
+    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, StringData);
     void add(StringData value = StringData());
     void insert(std::size_t ndx, StringData value = StringData());
@@ -70,29 +70,29 @@ public:
     void find_all(Column& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
 
-    int compare_values(std::size_t, std::size_t) const TIGHTDB_OVERRIDE;
+    int compare_values(std::size_t, std::size_t) const REALM_OVERRIDE;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to StringData::operator<().
-    std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_string(StringData value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
     //@}
 
-    void set_string(std::size_t, StringData) TIGHTDB_OVERRIDE;
+    void set_string(std::size_t, StringData) REALM_OVERRIDE;
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     // Search index
-    bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
-    const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
-    StringIndex* release_search_index() TIGHTDB_NOEXCEPT;
+    bool has_search_index() const REALM_NOEXCEPT REALM_OVERRIDE;
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) REALM_OVERRIDE;
+    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT REALM_OVERRIDE;
+    StringIndex* get_search_index() REALM_NOEXCEPT;
+    const StringIndex* get_search_index() const REALM_NOEXCEPT;
+    StringIndex* release_search_index() REALM_NOEXCEPT;
     StringIndex* create_search_index();
-    void destroy_search_index() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void destroy_search_index() REALM_NOEXCEPT REALM_OVERRIDE;
 
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
@@ -111,26 +111,26 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) REALM_NOEXCEPT;
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+                   _impl::OutputStream&) const REALM_OVERRIDE;
 
-    bool is_string_col() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    bool is_string_col() const REALM_NOEXCEPT REALM_OVERRIDE;
 
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void clear(std::size_t, bool) REALM_OVERRIDE;
+    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
-    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+#ifdef REALM_DEBUG
+    void Verify() const REALM_OVERRIDE;
+    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
 #endif
 
 protected:
@@ -139,7 +139,7 @@ protected:
 private:
     StringIndex* m_search_index;
 
-    std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
@@ -179,9 +179,9 @@ private:
 
     void refresh_root_accessor();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const TIGHTDB_OVERRIDE;
+                     std::ostream&) const REALM_OVERRIDE;
 #endif
 
     friend class Array;
@@ -194,7 +194,7 @@ private:
 
 // Implementation:
 
-inline std::size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
+inline std::size_t AdaptiveStringColumn::size() const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -227,7 +227,7 @@ inline void AdaptiveStringColumn::add(StringData value)
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx, StringData value)
 {
     std::size_t size = this->size();
-    TIGHTDB_ASSERT_3(row_ndx, <=, size);
+    REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t num_rows = 1;
     bool is_append = row_ndx == size;
     do_insert(row_ndx, value, num_rows, is_append); // Throws
@@ -265,22 +265,22 @@ inline void AdaptiveStringColumn::set_string(std::size_t row_ndx, StringData val
     set(row_ndx, value); // Throws
 }
 
-inline bool AdaptiveStringColumn::has_search_index() const TIGHTDB_NOEXCEPT
+inline bool AdaptiveStringColumn::has_search_index() const REALM_NOEXCEPT
 {
     return m_search_index != 0;
 }
 
-inline StringIndex* AdaptiveStringColumn::get_search_index() TIGHTDB_NOEXCEPT
+inline StringIndex* AdaptiveStringColumn::get_search_index() REALM_NOEXCEPT
 {
     return m_search_index;
 }
 
-inline const StringIndex* AdaptiveStringColumn::get_search_index() const TIGHTDB_NOEXCEPT
+inline const StringIndex* AdaptiveStringColumn::get_search_index() const REALM_NOEXCEPT
 {
     return m_search_index;
 }
 
-inline StringIndex* AdaptiveStringColumn::release_search_index() TIGHTDB_NOEXCEPT
+inline StringIndex* AdaptiveStringColumn::release_search_index() REALM_NOEXCEPT
 {
     StringIndex* i = m_search_index;
     m_search_index = 0;
@@ -288,7 +288,7 @@ inline StringIndex* AdaptiveStringColumn::release_search_index() TIGHTDB_NOEXCEP
 }
 
 inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
-                                                           Allocator& alloc) TIGHTDB_NOEXCEPT
+                                                           Allocator& alloc) REALM_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
@@ -309,7 +309,7 @@ inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
     return Array::get_bptree_size_from_header(root_header);
 }
 
-inline bool AdaptiveStringColumn::is_string_col() const TIGHTDB_NOEXCEPT
+inline bool AdaptiveStringColumn::is_string_col() const REALM_NOEXCEPT
 {
     return true;
 }
@@ -342,4 +342,4 @@ inline void AdaptiveStringColumn::clear(std::size_t, bool)
 
 } // namespace tightdb
 
-#endif // TIGHTDB_COLUMN_STRING_HPP
+#endif // REALM_COLUMN_STRING_HPP

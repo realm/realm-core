@@ -60,7 +60,7 @@
 
 ### Internals:
 
-* Many `TIGHTDB_ASSERT` invocations replaced by new `TIGHTDB_ASSERT_3` macro
+* Many `REALM_ASSERT` invocations replaced by new `REALM_ASSERT_3` macro
   that prints variable/argument contents on failure. It's not implemented
   optimally yet.
 
@@ -216,13 +216,13 @@
 
 ### Internals:
 
-* There is now three kinds of runtime assertions, `TIGHTDB_ASSERT_DEBUG()`,
-  which is retained only in debug-mode builds, `TIGHTDB_ASSERT_RELEASE()`, which
-  is also retained in release-mode builds, and finally, `TIGHTDB_ASSERT()`,
+* There is now three kinds of runtime assertions, `REALM_ASSERT_DEBUG()`,
+  which is retained only in debug-mode builds, `REALM_ASSERT_RELEASE()`, which
+  is also retained in release-mode builds, and finally, `REALM_ASSERT()`,
   which is normally only retained in debug-mode builds, but may occasionally be
   retained in release-mode builds too, depending on the specific build
   configuration.
-* `TIGHTDB_ASSERT()` assertions are now enabled in release-mode builds by
+* `REALM_ASSERT()` assertions are now enabled in release-mode builds by
   default.
 
 ----------------------------------------------
@@ -423,9 +423,9 @@
 
 ### Internals:
 
-* `TIGHTDB_MAX_LIST_SIZE` was renamed to `TIGHTDB_MAX_BPNODE_SIZE`. `BPNODE`
+* `REALM_MAX_LIST_SIZE` was renamed to `REALM_MAX_BPNODE_SIZE`. `BPNODE`
   stands for "B+-tree node".
-* `TIGHTDB_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
+* `REALM_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
   mode.
 
 ----------------------------------------------
@@ -533,10 +533,10 @@
 
 * Fixed bug in `Table::add_column()` which would produce a corrupt underlying
   node structure if the table already contains more than N**2 rows, where N is
-  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+  `REALM_MAX_LIST_SIZE` (currently set to 1000).
 * Fixed bugs in `Table::clear()` which would produce a corrupt underlying node
   structure if the table already contains more than N rows, where N is
-  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+  `REALM_MAX_LIST_SIZE` (currently set to 1000).
 
 ### Enhancements:
 
@@ -974,7 +974,7 @@ Format:
 + New Group::open(...) methods added. Same for SharedGroup.
 + New Group::is_attached() added. Same for SharedGroup.
 + Classes ReadTransaction and WriteTransaction added for handling safe scoped transaction.
-+ Many methods have now been qualified with TIGHTDB_NOEXCEPT.
++ Many methods have now been qualified with REALM_NOEXCEPT.
 
 
 2013-01-14 (Kristian Spangsege)
@@ -1098,12 +1098,12 @@ Format:
 
 2012-07-24 (Kristian Spangsege)
 ----------
-+  New macro TIGHTDB_DEBUG to control compilation mode.
++  New macro REALM_DEBUG to control compilation mode.
     The library (including all headers) is no longer affected in any way by the definition status of NDEBUG or _DEBUG.
     When we (TightDB) compile the library in debug mode, we must define this macro.
     We will deliver two versions of the library, one for release mode, and one for debug mode.
     If the customer wishes to use the debugging version of the library, he must do two things:
-    1) Define TIGHTDB_DEBUG in any translation unit that includes a TightDB header.
+    1) Define REALM_DEBUG in any translation unit that includes a TightDB header.
     2) Use the version of the library that is compiled for debug mode (libtightdb_d.a).
 + 5 Removed obsolete constructor Mixed(ColumnType). Use Mixed(subtable_tag) instead, since this has no runtime overhead.
 

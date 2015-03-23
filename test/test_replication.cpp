@@ -7,13 +7,13 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/file.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
 
 #include "test.hpp"
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 using namespace std;
 using namespace tightdb;
@@ -58,7 +58,7 @@ class MyTrivialReplication: public TrivialReplication {
 public:
     MyTrivialReplication(string path): TrivialReplication(path) {}
 
-    ~MyTrivialReplication() TIGHTDB_NOEXCEPT
+    ~MyTrivialReplication() REALM_NOEXCEPT
     {
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    void handle_transact_log(const char* data, size_t size, version_type) TIGHTDB_OVERRIDE
+    void handle_transact_log(const char* data, size_t size, version_type) REALM_OVERRIDE
     {
         UniquePtr<char[]> log(new char[size]); // Throws
         copy(data, data+size, log.get());
@@ -90,18 +90,18 @@ private:
     TransactLogs m_transact_logs;
 };
 
-TIGHTDB_TABLE_1(MySubsubsubtable,
+REALM_TABLE_1(MySubsubsubtable,
                 i, Int)
 
-TIGHTDB_TABLE_3(MySubsubtable,
+REALM_TABLE_3(MySubsubtable,
                 a, Int,
                 b, Subtable<MySubsubsubtable>,
                 c, Int)
 
-TIGHTDB_TABLE_1(MySubtable,
+REALM_TABLE_1(MySubtable,
                 t, Subtable<MySubsubtable>)
 
-TIGHTDB_TABLE_9(MyTable,
+REALM_TABLE_9(MyTable,
                 my_int,       Int,
                 my_bool,      Bool,
                 my_float,     Float,
@@ -491,5 +491,5 @@ TEST(Replication_Links)
 
 } // anonymous namespace
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 #endif // TEST_REPLICATION

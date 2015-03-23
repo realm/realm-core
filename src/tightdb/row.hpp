@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ROW_HPP
-#define TIGHTDB_ROW_HPP
+#ifndef REALM_ROW_HPP
+#define REALM_ROW_HPP
 
 #include <stdint.h>
 
@@ -69,24 +69,24 @@ public:
     typedef util::bind_ptr<const L> ConstLinkViewRef;
     typedef util::bind_ptr<L> LinkViewRef; // Same as ConstLinkViewRef if `T` is 'const'
 
-    int_fast64_t get_int(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    bool get_bool(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    float get_float(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    double get_double(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    StringData get_string(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    BinaryData get_binary(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    DateTime get_datetime(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    int_fast64_t get_int(std::size_t col_ndx) const REALM_NOEXCEPT;
+    bool get_bool(std::size_t col_ndx) const REALM_NOEXCEPT;
+    float get_float(std::size_t col_ndx) const REALM_NOEXCEPT;
+    double get_double(std::size_t col_ndx) const REALM_NOEXCEPT;
+    StringData get_string(std::size_t col_ndx) const REALM_NOEXCEPT;
+    BinaryData get_binary(std::size_t col_ndx) const REALM_NOEXCEPT;
+    DateTime get_datetime(std::size_t col_ndx) const REALM_NOEXCEPT;
     ConstTableRef get_subtable(std::size_t col_ndx) const;
     TableRef get_subtable(std::size_t col_ndx);
-    std::size_t get_subtable_size(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    bool is_null_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_subtable_size(std::size_t col_ndx) const REALM_NOEXCEPT;
+    std::size_t get_link(std::size_t col_ndx) const REALM_NOEXCEPT;
+    bool is_null_link(std::size_t col_ndx) const REALM_NOEXCEPT;
     ConstLinkViewRef get_linklist(std::size_t col_ndx) const;
     LinkViewRef get_linklist(std::size_t col_ndx);
-    bool linklist_is_empty(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_link_count(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    Mixed get_mixed(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    DataType get_mixed_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    bool linklist_is_empty(std::size_t col_ndx) const REALM_NOEXCEPT;
+    std::size_t get_link_count(std::size_t col_ndx) const REALM_NOEXCEPT;
+    Mixed get_mixed(std::size_t col_ndx) const REALM_NOEXCEPT;
+    DataType get_mixed_type(std::size_t col_ndx) const REALM_NOEXCEPT;
 
     void set_int(std::size_t col_ndx, int_fast64_t value);
     void set_bool(std::size_t col_ndx, bool value);
@@ -108,14 +108,14 @@ public:
     //@}
 
     std::size_t get_backlink_count(const Table& src_table,
-                                   std::size_t src_col_ndx) const TIGHTDB_NOEXCEPT;
+                                   std::size_t src_col_ndx) const REALM_NOEXCEPT;
     std::size_t get_backlink(const Table& src_table, std::size_t src_col_ndx,
-                             std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT;
+                             std::size_t backlink_ndx) const REALM_NOEXCEPT;
 
-    std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
-    DataType get_column_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    StringData get_column_name(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
+    std::size_t get_column_count() const REALM_NOEXCEPT;
+    DataType get_column_type(std::size_t col_ndx) const REALM_NOEXCEPT;
+    StringData get_column_name(std::size_t col_ndx) const REALM_NOEXCEPT;
+    std::size_t get_column_index(StringData name) const REALM_NOEXCEPT;
 
     /// Returns true if, and only if this accessor is currently attached to a
     /// row.
@@ -134,32 +134,32 @@ public:
     /// A row accessor becomes detached if the underlying row is removed, if the
     /// associated table accessor becomes detached, or if the detach() method is
     /// called. A row accessor does not become detached for any other reason.
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const REALM_NOEXCEPT;
 
     /// Detach this accessor from the row it was attached to. This function has
     /// no effect if the accessor was already detached (idempotency).
-    void detach() TIGHTDB_NOEXCEPT;
+    void detach() REALM_NOEXCEPT;
 
     /// The table containing the row to which this accessor is currently
     /// bound. For a detached accessor, the returned value is null.
-    const table_type* get_table() const TIGHTDB_NOEXCEPT;
-    table_type* get_table() TIGHTDB_NOEXCEPT;
+    const table_type* get_table() const REALM_NOEXCEPT;
+    table_type* get_table() REALM_NOEXCEPT;
 
     /// The index of the row to which this accessor is currently bound. For a
     /// detached accessor, the returned value is unspecified.
-    std::size_t get_index() const TIGHTDB_NOEXCEPT;
+    std::size_t get_index() const REALM_NOEXCEPT;
 
-#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    explicit operator bool() const TIGHTDB_NOEXCEPT;
+#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    explicit operator bool() const REALM_NOEXCEPT;
 #else
     typedef bool (RowFuncs::*unspecified_bool_type)() const;
-    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+    operator unspecified_bool_type() const REALM_NOEXCEPT;
 #endif
 
 private:
-    const T* table() const TIGHTDB_NOEXCEPT;
-    T* table() TIGHTDB_NOEXCEPT;
-    std::size_t row_ndx() const TIGHTDB_NOEXCEPT;
+    const T* table() const REALM_NOEXCEPT;
+    T* table() REALM_NOEXCEPT;
+    std::size_t row_ndx() const REALM_NOEXCEPT;
 };
 
 
@@ -178,17 +178,17 @@ private:
 template<class T> class BasicRowExpr:
         public RowFuncs<T, BasicRowExpr<T> > {
 public:
-    template<class U> BasicRowExpr(const BasicRowExpr<U>&) TIGHTDB_NOEXCEPT;
+    template<class U> BasicRowExpr(const BasicRowExpr<U>&) REALM_NOEXCEPT;
 
 private:
     T* m_table; // Null if detached.
     std::size_t m_row_ndx; // Undefined if detached.
 
-    BasicRowExpr(T*, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    BasicRowExpr(T*, std::size_t row_ndx) REALM_NOEXCEPT;
 
-    T* impl_get_table() const TIGHTDB_NOEXCEPT;
-    std::size_t impl_get_row_ndx() const TIGHTDB_NOEXCEPT;
-    void impl_detach() TIGHTDB_NOEXCEPT;
+    T* impl_get_table() const REALM_NOEXCEPT;
+    std::size_t impl_get_row_ndx() const REALM_NOEXCEPT;
+    void impl_detach() REALM_NOEXCEPT;
 
     // Make impl_get_table(), impl_get_row_ndx(), and impl_detach() accessible
     // from RowFuncs.
@@ -212,9 +212,9 @@ protected:
     TableRef m_table; // Null if detached.
     std::size_t m_row_ndx; // Undefined if detached.
 
-    void attach(Table*, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void reattach(Table*, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void impl_detach() TIGHTDB_NOEXCEPT;
+    void attach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
+    void reattach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
+    void impl_detach() REALM_NOEXCEPT;
 
 private:
     RowBase* m_prev; // Null if first, undefined if detached.
@@ -258,19 +258,19 @@ template<class T> class BasicRow:
         private RowBase,
         public RowFuncs<T, BasicRow<T> > {
 public:
-    BasicRow() TIGHTDB_NOEXCEPT;
+    BasicRow() REALM_NOEXCEPT;
 
-    template<class U> BasicRow(BasicRowExpr<U>) TIGHTDB_NOEXCEPT;
-    template<class U> BasicRow(const BasicRow<U>&) TIGHTDB_NOEXCEPT;
-    template<class U> BasicRow& operator=(BasicRowExpr<U>) TIGHTDB_NOEXCEPT;
-    template<class U> BasicRow& operator=(BasicRow<U>) TIGHTDB_NOEXCEPT;
-    BasicRow& operator=(const BasicRow<T>&) TIGHTDB_NOEXCEPT;
+    template<class U> BasicRow(BasicRowExpr<U>) REALM_NOEXCEPT;
+    template<class U> BasicRow(const BasicRow<U>&) REALM_NOEXCEPT;
+    template<class U> BasicRow& operator=(BasicRowExpr<U>) REALM_NOEXCEPT;
+    template<class U> BasicRow& operator=(BasicRow<U>) REALM_NOEXCEPT;
+    BasicRow& operator=(const BasicRow<T>&) REALM_NOEXCEPT;
 
-    ~BasicRow() TIGHTDB_NOEXCEPT;
+    ~BasicRow() REALM_NOEXCEPT;
 
 private:
-    T* impl_get_table() const TIGHTDB_NOEXCEPT;
-    std::size_t impl_get_row_ndx() const TIGHTDB_NOEXCEPT;
+    T* impl_get_table() const REALM_NOEXCEPT;
+    std::size_t impl_get_row_ndx() const REALM_NOEXCEPT;
 
     // Make impl_get_table(), impl_get_row_ndx(), and impl_detach() accessible
     // from RowFuncs.
@@ -290,43 +290,43 @@ typedef BasicRow<const Table> ConstRow;
 // Implementation
 
 template<class T, class R>
-inline int_fast64_t RowFuncs<T,R>::get_int(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline int_fast64_t RowFuncs<T,R>::get_int(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_int(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline bool RowFuncs<T,R>::get_bool(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline bool RowFuncs<T,R>::get_bool(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_bool(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline float RowFuncs<T,R>::get_float(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline float RowFuncs<T,R>::get_float(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_float(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline double RowFuncs<T,R>::get_double(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline double RowFuncs<T,R>::get_double(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_double(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline StringData RowFuncs<T,R>::get_string(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline StringData RowFuncs<T,R>::get_string(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_string(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline BinaryData RowFuncs<T,R>::get_binary(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline BinaryData RowFuncs<T,R>::get_binary(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_binary(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline DateTime RowFuncs<T,R>::get_datetime(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline DateTime RowFuncs<T,R>::get_datetime(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_datetime(col_ndx, row_ndx());
 }
@@ -344,19 +344,19 @@ inline typename RowFuncs<T,R>::TableRef RowFuncs<T,R>::get_subtable(std::size_t 
 }
 
 template<class T, class R>
-inline std::size_t RowFuncs<T,R>::get_subtable_size(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t RowFuncs<T,R>::get_subtable_size(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_subtable_size(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline std::size_t RowFuncs<T,R>::get_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t RowFuncs<T,R>::get_link(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_link(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline bool RowFuncs<T,R>::is_null_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline bool RowFuncs<T,R>::is_null_link(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->is_null_link(col_ndx, row_ndx());
 }
@@ -374,25 +374,25 @@ inline typename RowFuncs<T,R>::LinkViewRef RowFuncs<T,R>::get_linklist(std::size
 }
 
 template<class T, class R>
-inline bool RowFuncs<T,R>::linklist_is_empty(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline bool RowFuncs<T,R>::linklist_is_empty(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->linklist_is_empty(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline std::size_t RowFuncs<T,R>::get_link_count(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t RowFuncs<T,R>::get_link_count(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_link_count(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline Mixed RowFuncs<T,R>::get_mixed(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline Mixed RowFuncs<T,R>::get_mixed(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_mixed(col_ndx, row_ndx());
 }
 
 template<class T, class R>
-inline DataType RowFuncs<T,R>::get_mixed_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline DataType RowFuncs<T,R>::get_mixed_type(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_mixed_type(col_ndx, row_ndx());
 }
@@ -481,148 +481,148 @@ template<class T, class R> inline void RowFuncs<T,R>::move_last_over()
 
 template<class T, class R> inline std::size_t
 RowFuncs<T,R>::get_backlink_count(const Table& src_table, std::size_t src_col_ndx) const
-    TIGHTDB_NOEXCEPT
+    REALM_NOEXCEPT
 {
     return table()->get_backlink_count(row_ndx(), src_table, src_col_ndx);
 }
 
 template<class T, class R>
 inline std::size_t RowFuncs<T,R>::get_backlink(const Table& src_table, std::size_t src_col_ndx,
-                                               std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT
+                                               std::size_t backlink_ndx) const REALM_NOEXCEPT
 {
     return table()->get_backlink(row_ndx(), src_table, src_col_ndx, backlink_ndx);
 }
 
 template<class T, class R>
-inline std::size_t RowFuncs<T,R>::get_column_count() const TIGHTDB_NOEXCEPT
+inline std::size_t RowFuncs<T,R>::get_column_count() const REALM_NOEXCEPT
 {
     return table()->get_column_count();
 }
 
 template<class T, class R>
-inline DataType RowFuncs<T,R>::get_column_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline DataType RowFuncs<T,R>::get_column_type(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_column_type(col_ndx);
 }
 
 template<class T, class R>
-inline StringData RowFuncs<T,R>::get_column_name(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline StringData RowFuncs<T,R>::get_column_name(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->get_column_name(col_ndx);
 }
 
 template<class T, class R>
-inline std::size_t RowFuncs<T,R>::get_column_index(StringData name) const TIGHTDB_NOEXCEPT
+inline std::size_t RowFuncs<T,R>::get_column_index(StringData name) const REALM_NOEXCEPT
 {
     return table()->get_column_index(name);
 }
 
-template<class T, class R> inline bool RowFuncs<T,R>::is_attached() const TIGHTDB_NOEXCEPT
+template<class T, class R> inline bool RowFuncs<T,R>::is_attached() const REALM_NOEXCEPT
 {
     return static_cast<const R*>(this)->impl_get_table();
 }
 
-template<class T, class R> inline void RowFuncs<T,R>::detach() TIGHTDB_NOEXCEPT
+template<class T, class R> inline void RowFuncs<T,R>::detach() REALM_NOEXCEPT
 {
     static_cast<R*>(this)->impl_detach();
 }
 
-template<class T, class R> inline const T* RowFuncs<T,R>::get_table() const TIGHTDB_NOEXCEPT
+template<class T, class R> inline const T* RowFuncs<T,R>::get_table() const REALM_NOEXCEPT
 {
     return table();
 }
 
-template<class T, class R> inline T* RowFuncs<T,R>::get_table() TIGHTDB_NOEXCEPT
+template<class T, class R> inline T* RowFuncs<T,R>::get_table() REALM_NOEXCEPT
 {
     return table();
 }
 
-template<class T, class R> inline std::size_t RowFuncs<T,R>::get_index() const TIGHTDB_NOEXCEPT
+template<class T, class R> inline std::size_t RowFuncs<T,R>::get_index() const REALM_NOEXCEPT
 {
     return row_ndx();
 }
 
-#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
-template<class T, class R> inline RowFuncs<T,R>::operator bool() const TIGHTDB_NOEXCEPT
+template<class T, class R> inline RowFuncs<T,R>::operator bool() const REALM_NOEXCEPT
 {
     return is_attached();
 }
 
-#else // TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#else // REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
 template<class T, class R>
-inline RowFuncs<T,R>::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
+inline RowFuncs<T,R>::operator unspecified_bool_type() const REALM_NOEXCEPT
 {
     return is_attached() ? &RowFuncs::is_attached : 0;
 }
 
-#endif // TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#endif // REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
-template<class T, class R> inline const T* RowFuncs<T,R>::table() const TIGHTDB_NOEXCEPT
+template<class T, class R> inline const T* RowFuncs<T,R>::table() const REALM_NOEXCEPT
 {
     return static_cast<const R*>(this)->impl_get_table();
 }
 
-template<class T, class R> inline T* RowFuncs<T,R>::table() TIGHTDB_NOEXCEPT
+template<class T, class R> inline T* RowFuncs<T,R>::table() REALM_NOEXCEPT
 {
     return static_cast<R*>(this)->impl_get_table();
 }
 
-template<class T, class R> inline std::size_t RowFuncs<T,R>::row_ndx() const TIGHTDB_NOEXCEPT
+template<class T, class R> inline std::size_t RowFuncs<T,R>::row_ndx() const REALM_NOEXCEPT
 {
     return static_cast<const R*>(this)->impl_get_row_ndx();
 }
 
 
 template<class T> template<class U>
-inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) TIGHTDB_NOEXCEPT:
+inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) REALM_NOEXCEPT:
     m_table(expr.m_table),
     m_row_ndx(expr.m_row_ndx)
 {
 }
 
 template<class T>
-inline BasicRowExpr<T>::BasicRowExpr(T* table, std::size_t row_ndx) TIGHTDB_NOEXCEPT:
+inline BasicRowExpr<T>::BasicRowExpr(T* table, std::size_t row_ndx) REALM_NOEXCEPT:
     m_table(table),
     m_row_ndx(row_ndx)
 {
 }
 
-template<class T> inline T* BasicRowExpr<T>::impl_get_table() const TIGHTDB_NOEXCEPT
+template<class T> inline T* BasicRowExpr<T>::impl_get_table() const REALM_NOEXCEPT
 {
     return m_table;
 }
 
-template<class T> inline std::size_t BasicRowExpr<T>::impl_get_row_ndx() const TIGHTDB_NOEXCEPT
+template<class T> inline std::size_t BasicRowExpr<T>::impl_get_row_ndx() const REALM_NOEXCEPT
 {
     return m_row_ndx;
 }
 
-template<class T> inline void BasicRowExpr<T>::impl_detach() TIGHTDB_NOEXCEPT
+template<class T> inline void BasicRowExpr<T>::impl_detach() REALM_NOEXCEPT
 {
     m_table = 0;
 }
 
 
-template<class T> inline BasicRow<T>::BasicRow() TIGHTDB_NOEXCEPT
+template<class T> inline BasicRow<T>::BasicRow() REALM_NOEXCEPT
 {
 }
 
-template<class T> template<class U> inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) TIGHTDB_NOEXCEPT
+template<class T> template<class U> inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) REALM_NOEXCEPT
 {
     T* table = expr.m_table; // Check that pointer types are compatible
     attach(const_cast<Table*>(table), expr.m_row_ndx);
 }
 
-template<class T> template<class U> inline BasicRow<T>::BasicRow(const BasicRow<U>& row) TIGHTDB_NOEXCEPT
+template<class T> template<class U> inline BasicRow<T>::BasicRow(const BasicRow<U>& row) REALM_NOEXCEPT
 {
     T* table = row.m_table.get(); // Check that pointer types are compatible
     attach(const_cast<Table*>(table), row.m_row_ndx);
 }
 
 template<class T> template<class U>
-inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) TIGHTDB_NOEXCEPT
+inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) REALM_NOEXCEPT
 {
     T* table = expr.m_table; // Check that pointer types are compatible
     reattach(const_cast<Table*>(table), expr.m_row_ndx);
@@ -630,7 +630,7 @@ inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) TIGHTDB_NOEXCEP
 }
 
 template<class T> template<class U>
-inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row) TIGHTDB_NOEXCEPT
+inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row) REALM_NOEXCEPT
 {
     T* table = row.m_table.get(); // Check that pointer types are compatible
     reattach(const_cast<Table*>(table), row.m_row_ndx);
@@ -638,27 +638,27 @@ inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row) TIGHTDB_NOEXCEPT
 }
 
 template<class T>
-inline BasicRow<T>& BasicRow<T>::operator=(const BasicRow<T>& row) TIGHTDB_NOEXCEPT
+inline BasicRow<T>& BasicRow<T>::operator=(const BasicRow<T>& row) REALM_NOEXCEPT
 {
     reattach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
     return *this;
 }
 
-template<class T> inline BasicRow<T>::~BasicRow() TIGHTDB_NOEXCEPT
+template<class T> inline BasicRow<T>::~BasicRow() REALM_NOEXCEPT
 {
     RowBase::impl_detach();
 }
 
-template<class T> inline T* BasicRow<T>::impl_get_table() const TIGHTDB_NOEXCEPT
+template<class T> inline T* BasicRow<T>::impl_get_table() const REALM_NOEXCEPT
 {
     return m_table.get();
 }
 
-template<class T> inline std::size_t BasicRow<T>::impl_get_row_ndx() const TIGHTDB_NOEXCEPT
+template<class T> inline std::size_t BasicRow<T>::impl_get_row_ndx() const REALM_NOEXCEPT
 {
     return m_row_ndx;
 }
 
 } // namespace tightdb
 
-#endif // TIGHTDB_ROW_HPP
+#endif // REALM_ROW_HPP
