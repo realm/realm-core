@@ -375,8 +375,8 @@ TEST_EX(Success_String, success_list, true) // Test #4, accum checks = 57 + 16 =
 
     // Check that we are not comparing pointers
     const char* t = "foo";
-    UniquePtr<char[]> t_1(new char[strlen(t)+1]);
-    UniquePtr<char[]> t_2(new char[strlen(t)+1]);
+    std::unique_ptr<char[]> t_1(new char[strlen(t)+1]);
+    std::unique_ptr<char[]> t_2(new char[strlen(t)+1]);
     copy(t, t + strlen(t) + 1, t_1.get());
     copy(t, t + strlen(t) + 1, t_2.get());
     CHECK_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_1.get()));
@@ -404,8 +404,8 @@ TEST_EX(Failure_String, failure_list, true) // Test #4, accum checks = 77 + 16 =
 
     // Check that we are not comparing pointers
     const char* t = "foo";
-    UniquePtr<char[]> t_1(new char[strlen(t)+1]);
-    UniquePtr<char[]> t_2(new char[strlen(t)+1]);
+    std::unique_ptr<char[]> t_1(new char[strlen(t)+1]);
+    std::unique_ptr<char[]> t_2(new char[strlen(t)+1]);
     copy(t, t + strlen(t) + 1, t_1.get());
     copy(t, t + strlen(t) + 1, t_2.get());
     CHECK_NOT_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_1.get()));
@@ -521,7 +521,7 @@ void check_filtered_summary(TestResults& test_results, TestList& list, const cha
 {
     Summary summary;
     SummaryRecorder reporter(summary);
-    UniquePtr<Filter> filter(create_wildcard_filter(filter_str));
+    std::unique_ptr<Filter> filter(create_wildcard_filter(filter_str));
     list.run(&reporter, filter.get());
     CHECK_EQUAL(num_included_tests, summary.num_included_tests);
     CHECK_EQUAL(num_failed_tests,   summary.num_failed_tests);

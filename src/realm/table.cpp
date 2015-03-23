@@ -935,7 +935,7 @@ void Table::update_subtables(Descriptor& desc, SubtableUpdater* updater)
     size_t size = sizeof stat_buf / sizeof *stat_buf;
     size_t* begin = stat_buf;
     size_t* end = begin + size;
-    UniquePtr<size_t> dyn_buf;
+    std::unique_ptr<size_t> dyn_buf;
     for (;;) {
         typedef _impl::DescriptorFriend df;
         begin = df::record_subdesc_path(desc, begin, end);

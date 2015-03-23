@@ -196,7 +196,7 @@ public:
     }
     void replace_root_by_empty_leaf() REALM_OVERRIDE
     {
-        util::UniquePtr<BasicArray<T> > leaf;
+        std::unique_ptr<BasicArray<T> > leaf;
         leaf.reset(new BasicArray<T>(get_alloc())); // Throws
         leaf->create(); // Throws
         replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
@@ -241,7 +241,7 @@ template<class T> void BasicColumn<T>::do_clear()
     }
 
     // Revert to generic array
-    util::UniquePtr<BasicArray<T> > array;
+    std::unique_ptr<BasicArray<T> > array;
     array.reset(new BasicArray<T>(m_array->get_alloc())); // Throws
     array->create(); // Throws
     array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());

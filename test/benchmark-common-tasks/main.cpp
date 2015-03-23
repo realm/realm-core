@@ -261,7 +261,7 @@ void run_benchmark(BenchmarkResults& results)
     for (size_t i = 0; i < num_durabilities; ++i) {
         // Open a SharedGroup:
         File::try_remove(realm_path);
-        UniquePtr<SharedGroup> group;
+        std::unique_ptr<SharedGroup> group;
         SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
         group.reset(new SharedGroup(realm_path, false, level));
 

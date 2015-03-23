@@ -218,7 +218,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
         ref = curr_ref_end;
     }
     REALM_ASSERT_DEBUG(0 < new_size);
-    UniquePtr<char[]> mem(new char[new_size]); // Throws
+    std::unique_ptr<char[]> mem(new char[new_size]); // Throws
     fill(mem.get(), mem.get()+new_size, 0);
 
     // Add to list of slabs

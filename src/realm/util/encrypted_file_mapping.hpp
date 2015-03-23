@@ -159,7 +159,7 @@ private:
     File::AccessMode m_access;
 
 #ifdef REALM_DEBUG
-    UniquePtr<char[]> m_validate_buffer;
+    std::unique_ptr<char[]> m_validate_buffer;
 #endif
 
     char* page_addr(size_t i) const REALM_NOEXCEPT;

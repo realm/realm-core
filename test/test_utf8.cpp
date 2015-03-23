@@ -391,7 +391,7 @@ template<class String16> String16 utf8_to_utf16(const string& s)
     size_t utf16_buf_size = Xcode::find_utf16_buf_size(in_begin, in_end);
     if (in_begin != in_end) throw runtime_error("Bad UTF-8");
     in_begin = s.data();
-    UniquePtr<Char16[]> utf16_buf(new Char16[utf16_buf_size]);
+    std::unique_ptr<Char16[]> utf16_buf(new Char16[utf16_buf_size]);
     Char16* out_begin = utf16_buf.get();
     Char16* out_end = out_begin + utf16_buf_size;
     bool valid_utf8 = Xcode::to_utf16(in_begin, in_end, out_begin, out_end);
@@ -411,7 +411,7 @@ template<class String16> string utf16_to_utf8(const String16& s)
     size_t utf8_buf_size = Xcode::find_utf8_buf_size(in_begin, in_end);
     if (in_begin != in_end) throw runtime_error("Bad UTF-16");
     in_begin = s.data();
-    UniquePtr<char[]> utf8_buf(new char[utf8_buf_size]);
+    std::unique_ptr<char[]> utf8_buf(new char[utf8_buf_size]);
     char* out_begin = utf8_buf.get();
     char* out_end = out_begin + utf8_buf_size;
     bool valid_utf16 = Xcode::to_utf8(in_begin, in_end, out_begin, out_end);

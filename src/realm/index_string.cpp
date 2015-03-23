@@ -41,7 +41,7 @@ void StringIndex::validate_value(StringData str) const
 ArrayInteger* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
-    UniquePtr<ArrayInteger> top(new ArrayInteger(alloc)); // Throws
+    std::unique_ptr<ArrayInteger> top(new ArrayInteger(alloc)); // Throws
     top->create(type); // Throws
 
     // Mark that this is part of index

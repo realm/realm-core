@@ -1289,7 +1289,7 @@ void SharedGroup::advance_read(VersionID specific_version)
     // because in order for us to get the new version when we grab the
     // readlock, the new version must have been entered into the ringbuffer.
     // commit always updates the replication log BEFORE updating the ringbuffer.
-    UniquePtr<BinaryData[]>
+    std::unique_ptr<BinaryData[]>
         logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
 
     repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs.get());

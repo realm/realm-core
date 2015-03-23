@@ -117,7 +117,7 @@ private:
     Allocator& m_alloc;
     _impl::OutputStream& m_out;
     class ParentLevel;
-    UniquePtr<ParentLevel> m_last_parent_level;
+    std::unique_ptr<ParentLevel> m_last_parent_level;
 };
 
 class TreeWriter::ParentLevel {
@@ -135,7 +135,7 @@ private:
     Array m_main;
     ArrayInteger m_offsets;
     _impl::OutputStream& m_out;
-    UniquePtr<ParentLevel> m_prev_parent_level;
+    std::unique_ptr<ParentLevel> m_prev_parent_level;
 };
 
 
@@ -389,7 +389,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
 
     Array* orig_root = m_array;
     Allocator& alloc = orig_root->get_alloc();
-    UniquePtr<Array> new_root(new Array(alloc)); // Throws
+    std::unique_ptr<Array> new_root(new Array(alloc)); // Throws
     new_root->create(Array::type_InnerBptreeNode); // Throws
     new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
     new_root->update_parent(); // Throws
@@ -754,7 +754,7 @@ namespace {
 StringIndex* Column::create_search_index()
 {
     REALM_ASSERT(!m_search_index);
-    UniquePtr<StringIndex> index;
+    std::unique_ptr<StringIndex> index;
     StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
     index.reset(si);
 
@@ -954,7 +954,7 @@ public:
     }
     void replace_root_by_empty_leaf() REALM_OVERRIDE
     {
-        UniquePtr<Array> leaf(new Array(get_alloc())); // Throws
+        std::unique_ptr<Array> leaf(new Array(get_alloc())); // Throws
         leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
                      Array::type_Normal); // Throws
         replace_root(leaf.release()); // Throws, but callee takes ownership of accessor

@@ -440,7 +440,7 @@ private:
     int m_fd;
 #endif
 
-    UniquePtr<const char[]> m_encryption_key;
+    std::unique_ptr<const char[]> m_encryption_key;
 
     bool lock(bool exclusive, bool non_blocking);
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
@@ -600,7 +600,7 @@ private:
     static const std::size_t buffer_size = 4096;
 
     File& m_file;
-    UniquePtr<char[]> const m_buffer;
+    std::unique_ptr<char[]> const m_buffer;
 
     int_type overflow(int_type) REALM_OVERRIDE;
     int sync() REALM_OVERRIDE;

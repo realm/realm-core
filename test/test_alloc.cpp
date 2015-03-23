@@ -168,7 +168,7 @@ TEST(Alloc_AttachBuffer)
     GROUP_TEST_PATH(path);
 
     // Produce a valid buffer
-    UniquePtr<char[]> buffer;
+    std::unique_ptr<char[]> buffer;
     size_t buffer_size;
     {
         File::try_remove(path);
