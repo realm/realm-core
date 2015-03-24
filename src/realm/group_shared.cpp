@@ -879,7 +879,8 @@ bool SharedGroup::compact()
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match
-    Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(info->readers.get_last());
+    SharedInfo* r_info = m_reader_map.get_addr();
+    Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
     REALM_ASSERT(rc.version == info->latest_version_number);
     rc.filesize = file_size;
     rc.current_top = top_ref;

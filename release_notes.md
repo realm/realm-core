@@ -3,6 +3,10 @@
 ### Bugfixes:
 
 * Added a check for NUL bytes in indexed strings to avoid corrupting data structures.
+* Fixed bug in SharedGroup::compact(). The bug left the freelist outdated in some situations,
+  which could cause crash later, if work continued on the same shared group. The bug did not
+  affect the data written to the compacted database, but later commits working on the outdated
+  freelist might have. The fix forces proper (re)initialization of the free list.
 
 ### API breaking changes:
 
