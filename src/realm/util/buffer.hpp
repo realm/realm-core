@@ -38,7 +38,7 @@ namespace util {
 /// size.
 template<class T> class Buffer {
 public:
-    Buffer() REALM_NOEXCEPT: m_data(0), m_size(0) {}
+    Buffer() REALM_NOEXCEPT: m_data(nullptr), m_size(0) {}
     Buffer(std::size_t size);
     ~Buffer() REALM_NOEXCEPT {}
 
