@@ -1,12 +1,12 @@
 // @@Example: ex_cpp_group_traverse @@
 // @@Fold@@
 #include <iostream>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 

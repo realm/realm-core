@@ -1,37 +1,37 @@
 /*************************************************************************
  *
- * TIGHTDB CONFIDENTIAL
+ * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_RANDOM_HPP
-#define TIGHTDB_TEST_UTIL_RANDOM_HPP
+#ifndef REALM_TEST_UTIL_RANDOM_HPP
+#define REALM_TEST_UTIL_RANDOM_HPP
 
 #include <limits>
 #include <iterator>
 #include <utility>
 #include <algorithm>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/assert.hpp>
-#include <tightdb/util/type_traits.hpp>
-#include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm/util/features.h>
+#include <realm/util/assert.hpp>
+#include <realm/util/type_traits.hpp>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/thread.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -43,17 +43,17 @@ namespace test_util {
 /// The thread-safety of this function means that it is relatively slow, so if
 /// you need to draw many random numbers efficiently, consider creating your own
 /// instance of `Random`.
-template<class T> T random_int(T min, T max) TIGHTDB_NOEXCEPT;
+template<class T> T random_int(T min, T max) REALM_NOEXCEPT;
 
 /// Same as `random_int(lim::min(), lim::max())` where `lim` is
 /// `std::numeric_limits<T>`.
-template<class T> T random_int() TIGHTDB_NOEXCEPT;
+template<class T> T random_int() REALM_NOEXCEPT;
 
 /// Reseed the global pseudorandom number generator that is used by
 /// random_int().
 ///
 /// This function is thread safe.
-void random_seed(unsigned long) TIGHTDB_NOEXCEPT;
+void random_seed(unsigned long) REALM_NOEXCEPT;
 
 /// To the extent possible, produce a nondeterministic value for seeding a
 /// pseudorandom number genrator.
@@ -98,20 +98,20 @@ public:
     static const result_type initialization_multiplier = f;
     static const result_type default_seed = 5489U;
 
-    MersenneTwisterEngine(result_type value = default_seed) TIGHTDB_NOEXCEPT;
+    MersenneTwisterEngine(result_type value = default_seed) REALM_NOEXCEPT;
 
-    void seed(result_type) TIGHTDB_NOEXCEPT;
+    void seed(result_type) REALM_NOEXCEPT;
 
-    result_type operator()() TIGHTDB_NOEXCEPT;
+    result_type operator()() REALM_NOEXCEPT;
 
-    static result_type min() TIGHTDB_NOEXCEPT;
-    static result_type max() TIGHTDB_NOEXCEPT;
+    static result_type min() REALM_NOEXCEPT;
+    static result_type max() REALM_NOEXCEPT;
 
 private:
     UIntType m_x[state_size];
     int m_p;
 
-    void gen_rand() TIGHTDB_NOEXCEPT;
+    void gen_rand() REALM_NOEXCEPT;
 };
 
 
@@ -126,15 +126,15 @@ typedef MersenneTwisterEngine<util::FastestUnsigned<32>::type,
 
 template<class T> class UniformIntDistribution {
 public:
-    UniformIntDistribution(T min = 0, T max = std::numeric_limits<T>::max()) TIGHTDB_NOEXCEPT;
+    UniformIntDistribution(T min = 0, T max = std::numeric_limits<T>::max()) REALM_NOEXCEPT;
 
-    template<class G> T operator()(G& generator) const TIGHTDB_NOEXCEPT;
+    template<class G> T operator()(G& generator) const REALM_NOEXCEPT;
 
 private:
     T m_min, m_max;
 
     // Requires that `min` < `max`
-    template<class G> static T draw(G& generator, T min, T max) TIGHTDB_NOEXCEPT;
+    template<class G> static T draw(G& generator, T min, T max) REALM_NOEXCEPT;
 };
 
 
@@ -142,40 +142,40 @@ private:
 /// Simple pseudorandom number generator.
 class Random {
 public:
-    Random() TIGHTDB_NOEXCEPT;
+    Random() REALM_NOEXCEPT;
 
-    Random(unsigned long seed) TIGHTDB_NOEXCEPT;
+    Random(unsigned long seed) REALM_NOEXCEPT;
 
     /// Reseed this pseudorandom number generator.
-    void seed(unsigned long) TIGHTDB_NOEXCEPT;
+    void seed(unsigned long) REALM_NOEXCEPT;
 
     /// Draw a uniformly distributed integer from the specified range. It is an
     /// error if `min` is greater than `max`.
-    template<class T> T draw_int(T min, T max) TIGHTDB_NOEXCEPT;
+    template<class T> T draw_int(T min, T max) REALM_NOEXCEPT;
 
     /// Same as `draw_int(lim::min(), lim::max())` where `lim` is
     /// `std::numeric_limits<T>`.
-    template<class T> T draw_int() TIGHTDB_NOEXCEPT;
+    template<class T> T draw_int() REALM_NOEXCEPT;
 
     /// Same as `draw_int<T>(0, max)`. It is an error to specify a `max` less
     /// than 0.
-    template<class T> T draw_int_max(T max) TIGHTDB_NOEXCEPT;
+    template<class T> T draw_int_max(T max) REALM_NOEXCEPT;
 
     /// Same as `draw_int_max(module_size-1)`. It is an error to specify a
     /// module size less than 1.
-    template<class T> T draw_int_mod(T module_size) TIGHTDB_NOEXCEPT;
+    template<class T> T draw_int_mod(T module_size) REALM_NOEXCEPT;
 
     /// Same as `draw_int<T>(max)` where `max` is one less than 2 to the power
     /// of `bits`. It is an error to specify a number of bits less than zero, or
     /// greater than `lim::digits` where `lim` is `std::numeric_limits<T>`.
-    template<class T> T draw_int_bits(int bits) TIGHTDB_NOEXCEPT;
+    template<class T> T draw_int_bits(int bits) REALM_NOEXCEPT;
 
     /// Draw true `n` out of `m` times. It is an error if `n` is less than 1, or
     /// if `m` is less than `n`.
-    bool chance(int n, int m) TIGHTDB_NOEXCEPT;
+    bool chance(int n, int m) REALM_NOEXCEPT;
 
     /// Same as `chance(1,2)`.
-    bool draw_bool() TIGHTDB_NOEXCEPT;
+    bool draw_bool() REALM_NOEXCEPT;
 
     /// Reorder the specified elements such that each possible permutation has
     /// an equal probability of appearing.
@@ -195,7 +195,7 @@ template<class UIntType, int w, int n, int m, int r, UIntType a,
          int u, UIntType d, int s, UIntType b, int t, UIntType c, int l,
          UIntType f>
 inline MersenneTwisterEngine<UIntType, w, n, m, r, a, u, d, s, b, t, c, l, f>::
-MersenneTwisterEngine(result_type value) TIGHTDB_NOEXCEPT
+MersenneTwisterEngine(result_type value) REALM_NOEXCEPT
 {
     seed(value);
 }
@@ -204,7 +204,7 @@ template<class UIntType, int w, int n, int m, int r, UIntType a,
          int u, UIntType d, int s, UIntType b, int t, UIntType c, int l,
          UIntType f>
 inline void MersenneTwisterEngine<UIntType, w, n, m, r, a, u, d, s, b, t, c, l, f>::
-seed(result_type sd) TIGHTDB_NOEXCEPT
+seed(result_type sd) REALM_NOEXCEPT
 {
     int excess_bits = std::numeric_limits<UIntType>::digits - word_size;
     UIntType mask = ~UIntType() >> excess_bits;
@@ -224,7 +224,7 @@ template<class UIntType, int w, int n, int m, int r, UIntType a,
          int u, UIntType d, int s, UIntType b, int t, UIntType c, int l,
          UIntType f>
 inline UIntType MersenneTwisterEngine<UIntType, w, n, m, r, a, u, d, s, b, t, c, l, f>::
-operator()() TIGHTDB_NOEXCEPT
+operator()() REALM_NOEXCEPT
 {
     if (m_p >= state_size)
         gen_rand();
@@ -242,7 +242,7 @@ template<class UIntType, int w, int n, int m, int r, UIntType a,
          int u, UIntType d, int s, UIntType b, int t, UIntType c, int l,
          UIntType f>
 inline UIntType MersenneTwisterEngine<UIntType, w, n, m, r, a, u, d, s, b, t, c, l, f>::
-min() TIGHTDB_NOEXCEPT
+min() REALM_NOEXCEPT
 {
     return 0;
 }
@@ -251,7 +251,7 @@ template<class UIntType, int w, int n, int m, int r, UIntType a,
          int u, UIntType d, int s, UIntType b, int t, UIntType c, int l,
          UIntType f>
 inline UIntType MersenneTwisterEngine<UIntType, w, n, m, r, a, u, d, s, b, t, c, l, f>::
-max() TIGHTDB_NOEXCEPT
+max() REALM_NOEXCEPT
 {
     int excess_bits = std::numeric_limits<UIntType>::digits - word_size;
     return ~result_type() >> excess_bits;
@@ -261,7 +261,7 @@ template<class UIntType, int w, int n, int m, int r, UIntType a,
          int u, UIntType d, int s, UIntType b, int t, UIntType c, int l,
          UIntType f>
 inline void MersenneTwisterEngine<UIntType, w, n, m, r, a, u, d, s, b, t, c, l, f>::
-gen_rand() TIGHTDB_NOEXCEPT
+gen_rand() REALM_NOEXCEPT
 {
     UIntType upper_mask = (~UIntType()) << mask_bits;
     UIntType lower_mask = ~upper_mask;
@@ -284,14 +284,14 @@ gen_rand() TIGHTDB_NOEXCEPT
 
 
 template<class T>
-inline UniformIntDistribution<T>::UniformIntDistribution(T min, T max) TIGHTDB_NOEXCEPT:
+inline UniformIntDistribution<T>::UniformIntDistribution(T min, T max) REALM_NOEXCEPT:
     m_min(min),
     m_max(max)
 {
 }
 
 template<class T> template<class G>
-inline T UniformIntDistribution<T>::operator()(G& generator) const TIGHTDB_NOEXCEPT
+inline T UniformIntDistribution<T>::operator()(G& generator) const REALM_NOEXCEPT
 {
     if (m_min >= m_max)
         return m_min;
@@ -299,7 +299,7 @@ inline T UniformIntDistribution<T>::operator()(G& generator) const TIGHTDB_NOEXC
 }
 
 template<class T> template<class G>
-inline T UniformIntDistribution<T>::draw(G& generator, T min, T max) TIGHTDB_NOEXCEPT
+inline T UniformIntDistribution<T>::draw(G& generator, T min, T max) REALM_NOEXCEPT
 {
     // FIXME: This implementation assumes that if `T` is signed then there
     // exists an unsigned type with at least one more value bit than `T`
@@ -323,7 +323,7 @@ inline T UniformIntDistribution<T>::draw(G& generator, T min, T max) TIGHTDB_NOE
         uint_type compound_size = num_modules * num_values;
         if (compound_size > 0) {
             // `(gen_max+1) / num_values` has remainder
-            while (TIGHTDB_UNLIKELY(value >= compound_size))
+            while (REALM_UNLIKELY(value >= compound_size))
                 value = uint_type(generator()) - uint_type(G::min());
         }
         value /= num_modules;
@@ -346,43 +346,43 @@ inline T UniformIntDistribution<T>::draw(G& generator, T min, T max) TIGHTDB_NOE
 }
 
 
-inline Random::Random() TIGHTDB_NOEXCEPT:
+inline Random::Random() REALM_NOEXCEPT:
     m_engine(MT19937::default_seed)
 {
 }
 
-inline Random::Random(unsigned long seed) TIGHTDB_NOEXCEPT:
+inline Random::Random(unsigned long seed) REALM_NOEXCEPT:
     m_engine(MT19937::result_type(seed))
 {
 }
 
-inline void Random::seed(unsigned long seed) TIGHTDB_NOEXCEPT
+inline void Random::seed(unsigned long seed) REALM_NOEXCEPT
 {
     m_engine.seed(MT19937::result_type(seed));
 }
 
-template<class T> inline T Random::draw_int(T min, T max) TIGHTDB_NOEXCEPT
+template<class T> inline T Random::draw_int(T min, T max) REALM_NOEXCEPT
 {
     return UniformIntDistribution<T>(min, max)(m_engine);
 }
 
-template<class T> inline T Random::draw_int() TIGHTDB_NOEXCEPT
+template<class T> inline T Random::draw_int() REALM_NOEXCEPT
 {
     typedef std::numeric_limits<T> lim;
     return draw_int(lim::min(), lim::max());
 }
 
-template<class T> inline T Random::draw_int_max(T max) TIGHTDB_NOEXCEPT
+template<class T> inline T Random::draw_int_max(T max) REALM_NOEXCEPT
 {
     return draw_int(T(), max);
 }
 
-template<class T> inline T Random::draw_int_mod(T module_size) TIGHTDB_NOEXCEPT
+template<class T> inline T Random::draw_int_mod(T module_size) REALM_NOEXCEPT
 {
     return draw_int_max(T(module_size-1));
 }
 
-template<class T> inline T Random::draw_int_bits(int bits) TIGHTDB_NOEXCEPT
+template<class T> inline T Random::draw_int_bits(int bits) REALM_NOEXCEPT
 {
     if (bits <= 0)
         return T();
@@ -391,12 +391,12 @@ template<class T> inline T Random::draw_int_bits(int bits) TIGHTDB_NOEXCEPT
     return draw_int_max(max);
 }
 
-inline bool Random::chance(int n, int m) TIGHTDB_NOEXCEPT
+inline bool Random::chance(int n, int m) REALM_NOEXCEPT
 {
     return draw_int_mod(m) < n;
 }
 
-inline bool Random::draw_bool() TIGHTDB_NOEXCEPT
+inline bool Random::draw_bool() REALM_NOEXCEPT
 {
     return draw_int(0,1) == 1;
 }
@@ -419,7 +419,7 @@ namespace _impl {
 struct GlobalRandom {
     util::Mutex m_mutex;
     test_util::Random m_random;
-    static GlobalRandom& get() TIGHTDB_NOEXCEPT;
+    static GlobalRandom& get() REALM_NOEXCEPT;
 };
 
 } // namespace _impl
@@ -427,20 +427,20 @@ struct GlobalRandom {
 namespace test_util {
 
 
-template<class T> inline T random_int(T min, T max) TIGHTDB_NOEXCEPT
+template<class T> inline T random_int(T min, T max) REALM_NOEXCEPT
 {
     _impl::GlobalRandom& r = _impl::GlobalRandom::get();
     util::LockGuard lock(r.m_mutex);
     return r.m_random.draw_int(min, max);
 }
 
-template<class T> inline T random_int() TIGHTDB_NOEXCEPT
+template<class T> inline T random_int() REALM_NOEXCEPT
 {
     typedef std::numeric_limits<T> lim;
     return random_int(lim::min(), lim::max());
 }
 
-inline void random_seed(unsigned long seed) TIGHTDB_NOEXCEPT
+inline void random_seed(unsigned long seed) REALM_NOEXCEPT
 {
     _impl::GlobalRandom& r = _impl::GlobalRandom::get();
     util::LockGuard lock(r.m_mutex);
@@ -449,6 +449,6 @@ inline void random_seed(unsigned long seed) TIGHTDB_NOEXCEPT
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
-#endif // TIGHTDB_TEST_UTIL_RANDOM_HPP
+#endif // REALM_TEST_UTIL_RANDOM_HPP

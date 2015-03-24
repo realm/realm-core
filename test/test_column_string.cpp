@@ -1,13 +1,13 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_STRING
 
-#include <tightdb/column_string.hpp>
-#include <tightdb/column_string_enum.hpp>
-#include <tightdb/index_string.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_string_enum.hpp>
+#include <realm/index_string.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety
@@ -722,7 +722,7 @@ TEST(ColumnString_FindAllRangesLong)
     ref_type col_ref = Column::create(Allocator::get_default());
     Column c(Allocator::get_default(), col_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
     asc.add("HEJSA");
@@ -779,7 +779,7 @@ TEST(ColumnString_FindAllRanges)
     ref_type col_ref = Column::create(Allocator::get_default());
     Column c(Allocator::get_default(), col_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -856,7 +856,7 @@ TEST(ColumnString_Count)
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -899,7 +899,7 @@ TEST(ColumnString_Index)
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -920,7 +920,7 @@ TEST(ColumnString_Index)
 
     const StringIndex& ndx = *asc.create_search_index();
     CHECK(asc.has_search_index());
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     ndx.verify_entries(asc);
 #else
     static_cast<void>(ndx);

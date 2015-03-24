@@ -1,13 +1,13 @@
-import tightdb
+import realm
 import os
 import random
 
 # this is just a test, so start over each time
-db_path = 'parallel_benchmark.tightdb'
+db_path = 'parallel_benchmark.realm'
 if os.path.exists(db_path):
     os.remove(db_path)
 
-db = tightdb.SharedGroup(db_path)
+db = realm.SharedGroup(db_path)
 
 print "Filling db"
 with db.write() as group:

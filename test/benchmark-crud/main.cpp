@@ -2,22 +2,22 @@
 #include <algorithm>
 #include <iostream>
 
-#include <tightdb.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <realm.hpp>
+#include <memory>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 
 namespace {
 
-TIGHTDB_TABLE_1(IntTable,
+REALM_TABLE_1(IntTable,
                 i, Int)
 
 
@@ -76,7 +76,7 @@ int main()
     Random random;
     random.shuffle(random_order.begin(), random_order.end());
 
-    UniquePtr<Group> group;
+    std::unique_ptr<Group> group;
     IntTable::Ref tables_1[num_tables], tables_2[num_tables];
 
     bool from_group = true;

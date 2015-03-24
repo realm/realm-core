@@ -1,14 +1,14 @@
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
-TIGHTDB_TABLE_2(Phones,
+REALM_TABLE_2(Phones,
                 desc, String,
                 number, String)
 
-TIGHTDB_TABLE_4(People,
+REALM_TABLE_4(People,
                 name, String,
                 age,  Int,
                 hired, Bool,

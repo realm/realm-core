@@ -9,7 +9,7 @@ Precisely, the library name at the end of this line:
 
 ```
 [...]
-LOCAL_LDLIBS     := -llog -landroid -ltightdb-android-arm
+LOCAL_LDLIBS     := -llog -landroid -lrealm-android-arm
 [...]
 ```
 
@@ -72,7 +72,7 @@ Of course make sure the device is set to developer mode and connected.
 You can of course tap the app icon. Alternatively you can do it from the command line:
 
 ```
-$ adb shell am start -a android.intent.action.MAIN -n com.tightdb.test/android.app.NativeActivity
+$ adb shell am start -a android.intent.action.MAIN -n com.realm.test/android.app.NativeActivity
 ```
 
 ## See the logs
@@ -86,6 +86,6 @@ $ adb logcat
 ## Retrieving the XML file containing the test results:
 
 ```
-$ adb pull /storage/sdcard0/Android/data/com.tightdb.test/files/unit-test-report.xml .
+$ adb pull /storage/sdcard0/Android/data/com.realm.test/files/unit-test-report.xml .
 ```
 

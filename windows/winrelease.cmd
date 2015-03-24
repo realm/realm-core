@@ -1,10 +1,10 @@
 if .%1==. goto error
 @echo off
-echo Tightdb core c++ binding Windows Release.
+echo Realm core c++ binding Windows Release.
 Echo beta 0.11
 echo ----------------------------------------------------------
 echo This cmd file will collect the result of a visual studio
-echo Version %1 build of TightDb and create a release archive 
+echo Version %1 build of Realm and create a release archive 
 echo with all the files that should be distributed 
 echo to c++ binding users.
 echo The release will be located in Windows\Release\vs%1
@@ -53,7 +53,7 @@ copy %location%release_Readme.txt %location%\release\vs%vsversion%\files
 
 :archive the files directory and put it in the release directory
 echo creating release archive
-set releasefilename=%location%\release\vs%vsversion%\release\tightdb_cpp_VS%vsversion%_%reldate%_%reltime%_%reldeveloper%
+set releasefilename=%location%\release\vs%vsversion%\release\realm_cpp_VS%vsversion%_%reldate%_%reltime%_%reldeveloper%
 echo release file name set to %releasefilename%
 cd %location%release\vs%vsversion%\files
 echo %location%7z.exe a -tzip -r %location%release\vs%vsversion%\release\%releasefilename% *.*

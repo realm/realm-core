@@ -33,7 +33,7 @@ DESCR      :
              SharedGroup is 4Kb.
 
              Moreover, the class also provides a transactional
-             interface to TightDB. Transactions are divided into
+             interface to Realm. Transactions are divided into
              read and write transactions. While read transactions
              do not modify the table and thereby the group, write
              transactions do. This division is important to remember
@@ -97,7 +97,7 @@ CATEGORIES:
                  This provides much higher write performance, compared to full
                  durability. The transactions are still done atomically.
                  (Note: this mode is currently not implemented on Windows versions
-                 of TightDB).
+                 of Realm).
 
                  If your data is transient, and does not need to persist to disk
                  (like for caching or shared state between processes). You can
@@ -433,7 +433,7 @@ CATEGORIES:
                  for the initial section that corresponds to the
                  specified size. On systems that do not support
                  preallocation, this function has no effect. To know
-                 whether preallocation is supported by TightDB on your
+                 whether preallocation is supported by Realm on your
                  platform, call util::File::is_prealloc_supported().
 
                  It is an error to call this function on an unattached

@@ -1,13 +1,13 @@
 #include <iostream>
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/mem.hpp"
 #include "../util/number_names.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 namespace {
 
@@ -21,10 +21,10 @@ uint64_t rand2()
     return seed * seed2 + seed2;
 }
 
-TIGHTDB_TABLE_1(IntegerTable,
+REALM_TABLE_1(IntegerTable,
                 first, Int)
 
-TIGHTDB_TABLE_1(StringTable,
+REALM_TABLE_1(StringTable,
                 first, String)
 
 enum Days {
@@ -37,7 +37,7 @@ enum Days {
     Sun
 };
 
-TIGHTDB_TABLE_4(TestTable,
+REALM_TABLE_4(TestTable,
                 first,  Int,
                 second, String,
                 third,  Int,

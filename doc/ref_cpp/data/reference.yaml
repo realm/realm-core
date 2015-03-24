@@ -5,7 +5,7 @@ ID        : cpp
 TITLE     : 'C++'
 STATUS:
   CODE    : Beta
-  DESCR   : All the features of TightDB are fully functional and tested and used
+  DESCR   : All the features of Realm are fully functional and tested and used
             by some companies in production.
             It is however to be considered beta software, and changes to the API
             based on user feedback should still be expected.
@@ -14,13 +14,13 @@ STATUS:
             customer usage for such a new feature.
 DESCR     : &g_introduction_descr
             >
-            The goal of TightDB is to provide high performance
+            The goal of Realm is to provide high performance
             data storage for your applications.
 
-            TightDB integrates seamless in your programming language, making it
+            Realm integrates seamless in your programming language, making it
             fast to learn and easy to use.  You can replace your traditional data
-            structures with TightDB. Whether it is a simple array of integers or a
-            complex structure, you interface to TightDB as easily as using a
+            structures with Realm. Whether it is a simple array of integers or a
+            complex structure, you interface to Realm as easily as using a
             standard array or vector like container. But in addition you can
             handle much more data in much less space, you get powerful query
             possibilities in an intuitive language and the ability to share your data
@@ -45,7 +45,7 @@ DESCR     : &g_introduction_descr
             {@link class_dyn_tableview} or {@link class_typed_tableview} object.
 
             The {@link class_group} class lets you serialize tables to disk or memory. The
-            TightDB data format is consistent across operating systems, hardware platforms,
+            Realm data format is consistent across operating systems, hardware platforms,
             and programming languages. This implies that you can share data across applications
             and environments.
 

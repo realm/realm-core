@@ -64,7 +64,7 @@
 
 ### Internals:
 
-* Many `TIGHTDB_ASSERT` invocations replaced by new `TIGHTDB_ASSERT_3` macro
+* Many `REALM_ASSERT` invocations replaced by new `REALM_ASSERT_3` macro
   that prints variable/argument contents on failure. It's not implemented
   optimally yet.
 
@@ -198,7 +198,7 @@
 
 ### Internals:
 
-* Extra assertions in `src/tightdb/util.file.cpp`.
+* Extra assertions in `src/realm/util.file.cpp`.
 
 ----------------------------------------------
 
@@ -220,13 +220,13 @@
 
 ### Internals:
 
-* There is now three kinds of runtime assertions, `TIGHTDB_ASSERT_DEBUG()`,
-  which is retained only in debug-mode builds, `TIGHTDB_ASSERT_RELEASE()`, which
-  is also retained in release-mode builds, and finally, `TIGHTDB_ASSERT()`,
+* There is now three kinds of runtime assertions, `REALM_ASSERT_DEBUG()`,
+  which is retained only in debug-mode builds, `REALM_ASSERT_RELEASE()`, which
+  is also retained in release-mode builds, and finally, `REALM_ASSERT()`,
   which is normally only retained in debug-mode builds, but may occasionally be
   retained in release-mode builds too, depending on the specific build
   configuration.
-* `TIGHTDB_ASSERT()` assertions are now enabled in release-mode builds by
+* `REALM_ASSERT()` assertions are now enabled in release-mode builds by
   default.
 
 ----------------------------------------------
@@ -358,7 +358,7 @@
 ### Internals:
 
 * Introducing `LogicError` as an alternative to expected exceptions. See
-  https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
+  https://github.com/Realm/realm/wiki/Exception-safety-guarantees for more
   on this.
 * Various query related speed improvements.
 * Test suite now passes ASAN (address sanitizer).
@@ -427,9 +427,9 @@
 
 ### Internals:
 
-* `TIGHTDB_MAX_LIST_SIZE` was renamed to `TIGHTDB_MAX_BPNODE_SIZE`. `BPNODE`
+* `REALM_MAX_LIST_SIZE` was renamed to `REALM_MAX_BPNODE_SIZE`. `BPNODE`
   stands for "B+-tree node".
-* `TIGHTDB_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
+* `REALM_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
   mode.
 
 ----------------------------------------------
@@ -445,7 +445,7 @@
   the spaecified name. Addition is now handled by either `Group::add_table()` or
   `Group::get_or_add_table()`.
 * `Group::get_table()` and Group::get_table_name() now throw
-  `tightdb::InvalidArgument` if the specified table index is out of range.
+  `realm::InvalidArgument` if the specified table index is out of range.
 * Template version of `Group::get_table()` now throws `DescriptorMismatch` if
   the dynamic type disagrees with the statically specified custom table type.
 * `LangBindHelper::bind_table_ref()` was renamed to
@@ -537,10 +537,10 @@
 
 * Fixed bug in `Table::add_column()` which would produce a corrupt underlying
   node structure if the table already contains more than N**2 rows, where N is
-  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+  `REALM_MAX_LIST_SIZE` (currently set to 1000).
 * Fixed bugs in `Table::clear()` which would produce a corrupt underlying node
   structure if the table already contains more than N rows, where N is
-  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+  `REALM_MAX_LIST_SIZE` (currently set to 1000).
 
 ### Enhancements:
 
@@ -607,7 +607,7 @@
 
 ### API breaking changes:
 
-* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
+* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/realm/table_view.hpp`.
 * is_attached(), detach(), get_table(), and get_index() moved from BasicRow to RowFuncs. This makes it possible to write `link_list[7].get_index()`, for instance.
 * `LinkView::get_target_row(link_ndx)` was removed as it is now just a shorthand for the equally efficient `LinkView::get(link_ndx).get_index()`.
 * Added missing const versions of `LinkView::get()` and `LinkView::operator[]()`.
@@ -664,7 +664,7 @@ The C++ API has been updated and your code will break!
 ----------------------------------------------
 
 
-TightDB Changelog:
+Realm Changelog:
 ==================
 
 Format:
@@ -715,7 +715,7 @@ Format:
 
 
 2014-02-11 (Kristian Spangsege)
-+ Group::write(std::ostream&) added. This allows general online streaming of TightDB databases in memory for the first time.
++ Group::write(std::ostream&) added. This allows general online streaming of Realm databases in memory for the first time.
 + Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
 
 
@@ -760,7 +760,7 @@ Format:
 
 2013-12-17 (Kristian Spangsege)
 + Implicit termination of active transaction when SharedGroup is destroyed.
-. Class `File` and related exceptions such as `File::AccessError` moved to namespace `tightdb::util`.
+. Class `File` and related exceptions such as `File::AccessError` moved to namespace `realm::util`.
 . Table::add_column() optimized. For integer columns, the speedup is by more than a factor of 1000 for large tables.
 
 
@@ -871,7 +871,7 @@ Format:
 + Support for explicit string lengths added. Most method arguments and
   return values of type 'const char*' have been changed to be of type
   'StringData'. This new type is defined in
-  <tightdb/string_data.hpp>. 'StringData' can be implicitly
+  <realm/string_data.hpp>. 'StringData' can be implicitly
   constructed from 'const char*', so no change is required when
   passing arguments. Source code change is required when dealing with
   returned strings of type 'const char*'. The following is a complete
@@ -978,7 +978,7 @@ Format:
 + New Group::open(...) methods added. Same for SharedGroup.
 + New Group::is_attached() added. Same for SharedGroup.
 + Classes ReadTransaction and WriteTransaction added for handling safe scoped transaction.
-+ Many methods have now been qualified with TIGHTDB_NOEXCEPT.
++ Many methods have now been qualified with REALM_NOEXCEPT.
 
 
 2013-01-14 (Kristian Spangsege)
@@ -1019,7 +1019,7 @@ Format:
 
 2012-12-06 (Kristian Spangsege)
 ----------
-. "C" API moved to its own repository "tightdb_c".
+. "C" API moved to its own repository "realm_c".
 
 
 2012-12-03 (Brian Munkholm)
@@ -1054,7 +1054,7 @@ Format:
 
 2012-10-02 (Kristian Spangsege)
 ----------
-+ New program 'tightdb-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
++ New program 'realm-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the Realm core library.
 
 
 2012-10-01 (Brian Munkholm)
@@ -1091,9 +1091,9 @@ Format:
 
 2012-07-27 (Kristian Spangsege)
 ----------
-+ 6 tightdb::is_a<MyTable>(const Table&) added.
-+ 6 tightdb::unchecked_cast<MyTable>(TableRef) added.
-+ 6 tightdb::checked_cast<MyTable>(TableRef) added.
++ 6 realm::is_a<MyTable>(const Table&) added.
++ 6 realm::unchecked_cast<MyTable>(TableRef) added.
++ 6 realm::checked_cast<MyTable>(TableRef) added.
 + 6 my_table[i].mixed.set_subtable() added.
 + 6 my_table[i].mixed.set_subtable<MySubtable>() added.
 + 6 my_table[i].mixed.is_subtable<MyTable>() added (inefficient, do we want it at all?).
@@ -1102,13 +1102,13 @@ Format:
 
 2012-07-24 (Kristian Spangsege)
 ----------
-+  New macro TIGHTDB_DEBUG to control compilation mode.
++  New macro REALM_DEBUG to control compilation mode.
     The library (including all headers) is no longer affected in any way by the definition status of NDEBUG or _DEBUG.
-    When we (TightDB) compile the library in debug mode, we must define this macro.
+    When we (Realm) compile the library in debug mode, we must define this macro.
     We will deliver two versions of the library, one for release mode, and one for debug mode.
     If the customer wishes to use the debugging version of the library, he must do two things:
-    1) Define TIGHTDB_DEBUG in any translation unit that includes a TightDB header.
-    2) Use the version of the library that is compiled for debug mode (libtightdb_d.a).
+    1) Define REALM_DEBUG in any translation unit that includes a Realm header.
+    2) Use the version of the library that is compiled for debug mode (librealm_d.a).
 + 5 Removed obsolete constructor Mixed(ColumnType). Use Mixed(subtable_tag) instead, since this has no runtime overhead.
 
 

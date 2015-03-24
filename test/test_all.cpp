@@ -14,12 +14,12 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb.hpp>
-#include <tightdb/utilities.hpp>
-#include <tightdb/version.hpp>
+#include <realm/util/features.h>
+#include <memory>
+#include <realm/util/features.h>
+#include <realm.hpp>
+#include <realm/utilities.hpp>
+#include <realm/version.hpp>
 
 #include "test_all.hpp"
 #include "util/timer.hpp"
@@ -28,10 +28,10 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
+using namespace realm::test_util::unit_test;
 
 
 namespace {
@@ -46,25 +46,25 @@ const char* file_order[] = {
     //
     "test_self.cpp",
 
-    // tightdb/util/
+    // realm/util/
     "test_safe_int_ops.cpp",
     "test_basic_utils.cpp",
     "test_file*.cpp",
     "test_thread.cpp",
     "test_utf8.cpp",
 
-    // /tightdb/ (helpers)
+    // /realm/ (helpers)
     "test_string_data.cpp",
     "test_binary_data.cpp",
 
-    // /tightdb/impl/ (detail)
+    // /realm/impl/ (detail)
     "test_alloc*.cpp",
     "test_array*.cpp",
     "test_column*.cpp",
     "test_index*.cpp",
     "test_destroy_guard.cpp",
 
-    // /tightdb/ (main API)
+    // /realm/ (main API)
     "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
@@ -112,24 +112,24 @@ void fix_async_daemon_path()
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
-#  ifdef TIGHTDB_DEBUG
-        async_daemon = "tightdbd-dbg-noinst";
+#  ifdef REALM_DEBUG
+        async_daemon = "realmd-dbg-noinst";
 #  else
-        async_daemon = "tightdbd-noinst";
+        async_daemon = "realmd-noinst";
 #  endif
     }
     else {
-#  ifdef TIGHTDB_COVER
-        async_daemon = "../src/tightdb/tightdbd-cov-noinst";
+#  ifdef REALM_COVER
+        async_daemon = "../src/realm/realmd-cov-noinst";
 #  else
-#    ifdef TIGHTDB_DEBUG
-        async_daemon = "../src/tightdb/tightdbd-dbg-noinst";
+#    ifdef REALM_DEBUG
+        async_daemon = "../src/realm/realmd-dbg-noinst";
 #    else
-        async_daemon = "../src/tightdb/tightdbd-noinst";
+        async_daemon = "../src/realm/realmd-noinst";
 #    endif
 #  endif
     }
-    setenv("TIGHTDB_ASYNC_DAEMON", async_daemon, 0);
+    setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
 #endif // _WIN32
 }
 
@@ -141,30 +141,30 @@ void display_build_config()
     const char* with_replication =
         Version::has_feature(feature_Replication) ? "Enabled" : "Disabled";
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
 #else
     const char* compiler_sse = "No";
 #endif
 
-#ifdef TIGHTDB_COMPILER_AVX
+#ifdef REALM_COMPILER_AVX
     const char* compiler_avx = "Yes";
 #else
     const char* compiler_avx = "No";
 #endif
 
-    const char* cpu_sse = tightdb::sseavx<42>() ? "4.2" :
-        (tightdb::sseavx<30>() ? "3.0" : "None");
+    const char* cpu_sse = realm::sseavx<42>() ? "4.2" :
+        (realm::sseavx<30>() ? "3.0" : "None");
 
-    const char* cpu_avx = tightdb::sseavx<1>() ? "Yes" : "No";
+    const char* cpu_avx = realm::sseavx<1>() ? "Yes" : "No";
 
     cout <<
         "\n"
-        "TightDB version: "<<Version::get_version()<<"\n"
+        "Realm version: "<<Version::get_version()<<"\n"
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"
-        "TIGHTDB_MAX_BPNODE_SIZE = "<<TIGHTDB_MAX_BPNODE_SIZE<<"\n"
+        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -186,11 +186,11 @@ public:
     {
     }
 
-    ~CustomReporter() TIGHTDB_NOEXCEPT
+    ~CustomReporter() REALM_NOEXCEPT
     {
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) TIGHTDB_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) REALM_OVERRIDE
     {
         result r;
         r.m_test_name = details.test_name;
@@ -199,7 +199,7 @@ public:
         SimpleReporter::end(details, elapsed_seconds);
     }
 
-    void summary(const Summary& summary) TIGHTDB_OVERRIDE
+    void summary(const Summary& summary) REALM_OVERRIDE
     {
         SimpleReporter::summary(summary);
 
@@ -275,13 +275,13 @@ bool run_tests()
             keep_test_files();
     }
 
-    UniquePtr<Reporter> reporter;
-    UniquePtr<Filter> filter;
+    std::unique_ptr<Reporter> reporter;
+    std::unique_ptr<Filter> filter;
 
     // Set up reporter
     ofstream xml_file;
     bool xml;
-#ifdef TIGHTDB_MOBILE
+#ifdef REALM_MOBILE
     xml = true;
 #else
     const char* xml_str = getenv("UNITTEST_XML");

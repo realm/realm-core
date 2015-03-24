@@ -9,8 +9,8 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 *after* it because it works by wrapping pthread functions by macro-redefining their function names.
 */
 
-#ifndef TIGHTDB_PTHREAD_TEST_HPP
-#define TIGHTDB_PTHREAD_TEST_HPP
+#ifndef REALM_PTHREAD_TEST_HPP
+#define REALM_PTHREAD_TEST_HPP
 
 #ifdef _WIN32
 #define NOMINMAX

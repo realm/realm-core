@@ -1,14 +1,14 @@
 // @@Example: ex_cpp_ng_query_typed @@
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
-TIGHTDB_TABLE_3(Books,
+REALM_TABLE_3(Books,
                 title,  String,
                 author, String,
                 pages, Int)
 
-using namespace tightdb;
+using namespace realm;
 
 int main()
 {
