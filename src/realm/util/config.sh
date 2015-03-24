@@ -29,7 +29,7 @@ cstring_escape()
 }
 
 realm_version="$(get_config_param "REALM_VERSION")" || exit 1
-tigthdb_version_escaped="$(cstring_escape "$realm_version")" || exit 1
+realm_version_escaped="$(cstring_escape "$realm_version")" || exit 1
 
 install_prefix="$(get_config_param "INSTALL_PREFIX")" || exit 1
 install_prefix_escaped="$(cstring_escape "$install_prefix")" || exit 1
@@ -89,7 +89,7 @@ cat >"$target" <<EOF
  *
  *************************************************************************/
 
-#define REALM_VERSION "$tigthdb_version_escaped"
+#define REALM_VERSION "$realm_version_escaped"
 
 #define REALM_INSTALL_PREFIX      "$install_prefix_escaped"
 #define REALM_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"
