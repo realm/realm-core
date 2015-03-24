@@ -3777,8 +3777,7 @@ void Table::optimize()
 
             // Inherit any existing index
             if (info.m_has_search_index) {
-                StringIndex* index = column->release_search_index();
-                e->install_search_index(index);
+                e->install_search_index(column->release_search_index());
             }
 
             // Clean up the old column
