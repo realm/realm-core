@@ -21,7 +21,7 @@ REALM_TABLE_2(MyTable,
 
 int main(int argc, const char* const argv[])
 {
-    string database_file  = "/tmp/push_data.tdb";
+    string database_file  = "/tmp/push_data.realm";
 
     deque<string> positional_args;
     for (int i=1; i<argc; ++i) {

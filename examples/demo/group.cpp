@@ -33,10 +33,10 @@ int main()
     t2->add("Childhood's End", "Arthur C. Clarke");
 
     // and save to disk
-    g1.write("test.tdb");
+    g1.write("test.realm");
 
     // Read a group from disk
-    Group g2("test.tdb");
+    Group g2("test.realm");
     Books::Ref t3 = g2.get_table<Books>("books");
     cout << "Table Books" << endl;
     for(size_t i=0; i<t3->size(); ++i) {

@@ -25,7 +25,7 @@ REALM_TABLE_2(Books,
 
 void* reader(void*)
 {
-    SharedGroup sg("test.tdb");
+    SharedGroup sg("test.realm");
 
     // Read transaction
     {
@@ -52,7 +52,7 @@ void* reader(void*)
 
 void* writer(void*)
 {
-    SharedGroup sg("test.tdb");
+    SharedGroup sg("test.realm");
 
     sleep(5);
 

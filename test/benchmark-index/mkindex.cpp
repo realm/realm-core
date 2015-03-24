@@ -42,5 +42,5 @@ int main(int argc, char *argv[]) {
     printf("Creating index\n");
     t->column().s1.set_index();
     printf("Writing to disk\n");
-    g->write("test.tdb");
+    g->write("test.realm");
 }
