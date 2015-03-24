@@ -498,7 +498,7 @@ void spawn_daemon(const string& file)
         // single threaded context. This is ensured by the fork above.
         const char* async_daemon = getenv("REALM_ASYNC_DAEMON");
         if (!async_daemon) {
-#ifndef TIGTHDB_DEBUG
+#ifndef REALM_DEBUG
             async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd";
 #else
             async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd-dbg";
