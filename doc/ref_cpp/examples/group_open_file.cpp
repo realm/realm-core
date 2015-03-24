@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_open_file @@
 // @@Fold@@
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 
@@ -15,7 +15,7 @@ void func()
     // Create a group from a file:
     Group::unattached_tag tag;
     Group g(tag);
-    g.open("people.tightdb", 0, Group::mode_ReadWrite);
+    g.open("people.realm", 0, Group::mode_ReadWrite);
 
 // @@Fold@@
     PeopleTable::Ref table = g.add_table<PeopleTable>("people");
@@ -24,16 +24,16 @@ void func()
     table->add("Joe", 17);
     table->add("Jack", 22);
 
-    g.write("people_new.tightdb");
+    g.write("people_new.realm");
 }
 
 int main()
 {
     Group g;
-    g.write("people.tightdb");
+    g.write("people.realm");
     func();
-    util::File::remove("people.tightdb");
-    util::File::remove("people_new.tightdb");
+    util::File::remove("people.realm");
+    util::File::remove("people_new.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

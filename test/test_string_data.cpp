@@ -5,7 +5,7 @@
 #include <string>
 #include <sstream>
 
-#include <tightdb/string_data.hpp>
+#include <realm/string_data.hpp>
 
 #include "test.hpp"
 

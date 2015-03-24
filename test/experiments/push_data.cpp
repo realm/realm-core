@@ -3,8 +3,8 @@
 #include <sstream>
 #include <iostream>
 
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
 
 using namespace std;
 using namespace realm;

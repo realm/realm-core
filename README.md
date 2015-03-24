@@ -88,11 +88,11 @@ language binding:
 
 Headers will be installed in:
 
-    /usr/local/include/tightdb/
+    /usr/local/include/realm/
 
-Except for `tightdb.hpp` which is installed as:
+Except for `realm.hpp` which is installed as:
 
-    /usr/local/include/tightdb.hpp
+    /usr/local/include/realm.hpp
 
 The following libraries will be installed:
 
@@ -352,9 +352,9 @@ Building a distribution package
 In general, it is necessary (and crucial) to properly update the
 versions of the following shared libraries:
 
-    librealm.so      (/tightdb/src/tightdb/Makefile)
-    librealm-c.so    (/realm_c/src/tightdb/c/Makefile)
-    librealm-objc.so (/realm_objc/src/tightdb/objc/Makefile)
+    librealm.so      (/realm/src/realm/Makefile)
+    librealm-c.so    (/realm_c/src/realm/c/Makefile)
+    librealm-objc.so (/realm_objc/src/realm/objc/Makefile)
 
 Do this by editing the the indicated Makefiles.
 

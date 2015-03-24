@@ -1,8 +1,8 @@
 #include <ctime>
 #include <iostream>
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace std;
 using namespace realm;
@@ -25,17 +25,17 @@ int main()
     bool no_create = false;
     SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_Full;
 
-    File::try_remove(DIR "/benchmark-prealloc.tightdb");
-    SharedGroup sg(DIR "/benchmark-prealloc.tightdb", no_create, dlevel);
+    File::try_remove(DIR "/benchmark-prealloc.realm");
+    SharedGroup sg(DIR "/benchmark-prealloc.realm", no_create, dlevel);
 
-    File::try_remove(DIR "/benchmark-prealloc-interfere1.tightdb");
-    SharedGroup sg_interfere1(DIR "/benchmark-prealloc-interfere1.tightdb", no_create, dlevel);
+    File::try_remove(DIR "/benchmark-prealloc-interfere1.realm");
+    SharedGroup sg_interfere1(DIR "/benchmark-prealloc-interfere1.realm", no_create, dlevel);
 
-    File::try_remove(DIR "/benchmark-prealloc-interfere2.tightdb");
-    SharedGroup sg_interfere2(DIR "/benchmark-prealloc-interfere2.tightdb", no_create, dlevel);
+    File::try_remove(DIR "/benchmark-prealloc-interfere2.realm");
+    SharedGroup sg_interfere2(DIR "/benchmark-prealloc-interfere2.realm", no_create, dlevel);
 
-    File::try_remove(DIR "/benchmark-prealloc-interfere3.tightdb");
-    SharedGroup sg_interfere3(DIR "/benchmark-prealloc-interfere3.tightdb", no_create, dlevel);
+    File::try_remove(DIR "/benchmark-prealloc-interfere3.realm");
+    SharedGroup sg_interfere3(DIR "/benchmark-prealloc-interfere3.realm", no_create, dlevel);
 
     int n_outer = 100;
     {

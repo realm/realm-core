@@ -27,8 +27,8 @@
 #  include <win32\stdint.h>
 #endif
 
-#include <tightdb/array.hpp>
-#include <tightdb/column.hpp>
+#include <realm/array.hpp>
+#include <realm/column.hpp>
 
 #include "random.hpp"
 

@@ -5,10 +5,10 @@
 #include <limits>
 #include <vector>
 
-#include <tightdb.hpp>
-#include <tightdb/lang_bind_helper.hpp>
-#include <tightdb/column.hpp>
-#include <tightdb/query_engine.hpp>
+#include <realm.hpp>
+#include <realm/lang_bind_helper.hpp>
+#include <realm/column.hpp>
+#include <realm/query_engine.hpp>
 
 #include "test.hpp"
 

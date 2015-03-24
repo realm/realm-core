@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-#include <tightdb/column_basic.hpp>
+#include <realm/column_basic.hpp>
 
 #include "test.hpp"
 

@@ -1,6 +1,6 @@
 // @@Example: ex_cpp_tableview_max @@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 REALM_TABLE_3(PeopleTable,

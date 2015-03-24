@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_traverse @@
 // @@Fold@@
 #include <iostream>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
 using namespace realm;

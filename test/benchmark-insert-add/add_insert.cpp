@@ -2,7 +2,7 @@
 
 #include <unistd.h>
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 #include "../util/timer.hpp"
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 
     // FIXME: 'getopt' is POSIX/Linux specific. We should replace with
     // code similar to what appears in main() in
-    // "realm_tools/src/tightdb/tools/prompt/prompt.cpp".
+    // "realm_tools/src/realm/tools/prompt/prompt.cpp".
     while ((c = getopt(argc, argv, "hs:iN:n:r:gR")) != EOF) {
         switch (c) {
             case 'h':
@@ -145,14 +145,14 @@ int main(int argc, char *argv[])
         srandom(0);
     }
 
-    while (File::exists("test.tightdb.lock")) {
+    while (File::exists("test.realm.lock")) {
         usleep(10000);
     }
-    File::try_remove("test.tightdb");
-    File::try_remove("gtest.tightdb");
+    File::try_remove("test.realm");
+    File::try_remove("gtest.realm");
 
-    SharedGroup sg = SharedGroup("test.tightdb", false, dlevel);
-    Group g("gtest.tightdb", Group::mode_ReadWrite);
+    SharedGroup sg = SharedGroup("test.realm", false, dlevel);
+    Group g("gtest.realm", Group::mode_ReadWrite);
 
     switch(m) {
         case mode_UseShared: {

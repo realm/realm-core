@@ -16,14 +16,14 @@
 #  include <windows.h>
 #endif
 
-#include <tightdb.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/terminate.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm.hpp>
+#include <realm/util/features.h>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/unique_ptr.hpp>
+#include <realm/util/bind.hpp>
+#include <realm/util/terminate.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"

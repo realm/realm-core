@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-#include <tightdb/util/features.h>
+#include <realm/util/features.h>
 
 
 namespace realm {

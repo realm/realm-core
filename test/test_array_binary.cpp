@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_BINARY
 
-#include <tightdb/array_binary.hpp>
+#include <realm/array_binary.hpp>
 
 #include "test.hpp"
 

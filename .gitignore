@@ -43,8 +43,8 @@ Static library*/
 *.opensdf
 *.sdf
 
-/tightdb.xcodeproj/project.xcworkspace
-/tightdb.xcodeproj/xcuserdata
+/realm.xcodeproj/project.xcworkspace
+/realm.xcodeproj/xcuserdata
 
 # ref doc
 /doc/ref_cpp/html/*
@@ -65,12 +65,12 @@ Static library*/
 core-android-*.tar.gz
 
 # debian/ubuntu builds
-/debian/tightdb/*
+/debian/realm/*
 /debian/librealm/*
 /debian/librealm-dev/*
 /debian/librealm-dev.substvars
 /debian/librealm.substvars
-/debian/tightdb.substvars
+/debian/realm.substvars
 /debian/files
 /debian/changelog
 /debian/debhelper.log

@@ -1,6 +1,6 @@
 // @@Example: ex_cpp_dyn_query_avg @@
 #include <cassert>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace realm;
 

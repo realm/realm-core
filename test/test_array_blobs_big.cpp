@@ -1,5 +1,5 @@
-#include <tightdb/array_blobs_big.hpp>
-#include <tightdb/column.hpp>
+#include <realm/array_blobs_big.hpp>
+#include <realm/column.hpp>
 
 #include "test.hpp"
 

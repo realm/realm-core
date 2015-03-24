@@ -2,8 +2,8 @@
 #ifdef TEST_LINKS
 
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 #include "test.hpp"
 

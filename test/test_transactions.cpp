@@ -8,10 +8,10 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/group_shared.hpp>
-#include <tightdb/table_macros.hpp>
+#include <realm/util/bind.hpp>
+#include <realm/util/file.hpp>
+#include <realm/group_shared.hpp>
+#include <realm/table_macros.hpp>
 
 #include "util/thread_wrapper.hpp"
 

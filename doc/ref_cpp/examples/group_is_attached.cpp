@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_is_attached @@
 // @@Fold@@
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 
@@ -13,7 +13,7 @@ REALM_TABLE_2(PeopleTable,
 void func(Group& g)
 {
     if (!g.is_attached())
-        g.open("people.tightdb");
+        g.open("people.realm");
 
     PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 
@@ -21,7 +21,7 @@ void func(Group& g)
     table->add("Joe", 17);
     table->add("Jack", 22);
 
-    g.write("people_new.tightdb");
+    g.write("people_new.realm");
 }
 // @@Fold@@
 
@@ -30,13 +30,13 @@ int main()
     // Create a group with storage implicitly attached
     Group g;
     // Serialize to a file
-    g.write("people.tightdb");
+    g.write("people.realm");
 
     // Create a new group without attaced storage
     Group g2((Group::unattached_tag()));
     func(g2);
-    util::File::remove("people.tightdb");
-    util::File::remove("people_new.tightdb");
+    util::File::remove("people.realm");
+    util::File::remove("people_new.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -1,7 +1,7 @@
 /*
  * Transaction benchmark for SQLite 3 and Realm
  *
- * (C) Copyright 2012 by Realm, Inc. <http://www.tightdb.com/>
+ * (C) Copyright 2012 by Realm, Inc. <http://www.realm.com/>
  *
  */
 
@@ -16,9 +16,9 @@
 #include <time.h>
 #include <sqlite3.h>
 #include <mysql/mysql.h>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
+#include <realm/group_shared.hpp>
 
 using namespace std;
 using namespace realm;

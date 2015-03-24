@@ -24,7 +24,7 @@ relman_user="$(git config --get user.name)" || exit 1
 relman_mail="$(git config --get user.email)" || exit 1
 
 # create a new entry in the debian changelog - in reverse order
-tempfile="$(mktemp 'tightdb.XXXXXXXX')" || exit 1
+tempfile="$(mktemp 'realm.XXXXXXXX')" || exit 1
 printf "$package ($realm_version~@CODENAME@-1) UNRELEASED; urgency=low\n" >> "$tempfile" || exit 1
 printf "\n" >> "$tempfile" || exit 1
 printf "  * Tracking upstream release.\n" >> "$tempfile" || exit 1
@@ -32,7 +32,7 @@ printf "\n" >> "$tempfile" || exit 1
 printf " -- $relman_user <$relman_mail>  $now\n" >> "$tempfile" || exit 1
 printf "\n" >> "$tempfile" || exit 1
 printf "\n" >> "$tempfile" || exit 1
-temp_result_file="$(mktemp  'tightdb.XXXXXXXX')" || exit 1
+temp_result_file="$(mktemp  'realm.XXXXXXXX')" || exit 1
 cat "$tempfile" "$changelog" > "$temp_result_file" || exit 1
 rm -f "$tempfile" || exit 1
 mv "$temp_result_file" "$changelog" || exit 1

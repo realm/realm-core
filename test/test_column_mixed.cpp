@@ -3,8 +3,8 @@
 
 #include <limits>
 
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/column_mixed.hpp>
+#include <realm/util/unique_ptr.hpp>
+#include <realm/column_mixed.hpp>
 
 #include "test.hpp"
 

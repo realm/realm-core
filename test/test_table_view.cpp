@@ -6,7 +6,7 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
+#include <realm/table_macros.hpp>
 
 #include "util/misc.hpp"
 

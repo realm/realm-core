@@ -1,7 +1,7 @@
 #include <map>
 
-#include <tightdb/array.hpp>
-#include <tightdb/impl/destroy_guard.hpp>
+#include <realm/array.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 #include "test.hpp"
 

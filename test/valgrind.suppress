@@ -41,17 +41,17 @@
    <mutex destruction - presumed valgrind problem>
    drd:MutexErr
    fun:pthread_mutex_destroy
-   fun:_ZN7tightdb11SharedGroup16do_async_commitsEv
-   fun:_ZN7tightdb11SharedGroup4openERKSsbNS0_15DurabilityLevelEb
+   fun:_ZN7realm11SharedGroup16do_async_commitsEv
+   fun:_ZN7realm11SharedGroup4openERKSsbNS0_15DurabilityLevelEb
    fun:main
 }
 {
    <valgrind fsync problem (presumed)>
    drd:ConflictingAccess
    fun:fsync
-   fun:_ZN7tightdb4File4syncEv
-   fun:_ZN7tightdb11GroupWriter17extend_free_spaceEm
-   fun:_ZN7tightdb11GroupWriter18reserve_free_spaceEm
-   fun:_ZN7tightdb11GroupWriter14get_free_spaceEm
+   fun:_ZN7realm4File4syncEv
+   fun:_ZN7realm11GroupWriter17extend_free_spaceEm
+   fun:_ZN7realm11GroupWriter18reserve_free_spaceEm
+   fun:_ZN7realm11GroupWriter14get_free_spaceEm
    ...
 }

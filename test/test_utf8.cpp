@@ -7,10 +7,10 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/util/assert.hpp>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/utf8.hpp>
-#include <tightdb/unicode.hpp>
+#include <realm/util/assert.hpp>
+#include <realm/util/unique_ptr.hpp>
+#include <realm/util/utf8.hpp>
+#include <realm/unicode.hpp>
 
 #include "test.hpp"
 

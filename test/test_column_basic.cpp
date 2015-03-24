@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_BASIC
 
-#include <tightdb/column_basic.hpp>
+#include <realm/column_basic.hpp>
 
 #include "test.hpp"
 

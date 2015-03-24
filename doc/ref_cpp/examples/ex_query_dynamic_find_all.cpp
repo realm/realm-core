@@ -1,5 +1,5 @@
 // @@Example: ex_cpp_dyn_query_find_all @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 using namespace realm;

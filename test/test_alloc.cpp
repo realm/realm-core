@@ -3,9 +3,9 @@
 
 #include <string>
 
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/alloc_slab.hpp>
+#include <realm/util/unique_ptr.hpp>
+#include <realm/util/file.hpp>
+#include <realm/alloc_slab.hpp>
 
 #include "test.hpp"
 

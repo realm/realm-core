@@ -25,11 +25,11 @@
 #include <utility>
 #include <algorithm>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/assert.hpp>
-#include <tightdb/util/type_traits.hpp>
-#include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm/util/features.h>
+#include <realm/util/assert.hpp>
+#include <realm/util/type_traits.hpp>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/thread.hpp>
 
 namespace realm {
 namespace test_util {

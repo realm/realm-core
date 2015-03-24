@@ -7,9 +7,9 @@
 #include <vector>
 #include <map>
 
-#include <tightdb/array.hpp>
-#include <tightdb/column.hpp>
-#include <tightdb/query_conditions.hpp>
+#include <realm/array.hpp>
+#include <realm/column.hpp>
+#include <realm/query_conditions.hpp>
 
 #include "test.hpp"
 

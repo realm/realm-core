@@ -3,8 +3,8 @@
 
 #include <cstring>
 
-#include <tightdb/array_blob.hpp>
-#include <tightdb/column_string.hpp>
+#include <realm/array_blob.hpp>
+#include <realm/column_string.hpp>
 
 #include "test.hpp"
 

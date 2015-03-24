@@ -7,14 +7,14 @@
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
-#include <tightdb/descriptor.hpp>
-#include <tightdb/table_macros.hpp>
-#include <tightdb/lang_bind_helper.hpp>
-#include <tightdb/util/encrypted_file_mapping.hpp>
+#include <realm/descriptor.hpp>
+#include <realm/table_macros.hpp>
+#include <realm/lang_bind_helper.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 #ifdef REALM_ENABLE_REPLICATION
-#  include <tightdb/replication.hpp>
-#  include <tightdb/commit_log.hpp>
-#  include <tightdb/util/bind.hpp>
+#  include <realm/replication.hpp>
+#  include <realm/commit_log.hpp>
+#  include <realm/util/bind.hpp>
 #endif
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32

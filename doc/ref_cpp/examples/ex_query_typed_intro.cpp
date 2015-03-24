@@ -1,5 +1,5 @@
 // @@Example: ex_cpp_typed_query_intro @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 REALM_TABLE_2(PeopleTable,

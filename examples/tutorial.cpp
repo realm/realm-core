@@ -1,5 +1,5 @@
 #include <iostream>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
 using namespace realm;
@@ -124,13 +124,13 @@ int main()
     t->add("Anni", 54, true);
 
     // Remove database file if already existing
-    remove("employees.tightdb");
+    remove("employees.realm");
 
     // Write to disk
-    group.write("employees.tightdb");
+    group.write("employees.realm");
 
     // Load a group from disk (and print contents)
-    Group fromDisk("employees.tightdb");
+    Group fromDisk("employees.realm");
     MyTable::Ref diskTable = fromDisk.get_table<MyTable>("employees");
     for (size_t i = 0; i < diskTable->size(); ++i)
         cout << i << ": " << diskTable[i].name << endl;
@@ -147,7 +147,7 @@ int main()
 
     // @@Example: transaction @@
     // Open a shared group
-    SharedGroup db("employees.tightdb");
+    SharedGroup db("employees.realm");
 
     // Read transaction
     {

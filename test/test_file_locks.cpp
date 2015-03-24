@@ -5,11 +5,11 @@
 #include <map>
 #include <iostream>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/thread.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/util/features.h>
+#include <realm/util/features.h>
+#include <realm/util/bind.hpp>
+#include <realm/util/thread.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/features.h>
 
 #include "test.hpp"
 

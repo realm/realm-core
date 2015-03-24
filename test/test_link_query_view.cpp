@@ -6,9 +6,9 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
-#include <tightdb/link_view.hpp> // lasse todo remove
-#include <tightdb.hpp>
+#include <realm/table_macros.hpp>
+#include <realm/link_view.hpp> // lasse todo remove
+#include <realm.hpp>
 
 #include "util/misc.hpp"
 

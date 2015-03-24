@@ -28,10 +28,10 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/type_traits.hpp>
-#include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/bind_ptr.hpp>
+#include <realm/util/features.h>
+#include <realm/util/type_traits.hpp>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/bind_ptr.hpp>
 
 
 #define TEST(name) TEST_IF(name, true)
@@ -47,15 +47,15 @@
     TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled)
 
 #define TEST_EX(name, list, enabled) \
-    struct Tightdb_UnitTest__##name: realm::test_util::unit_test::Test { \
+    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
         bool test_enabled() const { return bool(enabled); } \
         void test_run(); \
     }; \
-    Tightdb_UnitTest__##name realm_unit_test__##name; \
+    Realm_UnitTest__##name realm_unit_test__##name; \
     realm::test_util::unit_test::RegisterTest \
         realm_unit_test_reg__##name((list), realm_unit_test__##name, \
                                       "DefaultSuite", #name, __FILE__, __LINE__); \
-    void Tightdb_UnitTest__##name::test_run()
+    void Realm_UnitTest__##name::test_run()
 
 
 #define CHECK(cond) \

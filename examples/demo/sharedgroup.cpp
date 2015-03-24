@@ -1,5 +1,5 @@
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
 #include <pthread.h>
 
 #include <unistd.h>

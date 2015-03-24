@@ -4,7 +4,7 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/util/file.hpp>
+#include <realm/util/file.hpp>
 
 #include "test.hpp"
 #include "crypt_key.hpp"

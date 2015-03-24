@@ -13,11 +13,11 @@
 #  include <unistd.h> // usleep()
 #endif
 
-#include <tightdb.hpp>
-#include <tightdb/column.hpp>
-#include <tightdb/utilities.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/column.hpp>
+#include <realm/utilities.hpp>
+#include <realm/util/bind.hpp>
+#include <realm/util/file.hpp>
 
 #include "util/thread_wrapper.hpp"
 

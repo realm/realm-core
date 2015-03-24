@@ -1,6 +1,6 @@
 // @@Example: ex_cpp_dyn_table_lower_upper_bound @@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
 using namespace realm;

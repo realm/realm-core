@@ -194,7 +194,7 @@
 
 ### Internals:
 
-* Extra assertions in `src/tightdb/util.file.cpp`.
+* Extra assertions in `src/realm/util.file.cpp`.
 
 ----------------------------------------------
 
@@ -354,7 +354,7 @@
 ### Internals:
 
 * Introducing `LogicError` as an alternative to expected exceptions. See
-  https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
+  https://github.com/Realm/realm/wiki/Exception-safety-guarantees for more
   on this.
 * Various query related speed improvements.
 * Test suite now passes ASAN (address sanitizer).
@@ -603,7 +603,7 @@
 
 ### API breaking changes:
 
-* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
+* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/realm/table_view.hpp`.
 * is_attached(), detach(), get_table(), and get_index() moved from BasicRow to RowFuncs. This makes it possible to write `link_list[7].get_index()`, for instance.
 * `LinkView::get_target_row(link_ndx)` was removed as it is now just a shorthand for the equally efficient `LinkView::get(link_ndx).get_index()`.
 * Added missing const versions of `LinkView::get()` and `LinkView::operator[]()`.
@@ -867,7 +867,7 @@ Format:
 + Support for explicit string lengths added. Most method arguments and
   return values of type 'const char*' have been changed to be of type
   'StringData'. This new type is defined in
-  <tightdb/string_data.hpp>. 'StringData' can be implicitly
+  <realm/string_data.hpp>. 'StringData' can be implicitly
   constructed from 'const char*', so no change is required when
   passing arguments. Source code change is required when dealing with
   returned strings of type 'const char*'. The following is a complete

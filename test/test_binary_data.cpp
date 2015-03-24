@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <tightdb/binary_data.hpp>
+#include <realm/binary_data.hpp>
 
 #include "test.hpp"
 

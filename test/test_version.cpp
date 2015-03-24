@@ -1,7 +1,7 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/version.hpp>
+#include <realm/version.hpp>
 
 #include "test.hpp"
 

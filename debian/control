@@ -1,10 +1,10 @@
 Source: librealm
 Section: devel
 Priority: optional
-Maintainer: Kenneth Geisshirt <kg@tightdb.com>
+Maintainer: Kenneth Geisshirt <kg@realm.com>
 Build-Depends: debhelper (>=7)
 Standards-Version: 3.9.4
-Homepage: http://www.tightdb.com/
+Homepage: http://www.realm.com/
 
 Package: librealm
 Architecture: any

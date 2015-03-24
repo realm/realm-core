@@ -1,8 +1,8 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING
 
-#include <tightdb/array_string.hpp>
-#include <tightdb/column.hpp>
+#include <realm/array_string.hpp>
+#include <realm/column.hpp>
 
 #include "test.hpp"
 

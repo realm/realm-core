@@ -1,7 +1,7 @@
 #include <cstring>
 #include <algorithm>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <realm/util/unique_ptr.hpp>
 
 #include "test.hpp"
 

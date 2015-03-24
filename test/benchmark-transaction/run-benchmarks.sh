@@ -2,7 +2,7 @@
 #
 # run transaction benchmarks
 #
-# (C) Copyright 2012 by Realm, Inc. <http://www.tightdb.com/>
+# (C) Copyright 2012 by Realm, Inc. <http://www.realm.com/>
 #
 PATH=/bin:/usr/bin
 

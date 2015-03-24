@@ -1,6 +1,6 @@
 // @@Example: ex_cpp_ng_query_typed @@
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 REALM_TABLE_3(Books,

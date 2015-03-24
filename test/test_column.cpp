@@ -4,7 +4,7 @@
 #include <vector>
 #include <algorithm>
 
-#include <tightdb/column.hpp>
+#include <realm/column.hpp>
 
 #include "test.hpp"
 

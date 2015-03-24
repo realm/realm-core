@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include <tightdb/group.hpp>
+#include <realm/group.hpp>
 
 using namespace std;
 using namespace realm;

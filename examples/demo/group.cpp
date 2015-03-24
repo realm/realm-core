@@ -1,4 +1,4 @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace realm;
 using namespace std;

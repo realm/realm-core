@@ -2,8 +2,8 @@
 // @@Fold@@
 #include <iostream>
 #include <sstream>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace std;
 using namespace realm;

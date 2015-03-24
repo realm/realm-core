@@ -33,7 +33,7 @@ DESCR       :
               Realm's highly efficient binary format, or it can be serialized
               to a stream in either ascii or json format.
 
-              The result of serializing in Tightdb's own binary format (whether as a file
+              The result of serializing in Realm's own binary format (whether as a file
               or a memory buffer) can later be attached to a group. This makes it easy
               to exchange data between applications written in any supported programming language.
 

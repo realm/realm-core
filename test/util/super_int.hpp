@@ -24,8 +24,8 @@
 #include <limits>
 #include <ostream>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/type_traits.hpp>
+#include <realm/util/features.h>
+#include <realm/util/type_traits.hpp>
 
 namespace realm {
 namespace test_util {

@@ -1,5 +1,5 @@
 #include <iostream>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
 using namespace realm;
@@ -13,7 +13,7 @@ REALM_TABLE_2(MyTable,
 int main()
 {
     // create an in-memory shared data structure
-    SharedGroup sg("persons.tightdb", false, SharedGroup::durability_MemOnly);
+    SharedGroup sg("persons.realm", false, SharedGroup::durability_MemOnly);
 
     // a write transaction
     {

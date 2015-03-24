@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <vector>
 
-#include <tightdb/column.hpp>
-#include <tightdb/query_conditions.hpp>
+#include <realm/column.hpp>
+#include <realm/query_conditions.hpp>
 
 #include "../util/verified_integer.hpp"
 

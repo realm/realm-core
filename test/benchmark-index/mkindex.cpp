@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace realm;
 using namespace std;

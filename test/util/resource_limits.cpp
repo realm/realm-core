@@ -1,6 +1,6 @@
 #include <stdexcept>
 
-#include <tightdb/util/assert.hpp>
+#include <realm/util/assert.hpp>
 
 #include "resource_limits.hpp"
 

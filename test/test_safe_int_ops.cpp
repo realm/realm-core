@@ -8,8 +8,8 @@
 
 #include <stdint.h>
 
-#include <tightdb/util/type_list.hpp>
-#include <tightdb/util/safe_int_ops.hpp>
+#include <realm/util/type_list.hpp>
+#include <realm/util/safe_int_ops.hpp>
 
 #include "util/demangle.hpp"
 #include "util/super_int.hpp"

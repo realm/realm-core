@@ -1,9 +1,9 @@
 Format-Specification: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=135
-Name: tightdb
-Maintainer: Kenneth Geisshirt <kg@tightdb.com>
-Source: http://www.tightdb.com/
+Name: realm
+Maintainer: Kenneth Geisshirt <kg@realm.com>
+Source: http://www.realm.com/
 
-Copyright: 2011-2013 Realm <info@tightdb.com>
+Copyright: 2011-2013 Realm <info@realm.com>
 License: TDBLicense
 
 License: TDBLicense

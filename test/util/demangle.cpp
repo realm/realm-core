@@ -1,7 +1,7 @@
 #include <cstdlib>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
+#include <realm/util/features.h>
+#include <realm/util/unique_ptr.hpp>
 
 #if REALM_HAVE_AT_LEAST_GCC(3,2)
 #  define REALM_HAVE_CXXABI_DEMANGLE

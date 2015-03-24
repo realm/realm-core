@@ -1,6 +1,6 @@
 This directory contains scripts and code files used to collect and zip files for a windows relase.
 
-Following is a short description of how to create a windows release of tightdb as c++ LIB binaries.
+Following is a short description of how to create a windows release of realm as c++ LIB binaries.
 
 Following ths procedure, You will have accomplihed the following tasks for all combinations of :
 VS2010 / VS2012

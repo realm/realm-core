@@ -1,12 +1,12 @@
 This is a binary relase of the TightDb Engine, for Microsoft Visual Studio.
 
-to use tightdb in Visual Studio C++ solutions, You will have to reference the LIB 
+to use realm in Visual Studio C++ solutions, You will have to reference the LIB 
 and header files enclosed in this archive.
 Furthermore any compiler settings that change ABI layout, must match those used 
 to build tightDb core.
 
 In the examples directory you will find an empty C++ solution with a console project 
-that uses tightdb. You can use that solution as a starting point,
+that uses realm. You can use that solution as a starting point,
 or adapt Your own project settings, using the example project settings as a guide.
 
 It is critically important that You reference debug libraries in debug builds, and

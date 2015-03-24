@@ -14,12 +14,12 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb.hpp>
-#include <tightdb/utilities.hpp>
-#include <tightdb/version.hpp>
+#include <realm/util/features.h>
+#include <realm/util/unique_ptr.hpp>
+#include <realm/util/features.h>
+#include <realm.hpp>
+#include <realm/utilities.hpp>
+#include <realm/version.hpp>
 
 #include "test_all.hpp"
 #include "util/timer.hpp"
@@ -46,25 +46,25 @@ const char* file_order[] = {
     //
     "test_self.cpp",
 
-    // tightdb/util/
+    // realm/util/
     "test_safe_int_ops.cpp",
     "test_basic_utils.cpp",
     "test_file*.cpp",
     "test_thread.cpp",
     "test_utf8.cpp",
 
-    // /tightdb/ (helpers)
+    // /realm/ (helpers)
     "test_string_data.cpp",
     "test_binary_data.cpp",
 
-    // /tightdb/impl/ (detail)
+    // /realm/impl/ (detail)
     "test_alloc*.cpp",
     "test_array*.cpp",
     "test_column*.cpp",
     "test_index*.cpp",
     "test_destroy_guard.cpp",
 
-    // /tightdb/ (main API)
+    // /realm/ (main API)
     "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
@@ -120,12 +120,12 @@ void fix_async_daemon_path()
     }
     else {
 #  ifdef REALM_COVER
-        async_daemon = "../src/tightdb/realmd-cov-noinst";
+        async_daemon = "../src/realm/realmd-cov-noinst";
 #  else
 #    ifdef REALM_DEBUG
-        async_daemon = "../src/tightdb/realmd-dbg-noinst";
+        async_daemon = "../src/realm/realmd-dbg-noinst";
 #    else
-        async_daemon = "../src/tightdb/realmd-noinst";
+        async_daemon = "../src/realm/realmd-noinst";
 #    endif
 #  endif
     }

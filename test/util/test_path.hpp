@@ -22,7 +22,7 @@
 
 #include <string>
 
-#include <tightdb/util/features.h>
+#include <realm/util/features.h>
 
 #include "unit_test.hpp"
 
@@ -33,10 +33,10 @@
     TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
 
 #define GROUP_TEST_PATH(var_name) \
-    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "tightdb");
+    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "realm");
 
 #define SHARED_GROUP_TEST_PATH(var_name) \
-    TEST_PATH_HELPER(realm::test_util::SharedGroupTestPathGuard, var_name, "tightdb");
+    TEST_PATH_HELPER(realm::test_util::SharedGroupTestPathGuard, var_name, "realm");
 
 namespace realm {
 namespace test_util {

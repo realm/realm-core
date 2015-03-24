@@ -4,7 +4,7 @@
 #include <sstream>
 #include <iostream>
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 #include "../util/timer.hpp"
 

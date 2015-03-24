@@ -1,6 +1,6 @@
 #include "testsettings.hpp"
 
-#include <tightdb/array_integer.hpp>
+#include <realm/array_integer.hpp>
 
 #include "test.hpp"
 

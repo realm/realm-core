@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <queue>
 
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm/util/bind.hpp>
+#include <realm/util/thread.hpp>
 
 #include "test.hpp"
 

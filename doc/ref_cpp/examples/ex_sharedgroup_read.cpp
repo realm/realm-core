@@ -1,8 +1,8 @@
 // @@Example: ex_cpp_shared_group_read @@
 // @@Fold@@
 #include <cassert>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 
@@ -24,7 +24,7 @@ void some_function_making_it_impossible_to_use_RAII(SharedGroup& g, PeopleTable:
 void func()
 {
     // Create a new shared group
-    SharedGroup db("shared_db.tightdb");
+    SharedGroup db("shared_db.realm");
 
     {
         Group& g = db.begin_write();
@@ -50,7 +50,7 @@ void func()
 int main()
 {
     func();
-    util::File::remove("shared_db.tightdb");
+    util::File::remove("shared_db.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

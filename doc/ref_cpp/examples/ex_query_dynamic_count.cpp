@@ -1,6 +1,6 @@
 // @@Example: ex_cpp_dyn_query_count @@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 REALM_TABLE_2(PeopleTable,

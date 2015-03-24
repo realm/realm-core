@@ -1,9 +1,9 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_STRING
 
-#include <tightdb/column_string.hpp>
-#include <tightdb/column_string_enum.hpp>
-#include <tightdb/index_string.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_string_enum.hpp>
+#include <realm/index_string.hpp>
 
 #include "test.hpp"
 

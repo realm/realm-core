@@ -12,7 +12,7 @@ gdb-testcase-debug: check-debug-norun
 
 # check_PROGRAMS += innotest
 # innotest_SOURCES = innotest.cpp
-# innotest_LIBS = ../../src/tightdb/librealm.a
+# innotest_LIBS = ../../src/realm/librealm.a
 #innotest_LDFLAGS = -lprofiler
 
 include ../../src/generic.mk

@@ -3,9 +3,9 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm/util/unique_ptr.hpp>
+#include <realm/util/bind.hpp>
+#include <realm/util/thread.hpp>
 
 #include "demangle.hpp"
 #include "timer.hpp"

@@ -1,8 +1,8 @@
 // @@Example: ex_cpp_group_write_to_mem @@
 // @@Fold@@
 #include <iostream>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace std;
 using namespace realm;

@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX
 
-#include <tightdb/index.hpp>
+#include <realm/index.hpp>
 
 #include "test.hpp"
 

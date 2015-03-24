@@ -1,6 +1,6 @@
 if .%1==. goto error
 @echo off
-echo Tightdb core c++ binding Windows Release.
+echo Realm core c++ binding Windows Release.
 Echo beta 0.11
 echo ----------------------------------------------------------
 echo This cmd file will collect the result of a visual studio

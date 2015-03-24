@@ -1,8 +1,8 @@
 #include <iostream>
 #include <sstream>
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
@@ -26,7 +26,7 @@ using namespace realm::test_util;
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
 */
 
-static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
+static const char realm_path[] = "/tmp/benchmark-common-tasks.realm";
 static const size_t min_repetitions = 10;
 static const size_t max_repetitions = 100;
 static const double min_duration_s = 0.05;

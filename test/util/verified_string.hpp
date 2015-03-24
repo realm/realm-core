@@ -28,8 +28,8 @@
 #  include <win32\stdint.h>
 #endif
 
-#include <tightdb/string_data.hpp>
-#include <tightdb/column_string.hpp>
+#include <realm/string_data.hpp>
+#include <realm/column_string.hpp>
 
 namespace realm {
 namespace test_util {

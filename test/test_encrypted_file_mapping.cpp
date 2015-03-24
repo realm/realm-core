@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_ENCRYPTED_FILE_MAPPING
 
-#include <tightdb/util/encrypted_file_mapping.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 
 #include "test.hpp"
 

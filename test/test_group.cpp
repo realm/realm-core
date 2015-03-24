@@ -19,8 +19,8 @@ static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
 static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #endif
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 #include "test.hpp"
 #include "crypt_key.hpp"

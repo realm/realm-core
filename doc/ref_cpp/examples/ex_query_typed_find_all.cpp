@@ -1,6 +1,6 @@
 // @@Example: ex_cpp_typed_query_findall @@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 REALM_TABLE_2(PeopleTable,

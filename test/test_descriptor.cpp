@@ -1,4 +1,4 @@
-#include <tightdb/descriptor.hpp>
+#include <realm/descriptor.hpp>
 
 #include "test.hpp"
 

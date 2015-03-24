@@ -1,5 +1,5 @@
 // @@Example: ex_cpp_dyn_query_sum @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 using namespace realm;

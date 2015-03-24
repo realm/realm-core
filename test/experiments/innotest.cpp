@@ -1,4 +1,4 @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <gperftools/profiler.h>
 #include <unistd.h>
 #include <wait.h>
@@ -32,7 +32,7 @@ int main(int argc, char* argv [])
             ProfilerStart(name);
     }
     {
-        SharedGroup db("parallel_benchmark.tightdb", true, SharedGroup::durability_Async);
+        SharedGroup db("parallel_benchmark.realm", true, SharedGroup::durability_Async);
 
         for (size_t round = 0; round < 20; ++round) {
     

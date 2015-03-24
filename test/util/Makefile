@@ -17,7 +17,7 @@ resource_limits.cpp \
 jsmn.cpp
 
 
-test_util_a_LIBS = ../../src/tightdb/librealm.a
+test_util_a_LIBS = ../../src/realm/librealm.a
 
 ifeq ($(shell uname),Linux)
 

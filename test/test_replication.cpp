@@ -3,12 +3,12 @@
 
 #include <algorithm>
 
-#include <tightdb.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/features.h>
+#include <realm/util/unique_ptr.hpp>
+#include <realm/util/file.hpp>
 #ifdef REALM_ENABLE_REPLICATION
-#  include <tightdb/replication.hpp>
+#  include <realm/replication.hpp>
 #endif
 
 #include "test.hpp"

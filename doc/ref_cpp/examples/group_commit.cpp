@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_commit @@
 // @@Fold@@
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 
@@ -24,9 +24,9 @@ void func(Group& g)
 
 int main()
 {
-    Group g("people.tightdb", 0, Group::mode_ReadWrite);
+    Group g("people.realm", 0, Group::mode_ReadWrite);
     func(g);
-    util::File::remove("people.tightdb");
+    util::File::remove("people.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -1,7 +1,7 @@
 #include <iostream>
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 using namespace std;
@@ -24,9 +24,9 @@ int main()
 
     // Many transactions
     {
-        File::try_remove("over_alloc_1.tightdb");
-        File::try_remove("over_alloc_1.tightdb.lock");
-        SharedGroup db("over_alloc_1.tightdb");
+        File::try_remove("over_alloc_1.realm");
+        File::try_remove("over_alloc_1.realm.lock");
+        SharedGroup db("over_alloc_1.realm");
         if (!db.is_valid()) throw runtime_error("Failed to open database 1");
 
         for (int i=0; i<n_outer; ++i) {
@@ -43,9 +43,9 @@ int main()
 
     // One transaction
     {
-        File::try_remove("over_alloc_2.tightdb");
-        File::try_remove("over_alloc_2.tightdb.lock");
-        SharedGroup db("over_alloc_2.tightdb");
+        File::try_remove("over_alloc_2.realm");
+        File::try_remove("over_alloc_2.realm.lock");
+        SharedGroup db("over_alloc_2.realm");
         if (!db.is_valid()) throw runtime_error("Failed to open database 2");
 
         {

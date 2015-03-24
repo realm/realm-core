@@ -24,8 +24,8 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm/util/bind.hpp>
+#include <realm/util/thread.hpp>
 
 namespace realm {
 namespace test_util {

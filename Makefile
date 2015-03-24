@@ -70,15 +70,15 @@ benchmark-common-tasks: check-norun/subdir/src
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: check-cover
-	lcov --capture --directory . --output-file /tmp/tightdb.lcov
-	lcov --extract /tmp/tightdb.lcov '$(abspath .)/src/*' --output-file /tmp/realm-clean.lcov
+	lcov --capture --directory . --output-file /tmp/realm.lcov
+	lcov --extract /tmp/realm.lcov '$(abspath .)/src/*' --output-file /tmp/realm-clean.lcov
 	rm -fr cover_html
 	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/realm-clean.lcov
 
 # Run coverage analysis after building everything, this time using GCOVR
 .PHONY: gcovr
 gcovr: check-cover
-	gcovr --filter='.*src/tightdb.*' -x >gcovr.xml
+	gcovr --filter='.*src/realm.*' -x >gcovr.xml
 
 # Build and run whatever is in test/experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug

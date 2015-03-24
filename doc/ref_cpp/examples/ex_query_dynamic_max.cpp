@@ -1,5 +1,5 @@
 // @@Example: ex_cpp_dyn_query_max @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
 using namespace realm;

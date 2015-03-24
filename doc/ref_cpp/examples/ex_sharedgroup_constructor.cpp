@@ -1,8 +1,8 @@
 // @@Example: ex_cpp_shared_group_constructor @@
 // @@Fold@@
 #include <cassert>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 
@@ -17,7 +17,7 @@ REALM_TABLE_3(PeopleTable,
 void func()
 {
     // Create a new shared group
-    SharedGroup db("shared_db.tightdb");
+    SharedGroup db("shared_db.realm");
 
     // @@Fold@@
     // Do a write transaction
@@ -55,7 +55,7 @@ void func()
 int main()
 {
     func();
-    util::File::remove("shared_db.tightdb");
+    util::File::remove("shared_db.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -7,9 +7,9 @@
 #include <fstream>
 #include <ostream>
 
-#include <tightdb.hpp>
-#include <tightdb/lang_bind_helper.hpp>
-#include <tightdb/util/buffer.hpp>
+#include <realm.hpp>
+#include <realm/lang_bind_helper.hpp>
+#include <realm/util/buffer.hpp>
 
 #include "util/misc.hpp"
 

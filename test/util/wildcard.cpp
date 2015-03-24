@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include <tightdb/util/assert.hpp>
+#include <realm/util/assert.hpp>
 
 #include "wildcard.hpp"
 

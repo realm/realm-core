@@ -2,7 +2,7 @@
 // @@Fold@@
 #include <cassert>
 #include <iostream>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
 using namespace realm;

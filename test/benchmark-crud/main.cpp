@@ -2,8 +2,8 @@
 #include <algorithm>
 #include <iostream>
 
-#include <tightdb.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <realm.hpp>
+#include <realm/util/unique_ptr.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"

@@ -1,6 +1,6 @@
 SUBDIRS = util
 PASSIVE_SUBDIRS = \
-test-tightdb \
+test-realm \
 test-sqlite3 \
 test-stl \
 performance \
@@ -34,10 +34,10 @@ gdb-debug: check-debug-norun
 	gdb realm-tests-dbg
 
 .PHONY: benchmark
-benchmark: check-norun/subdir/test-tightdb check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
+benchmark: check-norun/subdir/test-realm check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
 	@echo ""
 	@echo ".:: Realm ::."
-	test-tightdb/test-tightdb
+	test-realm/test-realm
 	@echo ""
 	@echo ".:: SQLite 3 ::."
 	test-sqlite3/test-sqlite3
