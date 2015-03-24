@@ -1231,7 +1231,8 @@ public:
             }
 
             m_index_matches_destroy = false;
-            last_indexed = 0;
+            m_last_indexed = 0;
+            m_last_start = 0;
 
             switch (fr) {
                 case FindRes_single:
@@ -1282,19 +1283,23 @@ public:
 
             size_t f = not_found;
 
-            while (f == not_found && last_indexed < m_index_size) {
-                m_index_getter->cache_next(last_indexed);
-                f = m_index_getter->m_array_ptr->FindGTE(start, last_indexed - m_index_getter->m_leaf_start, nullptr);
+            if (m_last_start > start)
+                m_last_indexed = 0;
+            m_last_start = start;
+
+            while (f == not_found && m_last_indexed < m_index_size) {
+                m_index_getter->cache_next(m_last_indexed);
+                f = m_index_getter->m_array_ptr->FindGTE(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
 
                 if (f >= end || f == not_found) {
-                    last_indexed = m_index_getter->m_leaf_end;
+                    m_last_indexed = m_index_getter->m_leaf_end;
                 }
                 else {
                     start = to_size_t(m_index_getter->m_array_ptr->get(f));
                     if (start >= end)
                         return not_found;
                     else {
-                        last_indexed = f + m_index_getter->m_leaf_start;
+                        m_last_indexed = f + m_index_getter->m_leaf_start;
                         return start;
                     }
                 }
@@ -1369,7 +1374,7 @@ private:
     }
 
     size_t m_key_ndx = size_t(-1);
-    size_t last_indexed;
+    size_t m_last_indexed;
 
     // Used for linear scan through enum-string
     SequentialGetter<int64_t> m_cse;
@@ -1379,6 +1384,7 @@ private:
     bool m_index_matches_destroy = false;
     std::unique_ptr<SequentialGetter<int64_t>> m_index_getter;
     size_t m_index_size;
+    size_t m_last_start;
 };
 
 // OR node contains at least two node pointers: Two or more conditions to OR
