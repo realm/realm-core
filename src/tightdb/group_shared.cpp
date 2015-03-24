@@ -884,11 +884,6 @@ bool SharedGroup::compact()
     TIGHTDB_ASSERT(rc.version == info->latest_version_number);
     rc.filesize = file_size;
     rc.current_top = top_ref;
-    {
-        begin_read();
-        m_group.Verify();
-        end_read();
-    }
     return true;
 }
 
