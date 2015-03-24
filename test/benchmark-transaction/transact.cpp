@@ -73,7 +73,7 @@ void usage(const char *msg)
     cout << " -w   : number of writers" << endl;
     cout << " -r   : number of readers" << endl;
     cout << " -f   : database file" << endl;
-    cout << " -d   : database (tdb, sqlite, sqlite-wal or mysql)" << endl;
+    cout << " -d   : database (realm, sqlite, sqlite-wal or mysql)" << endl;
     cout << " -t   : duration (in secs)" << endl;
     cout << " -n   : number of rows" << endl;
     cout << " -v   : verbose" << endl;
@@ -260,7 +260,7 @@ static void *mysql_reader(void *arg)
     mysql_close(db);
 }
 
-static void *tdb_reader(void *arg)
+static void *realm_reader(void *arg)
 {
     struct timespec ts_1, ts_2;
     struct thread_info *tinfo = (struct thread_info *)arg;
@@ -388,7 +388,7 @@ static void *mysql_writer(void *arg)
     return NULL;
 }
 
-static void *tdb_writer(void *arg)
+static void *realm_writer(void *arg)
 {
     struct timespec ts_1, ts_2;
     struct thread_info *tinfo = (struct thread_info *)arg;
@@ -485,7 +485,7 @@ void mysql_create(const char *f, long n)
     mysql_close(db);
 }
 
-void tdb_create(const char *f, long n)
+void realm_create(const char *f, long n)
 {
     File::try_remove(f);
     File::try_remove(string(f)+".lock");
@@ -551,7 +551,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     for(int i=0; i<n_readers; ++i) {
         switch (database) {
         case DB_REALM:
-            pthread_create(&tinfo[i].thread_id, &attr, &tdb_reader, &tinfo[i]);
+            pthread_create(&tinfo[i].thread_id, &attr, &realm_reader, &tinfo[i]);
             break;
         case DB_SQLITE:
         case DB_SQLITE_WAL:
@@ -567,7 +567,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
         int j = i+n_readers;
         switch (database) {
         case DB_REALM:
-            pthread_create(&tinfo[j].thread_id, &attr, &tdb_writer, &tinfo[j]);
+            pthread_create(&tinfo[j].thread_id, &attr, &realm_writer, &tinfo[j]);
             break;
         case DB_SQLITE:
         case DB_SQLITE_WAL:
@@ -639,7 +639,7 @@ int main(int argc, char *argv[])
             duration = atoi(optarg);
             break;
         case 'd':
-            if (strcmp(optarg, "tdb") == 0) {
+            if (strcmp(optarg, "realm") == 0) {
                 database = DB_REALM;
             }
             if (strcmp(optarg, "sqlite") == 0) {
@@ -683,7 +683,7 @@ int main(int argc, char *argv[])
     if (verbose) cout << "Creating test data for " << database << endl;
     switch (database) {
     case DB_REALM:
-        tdb_create(datfile, n_records);
+        realm_create(datfile, n_records);
         break;
     case DB_SQLITE:
     case DB_SQLITE_WAL:

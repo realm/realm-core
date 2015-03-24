@@ -30,7 +30,7 @@ function bench {
     done
 }
 
-bench "tdb"
+bench "realm"
 bench "sqlite"
 bench "mysql"
 bench "sqlite-wal"
