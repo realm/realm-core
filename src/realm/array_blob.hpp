@@ -28,7 +28,7 @@ namespace realm {
 class ArrayBlob: public Array {
 public:
     explicit ArrayBlob(Allocator&) REALM_NOEXCEPT;
-    ~ArrayBlob() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~ArrayBlob() REALM_NOEXCEPT override {}
 
     const char* get(std::size_t pos) const REALM_NOEXCEPT;
 
@@ -63,10 +63,10 @@ public:
 #endif
 
 private:
-    std::size_t CalcByteLen(std::size_t count, std::size_t width) const REALM_OVERRIDE;
+    std::size_t CalcByteLen(std::size_t count, std::size_t width) const override;
     std::size_t CalcItemCount(std::size_t bytes,
-                              std::size_t width) const REALM_NOEXCEPT REALM_OVERRIDE;
-    WidthType GetWidthType() const REALM_OVERRIDE { return wtype_Ignore; }
+                              std::size_t width) const REALM_NOEXCEPT override;
+    WidthType GetWidthType() const override { return wtype_Ignore; }
 };
 
 

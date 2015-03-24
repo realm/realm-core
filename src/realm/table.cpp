@@ -568,7 +568,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
         m_column_ndx(i), m_type(t)
     {
     }
-    void update(const ColumnTable& subtables, Array& subcolumns) REALM_OVERRIDE
+    void update(const ColumnTable& subtables, Array& subcolumns) override
     {
         size_t row_ndx = subcolumns.get_ndx_in_parent();
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
@@ -578,7 +578,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
         subcolumns.insert(m_column_ndx, column_ref); // Throws
         dg.release();
     }
-    void update_accessor(Table& table) REALM_OVERRIDE
+    void update_accessor(Table& table) override
     {
         table.adj_insert_column(m_column_ndx); // Throws
         table.refresh_column_accessors(m_column_ndx); // Throws
@@ -596,13 +596,13 @@ struct Table::EraseSubtableColumns: SubtableUpdater {
         m_column_ndx(i)
     {
     }
-    void update(const ColumnTable&, Array& subcolumns) REALM_OVERRIDE
+    void update(const ColumnTable&, Array& subcolumns) override
     {
         ref_type column_ref = to_ref(subcolumns.get(m_column_ndx));
         subcolumns.erase(m_column_ndx); // Throws
         Array::destroy_deep(column_ref, subcolumns.get_alloc());
     }
-    void update_accessor(Table& table) REALM_OVERRIDE
+    void update_accessor(Table& table) override
     {
         table.adj_erase_column(m_column_ndx);
         table.refresh_column_accessors(m_column_ndx);
@@ -615,10 +615,10 @@ private:
 
 
 struct Table::RenameSubtableColumns: SubtableUpdater {
-    void update(const ColumnTable&, Array&) REALM_OVERRIDE
+    void update(const ColumnTable&, Array&) override
     {
     }
-    void update_accessor(Table& table) REALM_OVERRIDE
+    void update_accessor(Table& table) override
     {
         bool bump_global = false;
         table.bump_version(bump_global);
@@ -3805,7 +3805,7 @@ public:
     {
     }
 
-    size_t write_names(_impl::OutputStream& out) REALM_OVERRIDE
+    size_t write_names(_impl::OutputStream& out) override
     {
         Allocator& alloc = Allocator::get_default();
         ArrayString table_names(alloc);
@@ -3816,7 +3816,7 @@ public:
         return pos;
     }
 
-    size_t write_tables(_impl::OutputStream& out) REALM_OVERRIDE
+    size_t write_tables(_impl::OutputStream& out) override
     {
         Allocator& alloc = Allocator::get_default();
 

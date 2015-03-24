@@ -91,7 +91,7 @@ public:
     const T m_value;
     SetLeafElem(Allocator& alloc, T value) REALM_NOEXCEPT: m_alloc(alloc), m_value(value) {}
     void update(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                std::size_t elem_ndx_in_leaf) REALM_OVERRIDE
+                std::size_t elem_ndx_in_leaf) override
     {
         BasicArray<T> leaf(m_alloc);
         leaf.init_from_mem(mem);
@@ -169,7 +169,7 @@ public:
         EraseHandlerBase(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          std::size_t leaf_ndx_in_parent,
-                         std::size_t elem_ndx_in_leaf) REALM_OVERRIDE
+                         std::size_t elem_ndx_in_leaf) override
     {
         BasicArray<T> leaf(get_alloc());
         leaf.init_from_mem(leaf_mem);
@@ -184,17 +184,17 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT REALM_OVERRIDE
+    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
     {
         Array::destroy(leaf_mem, get_alloc()); // Shallow
     }
-    void replace_root_by_leaf(MemRef leaf_mem) REALM_OVERRIDE
+    void replace_root_by_leaf(MemRef leaf_mem) override
     {
         BasicArray<T>* leaf = new BasicArray<T>(get_alloc()); // Throws
         leaf->init_from_mem(leaf_mem);
         replace_root(leaf); // Throws, but accessor ownership is passed to callee
     }
-    void replace_root_by_empty_leaf() REALM_OVERRIDE
+    void replace_root_by_empty_leaf() override
     {
         std::unique_ptr<BasicArray<T> > leaf;
         leaf.reset(new BasicArray<T>(get_alloc())); // Throws
@@ -258,7 +258,7 @@ template<class T> void BasicColumn<T>::do_clear()
 template<class T> class BasicColumn<T>::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
-    ref_type create_leaf(std::size_t size) REALM_OVERRIDE
+    ref_type create_leaf(std::size_t size) override
     {
         MemRef mem = BasicArray<T>::create_array(size, m_alloc); // Throws
         T* tp = reinterpret_cast<T*>(Array::get_data_from_header(mem.m_addr));
@@ -280,7 +280,7 @@ template<class T> class BasicColumn<T>::SliceHandler: public ColumnBase::SliceHa
 public:
     SliceHandler(Allocator& alloc): m_leaf(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) REALM_OVERRIDE
+                      Allocator& target_alloc) override
     {
         m_leaf.init_from_mem(leaf_mem);
         return m_leaf.slice(offset, size, target_alloc); // Throws

@@ -74,19 +74,19 @@ public:
     WriteLogCollector(string database_name, bool server_synchronization_mode,
                       const char* encryption_key);
     ~WriteLogCollector() REALM_NOEXCEPT;
-    string do_get_database_path() REALM_OVERRIDE { return m_database_name; }
-    void do_begin_write_transact(SharedGroup& sg) REALM_OVERRIDE;
+    string do_get_database_path() override { return m_database_name; }
+    void do_begin_write_transact(SharedGroup& sg) override;
     version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version)
-        REALM_OVERRIDE;
-    void do_rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT REALM_OVERRIDE;
-    void do_interrupt() REALM_NOEXCEPT REALM_OVERRIDE {};
-    void do_clear_interrupt() REALM_NOEXCEPT REALM_OVERRIDE {};
-    void transact_log_reserve(size_t size, char** new_begin, char** new_end) REALM_OVERRIDE;
-    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) REALM_OVERRIDE;
+        override;
+    void do_rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT override;
+    void do_interrupt() REALM_NOEXCEPT override {};
+    void do_clear_interrupt() REALM_NOEXCEPT override {};
+    void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
+    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     virtual void submit_transact_log(BinaryData);
-    virtual void stop_logging() REALM_OVERRIDE;
-    virtual void reset_log_management(version_type last_version) REALM_OVERRIDE;
+    virtual void stop_logging() override;
+    virtual void reset_log_management(version_type last_version) override;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
         REALM_NOEXCEPT;
     virtual void set_last_version_synced(version_type last_seen_version_number) REALM_NOEXCEPT;

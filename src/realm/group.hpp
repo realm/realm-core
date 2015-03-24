@@ -98,7 +98,7 @@ public:
     /// behavior.
     Group(unattached_tag) REALM_NOEXCEPT;
 
-    ~Group() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~Group() REALM_NOEXCEPT override;
 
     /// Attach this Group instance to the specified database file.
     ///
@@ -459,19 +459,19 @@ private:
     void init_for_transact(ref_type new_top_ref, std::size_t new_file_size);
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) REALM_OVERRIDE;
+    void update_child_ref(std::size_t, ref_type) override;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
+    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT override;
 
     // Overriding method in Table::Parent
-    StringData get_child_name(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
+    StringData get_child_name(std::size_t) const REALM_NOEXCEPT override;
 
     // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) REALM_NOEXCEPT REALM_OVERRIDE;
+    void child_accessor_destroyed(Table*) REALM_NOEXCEPT override;
 
     // Overriding method in Table::Parent
-    Group* get_parent_group() REALM_NOEXCEPT REALM_OVERRIDE;
+    Group* get_parent_group() REALM_NOEXCEPT override;
 
     class TableWriter;
     class DefaultTableWriter;
@@ -522,7 +522,7 @@ private:
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const REALM_OVERRIDE;
+    get_to_dot_parent(std::size_t ndx_in_parent) const override;
 #endif
 
     friend class Table;

@@ -118,8 +118,8 @@ public:
 
 class TransactLogBufferStream: public TransactLogStream {
 public:
-    void transact_log_reserve(std::size_t size, char** out_free_begin, char** out_free_end) REALM_OVERRIDE;
-    void transact_log_append(const char* data, std::size_t size, char** out_free_begin, char** out_free_end) REALM_OVERRIDE;
+    void transact_log_reserve(std::size_t size, char** out_free_begin, char** out_free_end) override;
+    void transact_log_append(const char* data, std::size_t size, char** out_free_begin, char** out_free_end) override;
 
     const char* transact_log_data() const;
 private:
@@ -385,7 +385,7 @@ private:
 
 class TransactLogParser::BadTransactLog: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
     {
         return "Bad transaction log";
     }

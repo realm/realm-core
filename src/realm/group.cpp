@@ -553,11 +553,11 @@ public:
         m_group(group)
     {
     }
-    size_t write_names(_impl::OutputStream& out) REALM_OVERRIDE
+    size_t write_names(_impl::OutputStream& out) override
     {
         return m_group.m_table_names.write(out); // Throws
     }
-    size_t write_tables(_impl::OutputStream& out) REALM_OVERRIDE
+    size_t write_tables(_impl::OutputStream& out) override
     {
         return m_group.m_tables.write(out); // Throws
     }
@@ -936,7 +936,7 @@ public:
             m_curr_buf_remaining_size = m_logs_begin->size();
     }
 
-    ~MultiLogInputStream() REALM_OVERRIDE
+    ~MultiLogInputStream() override
     {
     }
 
@@ -965,7 +965,7 @@ public:
         }
     }
 
-    virtual size_t next_block(const char*& begin, const char*& end) REALM_OVERRIDE
+    virtual size_t next_block(const char*& begin, const char*& end) override
     {
         while (m_logs_begin < m_logs_end) {
             size_t result = m_logs_begin->size();
@@ -989,13 +989,13 @@ private:
 
 class MarkDirtyUpdater: public _impl::TableFriend::AccessorUpdater {
 public:
-    void update(Table& table) REALM_OVERRIDE
+    void update(Table& table) override
     {
         typedef _impl::TableFriend tf;
         tf::mark(table);
     }
 
-    void update_parent(Table& table) REALM_OVERRIDE
+    void update_parent(Table& table) override
     {
         typedef _impl::TableFriend tf;
         tf::mark(table);
@@ -1013,14 +1013,14 @@ public:
     {
     }
 
-    void update(Table& table) REALM_OVERRIDE
+    void update(Table& table) override
     {
         typedef _impl::TableFriend tf;
         tf::adj_insert_column(table, m_col_ndx); // Throws
         tf::mark_link_target_tables(table, m_col_ndx+1);
     }
 
-    void update_parent(Table&) REALM_OVERRIDE
+    void update_parent(Table&) override
     {
     }
 
@@ -1036,14 +1036,14 @@ public:
     {
     }
 
-    void update(Table& table) REALM_OVERRIDE
+    void update(Table& table) override
     {
         typedef _impl::TableFriend tf;
         tf::adj_erase_column(table, m_col_ndx);
         tf::mark_link_target_tables(table, m_col_ndx);
     }
 
-    void update_parent(Table&) REALM_OVERRIDE
+    void update_parent(Table&) override
     {
     }
 
@@ -2081,7 +2081,7 @@ public:
     {
         m_chunks.insert(m_chunks.end(), verifier.m_chunks.begin(), verifier.m_chunks.end());
     }
-    void handle(ref_type ref, size_t allocated, size_t) REALM_OVERRIDE
+    void handle(ref_type ref, size_t allocated, size_t) override
     {
         add(ref, allocated);
     }

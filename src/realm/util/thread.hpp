@@ -237,7 +237,7 @@ public:
 
 class RobustMutex::NotRecoverable: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
     {
         return "Failed to recover consistent state of shared memory";
     }

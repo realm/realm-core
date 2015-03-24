@@ -178,7 +178,7 @@ public:
     }
 
     void handle_transact_log(const char* data, size_t size, Replication::version_type new_version)
-        REALM_OVERRIDE
+        override
     {
         std::unique_ptr<char[]> log(new char[size]); // Throws
         copy(data, data+size, log.get());
@@ -187,7 +187,7 @@ public:
     }
 
     void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
-        REALM_NOEXCEPT REALM_OVERRIDE
+        REALM_NOEXCEPT override
     {
         size_t n = to_version - from_version;
         for (size_t i = 0; i != n; ++i) {

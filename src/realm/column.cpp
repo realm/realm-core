@@ -306,7 +306,7 @@ public:
     ~WriteSliceHandler() REALM_NOEXCEPT
     {
     }
-    bool visit(const Array::NodeInfo& leaf_info) REALM_OVERRIDE
+    bool visit(const Array::NodeInfo& leaf_info) override
     {
         size_t size = leaf_info.m_size, pos;
         size_t leaf_begin = leaf_info.m_offset;
@@ -523,7 +523,7 @@ struct SetLeafElem: Array::UpdateHandler {
     SetLeafElem(Allocator& alloc, int_fast64_t value) REALM_NOEXCEPT:
         m_leaf(alloc), m_value(value) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) REALM_OVERRIDE
+                size_t elem_ndx_in_leaf) override
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
@@ -537,7 +537,7 @@ struct AdjustLeafElem: Array::UpdateHandler {
     AdjustLeafElem(Allocator& alloc, int_fast64_t value) REALM_NOEXCEPT:
     m_leaf(alloc), m_value(value) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) REALM_OVERRIDE
+                size_t elem_ndx_in_leaf) override
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
@@ -694,7 +694,7 @@ template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
     const int_fast64_t m_limit, m_diff;
     AdjustHandler(Allocator& alloc, int_fast64_t limit, int_fast64_t diff) REALM_NOEXCEPT:
         m_leaf(alloc), m_limit(limit), m_diff(diff) {}
-    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t) REALM_OVERRIDE
+    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t) override
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
@@ -923,7 +923,7 @@ public:
         m_leaves_have_refs(false) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) REALM_OVERRIDE
+                         size_t elem_ndx_in_leaf) override
     {
         m_leaf.init_from_mem(leaf_mem);
         REALM_ASSERT_3(m_leaf.size(), >=, 1);
@@ -939,20 +939,20 @@ public:
         m_leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT REALM_OVERRIDE
+    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
     {
         // FIXME: Seems like this would cause file space leaks if
         // m_leaves_have_refs is true, but consider carefully how
         // m_leaves_have_refs get its value.
         get_alloc().free_(leaf_mem);
     }
-    void replace_root_by_leaf(MemRef leaf_mem) REALM_OVERRIDE
+    void replace_root_by_leaf(MemRef leaf_mem) override
     {
         Array* leaf = new Array(get_alloc()); // Throws
         leaf->init_from_mem(leaf_mem);
         replace_root(leaf); // Throws, but callee takes ownership of accessor
     }
-    void replace_root_by_empty_leaf() REALM_OVERRIDE
+    void replace_root_by_empty_leaf() override
     {
         std::unique_ptr<Array> leaf(new Array(get_alloc())); // Throws
         leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
@@ -1035,7 +1035,7 @@ class Column::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Array::Type leaf_type, int_fast64_t value, Allocator& alloc):
         m_leaf_type(leaf_type), m_value(value), m_alloc(alloc) {}
-    ref_type create_leaf(size_t size) REALM_OVERRIDE
+    ref_type create_leaf(size_t size) override
     {
         bool context_flag = false;
         MemRef mem = ArrayInteger::create_array(m_leaf_type, context_flag, size,
@@ -1059,7 +1059,7 @@ class Column::SliceHandler: public ColumnBase::SliceHandler {
 public:
     SliceHandler(Allocator& alloc): m_leaf(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) REALM_OVERRIDE
+                      Allocator& target_alloc) override
     {
         m_leaf.init_from_mem(leaf_mem);
         return m_leaf.slice_and_clone_children(offset, size, target_alloc); // Throws
@@ -1132,7 +1132,7 @@ public:
     const ColumnBase& m_column;
     LeafToDot(const ColumnBase& column): m_column(column) {}
     void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                ostream& out) REALM_OVERRIDE
+                ostream& out) override
     {
         m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);
     }

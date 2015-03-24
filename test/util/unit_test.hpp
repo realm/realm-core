@@ -277,9 +277,9 @@ class SimpleReporter: public Reporter {
 public:
     explicit SimpleReporter(bool report_progress = false);
 
-    void begin(const TestDetails&) REALM_OVERRIDE;
-    void fail(const TestDetails&, const std::string&) REALM_OVERRIDE;
-    void summary(const Summary&) REALM_OVERRIDE;
+    void begin(const TestDetails&) override;
+    void fail(const TestDetails&, const std::string&) override;
+    void summary(const Summary&) override;
 
 protected:
     bool m_report_progress;

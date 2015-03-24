@@ -35,28 +35,28 @@ class ColumnSubtableParent: public Column, public Table::Parent {
 public:
     void discard_child_accessors() REALM_NOEXCEPT;
 
-    ~ColumnSubtableParent() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~ColumnSubtableParent() REALM_NOEXCEPT override;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    Table* get_subtable_accessor(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
+    Table* get_subtable_accessor(std::size_t) const REALM_NOEXCEPT override;
 
-    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void discard_subtable_accessor(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT REALM_OVERRIDE;
-    void mark(int) REALM_NOEXCEPT REALM_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) override;
+    void erase(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void discard_subtable_accessor(std::size_t) REALM_NOEXCEPT override;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
+    void mark(int) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void Verify() const override;
+    void Verify(const Table&, std::size_t) const override;
 #endif
 
 protected:
@@ -130,16 +130,16 @@ protected:
     Table* get_subtable_ptr(std::size_t subtable_ndx);
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) REALM_OVERRIDE;
+    void update_child_ref(std::size_t, ref_type) override;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
+    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT override;
 
     // Overriding method in Table::Parent
-    Table* get_parent_table(std::size_t*) REALM_NOEXCEPT REALM_OVERRIDE;
+    Table* get_parent_table(std::size_t*) REALM_NOEXCEPT override;
 
     // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) REALM_NOEXCEPT REALM_OVERRIDE;
+    void child_accessor_destroyed(Table*) REALM_NOEXCEPT override;
 
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
@@ -152,7 +152,7 @@ protected:
     ref_type clone_table_columns(const Table*);
 
     std::size_t* record_subtable_path(std::size_t* begin,
-                                      std::size_t* end) REALM_NOEXCEPT REALM_OVERRIDE;
+                                      std::size_t* end) REALM_NOEXCEPT override;
 
     void update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                                 _impl::TableFriend::AccessorUpdater&);
@@ -162,7 +162,7 @@ protected:
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const REALM_OVERRIDE;
+    get_to_dot_parent(std::size_t ndx_in_parent) const override;
 #endif
 
     friend class Table;
@@ -183,7 +183,7 @@ public:
     /// table. Otherwise you should pass zero.
     ColumnTable(Allocator&, ref_type, Table* table, std::size_t column_ndx);
 
-    ~ColumnTable() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~ColumnTable() REALM_NOEXCEPT override {}
 
     std::size_t get_subtable_size(std::size_t ndx) const REALM_NOEXCEPT;
 
@@ -209,18 +209,18 @@ public:
 
     using ColumnSubtableParent::insert;
 
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
+    void erase(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t, bool) override;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
 
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
+    void Verify(const Table&, std::size_t) const override;
+    void do_dump_node_structure(std::ostream&, int) const override;
+    void to_dot(std::ostream&, StringData title) const override;
 #endif
 
 private:
@@ -230,7 +230,7 @@ private:
 
     void destroy_subtable(std::size_t ndx) REALM_NOEXCEPT;
 
-    void do_discard_child_accessors() REALM_NOEXCEPT REALM_OVERRIDE;
+    void do_discard_child_accessors() REALM_NOEXCEPT override;
 };
 
 

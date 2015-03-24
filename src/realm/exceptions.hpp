@@ -31,7 +31,7 @@ namespace realm {
 /// exist.
 class NoSuchTable: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
 };
 
 
@@ -39,7 +39,7 @@ public:
 /// already in use.
 class TableNameInUse: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
 };
 
 
@@ -47,7 +47,7 @@ public:
 // columns, unless those link columns are part of the table itself.
 class CrossTableLinkTarget: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
 };
 
 
@@ -55,7 +55,7 @@ public:
 /// does not match a particular other table type (dynamic or static).
 class DescriptorMismatch: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
 };
 
 
@@ -110,7 +110,7 @@ public:
 
     LogicError(ErrorKind message);
 
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE;
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
     ErrorKind kind() const REALM_NOEXCEPT_OR_NOTHROW;
 private:
     ErrorKind m_kind;

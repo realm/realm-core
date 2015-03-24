@@ -259,7 +259,7 @@ public:
         m_alloc(alloc), m_value(value) {}
 
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) REALM_OVERRIDE
+                size_t elem_ndx_in_leaf) override
     {
         bool long_strings = Array::get_hasrefs_from_header(mem.m_addr);
         if (long_strings) {
@@ -369,7 +369,7 @@ public:
         EraseHandlerBase(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) REALM_OVERRIDE
+                         size_t elem_ndx_in_leaf) override
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
@@ -417,11 +417,11 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT REALM_OVERRIDE
+    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
     {
         Array::destroy_deep(leaf_mem, get_alloc());
     }
-    void replace_root_by_leaf(MemRef leaf_mem) REALM_OVERRIDE
+    void replace_root_by_leaf(MemRef leaf_mem) override
     {
         Array* leaf;
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
@@ -448,7 +448,7 @@ public:
         }
         replace_root(leaf); // Throws, but accessor ownership is passed to callee
     }
-    void replace_root_by_empty_leaf() REALM_OVERRIDE
+    void replace_root_by_empty_leaf() override
     {
         std::unique_ptr<ArrayString> leaf;
         leaf.reset(new ArrayString(get_alloc())); // Throws
@@ -1215,7 +1215,7 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
 class AdaptiveStringColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
-    ref_type create_leaf(size_t size) REALM_OVERRIDE
+    ref_type create_leaf(size_t size) override
     {
         MemRef mem = ArrayString::create_array(size, m_alloc); // Throws
         return mem.m_ref;
@@ -1235,7 +1235,7 @@ class AdaptiveStringColumn::SliceHandler: public ColumnBase::SliceHandler {
 public:
     SliceHandler(Allocator& alloc): m_alloc(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) REALM_OVERRIDE
+                      Allocator& target_alloc) override
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {

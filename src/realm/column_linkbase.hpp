@@ -29,7 +29,7 @@ class ColumnBackLink;
 // Abstract base class for columns containing links
 class ColumnLinkBase: public Column {
 public:
-    ~ColumnLinkBase() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~ColumnLinkBase() REALM_NOEXCEPT override;
 
     bool get_weak_links() const REALM_NOEXCEPT;
     void set_weak_links(bool) REALM_NOEXCEPT;
@@ -43,16 +43,16 @@ public:
     virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                                 std::size_t new_target_row_ndx) = 0;
 
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT REALM_OVERRIDE;
-    void mark(int) REALM_NOEXCEPT REALM_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void erase(std::size_t, bool) override;
+    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
+    void mark(int) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void Verify(const Table&, std::size_t) const override;
     using Column::Verify;
 #endif
 

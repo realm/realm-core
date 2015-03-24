@@ -132,7 +132,7 @@ private:
 
 class BufferSizeOverflow: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
     {
         return "Buffer size overflow";
     }

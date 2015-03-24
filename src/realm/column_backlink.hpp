@@ -38,7 +38,7 @@ namespace realm {
 class ColumnBackLink: public Column, public ArrayParent {
 public:
     ColumnBackLink(Allocator&, ref_type);
-    ~ColumnBackLink() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~ColumnBackLink() REALM_NOEXCEPT override {}
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
@@ -60,20 +60,20 @@ public:
     ColumnLinkBase& get_origin_column() const REALM_NOEXCEPT;
     void set_origin_column(ColumnLinkBase&) REALM_NOEXCEPT;
 
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT REALM_OVERRIDE;
-    void mark(int) REALM_NOEXCEPT REALM_OVERRIDE;
+    void erase(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
+    void mark(int) REALM_NOEXCEPT override;
 
-    void bump_link_origin_table_version() REALM_NOEXCEPT REALM_OVERRIDE;
+    void bump_link_origin_table_version() REALM_NOEXCEPT override;
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void Verify() const override;
+    void Verify(const Table&, std::size_t) const override;
     struct VerifyPair {
         std::size_t origin_row_ndx, target_row_ndx;
         bool operator<(const VerifyPair&) const REALM_NOEXCEPT;
@@ -83,11 +83,11 @@ public:
 
 protected:
     // ArrayParent overrides
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) REALM_OVERRIDE;
-    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT REALM_OVERRIDE;
+    void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
+    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT override;
 
 #ifdef REALM_DEBUG
-    std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const REALM_OVERRIDE;
+    std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
 #endif
 
 private:

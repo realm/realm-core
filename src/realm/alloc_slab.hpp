@@ -62,7 +62,7 @@ public:
     /// Construct a slab allocator in the unattached state.
     SlabAlloc();
 
-    ~SlabAlloc() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~SlabAlloc() REALM_NOEXCEPT override;
 
     /// Attach this allocator to the specified file.
     ///
@@ -226,18 +226,18 @@ public:
 
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
-    void Verify() const REALM_OVERRIDE;
+    void Verify() const override;
     bool is_all_free() const;
     void print() const;
 #endif
 
 protected:
-    MemRef do_alloc(std::size_t size) REALM_OVERRIDE;
+    MemRef do_alloc(std::size_t size) override;
     MemRef do_realloc(ref_type, const char*, std::size_t old_size,
-                    std::size_t new_size) REALM_OVERRIDE;
+                    std::size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void do_free(ref_type, const char*) REALM_NOEXCEPT REALM_OVERRIDE;
-    char* do_translate(ref_type) const REALM_NOEXCEPT REALM_OVERRIDE;
+    void do_free(ref_type, const char*) REALM_NOEXCEPT override;
+    char* do_translate(ref_type) const REALM_NOEXCEPT override;
 
 private:
     enum AttachMode {

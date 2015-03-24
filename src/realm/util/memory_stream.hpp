@@ -38,10 +38,10 @@ public:
     void set_buffer(const char *begin, const char *end) REALM_NOEXCEPT;
 
 private:
-    int_type underflow() REALM_OVERRIDE;
-    int_type uflow() REALM_OVERRIDE;
-    int_type pbackfail(int_type ch) REALM_OVERRIDE;
-    std::streamsize showmanyc() REALM_OVERRIDE;
+    int_type underflow() override;
+    int_type uflow() override;
+    int_type pbackfail(int_type ch) override;
+    std::streamsize showmanyc() override;
 
     const char* m_begin;
     const char* m_end;

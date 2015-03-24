@@ -886,7 +886,7 @@ public:
 
     ~InputStreamImpl() REALM_NOEXCEPT {}
 
-    size_t next_block(const char*& begin, const char*& end) REALM_OVERRIDE
+    size_t next_block(const char*& begin, const char*& end) override
     {
         if (m_begin != 0) {
             begin = m_begin;

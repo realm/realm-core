@@ -53,7 +53,7 @@ public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
                 StringGetter get_func, bool allow_duplicate_values, Allocator&);
-    ~StringIndex() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~StringIndex() REALM_NOEXCEPT override {}
     void set_target(void* target_column, StringGetter get_func) REALM_NOEXCEPT;
 
     bool is_empty() const;
@@ -101,9 +101,9 @@ public:
     void set_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
+    void Verify() const override;
     void verify_entries(const AdaptiveStringColumn& column) const;
-    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const override;
     void to_dot() const { to_dot(std::cerr); }
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif

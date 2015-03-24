@@ -30,7 +30,7 @@ public:
 
     explicit ArrayString(Allocator&) REALM_NOEXCEPT;
     explicit ArrayString(no_prealloc_tag) REALM_NOEXCEPT;
-    ~ArrayString() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~ArrayString() REALM_NOEXCEPT override {}
 
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
     void add();
@@ -80,10 +80,10 @@ public:
 #endif
 
 private:
-    std::size_t CalcByteLen(std::size_t count, std::size_t width) const REALM_OVERRIDE;
+    std::size_t CalcByteLen(std::size_t count, std::size_t width) const override;
     std::size_t CalcItemCount(std::size_t bytes,
-                              std::size_t width) const REALM_NOEXCEPT REALM_OVERRIDE;
-    WidthType GetWidthType() const REALM_OVERRIDE { return wtype_Multiply; }
+                              std::size_t width) const REALM_NOEXCEPT override;
+    WidthType GetWidthType() const override { return wtype_Multiply; }
 };
 
 

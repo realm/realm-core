@@ -1332,7 +1332,7 @@ private:
 
 class Table::Parent: public ArrayParent {
 public:
-    ~Parent() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~Parent() REALM_NOEXCEPT override {}
 
 protected:
     virtual StringData get_child_name(std::size_t child_ndx) const REALM_NOEXCEPT;

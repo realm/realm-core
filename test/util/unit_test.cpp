@@ -73,13 +73,13 @@ public:
     {
     }
 
-    void begin(const TestDetails& details) REALM_OVERRIDE
+    void begin(const TestDetails& details) override
     {
         test& t = m_tests[details.test_index];
         t.m_details = details;
     }
 
-    void fail(const TestDetails& details, const string& message) REALM_OVERRIDE
+    void fail(const TestDetails& details, const string& message) override
     {
         failure f;
         f.m_details = details;
@@ -88,13 +88,13 @@ public:
         t.m_failures.push_back(f);
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) REALM_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) override
     {
         test& t = m_tests[details.test_index];
         t.m_elapsed_seconds = elapsed_seconds;
     }
 
-    void summary(const Summary& summary) REALM_OVERRIDE
+    void summary(const Summary& summary) override
     {
         m_out <<
             "<?xml version=\"1.0\"?>\n"
@@ -198,7 +198,7 @@ public:
     {
     }
 
-    bool include(const TestDetails& details) REALM_OVERRIDE
+    bool include(const TestDetails& details) override
     {
         const char* name = details.test_name;
         typedef patterns::const_iterator iter;

@@ -42,7 +42,7 @@ public:
 
     void write(const char* data, size_t size);
 
-    size_t write_array(const char* data, size_t size, uint_fast32_t checksum) REALM_OVERRIDE;
+    size_t write_array(const char* data, size_t size, uint_fast32_t checksum) override;
 private:
     std::size_t m_pos;
     std::ostream& m_out;

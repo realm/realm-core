@@ -29,7 +29,7 @@ map<ref_type, void*> malloc_debug_map;
 
 class InvalidFreeSpace: std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
     {
         return "Free space tracking was lost due to out-of-memory";
     }

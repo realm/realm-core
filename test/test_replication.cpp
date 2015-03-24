@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    void handle_transact_log(const char* data, size_t size, version_type) REALM_OVERRIDE
+    void handle_transact_log(const char* data, size_t size, version_type) override
     {
         std::unique_ptr<char[]> log(new char[size]); // Throws
         copy(data, data+size, log.get());
