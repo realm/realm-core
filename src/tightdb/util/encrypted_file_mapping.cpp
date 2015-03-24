@@ -386,7 +386,7 @@ EncryptedFileMapping::~EncryptedFileMapping()
 {
     flush();
     sync();
-    m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
+    m_file.mappings.erase(std::remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
 
 char* EncryptedFileMapping::page_addr(size_t i) const TIGHTDB_NOEXCEPT
