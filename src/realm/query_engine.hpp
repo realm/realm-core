@@ -1373,7 +1373,7 @@ private:
         return BinaryData(s.data(), s.size());
     }
 
-    size_t m_key_ndx = size_t(-1);
+    size_t m_key_ndx = not_found;
     size_t m_last_indexed;
 
     // Used for linear scan through enum-string
