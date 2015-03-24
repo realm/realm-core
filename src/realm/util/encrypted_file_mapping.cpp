@@ -22,6 +22,7 @@
 #ifdef REALM_ENABLE_ENCRYPTION
 #include <cstdlib>
 #include <iostream>
+#include <algorithm>
 
 #include <cstdio>
 #include <cstring>
