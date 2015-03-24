@@ -49,7 +49,7 @@
 #if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
 #  define REALM_ASSERT_3(left, condition, right) \
     ((left condition right) ? static_cast<void>(0) : \
-        realm::util::terminate(REALM_VER_CHUNK " Assertion failed: " #left #condition #right, \
+        realm::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #left " " #condition " " #right, \
                                  __FILE__, __LINE__, left, right))
 #else
 #  define REALM_ASSERT_3(left, condition, right) static_cast<void>(0)
