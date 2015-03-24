@@ -34,7 +34,7 @@
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/terminate.hpp>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/meta.hpp>
 
 #ifdef REALM_HAVE_CXX11_ATOMIC

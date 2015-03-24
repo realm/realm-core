@@ -3,7 +3,7 @@
 
 #include <limits>
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/column_mixed.hpp>
 
 #include "test.hpp"

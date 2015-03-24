@@ -8,7 +8,7 @@
 #  include <win32\types.h>
 #endif
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 
 #include <realm/query_conditions.hpp>
 #include <realm/column_string.hpp>

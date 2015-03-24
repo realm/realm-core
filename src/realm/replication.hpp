@@ -28,7 +28,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/tuple.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/file.hpp>

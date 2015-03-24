@@ -20,7 +20,7 @@
 
 #include <exception>
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>

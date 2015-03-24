@@ -1,4 +1,4 @@
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/descriptor.hpp>
 #include <realm/column_string.hpp>
 

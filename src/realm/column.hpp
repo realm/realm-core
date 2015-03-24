@@ -24,7 +24,7 @@
 #include <cstdlib> // std::size_t
 #include <vector>
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/array_integer.hpp>
 #include <realm/column_type.hpp>
 #include <realm/column_fwd.hpp>

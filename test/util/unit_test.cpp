@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/bind.hpp>
 #include <realm/util/thread.hpp>
 

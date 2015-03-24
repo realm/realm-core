@@ -2,7 +2,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/column_binary.hpp>
 
 using namespace std;

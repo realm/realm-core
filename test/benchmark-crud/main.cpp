@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include <realm.hpp>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"

@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/file.hpp>
 #include <realm/alloc_slab.hpp>
 

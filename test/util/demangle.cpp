@@ -1,7 +1,7 @@
 #include <cstdlib>
 
 #include <realm/util/features.h>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 
 #if REALM_HAVE_AT_LEAST_GCC(3,2)
 #  define REALM_HAVE_CXXABI_DEMANGLE
@@ -12,7 +12,6 @@
 
 using namespace std;
 using namespace realm;
-using namespace realm::util;
 
 namespace {
 

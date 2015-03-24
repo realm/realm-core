@@ -9,7 +9,7 @@
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/terminate.hpp>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 

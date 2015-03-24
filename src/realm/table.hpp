@@ -27,7 +27,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/tuple.hpp>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/column_fwd.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>

@@ -19,7 +19,7 @@
 #include <realm.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/bind.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/file.hpp>

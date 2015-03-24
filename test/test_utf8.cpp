@@ -8,7 +8,7 @@
 #include <iostream>
 
 #include <realm/util/assert.hpp>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/utf8.hpp>
 #include <realm/unicode.hpp>
 

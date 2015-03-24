@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 
 #include <realm/column_string_enum.hpp>
 #include <realm/index_string.hpp>

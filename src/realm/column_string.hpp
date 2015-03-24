@@ -20,7 +20,7 @@
 #ifndef REALM_COLUMN_STRING_HPP
 #define REALM_COLUMN_STRING_HPP
 
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/array_string.hpp>
 #include <realm/array_string_long.hpp>
 #include <realm/array_blobs_big.hpp>

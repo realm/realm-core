@@ -5,7 +5,7 @@
 
 #include <realm.hpp>
 #include <realm/util/features.h>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/util/file.hpp>
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>

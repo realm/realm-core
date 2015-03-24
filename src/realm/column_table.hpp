@@ -23,7 +23,7 @@
 #include <vector>
 
 #include <realm/util/features.h>
-#include <realm/util/unique_ptr.hpp>
+#include <memory>
 #include <realm/column.hpp>
 #include <realm/table.hpp>
 
