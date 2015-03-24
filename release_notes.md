@@ -3,6 +3,7 @@
 ### Bugfixes:
 
 * Added a check for NUL bytes in indexed strings to avoid corrupting data structures.
+* Fixed bug in SharedGroup::compact().
 
 ### API breaking changes:
 
