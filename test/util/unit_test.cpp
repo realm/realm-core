@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 
@@ -354,7 +354,7 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
         random.shuffle(shared.m_tests.begin(), shared.m_tests.end());
     }
 
-    UniquePtr<ExecContext[]> thread_contexts(new ExecContext[num_threads]);
+    std::unique_ptr<ExecContext[]> thread_contexts(new ExecContext[num_threads]);
     for (int i = 0; i != num_threads; ++i)
         thread_contexts[i].m_shared = &shared;
 
@@ -362,7 +362,7 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
         thread_contexts[0].run();
     }
     else {
-        UniquePtr<Thread[]> threads(new Thread[num_threads]);
+        std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
         for (int i = 0; i != num_threads; ++i)
             threads[i].start(bind(&ExecContext::run, &thread_contexts[i]));
         for (int i = 0; i != num_threads; ++i)

@@ -19,7 +19,7 @@
 #include <tightdb.hpp>
 #include <tightdb/util/features.h>
 #include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/file.hpp>
@@ -860,8 +860,8 @@ TEST(Shared_ManyReaders)
 
     const int max_N = 64;
     CHECK(max_N >= rounds[num_rounds-1]);
-    UniquePtr<SharedGroup> shared_groups[8 * max_N];
-    UniquePtr<ReadTransaction> read_transactions[8 * max_N];
+    std::unique_ptr<SharedGroup> shared_groups[8 * max_N];
+    std::unique_ptr<ReadTransaction> read_transactions[8 * max_N];
 
     for (int round = 0; round < num_rounds; ++round) {
         int N = rounds[round];
@@ -1881,7 +1881,7 @@ void multiprocess_make_table(string path, string lock_path, string alone_path, s
 void multiprocess_threaded(TestResults& test_results, string path, size_t num_threads, size_t base)
 {
     // Do some changes in a async db
-    UniquePtr<test_util::ThreadWrapper[]> threads;
+    std::unique_ptr<test_util::ThreadWrapper[]> threads;
     threads.reset(new test_util::ThreadWrapper[num_threads]);
 
     // Start threads

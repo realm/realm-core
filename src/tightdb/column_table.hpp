@@ -23,7 +23,7 @@
 #include <vector>
 
 #include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/column.hpp>
 #include <tightdb/table.hpp>
 

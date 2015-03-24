@@ -11,7 +11,6 @@ util/tuple.hpp \
 util/type_traits.hpp \
 util/bind.hpp \
 util/safe_int_ops.hpp \
-util/unique_ptr.hpp \
 util/bind_ptr.hpp \
 util/buffer.hpp \
 util/string_buffer.hpp \

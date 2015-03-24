@@ -15,7 +15,7 @@
 #include <iomanip>
 
 #include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/features.h>
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
@@ -275,8 +275,8 @@ bool run_tests()
             keep_test_files();
     }
 
-    UniquePtr<Reporter> reporter;
-    UniquePtr<Filter> filter;
+    std::unique_ptr<Reporter> reporter;
+    std::unique_ptr<Filter> filter;
 
     // Set up reporter
     ofstream xml_file;

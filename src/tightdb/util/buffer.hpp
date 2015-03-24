@@ -28,7 +28,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 
 namespace tightdb {
 namespace util {
@@ -38,7 +38,7 @@ namespace util {
 /// size.
 template<class T> class Buffer {
 public:
-    Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    Buffer() TIGHTDB_NOEXCEPT: m_data(nullptr), m_size(0) {}
     Buffer(std::size_t size);
     ~Buffer() TIGHTDB_NOEXCEPT {}
 
@@ -76,7 +76,7 @@ public:
     }
 
 private:
-    UniquePtr<T[]> m_data;
+    std::unique_ptr<T[]> m_data;
     std::size_t m_size;
 };
 
@@ -153,7 +153,7 @@ template<class T> inline void Buffer<T>::set_size(std::size_t new_size)
 template<class T> inline void Buffer<T>::resize(std::size_t new_size, std::size_t copy_begin,
                                                 std::size_t copy_end, std::size_t copy_to)
 {
-    UniquePtr<T[]> new_data(new T[new_size]); // Throws
+    std::unique_ptr<T[]> new_data(new T[new_size]); // Throws
     std::copy(m_data.get() + copy_begin, m_data.get() + copy_end, new_data.get() + copy_to);
     m_data.reset(new_data.release());
     m_size = new_size;

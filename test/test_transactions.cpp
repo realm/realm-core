@@ -203,7 +203,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
         size_t size = ((512 + index%1024) * 1024) % max_blob_size;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index) * 677 % 256);
         subsubtable[index].binary = BinaryData(data.get(), size);
@@ -222,7 +222,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #11
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[index%2].zeta = BinaryData(data.get(), size);
@@ -246,7 +246,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #13
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         size_t size = (512 + (333 + 677*index) % 1024) * 327;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[(index+1)%2].zeta = BinaryData(data.get(), size);
@@ -305,7 +305,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
             subsubtable = subtable[0].theta.set_subtable<MyTable>();
         }
         size_t size = (17 + 233*index) % 523;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+79) * 677 % 256);
         BinaryData bin(data.get(), size);
@@ -470,7 +470,7 @@ TEST(Transactions_General)
         for (int i = 0; i != num_threads; ++i) {
             CHECK_EQUAL(1000+i, subsubtable[i].value);
             size_t size = ((512 + i%1024) * 1024) % max_blob_size;
-            UniquePtr<char[]> data(new char[size]);
+            std::unique_ptr<char[]> data(new char[size]);
             for (size_t j = 0; j != size; ++j)
                 data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
             CHECK_EQUAL(BinaryData(data.get(), size), subsubtable[i].binary);

@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/file.hpp>
 #include <tightdb/alloc_slab.hpp>
 
@@ -168,7 +168,7 @@ TEST(Alloc_AttachBuffer)
     GROUP_TEST_PATH(path);
 
     // Produce a valid buffer
-    UniquePtr<char[]> buffer;
+    std::unique_ptr<char[]> buffer;
     size_t buffer_size;
     {
         File::try_remove(path);

@@ -5,7 +5,7 @@
 
 #include <tightdb.hpp>
 #include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/file.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
@@ -80,7 +80,7 @@ public:
 private:
     void handle_transact_log(const char* data, size_t size, version_type) TIGHTDB_OVERRIDE
     {
-        UniquePtr<char[]> log(new char[size]); // Throws
+        std::unique_ptr<char[]> log(new char[size]); // Throws
         copy(data, data+size, log.get());
         m_transact_logs.push_back(BinaryData(log.get(), size)); // Throws
         log.release();

@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/index_string.hpp>
@@ -258,7 +258,7 @@ StringIndex* ColumnStringEnum::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
-    UniquePtr<StringIndex> index;
+    std::unique_ptr<StringIndex> index;
     index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
 
     // Populate the index

@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/array_string.hpp>
 #include <tightdb/array_string_long.hpp>
 #include <tightdb/array_blobs_big.hpp>

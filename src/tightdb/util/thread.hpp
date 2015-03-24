@@ -34,7 +34,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/terminate.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/meta.hpp>
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
@@ -315,7 +315,7 @@ inline Thread::Thread(): m_joinable(false)
 
 template<class F> inline Thread::Thread(F func): m_joinable(true)
 {
-    UniquePtr<F> func2(new F(func)); // Throws
+    std::unique_ptr<F> func2(new F(func)); // Throws
     start(&Thread::entry_point<F>, func2.get()); // Throws
     func2.release();
 }
@@ -324,7 +324,7 @@ template<class F> inline void Thread::start(F func)
 {
     if (m_joinable)
         std::terminate();
-    UniquePtr<F> func2(new F(func)); // Throws
+    std::unique_ptr<F> func2(new F(func)); // Throws
     start(&Thread::entry_point<F>, func2.get()); // Throws
     func2.release();
     m_joinable = true;
@@ -351,7 +351,7 @@ inline void Thread::start(entry_func_type entry_func, void* arg)
 
 template<class F> inline void* Thread::entry_point(void* cookie) TIGHTDB_NOEXCEPT
 {
-    UniquePtr<F> func(static_cast<F*>(cookie));
+    std::unique_ptr<F> func(static_cast<F*>(cookie));
     try {
         (*func)();
     }

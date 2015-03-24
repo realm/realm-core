@@ -28,7 +28,7 @@
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/buffer.hpp>
 #include <tightdb/util/string_buffer.hpp>
 #include <tightdb/util/file.hpp>

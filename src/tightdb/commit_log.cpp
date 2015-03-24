@@ -20,7 +20,7 @@
 
 #include <exception>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/file.hpp>
 #include <tightdb/group_shared.hpp>

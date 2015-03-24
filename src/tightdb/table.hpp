@@ -27,7 +27,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/tuple.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/link_view_fwd.hpp>
@@ -1582,7 +1582,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
 
 inline TableRef Table::create(Allocator& alloc)
 {
-    util::UniquePtr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
+    std::unique_ptr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = 0;
     std::size_t ndx_in_parent = 0;
@@ -1592,7 +1592,7 @@ inline TableRef Table::create(Allocator& alloc)
 
 inline TableRef Table::copy(Allocator& alloc) const
 {
-    util::UniquePtr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
+    std::unique_ptr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
     ref_type ref = clone(alloc); // Throws
     Parent* parent = 0;
     std::size_t ndx_in_parent = 0;
@@ -1918,7 +1918,7 @@ public:
     static Table* create_accessor(Allocator& alloc, ref_type top_ref,
                                   Table::Parent* parent, std::size_t ndx_in_parent)
     {
-        util::UniquePtr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
+        std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
         table->init(top_ref, parent, ndx_in_parent); // Throws
         return table.release();
     }
@@ -1927,7 +1927,7 @@ public:
                                   std::size_t parent_row_ndx)
     {
         Allocator& alloc = shared_spec.get_alloc();
-        util::UniquePtr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
+        std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
         table->init(shared_spec, parent_column, parent_row_ndx); // Throws
         return table.release();
     }
@@ -1936,7 +1936,7 @@ public:
     static Table* create_incomplete_accessor(Allocator& alloc, ref_type top_ref,
                                              Table::Parent* parent, std::size_t ndx_in_parent)
     {
-        util::UniquePtr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
+        std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
         bool skip_create_column_accessors = true;
         table->init(top_ref, parent, ndx_in_parent, skip_create_column_accessors); // Throws
         return table.release();

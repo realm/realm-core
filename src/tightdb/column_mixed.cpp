@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/column_mixed.hpp>
 
 using namespace std;
@@ -31,10 +31,10 @@ void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
 {
-    UniquePtr<Array> top;
-    UniquePtr<Column> types;
-    UniquePtr<RefsColumn> data;
-    UniquePtr<ColumnBinary> binary_data;
+    std::unique_ptr<Array> top;
+    std::unique_ptr<Column> types;
+    std::unique_ptr<RefsColumn> data;
+    std::unique_ptr<ColumnBinary> binary_data;
     top.reset(new Array(alloc)); // Throws
     top->init_from_ref(ref);
     TIGHTDB_ASSERT(top->size() == 2 || top->size() == 3);

@@ -702,7 +702,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
         size_t unrounded_size = final_file_size + sizeof(SlabAlloc::StreamingFooter);
         size_t rounded_size = round_up_to_page_size(unrounded_size);
         if (rounded_size != unrounded_size) {
-            UniquePtr<char[]> buffer(new char[rounded_size - unrounded_size]());
+            std::unique_ptr<char[]> buffer(new char[rounded_size - unrounded_size]());
             out_2.write(buffer.get(), rounded_size - unrounded_size);
         }
 #endif

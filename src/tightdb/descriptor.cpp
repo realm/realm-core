@@ -1,4 +1,4 @@
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/descriptor.hpp>
 #include <tightdb/column_string.hpp>
 
@@ -19,7 +19,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
     // Create a new descriptor accessor
     {
         SubspecRef subspec_ref = m_spec->get_subtable_spec(column_ndx);
-        UniquePtr<Spec> subspec(new Spec(subspec_ref)); // Throws
+        std::unique_ptr<Spec> subspec(new Spec(subspec_ref)); // Throws
         subdesc.reset(new Descriptor); // Throws
         m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc.get())); // Throws
         subdesc->attach(m_root_table.get(), this, subspec.get());
