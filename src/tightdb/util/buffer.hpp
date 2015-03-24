@@ -38,7 +38,7 @@ namespace util {
 /// size.
 template<class T> class Buffer {
 public:
-    Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    Buffer() TIGHTDB_NOEXCEPT: m_data(nullptr), m_size(0) {}
     Buffer(std::size_t size);
     ~Buffer() TIGHTDB_NOEXCEPT {}
 
