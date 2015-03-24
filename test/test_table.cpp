@@ -1018,12 +1018,12 @@ TEST(Table_6)
 {
     TestTableEnum table;
 
-    TDB_QUERY(TestQuery, TestTableEnum) {
+    RLM_QUERY(TestQuery, TestTableEnum) {
     //  first.between(Mon, Thu);
         second == "Hello" || (second == "Hey" && first == Mon);
     }};
 
-    TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
+    RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
         (void)b;
         (void)a;
         //first.between(a, b);

@@ -67,7 +67,7 @@ TConditionValue:    Type of values in condition column. That is, int64_t, float,
 TAction:            What to do with each search result, from the enums act_ReturnFirst, act_Count, act_Sum, etc
 
 TResult:            Type of result of actions - float, double, int64_t, etc. Special notes: For act_Count it's
-                    int64_t, for TDB_FIND_ALL it's int64_t which points at destination array.
+                    int64_t, for RLM_FIND_ALL it's int64_t which points at destination array.
 
 TSourceColumn:      Type of source column used in actions, or *ignored* if no source column is used (like for
                     act_Count, act_ReturnFirst)

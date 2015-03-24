@@ -574,9 +574,9 @@ template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const ch
 public:
     virtual ~Subexpr2() {};
 
-    #define TDB_U2(t, o) using Overloads<T, t>::operator o;
-    #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o) TDB_U2(StringData, o) TDB_U2(bool, o) TDB_U2(DateTime, o)
-    TDB_U(+) TDB_U(-) TDB_U(*) TDB_U(/) TDB_U(>) TDB_U(<) TDB_U(==) TDB_U(!=) TDB_U(>=) TDB_U(<=)
+    #define RLM_U2(t, o) using Overloads<T, t>::operator o;
+    #define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o)
+    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
 // Stores N values of type T. Can also exchange data with other ValueBase of different types
