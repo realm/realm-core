@@ -4,7 +4,7 @@ echo Realm core c++ binding Windows Release.
 Echo beta 0.11
 echo ----------------------------------------------------------
 echo This cmd file will collect the result of a visual studio
-echo Version %1 build of TightDb and create a release archive 
+echo Version %1 build of Realm and create a release archive 
 echo with all the files that should be distributed 
 echo to c++ binding users.
 echo The release will be located in Windows\Release\vs%1

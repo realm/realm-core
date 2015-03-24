@@ -1,9 +1,9 @@
-This is a binary relase of the TightDb Engine, for Microsoft Visual Studio.
+This is a binary relase of the Realm Engine, for Microsoft Visual Studio.
 
 to use realm in Visual Studio C++ solutions, You will have to reference the LIB 
 and header files enclosed in this archive.
 Furthermore any compiler settings that change ABI layout, must match those used 
-to build tightDb core.
+to build Realm core.
 
 In the examples directory you will find an empty C++ solution with a console project 
 that uses realm. You can use that solution as a starting point,

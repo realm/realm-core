@@ -24,7 +24,7 @@ Do not check these changed files back into github as VS2010 cannot read them cor
 If You have access to many cores, or two computers you can do vs2010 on one computer in one repository
 , and at the same time, start from vs2012. on another computer in another repository
 
-1. open tightDB.sln in VS2010
+1. open Realm.sln in VS2010
 
 2. select Build->Batch Build. Unmark *all* , mark the 4 called 
 project:  configuration: Platform
@@ -107,7 +107,7 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 
 ***Visual studio 2012 build 
 
-21. Open TightDb.sln with visual studio 2012 . right click "Solution 'Realm' (8 projects) in Solution Explorer
+21. Open Realm.sln with visual studio 2012 . right click "Solution 'Realm' (8 projects) in Solution Explorer
 
 22. select Update VC++ Projects
 
