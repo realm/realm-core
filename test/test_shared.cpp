@@ -1997,10 +1997,10 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 namespace {
 
-static const int num_threads = 3;
-static int shared_state[num_threads];
-static SharedGroup* sgs[num_threads];
-static Mutex* muu;
+const int num_threads = 3;
+int shared_state[num_threads];
+SharedGroup* sgs[num_threads];
+Mutex* muu;
 
 void waiter(string path, int i)
 {
