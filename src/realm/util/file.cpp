@@ -135,7 +135,7 @@ string make_temp_dir()
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
     for (;;) {
-        if (GetTempFileNameA(buffer1.c_str(), "tdb", 0, buffer2.data()) == 0)
+        if (GetTempFileNameA(buffer1.c_str(), "rlm", 0, buffer2.data()) == 0)
             throw runtime_error("GetTempFileName() failed");
         if (DeleteFileA(buffer2.c_str()) == 0)
             throw runtime_error("DeleteFile() failed");
