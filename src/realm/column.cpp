@@ -491,7 +491,7 @@ Column::~Column() REALM_NOEXCEPT
     if (m_search_index) {
         //static_cast<StringIndex*>(m_search_index)->destroy();
         delete static_cast<StringIndex*>(m_search_index);
-        m_search_index = null_ptr;
+        m_search_index = nullptr;
     }
     delete m_array;
 }
@@ -504,7 +504,7 @@ void Column::move_assign(Column& col)
     m_array = col.m_array;
     col.m_array = 0;
     m_search_index = col.m_search_index;
-    col.m_search_index = null_ptr;
+    col.m_search_index = nullptr;
 }
 
 void Column::update_from_parent(size_t old_baseline) REALM_NOEXCEPT

@@ -294,7 +294,7 @@ public:
     // binds it to a Query at a later time
     virtual const Table* get_table()
     {
-        return null_ptr;
+        return nullptr;
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -585,23 +585,23 @@ template<class T> class Value : public ValueBase, public Subexpr2<T>
 public:
     Value()
     {
-        m_v = null_ptr;
+        m_v = nullptr;
         init(false, ValueBase::default_size, 0);
     }
     Value(T v)
     {
-        m_v = null_ptr;
+        m_v = nullptr;
         init(false, ValueBase::default_size, v);
     }
     Value(bool link, size_t values)
     {
-        m_v = null_ptr;
+        m_v = nullptr;
         init(link, values, 0);
     }
 
     Value(bool link, size_t values, T v)
     {
-        m_v = null_ptr;
+        m_v = nullptr;
         init(link, values, v);
     }
 
@@ -610,7 +610,7 @@ public:
         // If we store more than default_size elements then we used 'new', else we used m_cache
         if (m_values > ValueBase::default_size)
             delete[] m_v;
-        m_v = null_ptr;
+        m_v = nullptr;
     }
 
     void init(bool link, size_t values, T v) {
@@ -618,7 +618,7 @@ public:
             // If we store more than default_size elements then we used 'new', else we used m_cache
             if (m_values > ValueBase::default_size)
                 delete[] m_v;
-            m_v = null_ptr;
+            m_v = nullptr;
         }
         ValueBase::from_link = link;
         ValueBase::m_values = values;
@@ -967,7 +967,7 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap
 {
 public:
-    LinkMap() : m_table(null_ptr) {};
+    LinkMap() : m_table(nullptr) {};
 
     void init(Table* table, std::vector<size_t> columns)
     {
@@ -1059,8 +1059,8 @@ template <class S, class I> Query string_compare(const Columns<StringData>& left
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(null_ptr),
-                                                                            m_table(null_ptr), 
+    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr),
+                                                                            m_table(nullptr), 
                                                                             m_column(column)
     {
         m_link_map.init(const_cast<Table*>(table), links);
@@ -1068,15 +1068,15 @@ public:
         REALM_ASSERT(m_link_map.m_table->get_column_type(column) == type_String);
     }
 
-    Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column(column)
+    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), m_column(column)
     {
         m_table = table;
     }
 
-    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr) { }
+    explicit Columns() : m_table_linked_from(nullptr), m_table(nullptr) { }
 
 
-    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column(column)
+    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), m_column(column)
     {
     }
 
@@ -1282,18 +1282,18 @@ public:
 
 private:
     Columns(size_t column, const Table* table, std::vector<size_t> links) :
-        m_table(null_ptr)
+        m_table(nullptr)
     {
         static_cast<void>(column);
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table;
     }
 
-    Columns() : m_table(null_ptr) { }
+    Columns() : m_table(nullptr) { }
 
-    explicit Columns(size_t column) : m_table(null_ptr) { static_cast<void>(column); }
+    explicit Columns(size_t column) : m_table(nullptr) { static_cast<void>(column); }
 
-    Columns(size_t column, const Table* table) : m_table(null_ptr)
+    Columns(size_t column, const Table* table) : m_table(nullptr)
     {
         static_cast<void>(column);
         m_table = table;
@@ -1333,24 +1333,24 @@ template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
 
-    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(null_ptr), 
-                                                                            m_table(null_ptr), sg(null_ptr),
+    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr), 
+                                                                            m_table(nullptr), sg(nullptr),
                                                                             m_column(column)
     {
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table; 
     }
 
-    Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
+    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
                                                  m_column(column)
     {
         m_table = table;
     }
 
 
-    Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr) { }
+    Columns() : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr) { }
 
-    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
+    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
                                       m_column(column) {}
 
     ~Columns()
@@ -1377,7 +1377,7 @@ public:
         else
             c = static_cast<const ColType*>(&m_link_map.m_table->get_column_base(m_column));
 
-        if (sg == null_ptr)
+        if (sg == nullptr)
             sg = new SequentialGetter<T>();
         sg->init(c);
     }
@@ -1521,9 +1521,9 @@ public:
         const Table* r = m_right.get_table();
 
         // Queries do not support multiple different tables; all tables must be the same.
-        REALM_ASSERT(l == null_ptr || r == null_ptr || l == r);
+        REALM_ASSERT(l == nullptr || r == nullptr || l == r);
 
-        // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
+        // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
@@ -1554,7 +1554,7 @@ public:
     // Compare extends Expression which extends Query. This constructor for Compare initializes the Query part by
     // adding an ExpressionNode (see query_engine.hpp) and initializes Query::table so that it's ready to call
     // Query methods on, like find_first(), etc.
-    Compare(TLeft& left, const TRight& right, bool auto_delete = false, const char* compare_string = null_ptr) :
+    Compare(TLeft& left, const TRight& right, bool auto_delete = false, const char* compare_string = nullptr) :
             m_left(left), m_right(const_cast<TRight&>(right)), m_compare_string(compare_string)
     {
         m_auto_delete = auto_delete;
@@ -1589,9 +1589,9 @@ public:
         const Table* r = m_right.get_table();
 
         // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
-        REALM_ASSERT(l == null_ptr || r == null_ptr || l == r);
+        REALM_ASSERT(l == nullptr || r == nullptr || l == r);
 
-        // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
+        // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 

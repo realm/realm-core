@@ -147,7 +147,7 @@ public:
     // arguments in clang and vs2010 (fixed in 2012)
     template <int function, typename T, typename R, class ColType>
     R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const,
-        size_t column_ndx, T count_target, size_t* return_ndx = null_ptr) const;
+        size_t column_ndx, T count_target, size_t* return_ndx = nullptr) const;
 
     int64_t sum_int(size_t column_ndx) const;
     int64_t maximum_int(size_t column_ndx, size_t* return_ndx = 0) const;

@@ -281,7 +281,7 @@ protected:
 
     template <class T, class R, Action action, class condition>
     R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1),
-                size_t* return_ndx = null_ptr) const;
+                size_t* return_ndx = nullptr) const;
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
@@ -424,16 +424,16 @@ public:
 
     std::size_t count(int64_t target) const;
     int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                size_t* return_ndx = null_ptr) const;
+                size_t* return_ndx = nullptr) const;
 
     int64_t maximum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                    size_t* return_ndx = null_ptr) const;
+                    size_t* return_ndx = nullptr) const;
 
     int64_t minimum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                    size_t* return_ndx = null_ptr) const;
+                    size_t* return_ndx = nullptr) const;
 
     double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                    size_t* return_ndx = null_ptr) const;
+                    size_t* return_ndx = nullptr) const;
 
     void destroy_subtree(size_t ndx, bool clear_value);
 
@@ -571,12 +571,12 @@ inline void ColumnBase::destroy() REALM_NOEXCEPT
 
 inline bool ColumnBase::has_search_index() const REALM_NOEXCEPT
 {
-    return get_search_index() != null_ptr;
+    return get_search_index() != nullptr;
 }
 
 inline StringIndex* ColumnBase::create_search_index()
 {
-    return null_ptr;
+    return nullptr;
 }
 
 inline void ColumnBase::destroy_search_index() REALM_NOEXCEPT
@@ -585,12 +585,12 @@ inline void ColumnBase::destroy_search_index() REALM_NOEXCEPT
 
 inline const StringIndex* ColumnBase::get_search_index() const REALM_NOEXCEPT
 {
-    return null_ptr;
+    return nullptr;
 }
 
 inline StringIndex* ColumnBase::get_search_index() REALM_NOEXCEPT
 {
-    return null_ptr;
+    return nullptr;
 }
 
 inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool)
@@ -771,13 +771,13 @@ inline bool Column::has_search_index() const REALM_NOEXCEPT
 }
 
 // fixme, must m_search_index be copied here?
-inline Column::Column(Allocator& alloc, ref_type ref) : m_search_index(null_ptr)
+inline Column::Column(Allocator& alloc, ref_type ref) : m_search_index(nullptr)
 {
     m_array = new Array(alloc); // Throws
     m_array->init_from_ref(ref);
 }
 
-inline Column::Column(unattached_root_tag, Allocator& alloc) : m_search_index(null_ptr)
+inline Column::Column(unattached_root_tag, Allocator& alloc) : m_search_index(nullptr)
 {
     m_array = new Array(alloc); // Throws
 
@@ -792,7 +792,7 @@ inline Column::Column(move_tag, Column& col) REALM_NOEXCEPT
 }
 
 inline Column::Column(ArrayInteger* root) REALM_NOEXCEPT:
-    ColumnBase(root), m_search_index(null_ptr)
+    ColumnBase(root), m_search_index(nullptr)
 {
 }
 

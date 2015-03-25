@@ -531,10 +531,10 @@ public:
     std::size_t count(int64_t value) const REALM_NOEXCEPT;
 
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
-                 std::size_t* return_ndx = null_ptr) const;
+                 std::size_t* return_ndx = nullptr) const;
 
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
-                 std::size_t* return_ndx = null_ptr) const;
+                 std::size_t* return_ndx = nullptr) const;
 
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const REALM_NOEXCEPT;
@@ -3203,7 +3203,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
-    state.init(act_ReturnFirst, null_ptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
+    state.init(act_ReturnFirst, nullptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
     Finder finder = m_finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 

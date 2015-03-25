@@ -68,7 +68,7 @@ template <class T, class R, Action action, class condition>
         end = size();
 
     QueryState<R> state;
-    state.init(action, null_ptr, limit);
+    state.init(action, nullptr, limit);
 
     ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
     SequentialGetter<T> sg(column);

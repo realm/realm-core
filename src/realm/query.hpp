@@ -55,7 +55,7 @@ class SequentialGetterBase;
 
 class Query {
 public:
-    Query(const Table& table, RowIndexes* tv = null_ptr);
+    Query(const Table& table, RowIndexes* tv = nullptr);
     Query(const Table& table, const LinkViewRef& lv);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
@@ -250,7 +250,7 @@ public:
     mutable bool do_delete;
 
 protected:
-    Query(Table& table, RowIndexes* tv = null_ptr);
+    Query(Table& table, RowIndexes* tv = nullptr);
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
@@ -290,7 +290,7 @@ private:
     template <Action action, typename T, typename R, class ColClass>
         R aggregate(R (ColClass::*method)(size_t, size_t, size_t, size_t*) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-                    size_t* return_ndx = null_ptr) const;
+                    size_t* return_ndx = nullptr) const;
 
     void aggregate_internal(Action TAction, DataType TSourceColumn,
                             ParentNode* pn, QueryStateBase* st, 
