@@ -87,8 +87,8 @@ private:
     template <bool can_fail> int64_t parse_integer(const char* col, bool* success = null_ptr);
     template <bool can_fail> bool parse_bool(const char*col, bool* success = null_ptr);
     vector<DataType> types (vector<string> v);
-    size_t tokenize(vector<vector<string> > & payload, size_t records);
-    vector<DataType> detect_scheme (vector<vector<string> > payload, size_t begin, size_t end);
+    size_t tokenize(vector<vector<string>> & payload, size_t records);
+    vector<DataType> detect_scheme (vector<vector<string>> payload, size_t begin, size_t end);
     vector<DataType> lowest_common (vector<DataType> types1, vector<DataType> types2);
 
     char src[2*chunk_size];    // .csv input buffer

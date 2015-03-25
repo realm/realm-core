@@ -116,7 +116,7 @@ private:
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx,
-                                Array::TreeInsert<BasicColumn<T> >&);
+                                Array::TreeInsert<BasicColumn<T>>&);
 
     template <typename R, Action action, class cond>
     R aggregate(T target, std::size_t start, std::size_t end, std::size_t* return_ndx) const;

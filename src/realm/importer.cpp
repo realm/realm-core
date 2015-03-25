@@ -418,7 +418,7 @@ vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataTyp
 }
 
 // Takes payload vectors, and for each field finds best type that can represent all rows.
-vector<DataType> Importer::detect_scheme(vector<vector<string> > payload, size_t begin, size_t end)
+vector<DataType> Importer::detect_scheme(vector<vector<string>> payload, size_t begin, size_t end)
 {
     vector<DataType> res;
     res = types(payload[begin]);
@@ -430,7 +430,7 @@ vector<DataType> Importer::detect_scheme(vector<vector<string> > payload, size_t
     return res;
 }
 
-size_t Importer::tokenize(vector<vector<string> > & payload, size_t records)
+size_t Importer::tokenize(vector<vector<string>> & payload, size_t records)
 {
     size_t original_size = payload.size();
 
@@ -548,7 +548,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                             size_t type_detection_rows, size_t skip_first_rows,
                             size_t import_rows)
 {
-    vector<vector<string> > payload;      // Used to build a 2D string vector with rows and columns of .csv content.
+    vector<vector<string>> payload;      // Used to build a 2D string vector with rows and columns of .csv content.
     vector<string> header;                // Column names (will be either auto-detected or read from cmd line args)
     vector<DataType> scheme;              // Scheme (will be either auto-detected or read from cmd line args)
     bool header_present = false;          // Used only in auto-detection mode.

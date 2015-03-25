@@ -2026,7 +2026,7 @@ void Array::Verify() const
 
 namespace {
 
-typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void> > > > VerifyBptreeResult;
+typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptreeResult;
 
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)

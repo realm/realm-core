@@ -196,7 +196,7 @@ public:
     }
     void replace_root_by_empty_leaf() override
     {
-        std::unique_ptr<BasicArray<T> > leaf;
+        std::unique_ptr<BasicArray<T>> leaf;
         leaf.reset(new BasicArray<T>(get_alloc())); // Throws
         leaf->create(); // Throws
         replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
@@ -241,7 +241,7 @@ template<class T> void BasicColumn<T>::do_clear()
     }
 
     // Revert to generic array
-    std::unique_ptr<BasicArray<T> > array;
+    std::unique_ptr<BasicArray<T>> array;
     array.reset(new BasicArray<T>(m_array->get_alloc())); // Throws
     array->create(); // Throws
     array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
@@ -573,7 +573,7 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, s
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
     ref_type new_sibling_ref;
-    Array::TreeInsert<BasicColumn<T> > state;
+    Array::TreeInsert<BasicColumn<T>> state;
     for (std::size_t i = 0; i != num_rows; ++i) {
         std::size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
@@ -601,7 +601,7 @@ template<class T> REALM_FORCEINLINE
 ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                      std::size_t ndx_in_parent,
                                      Allocator& alloc, std::size_t insert_ndx,
-                                     Array::TreeInsert<BasicColumn<T> >& state)
+                                     Array::TreeInsert<BasicColumn<T>>& state)
 {
     BasicArray<T> leaf(alloc);
     leaf.init_from_mem(leaf_mem);

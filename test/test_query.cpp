@@ -434,7 +434,7 @@ TEST(Query_NextGenSyntax)
     Subexpr* second = new Columns<float>(1);
     Subexpr* third = new Columns<double>(2);
     Subexpr* constant = new Value<int64_t>(40);
-    Subexpr* plus = new Operator<Plus<float> >(*first, *second);
+    Subexpr* plus = new Operator<Plus<float>>(*first, *second);
     Expression *e = new Compare<Greater, float>(*plus, *constant);
 
 
@@ -451,7 +451,7 @@ TEST(Query_NextGenSyntax)
     Subexpr* second2 = new Columns<float>(1);
     Subexpr* third2 = new Columns<double>(2);
     Subexpr* constant2 = new Value<int64_t>(40);
-    Subexpr* plus2 = new Operator<Plus<float> >(*first, *second);
+    Subexpr* plus2 = new Operator<Plus<float>>(*first, *second);
     Expression *e2 = new Compare<Greater, float>(*plus, *constant);
 
     match = untyped.where().expression(e).expression(e2).find();

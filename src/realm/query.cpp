@@ -420,27 +420,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Equal> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Equal>>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, NotEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, NotEqual>>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Greater> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Greater>>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, GreaterEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, GreaterEqual>>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, LessEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, LessEqual>>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Less> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Less>>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -455,27 +455,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Equal> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Equal>>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, NotEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, NotEqual>>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Greater> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Greater>>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, GreaterEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, GreaterEqual>>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, LessEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, LessEqual>>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Less> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Less>>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -1147,7 +1147,7 @@ void* Query::query_thread(void* arg)
     thread_state* ts = static_cast<thread_state*>(arg);
 
     vector<size_t> res;
-    vector<pair<size_t, size_t> > chunks;
+    vector<pair<size_t, size_t>> chunks;
 
     for (;;) {
         // Main waiting loop that waits for a query to start

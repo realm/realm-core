@@ -421,7 +421,7 @@ template<class T> struct GetColumnTypeId;
 template<> struct GetColumnTypeId<int64_t> {
     static const DataType id = type_Int;
 };
-template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
+template<class E> struct GetColumnTypeId<SpecBase::Enum<E>> {
     static const DataType id = type_Int;
 };
 template<> struct GetColumnTypeId<bool> {
@@ -667,14 +667,14 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
 {
     TableRef table = Table::create(alloc);
     set_dynamic_type(*table);
-    return unchecked_cast<BasicTable<Spec> >(move(table));
+    return unchecked_cast<BasicTable<Spec>>(move(table));
 }
 
 
 template<class Spec>
 inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) const
 {
-    return unchecked_cast<BasicTable<Spec> >(Table::copy(alloc));
+    return unchecked_cast<BasicTable<Spec>>(Table::copy(alloc));
 }
 
 
