@@ -219,7 +219,7 @@ public:
         init(column);
     }
 
-    ~SequentialGetter() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~SequentialGetter() REALM_NOEXCEPT override {}
 
     void init(const ColType* column)
     {
@@ -429,7 +429,7 @@ protected:
 class ListviewNode: public ParentNode {
 public:
     ListviewNode(TableView& tv) : m_max(0), m_next(0), m_size(tv.size()), m_tv(tv) { m_child = 0; m_dT = 0.0; }
-    ~ListviewNode() REALM_NOEXCEPT REALM_OVERRIDE {  }
+    ~ListviewNode() REALM_NOEXCEPT override {  }
 
     // Return the n'th table row index contained in the TableView.
     size_t tableindex(size_t n)
@@ -437,7 +437,7 @@ public:
         return to_size_t(m_tv.m_row_indexes.get(n));
     }
 
-    virtual void init(const Table& table) REALM_OVERRIDE
+    virtual void init(const Table& table) override
     {
         m_table = &table;
 
@@ -451,7 +451,7 @@ public:
         if (m_child) m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)  REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end)  override
     {
         // Simply return index of first table row which is >= start
         size_t r;
@@ -492,9 +492,9 @@ class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
     SubtableNode() {};
-    ~SubtableNode() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~SubtableNode() REALM_NOEXCEPT override {}
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_dD = 10.0;
         m_probes = 0;
@@ -525,7 +525,7 @@ public:
             return m_child->validate();
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(m_table);
         REALM_ASSERT(m_child);
@@ -556,7 +556,7 @@ public:
         return new SubtableNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) REALM_OVERRIDE
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_child2 = mapping.find(m_child2)->second;
@@ -662,9 +662,9 @@ public:
     {
         m_condition_column_idx = column;
     }
-    ~IntegerNode() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~IntegerNode() REALM_NOEXCEPT override {}
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_dD = 100.0;
         m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
@@ -674,7 +674,7 @@ public:
             m_child->init(table);
     }
 
-    void aggregate_local_prepare(Action TAction, DataType col_id) REALM_OVERRIDE
+    void aggregate_local_prepare(Action TAction, DataType col_id) override
     {
         m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
         m_TAction = TAction;
@@ -728,7 +728,7 @@ public:
 
     // FIXME: should be possible to move this up to IntegerNodeBase...
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column) REALM_OVERRIDE
+                           SequentialGetterBase* source_column) override
     {
         REALM_ASSERT(m_conds > 0);
         int c = TConditionFunction::condition;
@@ -789,7 +789,7 @@ public:
         }
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction condition;
         REALM_ASSERT(m_table);
@@ -866,9 +866,9 @@ public:
         m_child = 0;
         m_dT = 1.0;
     }
-    ~FloatDoubleNode() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~FloatDoubleNode() REALM_NOEXCEPT override {}
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_dD = 100.0;
         m_table = &table;
@@ -879,7 +879,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
 
@@ -927,12 +927,12 @@ public:
         m_value = BinaryData(data, v.size());
     }
 
-    ~BinaryNode() REALM_NOEXCEPT REALM_OVERRIDE
+    ~BinaryNode() REALM_NOEXCEPT override
     {
         delete[] m_value.data();
     }
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_dD = 100.0;
         m_table = &table;
@@ -943,7 +943,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
@@ -1003,12 +1003,12 @@ public:
         m_value = StringData(data, v.size());
     }
 
-    ~StringNodeBase() REALM_NOEXCEPT REALM_OVERRIDE
+    ~StringNodeBase() REALM_NOEXCEPT override
     {
         delete[] m_value.data();
     }
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_probes = 0;
         m_matches = 0;
@@ -1090,7 +1090,7 @@ public:
         m_lcase = lower;
     }
 
-    ~StringNode() REALM_NOEXCEPT REALM_OVERRIDE
+    ~StringNode() REALM_NOEXCEPT override
     {
         delete[] m_ucase;
         delete[] m_lcase;
@@ -1099,7 +1099,7 @@ public:
     }
 
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         clear_leaf_state();
 
@@ -1112,7 +1112,7 @@ public:
     }
 
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
 
@@ -1185,7 +1185,7 @@ public:
         m_index_matches = 0;
         m_index_matches_destroy = false;
     }
-    ~StringNode() REALM_NOEXCEPT REALM_OVERRIDE
+    ~StringNode() REALM_NOEXCEPT override
     {
         deallocate();
     }
@@ -1208,7 +1208,7 @@ public:
         m_index_getter = null_ptr;
     }
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         deallocate();
         m_dD = 10.0;
@@ -1272,7 +1272,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(m_table);
 
@@ -1402,9 +1402,9 @@ public:
         m_dT = 50.0;
     }
 
-    ~OrNode() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~OrNode() REALM_NOEXCEPT override {}
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_dD = 10.0;
 
@@ -1428,7 +1428,7 @@ public:
         m_table = &table;
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         if (start >= end)
             return not_found;
@@ -1455,7 +1455,7 @@ public:
         return index;
     }
 
-    std::string validate() REALM_OVERRIDE
+    std::string validate() override
     {
         if (error_code != "")
             return error_code;
@@ -1481,7 +1481,7 @@ public:
         return new OrNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) REALM_OVERRIDE
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         for (size_t i = 0; i < m_cond.size(); ++i)
@@ -1505,9 +1505,9 @@ public:
     }
 
     NotNode() {m_child = null_ptr; m_cond = null_ptr; m_dT = 50.0;}
-    ~NotNode() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~NotNode() REALM_NOEXCEPT override {}
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_dD = 10.0;
 
@@ -1528,9 +1528,9 @@ public:
         m_table = &table;
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE;
+    size_t find_first_local(size_t start, size_t end) override;
 
-    std::string validate() REALM_OVERRIDE
+    std::string validate() override
     {
         if (error_code != "")
             return error_code;
@@ -1552,7 +1552,7 @@ public:
         return new NotNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) REALM_OVERRIDE
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_cond = mapping.find(m_cond)->second;
@@ -1600,12 +1600,12 @@ public:
         m_child = 0;
     }
 
-    ~TwoColumnsNode() REALM_NOEXCEPT REALM_OVERRIDE
+    ~TwoColumnsNode() REALM_NOEXCEPT override
     {
         delete[] m_value.data();
     }
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
         m_dD = 100.0;
@@ -1621,7 +1621,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         size_t s = start;
 
@@ -1717,14 +1717,14 @@ public:
         m_dT = 50.0;
     }
 
-    void init(const Table& table)  REALM_OVERRIDE
+    void init(const Table& table)  override
     {
         m_compare->set_table();
         if (m_child)
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         size_t res = m_compare->find_first(start, end);
         return res;
@@ -1757,14 +1757,14 @@ public:
         m_dT = 50.0;
     }
 
-    void init(const Table& table) REALM_OVERRIDE
+    void init(const Table& table) override
     {
         m_table = &table;
         if (m_child)
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
+    size_t find_first_local(size_t start, size_t end) override
     {
         size_t ret = realm::npos; // superfluous init, but gives warnings otherwise
         DataType type = m_table->get_column_type(m_origin_column);

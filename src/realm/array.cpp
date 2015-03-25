@@ -2282,7 +2282,7 @@ public:
         m_stats(stats)
     {
     }
-    void handle(ref_type, size_t allocated, size_t used) REALM_OVERRIDE
+    void handle(ref_type, size_t allocated, size_t used) override
     {
         m_stats.allocated += allocated;
         m_stats.used += used;

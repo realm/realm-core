@@ -70,7 +70,7 @@ public:
     {
     }
 
-    MemRef do_alloc(size_t size) REALM_OVERRIDE
+    MemRef do_alloc(size_t size) override
     {
         ref_type ref = m_offset;
         char*& addr = m_map[ref]; // Throws
@@ -80,7 +80,7 @@ public:
         return MemRef(addr, ref);
     }
 
-    void do_free(ref_type ref, const char* addr) REALM_NOEXCEPT REALM_OVERRIDE
+    void do_free(ref_type ref, const char* addr) REALM_NOEXCEPT override
     {
         typedef map<ref_type, char*>::iterator iter;
         iter i = m_map.find(ref);
@@ -92,7 +92,7 @@ public:
         delete[] addr;
     }
 
-    char* do_translate(ref_type ref) const REALM_NOEXCEPT REALM_OVERRIDE
+    char* do_translate(ref_type ref) const REALM_NOEXCEPT override
     {
         typedef map<ref_type, char*>::const_iterator iter;
         iter i = m_map.find(ref);
@@ -118,7 +118,7 @@ public:
     }
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE
+    void Verify() const override
     {
     }
 #endif

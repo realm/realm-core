@@ -35,7 +35,7 @@ namespace realm {
 class ColumnLink: public ColumnLinkBase {
 public:
     ColumnLink(Allocator&, ref_type ref); // Throws
-    ~ColumnLink() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~ColumnLink() REALM_NOEXCEPT override;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
@@ -56,20 +56,20 @@ public:
 
     //@}
 
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void cascade_break_backlinks_to(std::size_t, CascadeState&) REALM_OVERRIDE;
-    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
+    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
 
 #ifdef REALM_DEBUG
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void Verify(const Table&, std::size_t) const override;
 #endif
 
 protected:
     friend class ColumnBackLink;
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) REALM_OVERRIDE;
+    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx) REALM_OVERRIDE;
+                        std::size_t new_target_row_ndx) override;
 
 private:
     void remove_backlinks(std::size_t row_ndx);

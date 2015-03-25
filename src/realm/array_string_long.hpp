@@ -31,7 +31,7 @@ public:
     typedef StringData value_type;
 
     explicit ArrayStringLong(Allocator&) REALM_NOEXCEPT;
-    ~ArrayStringLong() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~ArrayStringLong() REALM_NOEXCEPT override {}
 
     /// Create a new empty long string array and attach this accessor to
     /// it. This does not modify the parent reference information of

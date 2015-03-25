@@ -251,7 +251,7 @@ protected:
 
 class Replication::Interrupted: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
     {
         return "Interrupted";
     }
@@ -278,14 +278,14 @@ private:
     const std::string m_database_file;
     util::Buffer<char> m_transact_log_buffer;
 
-    std::string do_get_database_path() REALM_OVERRIDE;
-    void do_begin_write_transact(SharedGroup&) REALM_OVERRIDE;
-    version_type do_commit_write_transact(SharedGroup&, version_type orig_version) REALM_OVERRIDE;
-    void do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT REALM_OVERRIDE;
-    void do_interrupt() REALM_NOEXCEPT REALM_OVERRIDE;
-    void do_clear_interrupt() REALM_NOEXCEPT REALM_OVERRIDE;
-    void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) REALM_OVERRIDE;
-    void transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end) REALM_OVERRIDE;
+    std::string do_get_database_path() override;
+    void do_begin_write_transact(SharedGroup&) override;
+    version_type do_commit_write_transact(SharedGroup&, version_type orig_version) override;
+    void do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT override;
+    void do_interrupt() REALM_NOEXCEPT override;
+    void do_clear_interrupt() REALM_NOEXCEPT override;
+    void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) override;
+    void transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end) override;
     void internal_transact_log_reserve(std::size_t, char** new_begin, char** new_end);
 
     std::size_t transact_log_size();

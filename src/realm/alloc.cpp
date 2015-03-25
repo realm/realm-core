@@ -43,7 +43,7 @@ public:
         m_baseline = 1; // Zero is not available
     }
 
-    MemRef do_alloc(size_t size) REALM_OVERRIDE
+    MemRef do_alloc(size_t size) override
     {
         char* addr = static_cast<char*>(::malloc(size));
         if (REALM_UNLIKELY(!addr)) {
@@ -57,7 +57,7 @@ public:
     }
 
     MemRef do_realloc(ref_type, const char* addr, size_t old_size,
-                      size_t new_size) REALM_OVERRIDE
+                      size_t new_size) override
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (REALM_UNLIKELY(!new_addr)) {
@@ -72,18 +72,18 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
     }
 
-    void do_free(ref_type, const char* addr) REALM_NOEXCEPT REALM_OVERRIDE
+    void do_free(ref_type, const char* addr) REALM_NOEXCEPT override
     {
         ::free(const_cast<char*>(addr));
     }
 
-    char* do_translate(ref_type ref) const REALM_NOEXCEPT REALM_OVERRIDE
+    char* do_translate(ref_type ref) const REALM_NOEXCEPT override
     {
         return reinterpret_cast<char*>(ref);
     }
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE {}
+    void Verify() const override {}
 #endif
 };
 

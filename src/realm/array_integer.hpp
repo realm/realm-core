@@ -32,7 +32,7 @@ public:
 
     explicit ArrayInteger(no_prealloc_tag) REALM_NOEXCEPT;
     explicit ArrayInteger(Allocator&) REALM_NOEXCEPT;
-    ~ArrayInteger() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~ArrayInteger() REALM_NOEXCEPT override {}
 
     /// Construct an array of the specified type and size, and return just the
     /// reference to the underlying memory. All elements will be initialized to

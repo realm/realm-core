@@ -185,7 +185,7 @@ protected:
     Logger* const m_base_logger;
     Mutex m_mutex;
 
-    void do_log(const std::string& msg) REALM_OVERRIDE
+    void do_log(const std::string& msg) override
     {
         LockGuard l(m_mutex);
         Logger::do_log(m_base_logger, msg);
@@ -203,7 +203,7 @@ protected:
     const std::string m_prefix;
     Logger* const m_base_logger;
 
-    void do_log(const std::string& msg) REALM_OVERRIDE
+    void do_log(const std::string& msg) override
     {
         Logger::do_log(m_base_logger, m_prefix + msg);
     }

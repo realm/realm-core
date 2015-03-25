@@ -36,7 +36,7 @@ public:
     typedef BinaryData value_type;
 
     ColumnBinary(Allocator&, ref_type);
-    ~ColumnBinary() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~ColumnBinary() REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -66,23 +66,23 @@ public:
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const REALM_OVERRIDE;
+                   _impl::OutputStream&) const override;
 
-    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) override;
+    void erase(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
+    void Verify() const override;
+    void to_dot(std::ostream&, StringData title) const override;
+    void do_dump_node_structure(std::ostream&, int) const override;
 #endif
 
 private:
-    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
@@ -112,7 +112,7 @@ private:
 
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const REALM_OVERRIDE;
+                     std::ostream&) const override;
 #endif
 
     friend class Array;

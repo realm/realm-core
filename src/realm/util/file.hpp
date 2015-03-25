@@ -602,9 +602,9 @@ private:
     File& m_file;
     std::unique_ptr<char[]> const m_buffer;
 
-    int_type overflow(int_type) REALM_OVERRIDE;
-    int sync() REALM_OVERRIDE;
-    pos_type seekpos(pos_type, std::ios_base::openmode) REALM_OVERRIDE;
+    int_type overflow(int_type) override;
+    int sync() override;
+    pos_type seekpos(pos_type, std::ios_base::openmode) override;
     void flush();
 
     // Disable copying

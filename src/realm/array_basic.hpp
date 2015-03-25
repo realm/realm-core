@@ -30,7 +30,7 @@ template<class T> class BasicArray: public Array {
 public:
     explicit BasicArray(Allocator&) REALM_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) REALM_NOEXCEPT;
-    ~BasicArray() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~BasicArray() REALM_NOEXCEPT override {}
 
     T get(std::size_t ndx) const REALM_NOEXCEPT;
     void add(T value);

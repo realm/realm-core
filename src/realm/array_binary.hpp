@@ -30,7 +30,7 @@ namespace realm {
 class ArrayBinary: public Array {
 public:
     explicit ArrayBinary(Allocator&) REALM_NOEXCEPT;
-    ~ArrayBinary() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~ArrayBinary() REALM_NOEXCEPT override {}
 
     /// Create a new empty binary array and attach this accessor to
     /// it. This does not modify the parent reference information of

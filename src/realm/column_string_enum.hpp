@@ -54,10 +54,10 @@ public:
     typedef StringData value_type;
 
     ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref);
-    ~ColumnStringEnum() REALM_NOEXCEPT REALM_OVERRIDE;
-    void destroy() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~ColumnStringEnum() REALM_NOEXCEPT override;
+    void destroy() REALM_NOEXCEPT override;
 
-    int compare_values(size_t row1, size_t row2) const REALM_OVERRIDE
+    int compare_values(size_t row1, size_t row2) const override
     {
         StringData a = get(row1);
         StringData b = get(row2);
@@ -92,30 +92,30 @@ public:
     std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
     //@}
 
-    void set_string(std::size_t, StringData) REALM_OVERRIDE;
+    void set_string(std::size_t, StringData) override;
 
     void adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT;
 
     // Search index
-    bool has_search_index() const REALM_NOEXCEPT REALM_OVERRIDE;
-    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) REALM_OVERRIDE;
-    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT REALM_OVERRIDE;
+    bool has_search_index() const REALM_NOEXCEPT override;
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
+    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
     StringIndex* get_search_index() REALM_NOEXCEPT;
     const StringIndex* get_search_index() const REALM_NOEXCEPT;
     StringIndex* create_search_index();
     void install_search_index(StringIndex*) REALM_NOEXCEPT;
-    void destroy_search_index() REALM_NOEXCEPT REALM_OVERRIDE;
+    void destroy_search_index() REALM_NOEXCEPT override;
 
     // Compare two string columns for equality
     bool compare_string(const AdaptiveStringColumn&) const;
     bool compare_string(const ColumnStringEnum&) const;
 
-    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) override;
+    void erase(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
 
     std::size_t GetKeyNdx(StringData value) const;
     std::size_t GetKeyNdxOrAdd(StringData value);
@@ -124,10 +124,10 @@ public:
     const AdaptiveStringColumn& get_keys() const;
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
+    void Verify() const override;
+    void Verify(const Table&, std::size_t) const override;
+    void do_dump_node_structure(std::ostream&, int) const override;
+    void to_dot(std::ostream&, StringData title) const override;
 #endif
 
 private:

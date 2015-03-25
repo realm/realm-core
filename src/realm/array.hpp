@@ -247,7 +247,7 @@ public:
     struct no_prealloc_tag {};
     explicit Array(no_prealloc_tag) REALM_NOEXCEPT;
 
-    ~Array() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~Array() REALM_NOEXCEPT override {}
 
     enum Type {
         type_Normal,
@@ -1020,16 +1020,16 @@ protected:
     static std::size_t get_capacity_from_header(const char*) REALM_NOEXCEPT;
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) REALM_OVERRIDE;
+    void update_child_ref(std::size_t, ref_type) override;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT REALM_OVERRIDE;
+    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT override;
 
     void destroy_children(std::size_t offset = 0) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const REALM_OVERRIDE;
+    get_to_dot_parent(std::size_t ndx_in_parent) const override;
 #endif
 
 protected:

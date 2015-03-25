@@ -47,7 +47,7 @@ class TransactLogConvenientEncoder;
 class ColumnLinkList: public ColumnLinkBase, public ArrayParent {
 public:
     ColumnLinkList(Allocator&, ref_type, Table*, std::size_t column_ndx);
-    ~ColumnLinkList() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~ColumnLinkList() REALM_NOEXCEPT override;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
@@ -62,22 +62,22 @@ public:
 
     void to_json_row(std::size_t row_ndx, std::ostream& out) const;
 
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void cascade_break_backlinks_to(std::size_t, CascadeState&) REALM_OVERRIDE;
-    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) REALM_OVERRIDE;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT REALM_OVERRIDE;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT REALM_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
+    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
+    void Verify() const override;
+    void Verify(const Table&, std::size_t) const override;
 #endif
 
 protected:
-    void do_discard_child_accessors() REALM_NOEXCEPT REALM_OVERRIDE;
+    void do_discard_child_accessors() REALM_NOEXCEPT override;
 
 private:
     // A pointer to the table that this column is part of.
@@ -95,9 +95,9 @@ private:
 
     LinkView* get_ptr(std::size_t row_ndx) const;
 
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) REALM_OVERRIDE;
+    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx) REALM_OVERRIDE;
+                        std::size_t new_target_row_ndx) override;
 
     void unregister_linkview(const LinkView& view);
     ref_type get_row_ref(std::size_t row_ndx) const REALM_NOEXCEPT;
@@ -106,8 +106,8 @@ private:
     void remove_backlink(std::size_t target_row, std::size_t source_row);
 
     // ArrayParent overrides
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) REALM_OVERRIDE;
-    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT REALM_OVERRIDE;
+    void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
+    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT override;
 
     // These helpers are needed because of the way the B+-tree of links is
     // traversed in cascade_break_backlinks_to() and
@@ -122,7 +122,7 @@ private:
     void adj_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
-    std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const REALM_OVERRIDE;
+    std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
 #endif
 
     friend class ColumnBackLink;

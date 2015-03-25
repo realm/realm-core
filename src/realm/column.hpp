@@ -371,7 +371,7 @@ struct ColumnBase::CascadeState {
 class ColumnBase::EraseHandlerBase: public Array::EraseHandler {
 protected:
     EraseHandlerBase(ColumnBase& column) REALM_NOEXCEPT: m_column(column) {}
-    ~EraseHandlerBase() REALM_NOEXCEPT REALM_OVERRIDE {}
+    ~EraseHandlerBase() REALM_NOEXCEPT override {}
     Allocator& get_alloc() REALM_NOEXCEPT;
     void replace_root(Array* leaf); // Ownership passed
 private:
@@ -399,7 +399,7 @@ public:
     struct move_tag {};
     Column(move_tag, Column&) REALM_NOEXCEPT;
 
-    ~Column() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~Column() REALM_NOEXCEPT override;
     void destroy() REALM_NOEXCEPT;
     void move_assign(Column&);
     bool IsIntColumn() const REALM_NOEXCEPT { return true; }
@@ -448,7 +448,7 @@ public:
     StringIndex* create_search_index();
     StringIndex* get_search_index() REALM_NOEXCEPT;
     const StringIndex* get_search_index() const REALM_NOEXCEPT;
-    void destroy_search_index() REALM_NOEXCEPT REALM_OVERRIDE;
+    void destroy_search_index() REALM_NOEXCEPT override;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -469,24 +469,24 @@ public:
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const REALM_OVERRIDE;
+                   _impl::OutputStream&) const override;
 
-    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) override;
+    void erase(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
     void update_from_parent(size_t old_baseline) REALM_NOEXCEPT;
 
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
+    void Verify() const override;
     using ColumnBase::Verify;
-    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const override;
     MemStats stats() const;
-    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const override;
 #endif
 
 protected:
@@ -495,7 +495,7 @@ protected:
     ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array); }
     const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array); }
 
-    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
     void do_erase(std::size_t row_ndx, bool is_last);
 
@@ -511,7 +511,7 @@ protected:
 
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const REALM_OVERRIDE;
+                     std::ostream&) const override;
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
 

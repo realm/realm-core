@@ -281,7 +281,7 @@ public:
     /// Exception thrown if an attempt to lock on to a specific version fails.
     class UnreachableVersion : public std::exception {
     public:
-        const char* what() const REALM_NOEXCEPT_OR_NOTHROW REALM_OVERRIDE
+        const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
         {
             return "Failed to lock on to specific version";
         }

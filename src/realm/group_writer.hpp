@@ -61,7 +61,7 @@ public:
     ///
     /// Returns the position in the file where the first byte was
     /// written.
-    std::size_t write_array(const char* data, std::size_t size, uint_fast32_t checksum) REALM_OVERRIDE;
+    std::size_t write_array(const char* data, std::size_t size, uint_fast32_t checksum) override;
 
 #ifdef REALM_DEBUG
     void dump();

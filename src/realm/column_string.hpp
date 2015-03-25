@@ -49,9 +49,9 @@ public:
     typedef StringData value_type;
 
     AdaptiveStringColumn(Allocator&, ref_type);
-    ~AdaptiveStringColumn() REALM_NOEXCEPT REALM_OVERRIDE;
+    ~AdaptiveStringColumn() REALM_NOEXCEPT override;
 
-    void destroy() REALM_NOEXCEPT REALM_OVERRIDE;
+    void destroy() REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -70,7 +70,7 @@ public:
     void find_all(Column& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
 
-    int compare_values(std::size_t, std::size_t) const REALM_OVERRIDE;
+    int compare_values(std::size_t, std::size_t) const override;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -80,19 +80,19 @@ public:
     std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
     //@}
 
-    void set_string(std::size_t, StringData) REALM_OVERRIDE;
+    void set_string(std::size_t, StringData) override;
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     // Search index
-    bool has_search_index() const REALM_NOEXCEPT REALM_OVERRIDE;
-    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) REALM_OVERRIDE;
-    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT REALM_OVERRIDE;
+    bool has_search_index() const REALM_NOEXCEPT override;
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
+    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
     StringIndex* get_search_index() REALM_NOEXCEPT;
     const StringIndex* get_search_index() const REALM_NOEXCEPT;
     StringIndex* release_search_index() REALM_NOEXCEPT;
     StringIndex* create_search_index();
-    void destroy_search_index() REALM_NOEXCEPT REALM_OVERRIDE;
+    void destroy_search_index() REALM_NOEXCEPT override;
 
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
@@ -115,22 +115,22 @@ public:
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
-                   _impl::OutputStream&) const REALM_OVERRIDE;
+                   _impl::OutputStream&) const override;
 
-    bool is_string_col() const REALM_NOEXCEPT REALM_OVERRIDE;
+    bool is_string_col() const REALM_NOEXCEPT override;
 
-    void insert(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void erase(std::size_t, bool) REALM_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t, bool) REALM_OVERRIDE;
-    void clear(std::size_t, bool) REALM_OVERRIDE;
-    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT REALM_OVERRIDE;
-    void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) override;
+    void erase(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t, bool) override;
+    void clear(std::size_t, bool) override;
+    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify() const REALM_OVERRIDE;
-    void Verify(const Table&, std::size_t) const REALM_OVERRIDE;
-    void to_dot(std::ostream&, StringData title) const REALM_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const REALM_OVERRIDE;
+    void Verify() const override;
+    void Verify(const Table&, std::size_t) const override;
+    void to_dot(std::ostream&, StringData title) const override;
+    void do_dump_node_structure(std::ostream&, int) const override;
 #endif
 
 protected:
@@ -139,7 +139,7 @@ protected:
 private:
     StringIndex* m_search_index;
 
-    std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
+    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
@@ -181,7 +181,7 @@ private:
 
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const REALM_OVERRIDE;
+                     std::ostream&) const override;
 #endif
 
     friend class Array;

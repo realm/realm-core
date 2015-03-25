@@ -190,7 +190,7 @@ public:
     {
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) REALM_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) override
     {
         result r;
         r.m_test_name = details.test_name;
@@ -199,7 +199,7 @@ public:
         SimpleReporter::end(details, elapsed_seconds);
     }
 
-    void summary(const Summary& summary) REALM_OVERRIDE
+    void summary(const Summary& summary) override
     {
         SimpleReporter::summary(summary);
 
