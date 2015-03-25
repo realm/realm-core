@@ -6,14 +6,14 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
+#include <realm/table_macros.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
 
 
@@ -49,18 +49,18 @@ using namespace test_util;
 
 namespace {
 
-TIGHTDB_TABLE_1(TestTableInt,
+REALM_TABLE_1(TestTableInt,
                 first, Int)
 
-TIGHTDB_TABLE_2(TestTableInt2,
+REALM_TABLE_2(TestTableInt2,
                 first,  Int,
                 second, Int)
 
-TIGHTDB_TABLE_2(TestTableDate,
+REALM_TABLE_2(TestTableDate,
                 first, DateTime,
                 second, Int)
 
-TIGHTDB_TABLE_2(TestTableFloatDouble,
+REALM_TABLE_2(TestTableFloatDouble,
                 first, Float,
                 second, Double)
 
@@ -135,7 +135,7 @@ TEST(TableView_GetSetInteger)
 
 
 namespace {
-TIGHTDB_TABLE_3(TableFloats,
+REALM_TABLE_3(TableFloats,
                 col_float, Float,
                 col_double, Double,
                 col_int, Int)
@@ -564,7 +564,7 @@ TEST(TableView_FindAll)
 
 namespace {
 
-TIGHTDB_TABLE_1(TestTableString,
+REALM_TABLE_1(TestTableString,
                 first, String)
 
 } // anonymous namespace
@@ -726,9 +726,9 @@ TEST(TableView_SortNullString)
     t.add_column(type_String, "s", true);
     t.add_empty_row(4);
     t.set_string(0, 0, StringData(""));     // empty string
-    t.set_string(0, 1, tightdb::null());             // tightdb::null()
+    t.set_string(0, 1, realm::null());             // realm::null()
     t.set_string(0, 2, StringData(""));     // empty string
-    t.set_string(0, 3, tightdb::null());             // tightdb::null()
+    t.set_string(0, 3, realm::null());             // realm::null()
 
     TableView tv;
 
@@ -1080,14 +1080,14 @@ TEST(TableView_LowLevelSubtables)
 
 namespace {
 
-TIGHTDB_TABLE_1(MyTable1,
+REALM_TABLE_1(MyTable1,
                 val, Int)
 
-TIGHTDB_TABLE_2(MyTable2,
+REALM_TABLE_2(MyTable2,
                 val, Int,
                 subtab, Subtable<MyTable1>)
 
-TIGHTDB_TABLE_2(MyTable3,
+REALM_TABLE_2(MyTable3,
                 val, Int,
                 subtab, Subtable<MyTable2>)
 

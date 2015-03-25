@@ -3,15 +3,15 @@
 
 #include <string>
 
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/alloc_slab.hpp>
+#include <memory>
+#include <realm/util/file.hpp>
+#include <realm/alloc_slab.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 // Test independence and thread-safety
@@ -168,7 +168,7 @@ TEST(Alloc_AttachBuffer)
     GROUP_TEST_PATH(path);
 
     // Produce a valid buffer
-    UniquePtr<char[]> buffer;
+    std::unique_ptr<char[]> buffer;
     size_t buffer_size;
     {
         File::try_remove(path);

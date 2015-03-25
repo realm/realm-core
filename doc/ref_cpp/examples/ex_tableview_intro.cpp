@@ -1,8 +1,8 @@
 // @@Example: ex_cpp_tableview_into @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 

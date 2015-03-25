@@ -1,9 +1,9 @@
 // @@Example: ex_cpp_typed_query_avg @@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
-TIGHTDB_TABLE_3(PeopleTable,
+REALM_TABLE_3(PeopleTable,
                 name, String,
                 age, Int,
                 weight, Int)

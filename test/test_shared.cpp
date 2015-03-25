@@ -16,23 +16,23 @@
 #  include <windows.h>
 #endif
 
-#include <tightdb.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/terminate.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm.hpp>
+#include <realm/util/features.h>
+#include <realm/util/safe_int_ops.hpp>
+#include <memory>
+#include <realm/util/bind.hpp>
+#include <realm/util/terminate.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
 #include "crypt_key.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -77,7 +77,7 @@ namespace {
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !defined(__APPLE__)
-#  if TIGHTDB_ANDROID || defined DISABLE_ASYNC || defined TIGHTDB_ENABLE_ENCRYPTION
+#  if REALM_ANDROID || defined DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
 bool allow_async = true;
@@ -85,7 +85,7 @@ bool allow_async = true;
 #endif
 
 
-TIGHTDB_TABLE_4(TestTableShared,
+REALM_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
                 third,  Bool,
@@ -118,7 +118,7 @@ void writer(string path, int id)
 }
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined REALM_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, string path, int id)
 {
@@ -148,7 +148,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
             cerr << "waitpid got bad arguments" << endl;
         if (errno == ECHILD)
             cerr << "waitpid tried to wait for the wrong child: " << pid << endl;
-        TIGHTDB_TERMINATE("waitpid failed");
+        REALM_TERMINATE("waitpid failed");
     }
     bool child_exited_from_signal = WIFSIGNALED(stat_loc);
     CHECK(child_exited_from_signal);
@@ -167,7 +167,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION && !defined(TIGHTDB_ANDROID)
+#if !defined(__APPLE__) && !defined(_WIN32)&& !defined REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST(Shared_PipelinedWritesWithKills)
 {
@@ -187,7 +187,7 @@ TEST(Shared_PipelinedWritesWithKills)
     }
     int pid = fork();
     if (pid == -1)
-        TIGHTDB_TERMINATE("fork() failed");
+        REALM_TERMINATE("fork() failed");
     if (pid == 0) {
         // first writer!
         writer(path, 0);
@@ -198,7 +198,7 @@ TEST(Shared_PipelinedWritesWithKills)
             int pid2 = pid;
             pid = fork();
             if (pid == pid_t(-1))
-                TIGHTDB_TERMINATE("fork() failed");
+                REALM_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
                 _exit(0);
@@ -213,6 +213,7 @@ TEST(Shared_PipelinedWritesWithKills)
     }
 }
 #endif
+
 
 TEST(Shared_CompactingOnTheFly)
 {
@@ -260,11 +261,17 @@ TEST(Shared_CompactingOnTheFly)
     writer_thread.join();
     {
         SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        {
+            sg2.begin_write();
+            sg2.commit();
+        }
         CHECK_EQUAL(true, sg2.compact());
         ReadTransaction rt2(sg2);
         rt2.get_group().Verify();
     }
 }
+
+
 
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
@@ -853,8 +860,8 @@ TEST(Shared_ManyReaders)
 
     const int max_N = 64;
     CHECK(max_N >= rounds[num_rounds-1]);
-    UniquePtr<SharedGroup> shared_groups[8 * max_N];
-    UniquePtr<ReadTransaction> read_transactions[8 * max_N];
+    std::unique_ptr<SharedGroup> shared_groups[8 * max_N];
+    std::unique_ptr<ReadTransaction> read_transactions[8 * max_N];
 
     for (int round = 0; round < num_rounds; ++round) {
         int N = rounds[round];
@@ -1085,7 +1092,7 @@ TEST(Shared_ManyReaders)
 
 namespace {
 
-TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
+REALM_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 } // anonymous namespace
 
@@ -1094,7 +1101,7 @@ TEST(Shared_WritesSpecialOrder)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_BPNODE_SIZE, but that takes a loooooong time!
+    const int num_rows = 5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
 
     {
@@ -1219,8 +1226,8 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
-#if !defined TIGHTDB_ANDROID && !defined TIGHTDB_IOS
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
+#if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
@@ -1238,7 +1245,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     for (int i = 0; i < 10; ++i) {
         pid_t pid = fork();
         if (pid == pid_t(-1))
-            TIGHTDB_TERMINATE("fork() failed");
+            REALM_TERMINATE("fork() failed");
         if (pid == 0) {
             // Child
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
@@ -1253,7 +1260,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             int options = 0;
             pid = waitpid(pid, &stat_loc, options);
             if (pid == pid_t(-1))
-                TIGHTDB_TERMINATE("waitpid() failed");
+                REALM_TERMINATE("waitpid() failed");
             bool child_exited_normaly = WIFEXITED(stat_loc);
             CHECK(child_exited_normaly);
             int child_exit_status = WEXITSTATUS(stat_loc);
@@ -1288,7 +1295,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 }
 
 #endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
@@ -1433,10 +1440,10 @@ TEST(Shared_FormerErrorCase1)
 
 namespace {
 
-TIGHTDB_TABLE_1(FormerErrorCase2_Subtable,
+REALM_TABLE_1(FormerErrorCase2_Subtable,
                 value,  Int)
 
-TIGHTDB_TABLE_1(FormerErrorCase2_Table,
+REALM_TABLE_1(FormerErrorCase2_Table,
                 bar, Subtable<FormerErrorCase2_Subtable>)
 
 } // namespace
@@ -1463,7 +1470,7 @@ TEST(Shared_FormerErrorCase2)
 
 namespace {
 
-TIGHTDB_TABLE_1(OverAllocTable,
+REALM_TABLE_1(OverAllocTable,
                 text, String)
 
 } // namespace
@@ -1600,9 +1607,9 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
         TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
         table->add_search_index(0);
-        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
             table->add_empty_row();
-        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
             table->remove(0);
         db.commit();
     }
@@ -1874,7 +1881,7 @@ void multiprocess_make_table(string path, string lock_path, string alone_path, s
 void multiprocess_threaded(TestResults& test_results, string path, size_t num_threads, size_t base)
 {
     // Do some changes in a async db
-    UniquePtr<test_util::ThreadWrapper[]> threads;
+    std::unique_ptr<test_util::ThreadWrapper[]> threads;
     threads.reset(new test_util::ThreadWrapper[num_threads]);
 
     // Start threads
@@ -1990,34 +1997,34 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 namespace {
 
-static const int num_threads = 3;
-static int shared_state[num_threads];
-static SharedGroup* sgs[num_threads];
-static Mutex muu;
+const int num_threads = 3;
+int shared_state[num_threads];
+SharedGroup* sgs[num_threads];
+Mutex* muu;
 
 void waiter(string path, int i)
 {
     SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 1;
         sgs[i] = sg;
     }
     sg->wait_for_change();
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 2; // this state should not be observed by the writer
     }
     sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 3;
     }
     sg->begin_read();
     sg->end_read();
     sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 4;
     }
     // works within a read transaction as well
@@ -2025,14 +2032,14 @@ void waiter(string path, int i)
     sg->wait_for_change();
     sg->end_read();
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 5;
     }
     sg->begin_read();
     sg->end_read();
     sg->wait_for_change(); // wait until wait_for_change is released
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 6;
     }
 }
@@ -2041,6 +2048,7 @@ void waiter(string path, int i)
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
+    muu = new Mutex;
     SHARED_GROUP_TEST_PATH(path);
     for (int j=0; j < num_threads; j++)
         shared_state[j] = 0;
@@ -2052,7 +2060,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (shared_state[j] != 1) try_again = true;
         }
     }
@@ -2063,7 +2071,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (3 != shared_state[j]) try_again = true;
         }
     }
@@ -2074,7 +2082,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (4 != shared_state[j]) try_again = true;
         }
     }
@@ -2084,7 +2092,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (5 != shared_state[j]) try_again = true;
         }
     }
@@ -2092,21 +2100,22 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (sgs[j]) {
                 sgs[j]->wait_for_change_release();
             }
             if (6 != shared_state[j]) {
                 try_again = true;
             }
-            else { 
-                delete sgs[j];
-                sgs[j] = 0;
-            }
         }
     }
     for (int j=0; j < num_threads; j++)
         threads[j].join();
+    for (int j=0; j < num_threads; j++) {
+        delete sgs[j];
+        sgs[j] = 0;
+    }
+    delete muu;
 }
 
 #endif // endif not on windows (or apple)
@@ -2248,7 +2257,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-#ifndef TIGHTDB_ENABLE_ENCRYPTION // encrpted buffers aren't supported
+#ifndef REALM_ENABLE_ENCRYPTION // encrpted buffers aren't supported
     // The empty group created initially by a shared group accessor is special
     // in that it contains no nodes, and the root-ref is therefore zero. The
     // following block checks that the contents of such a file is still
@@ -2546,8 +2555,8 @@ TEST(Shared_MovingSearchIndex)
         wt.get_group().Verify();
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
@@ -2565,8 +2574,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(1) && table->has_search_index(2));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
@@ -2580,8 +2589,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
@@ -2596,8 +2605,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
         CHECK_EQUAL(1,  table->find_first_string(0, "foo_Y"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
@@ -2643,7 +2652,7 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 {
     // This test only makes sense when we can insert a number of rows
     // equal to the square of the maximum B+-tree node size.
-    size_t max_node_size = TIGHTDB_MAX_BPNODE_SIZE;
+    size_t max_node_size = REALM_MAX_BPNODE_SIZE;
     size_t max_node_size_squared = max_node_size;
     if (int_multiply_with_overflow_detect(max_node_size_squared, max_node_size))
         return;

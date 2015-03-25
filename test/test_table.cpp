@@ -7,18 +7,18 @@
 #include <fstream>
 #include <ostream>
 
-#include <tightdb.hpp>
-#include <tightdb/lang_bind_helper.hpp>
-#include <tightdb/util/buffer.hpp>
+#include <realm.hpp>
+#include <realm/lang_bind_helper.hpp>
+#include <realm/util/buffer.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -54,7 +54,7 @@ using unit_test::TestResults;
 
 namespace {
 
-TIGHTDB_TABLE_2(TupleTableType,
+REALM_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
 
@@ -63,12 +63,12 @@ TIGHTDB_TABLE_2(TupleTableType,
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
-TIGHTDB_TABLE_3(SubtableType,
+REALM_TABLE_3(SubtableType,
                 year,  Int,
                 daysSinceLastVisit, Int,
                 conceptId, String)
 
-TIGHTDB_TABLE_7(MainTableType,
+REALM_TABLE_7(MainTableType,
                 patientId, String,
                 gender, Int,
                 ethnicity, Int,
@@ -93,16 +93,16 @@ TEST(Table_ManyColumnsCrash2)
 #if 0
             // Add row to subtable through typed interface
             SubtableType::Ref subtable = mainTable[0].events->get_table_ref();
-            TIGHTDB_ASSERT(subtable->is_attached());
+            REALM_ASSERT(subtable->is_attached());
             subtable->add(0, 0, "");
-            TIGHTDB_ASSERT(subtable->is_attached());
+            REALM_ASSERT(subtable->is_attached());
 
 #else
             // Add row to subtable through dynamic interface. This mimics Java closest
             TableRef subtable2 = dynPatientTable->get_subtable(6, 0);
-            TIGHTDB_ASSERT(subtable2->is_attached());
+            REALM_ASSERT(subtable2->is_attached());
             size_t subrow = subtable2->add_empty_row();
-            TIGHTDB_ASSERT(subtable2->is_attached());
+            REALM_ASSERT(subtable2->is_attached());
 
 #endif
             if((counter % 1000) == 0){
@@ -139,7 +139,7 @@ TEST(Table_Null)
 
         // Test that inserting null in non-nullable column will throw
         try {
-            table->set_string(0, 0, tightdb::null());
+            table->set_string(0, 0, realm::null());
             CHECK(false);
         }
         catch (...) {
@@ -217,7 +217,7 @@ TEST(Table_1)
         CHECK_EQUAL(v2, table.get_int(1, i));
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -228,7 +228,7 @@ TEST(Table_ColumnNameTooLong)
     Group group;
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
-    UniquePtr<char[]> buf(new char[buf_size]);
+    std::unique_ptr<char[]> buf(new char[buf_size]);
     CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
@@ -262,7 +262,7 @@ TEST(Table_StringOrBinaryTooBig)
 
     size_t large_bin_size = 0xFFFFF1;
     size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
-    UniquePtr<char[]> large_buf(new char[large_bin_size]);
+    std::unique_ptr<char[]> large_buf(new char[large_bin_size]);
     CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
                       LogicError::string_too_big);
     CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size)),
@@ -326,7 +326,7 @@ TEST(Table_Floats)
         CHECK_EQUAL(v2, table.get_double(1, i));
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -335,7 +335,7 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-TIGHTDB_TABLE_4(TestTable,
+REALM_TABLE_4(TestTable,
                 first,  Int,
                 second, Int,
                 third,  Bool,
@@ -355,7 +355,7 @@ TEST(Table_2)
     CHECK_EQUAL(true, r.third);
     CHECK_EQUAL(Wed, r.fourth);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -383,14 +383,14 @@ TEST(Table_3)
     CHECK_EQUAL(3, table[0].first);
     CHECK_EQUAL(3, table[99].first);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
 
 namespace {
 
-TIGHTDB_TABLE_2(TestTableEnum,
+REALM_TABLE_2(TestTableEnum,
                 first,      Enum<Days>,
                 second,     String)
 
@@ -411,14 +411,14 @@ TEST(Table_4)
     CHECK_EQUAL(size_t(1),  table.column().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
     CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
 
 namespace {
 
-TIGHTDB_TABLE_2(TestTableFloats,
+REALM_TABLE_2(TestTableFloats,
                 first,      Float,
                 second,     Double)
 
@@ -435,7 +435,7 @@ TEST(Table_Float2)
     CHECK_EQUAL(1.1f, r.first);
     CHECK_EQUAL(2.2, r.second);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -461,7 +461,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(7, table[5].second);
     CHECK_EQUAL(8, table[6].second);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
@@ -473,7 +473,7 @@ TEST(Table_Delete)
     CHECK(table.is_empty());
     CHECK_EQUAL(0, table.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -679,13 +679,13 @@ TEST(Table_LowLevelCopy)
     Table table;
     setup_multi_table(table, 15, 2);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
     Table table2 = table;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table2.Verify();
 #endif
 
@@ -693,7 +693,7 @@ TEST(Table_LowLevelCopy)
 
     TableRef table3 = table.copy();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table3->Verify();
 #endif
 
@@ -707,13 +707,13 @@ TEST(Table_HighLevelCopy)
     table.add(10, 120, false, Mon);
     table.add(12, 100, true,  Tue);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
     TestTable table2 = table;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table2.Verify();
 #endif
 
@@ -721,7 +721,7 @@ TEST(Table_HighLevelCopy)
 
     TestTable::Ref table3 = table.copy();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table3->Verify();
 #endif
 
@@ -741,7 +741,7 @@ TEST(Table_DeleteAllTypes)
 
     CHECK_EQUAL(12, table.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
@@ -749,7 +749,7 @@ TEST(Table_DeleteAllTypes)
     table.clear();
     CHECK_EQUAL(0, table.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1040,7 +1040,7 @@ TEST(Table_FindInt)
     CHECK_EQUAL(size_t(1000), table.column().second.find_first(0));
     CHECK_EQUAL(size_t(-1),   table.column().second.find_first(1001));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1052,12 +1052,12 @@ TEST(Table_6)
 {
     TestTableEnum table;
 
-    TDB_QUERY(TestQuery, TestTableEnum) {
+    RLM_QUERY(TestQuery, TestTableEnum) {
     //  first.between(Mon, Thu);
         second == "Hello" || (second == "Hey" && first == Mon);
     }};
 
-    TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
+    RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
         (void)b;
         (void)a;
         //first.between(a, b);
@@ -1068,7 +1068,7 @@ TEST(Table_6)
     //size_t result2 = table.Range(10, 200).find_first(TestQuery());
     //CHECK_EQUAL((size_t)-1, result2);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1104,7 +1104,7 @@ TEST(Table_FindAllInt)
     CHECK_EQUAL(7, v.get_source_ndx(3));
     CHECK_EQUAL(9, v.get_source_ndx(4));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1139,7 +1139,7 @@ TEST(Table_SortedInt)
     CHECK_EQUAL(3, v.get_source_ndx(8));
     CHECK_EQUAL(8, v.get_source_ndx(9));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1176,7 +1176,7 @@ TEST(Table_Sorted_Query_where)
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1790,7 +1790,7 @@ TEST(Table_IndexInt)
     CHECK_EQUAL(6, table.column().second.find_first(30));
     CHECK_EQUAL(7, table.column().second.find_first(100));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1799,7 +1799,7 @@ TEST(Table_IndexInt)
 
 namespace {
 
-TIGHTDB_TABLE_4(TestTableAE,
+REALM_TABLE_4(TestTableAE,
                 first,  Int,
                 second, String,
                 third,  Bool,
@@ -1890,7 +1890,7 @@ TEST(Table_AutoEnumerationFindFindAll)
 
 namespace {
 
-TIGHTDB_TABLE_4(TestTableEnum4,
+REALM_TABLE_4(TestTableEnum4,
                 col1, String,
                 col2, String,
                 col3, String,
@@ -1935,16 +1935,16 @@ TEST(Table_AutoEnumerationOptimize)
         CHECK_EQUAL("test", t[i].col4);
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     t.Verify();
 #endif
 }
 
 namespace {
 
-TIGHTDB_TABLE_1(TestSubtabEnum2,
+REALM_TABLE_1(TestSubtabEnum2,
                 str, String)
-TIGHTDB_TABLE_1(TestSubtabEnum1,
+REALM_TABLE_1(TestSubtabEnum1,
                 subtab, Subtable<TestSubtabEnum2>)
 
 } // anonymous namespace
@@ -2040,7 +2040,7 @@ TEST(Table_SlabAlloc)
     table.remove(2);
     table.remove(4);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -2313,7 +2313,7 @@ TEST(Table_SpecDeleteColumns)
     CHECK_EQUAL(0, table->get_column_count());
     CHECK(table->is_empty());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table->Verify();
 #endif
 }
@@ -2334,13 +2334,13 @@ TEST(Table_NullInEnum)
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(100, r);
 
-    table->set_string(0, 50, tightdb::null());
+    table->set_string(0, 50, realm::null());
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(99, r);
 
     table->optimize();
 
-    table->set_string(0, 50, tightdb::null());
+    table->set_string(0, 50, realm::null());
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(99, r);
 
@@ -2348,22 +2348,22 @@ TEST(Table_NullInEnum)
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(100, r);
 
-    table->set_string(0, 50, tightdb::null());
+    table->set_string(0, 50, realm::null());
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(99, r);
 
-    r = table->where().equal(0, tightdb::null()).count();
+    r = table->where().equal(0, realm::null()).count();
     CHECK_EQUAL(1, r);
 
-    table->set_string(0, 55, tightdb::null());
-    r = table->where().equal(0, tightdb::null()).count();
+    table->set_string(0, 55, realm::null());
+    r = table->where().equal(0, realm::null()).count();
     CHECK_EQUAL(2, r);
 
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(98, r);
 
     table->remove(55);
-    r = table->where().equal(0, tightdb::null()).count();
+    r = table->where().equal(0, realm::null()).count();
     CHECK_EQUAL(1, r);
 }
 
@@ -2494,7 +2494,7 @@ TEST(Table_SpecAddColumns)
     stab->insert_done();
     CHECK_EQUAL(2, table->get_subtable_size(7, 0));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table->Verify();
 #endif
 }
@@ -2565,7 +2565,7 @@ TEST(Table_SpecDeleteColumnsBug)
     table->remove_column(1); // age
     table->remove_column(3); // extra
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table->Verify();
 #endif
 }
@@ -2719,14 +2719,14 @@ TEST(Table_Mixed)
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
     CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
 
 
 namespace {
-TIGHTDB_TABLE_1(TestTableMX,
+REALM_TABLE_1(TestTableMX,
                 first, Mixed)
 } // anonymous namespace
 
@@ -2910,18 +2910,18 @@ TEST(Table_LowLevelSubtables)
 
 
 namespace {
-TIGHTDB_TABLE_2(MyTable1,
+REALM_TABLE_2(MyTable1,
                 val, Int,
                 val2, Int)
 
-TIGHTDB_TABLE_2(MyTable2,
+REALM_TABLE_2(MyTable2,
                 val, Int,
                 subtab, Subtable<MyTable1>)
 
-TIGHTDB_TABLE_1(MyTable3,
+REALM_TABLE_1(MyTable3,
                 subtab, Subtable<MyTable2>)
 
-TIGHTDB_TABLE_1(MyTable4,
+REALM_TABLE_1(MyTable4,
                 mix, Mixed)
 } // anonymous namespace
 
@@ -3086,7 +3086,7 @@ TEST(Table_SetMethod)
 
 
 namespace {
-TIGHTDB_TABLE_2(TableDateAndBinary,
+REALM_TABLE_2(TableDateAndBinary,
                 date, DateTime,
                 bin, Binary)
 } // anonymous namespace
@@ -3291,7 +3291,7 @@ TEST(Table_HasSharedSpec)
 
 
 namespace {
-TIGHTDB_TABLE_3(TableAgg,
+REALM_TABLE_3(TableAgg,
                 c_int,   Int,
                 c_float, Float,
                 c_double, Double)
@@ -3300,7 +3300,7 @@ TIGHTDB_TABLE_3(TableAgg,
 } // anonymous namespace
 
 #if TEST_DURATION > 0
-#define TBL_SIZE TIGHTDB_MAX_BPNODE_SIZE*10
+#define TBL_SIZE REALM_MAX_BPNODE_SIZE*10
 #else
 #define TBL_SIZE 10
 #endif
@@ -3347,7 +3347,7 @@ TEST(Table_Aggregates)
 }
 
 namespace {
-TIGHTDB_TABLE_1(TableAgg2,
+REALM_TABLE_1(TableAgg2,
                 c_count, Int)
 } // anonymous namespace
 
@@ -3415,7 +3415,7 @@ TEST(Table_FormerLeakCase)
 
 namespace {
 
-TIGHTDB_TABLE_3(TablePivotAgg,
+REALM_TABLE_3(TablePivotAgg,
                 sex,   String,
                 age,   Int,
                 hired, Bool)
@@ -3608,7 +3608,7 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
                             case type_Mixed:
                             case type_Link:
                             case type_LinkList:
-                                TIGHTDB_ASSERT(false);
+                                REALM_ASSERT(false);
                         }
                     }
                 }
@@ -3684,7 +3684,7 @@ TEST(Table_WriteSlice)
     // Run through a 3-D matrix of table sizes, slice offsets, and
     // slice sizes. Each test involves a table with columns of each
     // possible type.
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 135 };
 #else
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561 };
@@ -3717,8 +3717,8 @@ TEST(Table_Parent)
 {
     TableRef table = Table::create();
     CHECK_EQUAL(TableRef(), table->get_parent_table());
-    CHECK_EQUAL(tightdb::npos, table->get_parent_row_index()); // Not a subtable
-    CHECK_EQUAL(tightdb::npos, table->get_index_in_group()); // Not a group-level table
+    CHECK_EQUAL(realm::npos, table->get_parent_row_index()); // Not a subtable
+    CHECK_EQUAL(realm::npos, table->get_index_in_group()); // Not a group-level table
 
     DescriptorRef subdesc;
     table->add_column(type_Table, "", &subdesc);
@@ -5791,7 +5791,7 @@ TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
     table.add_column(type_Int, "");
-    table.add_empty_row(TIGHTDB_MAX_BPNODE_SIZE*TIGHTDB_MAX_BPNODE_SIZE+1);
+    table.add_empty_row(REALM_MAX_BPNODE_SIZE*REALM_MAX_BPNODE_SIZE+1);
     table.add_column(type_Int, "");
     table.Verify();
 }
@@ -5801,7 +5801,7 @@ TEST(Table_ClearWithTwoLevelBptree)
 {
     Table table;
     table.add_column(type_Mixed, "");
-    table.add_empty_row(TIGHTDB_MAX_BPNODE_SIZE+1);
+    table.add_empty_row(REALM_MAX_BPNODE_SIZE+1);
     table.clear();
     table.Verify();
 }
@@ -5857,15 +5857,15 @@ TEST(Table_Nulls)
         t.add_empty_row(3);
         t.set_string(0, 0, "foo"); // short strings
         t.set_string(0, 1, "");
-        t.set_string(0, 2, tightdb::null());
+        t.set_string(0, 2, realm::null());
 
         CHECK_EQUAL(1, t.count_string(0, "foo"));
         CHECK_EQUAL(1, t.count_string(0, ""));
-        CHECK_EQUAL(1, t.count_string(0, tightdb::null()));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
 
         CHECK_EQUAL(0, t.find_first_string(0, "foo"));
         CHECK_EQUAL(1, t.find_first_string(0, ""));
-        CHECK_EQUAL(2, t.find_first_string(0, tightdb::null()));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
 
         tv = t.find_all_string(0, "foo");
         CHECK_EQUAL(1, tv.size());
@@ -5873,7 +5873,7 @@ TEST(Table_Nulls)
         tv = t.find_all_string(0, "");
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(1, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, tightdb::null());
+        tv = t.find_all_string(0, realm::null());
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(2, tv.get_source_ndx(0));
 
@@ -5881,11 +5881,11 @@ TEST(Table_Nulls)
 
         CHECK_EQUAL(1, t.count_string(0, "xxxxxxxxxxYYYYYYYYYY"));
         CHECK_EQUAL(1, t.count_string(0, ""));
-        CHECK_EQUAL(1, t.count_string(0, tightdb::null()));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
 
         CHECK_EQUAL(0, t.find_first_string(0, "xxxxxxxxxxYYYYYYYYYY"));
         CHECK_EQUAL(1, t.find_first_string(0, ""));
-        CHECK_EQUAL(2, t.find_first_string(0, tightdb::null()));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
 
         tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYY");
         CHECK_EQUAL(1, tv.size());
@@ -5893,7 +5893,7 @@ TEST(Table_Nulls)
         tv = t.find_all_string(0, "");
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(1, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, tightdb::null());
+        tv = t.find_all_string(0, realm::null());
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(2, tv.get_source_ndx(0));
 
@@ -5904,12 +5904,12 @@ TEST(Table_Nulls)
         CHECK_EQUAL(1, t.count_string(0,
             "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.count_string(0, ""));
-        CHECK_EQUAL(1, t.count_string(0, tightdb::null()));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
 
         CHECK_EQUAL(0, t.find_first_string(0,
             "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.find_first_string(0, ""));
-        CHECK_EQUAL(2, t.find_first_string(0, tightdb::null()));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
 
         tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
         CHECK_EQUAL(1, tv.size());
@@ -5917,7 +5917,7 @@ TEST(Table_Nulls)
         tv = t.find_all_string(0, "");
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(1, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, tightdb::null());
+        tv = t.find_all_string(0, realm::null());
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(2, tv.get_source_ndx(0));
     }

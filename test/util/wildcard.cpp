@@ -1,13 +1,13 @@
 #include <algorithm>
 
-#include <tightdb/util/assert.hpp>
+#include <realm/util/assert.hpp>
 
 #include "wildcard.hpp"
 
 using namespace std;
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -32,13 +32,13 @@ wildcard_pattern::wildcard_pattern(const string& text):
     m_cards.push_back(card(pos, m_text.size()));
 }
 
-bool wildcard_pattern::match(const char* begin, const char* end) const TIGHTDB_NOEXCEPT
+bool wildcard_pattern::match(const char* begin, const char* end) const REALM_NOEXCEPT
 {
     const char* begin_2 = begin;
     const char* end_2   = end;
 
     size_t num_cards = m_cards.size();
-    TIGHTDB_ASSERT(num_cards >= 1);
+    REALM_ASSERT(num_cards >= 1);
 
     typedef string::const_iterator str_iter;
 
@@ -83,4 +83,4 @@ bool wildcard_pattern::match(const char* begin, const char* end) const TIGHTDB_N
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

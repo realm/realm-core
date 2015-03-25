@@ -2,15 +2,15 @@
 #ifdef TEST_COLUMN_STRING
 
 #include <vector>
-#include <tightdb/column_string.hpp>
-#include <tightdb/column_string_enum.hpp>
-#include <tightdb/index_string.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_string_enum.hpp>
+#include <realm/index_string.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -688,7 +688,7 @@ TEST(ColumnString_Null)
 
         a.add("foo");
         a.add("");
-        a.add(tightdb::null());
+        a.add(realm::null());
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -710,7 +710,7 @@ TEST(ColumnString_Null)
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
         AdaptiveStringColumn a(Allocator::get_default(), ref, true);
 
-        a.add(tightdb::null());
+        a.add(realm::null());
         a.add("");
         a.add("foo");
 
@@ -720,9 +720,9 @@ TEST(ColumnString_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, tightdb::null());
-        a.insert(2, tightdb::null());
-        a.insert(4, tightdb::null());
+        a.insert(0, realm::null());
+        a.insert(2, realm::null());
+        a.insert(4, realm::null());
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
@@ -739,7 +739,7 @@ TEST(ColumnString_Null)
         AdaptiveStringColumn a(Allocator::get_default(), ref, true);
 
         a.add("");
-        a.add(tightdb::null());
+        a.add(realm::null());
         a.add("foo");
 
         CHECK_EQUAL(a.is_null(0), false);
@@ -778,7 +778,7 @@ TEST(ColumnString_Null)
                 v.erase(v.begin() + del);
             }
             else {
-                // Generate string with good probability of being empty or tightdb::null()
+                // Generate string with good probability of being empty or realm::null()
                 static const char str[] = "This string must be longer than 64 bytes in order to test the BinaryBlob type of strings";
                 size_t len;
                  
@@ -791,7 +791,7 @@ TEST(ColumnString_Null)
                 string stdstr;
 
                 if (random.draw_int<unsigned char>() > 100) {
-                    sd = tightdb::null();
+                    sd = realm::null();
                     stdstr = "null";
                 }
                 else {
@@ -882,7 +882,7 @@ TEST(ColumnString_FindAllRangesLong)
     ref_type col_ref = Column::create(Allocator::get_default());
     Column c(Allocator::get_default(), col_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
     asc.add("HEJSA");
@@ -939,7 +939,7 @@ TEST(ColumnString_FindAllRanges)
     ref_type col_ref = Column::create(Allocator::get_default());
     Column c(Allocator::get_default(), col_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -1016,7 +1016,7 @@ TEST(ColumnString_Count)
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -1059,7 +1059,7 @@ TEST(ColumnString_Index)
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
 
-    // 17 elements, to test node splits with TIGHTDB_MAX_BPNODE_SIZE = 3 or other small number
+    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
     asc.add("1");
     asc.add("HEJSA");
@@ -1080,7 +1080,7 @@ TEST(ColumnString_Index)
 
     const StringIndex& ndx = *asc.create_search_index();
     CHECK(asc.has_search_index());
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     ndx.verify_entries(asc);
 #else
     static_cast<void>(ndx);

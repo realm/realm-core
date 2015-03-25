@@ -9,7 +9,7 @@ SUMMARY    : &g_mixed_summary
 DESCR      : &g_mixed_descr
              The Mixed class is a light-weight implementation of a flexible type system. Once
              a variable is given a value via a constructor, it is not possible to modify the
-             value. Any supported type of TightDB can be used with the Mixed class. The current
+             value. Any supported type of Realm can be used with the Mixed class. The current
              supported types are boolean, integer, timestamps, strings, binary data and
              {@link class_dyn_table}.
 

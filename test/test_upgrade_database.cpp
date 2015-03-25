@@ -10,14 +10,14 @@
 #  include <sys/types.h>
 #endif
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 // Test independence and thread-safety
@@ -63,7 +63,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from Group
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         File::copy(path, path + ".tmp");
 
@@ -101,7 +101,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         File::copy(path, path + ".tmp");
 
@@ -129,7 +129,7 @@ TEST(Upgrade_Database_2_3)
     // Now see if we can open the upgraded file and also commit to it
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         SharedGroup sg(path + ".tmp");
         WriteTransaction rt(sg);
@@ -157,7 +157,7 @@ TEST(Upgrade_Database_2_3)
     // Begin from scratch; see if we can upgrade file and then use a write transaction
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         File::copy(path, path + ".tmp");
 
@@ -206,8 +206,8 @@ TEST(Upgrade_Database_2_3)
 #else   
     // For creating a version 2 database; use in OLD (0.84) core
     char leafsize[20];
-    sprintf(leafsize, "%d", TIGHTDB_MAX_BPNODE_SIZE);
-    string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".tightdb";
+    sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
+    string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".realm";
     File::try_remove(path);
 
     Group g;

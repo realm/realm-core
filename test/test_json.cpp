@@ -7,8 +7,8 @@
 #include <fstream>
 #include <ostream>
 
-#include <tightdb.hpp>
-#include <tightdb/lang_bind_helper.hpp>
+#include <realm.hpp>
+#include <realm/lang_bind_helper.hpp>
 
 #include "util/misc.hpp"
 #include "util/jsmn.hpp"
@@ -16,9 +16,9 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 

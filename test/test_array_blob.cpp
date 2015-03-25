@@ -3,15 +3,15 @@
 
 #include <cstring>
 
-#include <tightdb/array_blob.hpp>
-#include <tightdb/column_string.hpp>
+#include <realm/array_blob.hpp>
+#include <realm/column_string.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm::util;
+using namespace realm::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -120,7 +120,7 @@ TEST(ArrayBlob_AdaptiveStringLeak)
 {
     ref_type col_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col(Allocator::get_default(), col_ref);
-    for (size_t i = 0; i != 2 * TIGHTDB_MAX_BPNODE_SIZE; ++i)
+    for (size_t i = 0; i != 2 * REALM_MAX_BPNODE_SIZE; ++i)
         col.insert(0, string(100, 'a'));  // use constant larger than 'medium_string_max_size'
 
     col.destroy();
@@ -137,7 +137,7 @@ TEST(ArrayBlob_Null)
 
         a.add("foo");
         a.add("");
-        a.add(tightdb::null()); 
+        a.add(realm::null()); 
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -161,7 +161,7 @@ TEST(ArrayBlob_Null)
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 
-        a.add(tightdb::null());  
+        a.add(realm::null());  
         a.add("");
         a.add("foo");
 
@@ -171,9 +171,9 @@ TEST(ArrayBlob_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, tightdb::null()); 
-        a.insert(2, tightdb::null()); 
-        a.insert(4, tightdb::null()); 
+        a.insert(0, realm::null()); 
+        a.insert(2, realm::null()); 
+        a.insert(4, realm::null()); 
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
@@ -192,7 +192,7 @@ TEST(ArrayBlob_Null)
         a.clear();
 
         a.add("");
-        a.add(tightdb::null());
+        a.add(realm::null());
         a.add("foo");
 
         CHECK_EQUAL(a.is_null(0), false);
@@ -245,7 +245,7 @@ TEST(ArrayBlob_Null)
                 string stdstr;
 
                 if (random.draw_int<unsigned char>() > 100) {
-                    sd = tightdb::null();
+                    sd = realm::null();
                     stdstr = "null";
                 }
                 else {

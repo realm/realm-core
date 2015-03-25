@@ -1,7 +1,7 @@
 /*
- * Transaction benchmark for SQLite 3 and TightDB
+ * Transaction benchmark for SQLite 3 and Realm
  *
- * (C) Copyright 2012 by TightDB, Inc. <http://www.tightdb.com/>
+ * (C) Copyright 2012 by Realm, Inc. <http://www.realm.com/>
  *
  */
 
@@ -16,16 +16,16 @@
 #include <time.h>
 #include <sqlite3.h>
 #include <mysql/mysql.h>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
+#include <realm/group_shared.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // which databases are possible
-#define DB_TIGHTDB 0
+#define DB_REALM 0
 #define DB_SQLITE  1
 #define DB_MYSQL   2
 #define DB_SQLITE_WAL 3
@@ -37,7 +37,7 @@ using namespace tightdb;
 #define DB_NAME "benchmark"
 
 
-TIGHTDB_TABLE_2(TestTable,
+REALM_TABLE_2(TestTable,
                 x, Int,
                 y, Int)
 
@@ -73,7 +73,7 @@ void usage(const char *msg)
     cout << " -w   : number of writers" << endl;
     cout << " -r   : number of readers" << endl;
     cout << " -f   : database file" << endl;
-    cout << " -d   : database (tdb, sqlite, sqlite-wal or mysql)" << endl;
+    cout << " -d   : database (realm, sqlite, sqlite-wal or mysql)" << endl;
     cout << " -t   : duration (in secs)" << endl;
     cout << " -n   : number of rows" << endl;
     cout << " -v   : verbose" << endl;
@@ -260,7 +260,7 @@ static void *mysql_reader(void *arg)
     mysql_close(db);
 }
 
-static void *tdb_reader(void *arg)
+static void *realm_reader(void *arg)
 {
     struct timespec ts_1, ts_2;
     struct thread_info *tinfo = (struct thread_info *)arg;
@@ -388,7 +388,7 @@ static void *mysql_writer(void *arg)
     return NULL;
 }
 
-static void *tdb_writer(void *arg)
+static void *realm_writer(void *arg)
 {
     struct timespec ts_1, ts_2;
     struct thread_info *tinfo = (struct thread_info *)arg;
@@ -485,7 +485,7 @@ void mysql_create(const char *f, long n)
     mysql_close(db);
 }
 
-void tdb_create(const char *f, long n)
+void realm_create(const char *f, long n)
 {
     File::try_remove(f);
     File::try_remove(string(f)+".lock");
@@ -550,8 +550,8 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     clock_gettime(CLOCK_REALTIME, &ts_1);
     for(int i=0; i<n_readers; ++i) {
         switch (database) {
-        case DB_TIGHTDB:
-            pthread_create(&tinfo[i].thread_id, &attr, &tdb_reader, &tinfo[i]);
+        case DB_REALM:
+            pthread_create(&tinfo[i].thread_id, &attr, &realm_reader, &tinfo[i]);
             break;
         case DB_SQLITE:
         case DB_SQLITE_WAL:
@@ -566,8 +566,8 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     for(int i=0; i<n_writers; ++i) {
         int j = i+n_readers;
         switch (database) {
-        case DB_TIGHTDB:
-            pthread_create(&tinfo[j].thread_id, &attr, &tdb_writer, &tinfo[j]);
+        case DB_REALM:
+            pthread_create(&tinfo[j].thread_id, &attr, &realm_writer, &tinfo[j]);
             break;
         case DB_SQLITE:
         case DB_SQLITE_WAL:
@@ -601,7 +601,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     clock_gettime(CLOCK_REALTIME, &ts_2);
     wall_time = delta_time(ts_1, ts_2);
 
-    if (database == DB_TIGHTDB || database == DB_SQLITE) {
+    if (database == DB_REALM || database == DB_SQLITE) {
         unlink(("tmp"+string(datfile)).c_str());
         unlink(("tmp"+string(datfile)+".lock").c_str());
     }
@@ -639,8 +639,8 @@ int main(int argc, char *argv[])
             duration = atoi(optarg);
             break;
         case 'd':
-            if (strcmp(optarg, "tdb") == 0) {
-                database = DB_TIGHTDB;
+            if (strcmp(optarg, "realm") == 0) {
+                database = DB_REALM;
             }
             if (strcmp(optarg, "sqlite") == 0) {
                 database = DB_SQLITE;
@@ -682,8 +682,8 @@ int main(int argc, char *argv[])
 
     if (verbose) cout << "Creating test data for " << database << endl;
     switch (database) {
-    case DB_TIGHTDB:
-        tdb_create(datfile, n_records);
+    case DB_REALM:
+        realm_create(datfile, n_records);
         break;
     case DB_SQLITE:
     case DB_SQLITE_WAL:

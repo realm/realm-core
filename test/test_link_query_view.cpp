@@ -6,18 +6,18 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
-#include <tightdb/link_view.hpp> // lasse todo remove
-#include <tightdb.hpp>
+#include <realm/table_macros.hpp>
+#include <realm/link_view.hpp> // lasse todo remove
+#include <realm.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(LinkList_Basic1)
 {
@@ -1119,7 +1119,7 @@ TEST(Link_FindNullLink)
     match = table2->column<LinkList>(col_linklist2).is_null().find(2);
     CHECK_EQUAL(3, match);
 
-    // We have not yet defined behaviour of finding tightdb::null()-links in a linked-to table, so we just throw. Todo.
+    // We have not yet defined behaviour of finding realm::null()-links in a linked-to table, so we just throw. Todo.
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
 

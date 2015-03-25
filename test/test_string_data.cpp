@@ -5,13 +5,13 @@
 #include <string>
 #include <sstream>
 
-#include <tightdb.hpp>
-#include <tightdb/string_data.hpp>
+#include <realm.hpp>
+#include <realm/string_data.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety
@@ -238,7 +238,7 @@ TEST(StringData_Substrings)
     // original unchanged
 
     StringData sd_0("");
-    StringData ns = tightdb::null();
+    StringData ns = realm::null();
     StringData data("x");
 
     // null.

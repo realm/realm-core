@@ -1,11 +1,11 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_BASIC
 
-#include <tightdb/column_basic.hpp>
+#include <realm/column_basic.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

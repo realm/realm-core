@@ -3,12 +3,12 @@
 
 #include <string>
 
-#include <tightdb/binary_data.hpp>
+#include <realm/binary_data.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

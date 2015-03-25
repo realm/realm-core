@@ -1,11 +1,11 @@
 @files = <*.csv>;
 foreach $file (@files) {
-	unlink("out.tightdb");
+	unlink("out.realm");
 
 	print "\n\n\n\n***********************************************************\ntesting $file\n***********************************************************\n\n\n\n";
 
 
-    system("../../csv.exe", $file, "out.tightdb");
+    system("../../csv.exe", $file, "out.realm");
 	
 	if ( $? != 0 )
 	{

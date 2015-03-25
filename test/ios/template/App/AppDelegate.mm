@@ -3,7 +3,7 @@
 //  iOSTemp
 //
 //  Created by Oleks on 28/03/14.
-//  Copyright (c) 2014 Tightdb. All rights reserved.
+//  Copyright (c) 2014 Realm. All rights reserved.
 //
 
 #import "AppDelegate.h"
@@ -14,7 +14,7 @@
 #include <string>
 
 using namespace std;
-using namespace tightdb::test_util;
+using namespace realm::test_util;
 
 @implementation AppDelegate
 

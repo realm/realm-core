@@ -1,18 +1,18 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX_STRING
 
-#include <tightdb.hpp>
-#include <tightdb/index_string.hpp>
+#include <realm.hpp>
+#include <realm/index_string.hpp>
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using namespace util;
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -148,7 +148,7 @@ TEST(StringIndex_DeleteAll)
     col.erase(2, 2 == col.size()-1);
     col.erase(1, 1 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -172,7 +172,7 @@ TEST(StringIndex_DeleteAll)
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -224,7 +224,7 @@ TEST(StringIndex_Delete)
     // Delete all items
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
@@ -243,7 +243,7 @@ TEST(StringIndex_ClearEmpty)
 
     // Clear to remove all entries
     col.clear();
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -272,7 +272,7 @@ TEST(StringIndex_Clear)
 
     // Clear to remove all entries
     col.clear();
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -677,7 +677,7 @@ TEST(StringIndex_FuzzyTest_Int)
     ref_type ref = Column::create(Allocator::get_default());
     Column col(Allocator::get_default(), ref);
     Random random(random_int<unsigned long>());
-    const size_t n = 1.2 * TIGHTDB_MAX_BPNODE_SIZE;
+    const size_t n = 1.2 * REALM_MAX_BPNODE_SIZE;
 
     col.create_search_index();
 
@@ -754,11 +754,11 @@ TEST(StringIndex_Null)
     AdaptiveStringColumn col(Allocator::get_default(), ref, true);
 
     col.add("");
-    col.add(tightdb::null());
+    col.add(realm::null());
 
     const StringIndex& ndx = *col.create_search_index();
 
-    const size_t r1 = ndx.find_first(tightdb::null());
+    const size_t r1 = ndx.find_first(realm::null());
     CHECK_EQUAL(r1, 1);
 
     col.destroy();

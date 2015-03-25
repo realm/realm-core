@@ -2,21 +2,21 @@
 #ifdef TEST_LINKS
 
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-TIGHTDB_TABLE_4(TestTableLinks,
+REALM_TABLE_4(TestTableLinks,
                 first,  String,
                 second, Int,
                 third,  Bool,
@@ -825,7 +825,7 @@ TEST(Links_ClearColumnWithTwoLevelBptree)
     target->add_empty_row();
 
     origin->add_column_link(type_LinkList, "", *target);
-    origin->add_empty_row(TIGHTDB_MAX_BPNODE_SIZE+1);
+    origin->add_empty_row(REALM_MAX_BPNODE_SIZE+1);
     origin->clear();
     origin->add_empty_row();
     origin->get_linklist(0,0)->add(0);
@@ -842,7 +842,7 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     origin->add_column_link(type_LinkList, "", *target);
     origin->add_empty_row();
     LinkViewRef link_list = origin->get_linklist(0,0);
-    for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE+1; ++i)
+    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE+1; ++i)
         link_list->add(0);
     link_list->clear();
     group.Verify();
@@ -941,7 +941,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     // Break link by nullifying
     CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
     CHECK(target_row_0 && target_row_1);
-    origin_row_1.nullify_link(0); // origin[1].o_1 -> tightdb::null()
+    origin_row_1.nullify_link(0); // origin[1].o_1 -> realm::null()
     CHECK(target_row_0 && !target_row_1);
     target->add_empty_row();
     target_row_1 = target->get(1);

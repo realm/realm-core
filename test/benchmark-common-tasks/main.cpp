@@ -1,16 +1,16 @@
 #include <iostream>
 #include <sstream>
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -26,7 +26,7 @@ using namespace tightdb::test_util;
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
 */
 
-static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
+static const char realm_path[] = "/tmp/benchmark-common-tasks.realm";
 static const size_t min_repetitions = 10;
 static const size_t max_repetitions = 100;
 static const double min_duration_s = 0.05;
@@ -261,7 +261,7 @@ void run_benchmark(BenchmarkResults& results)
     for (size_t i = 0; i < num_durabilities; ++i) {
         // Open a SharedGroup:
         File::try_remove(realm_path);
-        UniquePtr<SharedGroup> group;
+        std::unique_ptr<SharedGroup> group;
         SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
         group.reset(new SharedGroup(realm_path, false, level));
 

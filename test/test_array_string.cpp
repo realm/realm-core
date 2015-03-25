@@ -1,14 +1,14 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING
 
-#include <tightdb/array_string.hpp>
-#include <tightdb/column.hpp>
+#include <realm/array_string.hpp>
+#include <realm/column.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
@@ -519,7 +519,7 @@ TEST(ArrayString_Null)
 
         a.add("foo");
         a.add("");
-        a.add(tightdb::null()); 
+        a.add(realm::null()); 
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -541,7 +541,7 @@ TEST(ArrayString_Null)
         ArrayString a(Allocator::get_default(), true);
         a.create();
 
-        a.add(tightdb::null());  
+        a.add(realm::null());  
         a.add("");
         a.add("foo");
 
@@ -551,9 +551,9 @@ TEST(ArrayString_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, tightdb::null()); 
-        a.insert(2, tightdb::null()); 
-        a.insert(4, tightdb::null()); 
+        a.insert(0, realm::null()); 
+        a.insert(2, realm::null()); 
+        a.insert(4, realm::null()); 
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
@@ -570,7 +570,7 @@ TEST(ArrayString_Null)
         a.create();
 
         a.add("");
-        a.add(tightdb::null());
+        a.add(realm::null());
         a.add("foo");
 
         CHECK_EQUAL(a.is_null(0), false);
@@ -609,8 +609,8 @@ TEST(ArrayString_Null)
                 v.erase(v.begin() + del);
             }
             else {
-                // Generate string with good probability of being empty or tightdb::null()
-                static const char str[] = "This is a test of tightdb::null() strings";
+                // Generate string with good probability of being empty or realm::null()
+                static const char str[] = "This is a test of realm::null() strings";
                 size_t len;
 
                 if (random.draw_int<unsigned char>() > 100)
@@ -622,8 +622,8 @@ TEST(ArrayString_Null)
                 string stdstr;
 
                 if (random.draw_int<unsigned char>() > 100) {
-                    sd = tightdb::null();
-                    stdstr = "tightdb::null()";
+                    sd = realm::null();
+                    stdstr = "realm::null()";
                 }
                 else {
                     sd = StringData(str, len);
@@ -642,7 +642,7 @@ TEST(ArrayString_Null)
 
                 CHECK_EQUAL(a.size(), v.size());
                 for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "tightdb::null()") {
+                    if (v[i] == "realm::null()") {
                         CHECK(a.is_null(i));
                         CHECK(a.get(i).data() == 0);
                     }

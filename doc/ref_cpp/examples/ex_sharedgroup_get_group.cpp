@@ -2,14 +2,14 @@
 // @@Fold@@
 #include <cassert>
 #include <iostream>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // Define schema for main table
-TIGHTDB_TABLE_3(PeopleTable,
+REALM_TABLE_3(PeopleTable,
                   name,   String,
                   age,    Int,
                   hired,  Bool)
@@ -36,7 +36,7 @@ void traverse(const Group& group)
 void func()
 {
     // Create a new shared group
-    SharedGroup db("shared_db.tightdb");
+    SharedGroup db("shared_db.realm");
 
     {
 // @@EndFold@@
@@ -52,7 +52,7 @@ void func()
 int main()
 {
     func();
-    util::File::remove("shared_db.tightdb");
+    util::File::remove("shared_db.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -1,9 +1,9 @@
 // @@Example: ex_cpp_dyn_table_lower_upper_bound @@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@EndFold@@
 // Using lower_bound_int() to insert new elements before existsing ones

@@ -4,7 +4,7 @@
 #include <sstream>
 #include <iostream>
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 #include "../util/timer.hpp"
 
@@ -17,7 +17,7 @@
 ***********************************************************************************/
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 namespace {
 
@@ -27,7 +27,7 @@ const size_t rounds = 1000;
 //const size_t row_count = 128*10; // should be divisible by 128
 //const size_t rounds = 1;
 
-TIGHTDB_TABLE_11(TestTable,
+REALM_TABLE_11(TestTable,
                 bits_0,    Int,
                 bits_1,    Int,
                 bits_2,    Int,
@@ -193,7 +193,7 @@ public:
 
 int main()
 {
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     cout << "Running Debug Build\n";
 #else
     cout << "Running Release Build\n";
@@ -204,7 +204,7 @@ int main()
 
 
 #ifndef ONLY_CN_TESTS
-    // TightDB tests
+    // Realm tests
     {
         TestTable table;
 
@@ -255,7 +255,7 @@ int main()
                         }
                     }
                 }
-                cout << "TightDB: Column "<<i<<": Sparse:  "<<timer<<"\n";
+                cout << "Realm: Column "<<i<<": Sparse:  "<<timer<<"\n";
 
                 // Search with column intrinsic functions
                 timer.reset();
@@ -276,7 +276,7 @@ int main()
                         }
                     }
                 }
-                cout << "TightDB: Column "<<i<<": Sparse2: "<<timer<<"\n";
+                cout << "Realm: Column "<<i<<": Sparse2: "<<timer<<"\n";
             }
 
             // Do a search over entire column (all matches)
@@ -304,7 +304,7 @@ int main()
                         }
                     }
                 }
-                cout << "TightDB: Column "<<i<<": Many:    "<<timer<<"\n";
+                cout << "Realm: Column "<<i<<": Many:    "<<timer<<"\n";
 
                 // Search with column intrinsic functions
                 timer.reset();
@@ -325,7 +325,7 @@ int main()
                         }
                     }
                 }
-                cout << "TightDB: Column "<<i<<": Many2:   "<<timer<<"\n";
+                cout << "Realm: Column "<<i<<": Many2:   "<<timer<<"\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -359,7 +359,7 @@ int main()
                         }
                     }
                 }
-                cout << "TightDB: Column "<<i<<": Sum:     "<<timer<<"\n";
+                cout << "Realm: Column "<<i<<": Sum:     "<<timer<<"\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -392,7 +392,7 @@ int main()
                         }
                     }
                 }
-                cout << "TightDB: Column "<<i<<": Sum2:    "<<timer<<"\n";
+                cout << "Realm: Column "<<i<<": Sum2:    "<<timer<<"\n";
             }
         }
 
@@ -416,7 +416,7 @@ int main()
                             }
                         }
                     }
-                    cout << "TightDB: "<<run<<"Column c "<<i<<": Sparse: "<<timer<<"\n";
+                    cout << "Realm: "<<run<<"Column c "<<i<<": Sparse: "<<timer<<"\n";
                 }
 
                 // Query: Do a search over entire column (sparse, only last value matches)
@@ -437,7 +437,7 @@ int main()
                             }
                         }
                     }
-                    cout << "TightDB: "<<run<<"Column q "<<i<<": Sparse: "<<timer<<"\n";
+                    cout << "Realm: "<<run<<"Column q "<<i<<": Sparse: "<<timer<<"\n";
                 }
 
                 // Do a search over entire column (many matches)
@@ -462,7 +462,7 @@ int main()
                             }
                         }
                     }
-                    cout << "TightDB: "<<run<<"Column c "<<i<<": Many:   "<<timer<<"\n";
+                    cout << "Realm: "<<run<<"Column c "<<i<<": Many:   "<<timer<<"\n";
                 }
 
                 // Query: Do a search over entire column (many matches)
@@ -483,7 +483,7 @@ int main()
                             }
                         }
                     }
-                    cout << "TightDB: "<<run<<"Column q "<<i<<": Many:   "<<timer<<"\n";
+                    cout << "Realm: "<<run<<"Column q "<<i<<": Many:   "<<timer<<"\n";
                 }
             }
 
@@ -687,7 +687,7 @@ int main()
 
 #endif
 
-    // TightDB Multi-column tests
+    // Realm Multi-column tests
     {
         TestTable table;
 
@@ -734,7 +734,7 @@ int main()
                     }
                 }
             }
-            cout << "TightDB: c2: "<<timer<<"\n";
+            cout << "Realm: c2: "<<timer<<"\n";
         }
 
         // Search over three columns
@@ -751,7 +751,7 @@ int main()
                     }
                 }
             }
-            cout << "TightDB: c3: "<<timer<<"\n";
+            cout << "Realm: c3: "<<timer<<"\n";
         }
 
         // Search over four columns
@@ -771,7 +771,7 @@ int main()
                     }
                 }
             }
-            cout << "TightDB: c4: "<<timer<<"\n";
+            cout << "Realm: c4: "<<timer<<"\n";
         }
 
         // Search over five columns
@@ -792,7 +792,7 @@ int main()
                     }
                 }
             }
-            cout << "TightDB: c5: "<<timer<<"\n";
+            cout << "Realm: c5: "<<timer<<"\n";
         }
 
         // Search over six columns
@@ -814,7 +814,7 @@ int main()
                     }
                 }
             }
-            cout << "TightDB: c6: "<<timer<<"\n";
+            cout << "Realm: c6: "<<timer<<"\n";
         }
 
         // Search over six columns
@@ -837,7 +837,7 @@ int main()
                     }
                 }
             }
-            cout << "TightDB: c7: "<<timer<<"\n";
+            cout << "Realm: c7: "<<timer<<"\n";
         }
     }
 

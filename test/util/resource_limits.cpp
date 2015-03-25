@@ -1,22 +1,22 @@
 #include <stdexcept>
 
-#include <tightdb/util/assert.hpp>
+#include <realm/util/assert.hpp>
 
 #include "resource_limits.hpp"
 
 #ifndef _WIN32
-#  define TIGHTDB_HAVE_POSIX_RLIMIT 1
+#  define REALM_HAVE_POSIX_RLIMIT 1
 #endif
 
-#if TIGHTDB_HAVE_POSIX_RLIMIT
+#if REALM_HAVE_POSIX_RLIMIT
 #  include <sys/resource.h>
 #endif
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
-#if TIGHTDB_HAVE_POSIX_RLIMIT
+#if REALM_HAVE_POSIX_RLIMIT
 
 namespace {
 
@@ -28,7 +28,7 @@ long get_rlimit(Resource resource, bool hard)
             resource_2 = RLIMIT_NOFILE;
             break;
     }
-    TIGHTDB_ASSERT(resource_2 != -1);
+    REALM_ASSERT(resource_2 != -1);
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
@@ -45,7 +45,7 @@ void set_rlimit(Resource resource, long value, bool hard)
             resource_2 = RLIMIT_NOFILE;
             break;
     }
-    TIGHTDB_ASSERT(resource_2 != -1);
+    REALM_ASSERT(resource_2 != -1);
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
@@ -59,15 +59,15 @@ void set_rlimit(Resource resource, long value, bool hard)
 
 } // anonymous namespace
 
-#endif // TIGHTDB_HAVE_POSIX_RLIMIT
+#endif // REALM_HAVE_POSIX_RLIMIT
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
-#if TIGHTDB_HAVE_POSIX_RLIMIT
+#if REALM_HAVE_POSIX_RLIMIT
 
-bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT
+bool system_has_rlimit(Resource) REALM_NOEXCEPT
 {
     return true;
 }
@@ -90,9 +90,9 @@ void set_soft_rlimit(Resource resource, long value)
     set_rlimit(resource, value, hard);
 }
 
-#else // ! TIGHTDB_HAVE_POSIX_RLIMIT
+#else // ! REALM_HAVE_POSIX_RLIMIT
 
-bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT
+bool system_has_rlimit(Resource) REALM_NOEXCEPT
 {
     return false;
 }
@@ -112,9 +112,9 @@ void set_soft_rlimit(Resource, long)
     throw runtime_error("Not supported");
 }
 
-#endif // ! TIGHTDB_HAVE_POSIX_RLIMIT
+#endif // ! REALM_HAVE_POSIX_RLIMIT
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 

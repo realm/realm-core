@@ -13,19 +13,19 @@
 #  include <unistd.h> // usleep()
 #endif
 
-#include <tightdb.hpp>
-#include <tightdb/column.hpp>
-#include <tightdb/utilities.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/column.hpp>
+#include <realm/utilities.hpp>
+#include <realm/util/bind.hpp>
+#include <realm/util/file.hpp>
 
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -64,7 +64,7 @@ using unit_test::TestResults;
 
 namespace {
 
-TIGHTDB_FORCEINLINE void rand_sleep(Random& random)
+REALM_FORCEINLINE void rand_sleep(Random& random)
 {
     const int64_t ms = 500000;
     unsigned char r = random.draw_int<unsigned char>();
@@ -279,7 +279,7 @@ private:
 const int ITER3 =     20;
 const int WRITERS3 =   4;
 const int READERS3 =   4;
-const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_BPNODE_SIZE = 1000
+const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if REALM_MAX_BPNODE_SIZE = 1000
 volatile bool terminate3 = false;
 
 void write_thread3(string path)
