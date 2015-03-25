@@ -494,7 +494,8 @@ void ColumnBinary::refresh_accessor_tree(size_t, const Spec&)
             return;
         }
         // Root is inner node
-        m_array->init_from_parent();
+        Array* root = m_array.get();
+        root->init_from_parent();
         return;
     }
 
