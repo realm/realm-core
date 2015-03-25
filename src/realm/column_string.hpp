@@ -280,11 +280,6 @@ inline const StringIndex* AdaptiveStringColumn::get_search_index() const REALM_N
     return m_search_index.get();
 }
 
-inline std::unique_ptr<StringIndex> AdaptiveStringColumn::release_search_index() REALM_NOEXCEPT
-{
-    return std::move(m_search_index);
-}
-
 inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
                                                            Allocator& alloc) REALM_NOEXCEPT
 {

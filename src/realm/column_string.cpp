@@ -197,6 +197,12 @@ void AdaptiveStringColumn::destroy_search_index() REALM_NOEXCEPT
 }
 
 
+std::unique_ptr<StringIndex> AdaptiveStringColumn::release_search_index() REALM_NOEXCEPT
+{
+    return std::move(m_search_index);
+}
+
+
 void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
                                                 size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
