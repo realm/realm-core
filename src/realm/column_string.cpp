@@ -64,8 +64,7 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 
 
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
-    m_search_index(0)
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -86,7 +85,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
             // Small strings root leaf
             ArrayString* root = new ArrayString(alloc); // Throws
             root->init_from_mem(mem);
-            m_array = root;
+            m_array.reset(root);
             return;
         }
         case Array::type_HasRefs: {
@@ -95,20 +94,20 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
                 // Medium strings root leaf
                 ArrayStringLong* root = new ArrayStringLong(alloc); // Throws
                 root->init_from_mem(mem);
-                m_array = root;
+                m_array.reset(root);
                 return;
             }
             // Big strings root leaf
             ArrayBigBlobs* root = new ArrayBigBlobs(alloc); // Throws
             root->init_from_mem(mem);
-            m_array = root;
+            m_array.reset(root);
             return;
         }
         case Array::type_InnerBptreeNode: {
             // Non-leaf root
             Array* root = new Array(alloc); // Throws
             root->init_from_mem(mem);
-            m_array = root;
+            m_array.reset(root);
             return;
         }
     }
@@ -118,8 +117,6 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
 
 AdaptiveStringColumn::~AdaptiveStringColumn() REALM_NOEXCEPT
 {
-    delete m_array;
-    delete m_search_index;
 }
 
 
@@ -139,17 +136,17 @@ StringData AdaptiveStringColumn::get(size_t ndx) const REALM_NOEXCEPT
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             return leaf->get(ndx);
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             return leaf->get(ndx);
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->get_string(ndx);
     }
 
@@ -189,15 +186,20 @@ StringIndex* AdaptiveStringColumn::create_search_index()
         index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
-    m_search_index = index.release();
-    return m_search_index;
+    m_search_index = std::move(index);
+    return m_search_index.get();
 }
 
 
 void AdaptiveStringColumn::destroy_search_index() REALM_NOEXCEPT
 {
-    delete m_search_index;
-    m_search_index = 0;
+    m_search_index.reset();
+}
+
+
+std::unique_ptr<StringIndex> AdaptiveStringColumn::release_search_index() REALM_NOEXCEPT
+{
+    return std::move(m_search_index);
 }
 
 
@@ -205,8 +207,8 @@ void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* paren
                                                 size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+                                         !allow_duplicate_valaues, m_array->get_alloc())); // Throws
 }
 
 
@@ -222,19 +224,19 @@ void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) REALM_NO
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             leaf->update_from_parent(old_baseline);
         }
         else {
             bool is_big = m_array->get_context_flag();
             if (!is_big) {
                 // Medium strings root leaf
-                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                 leaf->update_from_parent(old_baseline);
             }
             else {
                 // Big strings root leaf
-                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                 leaf->update_from_parent(old_baseline);
             }
         }
@@ -340,17 +342,17 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
         LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
         switch (leaf_type) {
             case leaf_type_Small: {
-                ArrayString* leaf = static_cast<ArrayString*>(m_array);
+                ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
                 leaf->set(ndx, value); // Throws
                 return;
             }
             case leaf_type_Medium: {
-                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                 leaf->set(ndx, value); // Throws
                 return;
             }
             case leaf_type_Big: {
-                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                 leaf->set_string(ndx, value); // Throws
                 return;
             }
@@ -475,19 +477,19 @@ void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             leaf->erase(ndx); // Throws
             return;
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             leaf->erase(ndx); // Throws
             return;
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         leaf->erase(ndx); // Throws
         return;
     }
@@ -495,7 +497,7 @@ void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
     // Non-leaf root
     size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
+    Array::erase_bptree_elem(m_array.get(), ndx_2, erase_leaf_elem); // Throws
 }
 
 
@@ -539,7 +541,7 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             leaf->set(row_ndx, copy_of_value); // Throws
             leaf->erase(last_row_ndx); // Throws
             return;
@@ -547,13 +549,13 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             leaf->set(row_ndx, copy_of_value); // Throws
             leaf->erase(last_row_ndx); // Throws
             return;
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         leaf->set_string(row_ndx, copy_of_value); // Throws
         leaf->erase(last_row_ndx); // Throws
         return;
@@ -563,7 +565,7 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     SetLeafElem set_leaf_elem(m_array->get_alloc(), copy_of_value);
     m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array, realm::npos, erase_leaf_elem); // Throws
+    Array::erase_bptree_elem(m_array.get(), realm::npos, erase_leaf_elem); // Throws
 }
 
 
@@ -573,19 +575,19 @@ void AdaptiveStringColumn::do_clear()
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             leaf->clear(); // Throws
         }
         else {
             bool is_big = m_array->get_context_flag();
             if (!is_big) {
                 // Medium strings root leaf
-                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                 leaf->clear(); // Throws
             }
             else {
                 // Big strings root leaf
-                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                 leaf->clear(); // Throws
             }
         }
@@ -601,9 +603,7 @@ void AdaptiveStringColumn::do_clear()
 
         // Remove original node
         m_array->destroy_deep();
-        delete m_array;
-
-        m_array = array.release();
+        m_array = std::move(array);
     }
 
     if (m_search_index)
@@ -620,19 +620,19 @@ size_t AdaptiveStringColumn::count(StringData value) const
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             return leaf->count(value);
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             return leaf->count(value);
         }
         // Big strings root leaf
         BinaryData bin(value.data(), value.size());
         bool is_string = true;
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->count(bin, is_string);
     }
 
@@ -690,17 +690,17 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             return leaf->find_first(value, begin, end);
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             return leaf->find_first(value, begin, end);
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         BinaryData bin(value.data(), value.size());
         bool is_string = true;
         return leaf->find_first(bin, is_string, begin, end);
@@ -775,19 +775,19 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             leaf->find_all(result, value, leaf_offset, begin, end); // Throws
             return;
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             leaf->find_all(result, value, leaf_offset, begin, end); // Throws
             return;
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         BinaryData bin(value.data(), value.size());
         bool is_string = true;
         leaf->find_all(result, bin, is_string, leaf_offset, begin, end); // Throws
@@ -866,17 +866,17 @@ size_t AdaptiveStringColumn::lower_bound_string(StringData value) const REALM_NO
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             return ColumnBase::lower_bound(*leaf, value);
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             return ColumnBase::lower_bound(*leaf, value);
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         BinToStrAdaptor adapt(*leaf);
         return ColumnBase::lower_bound(adapt, value);
     }
@@ -890,17 +890,17 @@ size_t AdaptiveStringColumn::upper_bound_string(StringData value) const REALM_NO
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             return ColumnBase::upper_bound(*leaf, value);
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             return ColumnBase::upper_bound(*leaf, value);
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         BinToStrAdaptor adapt(*leaf);
         return ColumnBase::upper_bound(adapt, value);
     }
@@ -1009,19 +1009,19 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
             switch (leaf_type) {
                 case leaf_type_Small: {
                     // Small strings root leaf
-                    ArrayString* leaf = static_cast<ArrayString*>(m_array);
+                    ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
                     goto insert_done;
                 }
                 case leaf_type_Medium: {
                     // Medium strings root leaf
-                    ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                    ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
                     goto insert_done;
                 }
                 case leaf_type_Big: {
                     // Big strings root leaf
-                    ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                    ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                     new_sibling_ref =
                         leaf->bptree_leaf_insert_string(row_ndx_2, value, state); // Throws
                     goto insert_done;
@@ -1114,7 +1114,7 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
         if (value_size <= medium_string_max_size)
             return leaf_type_Medium;
         // Upgrade root leaf from medium to big strings
-        ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+        ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
         std::unique_ptr<ArrayBigBlobs> new_leaf;
         ArrayParent* parent = leaf->get_parent();
         size_t ndx_in_parent = leaf->get_ndx_in_parent();
@@ -1125,13 +1125,12 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
         new_leaf->update_parent(); // Throws
         copy_leaf(*leaf, *new_leaf); // Throws
         leaf->destroy();
-        delete leaf;
-        m_array = new_leaf.release();
+        m_array = std::move(new_leaf);
         return leaf_type_Big;
     }
     if (value_size <= small_string_max_size)
         return leaf_type_Small;
-    ArrayString* leaf = static_cast<ArrayString*>(m_array);
+    ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
     ArrayParent* parent = leaf->get_parent();
     size_t ndx_in_parent = leaf->get_ndx_in_parent();
     Allocator& alloc = leaf->get_alloc();
@@ -1144,8 +1143,7 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
         new_leaf->update_parent(); // Throws
         copy_leaf(*leaf, *new_leaf); // Throws
         leaf->destroy();
-        delete leaf;
-        m_array = new_leaf.release();
+        m_array = std::move(new_leaf);
         return leaf_type_Medium;
     }
     // Upgrade root leaf from small to big strings
@@ -1156,8 +1154,7 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
     new_leaf->update_parent(); // Throws
     copy_leaf(*leaf, *new_leaf); // Throws
     leaf->destroy();
-    delete leaf;
-    m_array = new_leaf.release();
+    m_array = std::move(new_leaf);
     return leaf_type_Big;
 }
 
@@ -1270,19 +1267,19 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
         }
         else {
             bool is_big = m_array->get_context_flag();
             if (!is_big) {
                 // Medium strings
-                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                 mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
             }
             else {
                 // Big strings
-                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                 mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
             }
         }
@@ -1294,7 +1291,7 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
     }
     else {
         SliceHandler handler(get_alloc());
-        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+        ref = ColumnBase::write(m_array.get(), slice_offset, slice_size,
                                 table_size, handler, out); // Throws
     }
     return ref;
@@ -1339,23 +1336,23 @@ void AdaptiveStringColumn::refresh_root_accessor()
         if (old_root_is_leaf) {
             if (old_root_is_small) {
                 // Root is 'small strings' leaf
-                ArrayString* root = static_cast<ArrayString*>(m_array);
+                ArrayString* root = static_cast<ArrayString*>(m_array.get());
                 root->init_from_parent();
                 return;
             }
             if (old_root_is_medium) {
                 // Root is 'medium strings' leaf
-                ArrayStringLong* root = static_cast<ArrayStringLong*>(m_array);
+                ArrayStringLong* root = static_cast<ArrayStringLong*>(m_array.get());
                 root->init_from_parent();
                 return;
             }
             // Root is 'big strings' leaf
-            ArrayBigBlobs* root = static_cast<ArrayBigBlobs*>(m_array);
+            ArrayBigBlobs* root = static_cast<ArrayBigBlobs*>(m_array.get());
             root->init_from_parent();
             return;
         }
         // Root is inner node
-        Array* root = m_array;
+        Array* root = m_array.get();
         root->init_from_parent();
         return;
     }
@@ -1391,32 +1388,8 @@ void AdaptiveStringColumn::refresh_root_accessor()
     }
     new_root->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
 
-    // Destroy old root accessor
-    if (old_root_is_leaf) {
-        if (old_root_is_small) {
-            // Old root is 'small strings' leaf
-            ArrayString* old_root = static_cast<ArrayString*>(m_array);
-            delete old_root;
-        }
-        else if (old_root_is_medium) {
-            // Old root is 'medium strings' leaf
-            ArrayStringLong* old_root = static_cast<ArrayStringLong*>(m_array);
-            delete old_root;
-        }
-        else {
-            // Old root is 'big strings' leaf
-            ArrayBigBlobs* old_root = static_cast<ArrayBigBlobs*>(m_array);
-            delete old_root;
-        }
-    }
-    else {
-        // Old root is inner node
-        Array* old_root = m_array;
-        delete old_root;
-    }
-
     // Instate new root
-    m_array = new_root;
+    m_array.reset(new_root);
 }
 
 
@@ -1457,19 +1430,19 @@ void AdaptiveStringColumn::Verify() const
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             leaf->Verify();
         }
         else {
             bool is_big = m_array->get_context_flag();
             if (!is_big) {
                 // Medium strings root leaf
-                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                 leaf->Verify();
             }
             else {
                 // Big strings root leaf
-                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                 leaf->Verify();
             }
         }

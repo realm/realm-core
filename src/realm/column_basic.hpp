@@ -44,7 +44,6 @@ class BasicColumn : public ColumnBase, public ColumnTemplate<T> {
 public:
     typedef T value_type;
     BasicColumn(Allocator&, ref_type);
-    ~BasicColumn() REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }

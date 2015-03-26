@@ -128,8 +128,8 @@ public:
     /// that there is no guarantee that this node is an inner B+-tree
     /// node or a leaf. This is the case for a MixedColumn in
     /// particular.
-    Array* get_root_array() REALM_NOEXCEPT { return m_array; }
-    const Array* get_root_array() const REALM_NOEXCEPT { return m_array; }
+    Array* get_root_array() REALM_NOEXCEPT { return m_array.get(); }
+    const Array* get_root_array() const REALM_NOEXCEPT { return m_array.get(); }
     //@}
 
     /// Provides access to the leaf that contains the element at the
@@ -257,7 +257,7 @@ public:
 protected:
     // FIXME: This should not be mutable, the problem is again the
     // const-violating moving copy constructor.
-    mutable Array* m_array;
+    mutable std::unique_ptr<Array> m_array;
 
     ColumnBase(Array* root = 0) REALM_NOEXCEPT;
 
@@ -492,8 +492,8 @@ public:
 protected:
     Column(ArrayInteger* root = 0) REALM_NOEXCEPT;
 
-    ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array); }
-    const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array); }
+    ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array.get()); }
+    const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array.get()); }
 
     std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
@@ -530,7 +530,7 @@ private:
     friend class Array;
     friend class ColumnBase;
 
-    StringIndex* m_search_index;
+    std::unique_ptr<StringIndex> m_search_index;
 };
 
 
@@ -754,8 +754,7 @@ inline void ColumnBase::EraseHandlerBase::replace_root(Array* leaf)
     std::size_t ndx_in_parent = m_column.m_array->get_ndx_in_parent();
     leaf_2->set_parent(parent, ndx_in_parent);
     leaf_2->update_parent(); // Throws
-    delete m_column.m_array;
-    m_column.m_array = leaf_2.release();
+    m_column.m_array = std::move(leaf_2);
 }
 
 inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHandler& handler)
@@ -767,33 +766,7 @@ inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHan
 
 inline bool Column::has_search_index() const REALM_NOEXCEPT
 {
-    return m_search_index;
-}
-
-// fixme, must m_search_index be copied here?
-inline Column::Column(Allocator& alloc, ref_type ref) : m_search_index(null_ptr)
-{
-    m_array = new Array(alloc); // Throws
-    m_array->init_from_ref(ref);
-}
-
-inline Column::Column(unattached_root_tag, Allocator& alloc) : m_search_index(null_ptr)
-{
-    m_array = new Array(alloc); // Throws
-
-}
-
-inline Column::Column(move_tag, Column& col) REALM_NOEXCEPT
-{
-    m_array = col.m_array;
-    col.m_array = 0;
-    m_search_index = col.m_search_index;
-    col.m_search_index = 0;
-}
-
-inline Column::Column(ArrayInteger* root) REALM_NOEXCEPT:
-    ColumnBase(root), m_search_index(null_ptr)
-{
+    return m_search_index.get();
 }
 
 inline std::size_t Column::size() const REALM_NOEXCEPT
