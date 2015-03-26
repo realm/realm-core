@@ -518,7 +518,6 @@ private:
     Replication* get_replication() const REALM_NOEXCEPT;
     void set_replication(Replication*) REALM_NOEXCEPT;
     class TransactAdvancer;
-    class TransactReverser;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           const BinaryData* logs_begin, const BinaryData* logs_end);
     void reverse_transact(ref_type new_top_ref, const BinaryData& log);

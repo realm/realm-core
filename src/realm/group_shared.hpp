@@ -26,7 +26,6 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
 #include <realm/group.hpp>
-//#include <realm/commit_log.hpp>
 
 namespace realm {
 
@@ -437,7 +436,9 @@ private:
     /// open pointing at that specific version, and if the version requested
     /// is the same or later than the one currently accessed.
     /// Fails with exception UnreachableVersion.
-    void advance_read(VersionID specific_version = VersionID());
+    template<typename Handler>
+    void advance_read(Handler&& handler, VersionID specific_version=VersionID());
+    void advance_read(VersionID specific_version=VersionID());
 
     /// Promote the current read transaction to a write transaction.
     /// CAUTION: This also synchronizes with latest state of the database,
@@ -445,6 +446,17 @@ private:
     /// FIXME: A version of this which does NOT synchronize with latest
     /// state will be made available later, once we are able to merge commits.
     void promote_to_write();
+    template<typename Handler>
+    void promote_to_write(Handler&& handler);
+
+    // Advance the readlock to the given version and return the transaction logs
+    // between the old version and the given version, or nullptr if none.
+    std::unique_ptr<BinaryData[]> advance_readlock(VersionID specific_version);
+
+    // Advance the group to the current readlock version
+    void do_advance_read(ReadLockInfo old_readlock, std::unique_ptr<BinaryData[]> logs);
+
+    std::unique_ptr<BinaryData[]> do_promote_to_write();
 
     /// End the current write transaction and transition atomically into
     /// a read transaction, WITHOUT synchronizing to external changes
@@ -459,9 +471,7 @@ private:
     /// are not restored but will remain detached.
     void rollback_and_continue_as_read();
 
-    /// called by WriteLogCollector to transfer the actual commit log for
-    /// accessor retention/update as part of rollback.
-    void do_rollback_and_continue_as_read(const char* begin, const char* end);
+    Replication* get_replication() { return m_group.get_replication(); }
 #endif
     friend class ReadTransaction;
     friend class WriteTransaction;
