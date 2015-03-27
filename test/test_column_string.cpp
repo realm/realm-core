@@ -647,8 +647,7 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
     ColumnStringEnum e(Allocator::get_default(), values, keys);
 
     // Reuse the index from original column
-    StringIndex* index = c.release_search_index();
-    e.install_search_index(index);
+    e.install_search_index(c.release_search_index());
     CHECK(e.has_search_index());
 
     // Search for a value that does not exist

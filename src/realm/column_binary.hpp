@@ -36,7 +36,6 @@ public:
     typedef BinaryData value_type;
 
     ColumnBinary(Allocator&, ref_type);
-    ~ColumnBinary() REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -130,11 +129,11 @@ inline std::size_t ColumnBinary::size() const  REALM_NOEXCEPT
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
             return leaf->size();
         }
         // Big blobs root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->size();
     }
     // Non-leaf root
@@ -147,12 +146,12 @@ inline void ColumnBinary::update_from_parent(std::size_t old_baseline) REALM_NOE
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
             leaf->update_from_parent(old_baseline);
             return;
         }
         // Big blobs root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         leaf->update_from_parent(old_baseline);
         return;
     }
@@ -167,11 +166,11 @@ inline BinaryData ColumnBinary::get(std::size_t ndx) const REALM_NOEXCEPT
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
             return leaf->get(ndx);
         }
         // Big blobs root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->get(ndx);
     }
 

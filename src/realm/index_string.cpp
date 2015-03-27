@@ -171,7 +171,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         // Get sublist
         size_t refs_ndx = node_ndx+1; // first entry in refs points to offsets
         ref_type ref = m_array->get_as_ref(refs_ndx);
-        StringIndex target(ref, m_array, refs_ndx, m_target_column, m_get_func,
+        StringIndex target(ref, m_array.get(), refs_ndx, m_target_column, m_get_func,
                            m_deny_duplicate_values, alloc);
 
         // Insert item
@@ -300,7 +300,7 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     // Get sublists
     size_t refs_ndx = ndx+1; // first entry in refs points to offsets
     ref_type orig_ref = m_array->get_as_ref(refs_ndx);
-    StringIndex orig_col(orig_ref, m_array, refs_ndx, m_target_column, m_get_func,
+    StringIndex orig_col(orig_ref, m_array.get(), refs_ndx, m_target_column, m_get_func,
                          m_deny_duplicate_values, alloc);
     StringIndex new_col(new_ref, 0, 0, m_target_column, m_get_func,
                         m_deny_duplicate_values, alloc);
@@ -479,7 +479,7 @@ void StringIndex::distinct(Column& result) const
             else {
                 // A real ref either points to a list or a subindex
                 if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
-                    StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func,
+                    StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column, m_get_func,
                                     m_deny_duplicate_values, alloc);
                     ndx.distinct(result);
                 }

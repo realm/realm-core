@@ -448,8 +448,8 @@ inline void ColumnMixed::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
     // See if m_binary_data needs to be created.
     if (m_array->size() == 3) {
         ref_type ref = m_array->get_as_ref(2);
-        m_binary_data = new ColumnBinary(m_array->get_alloc(), ref); // Throws
-        m_binary_data->set_parent(m_array, 2);
+        m_binary_data.reset(new ColumnBinary(m_array->get_alloc(), ref)); // Throws
+        m_binary_data->set_parent(m_array.get(), 2);
     }
 }
 

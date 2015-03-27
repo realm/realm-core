@@ -103,7 +103,7 @@ public:
     StringIndex* get_search_index() REALM_NOEXCEPT;
     const StringIndex* get_search_index() const REALM_NOEXCEPT;
     StringIndex* create_search_index();
-    void install_search_index(StringIndex*) REALM_NOEXCEPT;
+    void install_search_index(std::unique_ptr<StringIndex>) REALM_NOEXCEPT;
     void destroy_search_index() REALM_NOEXCEPT override;
 
     // Compare two string columns for equality
@@ -133,7 +133,7 @@ public:
 private:
     // Member variables
     AdaptiveStringColumn m_keys;
-    StringIndex* m_search_index;
+    std::unique_ptr<StringIndex> m_search_index;
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
@@ -249,12 +249,12 @@ inline bool ColumnStringEnum::has_search_index() const REALM_NOEXCEPT
 
 inline StringIndex* ColumnStringEnum::get_search_index() REALM_NOEXCEPT
 {
-    return m_search_index;
+    return m_search_index.get();
 }
 
 inline const StringIndex* ColumnStringEnum::get_search_index() const REALM_NOEXCEPT
 {
-    return m_search_index;
+    return m_search_index.get();
 }
 
 inline AdaptiveStringColumn& ColumnStringEnum::get_keys()
