@@ -1,24 +1,24 @@
 /*************************************************************************
  *
- * TIGHTDB CONFIDENTIAL
+ * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
-#define TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
+#ifndef REALM_TEST_UTIL_UNIT_TEST_HPP
+#define REALM_TEST_UTIL_UNIT_TEST_HPP
 
 #include <cmath>
 #include <cstring>
@@ -28,10 +28,10 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/type_traits.hpp>
-#include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/bind_ptr.hpp>
+#include <realm/util/features.h>
+#include <realm/util/type_traits.hpp>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/bind_ptr.hpp>
 
 
 #define TEST(name) TEST_IF(name, true)
@@ -44,18 +44,18 @@
 /// variables which can then be adjusted before calling
 /// TestList::run().
 #define TEST_IF(name, enabled) \
-    TEST_EX(name, tightdb::test_util::unit_test::get_default_test_list(), enabled)
+    TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled)
 
 #define TEST_EX(name, list, enabled) \
-    struct Tightdb_UnitTest__##name: tightdb::test_util::unit_test::Test { \
+    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
         bool test_enabled() const { return bool(enabled); } \
         void test_run(); \
     }; \
-    Tightdb_UnitTest__##name tightdb_unit_test__##name; \
-    tightdb::test_util::unit_test::RegisterTest \
-        tightdb_unit_test_reg__##name((list), tightdb_unit_test__##name, \
+    Realm_UnitTest__##name realm_unit_test__##name; \
+    realm::test_util::unit_test::RegisterTest \
+        realm_unit_test_reg__##name((list), realm_unit_test__##name, \
                                       "DefaultSuite", #name, __FILE__, __LINE__); \
-    void Tightdb_UnitTest__##name::test_run()
+    void Realm_UnitTest__##name::test_run()
 
 
 #define CHECK(cond) \
@@ -164,7 +164,7 @@
 //@}
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 namespace unit_test {
 
@@ -198,14 +198,14 @@ public:
     virtual void fail(const TestDetails&, const std::string& message);
     virtual void end(const TestDetails&, double elapsed_seconds);
     virtual void summary(const Summary&);
-    virtual ~Reporter() TIGHTDB_NOEXCEPT {}
+    virtual ~Reporter() REALM_NOEXCEPT {}
 };
 
 
 class Filter {
 public:
     virtual bool include(const TestDetails&) = 0;
-    virtual ~Filter() TIGHTDB_NOEXCEPT {}
+    virtual ~Filter() REALM_NOEXCEPT {}
 };
 
 
@@ -277,9 +277,9 @@ class SimpleReporter: public Reporter {
 public:
     explicit SimpleReporter(bool report_progress = false);
 
-    void begin(const TestDetails&) TIGHTDB_OVERRIDE;
-    void fail(const TestDetails&, const std::string&) TIGHTDB_OVERRIDE;
-    void summary(const Summary&) TIGHTDB_OVERRIDE;
+    void begin(const TestDetails&) override;
+    void fail(const TestDetails&, const std::string&) override;
+    void summary(const Summary&) override;
 
 protected:
     bool m_report_progress;
@@ -572,7 +572,7 @@ template<class T> void to_string(const T& value, std::string& str)
 inline bool TestResults::check_cond(bool cond, const char* file, long line, const char* macro_name,
                                     const char* cond_text)
 {
-    if (TIGHTDB_LIKELY(cond)) {
+    if (REALM_LIKELY(cond)) {
         check_succeeded();
     }
     else {
@@ -596,7 +596,7 @@ inline bool TestResults::check_compare(bool cond, const A& a, const B& b,
                                        const char* file, long line, const char* macro_name,
                                        const char* a_text, const char* b_text)
 {
-    if (TIGHTDB_LIKELY(cond)) {
+    if (REALM_LIKELY(cond)) {
         check_succeeded();
     }
     else {
@@ -613,7 +613,7 @@ inline bool TestResults::check_inexact_compare(bool cond, long double a, long do
                                                const char* macro_name, const char* a_text,
                                                const char* b_text, const char* eps_text)
 {
-    if (TIGHTDB_LIKELY(cond)) {
+    if (REALM_LIKELY(cond)) {
         check_succeeded();
     }
     else {
@@ -719,6 +719,6 @@ inline bool TestResults::check_definitely_greater(long double a, long double b,
 
 } // namespace unit_test
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
-#endif // TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
+#endif // REALM_TEST_UTIL_UNIT_TEST_HPP

@@ -6,18 +6,18 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
-#include <tightdb/link_view.hpp> // lasse todo remove
-#include <tightdb.hpp>
+#include <realm/table_macros.hpp>
+#include <realm/link_view.hpp> // lasse todo remove
+#include <realm.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(LinkList_Basic1)
 {

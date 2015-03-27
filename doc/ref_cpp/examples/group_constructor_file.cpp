@@ -1,11 +1,11 @@
 // @@Example: ex_cpp_group_constructor_file @@
 // @@Fold@@
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
@@ -13,7 +13,7 @@ void func()
 {
 // @@EndFold@@
     // Create group with a file as backing store
-    Group g("people.tightdb");
+    Group g("people.realm");
 // @@Fold@@
     PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 
@@ -21,16 +21,16 @@ void func()
     table->add("Joe", 17);
     table->add("Jack", 22);
 
-    g.write("people_new.tightdb");
+    g.write("people_new.realm");
 }
 
 int main()
 {
     Group g;
-    g.write("people.tightdb");
+    g.write("people.realm");
     func();
-    util::File::remove("people.tightdb");
-    util::File::remove("people_new.tightdb");
+    util::File::remove("people.realm");
+    util::File::remove("people_new.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

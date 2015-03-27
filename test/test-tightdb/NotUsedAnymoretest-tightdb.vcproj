@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9,00"
-	Name="test-tightdb"
+	Name="test-realm"
 	ProjectGUID="{6DF07480-ECC6-4116-860A-818B9D2BA7B3}"
-	RootNamespace="testtightdb"
+	RootNamespace="testrealm"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="196613"
 	>
@@ -361,7 +361,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\test-tightdb.cpp"
+				RelativePath=".\test-realm.cpp"
 				>
 			</File>
 			<File
@@ -395,7 +395,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\tightdb.h"
+				RelativePath="..\..\src\realm.h"
 				>
 			</File>
 		</Filter>

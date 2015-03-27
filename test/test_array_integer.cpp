@@ -1,12 +1,12 @@
 #include "testsettings.hpp"
 
-#include <tightdb/array_integer.hpp>
+#include <realm/array_integer.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 TEST(ArrayInteger_Sum0)
 {

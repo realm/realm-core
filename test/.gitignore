@@ -9,9 +9,9 @@
 /large_tests/*.gcno
 /large_tests/*.gcda
 
-/tightdb-tests
-/tightdb-tests-dbg
-/tightdb-tests-cov
+/realm-tests
+/realm-tests-dbg
+/realm-tests-cov
 
 /benchmark/x64
 /benchmark

@@ -23,7 +23,7 @@ Anni is 43 years old.
 
 @@Overlay: execute_tutorial @@
 <pre>
-$ cd tightdb/examples
+$ cd realm/examples
 $ make
 $ ./tutorial
 </pre>

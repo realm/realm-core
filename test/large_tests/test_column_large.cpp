@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <vector>
 
-#include <tightdb/column.hpp>
-#include <tightdb/query_conditions.hpp>
+#include <realm/column.hpp>
+#include <realm/query_conditions.hpp>
 
 #include "../util/verified_integer.hpp"
 
@@ -15,8 +15,8 @@
 #define LL_MIN (-LL_MAX - 1)
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
@@ -50,7 +50,7 @@ using namespace tightdb::test_util;
 
 
 // These tests take ~5 min in release mode with
-// TIGHTDB_MAX_BPNODE_SIZE=1000
+// REALM_MAX_BPNODE_SIZE=1000
 
 
 TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)

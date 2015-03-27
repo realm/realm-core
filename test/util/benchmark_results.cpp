@@ -10,13 +10,13 @@
 
 #include <unistd.h> // link, unlink
 
-#include <tightdb/util/file.hpp>
+#include <realm/util/file.hpp>
 
 #include "timer.hpp"
 #include "benchmark_results.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
 
 
@@ -67,7 +67,7 @@ string format_change(double baseline, double input, BenchmarkResults::ChangeType
         case BenchmarkResults::change_RiseFactor:
             return format_rise_factor(baseline, input);
     }
-    TIGHTDB_UNREACHABLE();
+    REALM_UNREACHABLE();
 }
 
 } // anonymous namespace

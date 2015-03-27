@@ -3,12 +3,12 @@
 
 #include <string>
 
-#include <tightdb/column_binary.hpp>
+#include <realm/column_binary.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

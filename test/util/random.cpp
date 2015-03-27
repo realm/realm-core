@@ -11,7 +11,7 @@
 
 using namespace std;
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -35,7 +35,7 @@ unsigned long produce_nondeterministic_random_seed()
 namespace _impl {
 
 
-GlobalRandom& GlobalRandom::get() TIGHTDB_NOEXCEPT
+GlobalRandom& GlobalRandom::get() REALM_NOEXCEPT
 {
     // FIXME: Initialization of local statics are not guaranteed to be
     // thread safe.
@@ -45,4 +45,4 @@ GlobalRandom& GlobalRandom::get() TIGHTDB_NOEXCEPT
 
 
 } // namespace _impl
-} // namespace tightdb
+} // namespace realm

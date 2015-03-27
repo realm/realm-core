@@ -1,10 +1,10 @@
-#ifndef TIGHTDB_TEST_UTIL_DEMANGLE_HPP
-#define TIGHTDB_TEST_UTIL_DEMANGLE_HPP
+#ifndef REALM_TEST_UTIL_DEMANGLE_HPP
+#define REALM_TEST_UTIL_DEMANGLE_HPP
 
 #include <typeinfo>
 #include <string>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -30,6 +30,6 @@ template<typename T> inline std::string get_type_name(const T& v)
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
-#endif // TIGHTDB_TEST_UTIL_DEMANGLE_HPP
+#endif // REALM_TEST_UTIL_DEMANGLE_HPP

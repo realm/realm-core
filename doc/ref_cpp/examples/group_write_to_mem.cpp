@@ -1,14 +1,14 @@
 // @@Example: ex_cpp_group_write_to_mem @@
 // @@Fold@@
 #include <iostream>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@EndFold@@
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 

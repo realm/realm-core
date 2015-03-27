@@ -3,9 +3,9 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/thread.hpp>
+#include <memory>
+#include <realm/util/bind.hpp>
+#include <realm/util/thread.hpp>
 
 #include "demangle.hpp"
 #include "timer.hpp"
@@ -14,10 +14,10 @@
 #include "unit_test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
+using namespace realm::test_util::unit_test;
 
 
 
@@ -69,17 +69,17 @@ public:
     {
     }
 
-    ~XmlReporter() TIGHTDB_NOEXCEPT
+    ~XmlReporter() REALM_NOEXCEPT
     {
     }
 
-    void begin(const TestDetails& details) TIGHTDB_OVERRIDE
+    void begin(const TestDetails& details) override
     {
         test& t = m_tests[details.test_index];
         t.m_details = details;
     }
 
-    void fail(const TestDetails& details, const string& message) TIGHTDB_OVERRIDE
+    void fail(const TestDetails& details, const string& message) override
     {
         failure f;
         f.m_details = details;
@@ -88,13 +88,13 @@ public:
         t.m_failures.push_back(f);
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) TIGHTDB_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) override
     {
         test& t = m_tests[details.test_index];
         t.m_elapsed_seconds = elapsed_seconds;
     }
 
-    void summary(const Summary& summary) TIGHTDB_OVERRIDE
+    void summary(const Summary& summary) override
     {
         m_out <<
             "<?xml version=\"1.0\"?>\n"
@@ -194,11 +194,11 @@ public:
             m_include.push_back(wildcard_pattern("*"));
     }
 
-    ~WildcardFilter() TIGHTDB_NOEXCEPT
+    ~WildcardFilter() REALM_NOEXCEPT
     {
     }
 
-    bool include(const TestDetails& details) TIGHTDB_OVERRIDE
+    bool include(const TestDetails& details) override
     {
         const char* name = details.test_name;
         typedef patterns::const_iterator iter;
@@ -235,7 +235,7 @@ private:
 
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 namespace unit_test {
 
@@ -354,7 +354,7 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
         random.shuffle(shared.m_tests.begin(), shared.m_tests.end());
     }
 
-    UniquePtr<ExecContext[]> thread_contexts(new ExecContext[num_threads]);
+    std::unique_ptr<ExecContext[]> thread_contexts(new ExecContext[num_threads]);
     for (int i = 0; i != num_threads; ++i)
         thread_contexts[i].m_shared = &shared;
 
@@ -362,7 +362,7 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
         thread_contexts[0].run();
     }
     else {
-        UniquePtr<Thread[]> threads(new Thread[num_threads]);
+        std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
         for (int i = 0; i != num_threads; ++i)
             threads[i].start(bind(&ExecContext::run, &thread_contexts[i]));
         for (int i = 0; i != num_threads; ++i)
@@ -547,7 +547,7 @@ public:
             m_patterns.push_back(wildcard_pattern(*i));
     }
 
-    ~state() TIGHTDB_NOEXCEPT
+    ~state() REALM_NOEXCEPT
     {
     }
 
@@ -655,4 +655,4 @@ Filter* create_wildcard_filter(const string& filter)
 
 } // namespace unit_test
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

@@ -7,15 +7,15 @@
 #include <vector>
 #include <map>
 
-#include <tightdb/array.hpp>
-#include <tightdb/column.hpp>
-#include <tightdb/query_conditions.hpp>
+#include <realm/array.hpp>
+#include <realm/column.hpp>
+#include <realm/query_conditions.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -492,7 +492,7 @@ TEST(Array_AddNeg1_1)
 TEST(Array_UpperLowerBound)
 {
     // Tests Array::upper_bound() and Array::lower_bound()
-    // This test is independent of TIGHTDB_MAX_BPNODE_SIZE
+    // This test is independent of REALM_MAX_BPNODE_SIZE
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
     vector<int> v;
@@ -888,7 +888,7 @@ TEST(Array_FindSSE)
     for (size_t i = 0; i < 100; ++i) {
         a.set(i, 123);
         size_t t = a.find_first(123);
-        TIGHTDB_ASSERT(t == i);
+        REALM_ASSERT(t == i);
         a.set(i, 10000);
         static_cast<void>(t);
     }
@@ -923,7 +923,7 @@ TEST(Array_Greater)
             a.set(i, 1);
 
             size_t t = a.find_first<Greater>(0, 0, size_t(-1));
-            TIGHTDB_ASSERT(i == t);
+            REALM_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);
             a.set(i, 0);
@@ -1297,7 +1297,7 @@ TEST(Array_Copy)
     Array b(Allocator::get_default());
     b.init_from_mem(a.clone_deep(Allocator::get_default()));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     b.Verify();
 #endif
 
@@ -1316,7 +1316,7 @@ TEST(Array_Copy)
     Array d(Allocator::get_default());
     d.init_from_mem(c.clone_deep(Allocator::get_default()));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     d.Verify();
 #endif
 

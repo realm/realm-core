@@ -1,9 +1,9 @@
 // @@Example: ex_cpp_dyn_table_get_range_view@@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@EndFold@@
 

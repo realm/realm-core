@@ -5,7 +5,7 @@
 ID         : class_typed_query
 TITLE      : Query (typed)
 SUMMARY    : &g_typed_query_intro_summary
-             Query your TightDB table.
+             Query your Realm table.
 DESCR      : &g_typed_query_intro_descr
              >
              NOTE: The current documentation of Typed Query is under construction,

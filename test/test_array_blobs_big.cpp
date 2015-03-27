@@ -1,9 +1,9 @@
-#include <tightdb/array_blobs_big.hpp>
-#include <tightdb/column.hpp>
+#include <realm/array_blobs_big.hpp>
+#include <realm/column.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

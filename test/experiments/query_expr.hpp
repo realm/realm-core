@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <ostream>
 
-#include <tightdb/util/assert.hpp>
-#include <tightdb/util/meta.hpp>
-#include <tightdb/util/tuple.hpp>
+#include <realm/util/assert.hpp>
+#include <realm/util/meta.hpp>
+#include <realm/util/tuple.hpp>
 
 
 // Check that Inlining is still perfect when referring to context variables whose value are not known to be constant (e.g. a function argument)
@@ -41,7 +41,7 @@ Then reconsider AND changes for improved optimization
 // Optional dynamic column names in table spec
 
 
-namespace tightdb {
+namespace realm {
 
 
 
@@ -316,7 +316,7 @@ namespace query
     template<class Op, class Col, class Query>
     inline Subquery<Op, Col, Query> subquery(const Col& c, const Query& q)
     {
-        TIGHTDB_STATIC_ASSERT(IsSubtable<typename Col::column_type>::value,
+        REALM_STATIC_ASSERT(IsSubtable<typename Col::column_type>::value,
                               "A subtable column is required at this point");
         return Subquery<Op, Col, Query>(c,q);
     }
@@ -867,7 +867,7 @@ namespace query
 
         Type operator()(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type>::value,
+            REALM_STATIC_ASSERT(!IsSubtable<Type>::value,
                                   "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
             return static_cast<const Type*>(m_column)[i];
         }
@@ -875,7 +875,7 @@ namespace query
         template<int col_idx2, class Type2>
         Type2 operator()(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type2>::value,
+            REALM_STATIC_ASSERT(!IsSubtable<Type2>::value,
                                   "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
             return m_table->template get<col_idx2, Type2>(i);
         }
@@ -1152,4 +1152,4 @@ private:
 */
 };
 
-} // namespace tightdb
+} // namespace realm

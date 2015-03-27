@@ -1,9 +1,9 @@
 // @@Example: ex_cpp_ng_query_untyped @@
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
-using namespace tightdb;
+using namespace realm;
 
 int main()
 {

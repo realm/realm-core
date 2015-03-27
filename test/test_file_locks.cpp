@@ -5,16 +5,16 @@
 #include <map>
 #include <iostream>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/thread.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/util/features.h>
+#include <realm/util/features.h>
+#include <realm/util/bind.hpp>
+#include <realm/util/thread.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/features.h>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb::util;
+using namespace realm::util;
 
 
 // Test independence and thread-safety
@@ -109,7 +109,7 @@ void slave(int ndx, string path)
 
 } // anonymous namespace
 
-#ifndef TIGHTDB_IOS
+#ifndef REALM_IOS
 
 // The assumption is that if multiple processes try to place an
 // exclusive lock on a file in a non-blocking fashion, then at least
@@ -140,6 +140,6 @@ TEST(File_NoSpuriousTryLockFailures)
     CHECK_EQUAL(0, results[0]);
 }
 
-#endif // TIGHTDB_IOS
+#endif // REALM_IOS
 
 #endif // TEST_FILE_LOCKS
