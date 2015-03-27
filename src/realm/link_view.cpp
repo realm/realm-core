@@ -25,7 +25,7 @@
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
 #endif
-#include <tightdb/table_view.hpp>
+#include <realm/table_view.hpp>
 
 using namespace std;
 using namespace realm;
