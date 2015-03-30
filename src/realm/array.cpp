@@ -728,8 +728,8 @@ void Array::set_all_to_zero()
 }
 
 
-// If indirection == null_ptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
-// indirection == null_ptr then 'this' must be sorted increasingly.
+// If indirection == nullptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
+// indirection == nullptr then 'this' must be sorted increasingly.
 //
 // If indirection exists, then return lowest 'i' for which this->get(indirection->get(i)) >= target or -1 if none.
 // If indirection exists, then 'this' can be non-sorted, but 'indirection' must point into 'this' such that the values

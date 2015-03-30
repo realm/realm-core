@@ -60,16 +60,16 @@ public:
 
     typedef typename AggReturnType<T>::sum_type SumType;
     SumType sum(std::size_t begin = 0, std::size_t end = npos,
-                std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+                std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     double average(std::size_t begin = 0, std::size_t end = npos,
-                   std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+                   std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     T maximum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+              std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     T minimum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+              std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
 

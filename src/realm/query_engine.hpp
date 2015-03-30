@@ -327,7 +327,7 @@ public:
 
     virtual bool is_initialized() const
     {
-        return m_table != null_ptr;
+        return m_table != nullptr;
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
@@ -351,11 +351,11 @@ public:
         // TSourceColumn: type of aggregate source
         TSourceColumn av = (TSourceColumn)0;
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
-        if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
-            REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
+        if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
+            REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
         }
-        REALM_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
+        REALM_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
         bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
         return cont;
     }
@@ -721,7 +721,7 @@ public:
     bool find_callback_specialization(size_t s, size_t end2)
     {
         bool cont = m_array.find<TConditionFunction, act_CallbackIdx>
-            (m_value, s - m_leaf_start, end2, m_leaf_start, null_ptr,
+            (m_value, s - m_leaf_start, end2, m_leaf_start, nullptr,
              std::bind1st(std::mem_fun(&IntegerNodeBase::template match_callback<TAction, TSourceColumn>), this));
         return cont;
     }
@@ -741,7 +741,7 @@ public:
         // the same as the column used for the aggregate action, then the entire query can run within scope of that
         // column only, with no references to other columns:
         bool fastmode = (m_conds == 1 &&
-                         (source_column == null_ptr ||
+                         (source_column == nullptr ||
                           (!m_fastmode_disabled
                            && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
         for (size_t s = start; s < end; ) {
@@ -994,7 +994,7 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
-        m_leaf = null_ptr;
+        m_leaf = nullptr;
 
         // FIXME: Store these in std::string instead.
         // '*6' because case converted strings can take up more space. Todo, investigate
@@ -1202,10 +1202,10 @@ public:
         m_index_matches_destroy = false;
 
         delete m_index_matches;
-        m_index_matches = null_ptr;
+        m_index_matches = nullptr;
 
         delete m_index_getter;
-        m_index_getter = null_ptr;
+        m_index_getter = nullptr;
     }
 
     void init(const Table& table) override
@@ -1284,7 +1284,7 @@ public:
 
                 while (f == not_found && last_indexed < m_index_size) {
                     m_index_getter->cache_next(last_indexed);
-                    f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start, null_ptr);
+                    f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start, nullptr);
 
                     if (f >= end || f == not_found) {
                         last_indexed = m_index_getter->m_leaf_end;
@@ -1398,7 +1398,7 @@ public:
     }
 
     OrNode(ParentNode* p1) : m_cond(1, p1) {
-        m_child = null_ptr;
+        m_child = nullptr;
         m_dT = 50.0;
     }
 
@@ -1504,7 +1504,7 @@ public:
         return 0;
     }
 
-    NotNode() {m_child = null_ptr; m_cond = null_ptr; m_dT = 50.0;}
+    NotNode() {m_child = nullptr; m_cond = nullptr; m_dT = 50.0;}
     ~NotNode() REALM_NOEXCEPT override {}
 
     void init(const Table& table) override

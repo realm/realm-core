@@ -221,8 +221,8 @@ public:
 
 
     class Query;
-    Query       where(typename BasicTable<Spec>::View* tv = null_ptr) { return Query(*this, tv ? tv->get_impl() : null_ptr); }
-    Query where(typename BasicTable<Spec>::View* tv = null_ptr) const { return Query(*this, tv ? tv->get_impl() : null_ptr); }
+    Query       where(typename BasicTable<Spec>::View* tv = nullptr) { return Query(*this, tv ? tv->get_impl() : nullptr); }
+    Query where(typename BasicTable<Spec>::View* tv = nullptr) const { return Query(*this, tv ? tv->get_impl() : nullptr); }
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that

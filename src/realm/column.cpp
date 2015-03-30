@@ -580,8 +580,8 @@ void Column::set(size_t ndx, int64_t value)
     array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
-// When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values 
-// are converted from the native representation to 2's complement, but the opposite conversion is left as undefined. 
+// When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values
+// are converted from the native representation to 2's complement, but the opposite conversion is left as undefined.
 // realm::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
 // which reduces to a no-op when 2's complement is the native representation of negative values.
 void Column::set_uint(size_t ndx, uint64_t value)
@@ -754,8 +754,8 @@ void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 
 namespace {
 
-    // Getter function for index. For integer index, the caller must supply a buffer that we can store the 
-    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with 
+    // Getter function for index. For integer index, the caller must supply a buffer that we can store the
+    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
     // String index).
     StringData get_string(void* column, size_t ndx, char* buffer)
     {

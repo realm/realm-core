@@ -2674,34 +2674,34 @@ TEST(Query_Float)
 
     // ... NO conditions
     CHECK_EQUAL(1.20f, t.where().col_float.maximum());
-    t.where().col_float.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    t.where().col_float.maximum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
     CHECK_EQUAL(1.10f, t.where().col_float.minimum());
-    t.where().col_float.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    t.where().col_float.minimum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(3.20, t.where().col_double.maximum());
-    CHECK_EQUAL(3.20, t.where().col_double.maximum(null_ptr, 0, not_found, not_found, &ndx));
+    CHECK_EQUAL(3.20, t.where().col_double.maximum(nullptr, 0, not_found, not_found, &ndx));
 
     CHECK_EQUAL(2.20, t.where().col_double.minimum());
-    t.where().col_double.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    t.where().col_double.minimum(nullptr, 0, not_found, not_found, &ndx);
 
     // ... with conditions
     CHECK_EQUAL(1.20f, q2.col_float.maximum());
-    q2.col_float.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    q2.col_float.maximum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
     CHECK_EQUAL(1.13f, q2.col_float.minimum());
-    q2.col_float.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    q2.col_float.minimum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(1, ndx);
 
     CHECK_EQUAL(3.20, q2.col_double.maximum());
-    q2.col_double.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    q2.col_double.maximum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
     CHECK_EQUAL(2.21, q2.col_double.minimum());
-    q2.col_double.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    q2.col_double.minimum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(1, ndx);
 
     size_t count = 0;
@@ -4965,41 +4965,41 @@ TEST(Query_SumMinMaxAvg)
 
     size_t resindex = not_found;
 
-    t.where().first.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where().first.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where().first.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where().first.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(6, resindex);
 
-    t.where().third.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where().third.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where().third.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where().third.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where().fourth.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where().fourth.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where().fourth.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where().fourth.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where().fifth.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where().fifth.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where().fifth.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where().fifth.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
     // Now with condition (tests another code path in Array::minmax())
-    t.where().first.not_equal(0).fifth.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where().first.not_equal(0).fifth.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(0, resindex);
 
-    t.where().first.not_equal(0).fourth.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where().first.not_equal(0).fourth.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(0, resindex);
 
-    t.where().first.not_equal(0).third.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where().first.not_equal(0).third.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where().first.not_equal(0).third.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where().first.not_equal(0).third.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(4, resindex);
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where().first.average(), 0.001);
@@ -5056,28 +5056,28 @@ TEST(Query_SumMinMaxAvg_where)
 
     size_t resindex = not_found;
 
-    t.where(&v).first.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).first.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where(&v).first.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).first.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(6, resindex);
 
-    t.where(&v).third.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).third.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).third.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).third.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where(&v).fourth.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).fourth.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).fourth.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).fourth.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where(&v).fifth.maximum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).fifth.maximum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).fifth.minimum(null_ptr, 0, -1, -1, &resindex);
+    t.where(&v).fifth.minimum(nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).first.average(), 0.001);
@@ -5320,33 +5320,33 @@ TEST(Query_AllTypesDynamicallyTyped)
     size_t ndx = not_found;
 
     CHECK_EQUAL(54, query.minimum_int(1));
-    query.minimum_int(1, null_ptr, 0, not_found, not_found, &ndx);
+    query.minimum_int(1, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(54, query.maximum_int(1));
-    query.maximum_int(1, null_ptr, 0, not_found, not_found, &ndx);
+    query.maximum_int(1, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(54, query.sum_int(1));
     CHECK_EQUAL(54, query.average_int(1));
 
     CHECK_EQUAL(0.7f, query.minimum_float(2));
-    query.minimum_float(2, null_ptr, 0, not_found, not_found, &ndx);
+    query.minimum_float(2, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.7f, query.maximum_float(2));
-    query.maximum_float(2, null_ptr, 0, not_found, not_found, &ndx);
+    query.maximum_float(2, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.7f, query.sum_float(2));
     CHECK_EQUAL(0.7f, query.average_float(2));
 
     CHECK_EQUAL(0.8, query.minimum_double(3));
-    query.minimum_double(3, null_ptr, 0, not_found, not_found, &ndx);
+    query.minimum_double(3, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.8, query.maximum_double(3));
-    query.maximum_double(3, null_ptr, 0, not_found, not_found, &ndx);
+    query.maximum_double(3, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.8, query.sum_double(3));
@@ -5420,33 +5420,33 @@ TEST(Query_AllTypesStaticallyTyped)
     size_t ndx = not_found;
 
     CHECK_EQUAL(54, query.int_col.minimum());
-    query.int_col.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    query.int_col.minimum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(54, query.int_col.maximum());
-    query.int_col.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    query.int_col.maximum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(54, query.int_col.sum());
     CHECK_EQUAL(54, query.int_col.average());
 
     CHECK_EQUAL(0.7f, query.float_col.minimum());
-    query.float_col.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    query.float_col.minimum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.7f, query.float_col.maximum());
-    query.float_col.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    query.float_col.maximum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.7f, query.float_col.sum());
     CHECK_EQUAL(0.7f, query.float_col.average());
 
     CHECK_EQUAL(0.8, query.double_col.minimum());
-    query.double_col.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    query.double_col.minimum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.8, query.double_col.maximum());
-    query.double_col.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    query.double_col.maximum(nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     CHECK_EQUAL(0.8, query.double_col.sum());

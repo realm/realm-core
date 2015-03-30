@@ -11,9 +11,9 @@ const size_t init_subtab_path_buf_size = 2*init_subtab_path_buf_levels - 1;
 
 TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& stream):
     m_encoder(stream),
-    m_selected_table(null_ptr),
-    m_selected_spec(null_ptr),
-    m_selected_link_list(null_ptr)
+    m_selected_table(nullptr),
+    m_selected_spec(nullptr),
+    m_selected_link_list(nullptr)
 {
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
 }
@@ -68,8 +68,8 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
 
     int levels = (end - begin) / 2;
     m_encoder.select_table(*begin, levels, begin + 1); // Throws
-    m_selected_spec = null_ptr;
-    m_selected_link_list = null_ptr;
+    m_selected_spec = nullptr;
+    m_selected_link_list = nullptr;
     m_selected_table = table;
 }
 
