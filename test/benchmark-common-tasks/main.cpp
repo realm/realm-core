@@ -100,6 +100,7 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
         t->insert_empty_row(0);
+        // This should be enough to upgrade the entire array:
         t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
         tr.commit();
     }
