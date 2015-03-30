@@ -83,8 +83,8 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         BenchmarkWithStringsTable::setup(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(999);
-        for (size_t i = 0; i < 999; ++i) {
+        t->add_empty_row(REALM_MAX_BPNODE_SIZE - 1);
+        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE - 1; ++i) {
             std::stringstream ss;
             ss << rand();
             t->set_string(0, i, ss.str());
