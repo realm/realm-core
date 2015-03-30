@@ -176,7 +176,7 @@ private:
 ///
 /// \sa BasicRow
 template<class T> class BasicRowExpr:
-        public RowFuncs<T, BasicRowExpr<T> > {
+        public RowFuncs<T, BasicRowExpr<T>> {
 public:
     template<class U> BasicRowExpr(const BasicRowExpr<U>&) REALM_NOEXCEPT;
 
@@ -192,7 +192,7 @@ private:
 
     // Make impl_get_table(), impl_get_row_ndx(), and impl_detach() accessible
     // from RowFuncs.
-    friend class RowFuncs<T, BasicRowExpr<T> >;
+    friend class RowFuncs<T, BasicRowExpr<T>>;
 
     // Make m_table and m_col_ndx accessible from BasicRowExpr(const
     // BasicRowExpr<U>&) for any U.
@@ -256,7 +256,7 @@ private:
 /// \sa RowFuncs
 template<class T> class BasicRow:
         private RowBase,
-        public RowFuncs<T, BasicRow<T> > {
+        public RowFuncs<T, BasicRow<T>> {
 public:
     BasicRow() REALM_NOEXCEPT;
 
@@ -274,7 +274,7 @@ private:
 
     // Make impl_get_table(), impl_get_row_ndx(), and impl_detach() accessible
     // from RowFuncs.
-    friend class RowFuncs<T, BasicRow<T> >;
+    friend class RowFuncs<T, BasicRow<T>>;
 
     // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.

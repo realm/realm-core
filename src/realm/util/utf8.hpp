@@ -38,7 +38,7 @@ namespace util {
 ///
 /// \tparam Traits16 Must define to_int_type() and to_char_type() for
 /// \a Char16.
-template<class Char16, class Traits16 = std::char_traits<Char16> > struct Utf8x16 {
+template<class Char16, class Traits16 = std::char_traits<Char16>> struct Utf8x16 {
     /// Transcode as much as possible of the specified UTF-8 input, to
     /// UTF-16. Returns true if all input characters were transcoded, or
     /// transcoding stopped because the next character did not fit into the

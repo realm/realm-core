@@ -394,39 +394,39 @@ template <class L, class R> class Overloads
 public:
 
     // Arithmetic, right side constant
-    Operator<Plus<CommonType> >& operator + (R right)
+    Operator<Plus<CommonType>>& operator + (R right)
     {
-       return *new Operator<Plus<CommonType> >(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+       return *new Operator<Plus<CommonType>>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Minus<CommonType> >& operator - (R right)
+    Operator<Minus<CommonType>>& operator - (R right)
     {
-       return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+       return *new Operator<Minus<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Mul<CommonType> >& operator * (R right)
+    Operator<Mul<CommonType>>& operator * (R right)
     {
-       return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+       return *new Operator<Mul<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Div<CommonType> >& operator / (R right)
+    Operator<Div<CommonType>>& operator / (R right)
     {
-        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return *new Operator<Div<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
 
     // Arithmetic, right side subexpression
-    Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right)
+    Operator<Plus<CommonType>>& operator + (const Subexpr2<R>& right)
     {
-        return *new Operator<Plus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return *new Operator<Plus<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right)
+    Operator<Minus<CommonType>>& operator - (const Subexpr2<R>& right)
     {
-        return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return *new Operator<Minus<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Mul<CommonType> >& operator * (const Subexpr2<R>& right)
+    Operator<Mul<CommonType>>& operator * (const Subexpr2<R>& right)
     {
-        return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return *new Operator<Mul<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Div<CommonType> >& operator / (const Subexpr2<R>& right)
+    Operator<Div<CommonType>>& operator / (const Subexpr2<R>& right)
     {
-        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return *new Operator<Div<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 
     // Compare, right side constant
@@ -858,58 +858,58 @@ template <class R> Query operator != (int64_t left, const Subexpr2<R>& right) {
 }
 
 // Arithmetic
-template <class R> Operator<Plus<typename Common<R, double>::type> >& operator + (double left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, double>::type> >(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, double>::type>>& operator + (double left, const Subexpr2<R>& right) {
+    return *new Operator<Plus<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Plus<typename Common<R, float>::type> >& operator + (float left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, float>::type> >(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, float>::type>>& operator + (float left, const Subexpr2<R>& right) {
+    return *new Operator<Plus<typename Common<R, float>::type>>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Plus<typename Common<R, int>::type> >& operator + (int left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, int>::type> >(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, int>::type>>& operator + (int left, const Subexpr2<R>& right) {
+    return *new Operator<Plus<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Plus<typename Common<R, int64_t>::type> >& operator + (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, int64_t>::type>>& operator + (int64_t left, const Subexpr2<R>& right) {
+    return *new Operator<Plus<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Minus<typename Common<R, double>::type> >& operator - (double left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, double>::type> >(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, double>::type>>& operator - (double left, const Subexpr2<R>& right) {
+    return *new Operator<Minus<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Minus<typename Common<R, float>::type> >& operator - (float left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, float>::type> >(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, float>::type>>& operator - (float left, const Subexpr2<R>& right) {
+    return *new Operator<Minus<typename Common<R, float>::type>>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Minus<typename Common<R, int>::type> >& operator - (int left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, int>::type> >(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, int>::type>>& operator - (int left, const Subexpr2<R>& right) {
+    return *new Operator<Minus<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Minus<typename Common<R, int64_t>::type> >& operator - (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, int64_t>::type>>& operator - (int64_t left, const Subexpr2<R>& right) {
+    return *new Operator<Minus<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Mul<typename Common<R, double>::type> >& operator * (double left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, double>::type> >(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, double>::type>>& operator * (double left, const Subexpr2<R>& right) {
+    return *new Operator<Mul<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Mul<typename Common<R, float>::type> >& operator * (float left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, float>::type> >(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, float>::type>>& operator * (float left, const Subexpr2<R>& right) {
+    return *new Operator<Mul<typename Common<R, float>::type>>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Mul<typename Common<R, int>::type> >& operator * (int left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, int>::type> >(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, int>::type>>& operator * (int left, const Subexpr2<R>& right) {
+    return *new Operator<Mul<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Mul<typename Common<R, int64_t>::type> >& operator * (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, int64_t>::type>>& operator * (int64_t left, const Subexpr2<R>& right) {
+    return *new Operator<Mul<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Div<typename Common<R, double>::type> >& operator / (double left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, double>::type> >(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, double>::type>>& operator / (double left, const Subexpr2<R>& right) {
+    return *new Operator<Div<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Div<typename Common<R, float>::type> >& operator / (float left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, float>::type> >*(new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, float>::type>>& operator / (float left, const Subexpr2<R>& right) {
+    return *new Operator<Div<typename Common<R, float>::type>>*(new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Div<typename Common<R, int>::type> >& operator / (int left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, int>::type> >(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, int>::type>>& operator / (int left, const Subexpr2<R>& right) {
+    return *new Operator<Div<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
-template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator / (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, int64_t>::type>>& operator / (int64_t left, const Subexpr2<R>& right) {
+    return *new Operator<Div<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 
 // Unary operators
-template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
-    return *new UnaryOperator<Pow<T> >(left.clone(), true);
+template <class T> UnaryOperator<Pow<T>>& power (Subexpr2<T>& left) {
+    return *new UnaryOperator<Pow<T>>(left.clone(), true);
 }
 
 
