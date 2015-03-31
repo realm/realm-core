@@ -592,6 +592,7 @@
     <ClCompile Include="..\..\src\realm\array_binary.cpp" />
     <ClCompile Include="..\..\src\realm\array_blob.cpp" />
     <ClCompile Include="..\..\src\realm\array_blobs_big.cpp" />
+    <ClCompile Include="..\..\src\realm\array_integer.cpp" />
     <ClCompile Include="..\..\src\realm\array_string.cpp" />
     <ClCompile Include="..\..\src\realm\array_string_long.cpp" />
     <ClCompile Include="..\..\src\realm\column.cpp" />
@@ -672,6 +673,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\test\test_array_integer.cpp" />
     <ClCompile Include="..\..\test\test_json.cpp" />
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
@@ -1083,6 +1085,7 @@
       <FileType>CppHeader</FileType>
     </ClInclude>
     <ClInclude Include="..\..\src\realm\array_blobs_big.hpp" />
+    <ClInclude Include="..\..\src\realm\array_integer.hpp" />
     <ClInclude Include="..\..\src\realm\array_string.hpp" />
     <ClInclude Include="..\..\src\realm\array_string_long.hpp" />
     <ClInclude Include="..\..\src\realm\binary_data.hpp" />
