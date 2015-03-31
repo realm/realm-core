@@ -178,6 +178,8 @@ namespace _impl {
 struct GlobalRandom {
     std::atomic<std::mt19937::result_type> m_seed;
     static GlobalRandom& get() REALM_NOEXCEPT;
+private:
+    GlobalRandom(std::mt19937::result_type initial_seed) : m_seed(initial_seed) {}
 };
 
 } // namespace _impl

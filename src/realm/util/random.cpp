@@ -16,7 +16,7 @@ GlobalRandom& GlobalRandom::get() REALM_NOEXCEPT
 {
     // FIXME: Initialization of local statics are not guaranteed to be
     // thread safe.
-    static GlobalRandom r;
+    static GlobalRandom r { std::mt19937::result_type(util::produce_nondeterministic_random_seed()) };
     return r;
 }
 
