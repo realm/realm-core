@@ -1,10 +1,6 @@
 #include "testsettings.hpp"
 
-#ifndef __STDC_LIMIT_MACROS
-    #define __STDC_LIMIT_MACROS
-#endif
-
-#include <stdint.h>
+#include <limits>
 
 #include <realm/array_integer.hpp>
 #include <realm/column.hpp>
@@ -185,49 +181,49 @@ TEST(ArrayIntNull_Boundaries) {
     CHECK(a.is_null(0));
 
 
-    a.add(INT8_MAX);
-    CHECK_EQUAL(INT8_MAX, a.back());
+    a.add(std::numeric_limits<int8_t>::max());
+    CHECK_EQUAL(std::numeric_limits<int8_t>::max(), a.back());
     CHECK(a.is_null(0));
 
-    a.add(INT8_MIN);
-    CHECK_EQUAL(INT8_MIN, a.back());
+    a.add(std::numeric_limits<int8_t>::min());
+    CHECK_EQUAL(std::numeric_limits<int8_t>::min(), a.back());
     CHECK(a.is_null(0));
 
-    a.add(UINT8_MAX);
-    CHECK_EQUAL(UINT8_MAX, a.back());
-    CHECK(a.is_null(0));
-
-
-    a.add(INT16_MAX);
-    CHECK_EQUAL(INT16_MAX, a.back());
-    CHECK(a.is_null(0));
-    a.add(INT16_MIN);
-    CHECK_EQUAL(INT16_MIN, a.back());
-    CHECK(a.is_null(0));
-    a.add(UINT16_MAX);
-    CHECK_EQUAL(UINT16_MAX, a.back());
+    a.add(std::numeric_limits<uint8_t>::max());
+    CHECK_EQUAL(std::numeric_limits<uint8_t>::max(), a.back());
     CHECK(a.is_null(0));
 
 
-    a.add(INT32_MAX);
-    CHECK_EQUAL(INT32_MAX, a.back());
+    a.add(std::numeric_limits<int16_t>::max());
+    CHECK_EQUAL(std::numeric_limits<int16_t>::max(), a.back());
     CHECK(a.is_null(0));
-    a.add(INT32_MIN);
-    CHECK_EQUAL(INT32_MIN, a.back());
+    a.add(std::numeric_limits<int16_t>::min());
+    CHECK_EQUAL(std::numeric_limits<int16_t>::min(), a.back());
     CHECK(a.is_null(0));
-    a.add(UINT32_MAX);
-    CHECK_EQUAL(UINT32_MAX, a.back());
+    a.add(std::numeric_limits<uint16_t>::max());
+    CHECK_EQUAL(std::numeric_limits<uint16_t>::max(), a.back());
     CHECK(a.is_null(0));
 
 
-    a.add(INT64_MAX);
-    CHECK_EQUAL(INT64_MAX, a.back());
+    a.add(std::numeric_limits<int32_t>::max());
+    CHECK_EQUAL(std::numeric_limits<int32_t>::max(), a.back());
     CHECK(a.is_null(0));
-    a.add(INT64_MIN);
-    CHECK_EQUAL(INT64_MIN, a.back());
+    a.add(std::numeric_limits<int32_t>::min());
+    CHECK_EQUAL(std::numeric_limits<int32_t>::min(), a.back());
     CHECK(a.is_null(0));
-    a.add(UINT64_MAX);
-    CHECK_EQUAL(UINT64_MAX, a.get_uint(a.size()-1));
+    a.add(std::numeric_limits<uint32_t>::max());
+    CHECK_EQUAL(std::numeric_limits<uint32_t>::max(), a.back());
+    CHECK(a.is_null(0));
+
+
+    a.add(std::numeric_limits<int_fast64_t>::max());
+    CHECK_EQUAL(std::numeric_limits<int_fast64_t>::max(), a.back());
+    CHECK(a.is_null(0));
+    a.add(std::numeric_limits<int_fast64_t>::min());
+    CHECK_EQUAL(std::numeric_limits<int_fast64_t>::min(), a.back());
+    CHECK(a.is_null(0));
+    a.add(std::numeric_limits<uint_fast64_t>::max());
+    CHECK_EQUAL(std::numeric_limits<uint_fast64_t>::max(), a.get_uint(a.size()-1));
     CHECK(a.is_null(0));
 
 
@@ -346,7 +342,7 @@ TEST(ArrayIntNull_MinMaxOfNegativeIntegers)
     CHECK_EQUAL(-1, t1);
 
     a.clear();
-    a.add(INT64_MAX);
+    a.add(std::numeric_limits<int_fast64_t>::max());
     a.add(0);
     a.set_null(1);
 
@@ -354,7 +350,7 @@ TEST(ArrayIntNull_MinMaxOfNegativeIntegers)
     size_t i2;
     bool found = a.minimum(t2, 0, npos, &i2);
     CHECK_EQUAL(i2, 0);
-    CHECK_EQUAL(t2, INT64_MAX);
+    CHECK_EQUAL(t2, std::numeric_limits<int_fast64_t>::max());
     CHECK_EQUAL(found, true);
 
     a.destroy();
