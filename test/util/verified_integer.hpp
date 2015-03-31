@@ -29,12 +29,12 @@
 
 #include <realm/array.hpp>
 #include <realm/column.hpp>
-
-#include "random.hpp"
+#include <realm/util/random.hpp>
 
 namespace realm {
 namespace test_util {
 
+using realm::util::Random;
 
 class VerifiedInteger {
 public:
