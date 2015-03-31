@@ -971,6 +971,15 @@ protected:
                             bool context_flag, WidthType width_type, int width,
                             std::size_t size, std::size_t capacity) REALM_NOEXCEPT;
 
+
+    template <std::size_t width>
+    static int_fast64_t lbound_for_width() REALM_NOEXCEPT;
+    static int_fast64_t lbound_for_width(std::size_t width) REALM_NOEXCEPT;
+
+    template <std::size_t width>
+    static int_fast64_t ubound_for_width() REALM_NOEXCEPT;
+    static int_fast64_t ubound_for_width(std::size_t width) REALM_NOEXCEPT;
+
     template<std::size_t width> void set_width() REALM_NOEXCEPT;
     void set_width(std::size_t) REALM_NOEXCEPT;
     void alloc(std::size_t count, std::size_t width);
@@ -1048,6 +1057,8 @@ private:
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
+
+    static std::size_t bit_width(int64_t value);
 
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;

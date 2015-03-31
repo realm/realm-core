@@ -155,12 +155,10 @@ using namespace realm;
 using namespace realm::util;
 
 
-namespace {
-
 /// Takes a 64-bit value and returns the minimum number of bits needed
 /// to fit the value. For alignment this is rounded up to nearest
 /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-size_t bit_width(int64_t v)
+size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
@@ -179,8 +177,6 @@ size_t bit_width(int64_t v)
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
-
-} // anonymous namespace
 
 
 void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
@@ -1713,6 +1709,79 @@ void Array::alloc(size_t size, size_t width)
     set_header_size(size);
 }
 
+int_fast64_t Array::lbound_for_width(size_t width) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(return lbound_for_width, width, ());
+}
+
+template <size_t width>
+int_fast64_t Array::lbound_for_width() REALM_NOEXCEPT
+{
+    if (width == 0) {
+        return 0;
+    }
+    else if (width == 1) {
+        return 0;
+    }
+    else if (width == 2) {
+        return 0;
+    }
+    else if (width == 4) {
+        return 0;
+    }
+    else if (width == 8) {
+        return -0x80LL;
+    }
+    else if (width == 16) {
+        return -0x8000LL;
+    }
+    else if (width == 32) {
+        return -0x80000000LL;
+    }
+    else if (width == 64) {
+        return -0x8000000000000000LL;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
+
+int_fast64_t Array::ubound_for_width(size_t width) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(return ubound_for_width, width, ());
+}
+
+template <size_t width>
+int_fast64_t Array::ubound_for_width() REALM_NOEXCEPT
+{
+    if (width == 0) {
+        return 0;
+    }
+    else if (width == 1) {
+        return 1;
+    }
+    else if (width == 2) {
+        return 3;
+    }
+    else if (width == 4) {
+        return 15;
+    }
+    else if (width == 8) {
+        return 0x7FLL;
+    }
+    else if (width == 16) {
+        return 0x7FFFLL;
+    }
+    else if (width == 32) {
+        return 0x7FFFFFFFLL;
+    }
+    else if (width == 64) {
+        return 0x7FFFFFFFFFFFFFFFLL;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
 
 void Array::set_width(size_t width) REALM_NOEXCEPT
 {
@@ -1721,41 +1790,8 @@ void Array::set_width(size_t width) REALM_NOEXCEPT
 
 template<size_t width> void Array::set_width() REALM_NOEXCEPT
 {
-    if (width == 0) {
-        m_lbound = 0;
-        m_ubound = 0;
-    }
-    else if (width == 1) {
-        m_lbound = 0;
-        m_ubound = 1;
-    }
-    else if (width == 2) {
-        m_lbound = 0;
-        m_ubound = 3;
-    }
-    else if (width == 4) {
-        m_lbound = 0;
-        m_ubound = 15;
-    }
-    else if (width == 8) {
-        m_lbound = -0x80LL;
-        m_ubound =  0x7FLL;
-    }
-    else if (width == 16) {
-        m_lbound = -0x8000LL;
-        m_ubound =  0x7FFFLL;
-    }
-    else if (width == 32) {
-        m_lbound = -0x80000000LL;
-        m_ubound =  0x7FFFFFFFLL;
-    }
-    else if (width == 64) {
-        m_lbound = -0x8000000000000000LL;
-        m_ubound =  0x7FFFFFFFFFFFFFFFLL;
-    }
-    else {
-        REALM_ASSERT_DEBUG(false);
-    }
+    m_lbound = lbound_for_width<width>();
+    m_ubound = ubound_for_width<width>();
 
     m_width = width;
     // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of get() instead of get<n>
