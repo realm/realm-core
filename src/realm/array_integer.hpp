@@ -119,9 +119,9 @@ public:
     int64_t sum(std::size_t start = 0, std::size_t end = npos) const;
     std::size_t count(int64_t value) const REALM_NOEXCEPT;
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = npos,
-        std::size_t* return_ndx = null_ptr) const;
+        std::size_t* return_ndx = nullptr) const;
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = npos,
-                 std::size_t* return_ndx = null_ptr) const;
+                 std::size_t* return_ndx = nullptr) const;
 
     bool find(int cond, Action action, int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state) const;
@@ -169,7 +169,7 @@ protected:
 private:
     template<bool find_max>
     bool minmax_helper(int64_t& result, std::size_t start = 0, std::size_t end = npos,
-                         std::size_t* return_ndx = null_ptr) const;
+                         std::size_t* return_ndx = nullptr) const;
 
     int_fast64_t choose_random_null(int64_t incoming);
     void replace_nulls_with(int64_t new_null);
