@@ -344,9 +344,39 @@ public:
     /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
     /// declared below. 'export_for_handover()' returns a Handover object, and 
     /// 'import_for_handover()' consumes the object.
-    /// The Handover object does *not* assume ownership of the object being handed over.
+    ///
+    /// FIXME: description given below is not implemented correctly yet:
+    /// (a: current implementation does not copy TableView objects, and
+    ///  b: imported accessor does not implement ownership of the accessors
+    ///     it depend on)
+    ///
+    /// The Handover always creates a new accessor object at the importing side.
+    /// For TableViews, there are 3 forms of handover.
+    /// - with payload move: the payload is handed over and ends up as a payload
+    ///   held by the accessor at the importing side. The accessor on the exporting
+    ///   side will rerun its query and generate a new payload, if sync_if_needed() is
+    ///   called.
+    /// - with payload copy: a copy of the payload is handed over, so both the accessors
+    ///   on the exporting side *and* the accessors created at the importing side has 
+    ///   their own payload.
+    /// - without payload: the payload stays with the accessor on the exporting
+    ///   side. On the importing side, the new accessor is created without payload.
+    ///   a call to sync_if_needed() will trigger generation of a new payload.
+    /// Handover *without* payload is useful when you want to ship a query for execution
+    /// in a background thread. Handover with *payload move* is useful when you want to transfer
+    /// the result back.
+    /// Handover *without* payload or with payload copy is guaranteed *not* to change 
+    /// the accessors on the exporting side and is thread safe - it is interlocked with 
+    /// advance_read(), promote_to_write etc - but it is not interlocked with deletion of 
+    /// the accessors: The caller must ensure that the accessors relevant for the export 
+    /// operation stays valid for the duration of the export.
+    /// Handover with payload *move* is *not* thread safe and should be carried out 
+    /// by the thread that "owns" the involved accessors.
     /// If the object being handed over depends on other views (table- or link- ), those
-    /// objects will be handed over as well.
+    /// objects will be handed over as well. The mode of handover (payload copy, payload
+    /// move, without payload) is applied recursively.
+    /// On the importing side, the toplevel accessor being created takes ownership
+    /// of all other accessors (if any) being created as part of the import.
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
@@ -358,22 +388,16 @@ public:
         {
         }
     };
-
-    /// Create a handover object for the given accessor. The object being handed over is 
-    /// detached and cannot be used before it is imported by a SharedGroup. The call to 
-    /// export_for_handover is not thread-safe. For table views, export is restricted to 
-    /// certain kinds of table views and will throw if the restriction is violated. 
-    /// See table_view.hpp for a description of the restrictions applying to export of 
-    /// table views. 
-    /// Note that the object being handed over is passed by reference. The handover does 
-    /// not assume ownership, and the handed over object must be available/in scope where 
-    /// it is imported.
+    enum Handover_mode { payload_move, payload_copy, payload_stay };
     template<typename T>
-    Handover<T>* export_for_handover(T& accessor)
+    Handover<T>* export_for_handover(T& accessor, Handover_mode mode)
     {
+        // TODO: lock
         typename T::Handover_data handover_data;
-        accessor.prepare_for_export(handover_data);
-        return new Handover<T>(&accessor, handover_data, get_version_of_current_transaction());
+        accessor.prepare_for_export(handover_data, mode);
+        Handover<T>* result = new Handover<T>(&accessor, handover_data, get_version_of_current_transaction());
+        // TODO: unlock
+        return result;
     }
 
     /// Import an accessor wrapped in a handover object. The import will fail if the
