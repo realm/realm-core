@@ -105,7 +105,8 @@ private:
 
 /// Implementation:
 
-inline Random::Random() REALM_NOEXCEPT
+inline Random::Random() REALM_NOEXCEPT:
+    m_engine(produce_nondeterministic_random_seed())
 {
 }
 
