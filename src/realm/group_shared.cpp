@@ -23,6 +23,7 @@
 #include <iostream>
 
 #include <fcntl.h>
+#include <atomic>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -141,35 +142,35 @@ const uint16_t relaxed_sync_threshold = 50;
 //   there is no standardized support for it.
 //
 
-template<typename T> bool atomic_double_inc_if_even(Atomic<T>& counter)
+template<typename T> bool atomic_double_inc_if_even(std::atomic<T>& counter)
 {
-    T oldval = counter.fetch_add_acquire(2);
+    T oldval = counter.fetch_add(2, std::memory_order_acquire);
     if (oldval & 1) {
         // oooops! was odd, adjust
-        counter.fetch_sub_relaxed(2);
+        counter.fetch_sub(2, std::memory_order_relaxed);
         return false;
     }
     return true;
 }
 
-template<typename T> inline void atomic_double_dec(Atomic<T>& counter)
+template<typename T> inline void atomic_double_dec(std::atomic<T>& counter)
 {
-    counter.fetch_sub_release(2);
+    counter.fetch_sub(2, std::memory_order_release);
 }
 
-template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
+template<typename T> bool atomic_one_if_zero(std::atomic<T>& counter)
 {
-    T old_val = counter.fetch_add_acquire(1);
+    T old_val = counter.fetch_add(1, std::memory_order_acquire);
     if (old_val != 0) {
-        counter.fetch_sub_relaxed(1);
+        counter.fetch_sub(1, std::memory_order_relaxed);
         return false;
     }
     return true;
 }
 
-template<typename T> void atomic_dec(Atomic<T>& counter)
+template<typename T> void atomic_dec(std::atomic<T>& counter)
 {
-    counter.fetch_sub_release(1);
+    counter.fetch_sub(1, std::memory_order_release);
 }
 
 // nonblocking ringbuffer
@@ -195,7 +196,7 @@ public:
         // fields. A succesfull inc implies acquire with regard to memory consistency.
         // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
-        mutable Atomic<uint32_t> count;
+        mutable std::atomic<uint32_t> count;
         uint32_t next;
     };
 
@@ -204,36 +205,36 @@ public:
         entries = init_readers_size;
         for (int i=0; i < init_readers_size; i++) {
             data[i].version = 1;
-            data[i].count.store_relaxed( 1 );
+            data[i].count.store( 1, std::memory_order_relaxed );
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
         }
         old_pos = 0;
-        data[ 0 ].count.store_relaxed( 0 );
+        data[ 0 ].count.store( 0, std::memory_order_relaxed );
         data[ init_readers_size-1 ].next = 0 ;
-        put_pos.store_release( 0 );
+        put_pos.store( 0, std::memory_order_release );
     }
 
     void dump()
     {
         uint_fast32_t i = old_pos;
         cout << "--- " << endl;
-         while (i != put_pos.load_relaxed()) {
+         while (i != put_pos.load()) {
             cout << "  used " << i << " : "
-                 << data[i].count.load_relaxed() << " | "
+                 << data[i].count.load() << " | "
                  << data[i].version
                  << endl;
             i = data[i].next;
         }
         cout << "  LAST " << i << " : "
-             << data[i].count.load_relaxed() << " | "
+             << data[i].count.load() << " | "
              << data[i].version
              << endl;
         i = data[i].next;
         while (i != old_pos) {
             cout << "  free " << i << " : "
-                 << data[i].count.load_relaxed() << " | "
+                 << data[i].count.load() << " | "
                  << data[i].version
                  << endl;
             i = data[i].next;
@@ -247,13 +248,13 @@ public:
         // dump();
         for (uint_fast32_t i = entries; i < new_entries; i++) {
             data[i].version = 1;
-            data[i].count.store_relaxed( 1 );
+            data[i].count.store( 1, std::memory_order_relaxed );
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
         }
         data[ new_entries - 1 ].next = old_pos;
-        data[ put_pos.load_relaxed() ].next = entries;
+        data[ put_pos.load(std::memory_order_relaxed) ].next = entries;
         entries = new_entries;
         // dump();
     }
@@ -273,7 +274,7 @@ public:
 
     uint_fast32_t last() const  REALM_NOEXCEPT
     {
-        return put_pos.load_acquire();
+        return put_pos.load(std::memory_order_acquire);
     }
 
     const ReadCount& get(uint_fast32_t idx) const  REALM_NOEXCEPT
@@ -312,14 +313,14 @@ public:
     void use_next()  REALM_NOEXCEPT
     {
         atomic_dec(get_next().count); // .store_release(0);
-        put_pos.store_release(next());
+        put_pos.store(next(), std::memory_order_release);
     }
 
     void cleanup()  REALM_NOEXCEPT
     {   // invariant: entry held by put_pos has count > 1.
         // cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
-        while (old_pos != put_pos.load_relaxed()) {
+        while (old_pos != put_pos.load(std::memory_order_relaxed)) {
             const ReadCount& r = get(old_pos);
             if (! atomic_one_if_zero( r.count ))
                 break;
@@ -330,7 +331,7 @@ public:
 private:
     // number of entries. Access synchronized through put_pos.
     uint32_t entries;
-    Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
+    std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint32_t old_pos; // only accessed during write transactions and under lock
 
     const static int init_readers_size = 32;
