@@ -7,6 +7,7 @@
   which could cause crash later, if work continued on the same shared group. The bug did not
   affect the data written to the compacted database, but later commits working on the outdated
   freelist might have. The fix forces proper (re)initialization of the free list.
+* Fixed incorrect results in querying on an indexed string column via a LinkView.
 
 ### API breaking changes:
 
