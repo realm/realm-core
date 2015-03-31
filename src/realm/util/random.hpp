@@ -23,6 +23,7 @@
 
 #include <limits>
 #include <random>
+#include <atomic>
 
 #include <realm/util/thread.hpp>
 
@@ -175,8 +176,7 @@ template<class RandomIt> inline void Random::shuffle(RandomIt begin, RandomIt en
 namespace _impl {
 
 struct GlobalRandom {
-    util::Mutex m_mutex;
-    util::Random m_random;
+    std::atomic<std::mt19937::result_type> m_seed;
     static GlobalRandom& get() REALM_NOEXCEPT;
 };
 
@@ -187,8 +187,9 @@ namespace util {
 template<class T> inline T random_int(T min, T max) REALM_NOEXCEPT
 {
     _impl::GlobalRandom& r = _impl::GlobalRandom::get();
-    util::LockGuard lock(r.m_mutex);
-    return r.m_random.draw_int(min, max);
+    Random random { r.m_seed.load() };
+    r.m_seed.store(random.draw_int<std::mt19937::result_type>());
+    return random.draw_int(min, max);
 }
 
 template<class T> inline T random_int() REALM_NOEXCEPT
@@ -200,8 +201,7 @@ template<class T> inline T random_int() REALM_NOEXCEPT
 inline void random_seed(unsigned long seed) REALM_NOEXCEPT
 {
     _impl::GlobalRandom& r = _impl::GlobalRandom::get();
-    util::LockGuard lock(r.m_mutex);
-    return r.m_random.seed(seed);
+    r.m_seed.store(seed);
 }
 
 } // namespace util
