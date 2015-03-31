@@ -107,6 +107,8 @@
     <ClCompile Include="..\..\src\realm\util\encrypted_file_mapping.cpp" />
     <ClCompile Include="..\..\src\realm\util\memory_stream.cpp" />
     <ClCompile Include="..\..\src\realm\impl\transact_log.cpp" />
+    <ClCompile Include="..\..\test\test_array_integer.cpp" />
+    <ClCompile Include="..\..\src\realm\array_integer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
@@ -207,6 +209,7 @@
     <ClInclude Include="..\..\src\realm\impl\destroy_guard.hpp" />
     <ClInclude Include="..\..\src\realm\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\realm\impl\transact_log.hpp" />
+    <ClInclude Include="..\..\src\realm\array_integer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

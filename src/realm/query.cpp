@@ -12,7 +12,7 @@
 using namespace std;
 using namespace realm;
 
-Query::Query() : m_view(null_ptr), m_source_table_view(0)
+Query::Query() : m_view(nullptr), m_source_table_view(0)
 {
     Create();
 //    expression(static_cast<Expression*>(this));
@@ -21,7 +21,7 @@ Query::Query() : m_view(null_ptr), m_source_table_view(0)
 Query::Query(Table& table, TableViewBase* tv) 
     : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
-    REALM_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
@@ -30,14 +30,14 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     m_view(lv.get()),
     m_source_link_view(lv), m_source_table_view(0)
 {
-    REALM_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
 Query::Query(const Table& table, TableViewBase* tv) 
     : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
-    REALM_ASSERT_DEBUG(m_view == null_ptr ||m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
@@ -98,7 +98,7 @@ Query& Query::operator = (const Query& source)
         Create();
         first = source.first;
         std::map<ParentNode*, ParentNode*> node_mapping;
-        node_mapping[null_ptr] = null_ptr;
+        node_mapping[nullptr] = nullptr;
         std::vector<ParentNode*>::const_iterator i;
         for (i = source.all_nodes.begin(); i != source.all_nodes.end(); ++i) {
             ParentNode* new_node = (*i)->clone();
@@ -480,27 +480,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Equal> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Equal>>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, NotEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, NotEqual>>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Greater> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Greater>>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, GreaterEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, GreaterEqual>>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, LessEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, LessEqual>>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Less> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Less>>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -515,27 +515,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Equal> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Equal>>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, NotEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, NotEqual>>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Greater> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Greater>>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, GreaterEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, GreaterEqual>>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, LessEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, LessEqual>>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Less> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Less>>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -654,7 +654,7 @@ template <Action action, typename T, typename R, class ColType>
         // Aggregate with criteria - goes through the nodes in the query system
         Init(*m_table);
         QueryState<R> st;
-        st.init(action, null_ptr, limit);
+        st.init(action, nullptr, limit);
 
         SequentialGetter<T> source_column(*m_table, column_ndx);
 
@@ -891,16 +891,16 @@ Query& Query::Not()
 {
     NotNode* const p = new NotNode;
     all_nodes.push_back(p);
-    if (first[first.size()-1] == null_ptr) {
+    if (first[first.size()-1] == nullptr) {
         first[first.size()-1] = p;
     }
-    if (update[update.size()-1] != null_ptr) {
+    if (update[update.size()-1] != nullptr) {
         *update[update.size()-1] = p;
     }
     group();
     pending_not[pending_not.size()-1] = true;
     // value for update for sub-condition
-    update[update.size()-2] = null_ptr;
+    update[update.size()-2] = nullptr;
     update[update.size()-1] = &p->m_cond;
     // pending value for update, once the sub-condition ends:
     update_override[update_override.size()-1] = &p->m_child;
@@ -979,7 +979,7 @@ size_t Query::find(size_t begin)
     Init(*m_table);
 
     // User created query with no criteria; return first
-    if (first.size() == 0 || first[0] == null_ptr) {
+    if (first.size() == 0 || first[0] == nullptr) {
         if (m_view)
             return m_view->size() == 0 ? not_found : begin;
         else
@@ -1077,7 +1077,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     }
     else {
         QueryState<int64_t> st;
-        st.init(act_Count, null_ptr, limit);
+        st.init(act_Count, nullptr, limit);
         aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
         cnt = size_t(st.m_state);
     }
@@ -1181,11 +1181,11 @@ int Query::set_threads(unsigned int threadcount)
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
     pthread_win32_process_attach_np ();
 #endif
-    pthread_mutex_init(&ts.result_mutex, null_ptr);
-    pthread_cond_init(&ts.completed_cond, null_ptr);
-    pthread_mutex_init(&ts.jobs_mutex, null_ptr);
-    pthread_mutex_init(&ts.completed_mutex, null_ptr);
-    pthread_cond_init(&ts.jobs_cond, null_ptr);
+    pthread_mutex_init(&ts.result_mutex, nullptr);
+    pthread_cond_init(&ts.completed_cond, nullptr);
+    pthread_mutex_init(&ts.jobs_mutex, nullptr);
+    pthread_mutex_init(&ts.completed_mutex, nullptr);
+    pthread_cond_init(&ts.jobs_cond, nullptr);
 
     pthread_mutex_lock(&ts.jobs_mutex);
 
@@ -1193,7 +1193,7 @@ int Query::set_threads(unsigned int threadcount)
         pthread_detach(threads[i]);
 
     for (size_t i = 0; i < threadcount; ++i) {
-        int r = pthread_create(&threads[i], null_ptr, query_thread, (void*)&ts);
+        int r = pthread_create(&threads[i], nullptr, query_thread, (void*)&ts);
         if (r != 0)
             REALM_ASSERT(false); //todo
     }
@@ -1208,7 +1208,7 @@ void* Query::query_thread(void* arg)
     thread_state* ts = static_cast<thread_state*>(arg);
 
     vector<size_t> res;
-    vector<pair<size_t, size_t> > chunks;
+    vector<pair<size_t, size_t>> chunks;
 
     for (;;) {
         // Main waiting loop that waits for a query to start
@@ -1278,7 +1278,7 @@ string Query::validate()
 
 void Query::Init(const Table& table) const
 {
-    if (first[0] != null_ptr) {
+    if (first[0] != nullptr) {
         ParentNode* top = first[0];
         top->init(table);
         vector<ParentNode*> v;
@@ -1289,7 +1289,7 @@ void Query::Init(const Table& table) const
 bool Query::is_initialized() const
 {
     const ParentNode* top = first[0];
-    if (top != null_ptr) {
+    if (top != nullptr) {
         return top->is_initialized();
     }
     return true;
@@ -1381,10 +1381,10 @@ Query Query::operator||(Query q)
 
 Query Query::operator&&(Query q)
 {
-    if(first[0] == null_ptr)
+    if(first[0] == nullptr)
         return q;
 
-    if(q.first[0] == null_ptr)
+    if(q.first[0] == nullptr)
         return (*this);
 
     Query q2(*this->m_table);
@@ -1397,7 +1397,7 @@ Query Query::operator&&(Query q)
 
 Query Query::operator!()
 {
-    if (first[0] == null_ptr)
+    if (first[0] == nullptr)
         throw runtime_error("negation of empty query is not supported");
     Query q(*this->m_table);
     q.Not();

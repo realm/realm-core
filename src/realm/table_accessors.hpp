@@ -146,8 +146,8 @@ namespace _impl {
 /// If T matches 'BasicTableView<T2>' or 'const BasicTableView<T2>',
 /// then return T2, else simply return T.
 template<class Tab> struct GetTableFromView { typedef Tab type; };
-template<class Tab> struct GetTableFromView<BasicTableView<Tab> > { typedef Tab type; };
-template<class Tab> struct GetTableFromView<const BasicTableView<Tab> > { typedef Tab type; };
+template<class Tab> struct GetTableFromView<BasicTableView<Tab>> { typedef Tab type; };
+template<class Tab> struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
 
 
 /// Determine whether an accessor has const-only access to a table, so
@@ -159,7 +159,7 @@ template<class Tab> struct GetTableFromView<const BasicTableView<Tab> > { typede
 /// as it does not modify the contents of the table.
 template<class Taboid> struct TableIsConst { static const bool value = false; };
 template<class Taboid> struct TableIsConst<const Taboid> { static const bool value = true; };
-template<class Tab> struct TableIsConst<BasicTableView<const Tab> > {
+template<class Tab> struct TableIsConst<BasicTableView<const Tab>> {
     static const bool value = true;
 };
 
@@ -170,9 +170,9 @@ template<class Tab> struct TableIsConst<BasicTableView<const Tab> > {
 ///
 /// \tparam Taboid Either a table or a table view, that is, any of
 /// 'BasicTable<S>', 'const BasicTable<S>',
-/// 'BasicTableView<BasicTable<S> >', 'const
-/// BasicTableView<BasicTable<S> >', 'BasicTableView<const
-/// BasicTable<S> >', or 'const BasicTableView<const BasicTable<S>
+/// 'BasicTableView<BasicTable<S>>', 'const
+/// BasicTableView<BasicTable<S>>', 'BasicTableView<const
+/// BasicTable<S>>', or 'const BasicTableView<const BasicTable<S>
 /// >'. Note that the term 'taboid' is used here for something that is
 /// table-like, i.e., either a table of a table view.
 ///
@@ -658,7 +658,7 @@ protected:
 /// Field accessor specialization for mixed type of non-const parent.
 template<class Taboid, int col_idx>
 class FieldAccessor<Taboid, col_idx, Mixed, false>:
-    public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, false> > {
+    public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, false>> {
 private:
     typedef FieldAccessor<Taboid, col_idx, Mixed, false> This;
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
@@ -750,7 +750,7 @@ public:
 /// Field accessor specialization for mixed type of const parent.
 template<class Taboid, int col_idx>
 class FieldAccessor<Taboid, col_idx, Mixed, true>:
-    public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, true> > {
+    public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, true>> {
 private:
     typedef FieldAccessor<Taboid, col_idx, Mixed, true> This;
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
@@ -1082,10 +1082,10 @@ public:
 
 /// Column accessor specialization for enumerations.
 template<class Taboid, int col_idx, class E>
-class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E> >:
-    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E> > {
+class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E>>:
+    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E> > Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
@@ -1212,10 +1212,10 @@ public:
 
 /// Column accessor specialization for subtables.
 template<class Taboid, int col_idx, class Subtab>
-class ColumnAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab> >:
-    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab> > {
+class ColumnAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>>:
+    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab> > Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
@@ -1496,10 +1496,10 @@ public:
 
 /// QueryColumn specialization for enumerations.
 template<class Taboid, int col_idx, class E>
-class QueryColumn<Taboid, col_idx, SpecBase::Enum<E> >:
-    public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E> > {
+class QueryColumn<Taboid, col_idx, SpecBase::Enum<E>>:
+    public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
-    typedef QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E> > Base;
+    typedef QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
     typedef typename Taboid::Query Query;
 
 public:
@@ -1665,7 +1665,7 @@ public:
 
 /// QueryColumn specialization for subtables.
 template<class Taboid, int col_idx, class Subtab>
-class QueryColumn<Taboid, col_idx, SpecBase::Subtable<Subtab> > {
+class QueryColumn<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
 private:
     typedef typename Taboid::Query Query;
     Query* const m_query;

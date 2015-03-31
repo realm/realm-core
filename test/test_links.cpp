@@ -885,7 +885,7 @@ TEST(Links_RandomizedOperations)
         Group group;
         TableRef refs[tests]; // 'tests' is max number of tables that can be produced
 
-        vector<vector<size_t> > tables;
+        vector<vector<size_t>> tables;
 
         for (size_t inner_iter = 0; inner_iter < tests; inner_iter++) {
             int action = rnd.draw_int_mod(100);

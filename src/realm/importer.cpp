@@ -255,7 +255,7 @@ template <bool can_fail> float Importer::parse_float(const char*col, bool* succe
         return 0.0;
     }
 
-    if(can_fail && success != null_ptr)
+    if(can_fail && success != nullptr)
         *success = true;
 
     return static_cast<float>(d);
@@ -270,7 +270,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
     double x;
     bool is_neg = false;
     size_t dummy;
-    if(can_fail && significants == null_ptr)
+    if(can_fail && significants == nullptr)
         significants = &dummy;
 
     if(can_fail && is_null(col)) {
@@ -418,7 +418,7 @@ vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataTyp
 }
 
 // Takes payload vectors, and for each field finds best type that can represent all rows.
-vector<DataType> Importer::detect_scheme(vector<vector<string> > payload, size_t begin, size_t end)
+vector<DataType> Importer::detect_scheme(vector<vector<string>> payload, size_t begin, size_t end)
 {
     vector<DataType> res;
     res = types(payload[begin]);
@@ -430,7 +430,7 @@ vector<DataType> Importer::detect_scheme(vector<vector<string> > payload, size_t
     return res;
 }
 
-size_t Importer::tokenize(vector<vector<string> > & payload, size_t records)
+size_t Importer::tokenize(vector<vector<string>> & payload, size_t records)
 {
     size_t original_size = payload.size();
 
@@ -548,7 +548,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                             size_t type_detection_rows, size_t skip_first_rows,
                             size_t import_rows)
 {
-    vector<vector<string> > payload;      // Used to build a 2D string vector with rows and columns of .csv content.
+    vector<vector<string>> payload;      // Used to build a 2D string vector with rows and columns of .csv content.
     vector<string> header;                // Column names (will be either auto-detected or read from cmd line args)
     vector<DataType> scheme;              // Scheme (will be either auto-detected or read from cmd line args)
     bool header_present = false;          // Used only in auto-detection mode.
@@ -559,7 +559,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
     m_file = file;
     m_row = 1;
 
-    if(scheme2 == null_ptr) {
+    if(scheme2 == nullptr) {
         // Header detection: 1) If first line is strings-only and next line has at least 1 occurence of non-string, then
         // header is present. 2) If first line has at least one occurence of non-string or empty-field, then header is
         // not present. 3) If first two lines are strings-only, we can't tell, and treat both as payload
@@ -730,7 +730,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 
 size_t Importer::import_csv_auto(FILE* file, Table& table, size_t type_detection_rows, size_t import_rows)
 {
-    return import_csv(file, table, null_ptr, null_ptr, type_detection_rows, 0, import_rows);
+    return import_csv(file, table, nullptr, nullptr, type_detection_rows, 0, import_rows);
 }
 
 size_t Importer::import_csv_manual(FILE* file, Table& table, vector<DataType> scheme, vector<string> column_names,

@@ -1090,7 +1090,7 @@ void SharedGroup::do_async_commits()
             timespec ts;
             timeval tv;
             // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
-            gettimeofday(&tv, null_ptr);
+            gettimeofday(&tv, nullptr);
             ts.tv_sec = tv.tv_sec;
             ts.tv_nsec = tv.tv_usec * 1000;
             ts.tv_nsec += 10000000; // 10 msec

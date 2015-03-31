@@ -509,7 +509,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     copy_backward(begin_2, end_2, dest_end_2);
 }
 
-void Array::add_to_column(Column* column, int64_t value) 
+void Array::add_to_column(Column* column, int64_t value)
 {
     column->add(value);
 }
@@ -728,8 +728,8 @@ void Array::set_all_to_zero()
 }
 
 
-// If indirection == null_ptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
-// indirection == null_ptr then 'this' must be sorted increasingly.
+// If indirection == nullptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
+// indirection == nullptr then 'this' must be sorted increasingly.
 //
 // If indirection exists, then return lowest 'i' for which this->get(indirection->get(i)) >= target or -1 if none.
 // If indirection exists, then 'this' can be non-sorted, but 'indirection' must point into 'this' such that the values
@@ -2026,7 +2026,7 @@ void Array::Verify() const
 
 namespace {
 
-typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void> > > > VerifyBptreeResult;
+typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptreeResult;
 
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
@@ -2492,14 +2492,14 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) REALM_NO
         // minimizes the length of dependence chains leading up to branches.
         // Making the unfolding of the loop independent of the data being
         // searched, also minimizes the delays incurred by branch
-        // mispredictions, because they can be determined earlier 
+        // mispredictions, because they can be determined earlier
         // and the speculation corrected earlier.
 
         // Counterintuitive:
-        // To make size independent of data, we cannot always split the 
+        // To make size independent of data, we cannot always split the
         // range at the theoretical optimal point. When we determine that
-        // the key is larger than the probe at some index K, and prepare 
-        // to search the upper part of the range, you would normally start 
+        // the key is larger than the probe at some index K, and prepare
+        // to search the upper part of the range, you would normally start
         // the search at the next index, K+1, to get the shortest range.
         // We can only do this when splitting a range with odd number of entries.
         // If there is an even number of entries we search from K instead of K+1.
@@ -2856,7 +2856,7 @@ top:
                     }
                 }
                 else {
-                    return allnocopy ? size_t(FindRes_column) : 
+                    return allnocopy ? size_t(FindRes_column) :
                            first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
                 }
             }

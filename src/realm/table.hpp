@@ -619,7 +619,7 @@ public:
     };
 
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
-    void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Column* viewrefs = null_ptr) const;
+    void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Column* viewrefs = nullptr) const;
 
 
 private:
@@ -672,10 +672,10 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(TableViewBase* tv = null_ptr) { return Query(*this, tv); }
+    Query where(TableViewBase* tv = nullptr) { return Query(*this, tv); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where(TableViewBase* tv = null_ptr) const { return Query(*this, tv); }
+    Query where(TableViewBase* tv = nullptr) const { return Query(*this, tv); }
 
     // Perform queries on a LinkView. The returned Query holds a reference to lv.
     Query where(const LinkViewRef& lv) { return Query(*this, lv); }
@@ -973,7 +973,7 @@ private:
     void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth,
         std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
     void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = null_ptr) const;
+        std::map<std::string, std::string>* renames = nullptr) const;
 
     // Detach accessor from underlying table. Caller must ensure that
     // a reference count exists upon return, for example by obtaining
