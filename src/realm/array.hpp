@@ -971,6 +971,19 @@ protected:
                             bool context_flag, WidthType width_type, int width,
                             std::size_t size, std::size_t capacity) REALM_NOEXCEPT;
 
+
+    // This returns the minimum value ("lower bound") of the representable values
+    // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
+    template <std::size_t width>
+    static int_fast64_t lbound_for_width() REALM_NOEXCEPT;
+    static int_fast64_t lbound_for_width(std::size_t width) REALM_NOEXCEPT;
+
+    // This returns the maximum value ("inclusive upper bound") of the representable values
+    // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
+    template <std::size_t width>
+    static int_fast64_t ubound_for_width() REALM_NOEXCEPT;
+    static int_fast64_t ubound_for_width(std::size_t width) REALM_NOEXCEPT;
+
     template<std::size_t width> void set_width() REALM_NOEXCEPT;
     void set_width(std::size_t) REALM_NOEXCEPT;
     void alloc(std::size_t count, std::size_t width);
@@ -1048,6 +1061,11 @@ private:
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
+
+    /// Takes a 64-bit value and returns the minimum number of bits needed
+    /// to fit the value. For alignment this is rounded up to nearest
+    /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
+    static std::size_t bit_width(int64_t value);
 
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
