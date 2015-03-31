@@ -419,12 +419,12 @@ class SpinLockGuard {
 public:
     SpinLockGuard(std::atomic<bool>& lock) : m_lock(lock)
     {
-        while (m_lock.exchange(true, std::memory_ordering_acquire)) ;
+        while (m_lock.exchange(true, std::memory_order_acquire)) ;
     }
 
     ~SpinLockGuard()
     {
-        m_lock.store(false, std::memory_ordering_release);
+        m_lock.store(false, std::memory_order_release);
     }
 
 private:
