@@ -35,6 +35,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <atomic>
 
 #include <realm/util/errno.hpp>
 #include <realm/util/shared_ptr.hpp>
@@ -416,18 +417,18 @@ void install_handler()
 
 class SpinLockGuard {
 public:
-    SpinLockGuard(Atomic<bool>& lock) : m_lock(lock)
+    SpinLockGuard(std::atomic<bool>& lock) : m_lock(lock)
     {
-        while (m_lock.exchange_acquire(true)) ;
+        while (m_lock.exchange(true, std::memory_ordering_acquire)) ;
     }
 
     ~SpinLockGuard()
     {
-        m_lock.store_release(false);
+        m_lock.store(false, std::memory_ordering_release);
     }
 
 private:
-    Atomic<bool>& m_lock;
+    std::atomic<bool>& m_lock;
 };
 
 // A list of all of the active encrypted mappings for a single file
@@ -446,7 +447,7 @@ struct mapping_and_addr {
     size_t size;
 };
 
-Atomic<bool> mapping_lock;
+std::atomic<bool> mapping_lock;
 std::vector<mapping_and_addr> mappings_by_addr;
 std::vector<mappings_for_file> mappings_by_file;
 
