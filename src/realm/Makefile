@@ -13,6 +13,7 @@ util/bind.hpp \
 util/safe_int_ops.hpp \
 util/bind_ptr.hpp \
 util/buffer.hpp \
+util/random.hpp \
 util/string_buffer.hpp \
 util/shared_ptr.hpp \
 util/memory_stream.hpp \
@@ -109,6 +110,7 @@ util/errno.cpp \
 util/file.cpp \
 util/file_mapper.cpp \
 util/memory_stream.cpp \
+util/random.cpp \
 util/string_buffer.cpp \
 util/terminate.cpp \
 util/thread.cpp \

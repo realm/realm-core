@@ -94,7 +94,6 @@
     <ClCompile Include="..\..\test\test_version.cpp" />
     <ClCompile Include="..\..\test\util\demangle.cpp" />
     <ClCompile Include="..\..\test\util\misc.cpp" />
-    <ClCompile Include="..\..\test\util\random.cpp" />
     <ClCompile Include="..\..\test\util\resource_limits.cpp" />
     <ClCompile Include="..\..\test\util\test_only.cpp" />
     <ClCompile Include="..\..\test\util\test_path.cpp" />
