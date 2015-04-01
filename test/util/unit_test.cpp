@@ -6,10 +6,10 @@
 #include <memory>
 #include <realm/util/bind.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/random.hpp>
 
 #include "demangle.hpp"
 #include "timer.hpp"
-#include "random.hpp"
 #include "wildcard.hpp"
 #include "unit_test.hpp"
 

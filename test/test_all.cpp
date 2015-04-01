@@ -13,9 +13,8 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-
-#include <realm/util/features.h>
 #include <memory>
+
 #include <realm/util/features.h>
 #include <realm.hpp>
 #include <realm/utilities.hpp>

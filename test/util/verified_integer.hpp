@@ -29,16 +29,14 @@
 
 #include <realm/array.hpp>
 #include <realm/column.hpp>
-
-#include "random.hpp"
+#include <realm/util/random.hpp>
 
 namespace realm {
 namespace test_util {
 
-
 class VerifiedInteger {
 public:
-    VerifiedInteger(Random&);
+    VerifiedInteger(util::Random&);
     ~VerifiedInteger();
     void add(int64_t value);
     void insert(std::size_t ndx, int64_t value);
@@ -60,14 +58,14 @@ public:
 private:
     std::vector<int64_t> v;
     Column u;
-    Random& m_random;
+    util::Random& m_random;
 };
 
 
 
 // Implementation
 
-inline VerifiedInteger::VerifiedInteger(Random& random):
+inline VerifiedInteger::VerifiedInteger(util::Random& random):
     u(Column::unattached_root_tag(), Allocator::get_default()),
     m_random(random)
 {

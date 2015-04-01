@@ -4,7 +4,6 @@ test_util_a_SOURCES = \
 demangle.cpp \
 mem.cpp \
 timer.cpp \
-random.cpp \
 benchmark_results.cpp \
 wildcard.cpp \
 unit_test.cpp \
