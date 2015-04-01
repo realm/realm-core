@@ -189,7 +189,7 @@ namespace util {
 template<class T> inline T random_int(T min, T max) REALM_NOEXCEPT
 {
     _impl::GlobalRandom& r = _impl::GlobalRandom::get();
-    Random random { r.m_seed.load() };
+    Random random { r.m_seed++ }; // Increment to avoid multiple threads seeing the same seed.
     r.m_seed.store(random.draw_int<std::mt19937::result_type>());
     return random.draw_int(min, max);
 }
