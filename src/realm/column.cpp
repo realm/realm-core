@@ -488,7 +488,7 @@ Column::Column(unattached_root_tag, Allocator& alloc)
 
 }
 
-Column::Column(move_tag, Column& col) REALM_NOEXCEPT
+Column::Column(Column&& col) REALM_NOEXCEPT
 {
     m_array = std::move(col.m_array);
     m_search_index = std::move(col.m_search_index);

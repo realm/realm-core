@@ -255,9 +255,7 @@ public:
 #endif
 
 protected:
-    // FIXME: This should not be mutable, the problem is again the
-    // const-violating moving copy constructor.
-    mutable std::unique_ptr<Array> m_array;
+    std::unique_ptr<Array> m_array;
 
     ColumnBase(Array* root = 0) REALM_NOEXCEPT;
 
@@ -396,8 +394,7 @@ public:
     struct unattached_root_tag {};
     Column(unattached_root_tag, Allocator&);
 
-    struct move_tag {};
-    Column(move_tag, Column&) REALM_NOEXCEPT;
+    Column(Column&&) REALM_NOEXCEPT;
 
     ~Column() REALM_NOEXCEPT override;
     void destroy() REALM_NOEXCEPT;
@@ -516,8 +513,8 @@ protected:
 #endif
 
 private:
-    Column(const Column&); // not allowed
-    Column &operator=(const Column&); // not allowed
+    Column(const Column&) = delete; // not allowed
+    Column &operator=(const Column&) = delete; // not allowed
 
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
