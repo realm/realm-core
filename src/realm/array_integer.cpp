@@ -72,14 +72,18 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
 namespace {
     int64_t next_null_candidate(int64_t previous_candidate) {
         uint64_t x = static_cast<uint64_t>(previous_candidate);
-        x += 127;
+        x += 127; // really any prime number will do.
         return static_cast<int64_t>(x);
     }
 }
 
 int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming)
 {
+    // We just need any number -- it could have been `rand()`, but
+    // random numbers are hard, and we don't want to risk locking mutices
+    // or saving state. The top of the stack should be "random enough".
     int64_t candidate = reinterpret_cast<int64_t>(&candidate);
+
     while (true) {
         candidate = next_null_candidate(candidate);
         if (candidate == incoming) {
