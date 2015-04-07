@@ -215,7 +215,7 @@ TEST(Shared_PipelinedWritesWithKills)
 #endif
 
 
-TEST(Shared_CompactingOnTheFly)
+ONLY(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
     string old_path = path;
