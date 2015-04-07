@@ -740,7 +740,7 @@ TEST(LinkList_MultiLinkQuery)
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == "none").find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<String>(0) == "none").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
