@@ -571,7 +571,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) REALM_NOEXCEPT:
-    RowIndexes(Column::move_tag(), tv->m_row_indexes),
+    RowIndexes(std::move(tv->m_row_indexes)),
     m_table(move(tv->m_table)),
     m_distinct_column_source(tv->m_distinct_column_source)
 {
