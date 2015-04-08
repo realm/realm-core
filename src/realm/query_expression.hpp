@@ -1413,7 +1413,7 @@ public:
                 Value<T> v;
                 REALM_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
                 // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-                sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+                sg->m_leaf_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
                 destination.import(v);
             }
             else {

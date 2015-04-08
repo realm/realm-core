@@ -185,6 +185,16 @@ private:
     T m_value;
 };
 
+// PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
+// placement new. It simply calls the object's destructor without freeing the memory.
+struct PlacementDelete {
+    template <class T>
+    void operator()(T* v) const
+    {
+        v->~T();
+    }
+};
+
 } // namespace realm
 
 #endif // REALM_UTILITIES_HPP
