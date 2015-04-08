@@ -205,16 +205,18 @@ public:
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrayType;
 
-    SequentialGetter() : m_array(Array::no_prealloc_tag()) {}
+    SequentialGetter() {}
 
-    SequentialGetter(const Table& table, size_t column_ndx): m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const SequentialGetter&) = delete;
+
+    SequentialGetter(const Table& table, size_t column_ndx)
     {
         if (column_ndx != not_found)
             m_column = static_cast<const ColType*>(&table.get_column_base(column_ndx));
-        m_leaf_end = 0;
+        init(m_column);
     }
 
-    SequentialGetter(const ColType* column): m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const ColType* column)
     {
         init(column);
     }
@@ -223,6 +225,8 @@ public:
 
     void init(const ColType* column)
     {
+        m_array_ptr.reset(nullptr);
+        m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayType(column->get_alloc()));
         m_column = column;
         m_leaf_end = 0;
     }
@@ -232,9 +236,9 @@ public:
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
             std::size_t ndx_in_leaf;
-            m_array_ptr = &static_cast<const ArrayType&>(m_column->get_leaf(index, ndx_in_leaf, m_array));
+            m_leaf_ptr = &m_column->get_leaf(index, ndx_in_leaf, *m_array_ptr);
             m_leaf_start = index - ndx_in_leaf;
-            const size_t leaf_size = m_array_ptr->size();
+            const size_t leaf_size = m_leaf_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
         }
@@ -250,7 +254,7 @@ public:
 #endif
 
         cache_next(index);
-        T av = m_array_ptr->get(index - m_leaf_start);
+        T av = m_leaf_ptr->get(index - m_leaf_start);
         return av;
 
 #ifdef _MSC_VER
@@ -270,11 +274,14 @@ public:
     size_t m_leaf_end;
     const ColType* m_column;
 
-    // See reason for having both a pointer and instance above
-    const ArrayType* m_array_ptr;
+    const ArrayType* m_leaf_ptr = nullptr;
 private:
-    // Never access through m_array because it's uninitialized if column is just a leaf
-    ArrayType m_array;
+    // Leaf cache for when the root of the column is not a leaf.
+    // This dog and pony show is because Array has a reference to Allocator internally,
+    // but we need to be able to transfer queries between contexts, so init() reinitializes
+    // the leaf cache in the context of the current column.
+    typename std::aligned_storage<sizeof(ArrayType), alignof(ArrayType)>::type m_leaf_accessor_storage;
+    std::unique_ptr<ArrayType, PlacementDelete> m_array_ptr;
 };
 
 
@@ -611,7 +618,7 @@ public:
         return b;
     }
 
-    IntegerNodeBase() : m_array(Array::no_prealloc_tag())
+    IntegerNodeBase()
     {
         m_child = 0;
         m_conds = 0;
@@ -620,8 +627,7 @@ public:
         m_matches = 0;
     }
 
-    IntegerNodeBase(const IntegerNodeBase& from)
-        : ParentNode(from), m_array(Array::no_prealloc_tag())
+    IntegerNodeBase(const IntegerNodeBase& from) : ParentNode(from)
     {
         // state is transient/only valid during search, no need to copy
         m_child = from.m_child;
@@ -631,9 +637,15 @@ public:
         m_matches = 0;
     }
 
+    void init(const Table& table) override
+    {
+        ParentNode::init(table);
+        m_array_ptr.reset();
+        m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayInteger(table.get_alloc()));
+    }
+
     size_t m_last_local_match;
-    ArrayInteger m_array;
-    const ArrayInteger* m_array_ptr = &m_array;
+    const ArrayInteger* m_leaf_ptr = nullptr;
     size_t m_leaf_start;
     size_t m_leaf_end;
     size_t m_local_end;
@@ -646,6 +658,17 @@ public:
     QueryStateBase* m_state;
     SequentialGetterBase* m_source_column; // Column of values used in aggregate (act_FindAll, act_ReturnFirst, act_Sum, etc)
 
+    void get_leaf(const Column& col, std::size_t ndx)
+    {
+        std::size_t ndx_in_leaf;
+        m_leaf_ptr = &col.get_leaf(ndx, ndx_in_leaf, *m_array_ptr);
+        m_leaf_start = ndx - ndx_in_leaf;
+        m_leaf_end = m_leaf_start + m_leaf_ptr->size();
+    }
+
+private:
+    typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type m_leaf_accessor_storage;
+    std::unique_ptr<ArrayInteger, PlacementDelete> m_array_ptr;
 };
 
 // IntegerNode is for conditions for types stored as integers in a realm::Array (int, date, bool).
@@ -657,8 +680,6 @@ template <class TConditionValue, class TConditionFunction> class IntegerNode: pu
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
-    // NOTE: Be careful to call Array(no_prealloc_tag) constructors on m_array in the initializer list, otherwise
-    // their default constructors are called which are slow
     IntegerNode(TConditionValue v, size_t column) : m_value(v), m_find_callback_specialized(NULL)
     {
         m_condition_column_idx = column;
@@ -667,6 +688,7 @@ public:
 
     void init(const Table& table) override
     {
+        IntegerNodeBase::init(table);
         m_dD = 100.0;
         m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
         m_table = &table;
@@ -721,7 +743,7 @@ public:
     template <Action TAction, class TSourceColumn>
     bool find_callback_specialization(size_t s, size_t end2)
     {
-        bool cont = m_array_ptr->find<TConditionFunction, act_CallbackIdx>
+        bool cont = m_leaf_ptr->find<TConditionFunction, act_CallbackIdx>
             (m_value, s - m_leaf_start, end2, m_leaf_start, nullptr,
              std::bind1st(std::mem_fun(&IntegerNodeBase::template match_callback<TAction, TSourceColumn>), this));
         return cont;
@@ -748,11 +770,8 @@ public:
         for (size_t s = start; s < end; ) {
             // Cache internal leaves
             if (s >= m_leaf_end || s < m_leaf_start) {
-                std::size_t ndx_in_leaf;
-                m_array_ptr = &m_condition_column->get_leaf(s, ndx_in_leaf, m_array);
-                m_leaf_start = s - ndx_in_leaf;
-                m_leaf_end = m_leaf_start + m_array_ptr->size();
-                size_t w = m_array_ptr->get_width();
+                get_leaf(*m_condition_column, s);
+                size_t w = m_leaf_ptr->get_width();
                 m_dT = (w == 0 ? 1.0 / REALM_MAX_BPNODE_SIZE : w / float(bitwidth_time_unit));
             }
 
@@ -763,7 +782,7 @@ public:
                 end2 = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_array_ptr->find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                bool cont = m_leaf_ptr->find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
                 if (!cont)
                     return not_found;
             }
@@ -801,15 +820,12 @@ public:
 
             // Cache internal leaves
             if (start >= m_leaf_end || start < m_leaf_start) {
-                std::size_t ndx_in_leaf;
-                m_array_ptr = &m_condition_column->get_leaf(start, ndx_in_leaf, m_array);
-                m_leaf_start = start - ndx_in_leaf;
-                m_leaf_end = m_leaf_start + m_array_ptr->size();
+                get_leaf(*m_condition_column, start);
             }
 
             // Do search directly on cached leaf array
             if (start + 1 == end) {
-                if (condition(m_array_ptr->get(start - m_leaf_start), m_value))
+                if (condition(m_leaf_ptr->get(start - m_leaf_start), m_value))
                     return start;
                 else
                     return not_found;
@@ -821,7 +837,7 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            size_t s = m_array_ptr->find_first<TConditionFunction>(m_value, start - m_leaf_start, end2);
+            size_t s = m_leaf_ptr->find_first<TConditionFunction>(m_value, start - m_leaf_start, end2);
 
             if (s == not_found) {
                 start = m_leaf_end;
@@ -877,8 +893,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column.m_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
-        m_condition_column.m_leaf_end = 0;
+        m_condition_column.init(static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx)));
 
         if (m_child)
             m_child->init(table);
@@ -1195,6 +1210,8 @@ public:
         m_dD = 10.0;
         StringNodeBase::init(table);
 
+        m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
+
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
             m_key_ndx = (static_cast<const ColumnStringEnum*>(m_condition_column))->GetKeyNdx(m_value);
@@ -1277,13 +1294,13 @@ public:
 
             while (f == not_found && m_last_indexed < m_index_size) {
                 m_index_getter->cache_next(m_last_indexed);
-                f = m_index_getter->m_array_ptr->FindGTE(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
+                f = m_index_getter->m_leaf_ptr->FindGTE(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
 
                 if (f >= end || f == not_found) {
                     m_last_indexed = m_index_getter->m_leaf_end;
                 }
                 else {
-                    start = to_size_t(m_index_getter->m_array_ptr->get(f));
+                    start = to_size_t(m_index_getter->m_leaf_ptr->get(f));
                     if (start >= end)
                         return not_found;
                     else {
@@ -1302,7 +1319,7 @@ public:
 
             for (size_t s = start; s < end; ++s) {
                 m_cse.cache_next(s);
-                s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
+                s = m_cse.m_leaf_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
                 if (s == not_found)
                     s = m_cse.m_leaf_end - 1;
                 else
@@ -1628,7 +1645,7 @@ public:
                 m_getter2.cache_next(s);
 
                 QueryState<int64_t> qs;
-                bool resume = m_getter1.m_array_ptr->template CompareLeafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_array_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
+                bool resume = m_getter1.m_leaf_ptr->template CompareLeafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_leaf_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
 
                 if (resume)
                     s = m_getter1.m_leaf_end;

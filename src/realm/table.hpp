@@ -106,6 +106,8 @@ public:
 
     ~Table() REALM_NOEXCEPT;
 
+    Allocator& get_alloc() const;
+
     /// Construct a new freestanding top-level table with dynamic lifetime.
     static TableRef create(Allocator& = Allocator::get_default());
 
@@ -1578,6 +1580,11 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
     m_ref_count = 0; // Lifetime managed by reference counting
     m_descriptor = 0;
     m_row_accessors = 0;
+}
+
+inline Allocator& Table::get_alloc() const
+{
+    return m_top.get_alloc();
 }
 
 inline TableRef Table::create(Allocator& alloc)
