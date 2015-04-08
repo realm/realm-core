@@ -5671,12 +5671,193 @@ TEST(Query_StringIndexCrash)
     // Test for a crash which occured when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
-    table.add_column(type_String, "s");
+    table.add_column(type_String, "s", true);
     table.add_search_index(0);
 
     Query q = table.where().equal(0, StringData(""));
     q.count();
     Query(q, Query::TCopyExpressionTag());
+}
+
+
+TEST(Query_NullStrings)
+{
+    Table table;
+    table.add_column(type_String, "s", true);
+    table.add_empty_row(3);
+
+    Query q;
+    TableView v;
+
+    // Short strings
+    table.set_string(0, 0, "Albertslund");      // Normal non-empty string
+    table.set_string(0, 1, realm::null());    // NULL string
+    table.set_string(0, 2, "");                 // Empty string
+
+    q = table.column<StringData>(0) == realm::null();
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+
+    q = table.column<StringData>(0) != realm::null();
+    v = q.find_all();
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(0, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_ndx(1));
+
+    // contrary to SQL, comparisons with realm::null() can be true in Realm (todo, discuss if we want this behaviour)
+    q = table.column<StringData>(0) != StringData("Albertslund");
+    v = q.find_all();
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_ndx(1));
+
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
+
+    // Medium strings (16+)
+    table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
+
+    q = table.column<StringData>(0) == realm::null();
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
+
+    // Long strings (64+)
+    table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
+    q = table.column<StringData>(0) == realm::null();
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
+    
+}
+
+
+TEST(Query_Nulls_Fuzzy)
+{
+    for (int attributes = 1; attributes < 5; attributes++) {
+        Random random(random_int<unsigned long>());
+
+        for (size_t t = 0; t < 10; t++) {
+            Table table;
+            table.add_column(type_String, "string", true);
+
+            if (attributes == 0) {
+            }
+            if (attributes == 1) {
+                table.add_search_index(0);
+            }
+            else if (attributes == 2) {
+                table.optimize(true);
+            }
+            else if (attributes == 3) {
+                table.add_search_index(0);
+                table.optimize(true);
+            }
+            else if (attributes == 4) {
+                table.optimize(true);
+                table.add_search_index(0);
+            }
+
+            // vector that is kept in sync with the column so that we can compare with it
+            vector<string> v;
+
+            // ArrayString capacity starts at 128 bytes, so we need lots of elements
+            // to test if relocation works
+            for (size_t i = 0; i < 100; i++) {
+                unsigned char action = random.draw_int_max<int>(100);
+
+                if (action > 48 && table.size() < 10) {
+                    // Generate string with equal probability of being empty, null, short, medium and long, and with 
+                    // their contents having equal proability of being either random or a duplicate of a previous 
+                    // string. When it's random, each char must have equal probability of being 0 or non-0
+                    char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                    char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
+                    memcpy(buf1, buf, sizeof(buf));
+                    char buf2[] = "                                                                                         ";
+
+                    StringData sd;
+                    string st;
+
+                    if (fastrand(1) == 0) {
+                        // null string
+                        sd = realm::null();
+                        st = "null";
+                    }
+                    else {
+                        // non-null string
+                        size_t len = fastrand(3);
+                        if (len == 0)
+                            len = 0;
+                        else if (len == 1)
+                            len = 7;
+                        else if (len == 2)
+                            len = 27;
+                        else
+                            len = 73;
+
+                        if (fastrand(1) == 0) {
+                            // duplicate string
+                            sd = StringData(buf1, len);
+                            st = string(buf1, len);
+                        }
+                        else {
+                            // random string
+                            for (size_t t = 0; t < len; t++) {
+                                if (fastrand(100) > 20)
+                                    buf2[t] = 0;                        // zero byte
+                                else
+                                    buf2[t] = fastrand(255);  // random byte
+                            }
+                            // no generated string can equal "null" (our vector magic value for null) because 
+                            // len == 4 is not possible
+                            sd = StringData(buf2, len);
+                            st = string(buf2, len);
+                        }
+                    }
+
+                    size_t pos = random.draw_int_max<size_t>(table.size());
+                    table.insert_empty_row(pos);
+                    table.set_string(0, pos, sd);
+
+                    v.insert(v.begin() + pos, st);
+                    delete buf1;
+
+                }
+                else if (table.size() > 0) {
+                    // delete
+                    size_t row = random.draw_int_max<size_t>(table.size() - 1);
+                    table.remove(row);
+                    v.erase(v.begin() + row);
+                }
+
+
+                CHECK_EQUAL(table.size(), v.size());
+                for (size_t i = 0; i < table.size(); i++) {
+                    if (v[i] == "null") {
+                        CHECK(table.get_string(0, i).is_null());
+                    }
+                    else {
+                        CHECK(table.get_string(0, i) == v[i]);
+                    }
+                }
+
+            }
+
+        }
+    }
 }
 
 #endif // TEST_QUERY

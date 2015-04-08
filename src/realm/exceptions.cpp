@@ -38,6 +38,8 @@ const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
             return "Primary key already added";
         case LogicError::unique_constraint_violation:
             return "Unique constraint violation";
+        case LogicError::column_not_nullable:
+            return "Attempted to insert null into non-nullable column";
     }
     return "Unknown error";
 }

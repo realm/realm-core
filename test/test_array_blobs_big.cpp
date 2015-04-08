@@ -38,7 +38,7 @@ using namespace realm;
 
 TEST(ArrayBigBlobs_Basic)
 {
-    ArrayBigBlobs c(Allocator::get_default());
+    ArrayBigBlobs c(Allocator::get_default(), false);
     c.create();
 
     // TEST(ArrayBigBlobs_IsEmpty)
@@ -47,10 +47,9 @@ TEST(ArrayBigBlobs_Basic)
 
 
     // TEST(ArrayBigBlobs_MultiEmpty)
-
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
+    c.add(BinaryData());
+    c.add(BinaryData());
+    c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());

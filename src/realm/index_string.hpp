@@ -21,6 +21,7 @@
 #define REALM_INDEX_STRING_HPP
 
 #include <iostream>
+#include <cstring>
 
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
@@ -29,18 +30,24 @@ namespace realm {
 
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
 // by making Column convert its integers to strings by calling to_str().
-template <class T> inline StringData to_str(T& value)
+template <class T> inline StringData to_str(const T& value)
 {
     REALM_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
     const char* c = reinterpret_cast<const char*>(&value);
     return StringData(c, sizeof(T));
 }
 
-inline StringData to_str(StringData& input)
+inline StringData to_str(const StringData& input)
 {
     return input;
 }
 
+inline StringData to_str(null& input)
+{
+    return input;
+}
+
+// todo, should be removed
 inline StringData to_str(const char* value)
 {
     return StringData(value);
@@ -111,6 +118,7 @@ public:
     typedef int32_t key_type;
 
     static key_type create_key(StringData) REALM_NOEXCEPT;
+    static key_type create_key(StringData, size_t) REALM_NOEXCEPT;
 
 private:
     void* m_target_column;
@@ -234,6 +242,30 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) REALM_NOEXC
     key |= (key_type(static_cast<unsigned char>(str[0])) << 24);
   none:
     return key;
+}
+
+// Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So 
+// "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored as empty strings.
+inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) REALM_NOEXCEPT
+{
+        if (str.is_null())
+            return 0;
+
+        if (offset > str.size())
+            return 0;
+        else {
+            size_t tail = str.size() - offset;
+            if (tail <= sizeof(key_type)-1) {
+                char buf[sizeof(key_type)];
+                memset(buf, 0, sizeof(key_type));
+                buf[tail] = 'X';
+                memcpy(buf, str.data() + offset, tail);
+                return create_key(StringData(buf, tail + 1));
+            }
+            else {
+                return create_key(str.substr(offset));
+            }
+        }
 }
 
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)

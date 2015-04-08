@@ -50,6 +50,10 @@
 #  define REALM_HAVE_CXX11 1
 #endif
 
+#ifndef REALM_HAVE_NULL_SUPPORT
+#  define REALM_HAVE_NULL_SUPPORT 1
+#endif
+
 
 /* See these links for information about feature check macroes in GCC,
  * Clang, and MSVC:
@@ -188,6 +192,16 @@
 #  define REALM_NOEXCEPT_OR_NOTHROW noexcept
 #else
 #  define REALM_NOEXCEPT_OR_NOTHROW throw ()
+#endif
+
+
+/* Support for C++11 explicit virtual overrides */
+#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 7) || \
+    REALM_HAVE_CLANG_FEATURE(cxx_override_control) || \
+    REALM_HAVE_AT_LEAST_MSVC_11_2012
+//#  define override override
+#else
+#  define override
 #endif
 
 

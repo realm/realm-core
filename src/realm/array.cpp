@@ -2436,17 +2436,29 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) REALM_NOEX
 }
 
 
-template<int width>
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
+template<int width> inline pair<int64_t, int64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
 {
-    return make_pair(to_size_t(get_direct<width>(data, ndx+0)),
-                     to_size_t(get_direct<width>(data, ndx+1)));
+    return make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
+                     to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
-                                                size_t ndx) REALM_NOEXCEPT
+inline pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) REALM_NOEXCEPT
 {
     REALM_TEMPEX(return get_two, width, (data, ndx));
+}
+
+
+template<int width>
+inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    v0 = to_ref(get_direct<width>(data, ndx + 0));
+    v1 = to_ref(get_direct<width>(data, ndx + 1));
+    v2 = to_ref(get_direct<width>(data, ndx + 2));
+}
+
+inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(get_three, width, (data, ndx, v0, v1, v2));
 }
 
 
@@ -2796,10 +2808,11 @@ template <IndexMethod method, class T> size_t Array::index_string(StringData val
     bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
+    size_t stringoffset = 0;
 
 top:
     // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
+    key = StringIndex::create_key(value, stringoffset);
 
     for (;;) {
         // Get subnode table
@@ -2870,7 +2883,7 @@ top:
                 // for integer index, get_func fills out 'buffer' and makes str point at it
                 char buffer[8];
                 StringData str = (*get_func)(column, first_row_ref, buffer);
-                if (str != value) {
+                if (str.is_null() != value.is_null() || str != value) {
                     if (count)
                         return 0;
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
@@ -2926,10 +2939,10 @@ top:
         width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
 
-        if (value_2.size() <= 4)
-            value_2 = StringData();
+        if (value.size() - stringoffset >= 4)
+            stringoffset += 4;
         else
-            value_2 = value_2.substr(4);
+            stringoffset += value.size() - stringoffset + 1;
 
         goto top;
     }
@@ -3584,10 +3597,18 @@ int_fast64_t Array::get(const char* header, size_t ndx) REALM_NOEXCEPT
 }
 
 
-pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
+pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
-    pair<int_fast64_t, int_fast64_t> p = ::get_two(data, width, ndx);
-    return make_pair(int_least64_t(p.first), int_least64_t(p.second));
+    pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
+    return make_pair(p.first, p.second);
+}
+
+
+void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    const char* data = get_data_from_header(header);
+    int width = get_width_from_header(header);
+    ::get_three(data, width, ndx, v0, v1, v2);
 }

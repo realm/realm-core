@@ -6,7 +6,9 @@
 
 #include "test.hpp"
 
+using namespace std;
 using namespace realm;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
@@ -495,6 +497,164 @@ TEST(ArrayString_Basic)
     // TEST(ArrayString_Destroy)
 
     c.destroy();
+}
+
+
+TEST(ArrayString_Null)
+{
+    {
+        ArrayString a(Allocator::get_default(), true);
+        a.create();
+
+        a.add("");
+        size_t t = a.find_first("");
+        CHECK_EQUAL(t, 0);
+
+        a.destroy();
+    }
+
+    {
+        ArrayString a(Allocator::get_default(), true);
+        a.create();
+
+        a.add("foo");
+        a.add("");
+        a.add(realm::null()); 
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK(a.get(0) == "foo");
+
+        // Test set
+        a.set_null(0);
+        a.set_null(1);
+        a.set_null(2);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(2), true);
+
+        a.destroy();
+    }
+
+    {
+        ArrayString a(Allocator::get_default(), true);
+        a.create();
+
+        a.add(realm::null());  
+        a.add("");
+        a.add("foo");
+
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == "foo");
+
+        // Test insert
+        a.insert(0, realm::null()); 
+        a.insert(2, realm::null()); 
+        a.insert(4, realm::null()); 
+
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK_EQUAL(a.is_null(3), false);
+        CHECK_EQUAL(a.is_null(4), true);
+        CHECK_EQUAL(a.is_null(5), false);
+
+        a.destroy();
+    }
+
+    {
+        ArrayString a(Allocator::get_default(), true);
+        a.create();
+
+        a.add("");
+        a.add(realm::null());
+        a.add("foo");
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == "foo");
+
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), false);
+
+        a.destroy();
+    }
+
+    Random random(random_int<unsigned long>());
+
+    for (size_t t = 0; t < 50; t++) {
+        ArrayString a(Allocator::get_default(), true);
+        a.create();
+
+        // vector that is kept in sync with the ArrayString so that we can compare with it
+        vector<string> v;
+
+        // ArrayString capacity starts at 128 bytes, so we need lots of elements
+        // to test if relocation works
+        for (size_t i = 0; i < 100; i++) {
+            unsigned char rnd = random.draw_int<int>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+
+            // Add more often than removing, so that we grow
+            if (rnd < 80 && a.size() > 0) {
+                size_t del = rnd % a.size();
+                a.erase(del);
+                v.erase(v.begin() + del);
+            }
+            else {
+                // Generate string with good probability of being empty or realm::null()
+                static const char str[] = "This is a test of realm::null() strings";
+                size_t len;
+
+                if (random.draw_int<int>() > 100)
+                    len = rnd % 15;
+                else
+                    len = 0;
+
+                StringData sd;
+                string stdstr;
+
+                if (random.draw_int<int>() > 100) {
+                    sd = realm::null();
+                    stdstr = "realm::null()";
+                }
+                else {
+                    sd = StringData(str, len);
+                    stdstr = string(str, len);
+                }
+
+                if (random.draw_int<int>() > 100) {
+                    a.add(sd);
+                    v.push_back(stdstr);
+                }
+                else if (a.size() > 0) {
+                    size_t pos = rnd % a.size();
+                    a.insert(pos, sd);
+                    v.insert(v.begin() + pos, stdstr);
+                }
+
+                CHECK_EQUAL(a.size(), v.size());
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (v[i] == "realm::null()") {
+                        CHECK(a.is_null(i));
+                        CHECK(a.get(i).data() == 0);
+                    }
+                    else {
+                        CHECK(a.get(i) == v[i]);
+                    }
+                }
+            }
+        }
+        a.destroy();
+    }
+   
 }
 
 

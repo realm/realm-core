@@ -279,10 +279,10 @@ template<> struct ColumnTypeTraits3<DateTime> {
 
 // -- Table ---------------------------------------------------------------------------------
 
-size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
+size_t Table::add_column(DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
 {
     REALM_ASSERT(!has_shared_type());
-    return get_descriptor()->add_column(type, name, subdesc); // Throws
+    return get_descriptor()->add_column(type, name, subdesc, nullable); // Throws
 }
 
 size_t Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
@@ -391,11 +391,10 @@ void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
 }
 
 
-void Table::insert_column(size_t col_ndx, DataType type, StringData name,
-                          DescriptorRef* subdesc)
+void Table::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
 {
     REALM_ASSERT(!has_shared_type());
-    get_descriptor()->insert_column(col_ndx, type, name, subdesc); // Throws
+    get_descriptor()->insert_column(col_ndx, type, name, subdesc, nullable); // Throws
 }
 
 
@@ -627,7 +626,7 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
 
 
 void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
-                             StringData name, Table* link_target_table)
+                             StringData name, Table* link_target_table, bool nullable)
 {
     REALM_ASSERT(desc.is_attached());
 
@@ -640,7 +639,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
     if (desc.is_root()) {
         root_table.bump_version();
-        root_table.insert_root_column(col_ndx, type, name, link_target_table); // Throws
+        root_table.insert_root_column(col_ndx, type, name, link_target_table, nullable); // Throws
     }
     else {
         Spec& spec = df::get_spec(desc);
@@ -654,7 +653,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, col_ndx, type, name, link_target_table); // Throws
+        repl->insert_column(desc, col_ndx, type, name, link_target_table, nullable); // Throws
 #endif
 }
 
@@ -737,11 +736,11 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 
 
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
-                               Table* link_target_table)
+                               Table* link_target_table, bool nullable)
 {
     REALM_ASSERT_3(col_ndx, <=, m_spec.get_public_column_count());
 
-    do_insert_root_column(col_ndx, ColumnType(type), name); // Throws
+    do_insert_root_column(col_ndx, ColumnType(type), name, nullable); // Throws
     adj_insert_column(col_ndx); // Throws
     update_link_target_tables(col_ndx, col_ndx + 1); // Throws
 
@@ -790,9 +789,9 @@ void Table::erase_root_column(size_t col_ndx)
 }
 
 
-void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name)
+void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable)
 {
-    m_spec.insert_column(ndx, type, name); // Throws
+    m_spec.insert_column(ndx, type, name, nullable ? col_attr_Nullable : col_attr_None); // Throws
 
     Spec::ColumnInfo info;
     m_spec.get_column_info(ndx, info);
@@ -1188,6 +1187,12 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
     ColumnBase* col = 0;
     ref_type ref = m_columns.get_as_ref(ndx_in_parent);
     Allocator& alloc = m_columns.get_alloc();
+
+    bool nullable = is_nullable(col_ndx);
+
+    REALM_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
+                                  col_type != col_type_StringEnum)));
+
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
@@ -1201,7 +1206,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = new ColumnDouble(alloc, ref); // Throws
             break;
         case col_type_String:
-            col = new AdaptiveStringColumn(alloc, ref); // Throws
+            col = new AdaptiveStringColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Binary:
             col = new ColumnBinary(alloc, ref); // Throws
@@ -1211,7 +1216,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
                 m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
-            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref, nullable); // Throws
             col_2->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             col = col_2;
             break;
@@ -1335,6 +1340,31 @@ bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
     return col.has_search_index();
 }
 
+
+void Table::upgrade_file_format()
+{
+    for (size_t c = 0; c < get_column_count(); c++) {
+        if (has_search_index(c)) {
+            if (get_column_type(c) == type_String) {
+                AdaptiveStringColumn& asc = get_column_string(c);
+                asc.get_search_index()->clear();
+                asc.populate_search_index();
+            }
+            else if (get_real_column_type(c) == col_type_Int) {
+                ColumnBase& col = get_column_base(c);
+                Column& c = static_cast<Column&>(col);
+                c.get_search_index()->clear();
+                c.populate_search_index();
+            }
+            else {
+                // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
+                // so this is fine for now.
+                REALM_ASSERT(false); 
+            }
+
+        }
+    }
+}
 
 void Table::add_search_index(size_t col_ndx)
 {
@@ -1577,6 +1607,12 @@ void Table::remove_primary_key()
 //
 // Note: get_subtable_ptr() has now been collapsed to one version, but
 // the suggested change will still be a significant improvement.
+
+bool Table::is_nullable(size_t col_ndx) const
+{
+    REALM_ASSERT_DEBUG(col_ndx < m_spec.get_column_count());
+    return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
+}
 
 const ColumnBase& Table::get_column_base(size_t ndx) const REALM_NOEXCEPT
 {
@@ -1827,7 +1863,8 @@ ref_type Table::clone_columns(Allocator& alloc) const
         const ColumnBase* col = &get_column_base(col_ndx);
         if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
             ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
-            AdaptiveStringColumn new_col(alloc, ref); // Throws
+            bool nullable = is_nullable(col_ndx);
+            AdaptiveStringColumn new_col(alloc, ref, nullable); // Throws
             // FIXME: Should be optimized with something like
             // new_col.add(seq_tree_accessor.begin(),
             // seq_tree_accessor.end())
@@ -2457,16 +2494,19 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
-
+    StringData sd;
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = get_column_string(col_ndx);
-        return column.get(ndx);
+        sd = column.get(ndx);
     }
-
-    REALM_ASSERT_3(type, ==, col_type_StringEnum);
-    const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-    return column.get(ndx);
+    else {
+        REALM_ASSERT(type == col_type_StringEnum);
+        const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+        sd = column.get(ndx);
+    }
+    REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
+    return sd;
 }
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
@@ -2484,8 +2524,10 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    bump_version();
+    if(!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
 
+    bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
 
@@ -2501,6 +2543,9 @@ void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::string_too_big);
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <=, m_size);
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
@@ -3725,7 +3770,7 @@ size_t Table::upper_bound_string(size_t col_ndx, StringData value) const REALM_N
 }
 
 
-void Table::optimize()
+void Table::optimize(bool enforce)
 {
     // At the present time there is only one kind of optimization that
     // we can do, and that is to replace a string column with a string
@@ -3744,7 +3789,7 @@ void Table::optimize()
             AdaptiveStringColumn* column = &get_column_string(i);
 
             ref_type ref, keys_ref;
-            bool res = column->auto_enumerate(keys_ref, ref);
+            bool res = column->auto_enumerate(keys_ref, ref, enforce);
             if (!res)
                 continue;
 
@@ -3769,7 +3814,7 @@ void Table::optimize()
             size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
-            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref, is_nullable(i)); // Throws
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
@@ -4605,7 +4650,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 
 StringData Table::Parent::get_child_name(size_t) const REALM_NOEXCEPT
 {
-    return StringData();
+    return StringData("");
 }
 
 
@@ -4956,6 +5001,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
         bool has_search_index = (attr & col_attr_Indexed)    != 0;
         bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
+
         REALM_ASSERT(has_search_index || !is_primary_key);
         if (has_search_index) {
             bool allow_duplicate_values = !is_primary_key;

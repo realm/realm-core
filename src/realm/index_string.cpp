@@ -33,6 +33,9 @@ void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
 
 void StringIndex::validate_value(StringData str) const
 {
+    // The "nulls on String column" branch fixed all known bugs in the index
+    return;
+
     if (std::find(str.data(), str.data() + str.size(), '\0') != str.data() + str.size())
         throw std::invalid_argument("Cannot add string with embedded NULs to indexed column");
 }
@@ -77,8 +80,7 @@ StringIndex::key_type StringIndex::GetLastKey() const
 void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
 {
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
-
+    key_type key = create_key(value, offset);
     TreeInsert(row_ndx, key, offset, value); // Throws
 }
 
@@ -88,7 +90,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
     REALM_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     // Get subnode table
     Allocator& alloc = m_array->get_alloc();
@@ -562,7 +564,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     REALM_ASSERT(array()->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     const size_t pos = values.lower_bound(key);
     const size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -633,7 +635,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     REALM_ASSERT(array()->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     size_t pos = values.lower_bound(key);
     size_t pos_refs = pos + 1; // first entry in refs points to offsets

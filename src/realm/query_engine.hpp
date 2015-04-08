@@ -998,7 +998,8 @@ public:
 
         // FIXME: Store these in std::string instead.
         // '*6' because case converted strings can take up more space. Todo, investigate
-        char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
+        char* data;
+        data = v.data() ? new char[6 * v.size()] : nullptr; // FIXME: Arithmetic is prone to overflow
         memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
     }
@@ -1046,7 +1047,7 @@ public:
     StringNodeBase(const StringNodeBase& from) 
         : ParentNode(from)
     {
-        char* data = new char[from.m_value.size()];
+        char* data = from.m_value.data() ? new char[from.m_value.size()] : nullptr;
         memcpy(data, from.m_value.data(), from.m_value.size());
         m_value = StringData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;

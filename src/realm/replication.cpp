@@ -538,7 +538,7 @@ public:
         return false;
     }
 
-    bool insert_column(size_t col_ndx, DataType type, StringData name)
+    bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
     {
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
@@ -546,11 +546,11 @@ public:
 #ifdef REALM_DEBUG
                 if (m_log) {
                     *m_log << "desc->insert_column("<<col_ndx<<", "<<data_type_to_str(type)<<", "
-                        "\""<<name<<"\")\n";
+                        "\""<<name<< ", " << nullable << ")\")\n";
                 }
 #endif
                 Table* link_target_table = 0;
-                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
+                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
                 return true;
             }
         }
