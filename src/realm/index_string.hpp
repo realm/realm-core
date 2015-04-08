@@ -249,10 +249,8 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) REALM_NOEXC
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) REALM_NOEXCEPT
 {
 #ifdef REALM_NULL_STRINGS
-    return create_key(str.substr(offset));
-#else
     if (str.is_null())
-        return 0;
+    return 0;
 
     if (offset > str.size())
         return 0;
@@ -269,6 +267,8 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
             return create_key(str.substr(offset));
         }
     }
+#else
+    return create_key(str.substr(offset));
 #endif
 }
 
