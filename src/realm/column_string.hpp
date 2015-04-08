@@ -106,8 +106,9 @@ public:
         leaf_type_Big     ///< ArrayBigBlobs
     };
 
-    LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
-                      bool use_retval = false) const;
+    
+    std::unique_ptr<const ArrayParent> get_leaf(std::size_t ndx, std::size_t& out_ndx_in_parent,
+                      LeafType& out_leaf_type) const;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
@@ -138,6 +139,9 @@ protected:
 
 private:
     std::unique_ptr<StringIndex> m_search_index;
+
+    LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
+                      bool use_retval = false) const;
 
     std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 

@@ -1159,6 +1159,16 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
 }
 
 
+std::unique_ptr<const ArrayParent>
+AdaptiveStringColumn::get_leaf(size_t ndx, size_t& out_ndx_in_leaf, LeafType& out_leaf_type) const
+{
+    size_t off;
+    ArrayParent* ap = nullptr;
+    out_leaf_type = GetBlock(ndx, &ap, off, false);
+    out_ndx_in_leaf = ndx - off;
+    return std::unique_ptr<const ArrayParent>(ap);
+}
+
 AdaptiveStringColumn::LeafType
 AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool use_retval) const
 {
