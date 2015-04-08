@@ -1,14 +1,5 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-# Install pre-push hook to prevent pushing to the wrong remote
-PRE_PUSH_HOOK_SOURCE='tools/pre-push'
-PRE_PUSH_HOOK_DESTINATION='.git/hooks/pre-push'
-if ! [ -x "$PRE_PUSH_HOOK_DESTINATION" ] || ! diff "$PRE_PUSH_HOOK_DESTINATION" "$PRE_PUSH_HOOK_SOURCE" >/dev/null; then
-    echo >&2 'Installing pre-push hook to prevent pushing to the wrong remote'
-    cp "$PRE_PUSH_HOOK_SOURCE" "$PRE_PUSH_HOOK_DESTINATION"
-    chmod +x "$PRE_PUSH_HOOK_DESTINATION"
-fi
-
 # Enable tracing if REALM_SCRIPT_DEBUG is set
 if [ -e $HOME/.realm ]; then
     . $HOME/.realm
@@ -27,6 +18,15 @@ dir="$(dirname "$0")" || exit 1
 cd "$dir" || exit 1
 REALM_HOME="$(pwd)" || exit 1
 export REALM_HOME
+
+# Install pre-push hook to prevent pushing to the wrong remote
+PRE_PUSH_HOOK_SOURCE='tools/pre-push'
+PRE_PUSH_HOOK_DESTINATION='.git/hooks/pre-push'
+if ! [ -x "$PRE_PUSH_HOOK_DESTINATION" ] || ! diff "$PRE_PUSH_HOOK_DESTINATION" "$PRE_PUSH_HOOK_SOURCE" >/dev/null; then
+    echo >&2 'Installing pre-push hook to prevent pushing to the wrong remote'
+    cp "$PRE_PUSH_HOOK_SOURCE" "$PRE_PUSH_HOOK_DESTINATION"
+    chmod +x "$PRE_PUSH_HOOK_DESTINATION"
+fi
 
 MODE="$1"
 [ $# -gt 0 ] && shift
