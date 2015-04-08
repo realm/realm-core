@@ -6,8 +6,12 @@
 # Variables
 ################
 
-expected_remote_ssh='git@github.com:realm/realm-core.git'
-expected_remote_https='https://github.com/realm/realm-core.git'
+declare -a authorized_remotes=(
+    'git@github.com:realm/realm-core.git'
+    'https://github.com/realm/realm-core.git'
+    'git@github.com:kspangsege/realm-core.git'
+    'https://github.com/kspangsege/realm-core.git'
+)
 repo_name='realm-core'
 
 ################
@@ -15,10 +19,13 @@ repo_name='realm-core'
 ################
 
 verify_remote() {
-    if [[ "$1" != *"$expected_remote_ssh"* ]] && [[ "$1" != *"$expected_remote_https"* ]]; then
-        echo >&2 "attempting to push to a repo other than $repo_name or git remotes contains a repo other than $repo_name. aborting..."
-        exit 1
-    fi
+    for current_authorized_remote in "${authorized_remotes[@]}"; do
+        if [[ "$1" = *"$current_authorized_remote"* ]]; then
+            return
+        fi
+    done
+    echo >&2 "attempting to push to a repo other than $repo_name or git remotes contains a repo other than $repo_name. aborting..."
+    exit 1
 }
 
 ################
