@@ -2776,25 +2776,6 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-// Get containing array block direct through column b+-tree without instatiating any Arrays. Calling with
-// use_retval = true will return itself if leaf and avoid unneccesary header initialization.
-const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
-                             bool use_retval) const REALM_NOEXCEPT
-{
-    // Reduce time overhead for cols with few entries
-    if (!is_inner_bptree_node()) {
-        if (!use_retval)
-            arr.CreateFromHeaderDirect(get_header_from_data(m_data));
-        off = 0;
-        return this;
-    }
-
-    pair<MemRef, size_t> p = get_bptree_leaf(ndx);
-    arr.CreateFromHeaderDirect(p.first.m_addr);
-    off = ndx - p.second;
-    return &arr;
-}
-
 template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
 {
     bool first(method == index_FindFirst);

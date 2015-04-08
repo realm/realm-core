@@ -132,12 +132,6 @@ public:
     const Array* get_root_array() const REALM_NOEXCEPT { return m_array.get(); }
     //@}
 
-
-    // FIXME: Is almost identical to get_leaf(), but uses ill-defined
-    // aspects of the Array API. Should be eliminated.
-    const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                          bool use_retval = false) const REALM_NOEXCEPT;
-
     inline void detach(void);
     inline bool is_attached(void) const REALM_NOEXCEPT;
 
@@ -684,12 +678,6 @@ inline const ArrayInteger& Column::get_leaf(std::size_t ndx, std::size_t& ndx_in
     fallback.init_from_mem(p.first);
     ndx_in_leaf = p.second;
     return fallback;
-}
-
-inline const Array* ColumnBase::GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                                         bool use_retval) const REALM_NOEXCEPT
-{
-    return m_array->GetBlock(ndx, arr, off, use_retval);
 }
 
 inline std::size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& alloc)
