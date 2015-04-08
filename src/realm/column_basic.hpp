@@ -48,6 +48,9 @@ public:
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
+    const BasicArray<T>& get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                          BasicArray<T>& fallback) const REALM_NOEXCEPT;
+
     T get(std::size_t ndx) const REALM_NOEXCEPT;
     void add(T value = T());
     void set(std::size_t ndx, T value);
@@ -139,6 +142,20 @@ private:
     friend class Array;
     friend class ColumnBase;
 };
+
+template <class T>
+const BasicArray<T>& BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                                         BasicArray<T>& fallback) const REALM_NOEXCEPT
+{
+    if (!m_array->is_inner_bptree_node()) {
+        ndx_in_leaf = ndx;
+        return static_cast<const BasicArray<T>&>(*m_array);
+    }
+    std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
+    fallback.init_from_mem(p.first);
+    ndx_in_leaf = p.second;
+    return fallback;
+}
 
 
 } // namespace realm
