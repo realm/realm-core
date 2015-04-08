@@ -45,7 +45,7 @@ namespace realm {
 signed char sse_support = -1;
 signed char avx_support = -1;
 
-StringCompareCallback string_compare_callback = null_ptr;
+StringCompareCallback string_compare_callback = nullptr;
 string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 
 void cpuid_init()
@@ -277,23 +277,16 @@ int fast_popcount64(int64_t x)
 uint64_t fastrand(uint64_t max) 
 {
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
-    static util::Atomic<uint64_t> state(1);
+    static std::atomic<uint64_t> state(1);
     // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
-    state.fetch_add_release(1); 
-    uint64_t x = state.load_acquire();
+    state.fetch_add(1, std::memory_order_release); 
+    uint64_t x = state.load(std::memory_order_acquire);
     // The result of this arithmetic may be overwritten by another thread, but that's fine in a rand generator
     x ^= x >> 12; // a
     x ^= x << 25; // b
     x ^= x >> 27; // c
-    state.store_release(x);
+    state.store(x, std::memory_order_release);
     return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 0xffffffffffffffffULL : max + 1);
-}
-
-std::string int2string(int64_t value) // like C++11's to_string()
-{
-    char buf[20];
-    sprintf(buf, "%lld", static_cast<long long>(value));
-    return std::string(buf);
 }
 
 } // namespace realm

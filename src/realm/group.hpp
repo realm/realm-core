@@ -386,7 +386,7 @@ public:
 
     // Conversion
     template<class S> void to_json(S& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = null_ptr) const;
+        std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream& out) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
@@ -640,7 +640,7 @@ inline std::size_t Group::find_table(StringData name) const REALM_NOEXCEPT
 
 inline TableRef Group::get_table(std::size_t table_ndx)
 {
-    REALM_ASSERT(is_attached());    
+    REALM_ASSERT(is_attached());
     DescMatcher desc_matcher = 0; // Do not check descriptor
     Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return TableRef(table);

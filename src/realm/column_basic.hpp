@@ -44,7 +44,6 @@ class BasicColumn : public ColumnBase, public ColumnTemplate<T> {
 public:
     typedef T value_type;
     BasicColumn(Allocator&, ref_type);
-    ~BasicColumn() REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -61,16 +60,16 @@ public:
 
     typedef typename AggReturnType<T>::sum_type SumType;
     SumType sum(std::size_t begin = 0, std::size_t end = npos,
-                std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+                std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     double average(std::size_t begin = 0, std::size_t end = npos,
-                   std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+                   std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     T maximum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+              std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     T minimum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+              std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
 
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
 
@@ -116,7 +115,7 @@ private:
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx,
-                                Array::TreeInsert<BasicColumn<T> >&);
+                                Array::TreeInsert<BasicColumn<T>>&);
 
     template <typename R, Action action, class cond>
     R aggregate(T target, std::size_t start, std::size_t end, std::size_t* return_ndx) const;

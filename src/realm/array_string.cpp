@@ -16,45 +16,45 @@ using namespace realm;
 
 namespace {
 
-    const int max_width = 64;
+const int max_width = 64;
 
-    // Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
-    // strings in as little space as possible, because 0 can only store nulls.
-    size_t round_up(size_t size)
-    {
-        REALM_ASSERT(size <= 256);
+// Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
+// strings in as little space as possible, because 0 can only store nulls.
+size_t round_up(size_t size)
+{
+    REALM_ASSERT(size <= 256);
 
-        if (size <= 1)
-            return size;
-
-        size--;
-        size |= size >> 1;
-        size |= size >> 2;
-        size |= size >> 4;
-        ++size;
+    if (size <= 1)
         return size;
-    }
+
+    size--;
+    size |= size >> 1;
+    size |= size >> 2;
+    size |= size >> 4;
+    ++size;
+    return size;
+}
 
 } // anonymous namespace
 
 bool ArrayString::is_null(size_t ndx) const
 {
-    REALM_ASSERT(ndx < m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
     StringData sd = get(ndx);
     return sd.is_null();
 }
 
 void ArrayString::set_null(size_t ndx)
 {
-    REALM_ASSERT(ndx < m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
     StringData sd = realm::null();
     set(ndx, sd);
 }
 
 void ArrayString::set(size_t ndx, StringData value)
 {
-    REALM_ASSERT(ndx < m_size);
-    REALM_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
+    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -118,7 +118,7 @@ void ArrayString::set(size_t ndx, StringData value)
         m_width = new_width;
     }
 
-    REALM_ASSERT(0 < m_width);
+    REALM_ASSERT_3(0, <, m_width);
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
@@ -139,7 +139,7 @@ void ArrayString::set(size_t ndx, StringData value)
 
 void ArrayString::insert(size_t ndx, StringData value)
 {
-    REALM_ASSERT(ndx <= m_size);
+    REALM_ASSERT_3(ndx, <=, m_size);
     REALM_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
@@ -164,7 +164,7 @@ void ArrayString::insert(size_t ndx, StringData value)
 
 void ArrayString::erase(size_t ndx)
 {
-    REALM_ASSERT(ndx < m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -217,7 +217,7 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const REAL
 size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const REALM_NOEXCEPT
 {
     if (end == size_t(-1))
-    end = m_size;
+        end = m_size;
     REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
     if (m_width == 0) {
@@ -284,7 +284,7 @@ void ArrayString::find_all(Column& result, StringData value, size_t add_offset,
 bool ArrayString::compare_string(const ArrayString& c) const REALM_NOEXCEPT
 {
     if (c.size() != size())
-    return false;
+        return false;
 
     for (size_t i = 0; i < size(); ++i) {
         if (get(i) != c.get(i))
@@ -297,7 +297,7 @@ bool ArrayString::compare_string(const ArrayString& c) const REALM_NOEXCEPT
 ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    REALM_ASSERT(leaf_size <= REALM_MAX_BPNODE_SIZE);
+    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
     if (leaf_size < ndx) ndx = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws

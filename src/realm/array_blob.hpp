@@ -82,7 +82,7 @@ inline ArrayBlob::ArrayBlob(Allocator& alloc) REALM_NOEXCEPT:
 
 inline bool ArrayBlob::is_null(std::size_t index) const REALM_NOEXCEPT
 {
-    return (get(index) == null_ptr);
+    return (get(index) == nullptr);
 }
 
 inline const char* ArrayBlob::get(std::size_t index) const REALM_NOEXCEPT

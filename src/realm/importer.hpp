@@ -82,13 +82,13 @@ public:
 private:
     size_t import_csv(FILE* file, Table& table, vector<DataType> *scheme, vector<string> *column_names,
                       size_t type_detection_rows, size_t skip_first_rows, size_t import_rows);
-    template <bool can_fail> float parse_float(const char*col, bool* success = null_ptr);
-    template <bool can_fail> double parse_double(const char* col, bool* success = null_ptr, size_t* significants = null_ptr);
-    template <bool can_fail> int64_t parse_integer(const char* col, bool* success = null_ptr);
-    template <bool can_fail> bool parse_bool(const char*col, bool* success = null_ptr);
+    template <bool can_fail> float parse_float(const char*col, bool* success = nullptr);
+    template <bool can_fail> double parse_double(const char* col, bool* success = nullptr, size_t* significants = nullptr);
+    template <bool can_fail> int64_t parse_integer(const char* col, bool* success = nullptr);
+    template <bool can_fail> bool parse_bool(const char*col, bool* success = nullptr);
     vector<DataType> types (vector<string> v);
-    size_t tokenize(vector<vector<string> > & payload, size_t records);
-    vector<DataType> detect_scheme (vector<vector<string> > payload, size_t begin, size_t end);
+    size_t tokenize(vector<vector<string>> & payload, size_t records);
+    vector<DataType> detect_scheme (vector<vector<string>> payload, size_t begin, size_t end);
     vector<DataType> lowest_common (vector<DataType> types1, vector<DataType> types2);
 
     char src[2*chunk_size];    // .csv input buffer

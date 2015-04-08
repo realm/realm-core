@@ -175,7 +175,7 @@ private:
     /// Stores the MixedColType of each value at the given index. For
     /// values that uses all 64 bits, the type also encodes the sign
     /// bit by having distinct types for positive negative values.
-    Column* m_types;
+    std::unique_ptr<Column> m_types;
 
     /// Stores the data for each entry. For a subtable, the stored
     /// value is the ref of the subtable. For string and binary data,
@@ -183,10 +183,10 @@ private:
     /// types the stored value is itself. Since we only have 63 bits
     /// available for a non-ref value, the sign of numeric values is
     /// encoded as part of the type in `m_types`.
-    RefsColumn* m_data;
+    std::unique_ptr<RefsColumn> m_data;
 
     /// For string and binary data types, the bytes are stored here.
-    ColumnBinary* m_binary_data;
+    std::unique_ptr<ColumnBinary> m_binary_data;
 
     std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 

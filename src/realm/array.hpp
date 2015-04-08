@@ -536,10 +536,10 @@ public:
     std::size_t count(int64_t value) const REALM_NOEXCEPT;
 
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
-                 std::size_t* return_ndx = null_ptr) const;
+                 std::size_t* return_ndx = nullptr) const;
 
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
-                 std::size_t* return_ndx = null_ptr) const;
+                 std::size_t* return_ndx = nullptr) const;
 
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const REALM_NOEXCEPT;
@@ -980,6 +980,19 @@ protected:
                             bool context_flag, WidthType width_type, int width,
                             std::size_t size, std::size_t capacity) REALM_NOEXCEPT;
 
+
+    // This returns the minimum value ("lower bound") of the representable values
+    // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
+    template <std::size_t width>
+    static int_fast64_t lbound_for_width() REALM_NOEXCEPT;
+    static int_fast64_t lbound_for_width(std::size_t width) REALM_NOEXCEPT;
+
+    // This returns the maximum value ("inclusive upper bound") of the representable values
+    // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
+    template <std::size_t width>
+    static int_fast64_t ubound_for_width() REALM_NOEXCEPT;
+    static int_fast64_t ubound_for_width(std::size_t width) REALM_NOEXCEPT;
+
     template<std::size_t width> void set_width() REALM_NOEXCEPT;
     void set_width(std::size_t) REALM_NOEXCEPT;
     void alloc(std::size_t count, std::size_t width);
@@ -1057,6 +1070,11 @@ private:
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
+
+    /// Takes a 64-bit value and returns the minimum number of bits needed
+    /// to fit the value. For alignment this is rounded up to nearest
+    /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
+    static std::size_t bit_width(int64_t value);
 
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
@@ -3212,7 +3230,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
-    state.init(act_ReturnFirst, null_ptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
+    state.init(act_ReturnFirst, nullptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
     Finder finder = m_finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 

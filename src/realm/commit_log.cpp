@@ -725,13 +725,13 @@ WriteLogCollector::WriteLogCollector(string database_name,
 
 
 
-Replication* makeWriteLogCollector(string database_name,
-                                   bool server_synchronization_mode,
-                                   const char* encryption_key)
+std::unique_ptr<Replication> makeWriteLogCollector(string database_name,
+                                                   bool server_synchronization_mode,
+                                                   const char* encryption_key)
 {
-    return new _impl::WriteLogCollector(database_name,
-                                        server_synchronization_mode,
-                                        encryption_key);
+    return std::unique_ptr<Replication>(new _impl::WriteLogCollector(database_name,
+                                                                     server_synchronization_mode,
+                                                                     encryption_key));
 }
 
 

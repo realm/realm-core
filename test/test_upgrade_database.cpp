@@ -49,7 +49,7 @@ using namespace realm::util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-/*
+
 TEST(Upgrade_Database_2_3)
 {
     // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
@@ -63,7 +63,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from Group
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         File::copy(path, path + ".tmp");
 
@@ -81,7 +81,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = int2string(i);
+            string str = std::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -101,7 +101,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         File::copy(path, path + ".tmp");
 
@@ -115,7 +115,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = int2string(i);
+            string str = std::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -129,7 +129,7 @@ TEST(Upgrade_Database_2_3)
     // Now see if we can open the upgraded file and also commit to it
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         SharedGroup sg(path + ".tmp");
         WriteTransaction rt(sg);
@@ -141,7 +141,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = int2string(i);
+            string str = std::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -157,7 +157,7 @@ TEST(Upgrade_Database_2_3)
     // Begin from scratch; see if we can upgrade file and then use a write transaction
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
 
         File::copy(path, path + ".tmp");
 
@@ -171,7 +171,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = int2string(i);
+            string str = std::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -191,7 +191,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = int2string(i);
+            string str = std::to_string(i);
             StringData sd(str);
             size_t f = t2->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -228,6 +228,6 @@ TEST(Upgrade_Database_2_3)
     g.write(path);
 #endif    
 }
-*/
+
 
 #endif // TEST_GROUP

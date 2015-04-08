@@ -29,7 +29,7 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
-    explicit ArrayBigBlobs(Allocator&, bool) REALM_NOEXCEPT;
+    explicit ArrayBigBlobs(Allocator&, bool nullable) REALM_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -65,7 +65,7 @@ public:
     void add_string(StringData value);
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
-    static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool) REALM_NOEXCEPT;
+    static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool nullable) REALM_NOEXCEPT;
     ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
     //@}
 

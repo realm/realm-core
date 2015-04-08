@@ -76,7 +76,7 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
 
     for (size_t iter = 0; iter < 1000000; iter++) {
         for (size_t t = 0; t < size; t++) {
-            in[t] = random.draw_int<char>();
+            in[t] = random.draw_int<int>();
         }
 
         const char* in2 = in;
@@ -105,7 +105,7 @@ TEST(UTF8_Compare_Core_ASCII) {
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     // simplest test
     CHECK_EQUAL(true, utf8_compare("a", "b"));
@@ -159,7 +159,7 @@ TEST(UTF8_Compare_Core_utf8)
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     // single utf16 code points (tests mostly Windows)
     CHECK_EQUAL(false, utf8_compare(uae, uae));
@@ -200,7 +200,7 @@ TEST(UTF8_Compare_Core_utf8_invalid)
     static_cast<void>(spurious1);
     static_cast<void>(spurious2);
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
     StringData i1 = StringData(invalid1);
     StringData i2 = StringData(invalid2);
 
@@ -218,7 +218,7 @@ TEST(Compare_Core_utf8_invalid_crash)
     using namespace realm::test_util;
     Random r;
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     for (size_t t = 0; t < 10000; t++) {
         for (size_t i = 0; i < sizeof(str1); i++) {

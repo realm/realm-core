@@ -387,7 +387,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     // to be on the compact form if is_append is true and both
     // siblings are either leaves or inner nodes on the compact form.
 
-    Array* orig_root = m_array;
+    Array* orig_root = m_array.get();
     Allocator& alloc = orig_root->get_alloc();
     std::unique_ptr<Array> new_root(new Array(alloc)); // Throws
     new_root->create(Array::type_InnerBptreeNode); // Throws
@@ -418,8 +418,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
     new_root->add(1 + 2*v); // Throws
-    delete orig_root;
-    m_array = new_root.release();
+    m_array = std::move(new_root);
 }
 
 
@@ -476,10 +475,35 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
     }
 }
 
+// fixme, must m_search_index be copied here?
+Column::Column(Allocator& alloc, ref_type ref)
+{
+    m_array.reset(new Array(alloc)); // Throws
+    m_array->init_from_ref(ref);
+}
+
+Column::Column(unattached_root_tag, Allocator& alloc)
+{
+    m_array.reset(new Array(alloc)); // Throws
+
+}
+
+Column::Column(Column&& col) REALM_NOEXCEPT
+{
+    m_array = std::move(col.m_array);
+    m_search_index = std::move(col.m_search_index);
+}
+
+Column::Column(ArrayInteger* root) REALM_NOEXCEPT:
+    ColumnBase(root)
+{
+}
+
+
 void Column::destroy() REALM_NOEXCEPT
 {
     if (m_search_index) {
-        static_cast<StringIndex*>(m_search_index)->destroy();
+        m_search_index->destroy();
     }
 
     if (m_array)
@@ -488,23 +512,15 @@ void Column::destroy() REALM_NOEXCEPT
 
 Column::~Column() REALM_NOEXCEPT
 {
-    if (m_search_index) {
-        //static_cast<StringIndex*>(m_search_index)->destroy();
-        delete static_cast<StringIndex*>(m_search_index);
-        m_search_index = null_ptr;
-    }
-    delete m_array;
 }
 
 
 void Column::move_assign(Column& col)
 {
     destroy();
-    delete m_array;
-    m_array = col.m_array;
+    m_array = std::move(col.m_array);
     col.m_array = 0;
-    m_search_index = col.m_search_index;
-    col.m_search_index = null_ptr;
+    m_search_index = std::move(col.m_search_index);
 }
 
 void Column::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
@@ -552,7 +568,7 @@ void Column::set(size_t ndx, int64_t value)
     REALM_ASSERT_DEBUG(ndx < size());
 
     if (m_search_index) {
-        static_cast<StringIndex*>(m_search_index)->set(ndx, value);
+        m_search_index->set(ndx, value);
     }
 
     if (!m_array->is_inner_bptree_node()) {
@@ -564,8 +580,8 @@ void Column::set(size_t ndx, int64_t value)
     array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
-// When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values 
-// are converted from the native representation to 2's complement, but the opposite conversion is left as undefined. 
+// When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values
+// are converted from the native representation to 2's complement, but the opposite conversion is left as undefined.
 // realm::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
 // which reduces to a no-op when 2's complement is the native representation of negative values.
 void Column::set_uint(size_t ndx, uint64_t value)
@@ -597,7 +613,7 @@ void Column::adjust(size_t ndx, int_fast64_t diff)
 size_t Column::count(int64_t target) const
 {
     if (m_search_index)
-        return static_cast<StringIndex*>(m_search_index)->count(target);
+        return m_search_index->count(target);
 
     return size_t(aggregate<int64_t, int64_t, act_Count, Equal>(target, 0, size()));
 }
@@ -738,8 +754,8 @@ void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 
 namespace {
 
-    // Getter function for index. For integer index, the caller must supply a buffer that we can store the 
-    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with 
+    // Getter function for index. For integer index, the caller must supply a buffer that we can store the
+    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
     // String index).
     StringData get_string(void* column, size_t ndx, char* buffer)
     {
@@ -770,34 +786,32 @@ StringIndex* Column::create_search_index()
     std::unique_ptr<StringIndex> index;
     StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc());  // Throws
     index.reset(si);
-    m_search_index = index.release();
+    m_search_index = std::move(index);
     populate_search_index();
-    return m_search_index;
+    return m_search_index.get();
 }
 
 StringIndex* Column::get_search_index() REALM_NOEXCEPT
 {
-    return m_search_index;
+    return m_search_index.get();
 }
 
 const StringIndex* Column::get_search_index() const REALM_NOEXCEPT
 {
-    return m_search_index;
+    return m_search_index.get();
 }
 
 void Column::destroy_search_index() REALM_NOEXCEPT
 {
-    delete m_search_index;
-    m_search_index = 0;
+    m_search_index.reset();
 }
 
 void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
     size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    // Todo, set nullable argument to m_nullable when we have nullable ints
-    m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-        !allow_duplicate_valaues, m_array->get_alloc()); // Throws. 
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+        !allow_duplicate_valaues, m_array->get_alloc())); // Throws
 }
 
 size_t Column::find_first(int64_t value, size_t begin, size_t end) const
@@ -806,7 +820,7 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos)
-        return static_cast<StringIndex*>(m_search_index)->find_first(value);
+        return m_search_index->find_first(value);
 
     if (root_is_leaf())
         return m_array->find_first(value, begin, end); // Throws (maybe)
@@ -841,7 +855,7 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == size_t(-1))
-        return static_cast<StringIndex*>(m_search_index)->find_all(result, value);
+        return m_search_index->find_all(result, value);
 
     if (root_is_leaf()) {
         size_t leaf_offset = 0;
@@ -913,7 +927,7 @@ void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
     if (m_search_index) {
         bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        static_cast<StringIndex*>(m_search_index)->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
 
 }
@@ -973,7 +987,7 @@ void Column::do_erase(size_t ndx, bool is_last)
     REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
 
     if (m_search_index)
-        static_cast<StringIndex*>(m_search_index)->erase<StringData>(ndx, is_last);
+        m_search_index->erase<StringData>(ndx, is_last);
 
     if (!m_array->is_inner_bptree_node()) {
         m_array->erase(ndx); // Throws
@@ -982,7 +996,7 @@ void Column::do_erase(size_t ndx, bool is_last)
 
     size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem handler(*this);
-    Array::erase_bptree_elem(m_array, ndx_2, handler); // Throws
+    Array::erase_bptree_elem(m_array.get(), ndx_2, handler); // Throws
 }
 
 
@@ -994,12 +1008,12 @@ void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     if (m_search_index) {
         // remove the value to be overwritten from index
         bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        static_cast<StringIndex*>(m_search_index)->erase<StringData>(row_ndx, is_last); // Throws
+        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
 
         // update index to point to new location
         if (row_ndx != last_row_ndx) {
             int_fast64_t moved_value = get(last_row_ndx);
-            static_cast<StringIndex*>(m_search_index)->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
+            m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
         }
     }
 
@@ -1028,7 +1042,7 @@ void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 void Column::do_clear()
 {
     if (m_search_index)
-        static_cast<StringIndex*>(m_search_index)->clear();
+        m_search_index->clear();
 
     m_array->clear_and_destroy_children();
     if (m_array->is_inner_bptree_node())
@@ -1089,7 +1103,7 @@ ref_type Column::write(size_t slice_offset, size_t slice_size,
     }
     else {
         SliceHandler handler(get_alloc());
-        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+        ref = ColumnBase::write(m_array.get(), slice_offset, slice_size,
                                 table_size, handler, out); // Throws
     }
     return ref;

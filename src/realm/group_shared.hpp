@@ -601,7 +601,9 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
 {
     open(file, no_create, dlevel, false, key);
 
-    // Upgrade file format from 2 to 3 (no-op if already 3)
+    // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set 
+    // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
+    // call returns immediately if it finds that the upgrade is already complete.
     bool upgrade = false;
     begin_read();
     upgrade = m_group.get_file_format() < default_file_format_version;

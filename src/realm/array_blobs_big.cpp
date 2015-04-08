@@ -39,7 +39,7 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
     if (ref == 0 && value.is_null()) {
         return;
     }
-    else if (ref == 0 && value.data() != null_ptr) {
+    else if (ref == 0 && value.data() != nullptr) {
         ArrayBlob new_blob(m_alloc);
         new_blob.create(); // Throws
         new_blob.add(value.data(), value.size(), add_zero_term); // Throws
@@ -47,7 +47,7 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
         Array::set_as_ref(ndx, ref);
         return;
     }
-    else if (ref != 0 && value.data() != null_ptr) {
+    else if (ref != 0 && value.data() != nullptr) {
         blob.init_from_ref(ref);
         blob.set_parent(this, ndx);
         blob.clear(); // Throws

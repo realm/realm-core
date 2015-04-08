@@ -96,7 +96,7 @@ public:
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
     StringIndex* get_search_index() REALM_NOEXCEPT;
     const StringIndex* get_search_index() const REALM_NOEXCEPT;
-    StringIndex* release_search_index() REALM_NOEXCEPT;
+    std::unique_ptr<StringIndex> release_search_index() REALM_NOEXCEPT;
     StringIndex* create_search_index();
 
     // Simply inserts all column values in the index in a loop
@@ -148,7 +148,7 @@ protected:
     StringData get_val(std::size_t row) const { return get(row); }
 
 private:
-    StringIndex* m_search_index;
+    std::unique_ptr<StringIndex> m_search_index;
     bool m_nullable;
 
     std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
@@ -212,17 +212,17 @@ inline std::size_t AdaptiveStringColumn::size() const REALM_NOEXCEPT
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             return leaf->size();
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             return leaf->size();
         }
         // Big strings root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->size();
     }
     // Non-leaf root
@@ -305,19 +305,12 @@ inline bool AdaptiveStringColumn::has_search_index() const REALM_NOEXCEPT
 
 inline StringIndex* AdaptiveStringColumn::get_search_index() REALM_NOEXCEPT
 {
-    return m_search_index;
+    return m_search_index.get();
 }
 
 inline const StringIndex* AdaptiveStringColumn::get_search_index() const REALM_NOEXCEPT
 {
-    return m_search_index;
-}
-
-inline StringIndex* AdaptiveStringColumn::release_search_index() REALM_NOEXCEPT
-{
-    StringIndex* i = m_search_index;
-    m_search_index = 0;
-    return i;
+    return m_search_index.get();
 }
 
 inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,

@@ -177,21 +177,6 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 #endif
 }
 
-// Emulates nullptr of C++11
-const class {
-public:
-    template<class T> operator T*() const
-    {
-        return 0;
-    }
-    template<class C, class T> operator T C::*() const
-    {
-        return 0;
-    }
-private:
-    void operator& () const;
-} null_ptr = {};
-
 
 template<class T> struct Wrap {
     Wrap(const T& v): m_value(v) {}
@@ -199,8 +184,6 @@ template<class T> struct Wrap {
 private:
     T m_value;
 };
-
-std::string int2string(int64_t value); // like C++11's to_string()
 
 } // namespace realm
 

@@ -141,7 +141,7 @@ inline MemRef ArrayString::create_array(std::size_t size, Allocator& alloc)
 
 inline StringData ArrayString::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    REALM_ASSERT(ndx < m_size);
+    REALM_ASSERT_3(ndx, <, m_size);
     if (m_width == 0)
         return m_nullable ? realm::null() : StringData("");
 

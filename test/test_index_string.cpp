@@ -802,7 +802,7 @@ TEST(StringIndex_Zero_Crash2)
         table.add_search_index(0);
 
         for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
-            unsigned char action = random.draw_int_max<unsigned char>(100);
+            unsigned char action = random.draw_int_max<int>(100);
             if (action == 0) {
 //                table.remove_search_index(0);
                 table.add_search_index(0);
@@ -837,7 +837,7 @@ TEST(StringIndex_Zero_Crash2)
                         if (random.draw_int_max<int>(100) > 20)
                             buf2[t] = 0;                        // zero byte
                         else
-                            buf2[t] = random.draw_int<char>();  // random byte
+                            buf2[t] = random.draw_int<int>();  // random byte
                     }
                     // no generated string can equal "null" (our vector magic value for null) because 
                     // len == 4 is not possible
@@ -855,7 +855,7 @@ TEST(StringIndex_Zero_Crash2)
                 table.remove(row);
             }
 
-            action = random.draw_int_max<unsigned char>(100);
+            action = random.draw_int_max<int>(100);
             if (table.size() > 0) {
                 // Search for value that exists
                 size_t row = random.draw_int_max<size_t>(table.size() - 1);

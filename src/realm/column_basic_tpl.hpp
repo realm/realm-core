@@ -41,23 +41,12 @@ BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref)
     if (root_is_leaf) {
         BasicArray<T>* root = new BasicArray<T>(alloc); // Throws
         root->init_from_mem(MemRef(header, ref));
-        m_array = root;
+        m_array.reset(root);
     }
     else {
         Array* root = new Array(alloc); // Throws
         root->init_from_mem(MemRef(header, ref));
-        m_array = root;
-    }
-}
-
-template<class T>
-BasicColumn<T>::~BasicColumn() REALM_NOEXCEPT
-{
-    if (root_is_leaf()) {
-        delete static_cast<BasicArray<T>*>(m_array);
-    }
-    else {
-        delete m_array;
+        m_array.reset(root);
     }
 }
 
@@ -75,7 +64,7 @@ T BasicColumn<T>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf())
-        return static_cast<const BasicArray<T>*>(m_array)->get(ndx);
+        return static_cast<const BasicArray<T>*>(m_array.get())->get(ndx);
 
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
@@ -104,7 +93,7 @@ template<class T>
 void BasicColumn<T>::set(std::size_t ndx, T value)
 {
     if (!m_array->is_inner_bptree_node()) {
-        static_cast<BasicArray<T>*>(m_array)->set(ndx, value); // Throws
+        static_cast<BasicArray<T>*>(m_array.get())->set(ndx, value); // Throws
         return;
     }
 
@@ -196,7 +185,7 @@ public:
     }
     void replace_root_by_empty_leaf() override
     {
-        std::unique_ptr<BasicArray<T> > leaf;
+        std::unique_ptr<BasicArray<T>> leaf;
         leaf.reset(new BasicArray<T>(get_alloc())); // Throws
         leaf->create(); // Throws
         replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
@@ -210,13 +199,13 @@ void BasicColumn<T>::do_erase(std::size_t ndx, bool is_last)
     REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
     if (!m_array->is_inner_bptree_node()) {
-        static_cast<BasicArray<T>*>(m_array)->erase(ndx); // Throws
+        static_cast<BasicArray<T>*>(m_array.get())->erase(ndx); // Throws
         return;
     }
 
     std::size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
+    Array::erase_bptree_elem(m_array.get(), ndx_2, erase_leaf_elem); // Throws
 }
 
 
@@ -236,12 +225,12 @@ void BasicColumn<T>::do_move_last_over(std::size_t row_ndx, std::size_t last_row
 template<class T> void BasicColumn<T>::do_clear()
 {
     if (!m_array->is_inner_bptree_node()) {
-        static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
+        static_cast<BasicArray<T>*>(m_array.get())->clear(); // Throws
         return;
     }
 
     // Revert to generic array
-    std::unique_ptr<BasicArray<T> > array;
+    std::unique_ptr<BasicArray<T>> array;
     array.reset(new BasicArray<T>(m_array->get_alloc())); // Throws
     array->create(); // Throws
     array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
@@ -249,9 +238,8 @@ template<class T> void BasicColumn<T>::do_clear()
 
     // Remove original node
     m_array->destroy_deep();
-    delete m_array;
 
-    m_array = array.release();
+    m_array = std::move(array);
 }
 
 
@@ -295,7 +283,7 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
     ref_type ref;
     if (root_is_leaf()) {
         Allocator& alloc = Allocator::get_default();
-        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array.get());
         MemRef mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
@@ -305,7 +293,7 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
     }
     else {
         SliceHandler handler(get_alloc());
-        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+        ref = ColumnBase::write(m_array.get(), slice_offset, slice_size,
                                 table_size, handler, out); // Throws
     }
     return ref;
@@ -359,12 +347,12 @@ template<class T> void BasicColumn<T>::refresh_accessor_tree(std::size_t, const 
         // Keep, but refresh old root accessor
         if (old_root_is_leaf) {
             // Root is leaf
-            BasicArray<T>* root = static_cast<BasicArray<T>*>(m_array);
+            BasicArray<T>* root = static_cast<BasicArray<T>*>(m_array.get());
             root->init_from_parent();
             return;
         }
         // Root is inner node
-        Array* root = m_array;
+        Array* root = m_array.get();
         root->init_from_parent();
         return;
     }
@@ -386,20 +374,8 @@ template<class T> void BasicColumn<T>::refresh_accessor_tree(std::size_t, const 
     }
     new_root->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
 
-    // Destroy old root accessor
-    if (old_root_is_leaf) {
-        // Old root is leaf
-        BasicArray<T>* old_root = static_cast<BasicArray<T>*>(m_array);
-        delete old_root;
-    }
-    else {
-        // Old root is inner node
-        Array* old_root = m_array;
-        delete old_root;
-    }
-
     // Instate new root
-    m_array = new_root;
+    m_array.reset(new_root);
 }
 
 
@@ -418,7 +394,7 @@ template<class T>
 void BasicColumn<T>::Verify() const
 {
     if (root_is_leaf()) {
-        static_cast<BasicArray<T>*>(m_array)->Verify();
+        static_cast<BasicArray<T>*>(m_array.get())->Verify();
         return;
     }
 
@@ -474,7 +450,7 @@ std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t e
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (root_is_leaf())
-        return static_cast<BasicArray<T>*>(m_array)->
+        return static_cast<BasicArray<T>*>(m_array.get())->
             find_first(value, begin, end); // Throws (maybe)
 
     // FIXME: It would be better to always require that 'end' is
@@ -573,12 +549,12 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, s
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
     ref_type new_sibling_ref;
-    Array::TreeInsert<BasicColumn<T> > state;
+    Array::TreeInsert<BasicColumn<T>> state;
     for (std::size_t i = 0; i != num_rows; ++i) {
         std::size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
             REALM_ASSERT(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
-            BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+            BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array.get());
             new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state);
         }
         else {
@@ -601,7 +577,7 @@ template<class T> REALM_FORCEINLINE
 ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                      std::size_t ndx_in_parent,
                                      Allocator& alloc, std::size_t insert_ndx,
-                                     Array::TreeInsert<BasicColumn<T> >& state)
+                                     Array::TreeInsert<BasicColumn<T>>& state)
 {
     BasicArray<T> leaf(alloc);
     leaf.init_from_mem(leaf_mem);
@@ -613,7 +589,7 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
-        return static_cast<const BasicArray<T>*>(m_array)->lower_bound(value);
+        return static_cast<const BasicArray<T>*>(m_array.get())->lower_bound(value);
     }
     return ColumnBase::lower_bound(*this, value);
 }
@@ -621,7 +597,7 @@ template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const 
 template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
-        return static_cast<const BasicArray<T>*>(m_array)->upper_bound(value);
+        return static_cast<const BasicArray<T>*>(m_array.get())->upper_bound(value);
     }
     return ColumnBase::upper_bound(*this, value);
 }

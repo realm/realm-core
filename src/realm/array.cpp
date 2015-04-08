@@ -154,13 +154,7 @@ using namespace std;
 using namespace realm;
 using namespace realm::util;
 
-
-namespace {
-
-/// Takes a 64-bit value and returns the minimum number of bits needed
-/// to fit the value. For alignment this is rounded up to nearest
-/// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-size_t bit_width(int64_t v)
+size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
@@ -179,8 +173,6 @@ size_t bit_width(int64_t v)
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
-
-} // anonymous namespace
 
 
 void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
@@ -509,7 +501,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     copy_backward(begin_2, end_2, dest_end_2);
 }
 
-void Array::add_to_column(Column* column, int64_t value) 
+void Array::add_to_column(Column* column, int64_t value)
 {
     column->add(value);
 }
@@ -728,8 +720,8 @@ void Array::set_all_to_zero()
 }
 
 
-// If indirection == null_ptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
-// indirection == null_ptr then 'this' must be sorted increasingly.
+// If indirection == nullptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
+// indirection == nullptr then 'this' must be sorted increasingly.
 //
 // If indirection exists, then return lowest 'i' for which this->get(indirection->get(i)) >= target or -1 if none.
 // If indirection exists, then 'this' can be non-sorted, but 'indirection' must point into 'this' such that the values
@@ -1713,6 +1705,79 @@ void Array::alloc(size_t size, size_t width)
     set_header_size(size);
 }
 
+int_fast64_t Array::lbound_for_width(size_t width) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(return lbound_for_width, width, ());
+}
+
+template <size_t width>
+int_fast64_t Array::lbound_for_width() REALM_NOEXCEPT
+{
+    if (width == 0) {
+        return 0;
+    }
+    else if (width == 1) {
+        return 0;
+    }
+    else if (width == 2) {
+        return 0;
+    }
+    else if (width == 4) {
+        return 0;
+    }
+    else if (width == 8) {
+        return -0x80LL;
+    }
+    else if (width == 16) {
+        return -0x8000LL;
+    }
+    else if (width == 32) {
+        return -0x80000000LL;
+    }
+    else if (width == 64) {
+        return -0x8000000000000000LL;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
+
+int_fast64_t Array::ubound_for_width(size_t width) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(return ubound_for_width, width, ());
+}
+
+template <size_t width>
+int_fast64_t Array::ubound_for_width() REALM_NOEXCEPT
+{
+    if (width == 0) {
+        return 0;
+    }
+    else if (width == 1) {
+        return 1;
+    }
+    else if (width == 2) {
+        return 3;
+    }
+    else if (width == 4) {
+        return 15;
+    }
+    else if (width == 8) {
+        return 0x7FLL;
+    }
+    else if (width == 16) {
+        return 0x7FFFLL;
+    }
+    else if (width == 32) {
+        return 0x7FFFFFFFLL;
+    }
+    else if (width == 64) {
+        return 0x7FFFFFFFFFFFFFFFLL;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
 
 void Array::set_width(size_t width) REALM_NOEXCEPT
 {
@@ -1721,41 +1786,8 @@ void Array::set_width(size_t width) REALM_NOEXCEPT
 
 template<size_t width> void Array::set_width() REALM_NOEXCEPT
 {
-    if (width == 0) {
-        m_lbound = 0;
-        m_ubound = 0;
-    }
-    else if (width == 1) {
-        m_lbound = 0;
-        m_ubound = 1;
-    }
-    else if (width == 2) {
-        m_lbound = 0;
-        m_ubound = 3;
-    }
-    else if (width == 4) {
-        m_lbound = 0;
-        m_ubound = 15;
-    }
-    else if (width == 8) {
-        m_lbound = -0x80LL;
-        m_ubound =  0x7FLL;
-    }
-    else if (width == 16) {
-        m_lbound = -0x8000LL;
-        m_ubound =  0x7FFFLL;
-    }
-    else if (width == 32) {
-        m_lbound = -0x80000000LL;
-        m_ubound =  0x7FFFFFFFLL;
-    }
-    else if (width == 64) {
-        m_lbound = -0x8000000000000000LL;
-        m_ubound =  0x7FFFFFFFFFFFFFFFLL;
-    }
-    else {
-        REALM_ASSERT_DEBUG(false);
-    }
+    m_lbound = lbound_for_width<width>();
+    m_ubound = ubound_for_width<width>();
 
     m_width = width;
     // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of get() instead of get<n>
@@ -2026,7 +2058,7 @@ void Array::Verify() const
 
 namespace {
 
-typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void> > > > VerifyBptreeResult;
+typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptreeResult;
 
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
@@ -2504,14 +2536,14 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) REALM_NO
         // minimizes the length of dependence chains leading up to branches.
         // Making the unfolding of the loop independent of the data being
         // searched, also minimizes the delays incurred by branch
-        // mispredictions, because they can be determined earlier 
+        // mispredictions, because they can be determined earlier
         // and the speculation corrected earlier.
 
         // Counterintuitive:
-        // To make size independent of data, we cannot always split the 
+        // To make size independent of data, we cannot always split the
         // range at the theoretical optimal point. When we determine that
-        // the key is larger than the probe at some index K, and prepare 
-        // to search the upper part of the range, you would normally start 
+        // the key is larger than the probe at some index K, and prepare
+        // to search the upper part of the range, you would normally start
         // the search at the next index, K+1, to get the shortest range.
         // We can only do this when splitting a range with odd number of entries.
         // If there is an even number of entries we search from K instead of K+1.
@@ -2869,7 +2901,7 @@ top:
                     }
                 }
                 else {
-                    return allnocopy ? size_t(FindRes_column) : 
+                    return allnocopy ? size_t(FindRes_column) :
                            first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
                 }
             }

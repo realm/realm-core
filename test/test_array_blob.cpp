@@ -223,7 +223,7 @@ TEST(ArrayBlob_Null)
         vector<string> v;
 
         for (size_t i = 0; i < 2000; i++) {
-            unsigned char rnd = random.draw_int<unsigned char>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = random.draw_int<int>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
@@ -236,7 +236,7 @@ TEST(ArrayBlob_Null)
                 static const char str[] = "This is a test of null strings";
                 size_t len;
 
-                if (random.draw_int<unsigned char>() > 100)
+                if (random.draw_int<int>() > 100)
                     len = rnd % 15;
                 else
                     len = 0;
@@ -244,7 +244,7 @@ TEST(ArrayBlob_Null)
                 StringData sd;
                 string stdstr;
 
-                if (random.draw_int<unsigned char>() > 100) {
+                if (random.draw_int<int>() > 100) {
                     sd = realm::null();
                     stdstr = "null";
                 }
@@ -253,7 +253,7 @@ TEST(ArrayBlob_Null)
                     stdstr = string(str, len);
                 }
 
-                if (random.draw_int<unsigned char>() > 100) {
+                if (random.draw_int<int>() > 100) {
                     a.add(sd);
                     v.push_back(stdstr);
                 }

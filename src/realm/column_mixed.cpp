@@ -11,10 +11,6 @@ using namespace realm::util;
 
 ColumnMixed::~ColumnMixed() REALM_NOEXCEPT
 {
-    delete m_types;
-    delete m_data;
-    delete m_binary_data;
-    delete m_array;
 }
 
 
@@ -54,10 +50,10 @@ void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t co
         binary_data->set_parent(&*top, 2);
     }
 
-    m_array = top.release();
-    m_types = types.release();
-    m_data  = data.release();
-    m_binary_data = binary_data.release();
+    m_array = std::move(top);
+    m_types = std::move(types);
+    m_data  = std::move(data);
+    m_binary_data = std::move(binary_data);
 }
 
 
@@ -67,10 +63,10 @@ void ColumnMixed::ensure_binary_data_column()
         return;
 
     ref_type ref = ColumnBinary::create(m_array->get_alloc()); // Throws
-    m_binary_data = new ColumnBinary(m_array->get_alloc(), ref); // Throws
+    m_binary_data.reset(new ColumnBinary(m_array->get_alloc(), ref)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 2);
     m_array->add(ref); // Throws
-    m_binary_data->set_parent(m_array, 2);
+    m_binary_data->set_parent(m_array.get(), 2);
 }
 
 

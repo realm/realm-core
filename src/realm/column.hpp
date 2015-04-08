@@ -128,8 +128,8 @@ public:
     /// that there is no guarantee that this node is an inner B+-tree
     /// node or a leaf. This is the case for a MixedColumn in
     /// particular.
-    Array* get_root_array() REALM_NOEXCEPT { return m_array; }
-    const Array* get_root_array() const REALM_NOEXCEPT { return m_array; }
+    Array* get_root_array() REALM_NOEXCEPT { return m_array.get(); }
+    const Array* get_root_array() const REALM_NOEXCEPT { return m_array.get(); }
     //@}
 
     /// Provides access to the leaf that contains the element at the
@@ -255,9 +255,7 @@ public:
 #endif
 
 protected:
-    // FIXME: This should not be mutable, the problem is again the
-    // const-violating moving copy constructor.
-    mutable Array* m_array;
+    std::unique_ptr<Array> m_array;
 
     ColumnBase(Array* root = 0) REALM_NOEXCEPT;
 
@@ -281,7 +279,7 @@ protected:
 
     template <class T, class R, Action action, class condition>
     R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1),
-                size_t* return_ndx = null_ptr) const;
+                size_t* return_ndx = nullptr) const;
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
@@ -396,8 +394,7 @@ public:
     struct unattached_root_tag {};
     Column(unattached_root_tag, Allocator&);
 
-    struct move_tag {};
-    Column(move_tag, Column&) REALM_NOEXCEPT;
+    Column(Column&&) REALM_NOEXCEPT;
 
     ~Column() REALM_NOEXCEPT override;
     void destroy() REALM_NOEXCEPT;
@@ -424,16 +421,16 @@ public:
 
     std::size_t count(int64_t target) const;
     int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                size_t* return_ndx = null_ptr) const;
+                size_t* return_ndx = nullptr) const;
 
     int64_t maximum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                    size_t* return_ndx = null_ptr) const;
+                    size_t* return_ndx = nullptr) const;
 
     int64_t minimum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                    size_t* return_ndx = null_ptr) const;
+                    size_t* return_ndx = nullptr) const;
 
     double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
-                    size_t* return_ndx = null_ptr) const;
+                    size_t* return_ndx = nullptr) const;
 
     void destroy_subtree(size_t ndx, bool clear_value);
 
@@ -494,8 +491,8 @@ public:
 protected:
     Column(ArrayInteger* root = 0) REALM_NOEXCEPT;
 
-    ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array); }
-    const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array); }
+    ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array.get()); }
+    const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array.get()); }
 
     std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
@@ -518,8 +515,8 @@ protected:
 #endif
 
 private:
-    Column(const Column&); // not allowed
-    Column &operator=(const Column&); // not allowed
+    Column(const Column&) = delete; // not allowed
+    Column &operator=(const Column&) = delete; // not allowed
 
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
@@ -532,7 +529,7 @@ private:
     friend class Array;
     friend class ColumnBase;
 
-    StringIndex* m_search_index;
+    std::unique_ptr<StringIndex> m_search_index;
 };
 
 
@@ -573,12 +570,12 @@ inline void ColumnBase::destroy() REALM_NOEXCEPT
 
 inline bool ColumnBase::has_search_index() const REALM_NOEXCEPT
 {
-    return get_search_index() != null_ptr;
+    return get_search_index() != nullptr;
 }
 
 inline StringIndex* ColumnBase::create_search_index()
 {
-    return null_ptr;
+    return nullptr;
 }
 
 inline void ColumnBase::destroy_search_index() REALM_NOEXCEPT
@@ -587,12 +584,12 @@ inline void ColumnBase::destroy_search_index() REALM_NOEXCEPT
 
 inline const StringIndex* ColumnBase::get_search_index() const REALM_NOEXCEPT
 {
-    return null_ptr;
+    return nullptr;
 }
 
 inline StringIndex* ColumnBase::get_search_index() REALM_NOEXCEPT
 {
-    return null_ptr;
+    return nullptr;
 }
 
 inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool)
@@ -756,8 +753,7 @@ inline void ColumnBase::EraseHandlerBase::replace_root(Array* leaf)
     std::size_t ndx_in_parent = m_column.m_array->get_ndx_in_parent();
     leaf_2->set_parent(parent, ndx_in_parent);
     leaf_2->update_parent(); // Throws
-    delete m_column.m_array;
-    m_column.m_array = leaf_2.release();
+    m_column.m_array = std::move(leaf_2);
 }
 
 inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHandler& handler)
@@ -769,33 +765,7 @@ inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHan
 
 inline bool Column::has_search_index() const REALM_NOEXCEPT
 {
-    return m_search_index;
-}
-
-// fixme, must m_search_index be copied here?
-inline Column::Column(Allocator& alloc, ref_type ref) : m_search_index(null_ptr)
-{
-    m_array = new Array(alloc); // Throws
-    m_array->init_from_ref(ref);
-}
-
-inline Column::Column(unattached_root_tag, Allocator& alloc) : m_search_index(null_ptr)
-{
-    m_array = new Array(alloc); // Throws
-
-}
-
-inline Column::Column(move_tag, Column& col) REALM_NOEXCEPT
-{
-    m_array = col.m_array;
-    col.m_array = 0;
-    m_search_index = col.m_search_index;
-    col.m_search_index = 0;
-}
-
-inline Column::Column(ArrayInteger* root) REALM_NOEXCEPT:
-    ColumnBase(root), m_search_index(null_ptr)
-{
+    return m_search_index.get();
 }
 
 inline std::size_t Column::size() const REALM_NOEXCEPT

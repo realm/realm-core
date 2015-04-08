@@ -147,7 +147,7 @@ public:
     // arguments in clang and vs2010 (fixed in 2012)
     template <int function, typename T, typename R, class ColType>
     R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const,
-        size_t column_ndx, T count_target, size_t* return_ndx = null_ptr) const;
+        size_t column_ndx, T count_target, size_t* return_ndx = nullptr) const;
 
     int64_t sum_int(size_t column_ndx) const;
     int64_t maximum_int(size_t column_ndx, size_t* return_ndx = 0) const;
@@ -571,7 +571,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) REALM_NOEXCEPT:
-    RowIndexes(Column::move_tag(), tv->m_row_indexes),
+    RowIndexes(std::move(tv->m_row_indexes)),
     m_table(move(tv->m_table)),
     m_distinct_column_source(tv->m_distinct_column_source)
 {

@@ -28,14 +28,12 @@ StringData get_string(void* column, size_t ndx, char*)
 ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable):
     Column(alloc, ref), // Throws
     m_keys(alloc, keys_ref, nullable), // Throws
-    m_search_index(0),
     m_nullable(nullable)
 {
 }
 
 ColumnStringEnum::~ColumnStringEnum() REALM_NOEXCEPT
 {
-    delete m_search_index;
 }
 
 void ColumnStringEnum::destroy() REALM_NOEXCEPT
@@ -276,15 +274,14 @@ StringIndex* ColumnStringEnum::create_search_index()
         index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
-    m_search_index = index.release();
-    return m_search_index;
+    m_search_index = std::move(index);
+    return m_search_index.get();
 }
 
 
 void ColumnStringEnum::destroy_search_index() REALM_NOEXCEPT
 {
-    delete m_search_index;
-    m_search_index = 0;
+    m_search_index.reset();
 }
 
 
@@ -292,8 +289,8 @@ void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent,
                                             size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+                                         !allow_duplicate_valaues, m_array->get_alloc())); // Throws
 }
 
 
@@ -303,12 +300,12 @@ void ColumnStringEnum::set_search_index_allow_duplicate_values(bool allow) REALM
 }
 
 
-void ColumnStringEnum::install_search_index(StringIndex* index) REALM_NOEXCEPT
+void ColumnStringEnum::install_search_index(std::unique_ptr<StringIndex> index) REALM_NOEXCEPT
 {
     REALM_ASSERT(!m_search_index);
 
     index->set_target(this, &get_string);
-    m_search_index = index; // we now own this index
+    m_search_index = std::move(index); // we now own this index
 }
 
 

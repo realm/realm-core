@@ -421,8 +421,8 @@ inline const char* TransactLogBufferStream::transact_log_data() const
 
 inline TransactLogEncoder::TransactLogEncoder(TransactLogStream& stream):
     m_stream(stream),
-    m_transact_log_free_begin(null_ptr),
-    m_transact_log_free_end(null_ptr)
+    m_transact_log_free_begin(nullptr),
+    m_transact_log_free_end(nullptr)
 {
 }
 
@@ -435,9 +435,9 @@ inline void TransactLogEncoder::set_buffer(char* free_begin, char* free_end)
 
 inline void TransactLogConvenientEncoder::reset_selection_caches()
 {
-    m_selected_table = null_ptr;
-    m_selected_spec  = null_ptr;
-    m_selected_link_list  = null_ptr;
+    m_selected_table = nullptr;
+    m_selected_spec  = nullptr;
+    m_selected_link_list  = nullptr;
 }
 
 inline char* TransactLogEncoder::reserve(std::size_t n)
@@ -1891,7 +1891,7 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     std::size_t size = read_int<std::size_t>(); // Throws
 
     if (size == static_cast<size_t>(-1))
-        return StringData(null_ptr, 0);
+        return StringData(nullptr, 0);
 
     const std::size_t avail = m_input_end - m_input_begin;
     if (avail >= size) {
@@ -1901,7 +1901,7 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 
     buf.clear();
     if (size == static_cast<size_t>(-1)) {
-        return StringData(null_ptr, 0); // null        
+        return StringData(nullptr, 0); // null        
     }
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);

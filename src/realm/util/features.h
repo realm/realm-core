@@ -199,7 +199,7 @@
 #if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 7) || \
     REALM_HAVE_CLANG_FEATURE(cxx_override_control) || \
     REALM_HAVE_AT_LEAST_MSVC_11_2012
-#  define override override
+//#  define override override
 #else
 #  define override
 #endif

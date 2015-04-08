@@ -230,10 +230,10 @@ public:
 
 private:
     template<class> struct GetRowAccType { typedef void type; };
-    template<class Spec> struct GetRowAccType<BasicTable<Spec> > {
+    template<class Spec> struct GetRowAccType<BasicTable<Spec>> {
         typedef typename BasicTable<Spec>::RowAccessor type;
     };
-    template<class Spec> struct GetRowAccType<const BasicTable<Spec> > {
+    template<class Spec> struct GetRowAccType<const BasicTable<Spec>> {
         typedef typename BasicTable<Spec>::ConstRowAccessor type;
     };
     typedef typename GetRowAccType<T>::type RowAccessor;

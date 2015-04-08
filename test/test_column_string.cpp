@@ -649,8 +649,7 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
     ColumnStringEnum e(Allocator::get_default(), values, keys, false);
 
     // Reuse the index from original column
-    StringIndex* index = c.release_search_index();
-    e.install_search_index(index);
+    e.install_search_index(c.release_search_index());
     CHECK(e.has_search_index());
 
     // Search for a value that does not exist
@@ -769,7 +768,7 @@ TEST(ColumnString_Null)
         // ArrayString capacity starts at 128 bytes, so we need lots of elements
         // to test if relocation works
         for (size_t i = 0; i < 100; i++) {
-            unsigned char rnd = random.draw_int<unsigned char>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = random.draw_int<int>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
@@ -782,7 +781,7 @@ TEST(ColumnString_Null)
                 static const char str[] = "This string must be longer than 64 bytes in order to test the BinaryBlob type of strings";
                 size_t len;
                  
-                if (random.draw_int<unsigned char>() > 100)
+                if (random.draw_int<int>() > 100)
                     len = rnd % sizeof(str);
                 else
                     len = 0;
@@ -790,7 +789,7 @@ TEST(ColumnString_Null)
                 StringData sd;
                 string stdstr;
 
-                if (random.draw_int<unsigned char>() > 100) {
+                if (random.draw_int<int>() > 100) {
                     sd = realm::null();
                     stdstr = "null";
                 }
@@ -799,7 +798,7 @@ TEST(ColumnString_Null)
                     stdstr = string(str, len);
                 }
 
-                if (random.draw_int<unsigned char>() > 100) {
+                if (random.draw_int<int>() > 100) {
                     a.add(sd);
                     v.push_back(stdstr);
                 }

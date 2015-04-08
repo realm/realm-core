@@ -674,6 +674,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\test\test_destroy_guard.cpp" />
+    <ClCompile Include="..\..\test\test_array_integer.cpp" />
     <ClCompile Include="..\..\test\test_json.cpp" />
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
