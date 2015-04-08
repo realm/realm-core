@@ -1,0 +1,35 @@
+#!/bin/sh
+
+################
+# Variables
+################
+
+expected_remote='git@github.com:realm/realm-core.git'
+repo_name='realm-core'
+
+################
+# Functions
+################
+
+verify_remote() {
+    if [[ "$1" != *"$expected_remote"* ]]; then
+        echo >&2 "attempting to push to a repo other than $repo_name or git remotes contains a repo other than $repo_name. aborting..."
+        exit 1
+    fi
+}
+
+################
+# Script
+################
+
+# current_remote_name="$1"
+current_remote_url="$2"
+
+verify_remote "$current_remote_url"
+
+saved_remotes="$(git remote -v)"
+while read -r remote_line; do
+    verify_remote "$remote_line"
+done <<< "$saved_remotes"
+
+exit 0
