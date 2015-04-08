@@ -453,10 +453,6 @@ public:
     /// specified value.
     void ensure_minimum_width(int64_t value);
 
-    // Direct access methods
-    const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                          bool use_retval = false) const REALM_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
-
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
     void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const;
