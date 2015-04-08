@@ -1121,19 +1121,19 @@ public:
                     m_leaf_start = s - ndx_in_leaf;
 
                     if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
-                        m_end_s = m_leaf_start + static_cast<const ArrayString*>(m_leaf.get())->size();
+                        m_end_s = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
                     else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
-                        m_end_s = m_leaf_start + static_cast<const ArrayStringLong*>(m_leaf.get())->size();
+                        m_end_s = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
                     else
-                        m_end_s = m_leaf_start + static_cast<const ArrayBigBlobs*>(m_leaf.get())->size();
+                        m_end_s = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
                 }
 
                 if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
-                    t = static_cast<const ArrayString*>(m_leaf.get())->get(s - m_leaf_start);
+                    t = static_cast<const ArrayString&>(*m_leaf).get(s - m_leaf_start);
                 else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
-                    t = static_cast<const ArrayStringLong*>(m_leaf.get())->get(s - m_leaf_start);
+                    t = static_cast<const ArrayStringLong&>(*m_leaf).get(s - m_leaf_start);
                 else
-                    t = static_cast<const ArrayBigBlobs*>(m_leaf.get())->get_string(s - m_leaf_start);
+                    t = static_cast<const ArrayBigBlobs&>(*m_leaf).get_string(s - m_leaf_start);
             }
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
@@ -1322,21 +1322,21 @@ public:
                 m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
                 m_leaf_start = s - ndx_in_leaf;
                 if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
-                    m_leaf_end = m_leaf_start + static_cast<const ArrayString*>(m_leaf.get())->size();
+                    m_leaf_end = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
                 else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
-                    m_leaf_end = m_leaf_start + static_cast<const ArrayStringLong*>(m_leaf.get())->size();
+                    m_leaf_end = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
                 else
-                    m_leaf_end = m_leaf_start + static_cast<const ArrayBigBlobs*>(m_leaf.get())->size();
+                    m_leaf_end = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
                 REALM_ASSERT(m_leaf);
             }
             size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
             if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
-                s = static_cast<const ArrayString*>(m_leaf.get())->find_first(m_value, s - m_leaf_start, end2);
+                s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
             else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
-                s = static_cast<const ArrayStringLong*>(m_leaf.get())->find_first(m_value, s - m_leaf_start, end2);
+                s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
             else
-                s = static_cast<const ArrayBigBlobs*>(m_leaf.get())->find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
+                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
 
             if (s == not_found)
                 s = m_leaf_end - 1;
