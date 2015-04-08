@@ -3335,7 +3335,7 @@ struct AggrState {
 
     const ColumnStringEnum* enums;
     vector<size_t> keys;
-    Array block;
+    ArrayInteger block;
     size_t offset;
     size_t block_end;
 
@@ -3360,7 +3360,9 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 {
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
-        state.enums->Column::GetBlock(i, state.block, state.offset);
+        std::size_t ndx_in_leaf;
+        state.enums->Column::get_leaf(i, ndx_in_leaf, state.block);
+        state.offset = i - ndx_in_leaf;
         state.block_end = state.offset + state.block.size();
     }
 
@@ -3421,7 +3423,9 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.enums = &enums;
         state.keys.assign(key_count, 0);
 
-        enums.Column::GetBlock(0, state.block, state.offset);
+        std::size_t ndx_in_leaf;
+        enums.Column::get_leaf(0, ndx_in_leaf, state.block);
+        state.offset = 0 - ndx_in_leaf;
         state.block_end = state.offset + state.block.size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
     }
