@@ -207,39 +207,6 @@ void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
     set_width(m_width);
 }
 
-// FIXME: This is a very crude and error prone misuse of Array,
-// especially since its use is not isolated inside the array
-// class. There seems to be confusion about how to construct an array
-// to be used with this method. Somewhere (e.g. in
-// Column::find_first()) we use Array(Allocator&). In other places
-// (TableViewBase::aggregate()) we use Array(no_prealloc_tag). We must
-// at least document the rules governing the use of
-// CreateFromHeaderDirect().
-//
-// FIXME: If we want to keep this method, we should formally define
-// what can be termed 'direct read-only' use of an Array instance, and
-// what rules apply in this case. Currently Array::clone() just passes
-// zero for the 'ref' argument.
-//
-// FIXME: Assuming that this method is only used for what can be
-// termed 'direct read-only' use, the type of the header argument
-// should be changed to 'const char*', and a const_cast should be
-// added below. This would avoid the need for const_cast's in places
-// like Array::clone().
-void Array::CreateFromHeaderDirect(char* header, ref_type ref) REALM_NOEXCEPT
-{
-    // Parse header
-    // We only need limited info for direct read-only use
-    m_width    = get_width_from_header(header);
-    m_size     = get_size_from_header(header);
-
-    m_ref = ref;
-    m_data = get_data_from_header(header);
-
-    set_width(m_width);
-}
-
-
 void Array::set_type(Type type)
 {
     REALM_ASSERT(is_attached());
@@ -332,8 +299,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
 
         ref_type ref = to_ref(value);
         Allocator& alloc = get_alloc();
-        const char* subheader = alloc.translate(ref);
-        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.m_ref);
         value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
         slice.add(value); // Throws
@@ -1432,8 +1398,9 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
     return total_bits / width;
 }
 
-MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_alloc)
+MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
+    const char* header = mem.m_addr;
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
         // copy, which is more efficient.
@@ -1442,8 +1409,8 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         size_t size = get_byte_size_from_header(header);
 
         // Create the new array
-        MemRef mem = target_alloc.alloc(size); // Throws
-        char* clone_header = mem.m_addr;
+        MemRef clone_mem = target_alloc.alloc(size); // Throws
+        char* clone_header = clone_mem.m_addr;
 
         // Copy contents
         const char* src_begin = header;
@@ -1454,14 +1421,14 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         // Update with correct capacity
         set_header_capacity(size, clone_header);
 
-        return mem;
+        return clone_mem;
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
     REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
 
-    Array array((Array::no_prealloc_tag()));
-    array.CreateFromHeaderDirect(const_cast<char*>(header));
+    Array array { alloc };
+    array.init_from_mem(mem);
 
     // Create new empty array of refs
     Array new_array(target_alloc);
@@ -1485,8 +1452,7 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         }
 
         ref_type ref = to_ref(value);
-        const char* subheader = alloc.translate(ref);
-        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.m_ref);
         value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
         new_array.add(value); // Throws
