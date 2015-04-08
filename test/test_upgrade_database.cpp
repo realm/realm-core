@@ -50,7 +50,7 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(Upgrade_Database_2_3)
+ONLY(Upgrade_Database_2_3)
 {
     // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
     // very first action, call Group::upgrade_file_format() on it. You must not call any reading or modifying 
@@ -72,8 +72,10 @@ TEST(Upgrade_Database_2_3)
         Group g(path + ".tmp", 0, Group::mode_ReadOnly);
         
         TableRef t = g.get_table("table");
-        
+
+#ifdef REALM_NULL_STRINGS
         CHECK_EQUAL(g.get_file_format(), 3);
+#endif
 
         CHECK(t->has_search_index(0));
         CHECK(t->has_search_index(1));
