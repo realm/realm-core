@@ -783,10 +783,8 @@ void Column::populate_search_index()
 StringIndex* Column::create_search_index()
 {
     REALM_ASSERT(!m_search_index);
-    std::unique_ptr<StringIndex> index;
     StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc());  // Throws
-    index.reset(si);
-    m_search_index = std::move(index);
+    m_search_index.reset(si);
     populate_search_index();
     return m_search_index.get();
 }
