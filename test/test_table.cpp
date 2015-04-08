@@ -5832,7 +5832,7 @@ TEST(Table_IndexStringDelete)
     }
 }
 
-
+#ifdef REALM_NULL_STRINGS
 TEST(Table_Nulls)
 {
     // 'round' lets us run this entire test both with and without index and with/without optimize/enum
@@ -5922,5 +5922,6 @@ TEST(Table_Nulls)
         CHECK_EQUAL(2, tv.get_source_ndx(0));
     }
 }
+#endif 
 
 #endif // TEST_TABLE

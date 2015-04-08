@@ -30,8 +30,12 @@
 
 namespace realm {
 
-// Bumped to 3 because of null support of String columns and because of new format of index
-const int default_file_format_version = 3;
+#ifdef REALM_NULL_STRINGS
+    // Bumped to 3 because of null support of String columns and because of new format of index
+    const int default_file_format_version = 3;
+#else
+    const int default_file_format_version = 2;
+#endif
 
 // Pre-declarations
 class Group;

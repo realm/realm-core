@@ -34,7 +34,9 @@ void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
 void StringIndex::validate_value(StringData str) const
 {
     // The "nulls on String column" branch fixed all known bugs in the index
+#ifdef REALM_NULL_STRINGS
     return;
+#endif
 
     if (std::find(str.data(), str.data() + str.size(), '\0') != str.data() + str.size())
         throw std::invalid_argument("Cannot add string with embedded NULs to indexed column");

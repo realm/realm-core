@@ -712,7 +712,7 @@ TEST(StringIndex_EmbeddedZeroes)
     AdaptiveStringColumn col2(Allocator::get_default(), ref2);
     const StringIndex& ndx2 = *col2.create_search_index();
 
-#if 1
+#ifdef REALM_NULL_STRINGS
     // FIXME: re-enable once embedded nuls work
     col2.add(StringData("\0", 1));
     col2.add(StringData("\1", 1));
@@ -746,7 +746,7 @@ TEST(StringIndex_EmbeddedZeroes)
     col2.destroy();
 }
 
-
+#ifdef REALM_NULL_STRINGS
 TEST(StringIndex_Null)
 {
     // Create a column with string values
@@ -763,8 +763,9 @@ TEST(StringIndex_Null)
 
     col.destroy();
 }
+#endif
 
-
+#ifdef REALM_NULL_STRINGS
 TEST(StringIndex_Zero_Crash)
 {
     // StringIndex could crash if strings ended with one or more 0-bytes
@@ -788,8 +789,9 @@ TEST(StringIndex_Zero_Crash)
     t = table.find_first_string(0, StringData("\0\0", 2));
     CHECK_EQUAL(2, t);
 }
+#endif
 
-
+#ifdef REALM_NULL_STRINGS
 TEST(StringIndex_Zero_Crash2)
 {
     Random random(random_int<unsigned long>());
@@ -868,7 +870,7 @@ TEST(StringIndex_Zero_Crash2)
         }
     }
 }
-
+#endif
 
 TEST(StringIndex_Integer_Increasing)
 {
