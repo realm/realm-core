@@ -132,23 +132,6 @@ public:
     const Array* get_root_array() const REALM_NOEXCEPT { return m_array.get(); }
     //@}
 
-    /// Provides access to the leaf that contains the element at the
-    /// specified index. Upon return \a ndx_in_leaf will be set to the
-    /// corresponding index relative to the beginning of the leaf.
-    ///
-    /// When the root is a leaf, this function returns a pointer to
-    /// the array accessor cached inside this column
-    /// accessor. Otherwise this function attaches the specified
-    /// fallback accessor to the identified leaf, and returns a
-    /// pointer to the fallback accessor.
-    ///
-    /// This function cannot be used for modifying operations as it
-    /// does not ensure the presence of an unbroken chain of parent
-    /// accessors. For this reason, the identified leaf should always
-    /// be accessed through the returned const-qualified reference,
-    /// and never directly through the specfied fallback accessor.
-    const Array& get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                          Array& fallback) const REALM_NOEXCEPT;
 
     // FIXME: Is almost identical to get_leaf(), but uses ill-defined
     // aspects of the Array API. Should be eliminated.
@@ -403,6 +386,24 @@ public:
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+
+    /// Provides access to the leaf that contains the element at the
+    /// specified index. Upon return \a ndx_in_leaf will be set to the
+    /// corresponding index relative to the beginning of the leaf.
+    ///
+    /// When the root is a leaf, this function returns a pointer to
+    /// the array accessor cached inside this column
+    /// accessor. Otherwise this function attaches the specified
+    /// fallback accessor to the identified leaf, and returns a
+    /// pointer to the fallback accessor.
+    ///
+    /// This function cannot be used for modifying operations as it
+    /// does not ensure the presence of an unbroken chain of parent
+    /// accessors. For this reason, the identified leaf should always
+    /// be accessed through the returned const-qualified reference,
+    /// and never directly through the specfied fallback accessor.
+    const ArrayInteger& get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                          ArrayInteger& fallback) const REALM_NOEXCEPT;
 
     // Getting and setting values
     int_fast64_t get(std::size_t ndx) const REALM_NOEXCEPT;
@@ -672,12 +673,12 @@ inline void ColumnBase::set_parent(ArrayParent* parent, std::size_t ndx_in_paren
     m_array->set_parent(parent, ndx_in_parent);
 }
 
-inline const Array& ColumnBase::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                                         Array& fallback) const REALM_NOEXCEPT
+inline const ArrayInteger& Column::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                                         ArrayInteger& fallback) const REALM_NOEXCEPT
 {
     if (!m_array->is_inner_bptree_node()) {
         ndx_in_leaf = ndx;
-        return *m_array;
+        return static_cast<const ArrayInteger&>(*m_array);
     }
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
     fallback.init_from_mem(p.first);
