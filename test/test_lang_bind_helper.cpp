@@ -7149,7 +7149,7 @@ TEST(LangBindHelper_RollbackToInitialState1)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    sg_w.begin_read();
     LangBindHelper::promote_to_write(sg_w);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 }
