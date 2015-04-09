@@ -11,7 +11,9 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Changed the `tightdb` namespace to `realm`.
+* We switched to C++11, and removed functionality that was duplicated from the C++11 standard
+  library, including `null_ptr` and `util::UniquePtr`.
 
 ### Enhancements:
 
