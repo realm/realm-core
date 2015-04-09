@@ -223,7 +223,7 @@ public:
 
     void init(const ColType* column)
     {
-        m_array_ptr.reset(nullptr);
+        m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
         m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayType(column->get_alloc()));
         m_column = column;
         m_leaf_end = 0;
@@ -638,7 +638,7 @@ public:
     void init(const Table& table) override
     {
         ParentNode::init(table);
-        m_array_ptr.reset();
+        m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
         m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayInteger(table.get_alloc()));
     }
 
