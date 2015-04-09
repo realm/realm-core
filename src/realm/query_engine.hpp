@@ -207,8 +207,6 @@ public:
 
     SequentialGetter() {}
 
-    SequentialGetter(const SequentialGetter&) = delete;
-
     SequentialGetter(const Table& table, size_t column_ndx)
     {
         if (column_ndx != not_found)
