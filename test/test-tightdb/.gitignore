@@ -5,6 +5,6 @@
 /*.gcno
 /*.gcda
 
-/test-tightdb
-/test-tightdb-dbg
-/test-tightdb-cov
+/test-realm
+/test-realm-dbg
+/test-realm-cov

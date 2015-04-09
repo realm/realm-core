@@ -1,17 +1,17 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX_STRING
 
-#include <tightdb/index_string.hpp>
+#include <realm/index_string.hpp>
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using namespace util;
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -147,7 +147,7 @@ TEST(StringIndex_DeleteAll)
     col.erase(2, 2 == col.size()-1);
     col.erase(1, 1 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -171,7 +171,7 @@ TEST(StringIndex_DeleteAll)
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -223,7 +223,7 @@ TEST(StringIndex_Delete)
     // Delete all items
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
@@ -242,7 +242,7 @@ TEST(StringIndex_ClearEmpty)
 
     // Clear to remove all entries
     col.clear();
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -271,7 +271,7 @@ TEST(StringIndex_Clear)
 
     // Clear to remove all entries
     col.clear();
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -676,7 +676,7 @@ TEST(StringIndex_FuzzyTest_Int)
     ref_type ref = Column::create(Allocator::get_default());
     Column col(Allocator::get_default(), ref);
     Random random(random_int<unsigned long>());
-    const size_t n = 1.2 * TIGHTDB_MAX_BPNODE_SIZE;
+    const size_t n = 1.2 * REALM_MAX_BPNODE_SIZE;
 
     col.create_search_index();
 
@@ -704,16 +704,32 @@ TEST(StringIndex_FuzzyTest_Int)
 
 
 // Tests for a bug with strings containing zeroes
-TEST(StringIndex_Bug1)
+TEST(StringIndex_EmbeddedZeroes)
 {
     // String index
     ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col2(Allocator::get_default(), ref2);
     const StringIndex& ndx2 = *col2.create_search_index();
+
+#if 0
+    // FIXME: re-enable once embedded nuls work
+    col2.add(StringData("\0", 1));
+    col2.add(StringData("\1", 1));
+    col2.add(StringData("\0\0", 2));
+    col2.add(StringData("\0\1", 2));
+    col2.add(StringData("\1\0", 2));
+
+    CHECK_EQUAL(ndx2.find_first(StringData("\0", 1)), 0);
+    CHECK_EQUAL(ndx2.find_first(StringData("\1", 1)), 1);
+    CHECK_EQUAL(ndx2.find_first(StringData("\2", 1)), not_found);
+    CHECK_EQUAL(ndx2.find_first(StringData("\0\0", 2)), 3);
+    CHECK_EQUAL(ndx2.find_first(StringData("\0\1", 2)), 4);
+    CHECK_EQUAL(ndx2.find_first(StringData("\1\0", 2)), 5);
+    CHECK_EQUAL(ndx2.find_first(StringData("\1\0\0", 3)), not_found);
+#else
     static_cast<void>(ndx2);
-    col2.add(StringData("\0\0\0\0\0\x001\0\0", 8));
-    size_t t = ndx2.find_first(StringData("\0\0\0\0\0\x002\0\0"));
-    CHECK_EQUAL(t, not_found);
+    CHECK_THROW_ANY(col2.add(StringData("\0", 1)));
+#endif
 
     // Integer index (uses String index internally)
     int64_t v = 1ULL << 41;

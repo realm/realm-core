@@ -4,22 +4,22 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#include <tightdb/column.hpp>
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
-#include <tightdb/column_basic.hpp>
-#include <tightdb/column_string.hpp>
-#include <tightdb/column_string_enum.hpp>
-#include <tightdb/column_mixed.hpp>
-#include <tightdb/array_binary.hpp>
-#include <tightdb/array_string_long.hpp>
+#include <realm/column.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
+#include <realm/column_basic.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_string_enum.hpp>
+#include <realm/column_mixed.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_string_long.hpp>
 
 #include "../util/thread_wrapper.hpp"
 
 #include "../util/timer.hpp"
 #include "unit_test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 
@@ -125,7 +125,7 @@ sum: 8.876
         test_util::Timer t;
         double best;
 
-        tightdb::Array a;
+        realm::Array a;
         int64_t val = 0;
         volatile size_t tt = 40;
 
@@ -201,7 +201,7 @@ sum: 8.876
         test_util::Timer t;
         double best;
 
-        tightdb::Array a;
+        realm::Array a;
         int64_t val = 0;
 
         for(int i = 0; i < 1000; i++) {

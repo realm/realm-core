@@ -5,12 +5,12 @@
 #include <string>
 #include <sstream>
 
-#include <tightdb/string_data.hpp>
+#include <realm/string_data.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

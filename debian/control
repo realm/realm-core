@@ -1,19 +1,19 @@
-Source: libtightdb
+Source: librealm
 Section: devel
 Priority: optional
-Maintainer: Kenneth Geisshirt <kg@tightdb.com>
+Maintainer: Kenneth Geisshirt <kg@realm.com>
 Build-Depends: debhelper (>=7)
 Standards-Version: 3.9.4
-Homepage: http://www.tightdb.com/
+Homepage: http://www.realm.com/
 
-Package: libtightdb
+Package: librealm
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Fast, embedded database
- TightDB is a fast, embedded database.
+ Realm is a fast, embedded database.
 
-Package: libtightdb-dev
+Package: librealm-dev
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, g++
 Description: Fast, embedded database.
- TightDB is a fast, embedded database: Development and header files.
+ Realm is a fast, embedded database: Development and header files.

@@ -3,22 +3,22 @@
 
 #include <algorithm>
 
-#include <tightdb.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/file.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#  include <tightdb/replication.hpp>
+#include <realm.hpp>
+#include <realm/util/features.h>
+#include <memory>
+#include <realm/util/file.hpp>
+#ifdef REALM_ENABLE_REPLICATION
+#  include <realm/replication.hpp>
 #endif
 
 #include "test.hpp"
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -58,7 +58,7 @@ class MyTrivialReplication: public TrivialReplication {
 public:
     MyTrivialReplication(string path): TrivialReplication(path) {}
 
-    ~MyTrivialReplication() TIGHTDB_NOEXCEPT
+    ~MyTrivialReplication() REALM_NOEXCEPT
     {
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
@@ -78,9 +78,9 @@ public:
     }
 
 private:
-    void handle_transact_log(const char* data, size_t size, version_type) TIGHTDB_OVERRIDE
+    void handle_transact_log(const char* data, size_t size, version_type) override
     {
-        UniquePtr<char[]> log(new char[size]); // Throws
+        std::unique_ptr<char[]> log(new char[size]); // Throws
         copy(data, data+size, log.get());
         m_transact_logs.push_back(BinaryData(log.get(), size)); // Throws
         log.release();
@@ -90,18 +90,18 @@ private:
     TransactLogs m_transact_logs;
 };
 
-TIGHTDB_TABLE_1(MySubsubsubtable,
+REALM_TABLE_1(MySubsubsubtable,
                 i, Int)
 
-TIGHTDB_TABLE_3(MySubsubtable,
+REALM_TABLE_3(MySubsubtable,
                 a, Int,
                 b, Subtable<MySubsubsubtable>,
                 c, Int)
 
-TIGHTDB_TABLE_1(MySubtable,
+REALM_TABLE_1(MySubtable,
                 t, Subtable<MySubsubtable>)
 
-TIGHTDB_TABLE_9(MyTable,
+REALM_TABLE_9(MyTable,
                 my_int,       Int,
                 my_bool,      Bool,
                 my_float,     Float,
@@ -491,5 +491,5 @@ TEST(Replication_Links)
 
 } // anonymous namespace
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 #endif // TEST_REPLICATION

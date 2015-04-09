@@ -6,18 +6,18 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
-#include <tightdb/link_view.hpp> // lasse todo remove
-#include <tightdb.hpp>
+#include <realm/table_macros.hpp>
+#include <realm/link_view.hpp> // lasse todo remove
+#include <realm.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(LinkList_Basic1)
 {
@@ -1307,6 +1307,113 @@ TEST(LinkList_QueryOnLinkList)
     }
     query2.find_all();
     query2.find();
+}
+
+TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
+{
+    Group group;
+
+    TableRef data_table = group.add_table("data");
+    data_table->add_column(type_String, "col");
+    data_table->add_search_index(0);
+
+    TableRef link_table = group.add_table("link");
+    link_table->add_column_link(type_LinkList, "col", *data_table);
+
+    data_table->add_empty_row(2);
+    data_table->set_string(0, 0, "a");
+    data_table->set_string(0, 1, "b");
+
+    link_table->add_empty_row();
+    LinkViewRef lvr = link_table->get_linklist(0, 0);
+
+    // Test with LinkList order matching Table order
+    lvr->add(0);
+    lvr->add(1);
+
+    CHECK_EQUAL(0, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(1, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(not_found, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find());
+
+    // Test with LinkList being the reverse of Table order
+    lvr->clear();
+    lvr->add(1);
+    lvr->add(0);
+
+    CHECK_EQUAL(1, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(0, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(not_found, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find());
+}
+
+TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
+{
+    Group group;
+
+    TableRef data_table = group.add_table("data");
+    data_table->add_column(type_String, "col");
+    data_table->add_search_index(0);
+
+    TableRef link_table = group.add_table("link");
+    link_table->add_column_link(type_LinkList, "col", *data_table);
+
+    // Ensure that the results from the index don't fit in a single leaf
+    const size_t count = round_up(std::max(REALM_MAX_BPNODE_SIZE * 8, 100), 4);
+    data_table->add_empty_row(count);
+    for (size_t i = 0; i < count; ++i) {
+        char str[2]{};
+        str[0] = 'a' + (i % 4);
+        data_table->set_string(0, i, StringData(str, 1));
+    }
+
+    link_table->add_empty_row();
+    LinkViewRef lvr = link_table->get_linklist(0, 0);
+
+    // Add every other row to the LinkList in the same order as the table
+    for (size_t i = 0; i < count; i += 2)
+        lvr->add(i);
+
+    // in table and linkview
+    TableView tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(0, tv[0].get_index());
+    CHECK_EQUAL(4, tv[1].get_index());
+
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(2, tv[0].get_index());
+    CHECK_EQUAL(6, tv[1].get_index());
+
+    // in table, not in linkview
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // not in table
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "A").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // Add every other row to the LinkList in the opposite order as the table
+    lvr->clear();
+    for (size_t i = count; i > 1; i -= 2)
+        lvr->add(i - 2);
+
+    // in table and linkview
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(count - 4, tv[0].get_index());
+    CHECK_EQUAL(count - 8, tv[1].get_index());
+
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(count - 2, tv[0].get_index());
+    CHECK_EQUAL(count - 6, tv[1].get_index());
+
+    // in table, not in linkview
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // not in table
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "A").find_all();
+    CHECK_EQUAL(0, tv.size());
 }
 
 #endif

@@ -1,20 +1,20 @@
 check_PROGRAMS = test-installed
 
-TIGHTDB_INCLUDEDIR    := $(shell tightdb-config     --includedir)
-TIGHTDB_CFLAGS        := $(shell tightdb-config     --cflags)
-TIGHTDB_CFLAGS_DEBUG  := $(shell tightdb-config-dbg --cflags)
-TIGHTDB_LIBDIR        := $(shell tightdb-config     --libdir)
-TIGHTDB_LDFLAGS       := $(shell tightdb-config     --libs)
-TIGHTDB_LDFLAGS_DEBUG := $(shell tightdb-config-dbg --libs)
+REALM_INCLUDEDIR    := $(shell realm-config     --includedir)
+REALM_CFLAGS        := $(shell realm-config     --cflags)
+REALM_CFLAGS_DEBUG  := $(shell realm-config-dbg --cflags)
+REALM_LIBDIR        := $(shell realm-config     --libdir)
+REALM_LDFLAGS       := $(shell realm-config     --libs)
+REALM_LDFLAGS_DEBUG := $(shell realm-config-dbg --libs)
 
 test_installed_SOURCES       = test.cpp
-test_installed_CFLAGS        = -I$(TIGHTDB_INCLUDEDIR)
-test_installed_CFLAGS_OPTIM  = $(TIGHTDB_CFLAGS)
-test_installed_CFLAGS_DEBUG  = $(TIGHTDB_CFLAGS_DEBUG)
-test_installed_CFLAGS_COVER  = $(TIGHTDB_CFLAGS_DEBUG)
-test_installed_LDFLAGS       = -L$(TIGHTDB_LIBDIR) -Wl,-rpath,$(TIGHTDB_LIBDIR)
-test_installed_LDFLAGS_OPTIM = $(TIGHTDB_LDFLAGS)
-test_installed_LDFLAGS_DEBUG = $(TIGHTDB_LDFLAGS_DEBUG)
-test_installed_LDFLAGS_COVER = $(TIGHTDB_LDFLAGS_DEBUG)
+test_installed_CFLAGS        = -I$(REALM_INCLUDEDIR)
+test_installed_CFLAGS_OPTIM  = $(REALM_CFLAGS)
+test_installed_CFLAGS_DEBUG  = $(REALM_CFLAGS_DEBUG)
+test_installed_CFLAGS_COVER  = $(REALM_CFLAGS_DEBUG)
+test_installed_LDFLAGS       = -L$(REALM_LIBDIR) -Wl,-rpath,$(REALM_LIBDIR)
+test_installed_LDFLAGS_OPTIM = $(REALM_LDFLAGS)
+test_installed_LDFLAGS_DEBUG = $(REALM_LDFLAGS_DEBUG)
+test_installed_LDFLAGS_COVER = $(REALM_LDFLAGS_DEBUG)
 
 include generic.mk

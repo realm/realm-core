@@ -1,12 +1,12 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_FLOAT
 
-#include <tightdb/array_basic.hpp>
-#include <tightdb/column.hpp>
+#include <realm/array_basic.hpp>
+#include <realm/column.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using test_util::unit_test::TestResults;
 
 

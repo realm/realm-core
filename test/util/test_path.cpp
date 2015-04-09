@@ -1,10 +1,10 @@
-#include <tightdb/util/file.hpp>
+#include <realm/util/file.hpp>
 
 #include "test_path.hpp"
 
 using namespace std;
-using namespace tightdb::util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm::util;
+using namespace realm::test_util::unit_test;
 
 namespace {
 
@@ -15,7 +15,7 @@ string resource_path;
 
 } // anonymous namespace
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -58,7 +58,7 @@ TestPathGuard::TestPathGuard(const string& path):
     File::try_remove(m_path);
 }
 
-TestPathGuard::~TestPathGuard() TIGHTDB_NOEXCEPT
+TestPathGuard::~TestPathGuard() REALM_NOEXCEPT
 {
     if (keep_files)
         return;
@@ -88,4 +88,4 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard()
 }
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

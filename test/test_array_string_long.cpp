@@ -1,11 +1,11 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING_LONG
 
-#include <tightdb/array_string_long.hpp>
+#include <realm/array_string_long.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

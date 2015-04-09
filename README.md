@@ -1,19 +1,19 @@
-TightDB
+Realm
 =======
 
-This README file explains how to build and install the TightDB core
+This README file explains how to build and install the Realm core
 library.
 
 
 Prerequisites
 -------------
 
-To build the TightDB core library, you need the standard set of build
-tools. This includes a C/C++ compiler and GNU make. TightDB is
+To build the Realm core library, you need the standard set of build
+tools. This includes a C/C++ compiler and GNU make. Realm is
 thoroughly tested with both GCC and Clang. It is known to work with
 GCC 4.2 and newer, as well as with Clang 3.0 and newer.
 
-If you are going to modify the TightDB core library, you will need
+If you are going to modify the Realm core library, you will need
 Cheetah for Python (http://www.cheetahtemplate.org). It is needed
 because some source files are generated from Cheetah templates.
 
@@ -88,38 +88,38 @@ language binding:
 
 Headers will be installed in:
 
-    /usr/local/include/tightdb/
+    /usr/local/include/realm/
 
-Except for `tightdb.hpp` which is installed as:
+Except for `realm.hpp` which is installed as:
 
-    /usr/local/include/tightdb.hpp
+    /usr/local/include/realm.hpp
 
 The following libraries will be installed:
 
-    /usr/local/lib/libtightdb.so
-    /usr/local/lib/libtightdb-dbg.so
-    /usr/local/lib/libtightdb.a
+    /usr/local/lib/librealm.so
+    /usr/local/lib/librealm-dbg.so
+    /usr/local/lib/librealm.a
 
 Note: '.so' is replaced by '.dylib' on OS X.
 
 The following programs will be installed:
 
-    /usr/local/bin/tightdb-import
-    /usr/local/bin/tightdb-import-dbg
-    /usr/local/bin/tightdb-config
-    /usr/local/bin/tightdb-config-dbg
-    /usr/local/libexec/tightdbd
-    /usr/local/libexec/tightdbd-dbg
+    /usr/local/bin/realm-import
+    /usr/local/bin/realm-import-dbg
+    /usr/local/bin/realm-config
+    /usr/local/bin/realm-config-dbg
+    /usr/local/libexec/realmd
+    /usr/local/libexec/realmd-dbg
 
-The `tightdb-import` tool lets you load files containing
-comma-separated values into TightDB. The next two are used
-transparently by the TightDB library when `async` transactions are
+The `realm-import` tool lets you load files containing
+comma-separated values into Realm. The next two are used
+transparently by the Realm library when `async` transactions are
 enabled. The two `config` programs provide the necessary compiler
-flags for an application that needs to link against TightDB. They work
+flags for an application that needs to link against Realm. They work
 with GCC and other compilers, such as Clang, that are mostly command
 line compatible with GCC. Here is an example:
 
-    g++  my_app.cpp  `tightdb-config --cflags --libs`
+    g++  my_app.cpp  `realm-config --cflags --libs`
 
 Here is a more comple set of build-related commands:
 
@@ -143,11 +143,11 @@ It can be built using the following command:
 Building for iOS
 ----------------
 
-On Mac OS X it is possible to build a version of the TightDB core
+On Mac OS X it is possible to build a version of the Realm core
 library for iOS (the iPhone OS). It requires that the iPhoneOS and
 iPhoneSimulator SDKs for Xcode are installed.
 
-Run the following command to build the TightDB core library for
+Run the following command to build the Realm core library for
 iPhone/iOS:
 
     sh build.sh build-iphone
@@ -155,10 +155,10 @@ iPhone/iOS:
 This produces the following files and directories:
 
     iphone-lib/include/
-    iphone-lib/libtightdb-ios.a
-    iphone-lib/libtightdb-ios-dbg.a
-    iphone-lib/tightdb-config
-    iphone-lib/tightdb-config-dbg
+    iphone-lib/librealm-ios.a
+    iphone-lib/librealm-ios-dbg.a
+    iphone-lib/realm-config
+    iphone-lib/realm-config-dbg
 
 The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
@@ -182,12 +182,12 @@ following command before building and installing:
 Here, `PREFIX` is the installation prefix. If it is not specified, it
 defaults to `/usr/local`.
 
-Normally the TightDB version is taken to be what is returned by `git
-describe`. To override this, set `TIGHTDB_VERSION` as in the following
+Normally the Realm version is taken to be what is returned by `git
+describe`. To override this, set `REALM_VERSION` as in the following
 examples:
 
-    TIGHTDB_VERSION=0.1.4 sh build.sh config
-    TIGHTDB_VERSION=0.1.4 sh build.sh bin-dist all
+    REALM_VERSION=0.1.4 sh build.sh config
+    REALM_VERSION=0.1.4 sh build.sh bin-dist all
 
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
@@ -197,16 +197,16 @@ or `sh build.sh bin-dist`, as in the following example:
 
 ### Replication
 
-To enable replication in TightDB, set `TIGHTDB_ENABLE_REPLICATION` to
+To enable replication in Realm, set `REALM_ENABLE_REPLICATION` to
 a nonempty value during configuration as in the following example:
 
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh config
+    REALM_ENABLE_REPLICATION=1 sh build.sh config
 
 When set during preparation of a distribution package, it will have
 the extra effect of including "replication" as an optional extension
 available for installation to the end-user:
 
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
+    REALM_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
 
 
@@ -237,7 +237,7 @@ These are the available variables:
  - `UNITTEST_FILTER` can be used to exclude one or more tests from a
    particular run. For more information about the syntax, see the
    documentation of
-   `tightdb::test_util::unit_test::create_wildcard_filter()` in
+   `realm::test_util::unit_test::create_wildcard_filter()` in
    `test/util/unit_test.hpp`.
 
  - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
@@ -265,18 +265,18 @@ These are the available variables:
 
  - Set `UNITTEST_XML` to a non-empty value to dump the test results to
    an XML file. For details, see
-   `tightdb::test_util::unit_test::create_xml_reporter()` in
+   `realm::test_util::unit_test::create_xml_reporter()` in
    `test/util/unit_test.hpp`.
 
 Memory debugging:
 
-TightDB currently allows for uninitialized data to be written to a
+Realm currently allows for uninitialized data to be written to a
 database file. This is not an error (technically), but it does cause
 Valgrind to report errors. To avoid these 'false positives' during
-testing and debugging, set `TIGHTDB_ENABLE_ALLOC_SET_ZERO` to a
+testing and debugging, set `REALM_ENABLE_ALLOC_SET_ZERO` to a
 nonempty value during configuration as in the following example:
 
-    TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
+    REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
 
 Packaging for OS X
@@ -328,20 +328,20 @@ updated the changelog and version number in the `.spec` file. The core
 library and each binding have a `.spec` file. For the core, the
 command is:
 
-    cp libtightdb.spec $HOME/rpmbuild/SPECS
+    cp librealm.spec $HOME/rpmbuild/SPECS
 
 Next, you create a `tar.gz` file with the core, and copy it to the
 build area:
 
-    mkdir /tmp/libtightdb-0.1.5
-    sh build.sh dist-copy /tmp/libtightdb-0.1.5
-    (cd /tmp && tar czf libtightdb-0.1.5.tar.gz libtightdb-0.1.5)
-    mv /tmp/libtightdb-0.1.5.tar.gz $HOME/rpmbuild/SOURCES
+    mkdir /tmp/librealm-0.1.5
+    sh build.sh dist-copy /tmp/librealm-0.1.5
+    (cd /tmp && tar czf librealm-0.1.5.tar.gz librealm-0.1.5)
+    mv /tmp/librealm-0.1.5.tar.gz $HOME/rpmbuild/SOURCES
 
 Finally, you can build the `.rpm` files:
 
     cd $HOME/rpmbuld/SPECS
-    rpmbuild -bb libtightdb.spec
+    rpmbuild -bb librealm.spec
 
 The `.rpm` files can be found in `$HOME/rpmbuild/RPMS`.
 
@@ -352,9 +352,9 @@ Building a distribution package
 In general, it is necessary (and crucial) to properly update the
 versions of the following shared libraries:
 
-    libtightdb.so      (/tightdb/src/tightdb/Makefile)
-    libtightdb-c.so    (/tightdb_c/src/tightdb/c/Makefile)
-    libtightdb-objc.so (/tightdb_objc/src/tightdb/objc/Makefile)
+    librealm.so      (/realm/src/realm/Makefile)
+    librealm-c.so    (/realm_c/src/realm/c/Makefile)
+    librealm-objc.so (/realm_objc/src/realm/objc/Makefile)
 
 Do this by editing the the indicated Makefiles.
 
@@ -378,7 +378,7 @@ During the building of a distribution package, some Markdown documents
 are converted to PDF format, and this is done using the Pandoc
 utility. See below for instructions on how to install Pandoc. On some
 platforms, however, Pandoc installation is unfeasible (e.g. Amazon
-Linux). In those cases you may set `TIGHTDB_DISABLE_MARKDOWN_TO_PDF`
+Linux). In those cases you may set `REALM_DISABLE_MARKDOWN_CONVERT`
 to a nonempty value to disable the conversion to PDF.
 
 ### Linux Mint 15, 16, 17, Ubuntu 10.04, 12.04, 13.04, 13.10, 14.04

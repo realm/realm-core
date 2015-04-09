@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_ENCRYPTED_FILE_MAPPING
 
-#include <tightdb/util/encrypted_file_mapping.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 
 #include "test.hpp"
 
@@ -37,9 +37,9 @@
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
 
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(EncryptedFile_CryptorBasic)
 {
@@ -152,5 +152,5 @@ TEST(EncryptedFile_LargePages)
     close(fd);
 }
 
-#endif // TIGHTDB_ENABLE_ENCRYPTION
+#endif // REALM_ENABLE_ENCRYPTION
 #endif // TEST_ENCRYPTED_FILE_MAPPING

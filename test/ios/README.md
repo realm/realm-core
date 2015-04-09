@@ -58,7 +58,7 @@ This specifies which iOS device the app should be tested. The available
 platforms are iOS, and iOS Simulator. In either casem you need a device name,
 these are listed in Xcode. Examples:
 
-$ sh build.sh test-ios-app -destination "platform=iOS,name=tightdb's iPad"
+$ sh build.sh test-ios-app -destination "platform=iOS,name=realm's iPad"
 $ sh build.sh test-ios-app -destination "platform=iOS Simulator,name=iPad"
 
 The first example above is the default.

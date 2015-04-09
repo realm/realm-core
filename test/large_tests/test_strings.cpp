@@ -1,4 +1,4 @@
-#include <tightdb/column.hpp>
+#include <realm/column.hpp>
 
 #include "../util/number_names.hpp"
 #include "../util/verified_string.hpp"
@@ -7,8 +7,8 @@
 #include "../test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
@@ -45,7 +45,7 @@ namespace {
 
 string randstring(Random& random)
 {
-    // If there are in the order of TIGHTDB_MAX_BPNODE_SIZE different strings, then we'll get a good
+    // If there are in the order of REALM_MAX_BPNODE_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
     int64_t t = random.draw_int_mod(100) * 100;

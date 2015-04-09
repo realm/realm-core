@@ -1,11 +1,11 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX
 
-#include <tightdb/index.hpp>
+#include <realm/index.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety
@@ -286,4 +286,5 @@ TEST(Index_Set)
     col.Destroy();
     ndx.Destroy();
 }
+
 #endif

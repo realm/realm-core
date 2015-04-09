@@ -2,7 +2,7 @@
 using namespace std;
 
 
-namespace tightdb {
+namespace realm {
 
     struct Data {
         Data() { cout << "Data()\n"; }
@@ -47,42 +47,42 @@ namespace tightdb {
         ConstCopyAndMove(const Data* d): m_data(d) {}
     };
 
-} // namespace tightdb
+} // namespace realm
 
 
 
-tightdb::CopyAndMove func(tightdb::CopyAndMove a) { return move(a); }
+realm::CopyAndMove func(realm::CopyAndMove a) { return move(a); }
 
 int main()
 {
-    tightdb::CopyAndMove x1, x2;
+    realm::CopyAndMove x1, x2;
     cout << "---A---\n";
     x2 = x1;
     cout << "---B---\n";
     x2 = move(x1);
 
     cout << "---0---\n";
-    tightdb::CopyAndMove a1;
+    realm::CopyAndMove a1;
     cout << "---1---\n";
-    tightdb::CopyAndMove a2 = func(func(func(func(a1)))); // One genuine copy, and 'a1' is left untouched
+    realm::CopyAndMove a2 = func(func(func(func(a1)))); // One genuine copy, and 'a1' is left untouched
     cout << "---2---\n";
-    tightdb::CopyAndMove a3 = func(func(func(func(move(a2))))); // Zero genuine copies, and 'a2' is left truncated
+    realm::CopyAndMove a3 = func(func(func(func(move(a2))))); // Zero genuine copies, and 'a2' is left truncated
     cout << "---3---\n";
-    const tightdb::CopyAndMove a4(a3); // Copy
+    const realm::CopyAndMove a4(a3); // Copy
     cout << "---4---\n";
-    tightdb::CopyAndMove a5(a4); // Copy from const
+    realm::CopyAndMove a5(a4); // Copy from const
     cout << "---5---\n";
     static_cast<void>(a5);
 
-    tightdb::ConstCopyAndMove b1(a1); // One genuine copy
+    realm::ConstCopyAndMove b1(a1); // One genuine copy
     cout << "---6---\n";
-    tightdb::ConstCopyAndMove b2(move(a1)); // Zero genuine copies, and 'a1' is left truncated
+    realm::ConstCopyAndMove b2(move(a1)); // Zero genuine copies, and 'a1' is left truncated
     cout << "---7---\n";
-    tightdb::ConstCopyAndMove b3(a4); // One genuine copy from const
+    realm::ConstCopyAndMove b3(a4); // One genuine copy from const
     cout << "---8---\n";
-    tightdb::ConstCopyAndMove b4(func(func(func(func(a3))))); // One genuine copy, and 'a3' is left untouched
+    realm::ConstCopyAndMove b4(func(func(func(func(a3))))); // One genuine copy, and 'a3' is left untouched
     cout << "---9---\n";
-    tightdb::ConstCopyAndMove b5(func(func(func(func(move(a3)))))); // Zero genuine copies, and 'a3' is left truncated
+    realm::ConstCopyAndMove b5(func(func(func(func(move(a3)))))); // Zero genuine copies, and 'a3' is left truncated
     static_cast<void>(b1);
     static_cast<void>(b2);
     static_cast<void>(b3);

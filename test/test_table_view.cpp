@@ -6,14 +6,14 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
+#include <realm/table_macros.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
 
 
@@ -49,18 +49,18 @@ using namespace test_util;
 
 namespace {
 
-TIGHTDB_TABLE_1(TestTableInt,
+REALM_TABLE_1(TestTableInt,
                 first, Int)
 
-TIGHTDB_TABLE_2(TestTableInt2,
+REALM_TABLE_2(TestTableInt2,
                 first,  Int,
                 second, Int)
 
-TIGHTDB_TABLE_2(TestTableDate,
+REALM_TABLE_2(TestTableDate,
                 first, DateTime,
                 second, Int)
 
-TIGHTDB_TABLE_2(TestTableFloatDouble,
+REALM_TABLE_2(TestTableFloatDouble,
                 first, Float,
                 second, Double)
 
@@ -135,7 +135,7 @@ TEST(TableView_GetSetInteger)
 
 
 namespace {
-TIGHTDB_TABLE_3(TableFloats,
+REALM_TABLE_3(TableFloats,
                 col_float, Float,
                 col_double, Double,
                 col_int, Int)
@@ -564,7 +564,7 @@ TEST(TableView_FindAll)
 
 namespace {
 
-TIGHTDB_TABLE_1(TestTableString,
+REALM_TABLE_1(TestTableString,
                 first, String)
 
 } // anonymous namespace
@@ -619,7 +619,7 @@ TEST(TableView_StringSort)
     CHECK_EQUAL("ZEBRA", v[3].first);
 
     // Should be exactly the same as above because 0 was default already
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
     v.column().first.sort();
     CHECK_EQUAL("alpha", v[0].first);
     CHECK_EQUAL("ALPHA", v[1].first);
@@ -646,7 +646,7 @@ TEST(TableView_StringSort)
     // Try C++11 method which uses current locale of the operating system to give precise sorting. This C++11 feature
     // is currently (mid 2014) only supported by Visual Studio
     got_called = false;
-    bool available = set_string_compare_method(STRING_COMPARE_CPP11, null_ptr);
+    bool available = set_string_compare_method(STRING_COMPARE_CPP11, nullptr);
     if (available) {
         v.column().first.sort();
         CHECK_EQUAL("alpha", v[0].first);
@@ -658,7 +658,7 @@ TEST(TableView_StringSort)
 #endif
 
     // Set back to default for use by other unit tests
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
 
 TEST(TableView_FloatDoubleSort)
@@ -1047,14 +1047,14 @@ TEST(TableView_LowLevelSubtables)
 
 namespace {
 
-TIGHTDB_TABLE_1(MyTable1,
+REALM_TABLE_1(MyTable1,
                 val, Int)
 
-TIGHTDB_TABLE_2(MyTable2,
+REALM_TABLE_2(MyTable2,
                 val, Int,
                 subtab, Subtable<MyTable1>)
 
-TIGHTDB_TABLE_2(MyTable3,
+REALM_TABLE_2(MyTable3,
                 val, Int,
                 subtab, Subtable<MyTable2>)
 

@@ -1,8 +1,8 @@
 // @@Example: ex_cpp_dyn_query_greaterThanOrEqual @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 int main()

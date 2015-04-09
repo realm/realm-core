@@ -2,7 +2,7 @@
 
 using namespace std;
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 void replace_all(string& str, const string& from, const string& to) {
@@ -25,4 +25,4 @@ bool equal_without_cr(string s1, string s2)
 }
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

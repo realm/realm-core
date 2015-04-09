@@ -9,7 +9,7 @@
 ID         : class_dyn_query
 TITLE      : Query  (dynamic)
 SUMMARY    : &g_dyn_query_intro_summary
-             Query your TightDB table.
+             Query your Realm table.
 DESCR      : &g_dyn_query_intro_descr
              >
              The dynamic query class is used in conjunction with the dynamic table class.

@@ -1,4 +1,4 @@
 *.d
 *.o
 *.example
-*.tightdb
+*.realm

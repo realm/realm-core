@@ -1,15 +1,15 @@
 //
-// TightDB C++ coding standard - by example
+// Realm C++ coding standard - by example
 //
 
 
 // Lines should never exceed 118 characters --------------------------------------------------------------------------
 
 
-// Macro names use uppercase and have "TIGHTDB_" as prefix. Non-macro
+// Macro names use uppercase and have "REALM_" as prefix. Non-macro
 // names never use all uppercase.
 
-#define TIGHTDB_MY_MACRO 1
+#define REALM_MY_MACRO 1
 
 
 // A function name uses lowercase and its parts are separated by

@@ -1,10 +1,23 @@
 check_LIBRARIES = test-util.a
 
-test_util_a_SOURCES = demangle.cpp mem.cpp timer.cpp random.cpp benchmark_results.cpp \
-wildcard.cpp unit_test.cpp test_path.cpp test_only.cpp misc.cpp verified_integer.cpp \
-verified_string.cpp resource_limits.cpp jsmn.cpp 
+test_util_a_SOURCES = \
+demangle.cpp \
+mem.cpp \
+timer.cpp \
+random.cpp \
+benchmark_results.cpp \
+wildcard.cpp \
+unit_test.cpp \
+test_path.cpp \
+test_only.cpp \
+misc.cpp \
+verified_integer.cpp \
+verified_string.cpp \
+resource_limits.cpp \
+jsmn.cpp
 
-test_util_a_LIBS = ../../src/tightdb/libtightdb.a
+
+test_util_a_LIBS = ../../src/realm/librealm.a
 
 ifeq ($(shell uname),Linux)
 
@@ -19,7 +32,7 @@ else
 test_util_a_LDFLAGS += -lproc
 endif
 
-mem_o_CFLAGS = -DTIGHTDB_HAVE_LIBPROCPS
+mem_o_CFLAGS = -DREALM_HAVE_LIBPROCPS
 
 endif
 

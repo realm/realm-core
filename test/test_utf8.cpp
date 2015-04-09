@@ -7,17 +7,17 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/util/assert.hpp>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/utf8.hpp>
-#include <tightdb/unicode.hpp>
+#include <realm/util/assert.hpp>
+#include <memory>
+#include <realm/util/utf8.hpp>
+#include <realm/unicode.hpp>
 
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -76,7 +76,7 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
 
     for (size_t iter = 0; iter < 1000000; iter++) {
         for (size_t t = 0; t < size; t++) {
-            in[t] = random.draw_int<char>();
+            in[t] = random.draw_int<int>();
         }
 
         const char* in2 = in;
@@ -105,7 +105,7 @@ TEST(UTF8_Compare_Core_ASCII) {
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     // simplest test
     CHECK_EQUAL(true, utf8_compare("a", "b"));
@@ -159,7 +159,7 @@ TEST(UTF8_Compare_Core_utf8)
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     // single utf16 code points (tests mostly Windows)
     CHECK_EQUAL(false, utf8_compare(uae, uae));
@@ -200,7 +200,7 @@ TEST(UTF8_Compare_Core_utf8_invalid)
     static_cast<void>(spurious1);
     static_cast<void>(spurious2);
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
     StringData i1 = StringData(invalid1);
     StringData i2 = StringData(invalid2);
 
@@ -215,10 +215,10 @@ TEST(Compare_Core_utf8_invalid_crash)
     // See if we can crash Realm with random data
     char str1[20];
     char str2[20];
-    using namespace tightdb::test_util;
+    using namespace realm::test_util;
     Random r;
 
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     for (size_t t = 0; t < 10000; t++) {
         for (size_t i = 0; i < sizeof(str1); i++) {
@@ -391,13 +391,13 @@ template<class String16> String16 utf8_to_utf16(const string& s)
     size_t utf16_buf_size = Xcode::find_utf16_buf_size(in_begin, in_end);
     if (in_begin != in_end) throw runtime_error("Bad UTF-8");
     in_begin = s.data();
-    UniquePtr<Char16[]> utf16_buf(new Char16[utf16_buf_size]);
+    std::unique_ptr<Char16[]> utf16_buf(new Char16[utf16_buf_size]);
     Char16* out_begin = utf16_buf.get();
     Char16* out_end = out_begin + utf16_buf_size;
     bool valid_utf8 = Xcode::to_utf16(in_begin, in_end, out_begin, out_end);
-    TIGHTDB_ASSERT(valid_utf8);
+    REALM_ASSERT(valid_utf8);
     static_cast<void>(valid_utf8);
-    TIGHTDB_ASSERT(in_begin == in_end);
+    REALM_ASSERT(in_begin == in_end);
     return String16(utf16_buf.get(), out_begin);
 }
 
@@ -411,13 +411,13 @@ template<class String16> string utf16_to_utf8(const String16& s)
     size_t utf8_buf_size = Xcode::find_utf8_buf_size(in_begin, in_end);
     if (in_begin != in_end) throw runtime_error("Bad UTF-16");
     in_begin = s.data();
-    UniquePtr<char[]> utf8_buf(new char[utf8_buf_size]);
+    std::unique_ptr<char[]> utf8_buf(new char[utf8_buf_size]);
     char* out_begin = utf8_buf.get();
     char* out_end = out_begin + utf8_buf_size;
     bool valid_utf16 = Xcode::to_utf8(in_begin, in_end, out_begin, out_end);
-    TIGHTDB_ASSERT(valid_utf16);
+    REALM_ASSERT(valid_utf16);
     static_cast<void>(valid_utf16);
-    TIGHTDB_ASSERT(in_begin == in_end);
+    REALM_ASSERT(in_begin == in_end);
     return string(utf8_buf.get(), out_begin);
 }
 

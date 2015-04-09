@@ -3,16 +3,16 @@
 #include <sstream>
 #include <iostream>
 
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 namespace {
 
-TIGHTDB_TABLE_2(MyTable,
+REALM_TABLE_2(MyTable,
                 number, Int,
                 text, String)
 
@@ -21,7 +21,7 @@ TIGHTDB_TABLE_2(MyTable,
 
 int main(int argc, const char* const argv[])
 {
-    string database_file  = "/tmp/push_data.tdb";
+    string database_file  = "/tmp/push_data.realm";
 
     deque<string> positional_args;
     for (int i=1; i<argc; ++i) {
