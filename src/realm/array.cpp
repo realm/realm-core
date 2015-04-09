@@ -188,7 +188,7 @@ void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
 
     // Capacity is how many items there are room for
     // FIXME: Temporary hack to initialize arrays without an allocator.
-    bool is_read_only = (&m_alloc == nullptr) || m_alloc.is_read_only(mem.m_ref);
+    bool is_read_only = m_alloc.is_read_only(mem.m_ref);
     if (is_read_only) {
         m_capacity = m_size;
     }
