@@ -97,7 +97,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     // Array object instantiation must NOT allocate initial memory (capacity)
     // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call destroy() on array.
-    ArrType arr((Array::no_prealloc_tag()));
+    ArrType arr(column->get_alloc());
     const ArrType* arrp = nullptr;
     size_t leaf_start = 0;
     size_t leaf_end = 0;
