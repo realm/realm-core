@@ -121,6 +121,42 @@ private:
     bool m_engaged = false;
 };
 
+/// An Optional<T&> is functionally equivalent to a pointer (but safer)
+template <class T>
+class Optional<T&> {
+public:
+    using value_type = T&;
+    using target_type = typename std::decay<T>::type;
+
+    Optional() {}
+    Optional(None) : Optional() {}
+    Optional(Optional<T&>&& other) = default;
+    Optional(const Optional<T&>& other) = default;
+    template <class U>
+    Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get()) {}
+
+    Optional(T& value) : m_ptr(&value) {}
+
+    Optional<T&>& operator=(None) { m_ptr = nullptr; return *this; }
+    Optional<T&>& operator=(Optional<T&>&& other) { std::swap(m_ptr, other.m_ptr); return *this; }
+    Optional<T&>& operator=(const Optional<T&>& other) { m_ptr = other.m_ptr; return *this; }
+
+    template <class U>
+    Optional<T&>& operator=(std::reference_wrapper<U> ref) { m_ptr = &ref.get(); return *this; }
+
+    explicit operator bool() const { return m_ptr; }
+    const target_type& value() const; // Throws
+    target_type& value(); // Throws
+    const target_type& operator*() const { return value(); }
+    target_type& operator*() { return value(); }
+    const target_type* operator->() const { return &value(); }
+    target_type* operator->() { return &value(); }
+
+    void swap(Optional<T&> other); // FIXME: Add noexcept() clause
+private:
+    T* m_ptr = nullptr;
+};
+
 template <class T>
 Optional<T>::Optional()
 {
@@ -274,6 +310,24 @@ T& Optional<T>::value()
 }
 
 template <class T>
+const typename Optional<T&>::target_type& Optional<T&>::value() const
+{
+    if (!m_ptr) {
+        throw BadOptionalAccess{"bad optional access"};
+    }
+    return *m_ptr;
+}
+
+template <class T>
+typename Optional<T&>::target_type& Optional<T&>::value()
+{
+    if (!m_ptr) {
+        throw BadOptionalAccess{"bad optional access"};
+    }
+    return *m_ptr;
+}
+
+template <class T>
 const T& Optional<T>::operator*() const
 {
     // Note: This differs from std::optional, which doesn't throw.
@@ -369,6 +423,16 @@ struct FMapResult<void> {
         return Optional<void>::some();
     }
 };
+
+template <class T, class F>
+auto fmap(Optional<T>& opt, F&& func) -> Optional<decltype(func(std::declval<T>()))>
+{
+    using R = decltype(func(std::declval<T>()));
+    if (opt) {
+        return FMapResult<R>::get([&](){ return func(*opt); });
+    }
+    return none;
+}
 
 template <class T, class F>
 auto fmap(Optional<T>&& opt, F&& func) -> Optional<decltype(func(std::declval<T>()))>

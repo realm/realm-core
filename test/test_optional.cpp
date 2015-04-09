@@ -71,10 +71,21 @@ TEST(Optional_DestroyOnAssignNone) {
   CHECK(b);
 }
 
-// TEST(Optional_References) {
-//   int n;
-//   Optional<int&> x { n };
-// }
+TEST(Optional_References) {
+  int n = 0;
+  Optional<int&> x { n };
+  fmap(x, [&](int& y) {
+    y = 123;
+  });
+  CHECK(x);
+  CHECK_EQUAL(x.value(), 123);
+  x = realm::none;
+  CHECK(!x);
+}
+
+TEST(Optional_RvalueReferences) {
+  Optional<const int&> x = 1;
+}
 
 TEST(Optional_fmap) {
   Optional<int> a { 123 };
