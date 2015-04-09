@@ -188,10 +188,12 @@ public:
         Base::m_impl.move_assign(tv.m_impl);
     }
     typedef TableViewBase::Handover_data Handover_data;
-    void prepare_for_export(Handover_data& handover_data) {
-        Base::m_impl.prepare_for_export(handover_data);
+    void prepare_for_export(Handover_data& handover_data, PayloadHandoverMode mode) {
+        // clone and pack only the impl class
+        Base::m_impl.prepare_for_export(handover_data, mode);
     }
     void prepare_for_import(Handover_data& handover_data, Group& group) {
+        // recreate an instance of this wrapper class, using the cloned impl class
         Base::m_impl.prepare_for_import(handover_data, group);
     }
 private:

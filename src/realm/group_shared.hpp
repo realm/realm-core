@@ -26,6 +26,7 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
 #include <realm/group.hpp>
+#include <realm/handover_defs.hpp>
 
 namespace realm {
 
@@ -343,7 +344,8 @@ public:
     /// wrap it into a Handover<T> for the transfer. Wrapping and unwrapping of a handover
     /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
     /// declared below. 'export_for_handover()' returns a Handover object, and 
-    /// 'import_for_handover()' consumes the object.
+    /// 'import_for_handover()' consumes that object, producing a new accessor which
+    /// is ready for use in the context of the importing SharedGroup.
     ///
     /// FIXME: description given below is not implemented correctly yet:
     /// (a: current implementation does not copy TableView objects, and
@@ -352,26 +354,38 @@ public:
     ///
     /// The Handover always creates a new accessor object at the importing side.
     /// For TableViews, there are 3 forms of handover.
+    ///
     /// - with payload move: the payload is handed over and ends up as a payload
     ///   held by the accessor at the importing side. The accessor on the exporting
     ///   side will rerun its query and generate a new payload, if sync_if_needed() is
     ///   called.
+    ///
     /// - with payload copy: a copy of the payload is handed over, so both the accessors
     ///   on the exporting side *and* the accessors created at the importing side has 
     ///   their own payload.
+    ///
     /// - without payload: the payload stays with the accessor on the exporting
     ///   side. On the importing side, the new accessor is created without payload.
     ///   a call to sync_if_needed() will trigger generation of a new payload.
+    ///
+    /// For all other (non-TableView) accessors, handover is done with payload copy,
+    /// since the payload is trival.
+    ///
     /// Handover *without* payload is useful when you want to ship a query for execution
     /// in a background thread. Handover with *payload move* is useful when you want to transfer
     /// the result back.
+    ///
     /// Handover *without* payload or with payload copy is guaranteed *not* to change 
     /// the accessors on the exporting side and is thread safe - it is interlocked with 
     /// advance_read(), promote_to_write etc - but it is not interlocked with deletion of 
     /// the accessors: The caller must ensure that the accessors relevant for the export 
-    /// operation stays valid for the duration of the export.
+    /// operation stays valid for the duration of the export. Usually, this is trivially
+    /// ensured because the reference to the accessor will keep it alive.
+    ///
     /// Handover with payload *move* is *not* thread safe and should be carried out 
     /// by the thread that "owns" the involved accessors.
+    ///
+    /// Handover is transitive:
     /// If the object being handed over depends on other views (table- or link- ), those
     /// objects will be handed over as well. The mode of handover (payload copy, payload
     /// move, without payload) is applied recursively.
@@ -380,22 +394,26 @@ public:
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
-        T* m_payload;
+
+        // a copy of the accessor might be created during the export operation when convenient
+        // For some accessor types it is easier to ask the recieving context to create a copy.
+        // For others it is easier to create a copy during export and then attach it properly
+        // in the recieving context during import.
+        // The following accessor types are copied during export and attached during import:
+        // - TableView, Query
+        // The following accessor types just have their data copied, and a matching accessor is created
+        // using facilities on the importing side
+        // - LinkView, Row
         typename T::Handover_data m_handover_data;
         VersionID m_version;
-        Handover(T* payload, typename T::Handover_data handover_data, VersionID version) 
-            : m_payload(payload), m_handover_data(handover_data), m_version(version) 
-        {
-        }
     };
-    enum Handover_mode { payload_move, payload_copy, payload_stay };
     template<typename T>
-    Handover<T>* export_for_handover(T& accessor, Handover_mode mode)
+    Handover<T>* export_for_handover(T& accessor, PayloadHandoverMode mode)
     {
         // TODO: lock
-        typename T::Handover_data handover_data;
-        accessor.prepare_for_export(handover_data, mode);
-        Handover<T>* result = new Handover<T>(&accessor, handover_data, get_version_of_current_transaction());
+        Handover<T>* result = new Handover<T>();
+        accessor.handover_export(result->m_handover_data, mode);
+        result->version = get_version_of_current_transaction();
         // TODO: unlock
         return result;
     }
@@ -403,18 +421,20 @@ public:
     /// Import an accessor wrapped in a handover object. The import will fail if the
     /// importing SharedGroup is viewing a version of the database that is different
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
-    /// The handover object is "consumed", it cannot be handed over again.
+    /// The handover object is "consumed", it cannot be imported again.
+    // FIXME: make sure to properly destroy stuff if import fails
     template<typename T>
-    void import_from_handover(Handover<T>* handover)
+    T* import_from_handover(Handover<T>* handover)
     {
         if (handover->m_version != get_version_of_current_transaction()) {
             throw std::runtime_error("Handover failed due to version mismatch");
         }
         // move data
-        handover->m_payload->prepare_for_import(handover->m_handover_data, m_group);
+        T* result = T::handover_import(handover->m_handover_data, m_group);
         delete handover;
+        return result;
     }
-    // we need to special case for LinkViews, because they are not really handed over,
+    // we need to special case for LinkViews, because they are ref counted
     // instead a new instance is created at the recieving side
     Handover<LinkView>* export_for_handover(LinkViewRef& accessor);
     LinkViewRef import_from_handover(Handover<LinkView>* handover);

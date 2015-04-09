@@ -30,7 +30,7 @@
 using namespace std;
 using namespace realm;
 
-LinkViewRef LinkView::prepare_for_import(Handover_data& handover_data, Group& group) {
+LinkViewRef LinkView::handover_import(Handover_data& handover_data, Group& group) {
     TableRef tr(group.get_table(handover_data.m_table_num));
     return tr->get_linklist(handover_data.m_col_num, handover_data.m_row_ndx);
 }

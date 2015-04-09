@@ -397,9 +397,9 @@ protected:
     Query(const BasicTable<Spec>& table, TableViewBase* tv):
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
     typedef realm::Query::Handover_data Handover_data;
-    void prepare_for_export(Handover_data& handover_data)
+    void prepare_for_export(Handover_data& handover_data, PayloadHandoverMode mode)
     {
-        m_impl.prepare_for_export(handover_data);
+        m_impl.prepare_for_export(handover_data, mode);
     }
     void prepare_for_import(Handover_data& handover_data, Group& group)
     {

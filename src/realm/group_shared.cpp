@@ -1666,9 +1666,12 @@ void SharedGroup::reserve(size_t size)
 
 SharedGroup::Handover<LinkView>* SharedGroup::export_for_handover(LinkViewRef& accessor)
 {
-    LinkView::Handover_data handover_data;
-    accessor->prepare_for_export(handover_data);
-    return new Handover<LinkView>(0, handover_data, get_version_of_current_transaction());
+    // TODO: lock
+    Handover<LinkView>* result = new Handover<LinkView>();
+    accessor->handover_export(result->m_handover_data);
+    result->m_version = get_version_of_current_transaction();
+    // TODO: unlock
+    return result;
 }
 
 
@@ -1678,7 +1681,7 @@ LinkViewRef SharedGroup::import_from_handover(Handover<LinkView>* handover)
         throw std::runtime_error("Handover failed due to version mismatch");
     }
     // move data
-    LinkViewRef result = LinkView::prepare_for_import(handover->m_handover_data, m_group);
+    LinkViewRef result = LinkView::handover_import(handover->m_handover_data, m_group);
     delete handover;
     return result;
 }

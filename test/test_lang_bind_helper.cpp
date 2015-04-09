@@ -6960,7 +6960,6 @@ TEST(LangBindHelper_HandoverQuery)
     {
         // Typed interface
         std::unique_ptr<SharedGroup::Handover<TestTableInts::Query> > handover;
-        std::unique_ptr<TestTableInts::Query> q; // <-- must be visible in both exporting and importing scope
         {
             LangBindHelper::promote_to_write(sg_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
@@ -6971,14 +6970,14 @@ TEST(LangBindHelper_HandoverQuery)
                 CHECK_EQUAL(i, table[i].first);
             LangBindHelper::commit_and_continue_as_read(sg_w);
             vid = sg_w.get_version_of_current_transaction();
-            q.reset( new TestTableInts::Query(table->where()) );
-            handover.reset(sg_w.export_for_handover(*q));
+            TestTableInts::Query query(table->where());
+            handover.reset(sg_w.export_for_handover(query, PayloadHandoverMode::Copy));
         }
         {
             LangBindHelper::advance_read(sg,vid);
             sg_w.close();
-            // importing tv - note that tv must still be in scope
-            sg.import_from_handover(handover.release());
+            // importing query
+            std::unique_ptr<TestTableInts::Query> q(sg.import_from_handover(handover.release()));
             TestTableInts::View tv = q->find_all();
             CHECK(tv.is_attached());
             CHECK_EQUAL(100, tv.size());
@@ -7004,8 +7003,8 @@ TEST(LangBindHelper_HandoverAccessors)
     {
         // Typed interface
         std::unique_ptr<SharedGroup::Handover<TestTableInts::View> > handover;
-        TestTableInts::View tv; // <-- must be visible in both exporting and importing scope
         {
+            TestTableInts::View tv;
             LangBindHelper::promote_to_write(sg_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
             for (int i = 0; i <100; ++i)
@@ -7020,19 +7019,19 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv[i].first);
-            handover.reset(sg_w.export_for_handover(tv));
+            handover.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
             CHECK(!tv.is_attached());
         }
         {
             LangBindHelper::advance_read(sg,vid);
             //sg_w.end_read();
             sg_w.close();
-            // importing tv - note that tv must still be in scope
-            sg.import_from_handover(handover.release());
-            CHECK(tv.is_attached());
-            CHECK_EQUAL(100, tv.size());
+            // importing tv
+            std::unique_ptr<TestTableInts::View> tv( sg.import_from_handover(handover.release()) );
+            CHECK(tv->is_attached());
+            CHECK_EQUAL(100, tv->size());
             for (int i = 0; i<100; ++i)
-                CHECK_EQUAL(i, tv[i].first);
+                CHECK_EQUAL(i, (*tv)[i].first);
         }
     }
 
@@ -7040,9 +7039,9 @@ TEST(LangBindHelper_HandoverAccessors)
         // Untyped interface
         std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
         std::unique_ptr<SharedGroup::Handover<Row> > handover_row;
-        TableView tv;
-        Row row;
         {
+            TableView tv;
+            Row row;
             sg_w.open(*repl_w, SharedGroup::durability_Full, crypt_key());
             sg_w.begin_read();
             LangBindHelper::promote_to_write(sg_w);
@@ -7059,28 +7058,28 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv.get_int(0,i));
-            handover2.reset(sg_w.export_for_handover(tv));
+            handover2.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
             CHECK(!tv.is_attached());
             // Aaaaand rows!
             row = (*table)[7];
             CHECK_EQUAL(7, row.get_int(0));
-            handover_row.reset(sg_w.export_for_handover(row));
+            handover_row.reset(sg_w.export_for_handover(row, PayloadHandoverMode::Copy));
             CHECK(!row.is_attached());
         }
         {
             LangBindHelper::advance_read(sg,vid);
             sg_w.close();
             // importing tv:
-            sg.import_from_handover(handover2.release());
-            CHECK(tv.is_in_sync());
-            CHECK(tv.is_attached());
-            CHECK_EQUAL(100, tv.size());
+            std::unique_ptr<TableView> tv( sg.import_from_handover(handover2.release()) );
+            CHECK(tv->is_in_sync());
+            CHECK(tv->is_attached());
+            CHECK_EQUAL(100, tv->size());
             for (int i = 0; i<100; ++i)
-                CHECK_EQUAL(i, tv.get_int(0,i));
+                CHECK_EQUAL(i, tv->get_int(0,i));
             // importing row:
-            sg.import_from_handover(handover_row.release());
-            CHECK(row.is_attached());
-            CHECK_EQUAL(7, row.get_int(0));
+            std::unique_ptr<Row> row( sg.import_from_handover(handover_row.release()) );
+            CHECK(row->is_attached());
+            CHECK_EQUAL(7, row->get_int(0));
         }
     }
 
@@ -7102,9 +7101,9 @@ TEST(LangBindHelper_HandoverDependentViews)
         // Untyped interface
         std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
         std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
-        TableView tv1;
-        TableView tv2;
         {
+            TableView tv1;
+            TableView tv2;
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
@@ -7124,7 +7123,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv2.get_int(0,i));
-            handover2.reset(sg_w.export_for_handover(tv2));
+            handover2.reset(sg_w.export_for_handover(tv2, PayloadHandoverMode::Copy));
             CHECK(!tv1.is_attached());
             CHECK(!tv2.is_attached());
         }
@@ -7132,14 +7131,14 @@ TEST(LangBindHelper_HandoverDependentViews)
             LangBindHelper::advance_read(sg,vid);
             sg_w.close();
             // importing tv:
-            sg.import_from_handover(handover2.release());
-            CHECK(tv1.is_in_sync());
-            CHECK(tv2.is_in_sync());
-            CHECK(tv1.is_attached());
-            CHECK(tv2.is_attached());
-            CHECK_EQUAL(100, tv2.size());
+            std::unique_ptr<TableView> tv2(sg.import_from_handover(handover2.release()) );
+            // CHECK(tv1.is_in_sync()); -- not possible, tv1 is now owned by tv2 and not reachable
+            CHECK(tv2->is_in_sync());
+            // CHECK(tv1.is_attached());
+            CHECK(tv2->is_attached());
+            CHECK_EQUAL(100, tv2->size());
             for (int i = 0; i<100; ++i)
-                CHECK_EQUAL(i, tv2.get_int(0,i));
+                CHECK_EQUAL(i, tv2->get_int(0,i));
         }
     }
 }
@@ -7155,11 +7154,10 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
     std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    TableView tv;
     std::unique_ptr<SharedGroup::Handover<TableView> > handover;
     SharedGroup::VersionID vid;
     {
-
+        TableView tv;
         LangBindHelper::promote_to_write(sg_w);
 
         TableRef table1 = group_w.add_table("table1");
@@ -7207,16 +7205,16 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         // TableView tv2 = lvr->get_sorted_view(0);
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
-        handover.reset(sg_w.export_for_handover(tv));
+        handover.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
     }
     {
         LangBindHelper::advance_read(sg, vid);
         sg_w.close();
-        sg.import_from_handover(handover.release()); // <-- import tv
+        std::unique_ptr<TableView> tv( sg.import_from_handover(handover.release()) ); // <-- import tv
 
-        CHECK_EQUAL(2, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
-        CHECK_EQUAL(2, tv.get_source_ndx(1));
+        CHECK_EQUAL(2, tv->size());
+        CHECK_EQUAL(0, tv->get_source_ndx(0));
+        CHECK_EQUAL(2, tv->get_source_ndx(1));
     }
 }
 TEST(LangBindHelper_HandoverLinkView)
@@ -7341,7 +7339,7 @@ TEST(LangBindHelper_HandoverFailOfReverseDependency)
             bool handover_failed = false;
             try {
 */
-                handover2.reset(sg_w.export_for_handover(tv1));
+            handover2.reset(sg_w.export_for_handover(tv1, PayloadHandoverMode::Copy));
 /*
   FIXME
             } 

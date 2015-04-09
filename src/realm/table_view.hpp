@@ -70,6 +70,9 @@ using std::size_t;
 // - It does not matter whether the delete is done in-line (as part of the current transaction),
 //   or if it is done implicitly as part of advance_read() or promote_to_write().
 //
+// FIXME: The choice between reflective and imperative views should be represented by a
+// switch on the tableview, but isn't yet. For now, clients (bindings) must call sync_if_needed()
+// to get reflective behavior.
 //
 // Use cases:
 //
@@ -157,7 +160,9 @@ using std::size_t;
 // employee could recieve a (different, larger) raise which would then be overwritten and lost.
 // However, these are problems that you should expect, since the activity is spread over multiple
 // transactions.
-
+//
+// 5. Cross-thread stealing
+// TBD - or see description in group_shared.hpp
 
 
 /// Common base class for TableView and ConstTableView.
@@ -336,6 +341,9 @@ protected:
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
 
+    /// Copy constructor with configurable handling of data payload
+    TableViewBase(TableViewBase&, PayloadHandoverMode mode);
+
     /// Moving constructor.
     TableViewBase(TableViewBase*) REALM_NOEXCEPT;
 
@@ -348,42 +356,61 @@ protected:
     template<class R, class V> static R find_all_double(V*, std::size_t, double);
     template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
-    struct Handover_data {
+    struct Base_Handover_data {
         std::size_t table_num;
         Query::Handover_data query_handover_data;
         LinkView::Handover_data* linkview_handover_data;
     };
-
-    void prepare_for_export(Handover_data& handover_data)
+    void internal_handover_export(Base_Handover_data& handover_data, PayloadHandoverMode mode)
     {
+        REALM_ASSERT(mode != PayloadHandoverMode::Copy);
         handover_data.table_num = m_table->get_index_in_group();
-        if (handover_data.table_num == npos) {
-            throw std::runtime_error("Handover failed: not a group level table");
-        }
-        m_query.prepare_for_export(handover_data.query_handover_data);
         // must be group level table!
+        if (handover_data.table_num == npos) {
+            throw std::runtime_error("TableView handover failed: not a group level table");
+        }
+        m_query.handover_export(handover_data.query_handover_data, mode, true);
         if (m_linkview_source) {
             handover_data.linkview_handover_data = new LinkView::Handover_data;
-            m_linkview_source->prepare_for_export(*handover_data.linkview_handover_data);
+            m_linkview_source->handover_export(*handover_data.linkview_handover_data);
         }
         else
             handover_data.linkview_handover_data = 0;
-        detach();
     }
-    void prepare_for_import(Handover_data& handover_data, Group& group)
+
+    void internal_handover_import(Base_Handover_data& handover_data, Group& group)
     {
         TableRef tr = group.get_table(handover_data.table_num);
         m_table = tr;
         m_last_seen_version = tr->m_version;
         tr->register_view(this);
         // update query !!!
-        m_query.prepare_for_import(handover_data.query_handover_data, group);
+        m_query.handover_import(handover_data.query_handover_data, group);
         if (handover_data.linkview_handover_data) {
-            m_linkview_source = LinkView::prepare_for_import(*handover_data.linkview_handover_data, group);
+            m_linkview_source = LinkView::handover_import(*handover_data.linkview_handover_data, group);
             handover_data.linkview_handover_data = 0;
         }
         else
             m_linkview_source.reset(0);
+    }
+
+    struct Handover_data {
+        TableViewBase* clone;
+        Base_Handover_data base_data;
+    };
+
+    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
+    {
+        handover_data.clone = new TableViewBase(*this, mode);
+        internal_handover_export(handover_data.base_data, mode);
+    }
+    
+    static TableViewBase* handover_import(Handover_data& handover_data, Group& group)
+    {
+        TableViewBase* result = handover_data.clone;
+        result->internal_handover_import(handover_data.base_data, group);
+        handover_data.clone = 0;
+        return result;
     }
 private:
     void detach() const REALM_NOEXCEPT; // may have to remove const
@@ -580,12 +607,6 @@ private:
     friend class Table;
     friend class Query;
     friend class TableViewBase;
-};
-
-class HandoverTableView {
-public:
-    TableView import_from_handover(SharedGroup&);
-    ConstTableView const_import_from_handover(SharedGroup&);
 };
 
 

@@ -142,7 +142,7 @@ void Query::delete_nodes() REALM_NOEXCEPT
 }
 
 
-void Query::prepare_for_export(Handover_data& handover_data)
+void Query::prepare_for_export(Handover_data& handover_data, PayloadHandoverMode mode)
 {
     handover_data.m_has_table = bool(m_table);
     if (bool(m_table)) {
@@ -153,7 +153,7 @@ void Query::prepare_for_export(Handover_data& handover_data)
     if (m_source_table_view) {
         TableViewBase::Handover_data* tvb_handover = new TableViewBase::Handover_data;
         handover_data.table_view_data = tvb_handover;
-        m_source_table_view->prepare_for_export(*tvb_handover);
+        m_source_table_view->prepare_for_export(*tvb_handover, mode);
     }
     else
         handover_data.table_view_data = 0;

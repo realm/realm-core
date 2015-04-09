@@ -26,6 +26,7 @@
 #include <realm/mixed.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
+#include <realm/handover_defs.hpp>
 
 namespace realm {
 
@@ -220,14 +221,15 @@ protected:
 
     struct Handover_data {
         std::size_t table_num;
+        std::size_t row_ndx;
     };
-    void prepare_for_export(Handover_data& handover_data);
-    void prepare_for_import(Handover_data& handover_data, Group& group);
     void move_assign(RowBase& src_row)
     {
         reattach(src_row.m_table.get(), src_row.m_row_ndx);
         src_row.impl_detach();
     }
+protected:
+    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode);
 private:
     RowBase* m_prev; // Null if first, undefined if detached.
     RowBase* m_next; // Null if last, undefined if detached.
@@ -292,13 +294,18 @@ private:
     // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.
     template<class> friend class BasicRow;
-    void prepare_for_export(Handover_data& handover_data)
+    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
     {
-        RowBase::prepare_for_export(handover_data);
+        RowBase::handover_export(handover_data, mode);
     }
-    void prepare_for_import(Handover_data& handover_data, Group& group)
+    static BasicRow<T>* handover_import(Handover_data& handover_data, Group& group)
     {
-        RowBase::prepare_for_import(handover_data, group);
+        // FIXME: this will not work / Group is undefined
+        /*
+        TableRef table = group.get_table(handover_data.table_ndx);
+        return TableRef->get(handover_data.row_ndx);
+        */
+        return 0;
     }
     void move_assign(BasicRow<T>& row)
     {

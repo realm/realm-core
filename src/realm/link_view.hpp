@@ -109,12 +109,12 @@ private:
         std::size_t m_col_num;
         std::size_t m_row_ndx;
     };
-    void prepare_for_export(Handover_data& handover_data) const {
+    void handover_export(Handover_data& handover_data) const {
         handover_data.m_table_num = m_origin_table->get_index_in_group();
         handover_data.m_col_num = m_origin_column.m_column_ndx;
         handover_data.m_row_ndx = get_origin_row_index();
     }
-    static LinkViewRef prepare_for_import(Handover_data& handover_data, Group& group);
+    static LinkViewRef handover_import(Handover_data& handover_data, Group& group);
 
     // constructor (protected since it can only be used by friends)
     LinkView(Table* origin_table, ColumnLinkList&, std::size_t row_ndx);

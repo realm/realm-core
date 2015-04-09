@@ -39,6 +39,7 @@
 #include <realm/table_ref.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/datetime.hpp>
+#include <realm/handover_defs.hpp>
 
 namespace realm {
 
@@ -276,10 +277,12 @@ public:
     // view is a link view, m_source_link_view is non-zero. If it is a table view,
     // m_source_table_view is non-zero.
     RowIndexes* m_view;
+
     std::vector<bool> pending_not;
     struct Handover_data {
         std::size_t m_table_num;
         bool m_has_table;
+        Query* m_query;
         // we're navigating around circular include dependencies by using a
         // void* below - it should be a TableView::Handover_data, but we cant
         // forward declare a nested class...
@@ -287,8 +290,11 @@ public:
         // Similar for LinkView::Handover_data:
         void* link_view_data;
     };
-    void prepare_for_import(Handover_data& handover_data, Group& group);
-    void prepare_for_export(Handover_data& handover_data);
+    // if is_embedded is true, the query is assumed to be inside an already cloned tableview,
+    // so we should not clone it. If so, the import will return a pointer to the already
+    // embedded query object.
+    static Query* handover_import(Handover_data& handover_data, Group& group);
+    void handover_export(Handover_data& handover_data, PayloadHandoverMode, bool is_embedded = false);
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);

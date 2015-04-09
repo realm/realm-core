@@ -55,17 +55,11 @@ void RowBase::impl_detach() REALM_NOEXCEPT
     }
 }
 
-
-void RowBase::prepare_for_export(Handover_data& handover_data)
+void RowBase::handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
 {
+    static_cast<void>(mode);
     handover_data.table_num = m_table->get_index_in_group();
-    impl_detach();
+    handover_data.row_ndx = m_row_ndx;
 }
 
-
-void RowBase::prepare_for_import(Handover_data& handover_data, Group& group)
-{
-    TableRef table = group.get_table(handover_data.table_num);
-    reattach(table.get(), m_row_ndx);
-}
 
