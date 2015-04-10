@@ -677,7 +677,7 @@ TEST(StringIndex_FuzzyTest_Int)
     ref_type ref = Column::create(Allocator::get_default());
     Column col(Allocator::get_default(), ref);
     Random random(random_int<unsigned long>());
-    const size_t n = 1.2 * REALM_MAX_BPNODE_SIZE;
+    const size_t n = static_cast<size_t>(1.2 * REALM_MAX_BPNODE_SIZE);
 
     col.create_search_index();
 

@@ -81,7 +81,7 @@ sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, std::size_t offs
 {
     uint64_t magic = 0;
     for (unsigned int i=0; i<path.length(); ++i)
-        magic ^= (i+1) * 0x794e80091e8f2bc7ULL * (unsigned int)(path[i]);
+        magic ^= (i+1) * 0x794e80091e8f2bc7ULL * static_cast<unsigned int>(path[i]);
     std::string name = internal_naming_prefix;
     magic *= (offset+1);
     name += 'A'+(magic % 23);
@@ -104,7 +104,7 @@ void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
     shared_part.waiters = 0;
     shared_part.signal_counter = 0;
 #else
-    new ((void*) &shared_part) CondVar(CondVar::process_shared_tag());
+    new (&shared_part) CondVar(CondVar::process_shared_tag());
 #endif // REALM_CONDVAR_EMULATION
 }
 
