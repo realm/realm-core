@@ -73,7 +73,7 @@ enum Instruction {
     instr_ClearTable            = 30, // Remove all rows in selected table
     instr_OptimizeTable         = 31,
     instr_SelectDescriptor      = 32, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 33, // Insert new non-nullable column into to selected descriptor (nullable is #49)
+    instr_InsertColumn          = 33, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
     instr_InsertLinkColumn      = 34, // do, but for a link-type column
     instr_EraseColumn           = 35, // Remove column from selected descriptor
     instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
