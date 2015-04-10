@@ -239,7 +239,7 @@ TEST(Upgrade_Database_2_3)
 
 // Same as above test, just with different string lengths to get better coverage of the different String array types
 // that all have been modified by null support
-TEST(Upgrade_Database_2_Backwards_Compatible)
+ONLY(Upgrade_Database_2_Backwards_Compatible)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
@@ -258,19 +258,44 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     CHECK_EQUAL(g.get_file_format(), 2);
 #endif
 
+    size_t f;
+
     for (int i = 0; i < 9; i++) {
-        size_t f = t->find_first_string(0, std::string(""));
+        f = t->find_first_string(0, std::string(""));
+        CHECK_EQUAL(f, 0);
+        f = (t->column<String>(0) == "").find();
         CHECK_EQUAL(f, 0);
 
         f = t->find_first_string(1, std::string(5, char(i + 'a')));
         CHECK_EQUAL(f, i);
+        f = (t->column<String>(1) == std::string(5, char(i + 'a'))).find();
+        CHECK_EQUAL(f, i);
 
         f = t->find_first_string(2, std::string(40, char(i + 'a')));
+        CHECK_EQUAL(f, i);
+        f = (t->column<String>(2) == std::string(40, char(i + 'a'))).find();
         CHECK_EQUAL(f, i);
 
         f = t->find_first_string(3, std::string(200, char(i + 'a')));
         CHECK_EQUAL(f, i);
+        f = (t->column<String>(3) == std::string(200, char(i + 'a'))).find();
+        CHECK_EQUAL(f, i);
     }
+
+    f = t->find_first_string(4, "");
+    CHECK_EQUAL(f, 0);
+    f = (t->column<String>(4) == "").find();
+    CHECK_EQUAL(f, 0);
+
+    f = t->find_first_string(5, "");
+    CHECK_EQUAL(f, 0);
+    f = (t->column<String>(5) == "").find();
+    CHECK_EQUAL(f, 0);
+
+    f = t->find_first_string(6, "");
+    CHECK_EQUAL(f, 0);
+    f = (t->column<String>(6) == "").find();
+    CHECK_EQUAL(f, 0);
 
 #else
     // Create database file
