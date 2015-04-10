@@ -24,7 +24,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Merged lr_nulls into master, but keeping all the functionality (support for null in String column
+  and bugfix in String index with 0 bytes) disabled until we define REALM_NULL_STRINGS.
 
 ----------------------------------------------
 
