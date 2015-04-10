@@ -8,6 +8,8 @@
   affect the data written to the compacted database, but later commits working on the outdated
   freelist might have. The fix forces proper (re)initialization of the free list.
 * Fixed incorrect results in querying on an indexed string column via a LinkView.
+* Fixed corruption of indexes when using move_last_over() on rows with
+  duplicated values for indexed properties.
 
 ### API breaking changes:
 
