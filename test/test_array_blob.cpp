@@ -223,7 +223,7 @@ TEST(ArrayBlob_Null)
         vector<string> v;
 
         for (size_t i = 0; i < 2000; i++) {
-            unsigned char rnd = random.draw_int<int>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = random.draw_int<unsigned char>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
