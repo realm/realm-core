@@ -1876,7 +1876,7 @@ typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::si
     TableRef target_table = get_link_target(column_ndx);
 
     Table* table = &*target_table;
-    T* typed_table = (T*)(table);
+    T* typed_table = reinterpret_cast<T*>(table);
     return (*typed_table)[row_pos_in_target];
 }
 
