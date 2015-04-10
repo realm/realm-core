@@ -59,6 +59,9 @@ TEST(Upgrade_Database_2_3)
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
 
+    // If REALM_NULL_STRINGS is NOT defined, then this Realm core still operates in format 2 (null not supported) and
+    // this unit test will not upgrade the file. The REALM_NULL_STRINGS flag was introduced to be able to merge
+    // null branch into master but without activating version 3 yet.
 #if 1
     // Automatic upgrade from Group
     {
@@ -75,6 +78,8 @@ TEST(Upgrade_Database_2_3)
 
 #ifdef REALM_NULL_STRINGS
         CHECK_EQUAL(g.get_file_format(), 3);
+#else
+        CHECK_EQUAL(g.get_file_format(), 2);
 #endif
 
         CHECK(t->has_search_index(0));
@@ -232,4 +237,62 @@ TEST(Upgrade_Database_2_3)
 }
 
 
-#endif // TEST_GROUP
+// Same as above test, just with different string lengths to get better coverage of the different String array types
+// that all have been modified by null support
+TEST(Upgrade_Database_2_Backwards_Compatible)
+{
+    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
+    // version 2 database file. Then copy it into the /test directory of this current Realm core.
+
+#if 1
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    File::copy(path, path + ".tmp");
+    Group g(path + ".tmp", 0, Group::mode_ReadOnly);
+
+    TableRef t = g.get_table("table");
+
+#ifdef REALM_NULL_STRINGS
+    CHECK_EQUAL(g.get_file_format(), 3);
+#else
+    CHECK_EQUAL(g.get_file_format(), 2);
+#endif
+
+    for (int i = 0; i < 9; i++) {
+        size_t f = t->find_first_string(0, std::string(""));
+        CHECK_EQUAL(f, 0);
+
+        f = t->find_first_string(1, std::string(5, char(i + 'a')));
+        CHECK_EQUAL(f, i);
+
+        f = t->find_first_string(2, std::string(40, char(i + 'a')));
+        CHECK_EQUAL(f, i);
+
+        f = t->find_first_string(3, std::string(200, char(i + 'a')));
+        CHECK_EQUAL(f, i);
+    }
+
+#else
+    // Create database file
+    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    File::try_remove(path);
+
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_String, "empty");
+    t->add_column(type_String, "short");
+    t->add_column(type_String, "medium");
+    t->add_column(type_String, "long");
+
+    for (size_t i = 0; i < 1000; i++) {
+        t->add_empty_row();
+        t->set_string(0, i, std::string(""));
+        t->set_string(1, i, std::string(5, char(i + 'a')));
+        t->set_string(2, i, std::string(40, char(i + 'a')));
+        t->set_string(0, i, std::string(200, char(i + 'a')));
+    }
+    g.write(path);
+#endif
+}
+
+#endif 
