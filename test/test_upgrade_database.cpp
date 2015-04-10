@@ -313,24 +313,49 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
         }
     }
 #else
-    // Create database file
-    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    // Create database file (run this from old core)
+    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
     File::try_remove(path);
 
     Group g;
-    TableRef t = g.add_table("table");
-    t->add_column(type_String, "empty");
-    t->add_column(type_String, "short");
-    t->add_column(type_String, "medium");
-    t->add_column(type_String, "long");
+    TableRef t[2];
+    t[0] = g.add_table("table");
+    t[1] = g.add_table("table_indexed");
 
-    for (size_t i = 0; i < 1000; i++) {
-        t->add_empty_row();
-        t->set_string(0, i, std::string(""));
-        t->set_string(1, i, std::string(5, char(i + 'a')));
-        t->set_string(2, i, std::string(40, char(i + 'a')));
-        t->set_string(0, i, std::string(200, char(i + 'a')));
+    for (int tbl = 0; tbl < 2; tbl++) {
+        t[tbl]->add_column(type_String, "empty");
+        t[tbl]->add_column(type_String, "short");
+        t[tbl]->add_column(type_String, "medium");
+        t[tbl]->add_column(type_String, "long");
+
+        t[tbl]->add_column(type_String, "short_empty_string");
+        t[tbl]->add_column(type_String, "medium_empty_string");
+        t[tbl]->add_column(type_String, "long_empty_string");
+
+        for (size_t i = 0; i < 9; i++) {
+            t[tbl]->add_empty_row();
+            t[tbl]->set_string(0, i, std::string(""));
+            t[tbl]->set_string(1, i, std::string(5, char(i + 'a')));
+            t[tbl]->set_string(2, i, std::string(40, char(i + 'a')));
+            t[tbl]->set_string(3, i, std::string(200, char(i + 'a')));
+        }
+
+        t[tbl]->set_string(4, 0, std::string(5, 'a'));
+        t[tbl]->set_string(5, 0, std::string(40, 'a'));
+        t[tbl]->set_string(6, 0, std::string(200, 'a'));
+        t[tbl]->set_string(4, 0, std::string(""));
+        t[tbl]->set_string(5, 0, std::string(""));
+        t[tbl]->set_string(6, 0, std::string(""));
     }
+
+    t[1]->add_search_index(0);
+    t[1]->add_search_index(1);
+    t[1]->add_search_index(2);
+    t[1]->add_search_index(3);
+    t[1]->add_search_index(4);
+    t[1]->add_search_index(5);
+    t[1]->add_search_index(6);
+
     g.write(path);
 #endif
 }
