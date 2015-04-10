@@ -250,63 +250,67 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     File::copy(path, path + ".tmp");
     Group g(path + ".tmp", 0, Group::mode_ReadOnly);
 
-    TableRef t = g.get_table("table");
+    // First table is non-indexed for all columns, second is indexed for all columns
+    for (size_t tbl = 0; tbl < 2; tbl++) {
+        TableRef t = g.get_table(tbl);
 
 #ifdef REALM_NULL_STRINGS
-    CHECK_EQUAL(g.get_file_format(), 3);
+        CHECK_EQUAL(g.get_file_format(), 3);
 #else
-    CHECK_EQUAL(g.get_file_format(), 2);
+        CHECK_EQUAL(g.get_file_format(), 2);
 #endif
 
-    size_t f;
+        size_t f;
 
-    for (int mode = 0; mode < 2; mode++) {
-        if (mode == 1) {
-            t->add_search_index(0);
-            t->add_search_index(1);
-            t->add_search_index(2);
-            t->add_search_index(3);
-            t->add_search_index(4);
-            t->add_search_index(5);
-            t->add_search_index(6);
-        }
+        for (int mode = 0; mode < 2; mode++) {
+            if (mode == 1) {
+                // Add search index (no-op for second table in this group because it already has indexes on all cols)
+                t->add_search_index(0);
+                t->add_search_index(1);
+                t->add_search_index(2);
+                t->add_search_index(3);
+                t->add_search_index(4);
+                t->add_search_index(5);
+                t->add_search_index(6);
+            }
 
-        for (int i = 0; i < 9; i++) {
-            f = t->find_first_string(0, std::string(""));
+            for (int i = 0; i < 9; i++) {
+                f = t->find_first_string(0, std::string(""));
+                CHECK_EQUAL(f, 0);
+                f = (t->column<String>(0) == "").find();
+                CHECK_EQUAL(f, 0);
+
+                f = t->find_first_string(1, std::string(5, char(i + 'a')));
+                CHECK_EQUAL(f, i);
+                f = (t->column<String>(1) == std::string(5, char(i + 'a'))).find();
+                CHECK_EQUAL(f, i);
+
+                f = t->find_first_string(2, std::string(40, char(i + 'a')));
+                CHECK_EQUAL(f, i);
+                f = (t->column<String>(2) == std::string(40, char(i + 'a'))).find();
+                CHECK_EQUAL(f, i);
+
+                f = t->find_first_string(3, std::string(200, char(i + 'a')));
+                CHECK_EQUAL(f, i);
+                f = (t->column<String>(3) == std::string(200, char(i + 'a'))).find();
+                CHECK_EQUAL(f, i);
+            }
+
+            f = t->find_first_string(4, "");
             CHECK_EQUAL(f, 0);
-            f = (t->column<String>(0) == "").find();
+            f = (t->column<String>(4) == "").find();
             CHECK_EQUAL(f, 0);
 
-            f = t->find_first_string(1, std::string(5, char(i + 'a')));
-            CHECK_EQUAL(f, i);
-            f = (t->column<String>(1) == std::string(5, char(i + 'a'))).find();
-            CHECK_EQUAL(f, i);
+            f = t->find_first_string(5, "");
+            CHECK_EQUAL(f, 0);
+            f = (t->column<String>(5) == "").find();
+            CHECK_EQUAL(f, 0);
 
-            f = t->find_first_string(2, std::string(40, char(i + 'a')));
-            CHECK_EQUAL(f, i);
-            f = (t->column<String>(2) == std::string(40, char(i + 'a'))).find();
-            CHECK_EQUAL(f, i);
-
-            f = t->find_first_string(3, std::string(200, char(i + 'a')));
-            CHECK_EQUAL(f, i);
-            f = (t->column<String>(3) == std::string(200, char(i + 'a'))).find();
-            CHECK_EQUAL(f, i);
+            f = t->find_first_string(6, "");
+            CHECK_EQUAL(f, 0);
+            f = (t->column<String>(6) == "").find();
+            CHECK_EQUAL(f, 0);
         }
-
-        f = t->find_first_string(4, "");
-        CHECK_EQUAL(f, 0);
-        f = (t->column<String>(4) == "").find();
-        CHECK_EQUAL(f, 0);
-
-        f = t->find_first_string(5, "");
-        CHECK_EQUAL(f, 0);
-        f = (t->column<String>(5) == "").find();
-        CHECK_EQUAL(f, 0);
-
-        f = t->find_first_string(6, "");
-        CHECK_EQUAL(f, 0);
-        f = (t->column<String>(6) == "").find();
-        CHECK_EQUAL(f, 0);
     }
 #else
     // Create database file
