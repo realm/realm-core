@@ -66,7 +66,7 @@ void ArrayString::set(size_t ndx, StringData value)
             return; // element is already null
         }
 
-        //        REALM_ASSERT(0 < value.size());
+        // REALM_ASSERT(0 < value.size());
 
         // Calc min column width
         size_t new_width;
@@ -75,7 +75,7 @@ void ArrayString::set(size_t ndx, StringData value)
         else
             new_width = ::round_up(value.size() + 1);
 
-        //REALM_ASSERT(value.size() < new_width);
+        // REALM_ASSERT(value.size() < new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -106,7 +106,7 @@ void ArrayString::set(size_t ndx, StringData value)
         else {
             // m_width == 0, so all elements are null. Expand that to new width.
             while (new_end != base) {
-                REALM_ASSERT_3(new_width, <= , 128);
+                REALM_ASSERT_3(new_width, <= , max_width);
                 *--new_end = static_cast<char>(new_width); 
                 {
                     char* new_begin = new_end - (new_width - 1);
@@ -126,8 +126,8 @@ void ArrayString::set(size_t ndx, StringData value)
     char* end = begin + (m_width - 1);
     begin = copy(value.data(), value.data() + value.size(), begin);
     fill(begin, end, 0); // Pad with zero bytes
-    REALM_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-    //    REALM_ASSERT(end - begin < max_width);
+    REALM_STATIC_ASSERT(max_width <= max_width, "Padding size must fit in 7-bits");
+
     if (value.is_null()) {
         REALM_ASSERT_3(m_width, <= , 128);
         *end = static_cast<char>(m_width);
