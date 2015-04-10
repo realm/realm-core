@@ -349,7 +349,7 @@ public:
 
         // TResult: type of query result
         // TSourceColumn: type of aggregate source
-        TSourceColumn av = (TSourceColumn)0;
+        TSourceColumn av = static_cast<TSourceColumn>(0);
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
             REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
@@ -531,7 +531,7 @@ public:
         REALM_ASSERT(m_child);
 
         for (size_t s = start; s < end; ++s) {
-            const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
+            ConstTableRef subtable = m_table->get_subtable(m_column, s);
 
             if (subtable->is_degenerate())
                 return not_found;
@@ -760,7 +760,7 @@ public:
                 end2 = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_array.find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                bool cont = m_array.find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 if (!cont)
                     return not_found;
             }
@@ -1209,7 +1209,7 @@ public:
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
-            m_key_ndx = (static_cast<const ColumnStringEnum*>(m_condition_column))->GetKeyNdx(m_value);
+            m_key_ndx = static_cast<const ColumnStringEnum*>(m_condition_column)->GetKeyNdx(m_value);
         }
         else if (m_condition_column->has_search_index()) {
             m_dT = 0.0;

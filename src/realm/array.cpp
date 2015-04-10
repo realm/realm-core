@@ -2954,7 +2954,7 @@ void Array::IndexStringFindAll(Column& result, StringData value, void* column, S
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
     Column dummy;
-    return (FindRes)index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func);
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func));
 }
 
 
