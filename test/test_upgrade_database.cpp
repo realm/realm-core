@@ -239,7 +239,7 @@ TEST(Upgrade_Database_2_3)
 
 // Same as above test, just with different string lengths to get better coverage of the different String array types
 // that all have been modified by null support
-ONLY(Upgrade_Database_2_Backwards_Compatible)
+TEST(Upgrade_Database_2_Backwards_Compatible)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
