@@ -88,7 +88,7 @@ void ArrayStringLong::erase(size_t ndx)
 bool ArrayStringLong::is_null(size_t ndx) const
 {
     if (m_nullable) {
-        REALM_ASSERT(ndx < m_nulls.size());
+        REALM_ASSERT_3(ndx, <, m_nulls.size());
         return !m_nulls.get(ndx);
     }
     else {
@@ -99,7 +99,7 @@ bool ArrayStringLong::is_null(size_t ndx) const
 void ArrayStringLong::set_null(size_t ndx)
 {
     if (m_nullable) {
-        REALM_ASSERT(ndx < m_nulls.size());
+        REALM_ASSERT_3(ndx, <, m_nulls.size());
         m_nulls.set(ndx, false);
     }
 }

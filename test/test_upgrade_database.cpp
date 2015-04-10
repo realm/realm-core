@@ -340,9 +340,11 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
             t[tbl]->set_string(3, i, std::string(200, char(i + 'a')));
         }
 
+        // Upgrade leaf to short, medium, long
         t[tbl]->set_string(4, 0, std::string(5, 'a'));
         t[tbl]->set_string(5, 0, std::string(40, 'a'));
         t[tbl]->set_string(6, 0, std::string(200, 'a'));
+        // Set contents to empty string
         t[tbl]->set_string(4, 0, std::string(""));
         t[tbl]->set_string(5, 0, std::string(""));
         t[tbl]->set_string(6, 0, std::string(""));
