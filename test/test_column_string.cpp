@@ -667,7 +667,8 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
 
 #endif // !defined DISABLE_INDEX
 
-
+// First test if width expansion (nulls->empty string, nulls->non-empty string, empty string->non-empty string, etc)
+// works. Then do a fuzzy test at the end.
 TEST(ColumnString_Null)
 {
     {

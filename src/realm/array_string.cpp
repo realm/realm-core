@@ -106,7 +106,8 @@ void ArrayString::set(size_t ndx, StringData value)
         else {
             // m_width == 0, so all elements are null. Expand that to new width.
             while (new_end != base) {
-                *--new_end = new_width; //  char(new_width - 1);
+                REALM_ASSERT_3(new_width, <= , 128);
+                *--new_end = static_cast<char>(new_width); 
                 {
                     char* new_begin = new_end - (new_width - 1);
                     fill(new_begin, new_end, 0); // Fill with zero bytes
@@ -128,7 +129,8 @@ void ArrayString::set(size_t ndx, StringData value)
     REALM_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
     //    REALM_ASSERT(end - begin < max_width);
     if (value.is_null()) {
-        *end = m_width;
+        REALM_ASSERT_3(m_width, <= , 128);
+        *end = static_cast<char>(m_width);
     }
     else {
         int pad_size = int(end - begin);
