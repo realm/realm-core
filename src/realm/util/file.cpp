@@ -600,7 +600,8 @@ void File::seek(SizeType position)
 #endif
 }
 
-
+// We might be able to use lseek() with offset=0 as cross platform method, because we fortunatly
+// do not require to operate on files larger than 4 GB on 32-bit platforms
 File::SizeType File::get_file_position()
 {
     REALM_ASSERT_RELEASE(is_attached());
@@ -614,6 +615,7 @@ File::SizeType File::get_file_position()
 #else 
     // POSIX version not needed because it's only used by Windows version of resize().
     REALM_ASSERT(false);
+    return 0;
 #endif
 }
 
