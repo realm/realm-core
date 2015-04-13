@@ -2,24 +2,28 @@
 
 ### Bugfixes:
 
-* Added a check for NUL bytes in indexed strings to avoid corrupting data structures.
-* Fixed bug in SharedGroup::compact(). The bug left the freelist outdated in some situations,
-  which could cause crash later, if work continued on the same shared group. The bug did not
-  affect the data written to the compacted database, but later commits working on the outdated
-  freelist might have. The fix forces proper (re)initialization of the free list.
-* Fixed incorrect results in querying on an indexed string column via a LinkView.
+* Added a check for NUL bytes in indexed strings to avoid corrupting data
+  structures.
+* Fixed bug in SharedGroup::compact(). The bug left the freelist outdated in
+  some situations, which could cause crash later, if work continued on the same
+  shared group. The bug did not affect the data written to the compacted
+  database, but later commits working on the outdated freelist might have. The
+  fix forces proper (re)initialization of the free list.
+* Fixed incorrect results in querying on an indexed string column via a
+  LinkView.
 * Fixed corruption of indexes when using move_last_over() on rows with
   duplicated values for indexed properties.
 
 ### API breaking changes:
 
 * Changed the `tightdb` namespace to `realm`.
-* We switched to C++11, and removed functionality that was duplicated from the C++11 standard
-  library, including `null_ptr` and `util::UniquePtr`.
+* We switched to C++11, and removed functionality that was duplicated from the
+  C++11 standard library, including `null_ptr` and `util::UniquePtr`.
 
 ### Enhancements:
 
-* Improved performance of advance_read() over commits with string or binary data insertions.
+* Improved performance of advance_read() over commits with string or binary data
+  insertions.
 * Improved performance sorting TableView and LinkView.
 * Added Table::remove_search_index().
 
@@ -29,7 +33,8 @@
 
 ### Bugfixes:
 
-* Fixed bug in Integer index that could make it crash or return bad results (String index not affected)
+* Fixed bug in Integer index that could make it crash or return bad results
+  (String index not affected)
 
 ----------------------------------------------
 
