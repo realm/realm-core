@@ -701,7 +701,7 @@ TEST(ArrayString_Null2)
 
     // Same as above test, but for a nullable column
     {
-    ArrayString a(Allocator::get_default()), b(Allocator::get_default(), false);
+    ArrayString a(Allocator::get_default()), b(Allocator::get_default(), true);
     a.create();
     b.create();
 
