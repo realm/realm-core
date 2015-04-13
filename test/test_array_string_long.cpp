@@ -344,11 +344,23 @@ TEST(ArrayStringLong_Null)
         a.add("foo");
 
         CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.get(0), "");
         CHECK_EQUAL(a.is_null(1), false);
 
         a.destroy();
     }
 
+    {
+        ArrayStringLong a(Allocator::get_default(), false);
+        a.create();
+
+        a.add("");
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.get(0), "");
+
+        a.destroy();
+    }
 
     Random random(random_int<unsigned long>());
 
