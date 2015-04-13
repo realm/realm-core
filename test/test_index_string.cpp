@@ -232,6 +232,76 @@ TEST(StringIndex_Delete)
     col.destroy();
 }
 
+TEST(StringIndex_MoveLastOver)
+{
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+    col.add(s1);
+    col.add(s2);
+    col.add(s3);
+    col.add(s4);
+    col.add(s1); // duplicate value
+    col.add(s1); // duplicate value
+
+    col.create_search_index();
+
+    {
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
+            return;
+
+        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
+
+        CHECK_EQUAL(3, matches.size());
+        CHECK_EQUAL(0, matches.get(0));
+        CHECK_EQUAL(4, matches.get(1));
+        CHECK_EQUAL(5, matches.get(2));
+    }
+
+    // Remove a non-s1 row and change the order of the s1 rows
+    col.move_last_over(1);
+
+    {
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
+            return;
+
+        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
+
+        CHECK_EQUAL(3, matches.size());
+        CHECK_EQUAL(0, matches.get(0));
+        CHECK_EQUAL(1, matches.get(1));
+        CHECK_EQUAL(4, matches.get(2));
+    }
+
+    // Move a s1 row over a s1 row
+    col.move_last_over(1);
+
+    {
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
+            return;
+
+        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
+
+        CHECK_EQUAL(2, matches.size());
+        CHECK_EQUAL(0, matches.get(0));
+        CHECK_EQUAL(1, matches.get(1));
+    }
+
+    col.destroy();
+}
+
 TEST(StringIndex_ClearEmpty)
 {
     // Create a column with string values

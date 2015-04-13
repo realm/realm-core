@@ -666,9 +666,25 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
             else {
                 Column sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(array(), pos_refs);
-                size_t r = sub.find_first(row_ndx);
-                REALM_ASSERT(r != not_found);
-                sub.set(r, new_row_ndx);
+
+                size_t old_pos = sub.find_first(row_ndx);
+                size_t new_pos = sub.lower_bound_int(new_row_ndx);
+                REALM_ASSERT(old_pos != not_found);
+                REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
+
+                // shift each entry between the old and new position over one
+                if (new_pos < old_pos) {
+                    for (size_t i = old_pos; i > new_pos; --i)
+                        sub.set(i, sub.get(i - 1));
+                }
+                else if (new_pos > old_pos) {
+                    // we're removing the old entry from before the new entry,
+                    // so shift back one
+                    --new_pos;
+                    for (size_t i = old_pos; i < new_pos; ++i)
+                        sub.set(i, sub.get(i + 1));
+                }
+                sub.set(new_pos, new_row_ndx);
             }
         }
     }
