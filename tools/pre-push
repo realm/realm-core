@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # This pre-push hook should prevent pushing to the wrong remote
 
