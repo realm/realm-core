@@ -61,12 +61,11 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        // if m_width == 0 then entire array contains only null entries
+        // if m_width == 0 and m_nullable == true, then entire array contains only null entries
+        // if m_width == 0 and m_nullable == false, then entire array contains only "" entries
         if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
-            return; // element is already null
+            return; // existing element in array already equals the value we want to set it to
         }
-
-        // REALM_ASSERT(0 < value.size());
 
         // Calc min column width
         size_t new_width;
@@ -74,8 +73,6 @@ void ArrayString::set(size_t ndx, StringData value)
             new_width = ::round_up(1); // Entire Array is nulls; expand to m_width > 0
         else
             new_width = ::round_up(value.size() + 1);
-
-        // REALM_ASSERT(value.size() < new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -104,7 +101,7 @@ void ArrayString::set(size_t ndx, StringData value)
             }
         }
         else {
-            // m_width == 0, so all elements are null. Expand that to new width.
+            // m_width == 0. Expand to new width.
             while (new_end != base) {
                 REALM_ASSERT_3(new_width, <= , max_width);
                 *--new_end = static_cast<char>(new_width); 

@@ -676,5 +676,50 @@ TEST(ArrayString_Compare)
     b.destroy();
 }
 
+// Some internal testing for backwards compatibility between database file version 2 and 3
+TEST(ArrayString_Null2)
+{
+    {
+        ArrayString a(Allocator::get_default()), b(Allocator::get_default(), false);
+        a.create();
+        b.create();
+
+        // Keep width = 0
+        a.add("");
+
+        // Now add an "a" which will relocate the array and initialize the trailing width-byte of the empty string 
+        // (see array_string.hpp header) to the same value as m_width (which is 2). For a nullable column, that would
+        // indicate that a[0] == null. But we're not nullable, so the following get(0) should not return null.
+        a.add("a");
+
+        StringData sd = a.get(0);
+        CHECK(!sd.is_null());
+
+        a.destroy();
+        b.destroy();
+    }
+
+    // Same as above test, but for a nullable column
+    {
+    ArrayString a(Allocator::get_default()), b(Allocator::get_default(), false);
+    a.create();
+    b.create();
+
+    // Keep width = 0
+    a.add("");
+
+    // Now add an "a" which will relocate the array. In this case the column is nullable, so it should not flag the
+    // empty string as being null during relocation (width expansion)
+    a.add("a");
+
+    StringData sd = a.get(0);
+    CHECK(!sd.is_null());
+
+    a.destroy();
+    b.destroy();
+}
+
+}
+
 
 #endif // TEST_ARRAY_STRING
