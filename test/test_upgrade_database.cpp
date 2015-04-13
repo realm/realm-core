@@ -279,6 +279,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
                 CHECK_EQUAL(f, 0);
                 f = (t->column<String>(0) == "").find();
                 CHECK_EQUAL(f, 0);
+                CHECK(t->get_string(0, 0) == "");
 
                 f = t->find_first_string(1, std::string(5, char(i + 'a')));
                 CHECK_EQUAL(f, i);
@@ -300,16 +301,19 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
             CHECK_EQUAL(f, 0);
             f = (t->column<String>(4) == "").find();
             CHECK_EQUAL(f, 0);
+            CHECK(t->get_string(4, 0) == "");
 
             f = t->find_first_string(5, "");
             CHECK_EQUAL(f, 0);
             f = (t->column<String>(5) == "").find();
             CHECK_EQUAL(f, 0);
+            CHECK(t->get_string(5, 0) == "");
 
             f = t->find_first_string(6, "");
             CHECK_EQUAL(f, 0);
             f = (t->column<String>(6) == "").find();
             CHECK_EQUAL(f, 0);
+            CHECK(t->get_string(6, 0) == "");
         }
     }
 #else

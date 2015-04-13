@@ -195,16 +195,6 @@
 #endif
 
 
-/* Support for C++11 explicit virtual overrides */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 7) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_override_control) || \
-    REALM_HAVE_AT_LEAST_MSVC_11_2012
-//#  define override override
-#else
-#  define override
-#endif
-
-
 /* The way to specify that a function never returns.
  *
  * NOTE: C++11 generalized attributes are not yet fully supported in
