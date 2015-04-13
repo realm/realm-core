@@ -684,7 +684,7 @@ TEST(ArrayString_Null2)
         a.create();
         b.create();
 
-        // Keep width = 0
+        // Keeps width = 0
         a.add("");
 
         // Now add an "a" which will relocate the array and initialize the trailing width-byte of the empty string 
@@ -694,31 +694,47 @@ TEST(ArrayString_Null2)
 
         StringData sd = a.get(0);
         CHECK(!sd.is_null());
-
+        CHECK_EQUAL(a.find_first(""), 0);
+        
         a.destroy();
         b.destroy();
     }
 
     // Same as above test, but for a nullable column
     {
-    ArrayString a(Allocator::get_default()), b(Allocator::get_default(), true);
-    a.create();
-    b.create();
+        ArrayString a(Allocator::get_default()), b(Allocator::get_default(), true);
+        a.create();
+        b.create();
 
-    // Keep width = 0
-    a.add("");
+        // Keeps width = 0
+        a.add("");
 
-    // Now add an "a" which will relocate the array. In this case the column is nullable, so it should not flag the
-    // empty string as being null during relocation (width expansion)
-    a.add("a");
+        // Now add an "a" which will relocate the array. In this case the column is nullable, so it should not flag the
+        // empty string as being null during relocation (width expansion)
+        a.add("a");
 
-    StringData sd = a.get(0);
-    CHECK(!sd.is_null());
+        StringData sd = a.get(0);
+        CHECK(!sd.is_null());
 
-    a.destroy();
-    b.destroy();
-}
+        a.destroy();
+        b.destroy();
+    }
 
+    {
+        ArrayString a(Allocator::get_default()), b(Allocator::get_default(), false);
+        a.create();
+        b.create();
+
+        // Keeps width = 0
+        a.add("");
+
+        StringData sd = a.get(0);
+        CHECK(!sd.is_null());
+        CHECK_EQUAL(a.find_first(""), 0);
+
+        a.destroy();
+        b.destroy();
+    }
 }
 
 

@@ -336,6 +336,19 @@ TEST(ArrayStringLong_Null)
         a.destroy();
     }
 
+    {
+        ArrayStringLong a(Allocator::get_default(), false);
+        a.create();
+
+        a.add("");
+        a.add("foo");
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), false);
+
+        a.destroy();
+    }
+
 
     Random random(random_int<unsigned long>());
 
