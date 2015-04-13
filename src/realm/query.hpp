@@ -294,8 +294,10 @@ public:
     // so we should not clone it. If so, the import will return a pointer to the already
     // embedded query object.
     static Query* handover_import(Handover_data& handover_data, Group& group);
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode, bool is_embedded = false);
+    void handover_export(Handover_data& handover_data, PayloadHandoverMode, 
+                         bool is_embedded = false) const;
 private:
+    Query(const Query& src, PayloadHandoverMode mode);
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);

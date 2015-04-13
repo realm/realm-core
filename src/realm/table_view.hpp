@@ -361,7 +361,7 @@ protected:
         Query::Handover_data query_handover_data;
         LinkView::Handover_data* linkview_handover_data;
     };
-    void internal_handover_export(Base_Handover_data& handover_data, PayloadHandoverMode mode)
+    void internal_handover_export(Base_Handover_data& handover_data, PayloadHandoverMode mode) const
     {
         REALM_ASSERT(mode != PayloadHandoverMode::Copy);
         handover_data.table_num = m_table->get_index_in_group();
@@ -369,6 +369,7 @@ protected:
         if (handover_data.table_num == npos) {
             throw std::runtime_error("TableView handover failed: not a group level table");
         }
+        // remember to indicate that handover is of an *embedded* query:
         m_query.handover_export(handover_data.query_handover_data, mode, true);
         if (m_linkview_source) {
             handover_data.linkview_handover_data = new LinkView::Handover_data;
@@ -384,14 +385,14 @@ protected:
         m_table = tr;
         m_last_seen_version = tr->m_version;
         tr->register_view(this);
-        // update query !!!
-        m_query.handover_import(handover_data.query_handover_data, group);
+        // update query !!! (when called from here, the query is embedded, so
+        // Query::handover_import just updates the query in-place. The pointer
+        // it returns is to this in-place query, and in this context it is ignored).
+        Query::handover_import(handover_data.query_handover_data, group);
         if (handover_data.linkview_handover_data) {
             m_linkview_source = LinkView::handover_import(*handover_data.linkview_handover_data, group);
             handover_data.linkview_handover_data = 0;
         }
-        else
-            m_linkview_source.reset(0);
     }
 
     struct Handover_data {
@@ -399,7 +400,7 @@ protected:
         Base_Handover_data base_data;
     };
 
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
+    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode) const
     {
         handover_data.clone = new TableViewBase(*this, mode);
         internal_handover_export(handover_data.base_data, mode);
@@ -413,6 +414,7 @@ protected:
         return result;
     }
 private:
+    TableViewBase(const TableViewBase& src, PayloadHandoverMode mode);
     void detach() const REALM_NOEXCEPT; // may have to remove const
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
     friend class Table;

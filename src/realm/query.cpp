@@ -142,39 +142,54 @@ void Query::delete_nodes() REALM_NOEXCEPT
 }
 
 
-void Query::prepare_for_export(Handover_data& handover_data, PayloadHandoverMode mode)
+void Query::handover_export(Handover_data& handover_data, 
+                            PayloadHandoverMode mode,
+                            bool is_embedded) const
 {
-    handover_data.m_has_table = bool(m_table);
-    if (bool(m_table)) {
-        handover_data.m_table_num = m_table.get()->get_index_in_group();
-        m_table = TableRef(); // <- detach to prevent misuse until import!
+    // if called from TableView::handover_export, is_embedded will be true
+    // to indicate that the query is embedded inside a table view. In all other
+    // cases, is_embedded will be false, and we'll allocate a copy of the
+    // query during export.
+    Query* query;
+    if (!is_embedded) {
+        query = new Query(*this, mode);
+    }
+    else {
+        // if is_embedded, then it's not actually const...
+        query = const_cast<Query*>(this);
+    }
+    handover_data.m_query = query;
+    handover_data.m_has_table = bool(query->m_table);
+    if (bool(query->m_table)) {
+        handover_data.m_table_num = query->m_table.get()->get_index_in_group();
     }
     // prepare any source table view
-    if (m_source_table_view) {
+    if (query->m_source_table_view) {
         TableViewBase::Handover_data* tvb_handover = new TableViewBase::Handover_data;
         handover_data.table_view_data = tvb_handover;
-        m_source_table_view->prepare_for_export(*tvb_handover, mode);
+        query->m_source_table_view->handover_export(*tvb_handover, mode);
     }
     else
         handover_data.table_view_data = 0;
     // gather enough data to recreate any source link view at recieving side
-    if (bool(m_source_link_view)) {
+    if (bool(query->m_source_link_view)) {
         LinkView::Handover_data* lv_handover = new LinkView::Handover_data;
         handover_data.link_view_data = lv_handover;
-        m_source_link_view->prepare_for_export(*lv_handover);
+        query->m_source_link_view->handover_export(*lv_handover);
     }
     else
         handover_data.link_view_data = 0;
 }
 
-void Query::prepare_for_import(Handover_data& handover_data, Group& group)
+Query* Query::handover_import(Handover_data& handover_data, Group& group)
 {
-    REALM_ASSERT((m_source_table_view != 0) == (handover_data.table_view_data != 0));
+    Query* result = handover_data.m_query;
+    REALM_ASSERT((result->m_source_table_view != 0) == (handover_data.table_view_data != 0));
     // prepare any source table view
-    if (m_source_table_view) {
+    if (handover_data.table_view_data) {
         TableViewBase::Handover_data* tvb_handover 
             = reinterpret_cast<TableViewBase::Handover_data*>(handover_data.table_view_data);
-        m_source_table_view->prepare_for_import(*tvb_handover, group);
+        result->m_source_table_view = TableViewBase::handover_import(*tvb_handover, group);
         delete tvb_handover;
         handover_data.table_view_data = 0;
     }
@@ -182,15 +197,16 @@ void Query::prepare_for_import(Handover_data& handover_data, Group& group)
     if (handover_data.link_view_data) {
         LinkView::Handover_data* lv_handover
             = reinterpret_cast<LinkView::Handover_data*>(handover_data.link_view_data);
-        m_source_link_view = LinkView::prepare_for_import(*lv_handover, group);
-        m_view = m_source_link_view.get();
+        result->m_source_link_view = LinkView::handover_import(*lv_handover, group);
+        result->m_view = result->m_source_link_view.get();
         delete lv_handover;
         handover_data.link_view_data = 0;
     }
     if (handover_data.m_has_table)
-        m_table = group.get_table(handover_data.m_table_num);
+        result->m_table = group.get_table(handover_data.m_table_num);
     else
-        m_table = TableRef();
+        result->m_table = TableRef();
+    return result;
 }
 
 
