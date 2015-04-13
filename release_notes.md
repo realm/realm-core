@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.89.0 Release notes
 
 ### Bugfixes:
 
@@ -22,12 +22,6 @@
 * Improved performance of advance_read() over commits with string or binary data insertions.
 * Improved performance sorting TableView and LinkView.
 * Added Table::remove_search_index().
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
