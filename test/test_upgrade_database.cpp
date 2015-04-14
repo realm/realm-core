@@ -63,6 +63,8 @@ TEST(Upgrade_Database_2_3)
     // this unit test will not upgrade the file. The REALM_NULL_STRINGS flag was introduced to be able to merge
     // null branch into master but without activating version 3 yet.
 #if 1
+
+#if 0 // Not possible to upgrade from Group (needs write access to file)
     // Automatic upgrade from Group
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
@@ -104,6 +106,7 @@ TEST(Upgrade_Database_2_3)
         g.write(path + ".tmp2");
 
     }
+#endif
 
     // Automatic upgrade from SharedGroup
     {

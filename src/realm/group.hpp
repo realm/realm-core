@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <stdexcept>
 
 #include <realm/util/features.h>
 #include <realm/exceptions.hpp>
@@ -562,11 +563,14 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
-
-    // FIXME: open() will open file for write even though user requested ReadOnly. This is to be able to
-    // upgrade the database file format. See notes inside open().
+  
     open(file, key, mode); // Throws
-    upgrade_file_format();
+    
+    // Fixme / Review: We assume that database files opened with read-only access are using Group and that 
+    // read/write access makes the language binding use SharedGroup instead (which will perform the auto-upgrade)
+    if (m_alloc.get_file_format() < default_file_format_version)
+        throw std::runtime_error("You attempted to open a database file of an older format. Please open it with \
+        write access flags and make sure it resides on writable storage in order for it to be auto-upgraded");
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):

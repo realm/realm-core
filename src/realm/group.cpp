@@ -64,14 +64,6 @@ void Group::open(const string& file_path, const char* encryption_key, OpenMode m
     REALM_ASSERT(!is_attached());
     bool is_shared = false;
 
-    // FIXME! In order to upgrade the database file format we need to open the file for writing, even 
-    // though the user requested ReadOnly.
-    if (mode == mode_ReadOnly) {
-        if (!File::exists(file_path))
-            throw File::NotFound("Database file '" + file_path + "' not found");
-        mode = mode_ReadWrite;
-    }
-
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
