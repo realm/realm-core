@@ -2018,11 +2018,18 @@ void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
     parser.parse(reverser);
     reverser.execute(*this);
 
-    // restore group internal arrays to state before transaction (rollback state)
-    init_from_ref(new_top_ref);
+    if (new_top_ref) {
+        // restore group internal arrays to state before transaction (rollback state)
+        init_from_ref(new_top_ref);
 
-    // propagate restoration to all relevant accessors:
-    refresh_dirty_accessors();
+        // propagate restoration to all relevant accessors:
+        refresh_dirty_accessors();
+    }
+    else {
+        // rolling back to initial state is not directly supported.
+        detach();
+        create(true);
+    }
 }
 
 #endif // REALM_ENABLE_REPLICATION

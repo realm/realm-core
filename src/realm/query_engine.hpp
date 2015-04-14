@@ -349,7 +349,7 @@ public:
 
         // TResult: type of query result
         // TSourceColumn: type of aggregate source
-        TSourceColumn av = (TSourceColumn)0;
+        TSourceColumn av = static_cast<TSourceColumn>(0);
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
             REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
@@ -531,7 +531,7 @@ public:
         REALM_ASSERT(m_child);
 
         for (size_t s = start; s < end; ++s) {
-            const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
+            ConstTableRef subtable = m_table->get_subtable(m_column, s);
 
             if (subtable->is_degenerate())
                 return not_found;
@@ -760,7 +760,7 @@ public:
                 end2 = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_array.find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                bool cont = m_array.find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 if (!cont)
                     return not_found;
             }
@@ -1179,11 +1179,8 @@ protected:
 // Future optimization: make specialization for greater, notequal, etc
 template<> class StringNode<Equal>: public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column): StringNodeBase(v,column), m_key_ndx(size_t(-1))
+    StringNode(StringData v, size_t column): StringNodeBase(v,column)
     {
-        m_index_getter = 0;
-        m_index_matches = 0;
-        m_index_matches_destroy = false;
     }
     ~StringNode() REALM_NOEXCEPT override
     {
@@ -1200,12 +1197,8 @@ public:
             m_index_matches->destroy();
 
         m_index_matches_destroy = false;
-
-        delete m_index_matches;
-        m_index_matches = nullptr;
-
-        delete m_index_getter;
-        m_index_getter = nullptr;
+        m_index_matches.reset();
+        m_index_getter.reset();
     }
 
     void init(const Table& table) override
@@ -1216,7 +1209,7 @@ public:
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
-            m_key_ndx = ((const ColumnStringEnum*)m_condition_column)->GetKeyNdx(m_value);
+            m_key_ndx = static_cast<const ColumnStringEnum*>(m_condition_column)->GetKeyNdx(m_value);
         }
         else if (m_condition_column->has_search_index()) {
             m_dT = 0.0;
@@ -1238,28 +1231,35 @@ public:
             }
 
             m_index_matches_destroy = false;
-            if (fr == FindRes_single) {
-                m_index_matches = new Column(Column::unattached_root_tag(), Allocator::get_default()); // Throws
-                m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
-                m_index_matches->add(index_ref);
-                m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
-            }
-            else if (fr == FindRes_column) {
-                // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
-                // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-                m_index_matches = new Column(Column::unattached_root_tag(), m_condition_column->get_alloc()); // Throws
-                m_index_matches->get_root_array()->init_from_ref(index_ref);
-            }
-            else if (fr == FindRes_not_found) {
-                m_index_matches = new Column(Column::unattached_root_tag(), Allocator::get_default()); // Throws
-                m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
-                m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
+            m_last_indexed = 0;
+            m_last_start = 0;
+
+            switch (fr) {
+                case FindRes_single:
+                    m_index_matches.reset(new Column(Column::unattached_root_tag(), Allocator::get_default())); // Throws
+                    m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
+                    m_index_matches->add(index_ref);
+                    m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
+                    break;
+
+                case FindRes_column:
+                    // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
+                    // translate(x) = x. Shouldn't it inherit owner column's allocator?!
+                    m_index_matches.reset(new Column(Column::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
+                    m_index_matches->get_root_array()->init_from_ref(index_ref);
+                    break;
+
+                case FindRes_not_found:
+                    m_index_matches.reset();
+                    m_index_getter.reset();
+                    m_index_size = 0;
+                    break;
             }
 
-            last_indexed = 0;
-
-            m_index_getter = new SequentialGetter<int64_t>(m_index_matches);
-            m_index_size = m_index_getter->m_column->size();
+            if (m_index_matches) {
+                m_index_getter.reset(new SequentialGetter<int64_t>(m_index_matches.get()));
+                m_index_size = m_index_getter->m_column->size();
+            }
 
         }
         else if (m_column_type != col_type_String) {
@@ -1276,90 +1276,94 @@ public:
     {
         REALM_ASSERT(m_table);
 
-        for (size_t s = start; s < end; ++s) {
-            if (m_condition_column->has_search_index()) {
+        if (m_condition_column->has_search_index()) {
+            // Indexed string column
+            if (!m_index_getter)
+                return not_found; // no matches in the index
 
-                // Indexed string column
-                size_t f = not_found;
+            size_t f = not_found;
 
-                while (f == not_found && last_indexed < m_index_size) {
-                    m_index_getter->cache_next(last_indexed);
-                    f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start, nullptr);
+            if (m_last_start > start)
+                m_last_indexed = 0;
+            m_last_start = start;
 
-                    if (f >= end || f == not_found) {
-                        last_indexed = m_index_getter->m_leaf_end;
-                    }
-                    else {
-                        s = to_size_t(m_index_getter->m_array_ptr->get(f));
-                        if (s >= end)
-                            return not_found;
-                        else {
-                            last_indexed = f + m_index_getter->m_leaf_start;
-                            return s;
-                        }
-                    }
-                }
-                return not_found;
-            }
-            else {
-                if (m_column_type != col_type_String) {
+            while (f == not_found && m_last_indexed < m_index_size) {
+                m_index_getter->cache_next(m_last_indexed);
+                f = m_index_getter->m_array_ptr->FindGTE(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
 
-                    // Enum string column
-                    if (m_key_ndx == not_found)
-                        s = end; // not in key set
-                    else {
-                        m_cse.cache_next(s);
-                        s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
-                        if (s == not_found)
-                            s = m_cse.m_leaf_end - 1;
-                        else
-                            return s + m_cse.m_leaf_start;
-                    }
+                if (f >= end || f == not_found) {
+                    m_last_indexed = m_index_getter->m_leaf_end;
                 }
                 else {
-
-                    // Normal string column, with long or short leaf
-                    AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
-                    if (s >= m_leaf_end || s < m_leaf_start) {
-                        clear_leaf_state();
-                        m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
-                        if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
-                            m_leaf_end = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
-                        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
-                            m_leaf_end = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
-                        else
-                            m_leaf_end = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
-                        REALM_ASSERT(m_leaf);
+                    start = to_size_t(m_index_getter->m_array_ptr->get(f));
+                    if (start >= end)
+                        return not_found;
+                    else {
+                        m_last_indexed = f + m_index_getter->m_leaf_start;
+                        return start;
                     }
-                    size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
-
-                    if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
-                        s = static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
-                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
-                        s = static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
-                    else
-                        s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
-
-                    if (s == not_found)
-                        s = m_leaf_end - 1;
-                    else
-                        return s + m_leaf_start;
                 }
             }
+            return not_found;
         }
+
+        if (m_column_type != col_type_String) {
+            // Enum string column
+            if (m_key_ndx == not_found)
+                return not_found;  // not in key set
+
+            for (size_t s = start; s < end; ++s) {
+                m_cse.cache_next(s);
+                s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
+                if (s == not_found)
+                    s = m_cse.m_leaf_end - 1;
+                else
+                    return s + m_cse.m_leaf_start;
+            }
+
+            return not_found;
+        }
+
+        // Normal string column, with long or short leaf
+        for (size_t s = start; s < end; ++s) {
+            const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
+            if (s >= m_leaf_end || s < m_leaf_start) {
+                clear_leaf_state();
+                m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
+                if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                    m_leaf_end = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
+                else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                    m_leaf_end = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
+                else
+                    m_leaf_end = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
+                REALM_ASSERT(m_leaf);
+            }
+            size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
+
+            if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                s = static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+            else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                s = static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+            else
+                s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
+
+            if (s == not_found)
+                s = m_leaf_end - 1;
+            else
+                return s + m_leaf_start;
+        }
+
         return not_found;
     }
 
 public:
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new StringNode<Equal>(*this);
     }
 
     StringNode(const StringNode& from) : StringNodeBase(from)
     {
-        m_index_getter = 0;
-        m_index_matches = 0;
         m_index_matches_destroy = false;
     }
 
@@ -1369,17 +1373,18 @@ private:
         return BinaryData(s.data(), s.size());
     }
 
-    size_t m_key_ndx;
-    size_t last_indexed;
+    size_t m_key_ndx = not_found;
+    size_t m_last_indexed;
 
     // Used for linear scan through enum-string
     SequentialGetter<int64_t> m_cse;
 
     // Used for index lookup
-    Column* m_index_matches;
-    bool m_index_matches_destroy;
-    SequentialGetter<int64_t>* m_index_getter;
+    std::unique_ptr<Column> m_index_matches;
+    bool m_index_matches_destroy = false;
+    std::unique_ptr<SequentialGetter<int64_t>> m_index_getter;
     size_t m_index_size;
+    size_t m_last_start;
 };
 
 // OR node contains at least two node pointers: Two or more conditions to OR

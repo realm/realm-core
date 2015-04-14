@@ -737,7 +737,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 // this constructor is used to "move" results of find_all_xxx into a table view.
 // it is OK, that it just default constructs its view member.
 inline TableViewBase::TableViewBase(TableViewBase* tv) REALM_NOEXCEPT:
-    RowIndexes(Column::move_tag(), tv->m_row_indexes),
+    RowIndexes(std::move(tv->m_row_indexes)),
     m_table(move(tv->m_table)),
     m_distinct_column_source(tv->m_distinct_column_source), m_auto_sort(false),
     m_num_detached_refs(tv->m_num_detached_refs)

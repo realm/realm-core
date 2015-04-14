@@ -862,6 +862,11 @@ bool SharedGroup::compact()
     // so it becomes the database file, replacing the old one in the process.
     m_group.write(tmp_path, m_key, info->latest_version_number);
     rename(tmp_path.c_str(), m_db_path.c_str());
+    {
+        SharedInfo* r_info = m_reader_map.get_addr();
+        Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
+        REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
+    }
     end_read();
 
     // We must detach group complety to force it to fully refresh its accessors for use
@@ -1639,14 +1644,14 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
-#ifndef _WIN32
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         info->number_of_versions = new_version - readlock_version + 1;
         info->latest_version_number = new_version;
+#ifndef _WIN32
         m_new_commit_available.notify_all();
-    }
 #endif
+    }
 }
 
 

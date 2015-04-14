@@ -21,11 +21,11 @@ public:
         m_row_indexes(urt, alloc)
     {}
 
-    RowIndexes(Column::move_tag mt, Column& col) :
+    RowIndexes(Column&& col) : 
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected),
 #endif
-        m_row_indexes(mt, col)
+        m_row_indexes(std::move(col)) 
     {}
 
     RowIndexes(const RowIndexes& source, PayloadHandoverMode mode);
