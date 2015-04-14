@@ -100,6 +100,9 @@ public:
 
     ~Group() REALM_NOEXCEPT override;
 
+    void upgrade_file_format();
+    unsigned char get_file_format() const;
+
     /// Attach this Group instance to the specified database file.
     ///
     /// By default, the specified file is opened in read-only mode
@@ -424,6 +427,7 @@ private:
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
+    
     const bool m_is_shared;
     bool m_is_attached;
 
@@ -558,7 +562,11 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
+
+    // FIXME: open() will open file for write even though user requested ReadOnly. This is to be able to
+    // upgrade the database file format. See notes inside open().
     open(file, key, mode); // Throws
+    upgrade_file_format();
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):

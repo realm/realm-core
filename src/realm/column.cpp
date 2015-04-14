@@ -767,21 +767,25 @@ namespace {
 
 } // anonymous namespace
 
-StringIndex* Column::create_search_index()
+void Column::populate_search_index()
 {
-    REALM_ASSERT(!m_search_index);
-    std::unique_ptr<StringIndex> index(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
+    REALM_ASSERT(m_search_index);
 
-    // Populate the index
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         int64_t value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        index->insert(row_ndx, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
+}
 
-    m_search_index = std::move(index);
+StringIndex* Column::create_search_index()
+{
+    REALM_ASSERT(!m_search_index);
+    StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc());  // Throws
+    m_search_index.reset(si);
+    populate_search_index();
     return m_search_index.get();
 }
 

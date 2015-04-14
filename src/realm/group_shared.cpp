@@ -701,7 +701,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
-
                 // make sure the database is not on streaming format. This has to be done at
                 // session initialization, even if it means writing the database during open.
                 if (alloc.m_file_on_streaming_form) {
@@ -757,6 +756,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
+
             }
             else { // not the session initiator!
 #ifndef _WIN32
@@ -955,8 +955,17 @@ void SharedGroup::close() REALM_NOEXCEPT
 #ifdef REALM_ENABLE_REPLICATION
             // If replication is enabled, we need to stop log management:
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
-            if (repl)
+            if (repl) {
+#ifdef _WIN32
+                try {
+                    repl->stop_logging();
+                }
+                catch(...) {} // FIXME, on Windows, stop_logging() fails to delete a file because it's open
+#else
                 repl->stop_logging();
+#endif
+
+            }
 #endif
         }
     }

@@ -105,7 +105,11 @@ public:
 
         /// Indicates that a modification was attempted that would have produced a
         /// duplicate primary value.
-        unique_constraint_violation
+        unique_constraint_violation,
+
+        /// User attempted to insert null in non-nullable column
+        column_not_nullable
+
     };
 
     LogicError(ErrorKind message);

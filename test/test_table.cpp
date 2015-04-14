@@ -114,6 +114,40 @@ TEST(Table_ManyColumnsCrash2)
 
 #endif // JAVA_MANY_COLUMNS_CRASH
 
+TEST(Table_Null)
+{
+    {
+        // Check that add_empty_row() adds NULL string as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_String, "name", true);
+        table->add_empty_row();
+
+        CHECK(table->get_string(0, 0).is_null());
+    }
+
+    {
+        // Check that add_empty_row() adds empty string as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_String, "name");
+        table->add_empty_row();
+
+        CHECK(!table->get_string(0, 0).is_null());
+
+        // Test that inserting null in non-nullable column will throw
+        try {
+            table->set_string(0, 0, realm::null());
+            CHECK(false);
+        }
+        catch (...) {
+        }
+    }
+
+}
+
 TEST(Table_DeleteCrash)
 {
     Group group;
@@ -798,7 +832,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->find_first_float(2, 0));
     CHECK_EQUAL(not_found, degen_child->find_first_double(3, 0));
     CHECK_EQUAL(not_found, degen_child->find_first_datetime(4, DateTime()));
-    CHECK_EQUAL(not_found, degen_child->find_first_string(5, StringData()));
+    CHECK_EQUAL(not_found, degen_child->find_first_string(5, StringData("")));
 //    CHECK_EQUAL(not_found, degen_child->find_first_binary(6, BinaryData())); // Exists but not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->find_first_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->find_first_mixed(8, Mixed())); // Not yet implemented
@@ -808,7 +842,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->find_all_float(2, 0).size());
     CHECK_EQUAL(0, degen_child->find_all_double(3, 0).size());
     CHECK_EQUAL(0, degen_child->find_all_datetime(4, DateTime()).size());
-    CHECK_EQUAL(0, degen_child->find_all_string(5, StringData()).size());
+    CHECK_EQUAL(0, degen_child->find_all_string(5, StringData("")).size());
 //    CHECK_EQUAL(0, degen_child->find_all_binary(6, BinaryData()).size()); // Exists but not yet implemented
 //    CHECK_EQUAL(0, degen_child->find_all_subtable(7, subtab).size()); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->find_all_mixed(8, Mixed()).size()); // Not yet implemented
@@ -818,7 +852,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->lower_bound_float(2, 0));
     CHECK_EQUAL(0, degen_child->lower_bound_double(3, 0));
 //    CHECK_EQUAL(0, degen_child->lower_bound_date(4, Date())); // Not yet implemented
-    CHECK_EQUAL(0, degen_child->lower_bound_string(5, StringData()));
+    CHECK_EQUAL(0, degen_child->lower_bound_string(5, StringData("")));
 //    CHECK_EQUAL(0, degen_child->lower_bound_binary(6, BinaryData())); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->lower_bound_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->lower_bound_mixed(8, Mixed())); // Not yet implemented
@@ -828,7 +862,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->upper_bound_float(2, 0));
     CHECK_EQUAL(0, degen_child->upper_bound_double(3, 0));
 //    CHECK_EQUAL(0, degen_child->upper_bound_date(4, Date())); // Not yet implemented
-    CHECK_EQUAL(0, degen_child->upper_bound_string(5, StringData()));
+    CHECK_EQUAL(0, degen_child->upper_bound_string(5, StringData("")));
 //    CHECK_EQUAL(0, degen_child->upper_bound_binary(6, BinaryData())); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->upper_bound_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->upper_bound_mixed(8, Mixed())); // Not yet implemented
@@ -841,7 +875,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->count_float(2, 0));
     CHECK_EQUAL(0, degen_child->count_double(3, 0));
 //    CHECK_EQUAL(0, degen_child->count_date(4, Date())); // Not yet implemented
-    CHECK_EQUAL(0, degen_child->count_string(5, StringData()));
+    CHECK_EQUAL(0, degen_child->count_string(5, StringData("")));
 //    CHECK_EQUAL(0, degen_child->count_binary(6, BinaryData())); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->count_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->count_mixed(8, Mixed())); // Not yet implemented
@@ -871,7 +905,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal_datetime(4, DateTime()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData()).find());
+    CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData("")).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find()); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->where().equal(8, Mixed()).find()); // Not yet implemented
@@ -880,7 +914,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().not_equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal_datetime(4, DateTime()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData()).find());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData("")).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find()); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(8, Mixed()).find()); // Not yet implemented
@@ -2284,6 +2318,54 @@ TEST(Table_SpecDeleteColumns)
 #endif
 }
 
+TEST(Table_NullInEnum)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    table->add_column(type_String, "second", true);
+
+    for (size_t c = 0; c < 100; c++) {
+        table->insert_string(0, c, "hello");
+        table->insert_done();
+    }
+
+    size_t r;
+
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(100, r);
+
+    table->set_string(0, 50, realm::null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    table->optimize();
+
+    table->set_string(0, 50, realm::null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    table->set_string(0, 50, "hello");
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(100, r);
+
+    table->set_string(0, 50, realm::null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    r = table->where().equal(0, realm::null()).count();
+    CHECK_EQUAL(1, r);
+
+    table->set_string(0, 55, realm::null());
+    r = table->where().equal(0, realm::null()).count();
+    CHECK_EQUAL(2, r);
+
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(98, r);
+
+    table->remove(55);
+    r = table->where().equal(0, realm::null()).count();
+    CHECK_EQUAL(1, r);
+}
 
 TEST(Table_SpecAddColumns)
 {
@@ -4560,7 +4642,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          table[0].get_bool          (1));
         CHECK_EQUAL(float(),         table[0].get_float         (2));
         CHECK_EQUAL(double(),        table[0].get_double        (3));
-        CHECK_EQUAL(StringData(),    table[0].get_string        (4));
+        CHECK_EQUAL(StringData(""),    table[0].get_string        (4));
         CHECK_EQUAL(BinaryData(),    table[0].get_binary        (5));
         CHECK_EQUAL(DateTime(),      table[0].get_datetime      (6));
         CHECK_EQUAL(0,               table[0].get_subtable_size (7));
@@ -4601,8 +4683,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          const_table[0].get_bool          (1));
         CHECK_EQUAL(float(),         const_table[0].get_float         (2));
         CHECK_EQUAL(double(),        const_table[0].get_double        (3));
-        CHECK_EQUAL(StringData(),    const_table[0].get_string        (4));
-        CHECK_EQUAL(BinaryData(),    const_table[0].get_binary        (5));
+        CHECK_EQUAL(StringData(""),  const_table[0].get_string        (4));
+        CHECK_EQUAL(BinaryData(),  const_table[0].get_binary        (5));
         CHECK_EQUAL(DateTime(),      const_table[0].get_datetime      (6));
         CHECK_EQUAL(0,               const_table[0].get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  const_table[0].get_mixed         (8));
@@ -4643,8 +4725,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4677,8 +4759,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4711,8 +4793,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4745,8 +4827,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4789,7 +4871,7 @@ TEST(Table_RowAccessor)
         row_1.set_bool     (1, bool());
         row_1.set_float    (2, float());
         row_1.set_double   (3, double());
-        row_1.set_string   (4, StringData());
+        row_1.set_string   (4, StringData(""));
         row_1.set_binary   (5, BinaryData());
         row_1.set_datetime (6, DateTime());
         row_1.set_subtable (7, 0);
@@ -4810,8 +4892,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          table.get_bool     (1,1));
         CHECK_EQUAL(float(),         table.get_float    (2,1));
         CHECK_EQUAL(double(),        table.get_double   (3,1));
-        CHECK_EQUAL(StringData(),    table.get_string   (4,1));
-        CHECK_EQUAL(BinaryData(),    table.get_binary   (5,1));
+        CHECK_EQUAL(StringData(""),  table.get_string   (4,1));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,1));
         CHECK_EQUAL(DateTime(),      table.get_datetime (6,1));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,1));
 
@@ -4840,7 +4922,7 @@ TEST(Table_RowAccessor)
         table[0].set_bool     (1, bool());
         table[0].set_float    (2, float());
         table[0].set_double   (3, double());
-        table[0].set_string   (4, StringData());
+        table[0].set_string   (4, StringData(""));
         table[0].set_binary   (5, BinaryData());
         table[0].set_datetime (6, DateTime());
         table[0].set_subtable (7, 0);
@@ -4862,8 +4944,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          table.get_bool     (1,0));
         CHECK_EQUAL(float(),         table.get_float    (2,0));
         CHECK_EQUAL(double(),        table.get_double   (3,0));
-        CHECK_EQUAL(StringData(),    table.get_string   (4,0));
-        CHECK_EQUAL(BinaryData(),    table.get_binary   (5,0));
+        CHECK_EQUAL(StringData(""),  table.get_string   (4,0));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,0));
         CHECK_EQUAL(DateTime(),      table.get_datetime (6,0));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,0));
 
@@ -5749,5 +5831,97 @@ TEST(Table_IndexStringDelete)
         t.set_string(0, i, out.str());
     }
 }
+
+#ifdef REALM_NULL_STRINGS
+TEST(Table_Nulls)
+{
+    // 'round' lets us run this entire test both with and without index and with/without optimize/enum
+    for (size_t round = 0; round < 5; round++) {
+        Table t;
+        TableView tv;
+        t.add_column(type_String, "str", true);
+        
+        if (round == 1)
+            t.add_search_index(0);
+        else if (round == 2)
+            t.optimize(true);
+        else if (round == 3) {
+            t.add_search_index(0);
+            t.optimize(true);
+        }
+        else if (round == 4) {
+            t.optimize(true);
+            t.add_search_index(0);
+        }
+
+        t.add_empty_row(3);
+        t.set_string(0, 0, "foo"); // short strings
+        t.set_string(0, 1, "");
+        t.set_string(0, 2, realm::null());
+
+        CHECK_EQUAL(1, t.count_string(0, "foo"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0, "foo"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+
+        tv = t.find_all_string(0, "foo");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+
+        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYY"); // medium strings (< 64)
+
+        CHECK_EQUAL(1, t.count_string(0, "xxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0, "xxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+
+        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYY");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+
+
+        // long strings (>= 64)
+        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
+
+        CHECK_EQUAL(1, t.count_string(0,
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0,
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+
+        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+    }
+}
+#endif 
 
 #endif // TEST_TABLE

@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 
+#include <realm.hpp>
 #include <realm/string_data.hpp>
 
 #include "test.hpp"
@@ -64,8 +65,8 @@ TEST(StringData_Null)
 TEST(StringData_Equal)
 {
     // Test operator==() and operator!=()
-    StringData sd_00_1;
-    StringData sd_00_2;
+    StringData sd_00_1("");
+    StringData sd_00_2("");
     StringData sd_00_3("");
     StringData sd_01_1("x");
     StringData sd_01_2("x");
@@ -167,7 +168,7 @@ TEST(StringData_LexicographicCompare)
     string s_8_22(8, c_22);
     string s_9_11(9, c_11);
     string s_9_22(9, c_22);
-    StringData sd_0;
+    StringData sd_0("");
     StringData sd_8_11(s_8_11);
     StringData sd_8_22(s_8_22);
     StringData sd_9_11(s_9_11);
@@ -232,7 +233,44 @@ TEST(StringData_LexicographicCompare)
 
 TEST(StringData_Substrings)
 {
-    StringData sd_0;
+    // Reasoning behind behaviour is that if you append strings A + B then B is a suffix of a, and hence A
+    // "ends with" B, and B "begins with" A. This is true even though appending a null or empty string keeps the 
+    // original unchanged
+
+    StringData sd_0("");
+    StringData ns = realm::null();
+    StringData data("x");
+
+    // null.
+    CHECK(ns.begins_with(ns));
+    CHECK(ns.begins_with(sd_0));
+    CHECK(ns.begins_with(""));
+    CHECK(!ns.begins_with("x"));
+
+    CHECK(ns.ends_with(ns));
+    CHECK(ns.ends_with(sd_0));
+    CHECK(ns.ends_with(""));
+    CHECK(!ns.ends_with("x"));
+
+    CHECK(sd_0.begins_with(ns));
+    CHECK(sd_0.ends_with(ns));
+
+    CHECK(data.begins_with(ns));
+    CHECK(data.ends_with(ns));
+
+    CHECK(data.contains(ns));
+    CHECK(!ns.contains(data));
+
+    CHECK(sd_0.contains(ns));
+    CHECK(!sd_0.contains(data));
+
+    CHECK(ns.contains(ns));
+    CHECK(!ns.contains(data));
+
+    CHECK(ns.contains(sd_0));
+    CHECK(sd_0.contains(ns));
+
+    // non-nulls
     CHECK(sd_0.begins_with(sd_0));
     CHECK(sd_0.begins_with(""));
     CHECK(sd_0.ends_with(sd_0));

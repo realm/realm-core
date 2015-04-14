@@ -25,9 +25,10 @@ StringData get_string(void* column, size_t ndx, char*)
 } // anonymous namespace
 
 
-ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref):
+ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable):
     Column(alloc, ref), // Throws
-    m_keys(alloc, keys_ref) // Throws
+    m_keys(alloc, keys_ref, nullable), // Throws
+    m_nullable(nullable)
 {
 }
 
@@ -54,6 +55,11 @@ void ColumnStringEnum::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
     m_keys.update_from_parent(old_baseline);
     if (m_search_index)
         m_search_index->update_from_parent(old_baseline);
+}
+
+bool ColumnStringEnum::is_nullable() const
+{
+    return m_nullable;
 }
 
 void ColumnStringEnum::set(size_t ndx, StringData value)
