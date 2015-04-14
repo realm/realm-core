@@ -486,8 +486,12 @@ public:
     void do_dump_node_structure(std::ostream&, int) const override;
 #endif
 
-protected:
+    // FIXME: need to call this in a constructor for the RowIndexes class, 
+    // but a friend declaration does not give it access - putting it outside
+    // protected until we figure out why the friend decl doesn't give the
+    // desired results
     Column(ArrayInteger* root = 0) REALM_NOEXCEPT;
+protected:
 
     ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array.get()); }
     const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array.get()); }
@@ -526,6 +530,7 @@ private:
 
     friend class Array;
     friend class ColumnBase;
+    friend class RowIndexes;
 
     std::unique_ptr<StringIndex> m_search_index;
 };
