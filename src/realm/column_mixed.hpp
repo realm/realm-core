@@ -53,7 +53,7 @@ public:
     ///
     /// \param table If this column is used as part of a table you
     /// must pass a pointer to that table. Otherwise you must pass
-    /// null.
+    /// null
     ///
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that

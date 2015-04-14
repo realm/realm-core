@@ -941,7 +941,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     // Break link by nullifying
     CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
     CHECK(target_row_0 && target_row_1);
-    origin_row_1.nullify_link(0); // origin[1].o_1 -> null
+    origin_row_1.nullify_link(0); // origin[1].o_1 -> realm::null()
     CHECK(target_row_0 && !target_row_1);
     target->add_empty_row();
     target_row_1 = target->get(1);

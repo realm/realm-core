@@ -48,9 +48,9 @@ TEST(ColumnBinary_Basic)
 
     // TEST(ColumnBinary_MultiEmpty)
 
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
+    c.add(BinaryData());
+    c.add(BinaryData());
+    c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());

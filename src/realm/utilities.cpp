@@ -5,6 +5,7 @@
 
 #include <realm/utilities.hpp>
 #include <realm/unicode.hpp>
+#include <realm/util/thread.hpp>
 
 #ifdef REALM_COMPILER_SSE
 #  ifdef _MSC_VER
@@ -272,6 +273,24 @@ int fast_popcount64(int64_t x)
     return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
 }
 
+// A fast, thread safe, mediocre-quality random number generator named Xorshift
+uint64_t fastrand(uint64_t max) 
+{
+    // All the atomics (except the add) may be eliminated completely by the compiler on x64
+    static std::atomic<uint64_t> state(1);
+    // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
+    state.fetch_add(1, std::memory_order_release); 
+    uint64_t x = state.load(std::memory_order_acquire);
+    // The result of this arithmetic may be overwritten by another thread, but that's fine in a rand generator
+    x ^= x >> 12; // a
+    x ^= x << 25; // b
+    x ^= x >> 27; // c
+    state.store(x, std::memory_order_release);
+    return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 0xffffffffffffffffULL : max + 1);
+}
+
 } // namespace realm
+
+
 
 #endif // select best popcount implementations
