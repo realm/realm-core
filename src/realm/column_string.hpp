@@ -48,7 +48,7 @@ class AdaptiveStringColumn: public ColumnBase, public ColumnTemplate<StringData>
 public:
     typedef StringData value_type;
 
-    AdaptiveStringColumn(Allocator&, ref_type);
+    AdaptiveStringColumn(Allocator&, ref_type, bool nullable = false);
     ~AdaptiveStringColumn() REALM_NOEXCEPT override;
 
     void destroy() REALM_NOEXCEPT override;
@@ -56,10 +56,14 @@ public:
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
+    void set_null(std::size_t ndx);
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, StringData);
-    void add(StringData value = StringData());
-    void insert(std::size_t ndx, StringData value = StringData());
+    void add();
+    void add(StringData value);
+    void insert(std::size_t ndx);
+    void insert(std::size_t ndx, StringData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
@@ -84,6 +88,8 @@ public:
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
+    bool is_nullable() const;
+
     // Search index
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
@@ -92,10 +98,15 @@ public:
     const StringIndex* get_search_index() const REALM_NOEXCEPT;
     std::unique_ptr<StringIndex> release_search_index() REALM_NOEXCEPT;
     StringIndex* create_search_index();
+
+    // Simply inserts all column values in the index in a loop
+    void populate_search_index();
     void destroy_search_index() REALM_NOEXCEPT override;
 
     // Optimizing data layout
-    bool auto_enumerate(ref_type& keys, ref_type& values) const;
+    // Optimizing data layout. enforce == true will enforce enumeration; 
+    // enforce == false will auto-evaluate if it should be enumerated or not
+    bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;
 
     /// Compare two string columns for equality.
     bool compare_string(const AdaptiveStringColumn&) const;
@@ -138,6 +149,7 @@ protected:
 
 private:
     std::unique_ptr<StringIndex> m_search_index;
+    bool m_nullable;
 
     std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
@@ -219,18 +231,30 @@ inline std::size_t AdaptiveStringColumn::size() const REALM_NOEXCEPT
 
 inline void AdaptiveStringColumn::add(StringData value)
 {
+    REALM_ASSERT(!(value.is_null() && !m_nullable));
     std::size_t row_ndx = realm::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
 
+inline void AdaptiveStringColumn::add()
+{
+    add(m_nullable ? realm::null() : StringData(""));
+}
+
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx, StringData value)
 {
+    REALM_ASSERT(!(value.is_null() && !m_nullable));
     std::size_t size = this->size();
     REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t num_rows = 1;
     bool is_append = row_ndx == size;
     do_insert(row_ndx, value, num_rows, is_append); // Throws
+}
+
+inline void AdaptiveStringColumn::insert(std::size_t row_ndx)
+{
+    insert(row_ndx, m_nullable ? realm::null() : StringData(""));
 }
 
 inline void AdaptiveStringColumn::erase(std::size_t row_ndx)
@@ -255,6 +279,14 @@ inline int AdaptiveStringColumn::compare_values(std::size_t row1, std::size_t ro
 {
     StringData a = get(row1);
     StringData b = get(row2);
+
+    if (a.is_null() && !b.is_null())
+        return 1;
+    else if (b.is_null() && !a.is_null())
+        return -1;
+    else if (a.is_null() && b.is_null())
+        return 0;
+
     if (a == b)
         return 0;
     return utf8_compare(a, b) ? 1 : -1;
@@ -262,6 +294,7 @@ inline int AdaptiveStringColumn::compare_values(std::size_t row1, std::size_t ro
 
 inline void AdaptiveStringColumn::set_string(std::size_t row_ndx, StringData value)
 {
+    REALM_ASSERT(!(value.is_null() && !m_nullable));
     set(row_ndx, value); // Throws
 }
 
@@ -310,7 +343,7 @@ inline bool AdaptiveStringColumn::is_string_col() const REALM_NOEXCEPT
 // Implementing pure virtual method of ColumnBase.
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    StringData value = StringData();
+    StringData value = m_nullable ? realm::null() : StringData("");
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 

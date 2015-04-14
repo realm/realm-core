@@ -37,16 +37,48 @@ public:
 Initialization initialization;
 } // anonymous namespace
 
+void Group::upgrade_file_format()
+{
+#ifdef REALM_NULL_STRINGS
+    REALM_ASSERT(is_attached());
+    if (m_alloc.get_file_format() >= default_file_format_version)
+        return;
+
+    for (size_t t = 0; t < m_tables.size(); t++) {
+        TableRef table = get_table(t);
+        table->upgrade_file_format();
+    }
+
+    m_alloc.m_file_format_version = default_file_format_version;
+#endif
+}
+
+unsigned char Group::get_file_format() const
+{
+    return m_alloc.get_file_format();
+}
+
+
 void Group::open(const string& file_path, const char* encryption_key, OpenMode mode)
 {
     REALM_ASSERT(!is_attached());
     bool is_shared = false;
+
+    // FIXME! In order to upgrade the database file format we need to open the file for writing, even 
+    // though the user requested ReadOnly.
+    if (mode == mode_ReadOnly) {
+        if (!File::exists(file_path))
+            throw File::NotFound("Database file '" + file_path + "' not found");
+        mode = mode_ReadWrite;
+    }
+
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
     bool server_sync_mode = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
                                            skip_validate, encryption_key, server_sync_mode); // Throws
+
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     if (top_ref == 0) {
@@ -719,6 +751,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
 void Group::commit()
 {
     REALM_ASSERT(is_attached());
+   // REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     // GroupWriter::write_group() needs free-space tracking
     // information, so if the attached database does not contain it,
@@ -1403,8 +1436,9 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData)
+    bool insert_column(size_t col_ndx, DataType, StringData, bool nullable)
     {
+        static_cast<void>(nullable);
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
@@ -1871,7 +1905,7 @@ public:
         return true;
     }
 
-    bool insert_column(std::size_t col_idx, DataType, StringData)
+    bool insert_column(std::size_t col_idx, DataType, StringData, bool)
     {
         m_encoder.erase_column(col_idx);
         append_instruction();

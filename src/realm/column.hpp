@@ -445,6 +445,8 @@ public:
     StringIndex* create_search_index();
     StringIndex* get_search_index() REALM_NOEXCEPT;
     const StringIndex* get_search_index() const REALM_NOEXCEPT;
+    void populate_search_index();
+
     void destroy_search_index() REALM_NOEXCEPT override;
 
     //@{

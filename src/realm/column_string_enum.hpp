@@ -53,7 +53,7 @@ class ColumnStringEnum: public Column {
 public:
     typedef StringData value_type;
 
-    ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref);
+    ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref, bool nullable);
     ~ColumnStringEnum() REALM_NOEXCEPT override;
     void destroy() REALM_NOEXCEPT override;
 
@@ -61,18 +61,30 @@ public:
     {
         StringData a = get(row1);
         StringData b = get(row2);
+
+        if (a.is_null() && !b.is_null())
+            return 1;
+        else if (b.is_null() && !a.is_null())
+            return -1;
+        else if (a.is_null() && b.is_null())
+            return 0;
+
         if (a == b)
             return 0;
+
         return utf8_compare(a, b) ? 1 : -1;
     }
 
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, StringData value);
-    void add(StringData value = StringData());
-    void insert(std::size_t ndx, StringData value = StringData());
+    void add();
+    void add(StringData value);
+    void insert(std::size_t ndx);
+    void insert(std::size_t ndx, StringData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
+    bool is_nullable() const;
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -134,6 +146,7 @@ private:
     // Member variables
     AdaptiveStringColumn m_keys;
     std::unique_ptr<StringIndex> m_search_index;
+    bool m_nullable;
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
@@ -165,18 +178,32 @@ inline StringData ColumnStringEnum::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, Column::size());
     std::size_t key_ndx = to_size_t(Column::get(ndx));
-    return m_keys.get(key_ndx);
+    StringData sd = m_keys.get(key_ndx);
+    REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
+    return sd;
+}
+
+inline void ColumnStringEnum::add()
+{
+    add(m_nullable ? realm::null() : StringData(""));
 }
 
 inline void ColumnStringEnum::add(StringData value)
 {
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     std::size_t row_ndx = realm::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
 
+inline void ColumnStringEnum::insert(std::size_t row_ndx)
+{
+    insert(row_ndx, m_nullable ? realm::null() : StringData(""));
+}
+
 inline void ColumnStringEnum::insert(std::size_t row_ndx, StringData value)
 {
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     std::size_t size = this->size();
     REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t num_rows = 1;
@@ -205,7 +232,7 @@ inline void ColumnStringEnum::clear()
 // Overriding virtual method of Column.
 inline void ColumnStringEnum::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    StringData value = StringData();
+    StringData value = m_nullable ? realm::null() : StringData("");
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 

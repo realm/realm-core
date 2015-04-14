@@ -6,7 +6,8 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Merged lr_nulls into master, but keeping all the functionality (support for null in String column and bugfix in String index with 0 bytes) disabled until we define REALM_NULL_STRINGS. When we define REALM_NULL_STRINGS, then the API is as follows:
+Call add_column() with nullable = true. You can then use tightdb::null() in place of any StringData (in Query, Table::find(), get(), set(), etc) for that column. You can also call Table::is_null(), Table::set_null() and StringData::is_null(). NOTE: This upgrades the database file from version 2 to 3 initially the first time a file is opened. This may take some time. It rebuilds all indexes. 
 
 ### Enhancements:
 

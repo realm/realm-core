@@ -16,10 +16,15 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob new_blob(m_alloc);
-    new_blob.create(); // Throws
-    new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-    Array::add(int_fast64_t(new_blob.get_ref())); // Throws
+    if (value.is_null()) {
+        Array::add(0); // Throws
+    }
+    else {
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create(); // Throws
+        new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+        Array::add(static_cast<int64_t>(new_blob.get_ref())); // Throws
+    }
 }
 
 
@@ -30,10 +35,31 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 
     ArrayBlob blob(m_alloc);
     ref_type ref = get_as_ref(ndx);
-    blob.init_from_ref(ref);
-    blob.set_parent(this, ndx);
-    blob.clear(); // Throws
-    blob.add(value.data(), value.size(), add_zero_term); // Throws
+
+    if (ref == 0 && value.is_null()) {
+        return;
+    }
+    else if (ref == 0 && value.data() != nullptr) {
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create(); // Throws
+        new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+        ref = new_blob.get_ref();
+        Array::set_as_ref(ndx, ref);
+        return;
+    }
+    else if (ref != 0 && value.data() != nullptr) {
+        blob.init_from_ref(ref);
+        blob.set_parent(this, ndx);
+        blob.clear(); // Throws
+        blob.add(value.data(), value.size(), add_zero_term); // Throws
+        return;
+    }
+    else if (ref != 0 && value.is_null()) {
+        Array::destroy(ref, get_alloc()); // Shallow
+        Array::set(ndx, 0);
+        return;
+    }
+    REALM_ASSERT(false);
 }
 
 
@@ -42,10 +68,16 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
     REALM_ASSERT_3(ndx, <=, size());
     REALM_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob new_blob(m_alloc);
-    new_blob.create(); // Throws
-    new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-    Array::insert(ndx, int_fast64_t(new_blob.get_ref())); // Throws
+    if (value.is_null()) {
+        Array::insert(ndx, 0); // Throws
+    }
+    else {
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create(); // Throws
+        new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+
+        Array::insert(ndx, int64_t(new_blob.get_ref())); // Throws
+    }
 }
 
 
@@ -79,14 +111,25 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
     size_t value_size = value.size();
     size_t full_size = is_string ? value_size+1 : value_size;
 
-    for (size_t i = begin; i != end; ++i) {
-        ref_type ref = get_as_ref(i);
-        const char* blob_header = get_alloc().translate(ref);
-        size_t blob_size = get_size_from_header(blob_header);
-        if (blob_size == full_size) {
-            const char* blob_value = ArrayBlob::get(blob_header, 0);
-            if (equal(blob_value, blob_value + value_size, value.data()))
+    if (value.is_null()) {
+        for (size_t i = begin; i != end; ++i) {
+            ref_type ref = get_as_ref(i);
+            if (ref == 0)
                 return i;
+        }
+    }
+    else {
+        for (size_t i = begin; i != end; ++i) {
+            ref_type ref = get_as_ref(i);
+            if (ref) {
+                const char* blob_header = get_alloc().translate(ref);
+                size_t blob_size = get_size_from_header(blob_header);
+                if (blob_size == full_size) {
+                    const char* blob_value = ArrayBlob::get(blob_header, 0);
+                    if (equal(blob_value, blob_value + value_size, value.data()))
+                        return i;
+                }
+            }
         }
     }
 
@@ -121,7 +164,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
     }
 
     // Split leaf node
-    ArrayBigBlobs new_leaf(m_alloc);
+    ArrayBigBlobs new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value, add_zero_term);
@@ -148,9 +191,12 @@ void ArrayBigBlobs::Verify() const
     REALM_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
-        ArrayBlob blob(m_alloc);
-        blob.init_from_ref(blob_ref);
-        blob.Verify();
+        // 0 is used to indicate realm::null()
+        if (blob_ref != 0) {
+            ArrayBlob blob(m_alloc);
+            blob.init_from_ref(blob_ref);
+            blob.Verify();
+        }
     }
 }
 

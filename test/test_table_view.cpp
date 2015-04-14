@@ -720,6 +720,43 @@ TEST(TableView_DoubleSortPrecision)
     CHECK_EQUAL(d2, tv[1].second);
 }
 
+TEST(TableView_SortNullString)
+{
+    Table t;
+    t.add_column(type_String, "s", true);
+    t.add_empty_row(4);
+    t.set_string(0, 0, StringData(""));     // empty string
+    t.set_string(0, 1, realm::null());             // realm::null()
+    t.set_string(0, 2, StringData(""));     // empty string
+    t.set_string(0, 3, realm::null());             // realm::null()
+
+    TableView tv;
+
+    tv = t.where().find_all();
+    tv.sort(0);
+    CHECK(tv.get_string(0, 0).is_null());
+    CHECK(tv.get_string(0, 1).is_null());
+    CHECK(!tv.get_string(0, 2).is_null());
+    CHECK(!tv.get_string(0, 3).is_null());
+
+    t.set_string(0, 0, StringData("medium medium medium medium"));
+
+    tv = t.where().find_all();
+    tv.sort(0);
+    CHECK(tv.get_string(0, 0).is_null());
+    CHECK(tv.get_string(0, 1).is_null());
+    CHECK(!tv.get_string(0, 2).is_null());
+    CHECK(!tv.get_string(0, 3).is_null());
+
+    t.set_string(0, 0, StringData("long long long long long long long long long long long long long long"));
+
+    tv = t.where().find_all();
+    tv.sort(0);
+    CHECK(tv.get_string(0, 0).is_null());
+    CHECK(tv.get_string(0, 1).is_null());
+    CHECK(!tv.get_string(0, 2).is_null());
+    CHECK(!tv.get_string(0, 3).is_null());
+}
 
 TEST(TableView_Delete)
 {
@@ -802,10 +839,6 @@ TEST(TableView_Stacked)
     TableView tv2 = tv.find_all_int(1,2);
     CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
     CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
-
-
-    
-
 }
 
 
