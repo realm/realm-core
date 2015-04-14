@@ -3,6 +3,7 @@
 
 #include <realm/column.hpp>
 #include <realm/column_string_enum.hpp>
+#include <realm/handover_defs.hpp>
 
 using namespace realm;
 
@@ -26,6 +27,8 @@ public:
 #endif
         m_row_indexes(mt, col)
     {}
+
+    RowIndexes(const RowIndexes& source, PayloadHandoverMode mode);
 
     virtual ~RowIndexes()
     {

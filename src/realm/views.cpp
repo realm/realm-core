@@ -33,3 +33,18 @@ void RowIndexes::sort(Sorter& sorting_predicate)
         m_row_indexes.add(-1);
 }
 
+// FIXME: this is only works (and is only used) for row indexes with memory
+// managed by the default allocator, e.q. for TableViews.
+RowIndexes::RowIndexes(const RowIndexes& source, PayloadHandoverMode mode)
+    : m_row_indexes(Column::unattached_root_tag(), Allocator::get_default())
+{
+    REALM_ASSERT(mode != PayloadHandoverMode::Move);
+#ifdef REALM_COOKIE_CHECK
+    cookie = source.cookie;
+#endif
+    if (mode == PayloadHandoverMode::Copy) {
+        const Array* root = source.m_row_indexes.get_root_array();
+        MemRef mem = root->clone_deep(Allocator::get_default());
+        m_row_indexes. 
+    }
+}

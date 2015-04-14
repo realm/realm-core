@@ -152,7 +152,7 @@ void Query::handover_export(Handover_data& handover_data,
     // query during export.
     Query* query;
     if (!is_embedded) {
-        query = new Query(*this, mode);
+        query = new Query(*this, PartialCopyTag());
     }
     else {
         // if is_embedded, then it's not actually const...
@@ -209,6 +209,37 @@ Query* Query::handover_import(Handover_data& handover_data, Group& group)
     return result;
 }
 
+Query::Query(const Query& source, PartialCopyTag)
+{
+    Create();
+    first = source.first;
+    std::map<ParentNode*, ParentNode*> node_mapping;
+    node_mapping[nullptr] = nullptr;
+    std::vector<ParentNode*>::const_iterator i;
+    for (i = source.all_nodes.begin(); i != source.all_nodes.end(); ++i) {
+        ParentNode* new_node = (*i)->clone();
+        all_nodes.push_back(new_node);
+        node_mapping[*i] = new_node;
+    }
+    for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
+        (*i)->translate_pointers(node_mapping);
+    }
+    for (size_t t = 0; t < first.size(); t++) {
+        first[t] = node_mapping[first[t]];
+    }
+    m_table = TableRef();
+    m_view = 0;
+    m_source_link_view = LinkViewRef();
+    m_source_table_view = 0;
+
+    if (first[0]) {
+        ParentNode* node_to_update = first[0];
+        while (node_to_update->m_child) {
+            node_to_update = node_to_update->m_child;
+        }
+        update[0] = &node_to_update->m_child;
+    }
+}
 
 
 /*

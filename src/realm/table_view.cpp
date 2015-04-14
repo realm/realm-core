@@ -30,6 +30,22 @@
 using namespace std;
 using namespace realm;
 
+TableViewBase::TableViewBase(const TableViewBase& src, PayloadHandoverMode mode)
+    : RowIndexes(src, mode), m_query(src.m_query, Query::PartialCopyTag())
+{
+    m_table = TableRef();
+    m_linkview_source = LinkViewRef();
+    m_last_seen_version = 0;
+    m_distinct_column_source = src.m_distinct_column_source;
+    m_sorting_predicate = src.m_sorting_predicate;
+    m_auto_sort = src.m_auto_sort;
+    m_start = src.m_start;
+    m_end = src.m_end;
+    m_limit = src.m_limit;
+    m_num_detached_refs = 0;
+}
+
+
 // Searching
 
 // find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
