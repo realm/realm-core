@@ -413,8 +413,8 @@ protected:
         handover_data.clone = 0;
         return result;
     }
-private:
     TableViewBase(const TableViewBase& src, PayloadHandoverMode mode);
+private:
     void detach() const REALM_NOEXCEPT; // may have to remove const
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
     friend class Table;
@@ -537,7 +537,30 @@ public:
     Table& get_parent() REALM_NOEXCEPT;
     const Table& get_parent() const REALM_NOEXCEPT;
 
+    struct Handover_data {
+        TableView* clone;
+        Base_Handover_data base_data;
+    };
+
+    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode) const
+    {
+        handover_data.clone = new TableView(*this, mode);
+        internal_handover_export(handover_data.base_data, mode);
+    }
+    
+    static TableView* handover_import(Handover_data& handover_data, Group& group)
+    {
+        TableView* result = handover_data.clone;
+        result->internal_handover_import(handover_data.base_data, group);
+        handover_data.clone = 0;
+        return result;
+    }
+
 private:
+    /// Copy constructor with configurable handling of data payload
+    TableView(const TableView& tv, PayloadHandoverMode mode)
+        : TableViewBase(tv, mode) 
+    { }
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
     TableView(TableView* tv) REALM_NOEXCEPT;

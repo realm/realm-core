@@ -62,4 +62,11 @@ void RowBase::handover_export(Handover_data& handover_data, PayloadHandoverMode 
     handover_data.row_ndx = m_row_ndx;
 }
 
+void RowBase::internal_handover_import(Handover_data& handover_data, Group& group)
+{
+    m_table = group.get_table(handover_data.table_num);
+    m_table->register_row_accessor(this);
+    m_row_ndx = handover_data.row_ndx;
+}
+
 

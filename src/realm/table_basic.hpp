@@ -404,12 +404,12 @@ protected:
         // template (this class) is not
         m_impl.handover_export(handover_data, mode, false);
     }
-    static BasicTable<Spec>::Query handover_import(Handover_data& handover_data, Group& group)
+    static BasicTable<Spec>::Query* handover_import(Handover_data& handover_data, Group& group)
     {
         // create a new wrapping template class instance and use it to wrap
         // the copy created during export
         Query* q = Query::handover_import(handover_data, group);
-        return new BasicTable<Spec>::Query(q);
+        return new BasicTable<Spec>::Query(*q);
     }
 private:
     realm::Query m_impl;

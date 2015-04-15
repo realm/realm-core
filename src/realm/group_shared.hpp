@@ -413,7 +413,7 @@ public:
         // TODO: lock
         Handover<T>* result = new Handover<T>();
         accessor.handover_export(result->m_handover_data, mode);
-        result->version = get_version_of_current_transaction();
+        result->m_version = get_version_of_current_transaction();
         // TODO: unlock
         return result;
     }

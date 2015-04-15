@@ -230,6 +230,7 @@ protected:
     }
 protected:
     void handover_export(Handover_data& handover_data, PayloadHandoverMode mode);
+    void internal_handover_import(Handover_data& handover_data, Group& group);
 private:
     RowBase* m_prev; // Null if first, undefined if detached.
     RowBase* m_next; // Null if last, undefined if detached.
@@ -294,6 +295,7 @@ private:
     // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.
     template<class> friend class BasicRow;
+
     void handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
     {
         RowBase::handover_export(handover_data, mode);
@@ -301,11 +303,9 @@ private:
     static BasicRow<T>* handover_import(Handover_data& handover_data, Group& group)
     {
         // FIXME: this will not work / Group is undefined
-        /*
-        TableRef table = group.get_table(handover_data.table_ndx);
-        return TableRef->get(handover_data.row_ndx);
-        */
-        return 0;
+        BasicRow<T>* result = new BasicRow<T>();
+        result->internal_handover_import(handover_data, group);
+        return result;
     }
     void move_assign(BasicRow<T>& row)
     {
