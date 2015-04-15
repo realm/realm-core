@@ -59,8 +59,8 @@ TEST(Upgrade_Database_2_3)
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
 
-    // If REALM_NULL_STRINGS is NOT defined, then this Realm core still operates in format 2 (null not supported) and
-    // this unit test will not upgrade the file. The REALM_NULL_STRINGS flag was introduced to be able to merge
+    // If REALM_NULL_STRINGS is NOT defined to 1, then this Realm core still operates in format 2 (null not supported)
+    // and this unit test will not upgrade the file. The REALM_NULL_STRINGS flag was introduced to be able to merge
     // null branch into master but without activating version 3 yet.
 #if 1
 
@@ -78,7 +78,7 @@ TEST(Upgrade_Database_2_3)
         
         TableRef t = g.get_table("table");
 
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
         CHECK_EQUAL(g.get_file_format(), 3);
 #else
         CHECK_EQUAL(g.get_file_format(), 2);
@@ -240,6 +240,7 @@ TEST(Upgrade_Database_2_3)
 }
 
 
+
 // Same as above test, just with different string lengths to get better coverage of the different String array types
 // that all have been modified by null support
 TEST(Upgrade_Database_2_Backwards_Compatible)
@@ -251,16 +252,159 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     // Make a copy of the database so that we keep the original file intact and unmodified
     string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
     File::copy(path, path + ".tmp");
-    Group g(path + ".tmp", 0, Group::mode_ReadOnly);
+    SharedGroup g(path + ".tmp", 0);
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
-        TableRef t = g.get_table(tbl);
+        ReadTransaction rt(g);
 
-#ifdef REALM_NULL_STRINGS
-        CHECK_EQUAL(g.get_file_format(), 3);
+        ConstTableRef t = rt.get_table(tbl);
+
+#if REALM_NULL_STRINGS == 1
+        CHECK_EQUAL(rt.get_group().get_file_format(), 3);
 #else
-        CHECK_EQUAL(g.get_file_format(), 2);
+        CHECK_EQUAL(g.get_group().get_file_format(), 2);
+#endif
+
+        size_t f;
+
+        for (int i = 0; i < 9; i++) {
+            f = t->find_first_string(0, std::string(""));
+            CHECK_EQUAL(f, 0);
+            f = t->where().equal(0, "").find();
+            CHECK_EQUAL(f, 0);
+            CHECK(t->get_string(0, 0) == "");
+
+            f = t->where().equal(0, "").find();
+            f = t->find_first_string(1, std::string(5, char(i + 'a')));
+            CHECK_EQUAL(f, i);
+            f = t->where().equal(1, std::string(5, char(i + 'a'))).find();
+            CHECK_EQUAL(f, i);
+
+            f = t->find_first_string(2, std::string(40, char(i + 'a')));
+            CHECK_EQUAL(f, i);
+            f = t->where().equal(2, std::string(40, char(i + 'a'))).find();
+            CHECK_EQUAL(f, i);
+
+            f = t->find_first_string(3, std::string(200, char(i + 'a')));
+            CHECK_EQUAL(f, i);
+            f = t->where().equal(3, std::string(200, char(i + 'a'))).find();
+            CHECK_EQUAL(f, i);
+        }
+
+        f = t->find_first_string(4, "");
+        CHECK_EQUAL(f, 0);
+
+        f = t->where().equal(4, "").find();
+
+        CHECK_EQUAL(f, 0);
+
+        f = t->where().not_equal(4, "").find();
+
+        CHECK(f != 0);
+        CHECK(t->get_string(4, 0) == "");
+        CHECK(!(t->get_string(4, 0) != ""));
+
+        f = t->find_first_string(5, "");
+        CHECK_EQUAL(f, 0);
+
+        f = t->where().equal(5, "").find();
+
+        CHECK_EQUAL(f, 0);
+
+        f = t->where().not_equal(5, "").find();
+
+        CHECK(f != 0);
+        CHECK(t->get_string(5, 0) == "");
+        CHECK(!(t->get_string(5, 0) != ""));
+
+        f = t->find_first_string(6, "");
+        CHECK_EQUAL(f, 0);
+
+        f = t->where().equal(6, "").find();
+
+        CHECK_EQUAL(f, 0);
+
+        f = t->where().not_equal(6, "").find();
+
+        CHECK(f != 0);
+        CHECK(t->get_string(6, 0) == "");
+        CHECK(!(t->get_string(6, 0) != ""));
+
+    }
+#else
+    // Create database file (run this from old core)
+    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    File::try_remove(path);
+
+    Group g;
+    TableRef t[2];
+    t[0] = g.add_table("table");
+    t[1] = g.add_table("table_indexed");
+
+    for (int tbl = 0; tbl < 2; tbl++) {
+        t[tbl]->add_column(type_String, "empty");
+        t[tbl]->add_column(type_String, "short");
+        t[tbl]->add_column(type_String, "medium");
+        t[tbl]->add_column(type_String, "long");
+
+        t[tbl]->add_column(type_String, "short_empty_string");
+        t[tbl]->add_column(type_String, "medium_empty_string");
+        t[tbl]->add_column(type_String, "long_empty_string");
+
+        for (size_t i = 0; i < 9; i++) {
+            t[tbl]->add_empty_row();
+            t[tbl]->set_string(0, i, std::string(""));
+            t[tbl]->set_string(1, i, std::string(5, char(i + 'a')));
+            t[tbl]->set_string(2, i, std::string(40, char(i + 'a')));
+            t[tbl]->set_string(3, i, std::string(200, char(i + 'a')));
+        }
+
+        // Upgrade leaf to short, medium, long
+        t[tbl]->set_string(4, 0, std::string(5, 'a'));
+        t[tbl]->set_string(5, 0, std::string(40, 'a'));
+        t[tbl]->set_string(6, 0, std::string(200, 'a'));
+        // Set contents to empty string
+        t[tbl]->set_string(4, 0, std::string(""));
+        t[tbl]->set_string(5, 0, std::string(""));
+        t[tbl]->set_string(6, 0, std::string(""));
+    }
+
+    t[1]->add_search_index(0);
+    t[1]->add_search_index(1);
+    t[1]->add_search_index(2);
+    t[1]->add_search_index(3);
+    t[1]->add_search_index(4);
+    t[1]->add_search_index(5);
+    t[1]->add_search_index(6);
+
+    g.write(path);
+#endif
+}
+
+
+
+// Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
+TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
+{
+    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
+    // version 2 database file. Then copy it into the /test directory of this current Realm core.
+
+#if 1
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    File::copy(path, path + ".tmp");
+    SharedGroup g(path + ".tmp", 0);
+
+    // First table is non-indexed for all columns, second is indexed for all columns
+    for (size_t tbl = 0; tbl < 2; tbl++) {
+        WriteTransaction wt(g);
+        TableRef t = wt.get_table(tbl);
+
+#if REALM_NULL_STRINGS == 1
+        CHECK_EQUAL(wt.get_group().get_file_format(), 3);
+#else
+        CHECK_EQUAL(wt.get_group().get_file_format(), 2);
 #endif
 
         size_t f;
@@ -377,5 +521,8 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     g.write(path);
 #endif
 }
+
+
+
 
 #endif 

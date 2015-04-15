@@ -5832,7 +5832,7 @@ TEST(Table_IndexStringDelete)
     }
 }
 
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
 TEST(Table_Nulls)
 {
     // 'round' lets us run this entire test both with and without index and with/without optimize/enum

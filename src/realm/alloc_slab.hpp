@@ -30,7 +30,7 @@
 
 namespace realm {
 
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
     // Bumped to 3 because of null support of String columns and because of new format of index
     const int default_file_format_version = 3;
 #else

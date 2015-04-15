@@ -39,7 +39,7 @@ Initialization initialization;
 
 void Group::upgrade_file_format()
 {
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
     REALM_ASSERT(is_attached());
     if (m_alloc.get_file_format() >= default_file_format_version)
         return;

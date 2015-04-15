@@ -248,7 +248,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) REALM_NOEXC
 // "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) REALM_NOEXCEPT
 {
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
     if (str.is_null())
     return 0;
 

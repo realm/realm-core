@@ -34,7 +34,7 @@ void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
 void StringIndex::validate_value(StringData str) const
 {
     // The "nulls on String column" branch fixed all known bugs in the index
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
     return;
 #endif
 
