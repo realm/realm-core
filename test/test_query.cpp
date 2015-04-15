@@ -5744,7 +5744,7 @@ TEST(Query_NullStrings)
     
 }
 
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
 TEST(Query_Nulls_Fuzzy)
 {
     for (int attributes = 1; attributes < 5; attributes++) {

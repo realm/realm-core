@@ -78,7 +78,7 @@ TEST(Upgrade_Database_2_3)
         
         TableRef t = g.get_table("table");
 
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
         CHECK_EQUAL(g.get_file_format(), 3);
 #else
         CHECK_EQUAL(g.get_file_format(), 2);
@@ -257,7 +257,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     for (size_t tbl = 0; tbl < 2; tbl++) {
         TableRef t = g.get_table(tbl);
 
-#ifdef REALM_NULL_STRINGS
+#if REALM_NULL_STRINGS == 1
         CHECK_EQUAL(g.get_file_format(), 3);
 #else
         CHECK_EQUAL(g.get_file_format(), 2);
