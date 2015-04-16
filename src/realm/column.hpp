@@ -387,19 +387,19 @@ class Column: public ColumnBase, public ColumnTemplate<int64_t> {
 public:
     typedef int64_t value_type;
 
-    int64_t get_val(size_t row) const { return get(row); }
+    int64_t get_val(size_t row) const override { return get(row); }
 
     Column(Allocator&, ref_type);
-    inline bool has_search_index() const REALM_NOEXCEPT;
+    inline bool has_search_index() const REALM_NOEXCEPT override;
     struct unattached_root_tag {};
     Column(unattached_root_tag, Allocator&);
 
     Column(Column&&) REALM_NOEXCEPT;
 
     ~Column() REALM_NOEXCEPT override;
-    void destroy() REALM_NOEXCEPT;
+    void destroy() REALM_NOEXCEPT override;
     void move_assign(Column&);
-    bool IsIntColumn() const REALM_NOEXCEPT { return true; }
+    bool IsIntColumn() const REALM_NOEXCEPT override { return true; }
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -441,10 +441,10 @@ public:
     void find_all(Column& result, int64_t value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
-    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues);
-    StringIndex* create_search_index();
-    StringIndex* get_search_index() REALM_NOEXCEPT;
-    const StringIndex* get_search_index() const REALM_NOEXCEPT;
+    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues) override;
+    StringIndex* create_search_index() override;
+    StringIndex* get_search_index() REALM_NOEXCEPT override;
+    const StringIndex* get_search_index() const REALM_NOEXCEPT override;
     void populate_search_index();
 
     void destroy_search_index() REALM_NOEXCEPT override;

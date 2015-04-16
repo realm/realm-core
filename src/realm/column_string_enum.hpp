@@ -112,9 +112,9 @@ public:
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
-    StringIndex* get_search_index() REALM_NOEXCEPT;
-    const StringIndex* get_search_index() const REALM_NOEXCEPT;
-    StringIndex* create_search_index();
+    StringIndex* get_search_index() REALM_NOEXCEPT override;
+    const StringIndex* get_search_index() const REALM_NOEXCEPT override;
+    StringIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) REALM_NOEXCEPT;
     void destroy_search_index() REALM_NOEXCEPT override;
 

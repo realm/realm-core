@@ -515,7 +515,7 @@ public:
             m_child2->init(table);
     }
 
-    std::string validate()
+    std::string validate() override
     {
         if (error_code != "")
             return error_code;
@@ -546,12 +546,12 @@ public:
         return not_found;
     }
 
-    ParentNode* child_criteria()
+    ParentNode* child_criteria() override
     {
         return m_child2;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new SubtableNode(*this);
     }
@@ -1482,12 +1482,12 @@ public:
         return "";
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new OrNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         for (size_t i = 0; i < m_cond.size(); ++i)
@@ -1736,7 +1736,7 @@ public:
         return res;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new ExpressionNode(*this);
     }
@@ -1797,7 +1797,7 @@ public:
         return ret;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new LinksToNode(*this);
     }
