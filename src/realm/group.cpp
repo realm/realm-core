@@ -990,7 +990,7 @@ public:
         }
     }
 
-    virtual size_t next_block(const char*& begin, const char*& end) override
+    size_t next_block(const char*& begin, const char*& end) override
     {
         while (m_logs_begin < m_logs_end) {
             size_t result = m_logs_begin->size();

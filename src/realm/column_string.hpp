@@ -94,10 +94,10 @@ public:
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
-    StringIndex* get_search_index() REALM_NOEXCEPT;
-    const StringIndex* get_search_index() const REALM_NOEXCEPT;
+    StringIndex* get_search_index() REALM_NOEXCEPT override;
+    const StringIndex* get_search_index() const REALM_NOEXCEPT override;
     std::unique_ptr<StringIndex> release_search_index() REALM_NOEXCEPT;
-    StringIndex* create_search_index();
+    StringIndex* create_search_index() override;
 
     // Simply inserts all column values in the index in a loop
     void populate_search_index();
@@ -145,7 +145,7 @@ public:
 #endif
 
 protected:
-    StringData get_val(std::size_t row) const { return get(row); }
+    StringData get_val(std::size_t row) const override { return get(row); }
 
 private:
     std::unique_ptr<StringIndex> m_search_index;

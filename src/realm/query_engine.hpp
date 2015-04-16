@@ -437,7 +437,7 @@ public:
         return to_size_t(m_tv.m_row_indexes.get(n));
     }
 
-    virtual void init(const Table& table) override
+    void init(const Table& table) override
     {
         m_table = &table;
 
@@ -515,7 +515,7 @@ public:
             m_child2->init(table);
     }
 
-    std::string validate()
+    std::string validate() override
     {
         if (error_code != "")
             return error_code;
@@ -546,17 +546,17 @@ public:
         return not_found;
     }
 
-    ParentNode* child_criteria()
+    ParentNode* child_criteria() override
     {
         return m_child2;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new SubtableNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_child2 = mapping.find(m_child2)->second;
@@ -892,7 +892,7 @@ public:
     }
 
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new FloatDoubleNode(*this);
     }
@@ -1358,7 +1358,7 @@ public:
     }
 
 public:
-    virtual ParentNode* clone() override
+    ParentNode* clone() override
     {
         return new StringNode<Equal>(*this);
     }
@@ -1482,12 +1482,12 @@ public:
         return "";
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new OrNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         for (size_t i = 0; i < m_cond.size(); ++i)
@@ -1558,7 +1558,7 @@ public:
         return new NotNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_cond = mapping.find(m_cond)->second;
@@ -1673,7 +1673,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new TwoColumnsNode<TConditionValue, TConditionFunction>(*this);
     }
@@ -1736,7 +1736,7 @@ public:
         return res;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new ExpressionNode(*this);
     }
@@ -1797,7 +1797,7 @@ public:
         return ret;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new LinksToNode(*this);
     }

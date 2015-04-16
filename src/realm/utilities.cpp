@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 #include <stdint.h>
+#include <atomic>
 
 #include <realm/utilities.hpp>
 #include <realm/unicode.hpp>
