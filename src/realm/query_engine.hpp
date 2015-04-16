@@ -892,7 +892,7 @@ public:
     }
 
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new FloatDoubleNode(*this);
     }
@@ -1673,7 +1673,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new TwoColumnsNode<TConditionValue, TConditionFunction>(*this);
     }
