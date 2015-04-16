@@ -945,7 +945,7 @@ protected:
     void CreateFromHeaderDirect(char* header, ref_type = 0) REALM_NOEXCEPT;
 
     // Includes array header. Not necessarily 8-byte aligned.
-    std::size_t CalcByteLen(std::size_t size, std::size_t width) const override;
+    virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
 
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
