@@ -53,7 +53,7 @@ public:
     StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
 
     void add_string(StringData value);
-    void set_string(std::size_t ndx, StringData value);
+    void set_string(std::size_t ndx, StringData value) override;
     void insert_string(std::size_t ndx, StringData value);
 
     /// Compare two binary columns for equality.

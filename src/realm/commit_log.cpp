@@ -83,8 +83,8 @@ public:
     void do_clear_interrupt() REALM_NOEXCEPT override {};
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
-    virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    virtual void submit_transact_log(BinaryData);
+    bool is_in_server_synchronization_mode() override{ return m_is_persisting; }
+    void submit_transact_log(BinaryData) override;
     void stop_logging() override;
     void reset_log_management(version_type last_version) override;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)

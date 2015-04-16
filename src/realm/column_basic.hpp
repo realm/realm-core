@@ -104,7 +104,7 @@ public:
 #endif
 
 protected:
-    T get_val(size_t row) const { return get(row); }
+    T get_val(size_t row) const override { return get(row); }
 
 private:
     std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }

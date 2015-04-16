@@ -464,7 +464,7 @@ public:
         return tableindex(r);
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new ListviewNode(*this);
     }
@@ -829,7 +829,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new IntegerNode<TConditionValue, TConditionFunction>(*this);
     }
@@ -1153,7 +1153,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new StringNode<TConditionFunction>(*this);
     }
@@ -1553,7 +1553,7 @@ public:
         return "";
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new NotNode(*this);
     }
