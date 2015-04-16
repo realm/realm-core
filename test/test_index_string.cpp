@@ -919,7 +919,7 @@ TEST(StringIndex_Zero_Crash2)
                 size_t pos = random.draw_int_max<size_t>(table.size());
                 table.insert_empty_row(pos);
                 table.set_string(0, pos, sd);
-                delete buf1;
+                free(buf1);
             }
             else if (table.size() > 0) {
                 // delete

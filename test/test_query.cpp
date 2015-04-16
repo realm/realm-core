@@ -5833,7 +5833,7 @@ TEST(Query_Nulls_Fuzzy)
                     table.set_string(0, pos, sd);
 
                     v.insert(v.begin() + pos, st);
-                    delete buf1;
+                    free(buf1);
 
                 }
                 else if (table.size() > 0) {
