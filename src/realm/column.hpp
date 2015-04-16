@@ -475,7 +475,7 @@ public:
     void move_last_over(std::size_t, std::size_t, bool) override;
     void clear(std::size_t, bool) override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
-    void update_from_parent(size_t old_baseline) REALM_NOEXCEPT;
+    void update_from_parent(size_t old_baseline) REALM_NOEXCEPT override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);

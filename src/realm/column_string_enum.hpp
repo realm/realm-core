@@ -126,7 +126,7 @@ public:
     void erase(std::size_t, bool) override;
     void move_last_over(std::size_t, std::size_t, bool) override;
     void clear(std::size_t, bool) override;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
+    void update_from_parent(std::size_t) REALM_NOEXCEPT;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
     std::size_t GetKeyNdx(StringData value) const;
