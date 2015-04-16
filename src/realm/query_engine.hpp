@@ -954,7 +954,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new BinaryNode(*this);
     }
