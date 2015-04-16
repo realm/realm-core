@@ -437,7 +437,7 @@ public:
         return to_size_t(m_tv.m_row_indexes.get(n));
     }
 
-    virtual void init(const Table& table) override
+    void init(const Table& table) override
     {
         m_table = &table;
 
@@ -551,12 +551,12 @@ public:
         return m_child2;
     }
 
-    virtual ParentNode* clone() override
+    ParentNode* clone() override
     {
         return new SubtableNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_child2 = mapping.find(m_child2)->second;
@@ -1358,7 +1358,7 @@ public:
     }
 
 public:
-    virtual ParentNode* clone() override
+    ParentNode* clone() override
     {
         return new StringNode<Equal>(*this);
     }
@@ -1558,7 +1558,7 @@ public:
         return new NotNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_cond = mapping.find(m_cond)->second;
@@ -1797,7 +1797,7 @@ public:
         return ret;
     }
 
-    virtual ParentNode* clone() override
+    ParentNode* clone() override
     {
         return new LinksToNode(*this);
     }
