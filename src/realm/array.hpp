@@ -53,6 +53,7 @@ Searching: The main finding function is:
 #include <realm/alloc.hpp>
 #include <realm/string_data.hpp>
 #include <realm/query_conditions.hpp>
+#include <realm/column_fwd.hpp>
 
 /*
     MMX: mmintrin.h
@@ -150,7 +151,6 @@ const std::size_t not_found = npos;
 class Array;
 class AdaptiveStringColumn;
 class GroupWriter;
-class Column;
 template<class T> class QueryState;
 namespace _impl { class ArrayWriterBase; }
 
