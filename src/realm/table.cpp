@@ -3372,15 +3372,15 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
 namespace {
 
 struct AggrState {
-    AggrState() : block(Array::no_prealloc_tag()), added_row(false) {}
+    AggrState(const Table& table) : table(table), block(table.get_alloc()), added_row(false) {}
 
-    const Table* table;
+    const Table& table;
     const StringIndex* dst_index;
     size_t group_by_column;
 
     const ColumnStringEnum* enums;
     vector<size_t> keys;
-    Array block;
+    ArrayInteger block;
     size_t offset;
     size_t block_end;
 
@@ -3391,7 +3391,7 @@ typedef size_t (*get_group_fnc)(size_t, AggrState&, Table&);
 
 size_t get_group_ndx(size_t i, AggrState& state, Table& result)
 {
-    StringData str = state.table->get_string(state.group_by_column, i);
+    StringData str = state.table.get_string(state.group_by_column, i);
     size_t ndx = state.dst_index->find_first(str);
     if (ndx == not_found) {
         ndx = result.add_empty_row();
@@ -3405,7 +3405,9 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 {
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
-        state.enums->Column::GetBlock(i, state.block, state.offset);
+        std::size_t ndx_in_leaf;
+        state.enums->Column::get_leaf(i, ndx_in_leaf, state.block);
+        state.offset = i - ndx_in_leaf;
         state.block_end = state.offset + state.block.size();
     }
 
@@ -3452,7 +3454,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     const Column& src_column = get_column(aggr_column);
     Column& dst_column = result.get_column(1);
 
-    AggrState state;
+    AggrState state(*this);
     get_group_fnc get_group_ndx_fnc = NULL;
 
     // When doing grouped aggregates, the column to group on is likely
@@ -3466,7 +3468,9 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.enums = &enums;
         state.keys.assign(key_count, 0);
 
-        enums.Column::GetBlock(0, state.block, state.offset);
+        std::size_t ndx_in_leaf;
+        enums.Column::get_leaf(0, ndx_in_leaf, state.block);
+        state.offset = 0 - ndx_in_leaf;
         state.block_end = state.offset + state.block.size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
     }
@@ -3476,7 +3480,6 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         result.add_search_index(0);
         const StringIndex& dst_index = *result.get_column_string(0).get_search_index();
 
-        state.table = this;
         state.dst_index = &dst_index;
         state.group_by_column = group_by_column;
         get_group_ndx_fnc = &get_group_ndx;

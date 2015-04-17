@@ -97,7 +97,8 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     // Array object instantiation must NOT allocate initial memory (capacity)
     // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call destroy() on array.
-    ArrType arr((Array::no_prealloc_tag()));
+    ArrType arr(column->get_alloc());
+    const ArrType* arrp = nullptr;
     size_t leaf_start = 0;
     size_t leaf_end = 0;
     size_t row_ndx;
@@ -116,12 +117,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
         row_ndx = to_size_t(m_row_indexes.get(ss));
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
-            column->GetBlock(row_ndx, arr, leaf_start);
-            const size_t leaf_size = arr.size();
-            leaf_end = leaf_start + leaf_size;
+            size_t ndx_in_leaf;
+            arrp = &column->get_leaf(row_ndx, ndx_in_leaf, arr);
+            leaf_start = row_ndx - ndx_in_leaf;
+            leaf_end = leaf_start + arrp->size();
         }
 
-        T v = arr.get(row_ndx - leaf_start);
+        T v = arrp->get(row_ndx - leaf_start);
 
         if (function == act_Sum)
             res += static_cast<R>(v);

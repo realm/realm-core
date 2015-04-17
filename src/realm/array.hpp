@@ -458,10 +458,6 @@ public:
     /// specified value.
     void ensure_minimum_width(int64_t value);
 
-    // Direct access methods
-    const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                          bool use_retval = false) const REALM_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
-
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
     void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const;
@@ -942,8 +938,6 @@ protected:
 protected:
 //    void AddPositiveLocal(int64_t value);
 
-    void CreateFromHeaderDirect(char* header, ref_type = 0) REALM_NOEXCEPT;
-
     // Includes array header. Not necessarily 8-byte aligned.
     virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
 
@@ -1030,7 +1024,7 @@ protected:
     static MemRef create(Type, bool context_flag, WidthType, std::size_t size,
                          int_fast64_t value, Allocator&);
 
-    static MemRef clone(const char* header, Allocator& alloc, Allocator& target_alloc);
+    static MemRef clone(MemRef header, Allocator& alloc, Allocator& target_alloc);
 
     /// Get the address of the header of this array.
     char* get_header() REALM_NOEXCEPT;
@@ -1863,8 +1857,8 @@ inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has
 
 inline MemRef Array::clone_deep(Allocator& target_alloc) const
 {
-    const char* header = get_header_from_data(m_data);
-    return clone(header, m_alloc, target_alloc); // Throws
+    char* header = get_header_from_data(m_data);
+    return clone(MemRef(header, m_ref), m_alloc, target_alloc); // Throws
 }
 
 inline void Array::move_assign(Array& a) REALM_NOEXCEPT
