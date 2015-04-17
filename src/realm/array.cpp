@@ -2741,7 +2741,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
+template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);
@@ -2797,9 +2797,9 @@ top:
         if (ref & 1) {
             size_t row_ref = size_t(uint64_t(ref) >> 1);
 
-            // for integer index, get_func fills out 'buffer' and makes str point at it
+            // for integer index, get_index_data fills out 'buffer' and makes str point at it
             char buffer[8];
-            StringData str = (*get_func)(column, row_ref, buffer);
+            StringData str = column->get_index_data(row_ref, buffer);
             if (str == value) {
                 result_ref = row_ref;
                 if (all)
@@ -2827,9 +2827,9 @@ top:
                 const char* sub_data = get_data_from_header(sub_header);
                 const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
 
-                // for integer index, get_func fills out 'buffer' and makes str point at it
+                // for integer index, get_index_data fills out 'buffer' and makes str point at it
                 char buffer[8];
-                StringData str = (*get_func)(column, first_row_ref, buffer);
+                StringData str = column->get_index_data(first_row_ref, buffer);
                 if (str.is_null() != value.is_null() || str != value) {
                     if (count)
                         return 0;
@@ -2859,9 +2859,9 @@ top:
                 if (count)
                     sub_count = sub.size();
 
-                // for integer index, get_func fills out 'buffer' and makes str point at it
+                // for integer index, get_index_data fills out 'buffer' and makes str point at it
                 char buffer[8];
-                StringData str = (*get_func)(column, first_row_ref, buffer);
+                StringData str = column->get_index_data(first_row_ref, buffer);
                 if (str != value)
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
@@ -2895,34 +2895,34 @@ top:
     }
 }
 
-size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
+size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column) const
 {
     size_t dummy;
     Column dummycol;
-    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column, get_func);
+    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
 }
 
 
-void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const
 {
     size_t dummy;
 
-    index_string<index_FindAll, StringData>(value, result, dummy, column, get_func);
+    index_string<index_FindAll, StringData>(value, result, dummy, column);
 }
 
 
-FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
+FindRes Array::IndexStringFindAllNoCopy(StringData value, ref_type& res_ref, ColumnBase* column) const
 {
     Column dummy;
-    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func));
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
 }
 
 
-size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
+size_t Array::IndexStringCount(StringData value, ColumnBase* column) const
 {
     Column dummy;
     size_t dummysizet;
-    return index_string<index_Count, StringData>(value, dummy, dummysizet, column, get_func);
+    return index_string<index_Count, StringData>(value, dummy, dummysizet, column);
 }
 
 

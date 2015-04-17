@@ -585,6 +585,24 @@ TEST(ColumnString_AutoEnumerateIndex)
     CHECK_EQUAL(19, results.get(3));
     CHECK_EQUAL(24, results.get(4));
 
+    results.clear();
+    e.find_all(results, "a");
+    CHECK_EQUAL(5, results.size());
+    CHECK_EQUAL(0, results.get(0));
+    CHECK_EQUAL(5, results.get(1));
+    CHECK_EQUAL(10, results.get(2));
+    CHECK_EQUAL(15, results.get(3));
+    CHECK_EQUAL(20, results.get(4));
+
+    results.clear();
+    e.find_all(results, "bc");
+    CHECK_EQUAL(5, results.size());
+    CHECK_EQUAL(1, results.get(0));
+    CHECK_EQUAL(6, results.get(1));
+    CHECK_EQUAL(11, results.get(2));
+    CHECK_EQUAL(16, results.get(3));
+    CHECK_EQUAL(21, results.get(4));
+
     // Set a value
     e.set(1, "newval");
     size_t res3 = e.count("a");

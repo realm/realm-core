@@ -73,6 +73,7 @@ public:
     double get_double(std::size_t ndx) const REALM_NOEXCEPT;
     StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
     BinaryData get_binary(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT;
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.
@@ -218,6 +219,12 @@ private:
                      std::ostream&) const override {} // Not used
 #endif
 };
+
+inline StringData ColumnMixed::get_index_data(std::size_t, char*) const REALM_NOEXCEPT
+{
+    REALM_ASSERT(false && "Index not supported for ColumnMixed yet.");
+    REALM_UNREACHABLE();
+}
 
 
 class ColumnMixed::RefsColumn: public ColumnSubtableParent {

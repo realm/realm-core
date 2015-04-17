@@ -180,6 +180,12 @@ bool AdaptiveStringColumn::is_null(std::size_t ndx) const REALM_NOEXCEPT
     return sd.is_null();
 }
 
+StringData AdaptiveStringColumn::get_index_data(std::size_t ndx, char*) const REALM_NOEXCEPT
+{
+    return get(ndx);
+}
+
+
 void AdaptiveStringColumn::set_null(std::size_t ndx)
 {
     REALM_ASSERT_DEBUG(m_nullable);

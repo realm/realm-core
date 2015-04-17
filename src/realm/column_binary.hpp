@@ -41,6 +41,7 @@ public:
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT final;
 
     void add(BinaryData value = BinaryData());
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -122,6 +123,12 @@ private:
 
 
 // Implementation
+
+inline StringData ColumnBinary::get_index_data(std::size_t, char*) const REALM_NOEXCEPT
+{
+    REALM_ASSERT(false && "Index not implemented for ColumnBinary.");
+    REALM_UNREACHABLE();
+}
 
 inline std::size_t ColumnBinary::size() const  REALM_NOEXCEPT
 {

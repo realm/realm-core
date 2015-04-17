@@ -31,6 +31,7 @@
 #include <realm/spec.hpp>
 #include <realm/impl/output_stream.hpp>
 #include <realm/query_conditions.hpp>
+#include <realm/index_string.hpp>
 
 namespace realm {
 
@@ -107,6 +108,10 @@ public:
     virtual void destroy() REALM_NOEXCEPT;
 
     virtual ~ColumnBase() REALM_NOEXCEPT {};
+    // Getter function for index. For integer index, the caller must supply a buffer that we can store the
+    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
+    // String index).
+    virtual StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT = 0;
 
     // Search index
     virtual bool has_search_index() const REALM_NOEXCEPT;

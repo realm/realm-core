@@ -52,6 +52,7 @@ public:
                           BasicArray<T>& fallback) const REALM_NOEXCEPT;
 
     T get(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_index_data(std::size_t, char* buffer) const REALM_NOEXCEPT final;
     void add(T value = T());
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value = T());
@@ -154,7 +155,13 @@ const BasicArray<T>& BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
     fallback.init_from_mem(p.first);
     ndx_in_leaf = p.second;
-    return fallback;
+}
+
+template <class T>
+StringData BasicColumn<T>::get_index_data(std::size_t, char*) const REALM_NOEXCEPT
+{
+    REALM_ASSERT(false && "Index not supported for floating-point columns yet.");
+    REALM_UNREACHABLE();
 }
 
 

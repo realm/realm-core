@@ -3,6 +3,7 @@
 
 #include <realm.hpp>
 #include <realm/index_string.hpp>
+#include <realm/column_string.hpp>
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
@@ -651,7 +652,7 @@ TEST(StringIndex_Count_Int)
             if (ints[t] == ints[y])
                 real++;
         }
-        
+
         CHECK_EQUAL(real, count);
     }
     // Clean up
@@ -671,21 +672,21 @@ TEST(StringIndex_Distinct_Int)
     // Create a new index on column
     col.create_search_index();
 
-    
+
     StringIndex& ndx = *col.get_search_index();
-    
+
     ref_type results_ref = Column::create(Allocator::get_default());
     Column results(Allocator::get_default(), results_ref);
 
     ndx.distinct(results);
-    
-    std::set<int64_t> s;    
+
+    std::set<int64_t> s;
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         s.insert(ints[t]);
     }
 
     CHECK_EQUAL(s.size(), results.size());
-    
+
     // Clean up
     col.destroy();
     results.destroy();
@@ -720,12 +721,15 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
     CHECK_EQUAL(2, f);
 
     col.insert(1, 5);
+    CHECK_EQUAL(col.get(1), 5);
 
     f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(3, f);
 
     col.add(7);
+    CHECK_EQUAL(col.get(4), 7);
     col.set(4, 10);
+    CHECK_EQUAL(col.get(4), 10);
 
     f = ndx.find_first(int64_t(10));
     CHECK_EQUAL(col.size() - 1, f);

@@ -285,9 +285,11 @@ void ColumnStringEnum::destroy_search_index() REALM_NOEXCEPT
 }
 
 
+StringData ColumnStringEnum::get_index_data(std::size_t ndx, char*) const REALM_NOEXCEPT
 void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent,
                                             size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
+    return get(ndx);
     REALM_ASSERT(!m_search_index);
     m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
                                          !allow_duplicate_valaues, m_array->get_alloc())); // Throws

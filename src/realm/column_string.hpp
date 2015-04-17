@@ -91,6 +91,7 @@ public:
     bool is_nullable() const;
 
     // Search index
+    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT final;
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
