@@ -21,6 +21,7 @@
 #ifndef REALM_BPTREE_HPP
 #define REALM_BPTREE_HPP
 
+#include <memory> // std::unique_ptr
 #include <realm/array.hpp>
 
 namespace realm {
