@@ -298,6 +298,9 @@
 		B159814B18CF560000E3C5DF /* demangle.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814818CF560000E3C5DF /* demangle.hpp */; };
 		B159814C18CF560000E3C5DF /* super_int.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814918CF560000E3C5DF /* super_int.hpp */; };
 		B159814E18CF562600E3C5DF /* test_safe_int_ops.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */; };
+		F490EB681AE0E520003E5CFA /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F490EB661AE0E520003E5CFA /* bptree.cpp */; };
+		F490EB691AE0E520003E5CFA /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F490EB671AE0E520003E5CFA /* bptree.hpp */; };
+		F490EB6A1AE0E526003E5CFA /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F490EB661AE0E520003E5CFA /* bptree.cpp */; };
 		F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 /* End PBXBuildFile section */
@@ -618,6 +621,8 @@
 		B159814818CF560000E3C5DF /* demangle.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = demangle.hpp; sourceTree = "<group>"; };
 		B159814918CF560000E3C5DF /* super_int.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = super_int.hpp; sourceTree = "<group>"; };
 		B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_safe_int_ops.cpp; sourceTree = "<group>"; };
+		F490EB661AE0E520003E5CFA /* bptree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bptree.cpp; path = realm/bptree.cpp; sourceTree = "<group>"; };
+		F490EB671AE0E520003E5CFA /* bptree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = bptree.hpp; path = realm/bptree.hpp; sourceTree = "<group>"; };
 		F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = query_engine.cpp; path = realm/query_engine.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -700,6 +705,8 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				F490EB661AE0E520003E5CFA /* bptree.cpp */,
+				F490EB671AE0E520003E5CFA /* bptree.hpp */,
 				F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */,
 				3620DF0318B6CA7B003AD498 /* impl */,
 				52D7C4661852A01700633748 /* util */,
@@ -1018,6 +1025,7 @@
 				365CCE38157CC37D00172BF8 /* array_binary.hpp in Headers */,
 				365CCE3A157CC37D00172BF8 /* array_blob.hpp in Headers */,
 				36FDACE017D67DDD0084E8BB /* array_blobs_big.hpp in Headers */,
+				F490EB691AE0E520003E5CFA /* bptree.hpp in Headers */,
 				3F967AFB1AA4C00800005C38 /* transact_log.hpp in Headers */,
 				365CCE3E157CC37D00172BF8 /* array_string.hpp in Headers */,
 				365CCE3C157CC37D00172BF8 /* array_string_long.hpp in Headers */,
@@ -1338,6 +1346,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				36A1DC9116C3F2F30086A836 /* alloc.cpp in Sources */,
+				F490EB681AE0E520003E5CFA /* bptree.cpp in Sources */,
 				365CCE34157CC37D00172BF8 /* alloc_slab.cpp in Sources */,
 				365CCE3F157CC37D00172BF8 /* array.cpp in Sources */,
 				365CCE37157CC37D00172BF8 /* array_binary.cpp in Sources */,
@@ -1466,6 +1475,7 @@
 			files = (
 				52F6359416B43C79006117C4 /* alloc.cpp in Sources */,
 				4142C93B1623478700B3B902 /* alloc_slab.cpp in Sources */,
+				F490EB6A1AE0E526003E5CFA /* bptree.cpp in Sources */,
 				4142C9401623478700B3B902 /* array.cpp in Sources */,
 				4142C93C1623478700B3B902 /* array_binary.cpp in Sources */,
 				4142C93D1623478700B3B902 /* array_blob.cpp in Sources */,

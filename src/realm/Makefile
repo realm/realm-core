@@ -27,6 +27,7 @@ alloc_slab.hpp \
 array.hpp \
 array_integer.hpp \
 array_string.hpp \
+bptree.hpp \
 data_type.hpp \
 column_type.hpp \
 column_fwd.hpp \
@@ -122,6 +123,7 @@ array_blobs_big.cpp \
 array_integer.cpp \
 array_string.cpp \
 array_string_long.cpp \
+bptree.cpp \
 column.cpp \
 column_backlink.cpp \
 column_binary.cpp \
