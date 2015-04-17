@@ -55,7 +55,7 @@ void ColumnLink::move_last_over(size_t row_ndx, size_t last_row_ndx,
         }
     }
 
-    do_move_last_over(row_ndx, last_row_ndx);
+    Column::move_last_over(row_ndx, last_row_ndx);
 }
 
 
@@ -66,7 +66,7 @@ void ColumnLink::clear(size_t, bool broken_reciprocal_backlinks)
         m_backlink_column->remove_all_backlinks(num_target_rows); // Throws
     }
 
-    do_clear(); // Throws
+    clear_without_updating_index(); // Throws
 }
 
 

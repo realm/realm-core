@@ -25,14 +25,6 @@ namespace {
 const size_t small_string_max_size  = 15; // ArrayString
 const size_t medium_string_max_size = 63; // ArrayStringLong
 
-// Getter function for index. For integer index, the caller must supply a buffer that we can store the
-// extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
-// String index).
-StringData get_string(void* column, size_t ndx, char*)
-{
-    return static_cast<AdaptiveStringColumn*>(column)->get(ndx);
-}
-
 void copy_leaf(const ArrayString& from, ArrayStringLong& to)
 {
     size_t n = from.size();
@@ -211,7 +203,7 @@ StringIndex* AdaptiveStringColumn::create_search_index()
     REALM_ASSERT(!m_search_index);
 
     std::unique_ptr<StringIndex> index;
-    index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
+    index.reset(new StringIndex(this, m_array->get_alloc())); // Throws
 
     // Populate the index
     m_search_index = std::move(index);
@@ -236,7 +228,7 @@ void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* paren
                                                 size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
                                          !allow_duplicate_valaues, m_array->get_alloc())); // Throws
 }
 
@@ -395,11 +387,11 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
 }
 
 
-class AdaptiveStringColumn::EraseLeafElem: public ColumnBase::EraseHandlerBase {
+class AdaptiveStringColumn::EraseLeafElem: public Array::EraseHandler {
 public:
+    AdaptiveStringColumn& m_column;
     EraseLeafElem(AdaptiveStringColumn& column, bool nullable) REALM_NOEXCEPT:
-        EraseHandlerBase(column), m_nullable(nullable) {}
-
+        m_column(column), m_nullable(nullable) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) override
@@ -407,7 +399,7 @@ public:
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
             // Small strings
-            ArrayString leaf(get_alloc(), m_nullable);
+            ArrayString leaf(m_column.get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
             REALM_ASSERT_3(leaf.size(), >=, 1);
@@ -423,7 +415,7 @@ public:
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Medium strings
-            ArrayStringLong leaf(get_alloc(), m_nullable);
+            ArrayStringLong leaf(m_column.get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
             REALM_ASSERT_3(leaf.size(), >=, 1);
@@ -437,7 +429,7 @@ public:
             return false;
         }
         // Big strings
-        ArrayBigBlobs leaf(get_alloc(), m_nullable);
+        ArrayBigBlobs leaf(m_column.get_alloc(), m_nullable);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
         REALM_ASSERT_3(leaf.size(), >=, 1);
@@ -452,41 +444,41 @@ public:
     }
     void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
     {
-        Array::destroy_deep(leaf_mem, get_alloc());
+        Array::destroy_deep(leaf_mem, m_column.get_alloc());
     }
     void replace_root_by_leaf(MemRef leaf_mem) override
     {
-        Array* leaf;
+        std::unique_ptr<Array> leaf;
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
             // Small strings
-            ArrayString* leaf_2 = new ArrayString(get_alloc(), m_nullable); // Throws
+            ArrayString* leaf_2 = new ArrayString(m_column.get_alloc(), m_nullable); // Throws
             leaf_2->init_from_mem(leaf_mem);
-            leaf = leaf_2;
+            leaf.reset(leaf_2);
         }
         else {
             bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
             if (!is_big) {
                 // Medium strings
-                ArrayStringLong* leaf_2 = new ArrayStringLong(get_alloc(), m_nullable); // Throws
+                ArrayStringLong* leaf_2 = new ArrayStringLong(m_column.get_alloc(), m_nullable); // Throws
                 leaf_2->init_from_mem(leaf_mem);
-                leaf = leaf_2;
+                leaf.reset(leaf_2);
             }
             else {
                 // Big strings
-                ArrayBigBlobs* leaf_2 = new ArrayBigBlobs(get_alloc(), m_nullable); // Throws
+                ArrayBigBlobs* leaf_2 = new ArrayBigBlobs(m_column.get_alloc(), m_nullable); // Throws
                 leaf_2->init_from_mem(leaf_mem);
-                leaf = leaf_2;
+                leaf.reset(leaf_2);
             }
         }
-        replace_root(leaf); // Throws, but accessor ownership is passed to callee
+        m_column.replace_root_array(std::move(leaf)); // Throws, but accessor ownership is passed to callee
     }
     void replace_root_by_empty_leaf() override
     {
         std::unique_ptr<ArrayString> leaf;
-        leaf.reset(new ArrayString(get_alloc(),m_nullable)); // Throws
+        leaf.reset(new ArrayString(m_column.get_alloc(), m_nullable)); // Throws
         leaf->create(); // Throws
-        replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
+        m_column.replace_root_array(std::move(leaf)); // Throws, but accessor ownership is passed to callee
     }
 
 private:
@@ -1351,7 +1343,7 @@ void AdaptiveStringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spe
     // Refresh search index
     if (m_search_index) {
         size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        m_search_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+        m_search_index->set_ndx_in_parent(ndx_in_parent + 1);
         m_search_index->refresh_accessor_tree(col_ndx, spec); // Throws
     }
 }
@@ -1517,8 +1509,8 @@ void AdaptiveStringColumn::Verify(const Table& table, size_t col_ndx) const
     bool has_search_index = (attr & col_attr_Indexed) != 0;
     REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
     if (has_search_index) {
-        REALM_ASSERT(m_search_index->get_root_array()->get_ndx_in_parent() ==
-                       m_array->get_ndx_in_parent() + 1);
+        REALM_ASSERT(m_search_index->get_ndx_in_parent() ==
+                       get_root_array()->get_ndx_in_parent() + 1);
     }
 }
 

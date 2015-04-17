@@ -31,7 +31,7 @@ namespace realm {
 /// of the column is the root of the B+-tree. Leaf nodes are either of
 /// type ArrayBinary (array of small blobs) or ArrayBigBlobs (array of
 /// big blobs).
-class ColumnBinary: public ColumnBase {
+class ColumnBinary: public ColumnBaseSimple {
 public:
     typedef BinaryData value_type;
 

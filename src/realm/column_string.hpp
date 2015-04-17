@@ -25,6 +25,7 @@
 #include <realm/array_string_long.hpp>
 #include <realm/array_blobs_big.hpp>
 #include <realm/column.hpp>
+#include <realm/column_tpl.hpp>
 
 namespace realm {
 
@@ -44,7 +45,7 @@ class StringIndex;
 /// column.
 ///
 /// FIXME: Rename AdaptiveStringColumn to StringColumn
-class AdaptiveStringColumn: public ColumnBase, public ColumnTemplate<StringData> {
+class AdaptiveStringColumn: public ColumnBaseSimple, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
 
@@ -118,7 +119,6 @@ public:
         leaf_type_Big     ///< ArrayBigBlobs
     };
 
-    
     std::unique_ptr<const ArrayParent> get_leaf(std::size_t ndx, std::size_t& out_ndx_in_parent,
                       LeafType& out_leaf_type) const;
 

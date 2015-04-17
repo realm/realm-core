@@ -3372,7 +3372,7 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
 namespace {
 
 struct AggrState {
-    AggrState(const Table& table) : table(table), block(table.get_alloc()), added_row(false) {}
+    AggrState(const Table& table) : table(table), cache(table.get_alloc()), added_row(false) {}
 
     const Table& table;
     const StringIndex* dst_index;
@@ -3380,7 +3380,8 @@ struct AggrState {
 
     const ColumnStringEnum* enums;
     vector<size_t> keys;
-    ArrayInteger block;
+    const ArrayInteger* block = nullptr;
+    ArrayInteger cache;
     size_t offset;
     size_t block_end;
 
@@ -3406,14 +3407,15 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
         std::size_t ndx_in_leaf;
-        state.enums->Column::get_leaf(i, ndx_in_leaf, state.block);
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        state.enums->Column::get_leaf(i, ndx_in_leaf, leaf);
         state.offset = i - ndx_in_leaf;
-        state.block_end = state.offset + state.block.size();
+        state.block_end = state.offset + state.block->size();
     }
 
     // Since we know the exact number of distinct keys,
     // we can use that to avoid index lookups
-    int64_t key = state.block.get(i - state.offset);
+    int64_t key = state.block->get(i - state.offset);
     size_t ndx = state.keys[key];
 
     // Stored position is offset by one, so zero can indicate
@@ -3469,9 +3471,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.keys.assign(key_count, 0);
 
         std::size_t ndx_in_leaf;
-        enums.Column::get_leaf(0, ndx_in_leaf, state.block);
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        enums.Column::get_leaf(0, ndx_in_leaf, leaf);
         state.offset = 0 - ndx_in_leaf;
-        state.block_end = state.offset + state.block.size();
+        state.block_end = state.offset + state.block->size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
     }
     else {

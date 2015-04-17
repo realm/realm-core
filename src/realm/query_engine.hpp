@@ -233,8 +233,9 @@ public:
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
+            typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
             std::size_t ndx_in_leaf;
-            m_leaf_ptr = &m_column->get_leaf(index, ndx_in_leaf, *m_array_ptr);
+            m_column->get_leaf(index, ndx_in_leaf, leaf);
             m_leaf_start = index - ndx_in_leaf;
             const size_t leaf_size = m_leaf_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -659,7 +660,8 @@ public:
     void get_leaf(const Column& col, std::size_t ndx)
     {
         std::size_t ndx_in_leaf;
-        m_leaf_ptr = &col.get_leaf(ndx, ndx_in_leaf, *m_array_ptr);
+        Column::LeafInfo leaf_info{&m_leaf_ptr, m_array_ptr.get()};
+        col.get_leaf(ndx, ndx_in_leaf, leaf_info);
         m_leaf_start = ndx - ndx_in_leaf;
         m_leaf_end = m_leaf_start + m_leaf_ptr->size();
     }

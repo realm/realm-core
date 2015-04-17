@@ -46,7 +46,7 @@ class ColumnBinary;
 /// data. The last subcolumn is optional. The root of a mixed column
 /// is an array node of type Array that stores the root refs of the
 /// subcolumns.
-class ColumnMixed: public ColumnBase {
+class ColumnMixed: public ColumnBaseSimple {
 public:
     /// Create a mixed column wrapper and attach it to a preexisting
     /// underlying structure of arrays.

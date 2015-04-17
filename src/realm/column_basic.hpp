@@ -21,6 +21,7 @@
 #define REALM_COLUMN_BASIC_HPP
 
 #include <realm/column.hpp>
+#include <realm/column_tpl.hpp>
 #include <realm/array_basic.hpp>
 
 namespace realm {
@@ -40,7 +41,7 @@ template<> struct AggReturnType<float> {
 /// A basic column can currently only be used for simple unstructured
 /// types like float, double.
 template<class T>
-class BasicColumn : public ColumnBase, public ColumnTemplate<T> {
+class BasicColumn : public ColumnBaseSimple, public ColumnTemplate<T> {
 public:
     typedef T value_type;
     BasicColumn(Allocator&, ref_type);
@@ -48,8 +49,13 @@ public:
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    const BasicArray<T>& get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                          BasicArray<T>& fallback) const REALM_NOEXCEPT;
+    struct LeafInfo {
+        const BasicArray<T>** out_leaf_ptr;
+        BasicArray<T>* in_fallback;
+    };
+
+    void get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                          LeafInfo& inout_leaf_info) const REALM_NOEXCEPT;
 
     T get(std::size_t ndx) const REALM_NOEXCEPT;
     StringData get_index_data(std::size_t, char* buffer) const REALM_NOEXCEPT final;
@@ -145,15 +151,17 @@ private:
 };
 
 template <class T>
-const BasicArray<T>& BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                                         BasicArray<T>& fallback) const REALM_NOEXCEPT
+void BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                                         LeafInfo& leaf) const REALM_NOEXCEPT
 {
     if (!m_array->is_inner_bptree_node()) {
         ndx_in_leaf = ndx;
-        return static_cast<const BasicArray<T>&>(*m_array);
+        *leaf.out_leaf_ptr = static_cast<const BasicArray<T>*>(m_array.get());
+        return;
     }
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
-    fallback.init_from_mem(p.first);
+    leaf.in_fallback->init_from_mem(p.first);
+    *leaf.out_leaf_ptr = leaf.in_fallback;
     ndx_in_leaf = p.second;
 }
 
