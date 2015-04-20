@@ -70,7 +70,7 @@ TEST(Upgrade_Database_2_3)
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
         string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-        File::copy(path, path + ".tmp");
+        CHECK(File::copy(path, path + ".tmp"));
 
         // Open copy. Group constructor will upgrade automatically if needed, also even though user requested ReadOnly. Todo,
         // discuss if this is OK.
@@ -113,7 +113,7 @@ TEST(Upgrade_Database_2_3)
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
         string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-        File::copy(path, path + ".tmp");
+        CHECK(File::copy(path, path + ".tmp"));
 
         SharedGroup sg(path + ".tmp");
         ReadTransaction rt(sg);
@@ -169,7 +169,7 @@ TEST(Upgrade_Database_2_3)
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
         string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-        File::copy(path, path + ".tmp");
+        CHECK(File::copy(path, path + ".tmp"));
 
         SharedGroup sg(path + ".tmp");
         WriteTransaction rt(sg);
@@ -250,7 +250,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
     string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
-    File::copy(path, path + ".tmp");
+    CHECK(File::copy(path, path + ".tmp"));
     SharedGroup g(path + ".tmp", 0);
 
     // First table is non-indexed for all columns, second is indexed for all columns
@@ -392,7 +392,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
     string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
-    File::copy(path, path + ".tmp");
+    CHECK(File::copy(path, path + ".tmp"));
     SharedGroup g(path + ".tmp", 0);
 
     // First table is non-indexed for all columns, second is indexed for all columns
