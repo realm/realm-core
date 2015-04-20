@@ -134,6 +134,9 @@ public:
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx, Array::TreeInsert<BpTree<T, Nullable>>&);
 private:
+    LeafType& root_as_leaf();
+    const LeafType& root_as_leaf() const;
+
     struct EraseHandler;
     struct UpdateHandler;
     struct SliceHandler;
@@ -222,10 +225,26 @@ BpTree<T,N>::BpTree() : BpTreeBase(std::unique_ptr<Array>(new LeafType(Allocator
 }
 
 template <class T, bool N>
+typename BpTree<T,N>::LeafType&
+BpTree<T,N>::root_as_leaf()
+{
+    REALM_ASSERT_DEBUG(root_is_leaf());
+    return static_cast<LeafType&>(root());
+}
+
+template <class T, bool N>
+const typename BpTree<T,N>::LeafType&
+BpTree<T,N>::root_as_leaf() const
+{
+    REALM_ASSERT_DEBUG(root_is_leaf());
+    return static_cast<const LeafType&>(root());
+}
+
+template <class T, bool N>
 std::size_t BpTree<T, N>::size() const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
-        return static_cast<const LeafType&>(root()).size();
+        return root_as_leaf().size();
     }
     return root().get_bptree_size();
 }
@@ -242,7 +261,7 @@ T BpTree<T, N>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
-        return static_cast<const LeafType&>(root()).get(ndx);
+        root_as_leaf().get(ndx);
     }
     LeafType fallback(get_alloc());
     const LeafType* leaf;
@@ -301,7 +320,7 @@ template <class T, bool N>
 void BpTree<T, N>::set(std::size_t ndx, T value)
 {
     if (root_is_leaf()) {
-        static_cast<LeafType&>(*m_root).set(ndx, std::move(value));
+        root_as_leaf().set(ndx, std::move(value));
     }
     else {
         UpdateHandler set_leaf_elem(*this, std::move(value));
@@ -364,7 +383,7 @@ void BpTree<T,N>::erase(std::size_t ndx, bool is_last)
     REALM_ASSERT_DEBUG(ndx < size());
     REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
     if (root_is_leaf()) {
-        static_cast<LeafType&>(*m_root).erase(ndx);
+        root_as_leaf().erase(ndx);
     }
     else {
         std::size_t ndx_2 = is_last ? npos : ndx;
@@ -403,7 +422,7 @@ template <class T, bool N>
 void BpTree<T, N>::adjust(T diff)
 {
     if (root_is_leaf()) {
-        static_cast<LeafType&>(*m_root).adjust(0, m_root->size(), std::move(diff)); // Throws
+        root_as_leaf().adjust(0, m_root->size(), std::move(diff)); // Throws
     }
     else {
         AdjustHandler adjust_leaf_elem(*this, std::move(diff));
@@ -438,7 +457,7 @@ template <class T, bool N>
 void BpTree<T, N>::adjust_ge(T limit, T diff)
 {
     if (root_is_leaf()) {
-        static_cast<LeafType&>(*m_root).adjust_ge(std::move(limit), std::move(diff)); // Throws
+        root_as_leaf().adjust_ge(std::move(limit), std::move(diff)); // Throws
     }
     else {
         AdjustGEHandler adjust_leaf_elem(*this, std::move(limit), std::move(diff));
@@ -459,7 +478,7 @@ void BpTree<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
 {
     if (root_is_leaf()) {
         ndx_in_leaf = ndx;
-        *inout_leaf_info.out_leaf = &static_cast<const LeafType&>(root());
+        *inout_leaf_info.out_leaf = &root_as_leaf();
         return;
     }
     std::pair<MemRef, std::size_t> p = root().get_bptree_leaf(ndx);
@@ -472,7 +491,7 @@ template <class T, bool N>
 std::size_t BpTree<T, N>::find_first(T value, std::size_t begin, std::size_t end) const
 {
     if (root_is_leaf()) {
-        return static_cast<const LeafType&>(*m_root).find_first(value, begin, end);
+        return root_as_leaf().find_first(value, begin, end);
     }
 
     // FIXME: It would be better to always require that 'end' is
@@ -503,7 +522,7 @@ template <class T, bool N>
 void BpTree<T,N>::find_all(Column& result, T value, std::size_t begin, std::size_t end) const
 {
     if (root_is_leaf()) {
-        static_cast<const LeafType&>(root()).find_all(&result, value, 0, begin, end); // Throws
+        root_as_leaf().find_all(&result, value, 0, begin, end); // Throws
         return;
     }
 
@@ -553,10 +572,10 @@ template <class T, bool N>
 void BpTree<T, N>::verify() const
 {
     if (root_is_leaf()) {
-        static_cast<const LeafType&>(root()).Verify();
+        root_as_leaf().Verify();
     }
     else {
-        static_cast<const LeafType&>(root()).verify_bptree(&verify_leaf);
+        root().verify_bptree(&verify_leaf);
     }
 }
 #endif // REALM_DEBUG
