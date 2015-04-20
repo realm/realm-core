@@ -665,7 +665,7 @@ public:
     }
 
 private:
-    typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type m_leaf_accessor_storage;
+    std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type m_leaf_accessor_storage;
     std::unique_ptr<ArrayInteger, PlacementDelete> m_array_ptr;
 };
 
