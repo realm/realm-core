@@ -411,11 +411,10 @@ public:
     /// specified index. Upon return \a ndx_in_leaf will be set to the
     /// corresponding index relative to the beginning of the leaf.
     ///
-    /// When the root is a leaf, this function returns a pointer to
-    /// the array accessor cached inside this column
-    /// accessor. Otherwise this function attaches the specified
-    /// fallback accessor to the identified leaf, and returns a
-    /// pointer to the fallback accessor.
+    /// LeafInfo is a struct defined by the underlying BpTree<T,N>
+    /// data structure, that provides a way for the caller to do
+    /// leaf caching without instantiating too many objects along
+    /// the way.
     ///
     /// This function cannot be used for modifying operations as it
     /// does not ensure the presence of an unbroken chain of parent
@@ -531,8 +530,8 @@ protected:
     /// destroys that array node. Note that the same is **not** true for
     /// Column::do_erase() and Column::do_move_last_over().
     ///
-    /// FIXME: Be careful, do_clear() currently forgets if the leaf type is
-    /// Array::type_HasRefs.
+    /// FIXME: Be careful, clear_without_updating_index() currently forgets
+    /// if the leaf type is Array::type_HasRefs.
     void clear_without_updating_index();
 
 #ifdef REALM_DEBUG

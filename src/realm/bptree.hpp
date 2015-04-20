@@ -85,6 +85,15 @@ public:
     using value_type = T;
     using LeafType = typename GetLeafType<T, Nullable>::type;
 
+    /// LeafInfo is used by get_leaf() to provide access to a leaf
+    /// without instantiating unnecessary nodes along the way.
+    /// Upon return, out_leaf with hold a pointer to the leaf containing
+    /// the index given to get_leaf(). If the index happens to be
+    /// in the root node (i.e., the root is a leaf), it will point
+    /// to the root node.
+    /// If the index isn't in the root node, fallback will be initialized
+    /// to represent the leaf holding the node, and out_leaf will be set
+    /// to point to fallback.
     struct LeafInfo {
         const LeafType** out_leaf;
         LeafType* fallback;
@@ -114,8 +123,18 @@ public:
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     static MemRef create_leaf(Array::Type, std::size_t size, T value, Allocator&);
+
+    /// See LeafInfo for information about what to put in the inout_leaf
+    /// parameter.
+    ///
+    /// This function cannot be used for modifying operations as it
+    /// does not ensure the presence of an unbroken chain of parent
+    /// accessors. For this reason, the identified leaf should always
+    /// be accessed through the returned const-qualified reference,
+    /// and never directly through the specfied fallback accessor.
     void get_leaf(std::size_t ndx, std::size_t& out_ndx_in_leaf,
                   LeafInfo& inout_leaf) const REALM_NOEXCEPT;
+
     void update_each(Array::UpdateHandler&);
     void update_elem(std::size_t, Array::UpdateHandler&);
 

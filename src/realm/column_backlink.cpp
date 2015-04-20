@@ -261,7 +261,7 @@ void ColumnBackLink::clear(std::size_t num_rows, bool)
     }
 
     clear_without_updating_index(); // Throws
-    // FIXME: This one is needed because Column::do_clear() forgets about
+    // FIXME: This one is needed because Column::clear_without_updating_index() forgets about
     // the leaf type. A better solution should probably be found.
     get_root_array()->set_type(Array::type_HasRefs);
 }

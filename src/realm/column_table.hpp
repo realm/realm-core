@@ -275,7 +275,7 @@ inline void ColumnSubtableParent::clear(std::size_t, bool)
 {
     discard_child_accessors();
     clear_without_updating_index(); // Throws
-    // FIXME: This one is needed because Column::do_clear() forgets about the
+    // FIXME: This one is needed because Column::clear_without_updating_index() forgets about the
     // leaf type. A better solution should probably be sought after.
     get_root_array()->set_type(Array::type_HasRefs);
 }
