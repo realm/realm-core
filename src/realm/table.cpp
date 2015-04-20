@@ -1190,8 +1190,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
 
     bool nullable = is_nullable(col_ndx);
 
-    REALM_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
-                                  col_type != col_type_StringEnum)));
+    REALM_ASSERT_DEBUG(!(nullable && !is_nullable_type(col_type)));
 
     switch (col_type) {
         case col_type_Int:
@@ -1612,6 +1611,13 @@ bool Table::is_nullable(size_t col_ndx) const
 {
     REALM_ASSERT_DEBUG(col_ndx < m_spec.get_column_count());
     return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
+}
+
+bool Table::is_nullable_type(realm::ColumnType type) const {
+    return type == col_type_String ||
+           type == col_type_StringEnum ||
+           type == col_type_Link ||
+           type == col_type_LinkList;
 }
 
 const ColumnBase& Table::get_column_base(size_t ndx) const REALM_NOEXCEPT
