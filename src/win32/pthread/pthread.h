@@ -317,7 +317,7 @@ enum {
 #define HAVE_STRUCT_TIMESPEC
 #if !defined(_TIMESPEC_DEFINED)
 #define _TIMESPEC_DEFINED
-struct timespec {
+struct timespec2 {
         time_t tv_sec;
         long tv_nsec;
 };
