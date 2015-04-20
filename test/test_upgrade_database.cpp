@@ -52,9 +52,9 @@ using namespace realm::util;
 
 TEST(Upgrade_Database_2_3)
 {
-    // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
-    // very first action, call Group::upgrade_file_format() on it. You must not call any reading or modifying 
-    // method on it prior to that, because core is not backwards compatible with the version 2 file format!
+    // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
+    // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
+    // even read using Get()) without upgrading the database first.
 
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
