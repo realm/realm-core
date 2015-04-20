@@ -514,7 +514,7 @@ std::size_t BpTree<T, N>::find_first(T value, std::size_t begin, std::size_t end
     }
 
     // FIXME: It would be better to always require that 'end' is
-    // specified explicitely, since Table has the size readily
+    // specified explicitly, since Table has the size readily
     // available, and Array::get_bptree_size() is deprecated.
     if (end == npos)
         end = size();
