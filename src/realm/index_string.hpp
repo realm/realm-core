@@ -22,6 +22,7 @@
 
 #include <iostream>
 #include <cstring>
+#include <memory>
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
