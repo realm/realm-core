@@ -71,6 +71,16 @@ void ColumnBase::Verify(const Table&, size_t) const
 
 #endif // REALM_DEBUG
 
+void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
+{
+    // FIXME: Duplicated from bptree.cpp.
+    ArrayParent* parent = m_array->get_parent();
+    std::size_t ndx_in_parent = m_array->get_ndx_in_parent();
+    leaf->set_parent(parent, ndx_in_parent);
+    leaf->update_parent(); // Throws
+    m_array = std::move(leaf);
+}
+
 
 namespace {
 

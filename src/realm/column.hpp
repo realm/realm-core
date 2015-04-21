@@ -316,7 +316,7 @@ protected:
     ColumnBaseSimple(Array* root) : m_array(root) {}
     std::unique_ptr<Array> m_array;
 
-    void replace_root_array(std::unique_ptr<Array> new_root) final { m_array = std::move(new_root); }
+    void replace_root_array(std::unique_ptr<Array> new_root) final;
     bool root_is_leaf() const REALM_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
 
     /// Introduce a new root node which increments the height of the
