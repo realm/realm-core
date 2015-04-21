@@ -491,10 +491,11 @@ This tests the new string conditions now available for the expression syntax.
 Null behaviour (+ means concatenation): 
 
 If A + B == A, then A is a prefix of B, and B is a suffix of A. This is valid for any A and B, including null and 
-empty strings.
+empty strings. Three examples:
 
-So "" both begins with null and ends with null and contains null.
-But null does not contain, begin with, or end with ""
+1)    "" both begins with null and ends with null and contains null.
+2)    null does not contain, begin with, or end with ""
+3)    null contains null, begins with null and ends with null
 
 See TEST(StringData_Substrings) for more unit tests for null, isolated to using only StringData class with no
 columns or queries involved
@@ -645,7 +646,8 @@ TEST(Query_NextGen_StringConditions)
     m = table2->column<String>(0).not_equal(realm::null(), false).count();
     CHECK_EQUAL(m, 3);
 
-
+    m = table2->column<String>(0).contains(realm::null(), false).count();
+    CHECK_EQUAL(m, 3);
 }
 
 
