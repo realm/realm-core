@@ -784,7 +784,7 @@ T TColumn<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_n
 template <class T, bool N>
 void TColumn<T,N>::destroy_subtree(size_t ndx, bool clear_value)
 {
-    static_assert(std::is_convertible<T, int_fast64_t>::value && !N,
+    static_assert(std::is_same<T, int_fast64_t>::value && !N,
         "destroy_subtree only makes sense on non-nullable integer columns");
     int_fast64_t value = get(ndx);
 
