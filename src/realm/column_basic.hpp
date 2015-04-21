@@ -46,7 +46,7 @@ public:
     typedef T value_type;
     BasicColumn(Allocator&, ref_type);
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     struct LeafInfo {
@@ -117,8 +117,6 @@ protected:
     T get_val(size_t row) const override { return get(row); }
 
 private:
-    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
-
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, T value, std::size_t num_rows);
 

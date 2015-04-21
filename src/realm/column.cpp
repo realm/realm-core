@@ -35,14 +35,8 @@ void ColumnBase::set_string(size_t, StringData)
     throw LogicError(LogicError::type_mismatch);
 }
 
-void ColumnBase::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
-{
-    get_root_array()->update_from_parent(old_baseline);
-}
-
 void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    ColumnBase::update_from_parent(old_baseline);
     if (m_search_index) {
         m_search_index->update_from_parent(old_baseline);
     }
@@ -60,16 +54,8 @@ void ColumnBase::cascade_break_backlinks_to_all_rows(size_t, CascadeState&)
     // No-op by default
 }
 
-void ColumnBase::destroy() REALM_NOEXCEPT
-{
-    if (get_root_array()) {
-        get_root_array()->destroy_deep();
-    }
-}
-
 void ColumnBaseWithIndex::destroy() REALM_NOEXCEPT
 {
-    ColumnBase::destroy();
     if (m_search_index) {
         m_search_index->destroy();
     }
@@ -411,7 +397,7 @@ ref_type ColumnBase::write(const Array* root, size_t slice_offset, size_t slice_
 }
 
 
-void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
+void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
                                     bool is_append)
 {
     // At this point the original root and its new sibling is either
@@ -570,10 +556,15 @@ public:
     }
 };
 
-void ColumnBase::tree_to_dot(ostream& out) const
+void ColumnBaseSimple::tree_to_dot(ostream& out) const
+{
+    ColumnBase::bptree_to_dot(get_root_array(), out);
+}
+
+void ColumnBase::bptree_to_dot(const Array* root, ostream& out) const
 {
     LeafToDot handler(*this);
-    get_root_array()->bptree_to_dot(out, handler);
+    root->bptree_to_dot(out, handler);
 }
 
 void ColumnBase::dump_node_structure() const

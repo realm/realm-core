@@ -66,7 +66,7 @@ class ColumnBase {
 public:
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
-    std::size_t size() const REALM_NOEXCEPT;
+    virtual std::size_t size() const REALM_NOEXCEPT = 0;
 
     /// \throw LogicError Thrown if this column is not string valued.
     virtual void set_string(std::size_t row_ndx, StringData value);
@@ -106,7 +106,7 @@ public:
     // Returns true if, and only if this column is an AdaptiveStringColumn.
     virtual bool is_string_col() const REALM_NOEXCEPT;
 
-    virtual void destroy() REALM_NOEXCEPT;
+    virtual void destroy() REALM_NOEXCEPT = 0;
     void move_assign(ColumnBase& col) REALM_NOEXCEPT;
 
     virtual ~ColumnBase() REALM_NOEXCEPT {}
@@ -126,25 +126,15 @@ public:
                                       bool allow_duplicate_values);
     virtual void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
-    Allocator& get_alloc() const REALM_NOEXCEPT { return get_root_array()->get_alloc(); }
+    virtual Allocator& get_alloc() const REALM_NOEXCEPT = 0;
 
     /// Returns the 'ref' of the root array.
-    ref_type get_ref() const REALM_NOEXCEPT { return get_root_array()->get_ref(); }
-
-    //@{
-    /// Returns the array node at the root of this column, but note
-    /// that there is no guarantee that this node is an inner B+-tree
-    /// node or a leaf. This is the case for a MixedColumn in
-    /// particular.
-    virtual Array* get_root_array() REALM_NOEXCEPT = 0;
-    virtual const Array* get_root_array() const REALM_NOEXCEPT = 0;
-    //@}
+    virtual ref_type get_ref() const REALM_NOEXCEPT = 0;
 
     virtual void replace_root_array(std::unique_ptr<Array> leaf) = 0;
     virtual MemRef clone_deep(Allocator& alloc) const = 0;
-
-    inline void detach(void);
-    inline bool is_attached(void) const REALM_NOEXCEPT;
+    virtual void detach(void) = 0;
+    virtual bool is_attached(void) const REALM_NOEXCEPT = 0;
 
     static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) REALM_NOEXCEPT;
 
@@ -157,12 +147,14 @@ public:
     virtual ref_type write(std::size_t slice_offset, std::size_t slice_size,
                            std::size_t table_size, _impl::OutputStream&) const = 0;
 
-    void set_parent(ArrayParent*, std::size_t ndx_in_parent) REALM_NOEXCEPT;
+    virtual void set_parent(ArrayParent*, std::size_t ndx_in_parent) REALM_NOEXCEPT = 0;
+    virtual std::size_t get_ndx_in_parent() const REALM_NOEXCEPT = 0;
+    virtual void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT = 0;
 
     /// Called in the context of Group::commit() and
     /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
     /// table and link list accessors stay valid across a commit.
-    virtual void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
+    virtual void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT = 0;
 
     //@{
 
@@ -240,12 +232,12 @@ public:
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
+    void bptree_to_dot(const Array* root, std::ostream& out) const;
 #endif
 
 protected:
     ColumnBase() {}
     ColumnBase(ColumnBase&&) = default;
-    virtual std::size_t do_get_size() const REALM_NOEXCEPT = 0;
 
     // Must not assume more than minimal consistency (see
     // AccessorConsistencyLevels).
@@ -261,16 +253,9 @@ protected:
     //@}
 
     // Node functions
-    bool root_is_leaf() const REALM_NOEXCEPT { return !get_root_array()->is_inner_bptree_node(); }
-
     template <class T, class R, Action action, class condition>
     R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1),
                 size_t* return_ndx = nullptr) const;
-
-    /// Introduce a new root node which increments the height of the
-    /// tree by one.
-    void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
-                            bool is_append);
 
     class CreateHandler {
     public:
@@ -294,7 +279,6 @@ protected:
     class LeafToDot;
     virtual void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                              std::ostream&) const = 0;
-    void tree_to_dot(std::ostream&) const;
 #endif
 
 private:
@@ -308,8 +292,24 @@ private:
 // FIXME: Temporary class until all column types have been migrated to use BpTree interface
 class ColumnBaseSimple : public ColumnBase {
 public:
-    Array* get_root_array() REALM_NOEXCEPT final { return m_array.get(); }
-    const Array* get_root_array() const REALM_NOEXCEPT final { return m_array.get(); }
+    //@{
+    /// Returns the array node at the root of this column, but note
+    /// that there is no guarantee that this node is an inner B+-tree
+    /// node or a leaf. This is the case for a MixedColumn in
+    /// particular.
+    Array* get_root_array() REALM_NOEXCEPT { return m_array.get(); }
+    const Array* get_root_array() const REALM_NOEXCEPT { return m_array.get(); }
+    //@}
+
+    Allocator& get_alloc() const REALM_NOEXCEPT final { return m_array->get_alloc(); }
+    void destroy() REALM_NOEXCEPT override { if (m_array) m_array->destroy_deep(); }
+    ref_type get_ref() const REALM_NOEXCEPT final { return m_array->get_ref(); }
+    void detach() REALM_NOEXCEPT final { m_array->detach(); }
+    bool is_attached() const REALM_NOEXCEPT final { return m_array->is_attached(); }
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT final { m_array->set_parent(parent, ndx_in_parent); }
+    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT final { return m_array->get_ndx_in_parent(); }
+    void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT final { m_array->set_ndx_in_parent(ndx_in_parent); }
+    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override { m_array->update_from_parent(old_baseline); }
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 protected:
     ColumnBaseSimple() {}
@@ -317,6 +317,16 @@ protected:
     std::unique_ptr<Array> m_array;
 
     void replace_root_array(std::unique_ptr<Array> new_root) final { m_array = std::move(new_root); }
+    bool root_is_leaf() const REALM_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
+
+    /// Introduce a new root node which increments the height of the
+    /// tree by one.
+    void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
+                            bool is_append);
+
+#if defined(REALM_DEBUG)
+    void tree_to_dot(std::ostream&) const;
+#endif
 };
 
 class ColumnBaseWithIndex : public ColumnBase {
@@ -402,8 +412,19 @@ public:
     TColumn(TColumn<T, Nullable>&&) REALM_NOEXCEPT = default;
     ~TColumn() REALM_NOEXCEPT override;
 
+    // Accessor concept:
     void destroy() REALM_NOEXCEPT override;
+    Allocator& get_alloc() const REALM_NOEXCEPT final;
+    ref_type get_ref() const REALM_NOEXCEPT final;
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT override;
+    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT final;
+    void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT final;
+    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
+    void detach() REALM_NOEXCEPT final;
+    bool is_attached() const REALM_NOEXCEPT final;
     MemRef clone_deep(Allocator&) const override;
+
     void move_assign(TColumn<T, Nullable>&);
     bool IsIntColumn() const REALM_NOEXCEPT override;
 
@@ -503,8 +524,6 @@ public:
     void erase(std::size_t, bool) override;
     void move_last_over(std::size_t, std::size_t, bool) override;
     void clear(std::size_t, bool) override;
-    void refresh_accessor_tree(std::size_t, const Spec&) override;
-    void update_from_parent(size_t old_baseline) REALM_NOEXCEPT override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
     void insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows);
@@ -513,18 +532,24 @@ public:
     void Verify() const override;
     using ColumnBase::Verify;
     void to_dot(std::ostream&, StringData title) const override;
+    void tree_to_dot(std::ostream&) const;
     MemStats stats() const;
     void do_dump_node_structure(std::ostream&, int) const override;
 #endif
 
-    Array* get_root_array() REALM_NOEXCEPT final { return &m_tree.root(); }
-    const Array* get_root_array() const REALM_NOEXCEPT final { return &m_tree.root(); }
+    //@{
+    /// Returns the array node at the root of this column, but note
+    /// that there is no guarantee that this node is an inner B+-tree
+    /// node or a leaf. This is the case for a MixedColumn in
+    /// particular.
+    Array* get_root_array() REALM_NOEXCEPT { return &m_tree.root(); }
+    const Array* get_root_array() const REALM_NOEXCEPT { return &m_tree.root(); }
+    //@}
 
 protected:
-
+    bool root_is_leaf() const REALM_NOEXCEPT { return m_tree.root_is_leaf(); }
     void replace_root_array(std::unique_ptr<Array> leaf) final { m_tree.replace_root(std::move(leaf)); }
 
-    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
     void set_without_updating_index(std::size_t row_ndx, T value);
     void erase_without_updating_index(std::size_t row_ndx, bool is_last);
     void move_last_over_without_updating_index(std::size_t row_ndx, std::size_t last_row_ndx);
@@ -557,21 +582,6 @@ private:
 
 
 // Implementation:
-
-inline std::size_t ColumnBase::size() const REALM_NOEXCEPT
-{
-    return do_get_size();
-}
-
-inline void ColumnBase::detach()
-{
-    get_root_array()->detach();
-}
-
-inline bool ColumnBase::is_attached() const REALM_NOEXCEPT
-{
-    return get_root_array()->is_attached();
-}
 
 inline bool ColumnBase::is_string_col() const REALM_NOEXCEPT
 {
@@ -675,11 +685,6 @@ inline void ColumnBase::mark(int) REALM_NOEXCEPT
 inline void ColumnBase::bump_link_origin_table_version() REALM_NOEXCEPT
 {
     // Noop
-}
-
-inline void ColumnBase::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
-{
-    get_root_array()->set_parent(parent, ndx_in_parent);
 }
 
 template <class T, bool N>
@@ -946,7 +951,7 @@ template <class T, bool N>
 void TColumn<T,N>::destroy() REALM_NOEXCEPT
 {
     ColumnBaseWithIndex::destroy();
-    // m_tree.destroy(); // Don't need to call, because ColumnBase::destroy() calls root_array->destroy_deep
+    m_tree.destroy();
 }
 
 template <class T, bool N>
@@ -963,11 +968,52 @@ bool TColumn<T,N>::IsIntColumn() const REALM_NOEXCEPT
 }
 
 template <class T, bool N>
+Allocator& TColumn<T,N>::get_alloc() const REALM_NOEXCEPT
+{
+    return m_tree.get_alloc();
+}
+
+template <class T, bool N>
+void TColumn<T,N>::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
+{
+    m_tree.set_parent(parent, ndx_in_parent);
+}
+
+template <class T, bool N>
+std::size_t TColumn<T,N>::get_ndx_in_parent() const REALM_NOEXCEPT
+{
+    return m_tree.get_ndx_in_parent();
+}
+
+template <class T, bool N>
+void TColumn<T,N>::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
+{
+    m_tree.set_ndx_in_parent(ndx_in_parent);
+}
+
+template <class T, bool N>
+void TColumn<T,N>::detach() REALM_NOEXCEPT
+{
+    m_tree.detach();
+}
+
+template <class T, bool N>
+bool TColumn<T,N>::is_attached() const REALM_NOEXCEPT
+{
+    return m_tree.is_attached();
+}
+
+template <class T, bool N>
+ref_type TColumn<T,N>::get_ref() const REALM_NOEXCEPT
+{
+    return get_root_array()->get_ref();
+}
+
+template <class T, bool N>
 void TColumn<T,N>::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
 {
     ColumnBaseWithIndex::update_from_parent(old_baseline);
-    // Not necessary to call m_tree.update_from_parent, because ColumnBase
-    // calls get_root_array()->update_from_parent().
+    m_tree.update_from_parent(old_baseline);
 }
 
 template <class T, bool N>
@@ -1029,9 +1075,9 @@ void TColumn<T,N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
     std::size_t size = this->size(); // Slow
     bool is_append = row_ndx == size || row_ndx == npos;
     std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
-    
+
     m_tree.insert(ndx_or_npos_if_append, value, num_rows); // Throws
-    
+
     if (has_search_index()) {
         row_ndx = is_append ? size : row_ndx;
         m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
@@ -1274,6 +1320,12 @@ void TColumn<T,N>::to_dot(std::ostream& out, StringData title) const
     out << "\";" << endl;
     tree_to_dot(out);
     out << "}" << endl;
+}
+
+template <class T, bool N>
+void TColumn<T,N>::tree_to_dot(std::ostream& out) const
+{
+    ColumnBase::bptree_to_dot(get_root_array(), out);
 }
 
 template <class T, bool N>

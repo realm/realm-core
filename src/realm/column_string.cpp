@@ -114,7 +114,7 @@ AdaptiveStringColumn::~AdaptiveStringColumn() REALM_NOEXCEPT
 
 void AdaptiveStringColumn::destroy() REALM_NOEXCEPT
 {
-    ColumnBase::destroy();
+    ColumnBaseSimple::destroy();
     if (m_search_index)
         m_search_index->destroy();
 }
@@ -1450,7 +1450,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
     bool is_big = Array::get_context_flag_from_header(mem.m_addr);
     if (!is_big) {
         // Medium strings
-        ArrayStringLong leaf(alloc, false); 
+        ArrayStringLong leaf(alloc, false);
         leaf.init_from_mem(mem);
         leaf.Verify();
         return leaf.size();
@@ -1575,7 +1575,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
     else {
         bool is_big = Array::get_context_flag_from_header(mem.m_addr);
         if (!is_big) {
-            // Medium strings 
+            // Medium strings
             ArrayStringLong leaf(alloc, false);
             leaf.init_from_mem(mem);
             leaf_size = leaf.size();

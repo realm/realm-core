@@ -1359,7 +1359,7 @@ void Table::upgrade_file_format()
             else {
                 // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
                 // so this is fine for now.
-                REALM_ASSERT(false); 
+                REALM_ASSERT(false);
             }
 
         }
@@ -4404,7 +4404,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
-                break; 
+                break;
             case type_Binary:
                 out.width(widths[col+1]-6); // adjust for " bytes" text
                 out << get_binary(col, row_ndx).size() << " bytes";
@@ -4583,35 +4583,6 @@ bool Table::compare_rows(const Table& t) const
     }
     return true;
 }
-
-
-const Array* Table::get_column_root(size_t col_ndx) const REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    return m_cols[col_ndx]->get_root_array();
-}
-
-
-pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
-    REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-
-    const ColumnBase* col = m_cols[col_ndx];
-
-    const Array* root = col->get_root_array();
-    const Array* enum_root = 0;
-
-    if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
-        enum_root = c->get_keys().get_root_array();
-    }
-    else {
-        REALM_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));
-    }
-
-    return make_pair(root, enum_root);
-}
-
 
 StringData Table::Parent::get_child_name(size_t) const REALM_NOEXCEPT
 {
@@ -4919,7 +4890,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 
         if (col) {
             // Refresh the column accessor
-            col->get_root_array()->set_ndx_in_parent(ndx_in_parent);
+            col->set_ndx_in_parent(ndx_in_parent);
             col->refresh_accessor_tree(col_ndx, m_spec); // Throws
         }
         else {
@@ -5042,7 +5013,7 @@ void Table::Verify() const
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
             std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
-            REALM_ASSERT_3(ndx_in_parent, ==, column.get_root_array()->get_ndx_in_parent());
+            REALM_ASSERT_3(ndx_in_parent, ==, column.get_ndx_in_parent());
             column.Verify(*this, i);
             REALM_ASSERT_3(column.size(), ==, m_size);
         }

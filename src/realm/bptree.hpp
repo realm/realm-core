@@ -44,6 +44,8 @@ public:
     void detach();
     bool is_attached() const REALM_NOEXCEPT;
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT;
+    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT;
+    void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
     MemRef clone_deep(Allocator& alloc) const;
 
@@ -60,7 +62,6 @@ public:
     void destroy_subtree(std::size_t ndx, bool clear_value);
 
 protected:
-    explicit BpTreeBase(Allocator&);
     explicit BpTreeBase(std::unique_ptr<Array> root);
     explicit BpTreeBase(BpTreeBase&&) = default;
     BpTreeBase& operator=(BpTreeBase&&) = default;
@@ -101,7 +102,7 @@ public:
     };
 
     BpTree();
-    explicit BpTree(Allocator& alloc) : BpTreeBase(alloc) {}
+    explicit BpTree(Allocator& alloc);
     explicit BpTree(std::unique_ptr<Array> root) : BpTreeBase(std::move(root)) {}
     BpTree(BpTree<T, Nullable>&&) = default;
     BpTree<T, Nullable>& operator=(BpTree<T, Nullable>&&) = default;
@@ -167,13 +168,9 @@ private:
 
 /// Implementation:
 
-inline
-BpTreeBase::BpTreeBase(Allocator& alloc) : m_root(new Array(alloc))
-{
-}
-
 inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> root) : m_root(std::move(root))
 {
+    REALM_ASSERT_DEBUG(m_root);
 }
 
 inline
@@ -185,7 +182,8 @@ Allocator& BpTreeBase::get_alloc() const REALM_NOEXCEPT
 inline
 void BpTreeBase::destroy() REALM_NOEXCEPT
 {
-    m_root->destroy_deep();
+    if (m_root)
+        m_root->destroy_deep();
 }
 
 inline
@@ -210,6 +208,18 @@ inline
 void BpTreeBase::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
 {
     m_root->set_parent(parent, ndx_in_parent);
+}
+
+inline
+std::size_t BpTreeBase::get_ndx_in_parent() const REALM_NOEXCEPT
+{
+    return m_root->get_ndx_in_parent();
+}
+
+inline
+void BpTreeBase::set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT
+{
+    m_root->set_ndx_in_parent(ndx);
 }
 
 inline
@@ -246,7 +256,12 @@ Array& BpTreeBase::root() REALM_NOEXCEPT
 }
 
 template <class T, bool N>
-BpTree<T,N>::BpTree() : BpTreeBase(std::unique_ptr<Array>(new LeafType(Allocator::get_default())))
+BpTree<T,N>::BpTree() : BpTree(Allocator::get_default())
+{
+}
+
+template <class T, bool N>
+BpTree<T,N>::BpTree(Allocator& alloc) : BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))
 {
 }
 

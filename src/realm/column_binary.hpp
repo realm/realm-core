@@ -37,7 +37,7 @@ public:
 
     ColumnBinary(Allocator&, ref_type);
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
@@ -82,8 +82,6 @@ public:
 #endif
 
 private:
-    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
-
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
                    std::size_t num_rows);

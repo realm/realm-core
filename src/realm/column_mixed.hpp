@@ -63,7 +63,7 @@ public:
     ~ColumnMixed() REALM_NOEXCEPT override;
 
     DataType get_type(std::size_t ndx) const REALM_NOEXCEPT;
-    std::size_t size() const REALM_NOEXCEPT { return m_types->size(); }
+    std::size_t size() const REALM_NOEXCEPT final { return m_types->size(); }
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     int64_t get_int(std::size_t ndx) const REALM_NOEXCEPT;
@@ -188,8 +188,6 @@ private:
 
     /// For string and binary data types, the bytes are stored here.
     std::unique_ptr<ColumnBinary> m_binary_data;
-
-    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
     void do_erase(std::size_t row_ndx, bool is_last);
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);

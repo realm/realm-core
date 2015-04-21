@@ -1,3 +1,4 @@
+
 /*************************************************************************
  *
  * REALM CONFIDENTIAL
@@ -54,7 +55,7 @@ public:
 
     void destroy() REALM_NOEXCEPT override;
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
@@ -106,7 +107,7 @@ public:
     void destroy_search_index() REALM_NOEXCEPT override;
 
     // Optimizing data layout
-    // Optimizing data layout. enforce == true will enforce enumeration; 
+    // Optimizing data layout. enforce == true will enforce enumeration;
     // enforce == false will auto-evaluate if it should be enumerated or not
     bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;
 
@@ -155,8 +156,6 @@ private:
 
     LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
                       bool use_retval = false) const;
-
-    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
