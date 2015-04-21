@@ -4022,23 +4022,10 @@ inline void out_binary(ostream& out, const BinaryData bin)
 
 template<class T> void out_floats(ostream& out, T value)
 {
-    // fixme, windows prints exponent as 3 digits while *nix prints 2. We use _set_output_format()
-    // and restore it again with _set_output_format() because we're a library which must not permanently
-    // set modes that effect the application. However, this method of set/get is not thread safe! Must
-    // be fixed before releasing Windows versions of core.
-#if _MSC_VER
-    int oldformat = _get_output_format();
-    _set_output_format(_TWO_DIGIT_EXPONENT);
-#endif
     streamsize old = out.precision();
     out.precision(numeric_limits<T>::digits10 + 1);
     out << scientific << value;
     out.precision(old);
-
-#if _MSC_VER
-    _set_output_format(oldformat);
-#endif
-
 }
 
 } // anonymous namespace
@@ -4406,15 +4393,6 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
     out.width(row_ndx_width);
     out << row_ndx << ":";
 
-    // fixme, windows prints exponents as 3 digits while *nix prints 2. We use _set_output_format()
-    // and restore it again with _set_output_format() because we're a library which must not permanently
-    // set modes that effect the application. However, this method of set/get is not thread safe! Must
-    // be fixed before releasing Windows versions of core.
-#if _MSC_VER
-    int oldformat = _get_output_format();
-    _set_output_format(_TWO_DIGIT_EXPONENT);
-#endif
-
     for (size_t col = 0; col < column_count; ++col) {
         out << "  "; // spacing
         out.width(widths[col+1]);
@@ -4496,10 +4474,6 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 break;
         }
     }
-
-#if _MSC_VER
-    _set_output_format(oldformat);
-#endif
 
     out << "\n";
 }

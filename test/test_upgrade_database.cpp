@@ -52,9 +52,9 @@ using namespace realm::util;
 
 TEST(Upgrade_Database_2_3)
 {
-    // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
-    // very first action, call Group::upgrade_file_format() on it. You must not call any reading or modifying 
-    // method on it prior to that, because core is not backwards compatible with the version 2 file format!
+    // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
+    // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
+    // even read using Get()) without upgrading the database first.
 
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
@@ -68,7 +68,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from Group
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
         File::copy(path, path + ".tmp");
 
@@ -111,7 +111,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
         File::copy(path, path + ".tmp");
 
@@ -139,7 +139,7 @@ TEST(Upgrade_Database_2_3)
     // Now see if we can open the upgraded file and also commit to it
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
         SharedGroup sg(path + ".tmp");
         WriteTransaction rt(sg);
@@ -167,7 +167,7 @@ TEST(Upgrade_Database_2_3)
     // Begin from scratch; see if we can upgrade file and then use a write transaction
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+        string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
         File::copy(path, path + ".tmp");
 
@@ -217,7 +217,7 @@ TEST(Upgrade_Database_2_3)
     // For creating a version 2 database; use in OLD (0.84) core
     char leafsize[20];
     sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
-    string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".realm";
+    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + leafsize + "_1.realm";
     File::try_remove(path);
 
     Group g;
@@ -240,7 +240,6 @@ TEST(Upgrade_Database_2_3)
 }
 
 
-
 // Same as above test, just with different string lengths to get better coverage of the different String array types
 // that all have been modified by null support
 TEST(Upgrade_Database_2_Backwards_Compatible)
@@ -250,7 +249,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     File::copy(path, path + ".tmp");
     SharedGroup g(path + ".tmp", 0);
 
@@ -334,7 +333,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     }
 #else
     // Create database file (run this from old core)
-    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     File::try_remove(path);
 
     Group g;
@@ -392,7 +391,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     File::copy(path, path + ".tmp");
     SharedGroup g(path + ".tmp", 0);
 
@@ -474,7 +473,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     }
 #else
     // Create database file (run this from old core)
-    string path = test_util::get_test_path_prefix() + "version_2_database_backwards_compatible_" + std::to_string(REALM_MAX_BPNODE_SIZE) + ".realm";
+    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     File::try_remove(path);
 
     Group g;
