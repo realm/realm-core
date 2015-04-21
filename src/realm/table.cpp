@@ -1861,23 +1861,8 @@ ref_type Table::clone_columns(Allocator& alloc) const
     for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ref_type new_col_ref;
         const ColumnBase* col = &get_column_base(col_ndx);
-        if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
-            ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
-            bool nullable = is_nullable(col_ndx);
-            AdaptiveStringColumn new_col(alloc, ref, nullable); // Throws
-            // FIXME: Should be optimized with something like
-            // new_col.add(seq_tree_accessor.begin(),
-            // seq_tree_accessor.end())
-            size_t n = enum_col->size();
-            for (size_t i = 0; i < n; ++i)
-                new_col.add(enum_col->get(i)); // Throws
-            new_col_ref = new_col.get_ref();
-        }
-        else {
-            const Array& root = *col->get_root_array();
-            MemRef mem = root.clone_deep(alloc); // Throws
-            new_col_ref = mem.m_ref;
-        }
+        MemRef mem = col->clone_deep(alloc);
+        new_col_ref = mem.m_ref;
         new_columns.add(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();

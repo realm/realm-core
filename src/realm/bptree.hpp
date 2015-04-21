@@ -45,6 +45,7 @@ public:
     bool is_attached() const REALM_NOEXCEPT;
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
+    MemRef clone_deep(Allocator& alloc) const;
 
     // BpTree interface:
     const Array& root() const REALM_NOEXCEPT;
@@ -215,6 +216,12 @@ inline
 void BpTreeBase::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
 {
     m_root->update_from_parent(old_baseline);
+}
+
+inline
+MemRef BpTreeBase::clone_deep(Allocator& alloc) const
+{
+    return m_root->clone_deep(alloc);
 }
 
 inline

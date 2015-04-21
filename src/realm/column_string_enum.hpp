@@ -56,6 +56,7 @@ public:
     ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref, bool nullable);
     ~ColumnStringEnum() REALM_NOEXCEPT override;
     void destroy() REALM_NOEXCEPT override;
+    MemRef clone_deep(Allocator& alloc) const override;
 
     int compare_values(size_t row1, size_t row2) const override
     {

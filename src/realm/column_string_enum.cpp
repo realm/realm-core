@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <realm/column_string_enum.hpp>
+#include <realm/column_string.hpp>
 #include <realm/index_string.hpp>
 #include <realm/table.hpp>
 #include <realm/query_engine.hpp>
@@ -30,6 +31,19 @@ void ColumnStringEnum::destroy() REALM_NOEXCEPT
     Column::destroy();
     if (m_search_index)
         m_search_index->destroy();
+}
+
+MemRef ColumnStringEnum::clone_deep(Allocator& alloc) const
+{
+    ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
+    AdaptiveStringColumn new_col(alloc, ref, is_nullable()); // Throws
+    // FIXME: Should be optimized with something like
+    // new_col.add(seq_tree_accessor.begin(),
+    // seq_tree_accessor.end())
+    size_t n = size();
+    for (size_t i = 0; i < n; ++i)
+        new_col.add(get(i)); // Throws
+    return MemRef{new_col.get_ref(), alloc};
 }
 
 void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT

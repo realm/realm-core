@@ -141,6 +141,7 @@ public:
     //@}
 
     virtual void replace_root_array(std::unique_ptr<Array> leaf) = 0;
+    virtual MemRef clone_deep(Allocator& alloc) const = 0;
 
     inline void detach(void);
     inline bool is_attached(void) const REALM_NOEXCEPT;
@@ -309,6 +310,7 @@ class ColumnBaseSimple : public ColumnBase {
 public:
     Array* get_root_array() REALM_NOEXCEPT final { return m_array.get(); }
     const Array* get_root_array() const REALM_NOEXCEPT final { return m_array.get(); }
+    MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 protected:
     ColumnBaseSimple() {}
     ColumnBaseSimple(Array* root) : m_array(root) {}
@@ -401,6 +403,7 @@ public:
     ~TColumn() REALM_NOEXCEPT override;
 
     void destroy() REALM_NOEXCEPT override;
+    MemRef clone_deep(Allocator&) const override;
     void move_assign(TColumn<T, Nullable>&);
     bool IsIntColumn() const REALM_NOEXCEPT override;
 
@@ -965,6 +968,12 @@ void TColumn<T,N>::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
     ColumnBaseWithIndex::update_from_parent(old_baseline);
     // Not necessary to call m_tree.update_from_parent, because ColumnBase
     // calls get_root_array()->update_from_parent().
+}
+
+template <class T, bool N>
+MemRef TColumn<T,N>::clone_deep(Allocator& alloc) const
+{
+    return m_tree.clone_deep(alloc);
 }
 
 template <class T, bool N>
