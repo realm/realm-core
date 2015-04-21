@@ -574,6 +574,21 @@ TEST(Query_NextGen_StringConditions)
 
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
+
+    TableRef table2 = group.add_table("table2");
+    table2->add_column(type_String, "str1", true);
+
+    table2->add_empty_row();
+    table2->set_string(0, 0, "foo");
+    table2->add_empty_row();
+    table2->set_string(0, 1, "!");
+    table2->add_empty_row();
+    table2->set_string(0, 2, StringData());
+    table2->add_empty_row();
+    table2->set_string(0, 3, "bar");
+
+    m = table2->column<String>(0).contains(StringData("")).count();
+    CHECK_EQUAL(m, 3);
 }
 
 
