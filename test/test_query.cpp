@@ -485,7 +485,21 @@ TEST(Query_NextGenSyntax)
 }
 
 
-// This tests the new string conditions now available for the expression syntax
+/*
+This tests the new string conditions now available for the expression syntax.
+
+Null behaviour (+ means concatenation): 
+
+If A + B == A, then A is a prefix of B, and B is a suffix of A. This is valid for any A and B, including null and 
+empty strings.
+
+So "" both begins with null and ends with null and contains null.
+But null does not contain, begin with, or end with ""
+
+See TEST(StringData_Substrings) for more unit tests for null, isolated to using only StringData class with no
+columns or queries involved
+*/
+
 TEST(Query_NextGen_StringConditions)
 {
     Group group;
