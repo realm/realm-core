@@ -26,7 +26,7 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
+ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref, bool nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);

@@ -348,6 +348,8 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
             q.less_equal(column->m_column, only_numeric<R>(left));
         else if (util::SameType<Cond, EqualIns>::value)
             q.equal(column->m_column, only_string(left), false);
+        else if (util::SameType<Cond, NotEqualIns>::value)
+            q.not_equal(column->m_column, only_string(left), false);
         else if (util::SameType<Cond, BeginsWith>::value)
             q.begins_with(column->m_column, only_string(left));
         else if (util::SameType<Cond, BeginsWithIns>::value)

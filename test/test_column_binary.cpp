@@ -287,4 +287,15 @@ TEST(ColumnBinary_Basic)
     c.destroy();
 }
 
+ONLY(ColumnBinary_Null)
+{
+    ref_type ref = ColumnBinary::create(Allocator::get_default());
+    ColumnBinary c(Allocator::get_default(), ref, true);
+
+    c.add(BinaryData(0, 0));
+    CHECK(c.get(0).is_null());
+
+
+}
+
 #endif // TEST_COLUMN_BINARY

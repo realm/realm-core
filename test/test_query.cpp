@@ -574,6 +574,64 @@ TEST(Query_NextGen_StringConditions)
 
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
+
+    // Test various compare operations with null
+    TableRef table2 = group.add_table("table2");
+    table2->add_column(type_String, "str1", true);
+
+    table2->add_empty_row();
+    table2->set_string(0, 0, "foo");
+    table2->add_empty_row();
+    table2->set_string(0, 1, "!");
+    table2->add_empty_row();
+    table2->set_string(0, 2, realm::null());
+    table2->add_empty_row();
+    table2->set_string(0, 3, "bar");
+
+    m = table2->column<String>(0).contains(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).begins_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).ends_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).equal(StringData("")).count();
+    CHECK_EQUAL(m, 0);
+
+    m = table2->column<String>(0).not_equal(StringData("")).count();
+    CHECK_EQUAL(m, 4);
+
+    m = table2->column<String>(0).equal(realm::null()).count();
+    CHECK_EQUAL(m, 1);
+
+    m = table2->column<String>(0).not_equal(realm::null()).count();
+    CHECK_EQUAL(m, 3);
+
+
+    m = table2->column<String>(0).contains(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).begins_with(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).ends_with(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).equal(StringData(""), false).count();
+    CHECK_EQUAL(m, 0);
+
+    m = table2->column<String>(0).not_equal(StringData(""), false).count();
+    CHECK_EQUAL(m, 4);
+
+    m = table2->column<String>(0).equal(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
+
+    m = table2->column<String>(0).not_equal(realm::null(), false).count();
+    CHECK_EQUAL(m, 3);
+
+
 }
 
 

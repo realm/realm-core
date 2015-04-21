@@ -35,7 +35,7 @@ class ColumnBinary: public ColumnBase {
 public:
     typedef BinaryData value_type;
 
-    ColumnBinary(Allocator&, ref_type);
+    ColumnBinary(Allocator&, ref_type, bool nullable = false);
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
