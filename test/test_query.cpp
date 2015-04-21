@@ -589,6 +589,12 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(StringData("")).count();
     CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).begins_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).ends_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
 }
 
 
