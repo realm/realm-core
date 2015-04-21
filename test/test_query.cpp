@@ -5777,7 +5777,7 @@ TEST(Query_Nulls_Fuzzy)
             // ArrayString capacity starts at 128 bytes, so we need lots of elements
             // to test if relocation works
             for (size_t i = 0; i < 100; i++) {
-                unsigned char action = random.draw_int_max<int>(100);
+                unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
 
                 if (action > 48 && table.size() < 10) {
                     // Generate string with equal probability of being empty, null, short, medium and long, and with 
@@ -5819,7 +5819,7 @@ TEST(Query_Nulls_Fuzzy)
                                 if (fastrand(100) > 20)
                                     buf2[t] = 0;                        // zero byte
                                 else
-                                    buf2[t] = fastrand(255);  // random byte
+                                    buf2[t] = static_cast<char>(fastrand(255));  // random byte
                             }
                             // no generated string can equal "null" (our vector magic value for null) because 
                             // len == 4 is not possible
