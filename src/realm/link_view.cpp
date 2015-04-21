@@ -30,9 +30,30 @@
 using namespace std;
 using namespace realm;
 
-LinkViewRef LinkView::handover_import(Handover_data& handover_data, Group& group) {
-    TableRef tr(group.get_table(handover_data.m_table_num));
-    return tr->get_linklist(handover_data.m_col_num, handover_data.m_row_ndx);
+void LinkView::generate_patch(const ConstLinkViewRef& ref, Handover_patch*& patch)
+{
+    if (bool(ref)) {
+        patch = new Handover_patch;
+        patch->m_table_num = ref->m_origin_table->get_index_in_group();
+        patch->m_col_num = ref->m_origin_column.m_column_ndx;
+        patch->m_row_ndx = ref->get_origin_row_index();
+    }
+    else
+        patch = 0;
+}
+
+
+LinkViewRef LinkView::create_from_and_consume_patch(Handover_patch*& patch, Group& group) 
+{
+    if (patch) {
+        TableRef tr(group.get_table(patch->m_table_num));
+        LinkViewRef result = tr->get_linklist(patch->m_col_num, patch->m_row_ndx);
+        delete patch;
+        patch = 0;
+        return result;
+    }
+    else
+        return LinkViewRef();
 }
 
 

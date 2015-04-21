@@ -356,70 +356,33 @@ protected:
     template<class R, class V> static R find_all_double(V*, std::size_t, double);
     template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
-    struct Base_Handover_data {
-        std::size_t table_num;
-        Query::Handover_data query_handover_data;
-        LinkView::Handover_data* linkview_handover_data;
-    };
-    void internal_handover_export(Base_Handover_data& handover_data, PayloadHandoverMode mode) const
-    {
-        REALM_ASSERT(mode != PayloadHandoverMode::Copy);
-        handover_data.table_num = m_table->get_index_in_group();
-        // must be group level table!
-        if (handover_data.table_num == npos) {
-            throw std::runtime_error("TableView handover failed: not a group level table");
-        }
-        // remember to indicate that handover is of an *embedded* query:
-        m_query.handover_export(handover_data.query_handover_data, mode, true);
-        if (m_linkview_source) {
-            handover_data.linkview_handover_data = new LinkView::Handover_data;
-            m_linkview_source->handover_export(*handover_data.linkview_handover_data);
-        }
-        else
-            handover_data.linkview_handover_data = 0;
-    }
+    typedef TableView_Handover_patch Handover_patch;
 
-    void internal_handover_import(Base_Handover_data& handover_data, Group& group)
+    // handover machinery entry points based on dynamic type. These methods:
+    // a) forward their calls to the static type entry points.
+    // b) new/delete patch data structures.
+    virtual TableViewBase* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
     {
-        TableRef tr = group.get_table(handover_data.table_num);
-        m_table = tr;
-        m_last_seen_version = tr->m_version;
-        tr->register_view(this);
-        // update query !!! (when called from here, the query is embedded, so
-        // Query::handover_import just updates the query in-place. The pointer
-        // it returns is to this in-place query, and in this context it is ignored).
-        Query::handover_import(handover_data.query_handover_data, group);
-        if (handover_data.linkview_handover_data) {
-            m_linkview_source = LinkView::handover_import(*handover_data.linkview_handover_data, group);
-            handover_data.linkview_handover_data = 0;
-        }
+        patch = new Handover_patch;
+        return new TableViewBase(*this, *patch, mode);
     }
+    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        delete patch;
+        patch = 0;
+    }
+    // handover machinery entry points based on static type
+    void apply_patch(Handover_patch& patch, Group& group);
+    TableViewBase(const TableViewBase& source, Handover_patch& patch, PayloadHandoverMode mode);
 
-    struct Handover_data {
-        TableViewBase* clone;
-        Base_Handover_data base_data;
-    };
-
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode) const
-    {
-        handover_data.clone = new TableViewBase(*this, mode);
-        internal_handover_export(handover_data.base_data, mode);
-    }
-    
-    static TableViewBase* handover_import(Handover_data& handover_data, Group& group)
-    {
-        TableViewBase* result = handover_data.clone;
-        result->internal_handover_import(handover_data.base_data, group);
-        handover_data.clone = 0;
-        return result;
-    }
-    TableViewBase(const TableViewBase& src, PayloadHandoverMode mode);
 private:
     void detach() const REALM_NOEXCEPT; // may have to remove const
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
     friend class Table;
     friend class Query;
     friend class SharedGroup;
+    template<class Tab, class View, class Impl> friend class BasicTableViewBase;
 
     // Called by table to adjust any row references:
     void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
@@ -537,30 +500,34 @@ public:
     Table& get_parent() REALM_NOEXCEPT;
     const Table& get_parent() const REALM_NOEXCEPT;
 
-    struct Handover_data {
-        TableView* clone;
-        Base_Handover_data base_data;
-    };
-
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode) const
+    TableViewBase* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const override
     {
-        handover_data.clone = new TableView(*this, mode);
-        internal_handover_export(handover_data.base_data, mode);
+        patch = new Handover_patch;
+        return new TableView(*this, *patch, mode);
     }
-    
-    static TableView* handover_import(Handover_data& handover_data, Group& group)
+
+    // this one is here to follow the general scheme, it is not really needed, the
+    // one in the base class would be sufficient
+    void apply_and_consume_patch(Handover_patch*& patch, Group& group) override
     {
-        TableView* result = handover_data.clone;
-        result->internal_handover_import(handover_data.base_data, group);
-        handover_data.clone = 0;
-        return result;
+        apply_patch(*patch, group);
+        delete patch;
+        patch = 0;
+    }
+
+    TableView(const TableView& src, Handover_patch& patch, PayloadHandoverMode mode)
+        : TableViewBase(src, patch, mode)
+    {
+        // empty
+    }
+
+    // only here to follow the general scheme, base class method could be used instead
+    void apply_patch(Handover_patch& patch, Group& group)
+    {
+        TableViewBase::apply_patch(patch, group);
     }
 
 private:
-    /// Copy constructor with configurable handling of data payload
-    TableView(const TableView& tv, PayloadHandoverMode mode)
-        : TableViewBase(tv, mode) 
-    { }
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
     TableView(TableView* tv) REALM_NOEXCEPT;
@@ -574,6 +541,7 @@ private:
     friend class TableViewBase;
     friend class ListviewNode;
     friend class LinkView;
+    template<typename A, typename B, typename C> friend class BasicTableViewBase;
 };
 
 
@@ -621,6 +589,33 @@ public:
     ConstTableView find_all_string(size_t column_ndx, StringData value) const;
 
     const Table& get_parent() const REALM_NOEXCEPT;
+
+    TableViewBase* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const override
+    {
+        patch = new Handover_patch;
+        return new ConstTableView(*this, *patch, mode);
+    }
+
+    // this one is here to follow the general scheme, it is not really needed, the
+    // one in the base class would be sufficient
+    void apply_and_consume_patch(Handover_patch*& patch, Group& group) override
+    {
+        apply_patch(*patch, group);
+        delete patch;
+        patch = 0;
+    }
+
+    ConstTableView(const ConstTableView& src, Handover_patch& patch, PayloadHandoverMode mode)
+        : TableViewBase(src, patch, mode)
+    {
+        // empty
+    }
+
+    // only here to follow the general scheme, base class method could be used instead
+    void apply_patch(Handover_patch& patch, Group& group)
+    {
+        TableViewBase::apply_patch(patch, group);
+    }
 
 private:
     ConstTableView(const Table& parent);

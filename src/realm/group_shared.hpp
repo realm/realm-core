@@ -400,21 +400,41 @@ public:
         // For others it is easier to create a copy during export and then attach it properly
         // in the recieving context during import.
         // The following accessor types are copied during export and attached during import:
-        // - TableView, Query
+        // - TableView, Query, Row
         // The following accessor types just have their data copied, and a matching accessor is created
         // using facilities on the importing side
-        // - LinkView, Row
-        typename T::Handover_data m_handover_data;
-        VersionID m_version;
+        // - LinkView
+        typename T::Handover_patch* patch;
+        T* clone;
+        VersionID version;
     };
+    // thread-safe/const export (mode is Stay or Copy)
+    // during export, the following operations on the shared group is locked:
+    // - advance_read(), promote_to_write(), close()
     template<typename T>
-    Handover<T>* export_for_handover(T& accessor, PayloadHandoverMode mode)
+    Handover<T>* export_for_handover(const T& accessor, PayloadHandoverMode mode)
     {
         // TODO: lock
         Handover<T>* result = new Handover<T>();
-        accessor.handover_export(result->m_handover_data, mode);
-        result->m_version = get_version_of_current_transaction();
+        // often, the return value from clone will be T*, BUT it may be ptr to some base of T
+        // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
+        // clone() will clone the actual accessor instance, and hence return a type which is 
+        // either T or derived from T.
+        result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode));
+        result->version = get_version_of_current_transaction();
         // TODO: unlock
+        return result;
+    }
+    // destructive export (mode is Move)
+    template<typename T>
+    Handover<T>* export_for_handover(T& accessor)
+    {
+        // We do not lock anything, must be called by thread already
+        // associated with this shared group.
+        Handover<T>* result = new Handover<T>();
+        // see above re dynamic_cast.
+        result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch));
+        result->version = get_version_of_current_transaction();
         return result;
     }
 
@@ -426,18 +446,20 @@ public:
     template<typename T>
     T* import_from_handover(Handover<T>* handover)
     {
-        if (handover->m_version != get_version_of_current_transaction()) {
+        if (handover->version != get_version_of_current_transaction()) {
+            // TODO: Clean up both patch data and cloned data
             throw std::runtime_error("Handover failed due to version mismatch");
         }
-        // move data
-        T* result = T::handover_import(handover->m_handover_data, m_group);
+        T* result = handover->clone;
+        handover->clone = 0;
+        result->apply_and_consume_patch(handover->patch, m_group);
         delete handover;
         return result;
     }
     // we need to special case for LinkViews, because they are ref counted
     // instead a new instance is created at the recieving side
-    Handover<LinkView>* export_for_handover(LinkViewRef& accessor);
-    LinkViewRef import_from_handover(Handover<LinkView>* handover);
+    Handover<LinkView>* export_linkview_for_handover(const LinkViewRef& accessor);
+    LinkViewRef import_linkview_from_handover(Handover<LinkView>* handover);
 
 private:
     struct SharedInfo;

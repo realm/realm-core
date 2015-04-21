@@ -30,11 +30,18 @@
 using namespace std;
 using namespace realm;
 
-TableViewBase::TableViewBase(const TableViewBase& src, PayloadHandoverMode mode)
-    : RowIndexes(src, mode), m_query(src.m_query, Query::PartialCopyTag())
+TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch, PayloadHandoverMode mode)
+    : RowIndexes(src, mode), 
+      m_linkview_source(LinkViewRef()),
+      m_query(src.m_query, patch.query_patch, mode)
 {
+    patch.table_num = src.m_table->get_index_in_group();
+    // must be group level table!
+    if (patch.table_num == npos) {
+        throw std::runtime_error("TableView handover failed: not a group level table");
+    }
+    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
-    m_linkview_source = LinkViewRef();
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
     m_sorting_predicate = src.m_sorting_predicate;
@@ -45,6 +52,15 @@ TableViewBase::TableViewBase(const TableViewBase& src, PayloadHandoverMode mode)
     m_num_detached_refs = 0;
 }
 
+void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
+{
+    TableRef tr = group.get_table(patch.table_num);
+    m_table = tr;
+    m_last_seen_version = tr->m_version;
+    tr->register_view(this);
+    m_query.apply_patch(patch.query_patch, group);
+    m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
+}
 
 // Searching
 

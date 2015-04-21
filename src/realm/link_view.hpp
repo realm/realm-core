@@ -104,17 +104,9 @@ private:
     ColumnLinkList& m_origin_column;
     mutable std::size_t m_ref_count;
 
-    struct Handover_data {
-        std::size_t m_table_num;
-        std::size_t m_col_num;
-        std::size_t m_row_ndx;
-    };
-    void handover_export(Handover_data& handover_data) const {
-        handover_data.m_table_num = m_origin_table->get_index_in_group();
-        handover_data.m_col_num = m_origin_column.m_column_ndx;
-        handover_data.m_row_ndx = get_origin_row_index();
-    }
-    static LinkViewRef handover_import(Handover_data& handover_data, Group& group);
+    typedef LinkView_Handover_patch Handover_patch;
+    static void generate_patch(const ConstLinkViewRef& ref, Handover_patch*& patch);
+    static LinkViewRef create_from_and_consume_patch(Handover_patch*& patch, Group& group);
 
     // constructor (protected since it can only be used by friends)
     LinkView(Table* origin_table, ColumnLinkList&, std::size_t row_ndx);

@@ -1669,24 +1669,25 @@ void SharedGroup::reserve(size_t size)
 
 
 
-SharedGroup::Handover<LinkView>* SharedGroup::export_for_handover(LinkViewRef& accessor)
+SharedGroup::Handover<LinkView>* SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 {
     // TODO: lock
     Handover<LinkView>* result = new Handover<LinkView>();
-    accessor->handover_export(result->m_handover_data);
-    result->m_version = get_version_of_current_transaction();
+    LinkView::generate_patch(accessor, result->patch);
+    result->clone = 0; // not used for LinkView - maybe specialize Handover<LinkView> ?
+    result->version = get_version_of_current_transaction();
     // TODO: unlock
     return result;
 }
 
 
-LinkViewRef SharedGroup::import_from_handover(Handover<LinkView>* handover)
+LinkViewRef SharedGroup::import_linkview_from_handover(Handover<LinkView>* handover)
 {
-    if (handover->m_version != get_version_of_current_transaction()) {
+    if (handover->version != get_version_of_current_transaction()) {
         throw std::runtime_error("Handover failed due to version mismatch");
     }
     // move data
-    LinkViewRef result = LinkView::handover_import(handover->m_handover_data, m_group);
+    LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);
     delete handover;
     return result;
 }

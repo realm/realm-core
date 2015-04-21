@@ -219,18 +219,18 @@ protected:
     void reattach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
     void impl_detach() REALM_NOEXCEPT;
 
-    struct Handover_data {
-        std::size_t table_num;
-        std::size_t row_ndx;
-    };
     void move_assign(RowBase& src_row)
     {
         reattach(src_row.m_table.get(), src_row.m_row_ndx);
         src_row.impl_detach();
     }
 protected:
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode);
-    void internal_handover_import(Handover_data& handover_data, Group& group);
+    // FIXME: not confident about exposing this one:
+    RowBase() { m_prev = m_next = 0; };
+
+    typedef RowBase_Handover_patch Handover_patch;
+    RowBase(const RowBase& source, Handover_patch& patch, PayloadHandoverMode mode);
+    void apply_patch(Handover_patch& patch, Group& group);
 private:
     RowBase* m_prev; // Null if first, undefined if detached.
     RowBase* m_next; // Null if last, undefined if detached.
@@ -296,17 +296,29 @@ private:
     // for any U.
     template<class> friend class BasicRow;
 
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
+    virtual BasicRow<T>* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
     {
-        RowBase::handover_export(handover_data, mode);
+        patch = new Handover_patch;
+        return new BasicRow<T>(*this, *patch, mode);
     }
-    static BasicRow<T>* handover_import(Handover_data& handover_data, Group& group)
+
+    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
     {
-        // FIXME: this will not work / Group is undefined
-        BasicRow<T>* result = new BasicRow<T>();
-        result->internal_handover_import(handover_data, group);
-        return result;
+        apply_patch(*patch, group);
+        delete patch;
+        patch = 0;
     }
+
+    void apply_patch(Handover_patch& patch, Group& group)
+    {
+        RowBase::apply_patch(patch, group);
+    }
+
+    BasicRow(const BasicRow<T>& source, Handover_patch& patch, PayloadHandoverMode mode)
+        : RowBase(source, patch, mode)
+    {
+    }
+
     void move_assign(BasicRow<T>& row)
     {
         RowBase::move_assign(row);

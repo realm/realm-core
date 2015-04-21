@@ -7270,12 +7270,13 @@ TEST(LangBindHelper_HandoverLinkView)
         // TableView tv2 = lvr->get_sorted_view(0);
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
-        handover.reset(sg_w.export_for_handover(lvr));
+        // FIXME:
+        handover.reset(sg_w.export_linkview_for_handover(lvr));
     }
     {
         LangBindHelper::advance_read(sg, vid);
         sg_w.close();
-        LinkViewRef lvr = sg.import_from_handover(handover.release()); // <-- import lvr
+        LinkViewRef lvr = sg.import_linkview_from_handover(handover.release()); // <-- import lvr
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
         // q.m_table = table1

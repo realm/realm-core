@@ -63,7 +63,7 @@ public:
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
-    ~Query() REALM_NOEXCEPT;
+    virtual ~Query() REALM_NOEXCEPT;
     void move_assign(Query& query);
 
     Query& operator = (const Query& source);
@@ -279,23 +279,23 @@ public:
     RowIndexes* m_view;
 
     std::vector<bool> pending_not;
-    struct Handover_data {
-        std::size_t m_table_num;
-        bool m_has_table;
-        Query* m_query;
-        // we're navigating around circular include dependencies by using a
-        // void* below - it should be a TableView::Handover_data, but we cant
-        // forward declare a nested class...
-        void* table_view_data;
-        // Similar for LinkView::Handover_data:
-        void* link_view_data;
-    };
-    // if is_embedded is true, the query is assumed to be inside an already cloned tableview,
-    // so we should not clone it. If so, the import will return a pointer to the already
-    // embedded query object.
-    static Query* handover_import(Handover_data& handover_data, Group& group);
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode, 
-                         bool is_embedded = false) const;
+    typedef Query_Handover_patch Handover_patch;
+
+    virtual Query* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
+    {
+        patch = new Handover_patch;
+        return new Query(*this, *patch, mode);
+    }
+
+    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        delete patch;
+        patch = 0;
+    }
+
+    void apply_patch(Handover_patch& patch, Group& group);
+    Query(const Query& source, Handover_patch& patch, PayloadHandoverMode mode);
 private:
     struct PartialCopyTag {};
     Query(const Query& src, PartialCopyTag);

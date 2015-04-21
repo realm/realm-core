@@ -117,6 +117,8 @@ protected:
 
     BasicTableViewBase() {}
     BasicTableViewBase(Impl i): m_impl(move(i)) {}
+    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch, PayloadHandoverMode mode)
+        : m_impl(tv.m_impl, patch, mode) { }
 
     Impl* get_impl() REALM_NOEXCEPT { return &m_impl; }
     const Impl* get_impl() const REALM_NOEXCEPT { return &m_impl; }
@@ -161,7 +163,7 @@ private:
 public:
     BasicTableView() {}
     BasicTableView& operator=(BasicTableView tv) { Base::m_impl = move(tv.m_impl); return *this; }
-    friend BasicTableView move(BasicTableView& tv) { return BasicTableView(&tv); }
+     friend BasicTableView move(BasicTableView& tv) { return BasicTableView(&tv); }
 
     // Deleting
     void clear() { Base::m_impl.clear(); }
@@ -187,17 +189,32 @@ public:
     {
         Base::m_impl.move_assign(tv.m_impl);
     }
-    typedef TableView::Handover_data Handover_data;
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode) {
-        // clone and pack only the impl class
-        Base::m_impl.handover_export(handover_data, mode);
+    typedef TableView_Handover_patch Handover_patch;
+
+    BasicTableView<Tab>*
+    clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
+    {
+        patch = new Handover_patch;
+        return new BasicTableView<Tab>(*this, *patch, mode);
     }
-    static BasicTableView<Tab>* handover_import(Handover_data& handover_data, Group& group) {
-        // recreate an instance of this wrapper class, using the cloned impl class
-        BasicTableView<Tab>* result = new BasicTableView<Tab>();
-        result->m_impl.handover_import(handover_data, group);
-        return result;
+
+    void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        delete patch;
+        patch = 0;
     }
+
+    BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch, 
+                   PayloadHandoverMode mode)
+        : Base(source, patch, mode)
+    {}
+
+    void apply_patch(TableView::Handover_patch& patch, Group& group)
+    {
+        Base::m_impl.apply_patch(patch, group);
+    }
+
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(TableView tv): Base(move(tv)) {}

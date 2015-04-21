@@ -397,20 +397,31 @@ protected:
     Query(const BasicTable<Spec>& table, TableViewBase* tv):
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
-    typedef realm::Query::Handover_data Handover_data;
-    void handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
+    typedef Query_Handover_patch Handover_patch;
+    Query(const Query& source, Handover_patch& patch, PayloadHandoverMode mode) : 
+        Spec::template ColNames<QueryCol, Query*>(this), 
+        m_impl(source.m_impl, patch, mode)
     {
-        // the implementation object is copied at export time, the wrapping
-        // template (this class) is not
-        m_impl.handover_export(handover_data, mode, false);
     }
-    static BasicTable<Spec>::Query* handover_import(Handover_data& handover_data, Group& group)
+
+    void apply_patch(Handover_patch& patch, Group& group)
     {
-        // create a new wrapping template class instance and use it to wrap
-        // the copy created during export
-        Query* q = Query::handover_import(handover_data, group);
-        return new BasicTable<Spec>::Query(*q);
+        m_impl.apply_patch(patch, group);
     }
+
+    virtual Query* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
+    {
+        patch = new Handover_patch;
+        return new Query(*this, *patch, mode);
+    }
+
+    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        delete patch;
+        patch = 0;
+    }
+
 private:
     realm::Query m_impl;
 

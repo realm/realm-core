@@ -142,75 +142,21 @@ void Query::delete_nodes() REALM_NOEXCEPT
 }
 
 
-void Query::handover_export(Handover_data& handover_data, 
-                            PayloadHandoverMode mode,
-                            bool is_embedded) const
+Query::Query(const Query& source, Handover_patch& patch, PayloadHandoverMode mode)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
 {
-    // if called from TableView::handover_export, is_embedded will be true
-    // to indicate that the query is embedded inside a table view. In all other
-    // cases, is_embedded will be false, and we'll allocate a copy of the
-    // query during export.
-    Query* query;
-    if (!is_embedded) {
-        query = new Query(*this, PartialCopyTag());
+    patch.m_has_table = bool(source.m_table);
+    if (patch.m_has_table) {
+        patch.m_table_num = source.m_table.get()->get_index_in_group();
     }
-    else {
-        // if is_embedded, then it's not actually const...
-        query = const_cast<Query*>(this);
+    if (source.m_source_table_view) {
+        m_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
     }
-    handover_data.m_query = query;
-    handover_data.m_has_table = bool(query->m_table);
-    if (bool(query->m_table)) {
-        handover_data.m_table_num = query->m_table.get()->get_index_in_group();
-    }
-    // prepare any source table view
-    if (query->m_source_table_view) {
-        TableViewBase::Handover_data* tvb_handover = new TableViewBase::Handover_data;
-        handover_data.table_view_data = tvb_handover;
-        query->m_source_table_view->handover_export(*tvb_handover, mode);
-    }
-    else
-        handover_data.table_view_data = 0;
-    // gather enough data to recreate any source link view at recieving side
-    if (bool(query->m_source_link_view)) {
-        LinkView::Handover_data* lv_handover = new LinkView::Handover_data;
-        handover_data.link_view_data = lv_handover;
-        query->m_source_link_view->handover_export(*lv_handover);
-    }
-    else
-        handover_data.link_view_data = 0;
-}
+    else patch.table_view_data = 0;
+    LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
+    m_view = m_source_link_view.get();
 
-Query* Query::handover_import(Handover_data& handover_data, Group& group)
-{
-    Query* result = handover_data.m_query;
-    REALM_ASSERT((result->m_source_table_view != 0) == (handover_data.table_view_data != 0));
-    // prepare any source table view
-    if (handover_data.table_view_data) {
-        TableViewBase::Handover_data* tvb_handover 
-            = reinterpret_cast<TableViewBase::Handover_data*>(handover_data.table_view_data);
-        result->m_source_table_view = TableViewBase::handover_import(*tvb_handover, group);
-        delete tvb_handover;
-        handover_data.table_view_data = 0;
-    }
-    // FIXME: recreate/find source link view
-    if (handover_data.link_view_data) {
-        LinkView::Handover_data* lv_handover
-            = reinterpret_cast<LinkView::Handover_data*>(handover_data.link_view_data);
-        result->m_source_link_view = LinkView::handover_import(*lv_handover, group);
-        result->m_view = result->m_source_link_view.get();
-        delete lv_handover;
-        handover_data.link_view_data = 0;
-    }
-    if (handover_data.m_has_table)
-        result->m_table = group.get_table(handover_data.m_table_num);
-    else
-        result->m_table = TableRef();
-    return result;
-}
-
-Query::Query(const Query& source, PartialCopyTag)
-{
+    // copy actual query payload
     Create();
     first = source.first;
     std::map<ParentNode*, ParentNode*> node_mapping;
@@ -227,10 +173,6 @@ Query::Query(const Query& source, PartialCopyTag)
     for (size_t t = 0; t < first.size(); t++) {
         first[t] = node_mapping[first[t]];
     }
-    m_table = TableRef();
-    m_view = 0;
-    m_source_link_view = LinkViewRef();
-    m_source_table_view = 0;
 
     if (first[0]) {
         ParentNode* node_to_update = first[0];
@@ -241,6 +183,18 @@ Query::Query(const Query& source, PartialCopyTag)
     }
 }
 
+
+void Query::apply_patch(Handover_patch& patch, Group& group)
+{
+    if (m_source_table_view) {
+        m_source_table_view->apply_and_consume_patch(patch.table_view_data, group);
+    }
+    m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, group);
+    m_view = m_source_link_view.get();
+    if (patch.m_has_table) {
+        m_table = group.get_table(patch.m_table_num);
+    }
+}
 
 /*
 // use and_query() instead!

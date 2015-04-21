@@ -55,18 +55,20 @@ void RowBase::impl_detach() REALM_NOEXCEPT
     }
 }
 
-void RowBase::handover_export(Handover_data& handover_data, PayloadHandoverMode mode)
+RowBase::RowBase(const RowBase& source, Handover_patch& patch, 
+                 PayloadHandoverMode mode)
+    : m_table(TableRef())
 {
     static_cast<void>(mode);
-    handover_data.table_num = m_table->get_index_in_group();
-    handover_data.row_ndx = m_row_ndx;
+    patch.table_num = source.m_table->get_index_in_group();
+    patch.row_ndx = source.m_row_ndx;
 }
 
-void RowBase::internal_handover_import(Handover_data& handover_data, Group& group)
+void RowBase::apply_patch(Handover_patch& patch, Group& group)
 {
-    m_table = group.get_table(handover_data.table_num);
+    m_table = group.get_table(patch.table_num);
     m_table->register_row_accessor(this);
-    m_row_ndx = handover_data.row_ndx;
+    m_row_ndx = patch.row_ndx;
 }
 
 
