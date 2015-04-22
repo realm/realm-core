@@ -302,7 +302,7 @@ T BpTree<T, N>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
-        root_as_leaf().get(ndx);
+        return root_as_leaf().get(ndx);
     }
     LeafType fallback(get_alloc());
     const LeafType* leaf;
