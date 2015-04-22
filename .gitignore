@@ -1,6 +1,8 @@
 *.ncb
 *.suo
 *.swp
+*.realm.tmp
+*.realm.tmp.lock
 *~
 cscope.*
 tags
