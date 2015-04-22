@@ -53,6 +53,10 @@ struct ColumnTemplateBase
     virtual int compare_values(size_t row1, size_t row2) const = 0;
 };
 
+template <class T, class R, Action action, class Condition, class ColType>
+R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
+				std::size_t limit, std::size_t* return_ndx);
+
 template <class T> struct ColumnTemplate : public ColumnTemplateBase
 {
     // Overridden in column_string.* because == operator of StringData isn't yet locale aware; todo
@@ -260,9 +264,6 @@ protected:
     //@}
 
     // Node functions
-    template <class T, class R, Action action, class condition>
-    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1),
-                size_t* return_ndx = nullptr) const;
 
     class CreateHandler {
     public:
@@ -409,6 +410,7 @@ class TColumn : public ColumnBaseWithIndex, public ColumnTemplate<T> {
 public:
     using value_type = T;
     using LeafInfo = typename BpTree<T, Nullable>::LeafInfo;
+	using LeafType = typename BpTree<T, Nullable>::LeafType;
 
     struct unattached_root_tag {};
 
@@ -754,13 +756,13 @@ std::size_t TColumn<T, N>::count(T target) const
     if (has_search_index()) {
         return m_search_index->count(target);
     }
-    return aggregate<T, T, act_Count, Equal>(target, 0, size());
+    return aggregate<T, T, act_Count, Equal>(*this, target, 0, size(), npos, nullptr);
 }
 
 template <class T, bool N>
 T TColumn<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Sum, None>(0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
@@ -779,13 +781,13 @@ double TColumn<T, N>::average(std::size_t start, std::size_t end, std::size_t li
 template <class T, bool N>
 T TColumn<T,N>::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Min, None>(0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
 T TColumn<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Max, None>(0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Max, None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
@@ -1184,6 +1186,7 @@ void TColumn<T,N>::clear(std::size_t, bool)
 template <class T, bool N>
 std::size_t TColumn<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
 {
+	static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->lower_bound_int(value);
     }
@@ -1193,6 +1196,7 @@ std::size_t TColumn<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
 template <class T, bool N>
 std::size_t TColumn<T,N>::upper_bound_int(T value) const REALM_NOEXCEPT
 {
+	static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->upper_bound_int(value);
     }

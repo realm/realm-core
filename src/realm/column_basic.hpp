@@ -33,6 +33,21 @@ template<> struct AggReturnType<float> {
     typedef double sum_type;
 };
 
+template <>
+struct GetLeafType<float, false> {
+	using type = BasicArray<float>;
+};
+template <>
+struct GetLeafType<double, false> {
+	using type = BasicArray<double>;
+};
+
+// FIXME: Remove this — it's unused except in tests.
+template <>
+struct GetLeafType<int, false> {
+	using type = ArrayInteger;
+};
+
 
 /// A basic column (BasicColumn<T>) is a single B+-tree, and the root
 /// of the column is the root of the B+-tree. All leaf nodes are
@@ -43,7 +58,8 @@ template<> struct AggReturnType<float> {
 template<class T>
 class BasicColumn : public ColumnBaseSimple, public ColumnTemplate<T> {
 public:
-    typedef T value_type;
+	using LeafType = typename GetLeafType<T, false>::type;
+	using value_type = T;
     BasicColumn(Allocator&, ref_type);
 
     std::size_t size() const REALM_NOEXCEPT final;
@@ -124,9 +140,6 @@ private:
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx,
                                 Array::TreeInsert<BasicColumn<T>>&);
-
-    template <typename R, Action action, class cond>
-    R aggregate(T target, std::size_t start, std::size_t end, std::size_t* return_ndx) const;
 
     class SetLeafElem;
     class EraseLeafElem;
