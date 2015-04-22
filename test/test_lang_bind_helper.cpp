@@ -7020,7 +7020,7 @@ TEST(LangBindHelper_HandoverAccessors)
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv[i].first);
             handover.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
-            CHECK(!tv.is_attached());
+            CHECK(tv.is_attached());
         }
         {
             LangBindHelper::advance_read(sg,vid);
@@ -7059,12 +7059,12 @@ TEST(LangBindHelper_HandoverAccessors)
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv.get_int(0,i));
             handover2.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
-            CHECK(!tv.is_attached());
+            CHECK(tv.is_attached());
             // Aaaaand rows!
             row = (*table)[7];
             CHECK_EQUAL(7, row.get_int(0));
             handover_row.reset(sg_w.export_for_handover(row, PayloadHandoverMode::Copy));
-            CHECK(!row.is_attached());
+            CHECK(row.is_attached());
         }
         {
             LangBindHelper::advance_read(sg,vid);
@@ -7124,8 +7124,8 @@ TEST(LangBindHelper_HandoverDependentViews)
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv2.get_int(0,i));
             handover2.reset(sg_w.export_for_handover(tv2, PayloadHandoverMode::Copy));
-            CHECK(!tv1.is_attached());
-            CHECK(!tv2.is_attached());
+            CHECK(tv1.is_attached());
+            CHECK(tv2.is_attached());
         }
         {
             LangBindHelper::advance_read(sg,vid);
@@ -7270,7 +7270,6 @@ TEST(LangBindHelper_HandoverLinkView)
         // TableView tv2 = lvr->get_sorted_view(0);
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
-        // FIXME:
         handover.reset(sg_w.export_linkview_for_handover(lvr));
     }
     {
@@ -7296,7 +7295,7 @@ TEST(LangBindHelper_HandoverLinkView)
 }
 
 
-TEST(LangBindHelper_HandoverFailOfReverseDependency)
+TEST(LangBindHelper_HandoverWithReverseDependency)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
@@ -7334,23 +7333,8 @@ TEST(LangBindHelper_HandoverFailOfReverseDependency)
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv2.get_int(0,i));
-/*
-  FIXME
-            // must fail!
-            bool handover_failed = false;
-            try {
-*/
             handover2.reset(sg_w.export_for_handover(tv1, PayloadHandoverMode::Copy));
-/*
-  FIXME
-            } 
-            catch (...) {
-                handover_failed = true;
-            }
-            // FIXME CHECK(handover_failed);
-            // views are not affected if handover fails:
-            // FIXME CHECK(tv1.is_attached());
-*/
+            CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
         }
     }
