@@ -118,7 +118,8 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         row_ndx = to_size_t(m_row_indexes.get(ss));
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
-            arrp = &column->get_leaf(row_ndx, ndx_in_leaf, arr);
+            typename ColType::LeafInfo leaf { &arrp, &arr };
+            column->get_leaf(row_ndx, ndx_in_leaf, leaf);
             leaf_start = row_ndx - ndx_in_leaf;
             leaf_end = leaf_start + arrp->size();
         }

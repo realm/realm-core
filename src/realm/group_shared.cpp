@@ -701,7 +701,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
-
                 // make sure the database is not on streaming format. This has to be done at
                 // session initialization, even if it means writing the database during open.
                 if (alloc.m_file_on_streaming_form) {
@@ -757,6 +756,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
+
             }
             else { // not the session initiator!
 #ifndef _WIN32
@@ -861,6 +861,11 @@ bool SharedGroup::compact()
     // so it becomes the database file, replacing the old one in the process.
     m_group.write(tmp_path, m_key, info->latest_version_number);
     rename(tmp_path.c_str(), m_db_path.c_str());
+    {
+        SharedInfo* r_info = m_reader_map.get_addr();
+        Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
+        REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
+    }
     end_read();
 
     // We must detach group complety to force it to fully refresh its accessors for use
@@ -950,8 +955,17 @@ void SharedGroup::close() REALM_NOEXCEPT
 #ifdef REALM_ENABLE_REPLICATION
             // If replication is enabled, we need to stop log management:
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
-            if (repl)
+            if (repl) {
+#ifdef _WIN32
+                try {
+                    repl->stop_logging();
+                }
+                catch(...) {} // FIXME, on Windows, stop_logging() fails to delete a file because it's open
+#else
                 repl->stop_logging();
+#endif
+
+            }
 #endif
         }
     }
@@ -1628,14 +1642,14 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
-#ifndef _WIN32
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         info->number_of_versions = new_version - readlock_version + 1;
         info->latest_version_number = new_version;
+#ifndef _WIN32
         m_new_commit_available.notify_all();
-    }
 #endif
+    }
 }
 
 

@@ -138,10 +138,10 @@ public:
 
     static const std::size_t max_column_name_length = 63;
 
-    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
+    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
 
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
-                       DescriptorRef* subdesc = 0);
+                       DescriptorRef* subdesc = 0, bool nullable = false);
 
     std::size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
@@ -487,15 +487,15 @@ inline std::size_t Descriptor::get_column_index(StringData name) const REALM_NOE
     return m_spec->get_column_index(name);
 }
 
-inline std::size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc)
+inline std::size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
 {
     std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column(column_ndx, type, name, subdesc); // Throws
+    insert_column(column_ndx, type, name, subdesc, nullable); // Throws
     return column_ndx;
 }
 
 inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, StringData name,
-                                      DescriptorRef* subdesc)
+                                      DescriptorRef* subdesc, bool nullable)
 {
     typedef _impl::TableFriend tf;
     REALM_ASSERT(is_attached());
@@ -503,7 +503,7 @@ inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, Str
     REALM_ASSERT(!tf::is_link_type(ColumnType(type)));
 
     Table* link_target_table = 0;
-    tf::insert_column(*this, column_ndx, type, name, link_target_table); // Throws
+    tf::insert_column(*this, column_ndx, type, name, link_target_table, nullable); // Throws
     adj_insert_column(column_ndx);
     if (subdesc && type == type_Table)
         *subdesc = get_subdescriptor(column_ndx);

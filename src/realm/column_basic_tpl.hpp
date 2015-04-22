@@ -152,15 +152,16 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
 
 
 template<class T>
-class BasicColumn<T>::EraseLeafElem: public ColumnBase::EraseHandlerBase {
+class BasicColumn<T>::EraseLeafElem: public Array::EraseHandler {
 public:
+    BasicColumn<T>& m_column;
     EraseLeafElem(BasicColumn<T>& column) REALM_NOEXCEPT:
-        EraseHandlerBase(column) {}
+        m_column(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          std::size_t leaf_ndx_in_parent,
                          std::size_t elem_ndx_in_leaf) override
     {
-        BasicArray<T> leaf(get_alloc());
+        BasicArray<T> leaf(m_column.get_alloc());
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
         REALM_ASSERT_3(leaf.size(), >=, 1);
@@ -175,20 +176,20 @@ public:
     }
     void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
     {
-        Array::destroy(leaf_mem, get_alloc()); // Shallow
+        Array::destroy(leaf_mem, m_column.get_alloc()); // Shallow
     }
     void replace_root_by_leaf(MemRef leaf_mem) override
     {
-        BasicArray<T>* leaf = new BasicArray<T>(get_alloc()); // Throws
+        std::unique_ptr<BasicArray<T>> leaf(new BasicArray<T>(m_column.get_alloc())); // Throws
         leaf->init_from_mem(leaf_mem);
-        replace_root(leaf); // Throws, but accessor ownership is passed to callee
+        m_column.replace_root_array(std::move(leaf)); // Throws, but accessor ownership is passed to callee
     }
     void replace_root_by_empty_leaf() override
     {
         std::unique_ptr<BasicArray<T>> leaf;
-        leaf.reset(new BasicArray<T>(get_alloc())); // Throws
+        leaf.reset(new BasicArray<T>(m_column.get_alloc())); // Throws
         leaf->create(); // Throws
-        replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
+        m_column.replace_root_array(std::move(leaf)); // Throws, but accessor ownership is passed to callee
     }
 };
 

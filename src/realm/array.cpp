@@ -2402,17 +2402,29 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) REALM_NOEX
 }
 
 
-template<int width>
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
+template<int width> inline pair<int64_t, int64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
 {
-    return make_pair(to_size_t(get_direct<width>(data, ndx+0)),
-                     to_size_t(get_direct<width>(data, ndx+1)));
+    return make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
+                     to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
-                                                size_t ndx) REALM_NOEXCEPT
+inline pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) REALM_NOEXCEPT
 {
     REALM_TEMPEX(return get_two, width, (data, ndx));
+}
+
+
+template<int width>
+inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    v0 = to_ref(get_direct<width>(data, ndx + 0));
+    v1 = to_ref(get_direct<width>(data, ndx + 1));
+    v2 = to_ref(get_direct<width>(data, ndx + 2));
+}
+
+inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(get_three, width, (data, ndx, v0, v1, v2));
 }
 
 
@@ -2729,7 +2741,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
+template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);
@@ -2743,10 +2755,11 @@ template <IndexMethod method, class T> size_t Array::index_string(StringData val
     bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
+    size_t stringoffset = 0;
 
 top:
     // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
+    key = StringIndex::create_key(value, stringoffset);
 
     for (;;) {
         // Get subnode table
@@ -2784,9 +2797,9 @@ top:
         if (ref & 1) {
             size_t row_ref = size_t(uint64_t(ref) >> 1);
 
-            // for integer index, get_func fills out 'buffer' and makes str point at it
+            // for integer index, get_index_data fills out 'buffer' and makes str point at it
             char buffer[8];
-            StringData str = (*get_func)(column, row_ref, buffer);
+            StringData str = column->get_index_data(row_ref, buffer);
             if (str == value) {
                 result_ref = row_ref;
                 if (all)
@@ -2814,10 +2827,10 @@ top:
                 const char* sub_data = get_data_from_header(sub_header);
                 const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
 
-                // for integer index, get_func fills out 'buffer' and makes str point at it
+                // for integer index, get_index_data fills out 'buffer' and makes str point at it
                 char buffer[8];
-                StringData str = (*get_func)(column, first_row_ref, buffer);
-                if (str != value) {
+                StringData str = column->get_index_data(first_row_ref, buffer);
+                if (str.is_null() != value.is_null() || str != value) {
                     if (count)
                         return 0;
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
@@ -2846,9 +2859,9 @@ top:
                 if (count)
                     sub_count = sub.size();
 
-                // for integer index, get_func fills out 'buffer' and makes str point at it
+                // for integer index, get_index_data fills out 'buffer' and makes str point at it
                 char buffer[8];
-                StringData str = (*get_func)(column, first_row_ref, buffer);
+                StringData str = column->get_index_data(first_row_ref, buffer);
                 if (str != value)
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
@@ -2873,43 +2886,43 @@ top:
         width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
 
-        if (value_2.size() <= 4)
-            value_2 = StringData();
+        if (value.size() - stringoffset >= 4)
+            stringoffset += 4;
         else
-            value_2 = value_2.substr(4);
+            stringoffset += value.size() - stringoffset + 1;
 
         goto top;
     }
 }
 
-size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
+size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column) const
 {
     size_t dummy;
     Column dummycol;
-    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column, get_func);
+    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
 }
 
 
-void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const
 {
     size_t dummy;
 
-    index_string<index_FindAll, StringData>(value, result, dummy, column, get_func);
+    index_string<index_FindAll, StringData>(value, result, dummy, column);
 }
 
 
-FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
+FindRes Array::IndexStringFindAllNoCopy(StringData value, ref_type& res_ref, ColumnBase* column) const
 {
     Column dummy;
-    return (FindRes)index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func);
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
 }
 
 
-size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
+size_t Array::IndexStringCount(StringData value, ColumnBase* column) const
 {
     Column dummy;
     size_t dummysizet;
-    return index_string<index_Count, StringData>(value, dummy, dummysizet, column, get_func);
+    return index_string<index_Count, StringData>(value, dummy, dummysizet, column);
 }
 
 
@@ -3531,10 +3544,18 @@ int_fast64_t Array::get(const char* header, size_t ndx) REALM_NOEXCEPT
 }
 
 
-pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
+pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
-    pair<int_fast64_t, int_fast64_t> p = ::get_two(data, width, ndx);
-    return make_pair(int_least64_t(p.first), int_least64_t(p.second));
+    pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
+    return make_pair(p.first, p.second);
+}
+
+
+void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    const char* data = get_data_from_header(header);
+    int width = get_width_from_header(header);
+    ::get_three(data, width, ndx, v0, v1, v2);
 }

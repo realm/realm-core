@@ -249,7 +249,7 @@ inline void ColumnSubtableParent::insert(std::size_t row_ndx, std::size_t num_ro
 
 inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last)
 {
-    do_erase(row_ndx, is_last); // Throws
+    Column::erase(row_ndx, is_last); // Throws
 
     const bool fix_ndx_in_parent = true;
     bool last_entry_removed = m_subtable_map.adj_erase_row<fix_ndx_in_parent>(row_ndx);
@@ -261,7 +261,7 @@ inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last)
 inline void ColumnSubtableParent::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
                                                  bool)
 {
-    do_move_last_over(row_ndx, last_row_ndx); // Throws
+    Column::move_last_over(row_ndx, last_row_ndx); // Throws
 
     const bool fix_ndx_in_parent = true;
     bool last_entry_removed =
@@ -274,10 +274,10 @@ inline void ColumnSubtableParent::move_last_over(std::size_t row_ndx, std::size_
 inline void ColumnSubtableParent::clear(std::size_t, bool)
 {
     discard_child_accessors();
-    do_clear(); // Throws
-    // FIXME: This one is needed because Column::do_clear() forgets about the
+    clear_without_updating_index(); // Throws
+    // FIXME: This one is needed because Column::clear_without_updating_index() forgets about the
     // leaf type. A better solution should probably be sought after.
-    m_array->set_type(Array::type_HasRefs);
+    get_root_array()->set_type(Array::type_HasRefs);
 }
 
 inline void ColumnSubtableParent::mark(int type) REALM_NOEXCEPT
@@ -493,7 +493,7 @@ inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Ta
 
 inline ref_type ColumnSubtableParent::clone_table_columns(const Table* t)
 {
-    return _impl::TableFriend::clone_columns(*t, m_array->get_alloc());
+    return _impl::TableFriend::clone_columns(*t, get_root_array()->get_alloc());
 }
 
 inline ref_type ColumnSubtableParent::create(Allocator& alloc, std::size_t size)
@@ -526,7 +526,7 @@ update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col
 inline void ColumnSubtableParent::do_insert(std::size_t row_ndx, int_fast64_t value,
                                             std::size_t num_rows)
 {
-    Column::do_insert(row_ndx, value, num_rows); // Throws
+    Column::insert_without_updating_index(row_ndx, value, num_rows); // Throws
     bool is_append = row_ndx == realm::npos;
     if (!is_append) {
         const bool fix_ndx_in_parent = true;

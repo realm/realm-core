@@ -61,7 +61,7 @@ void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,
     // Do the actual delete and move
     bool clear_value = false;
     destroy_subtree(row_ndx, clear_value);
-    do_move_last_over(row_ndx, last_row_ndx);
+    Column::move_last_over(row_ndx, last_row_ndx);
 
     const bool fix_ndx_in_parent = true;
     adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
@@ -76,10 +76,10 @@ void ColumnLinkList::clear(size_t, bool broken_reciprocal_backlinks)
     }
 
     // Do the actual deletion
-    do_clear(); // Throws
-    // FIXME: This one is needed because Column::do_clear() forgets about the
+    clear_without_updating_index(); // Throws
+    // FIXME: This one is needed because Column::clear_without_updating_index() forgets about the
     // leaf type. A better solution should probably be sought after.
-    m_array->set_type(Array::type_HasRefs); // Throws
+    get_root_array()->set_type(Array::type_HasRefs); // Throws
 
     discard_child_accessors();
 }
@@ -328,7 +328,7 @@ void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM
 
 void ColumnLinkList::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    if (!m_array->update_from_parent(old_baseline))
+    if (!get_root_array()->update_from_parent(old_baseline))
         return;
 
     typedef list_accessors::const_iterator iter;
@@ -356,12 +356,12 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 void ColumnLinkList::Verify() const
 {
     if (root_is_leaf()) {
-        m_array->Verify();
-        REALM_ASSERT(m_array->has_refs());
+        get_root_array()->Verify();
+        REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
 
-    m_array->verify_bptree(&verify_leaf);
+    get_root_array()->verify_bptree(&verify_leaf);
 }
 
 
@@ -403,7 +403,7 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
 
 pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
     return make_pair(p.first.m_ref, p.second);
 }
 

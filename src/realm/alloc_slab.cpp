@@ -20,9 +20,6 @@ using namespace realm::util;
 
 namespace {
 
-// Limited to 8 bits (max 255).
-const int current_file_format_version = 2;
-
 #ifdef REALM_SLAB_ALLOC_DEBUG
 map<ref_type, void*> malloc_debug_map;
 #endif
@@ -41,7 +38,7 @@ public:
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
     { 0, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
-    { current_file_format_version, current_file_format_version },
+    { default_file_format_version, default_file_format_version },
     0, // reserved
     0  // select bit
 };
@@ -49,7 +46,7 @@ const SlabAlloc::Header SlabAlloc::empty_file_header = {
 const SlabAlloc::Header SlabAlloc::streaming_header = {
     { 0xFFFFFFFFFFFFFFFFULL, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
-    { current_file_format_version, current_file_format_version },
+    { default_file_format_version, default_file_format_version },
     0, // reserved
     0  // select bit
 };
@@ -449,9 +446,12 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         m_data        = map.release();
         m_baseline    = size;
         m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
+
+        Header* header;
+
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
-            Header* header = writable_map.get_addr();
+            header = writable_map.get_addr();
             header->m_flags |= server_sync_mode ? flags_ServerSyncMode : 0x0;
             header = reinterpret_cast<Header*>(m_data);
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
@@ -459,13 +459,18 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
                 throw runtime_error(path + ": failed to write!");
         }
         else {
-            Header* header = reinterpret_cast<Header*>(m_data);
+            header = reinterpret_cast<Header*>(m_data);
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode &&  !stored_server_sync_mode)
                 throw runtime_error(path + ": expected db in server sync mode, found local mode");
             if (!server_sync_mode &&  stored_server_sync_mode)
                 throw runtime_error(path + ": found db in server sync mode, expected local mode");
         }
+
+        int select_field = header->m_flags;
+        select_field ^= SlabAlloc::flags_SelectBit;
+        m_file_format_version = header->m_file_format_version[select_field];
+
     }
     catch (DecryptionFailed) {
         goto invalid_database;
@@ -481,6 +486,10 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
     throw InvalidDatabase();
 }
 
+unsigned char SlabAlloc::get_file_format() const
+{
+    return m_file_format_version;
+}
 
 ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 {
@@ -512,7 +521,6 @@ void SlabAlloc::attach_empty()
     m_baseline = sizeof (Header);
 }
 
-
 bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref)
 {
     // Verify that size is sane and 8-byte aligned
@@ -536,7 +544,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
     int version = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
-    if (version != current_file_format_version)
+    if (version > default_file_format_version)
         return false; // unsupported version
 
     // Top_ref should always point within buffer
@@ -563,8 +571,17 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>&
 {
     REALM_ASSERT(m_file_on_streaming_form);
     Header* header = reinterpret_cast<Header*>(mutable_data);
-    REALM_ASSERT(equal(reinterpret_cast<char*>(header), reinterpret_cast<char*>(header+1),
-                         reinterpret_cast<const char*>(&streaming_header)));
+
+    // Don't compare file format version fields as they are allowed to differ. 
+    // Also don't compare reserved fields (todo, is it correct to ignore?)
+    REALM_ASSERT_3(header->m_flags, == , streaming_header.m_flags);
+    REALM_ASSERT_3(header->m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
+    REALM_ASSERT_3(header->m_mnemonic[1], == , streaming_header.m_mnemonic[1]);
+    REALM_ASSERT_3(header->m_mnemonic[2], == , streaming_header.m_mnemonic[2]);
+    REALM_ASSERT_3(header->m_mnemonic[3], == , streaming_header.m_mnemonic[3]);
+    REALM_ASSERT_3(header->m_top_ref[0], == , streaming_header.m_top_ref[0]);
+    REALM_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
+
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;

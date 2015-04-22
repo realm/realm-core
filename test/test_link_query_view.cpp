@@ -740,7 +740,7 @@ TEST(LinkList_MultiLinkQuery)
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == "none").find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<String>(1) == "none").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
@@ -859,14 +859,14 @@ TEST(LinkList_SortLinkView)
     table1->set_string(1, 1, "alfa");
     table1->set_float(2, 1, 100.f);
     table1->set_double(3, 1, 100.);
-    table1->set_string(4, 0, "alfa");
+    table1->set_string(4, 1, "alfa");
 
     table1->add_empty_row();
     table1->set_int(0, 2, 200);
     table1->set_string(1, 2, "beta");
     table1->set_float(2, 2, 200.f);
     table1->set_double(3, 2, 200.);
-    table1->set_string(4, 0, "alfa");
+    table1->set_string(4, 2, "alfa");
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();
@@ -1119,7 +1119,7 @@ TEST(Link_FindNullLink)
     match = table2->column<LinkList>(col_linklist2).is_null().find(2);
     CHECK_EQUAL(3, match);
 
-    // We have not yet defined behaviour of finding null-links in a linked-to table, so we just throw. Todo.
+    // We have not yet defined behaviour of finding realm::null()-links in a linked-to table, so we just throw. Todo.
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
 

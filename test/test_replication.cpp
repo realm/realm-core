@@ -136,6 +136,9 @@ TEST(Replication_General)
         table->set    (0, 2, true, 2.0f, 2.0, "xx",  bin, 728, 0, mix);
         table->add       (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
         table->insert (0, 1, true, 1.0f, 1.0, "x",   bin, 727, 0, mix);
+
+        table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix);     // empty string
+        table->add(3, true, 3.0f, 1.0, "", bin, 729, 0, mix);     // empty string
         wt.commit();
     }
     {
@@ -181,11 +184,16 @@ TEST(Replication_General)
         rt_2.get_group().Verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
         MyTable::ConstRef table = rt_2.get_table<MyTable>("my_table");
-        CHECK_EQUAL(4, table->size());
+        CHECK_EQUAL(6, table->size());
         CHECK_EQUAL(10, table[0].my_int);
         CHECK_EQUAL(3,  table[1].my_int);
         CHECK_EQUAL(2,  table[2].my_int);
         CHECK_EQUAL(8,  table[3].my_int);
+
+        StringData sd1 = table[4].my_string.get();
+        StringData sd2 = table[5].my_string.get();
+
+        CHECK(!table[4].my_string.get().is_null());
     }
 }
 
@@ -487,6 +495,43 @@ TEST(Replication_Links)
 
     // FIXME: Reproduce the rest of the subtests from
     // LangBindHelper_AdvanceReadTransact_Links.
+}
+
+
+TEST(Replication_NullStrings)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    ostream* replay_log = 0;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_String, "c1", true);
+        table1->add_empty_row(3);                   // default value is null
+        table1->set_string(0, 1, StringData(""));   // empty string
+        table1->set_string(0, 2, realm::null());  // null
+
+        CHECK(table1->get_string(0, 0).is_null());
+        CHECK(!table1->get_string(0, 1).is_null());
+        CHECK(table1->get_string(0, 2).is_null());
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_log);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK(table2->get_string(0, 0).is_null());
+        CHECK(!table2->get_string(0, 1).is_null());
+        CHECK(table2->get_string(0, 2).is_null());
+    }
 }
 
 } // anonymous namespace

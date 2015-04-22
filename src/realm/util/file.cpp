@@ -600,7 +600,8 @@ void File::seek(SizeType position)
 #endif
 }
 
-
+// We might be able to use lseek() with offset=0 as cross platform method, because we fortunatly
+// do not require to operate on files larger than 4 GB on 32-bit platforms
 File::SizeType File::get_file_position()
 {
     REALM_ASSERT_RELEASE(is_attached());
@@ -614,6 +615,7 @@ File::SizeType File::get_file_position()
 #else 
     // POSIX version not needed because it's only used by Windows version of resize().
     REALM_ASSERT(false);
+    return 0;
 #endif
 }
 
@@ -917,6 +919,29 @@ void File::move(const string& old_path, const string& new_path)
     }
 }
 
+bool File::copy(string source, string destination)
+{
+    // Quick and dirty file copy, only used for unit tests. Todo, make more robust if used by Core.
+    char buf[1024];
+    size_t read;
+    File::try_remove(destination);
+    FILE* src = fopen(source.c_str(), "rb");
+    if (!src)
+        return false;
+
+    FILE* dst = fopen(destination.c_str(), "wb");
+    if (!dst) {
+        fclose(src);
+        return false;
+    }
+
+    while ((read = fread(buf, 1, 1024, src))) {
+        fwrite(buf, 1, read, dst);
+    }
+    fclose(src);
+    fclose(dst);
+    return true;
+}
 
 bool File::is_same_file(const File& f) const
 {

@@ -36,6 +36,12 @@
 #endif
 
 
+// Enables null support for strings, and also fixes an old bug in Index where it didn't support 0-bytes in 
+// strings. If enabled, then existing database files made by older versions of Core will be upgraded 
+// automatically the first time you open it. Hence, it must be opened with write access (through SharedGroup).
+// If you open it for read access (through Group) it will throw an exception (with a descriptive user friendly
+// error message).
+#define REALM_NULL_STRINGS 1
 
 /* The maximum number of elements in a B+-tree node. Applies to inner nodes and
  * to leaves. The minimum allowable value is 2.
@@ -48,6 +54,11 @@
 
 #if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__ || _MSC_VER >= 1700
 #  define REALM_HAVE_CXX11 1
+#endif
+
+// Fixme, remove?
+#ifndef REALM_HAVE_NULL_SUPPORT
+#  define REALM_HAVE_NULL_SUPPORT 1
 #endif
 
 

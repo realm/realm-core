@@ -253,10 +253,10 @@ inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
     typedef _impl::TableFriend tf;
     ref_type ref;
     if (t) {
-        ref = tf::clone(*t, m_array->get_alloc()); // Throws
+        ref = tf::clone(*t, get_alloc()); // Throws
     }
     else {
-        ref = tf::create_empty_table(m_array->get_alloc()); // Throws
+        ref = tf::create_empty_table(get_alloc()); // Throws
     }
     // Remove any previous refs or binary data
     clear_value_and_discard_subtab_acc(ndx, mixcol_Table); // Throws
@@ -274,7 +274,7 @@ inline void ColumnMixed::insert_value(std::size_t row_ndx, int_fast64_t types_va
     bool is_append = row_ndx == size;
     std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     std::size_t num_rows = 1;
-    m_types->do_insert(row_ndx_2, types_value, num_rows); // Throws
+    m_types->insert_without_updating_index(row_ndx_2, types_value, num_rows); // Throws
     m_data->do_insert(row_ndx_2, data_value, num_rows); // Throws
 }
 
@@ -354,10 +354,10 @@ inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
     typedef _impl::TableFriend tf;
     ref_type ref;
     if (t) {
-        ref = tf::clone(*t, m_array->get_alloc()); // Throws
+        ref = tf::clone(*t, get_alloc()); // Throws
     }
     else {
-        ref = tf::create_empty_table(m_array->get_alloc()); // Throws
+        ref = tf::create_empty_table(get_alloc()); // Throws
     }
     int_fast64_t types_value = mixcol_Table;
     int_fast64_t data_value = int_fast64_t(ref);
@@ -404,7 +404,7 @@ inline void ColumnMixed::insert(std::size_t row_ndx, std::size_t num_rows, bool 
     std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
 
     int_fast64_t type_value = mixcol_Int;
-    m_types->do_insert(row_ndx_2, type_value, num_rows); // Throws
+    m_types->insert_without_updating_index(row_ndx_2, type_value, num_rows); // Throws
 
     // The least significant bit indicates that the rest of the bits form an
     // integer value, so 1 is actually zero.
@@ -437,19 +437,19 @@ inline void ColumnMixed::mark(int type) REALM_NOEXCEPT
 
 inline void ColumnMixed::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
 {
-    m_array->init_from_parent();
+    get_root_array()->init_from_parent();
     m_types->refresh_accessor_tree(col_ndx, spec); // Throws
     m_data->refresh_accessor_tree(col_ndx, spec); // Throws
     if (m_binary_data) {
-        REALM_ASSERT_3(m_array->size(), ==, 3);
+        REALM_ASSERT_3(get_root_array()->size(), ==, 3);
         m_binary_data->refresh_accessor_tree(col_ndx, spec); // Throws
         return;
     }
     // See if m_binary_data needs to be created.
-    if (m_array->size() == 3) {
-        ref_type ref = m_array->get_as_ref(2);
-        m_binary_data.reset(new ColumnBinary(m_array->get_alloc(), ref)); // Throws
-        m_binary_data->set_parent(m_array.get(), 2);
+    if (get_root_array()->size() == 3) {
+        ref_type ref = get_root_array()->get_as_ref(2);
+        m_binary_data.reset(new ColumnBinary(get_alloc(), ref)); // Throws
+        m_binary_data->set_parent(get_root_array(), 2);
     }
 }
 

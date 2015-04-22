@@ -1,6 +1,4 @@
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
-#ifndef _WIN32
-
 #include <map>
 #include <sstream>
 
@@ -665,7 +663,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         CHECK_EQUAL(str_mix, strings->get_mixed  (2,0));
         CHECK_EQUAL(bin_mix, strings->get_mixed  (3,0));
         if (step.m_num_rows >= 2) {
-            CHECK_EQUAL(StringData(), strings->get_string (0,1));
+            CHECK_EQUAL(StringData(""), strings->get_string (0,1));
             CHECK_EQUAL(BinaryData(), strings->get_binary (1,1));
             CHECK_EQUAL(int64_t(),    strings->get_mixed  (2,1));
             CHECK_EQUAL(int64_t(),    strings->get_mixed  (3,1));
@@ -6297,6 +6295,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     }
 }
 
+#ifndef _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
@@ -6329,6 +6328,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     }
 }
 
+#endif
 
 TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
@@ -6947,6 +6947,7 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
 
 REALM_TABLE_1(MyTable, first,  Int)
 
+#ifndef _WIN32
 
 TEST(LangBindHelper_VersionControl)
 {
@@ -7069,6 +7070,8 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
+#endif
+
 TEST(Shared_LinkListCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -7144,8 +7147,26 @@ TEST(LangBindHelper_MixedCommitSizes)
     }
 }
 
+TEST(LangBindHelper_RollbackToInitialState1)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    sg_w.begin_read();
+    LangBindHelper::promote_to_write(sg_w);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+}
+
+
+TEST(LangBindHelper_RollbackToInitialState2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    sg_w.begin_write();
+    sg_w.rollback();
+}
+
 #endif // REALM_ENABLE_REPLICATION
 
 #endif
-
-#endif // Disables whole .cpp file on Windows

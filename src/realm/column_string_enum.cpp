@@ -4,30 +4,20 @@
 #include <memory>
 
 #include <realm/column_string_enum.hpp>
+#include <realm/column_string.hpp>
 #include <realm/index_string.hpp>
 #include <realm/table.hpp>
+#include <realm/query_engine.hpp>
+#include <realm/column_tpl.hpp>
 
 using namespace std;
 using namespace realm;
 using namespace realm::util;
 
-
-namespace {
-
-// Getter function for index. For integer index, the caller must supply a buffer that we can store the 
-// extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with 
-// String index).
-StringData get_string(void* column, size_t ndx, char*)
-{
-    return static_cast<ColumnStringEnum*>(column)->get(ndx);
-}
-
-} // anonymous namespace
-
-
-ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref):
+ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable):
     Column(alloc, ref), // Throws
-    m_keys(alloc, keys_ref) // Throws
+    m_keys(alloc, keys_ref, nullable), // Throws
+    m_nullable(nullable)
 {
 }
 
@@ -43,6 +33,19 @@ void ColumnStringEnum::destroy() REALM_NOEXCEPT
         m_search_index->destroy();
 }
 
+MemRef ColumnStringEnum::clone_deep(Allocator& alloc) const
+{
+    ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
+    AdaptiveStringColumn new_col(alloc, ref, is_nullable()); // Throws
+    // FIXME: Should be optimized with something like
+    // new_col.add(seq_tree_accessor.begin(),
+    // seq_tree_accessor.end())
+    size_t n = size();
+    for (size_t i = 0; i < n; ++i)
+        new_col.add(get(i)); // Throws
+    return MemRef{new_col.get_ref(), alloc};
+}
+
 void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT
 {
     m_keys.get_root_array()->adjust_ndx_in_parent(diff);
@@ -50,10 +53,13 @@ void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT
 
 void ColumnStringEnum::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    m_array->update_from_parent(old_baseline);
+    Column::update_from_parent(old_baseline);
     m_keys.update_from_parent(old_baseline);
-    if (m_search_index)
-        m_search_index->update_from_parent(old_baseline);
+}
+
+bool ColumnStringEnum::is_nullable() const
+{
+    return m_nullable;
 }
 
 void ColumnStringEnum::set(size_t ndx, StringData value)
@@ -69,7 +75,7 @@ void ColumnStringEnum::set(size_t ndx, StringData value)
     }
 
     size_t key_ndx = GetKeyNdxOrAdd(value);
-    Column::set(ndx, key_ndx);
+    set_without_updating_index(ndx, key_ndx);
 }
 
 
@@ -77,7 +83,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
 {
     size_t key_ndx = GetKeyNdxOrAdd(value);
     int64_t value_2 = int64_t(key_ndx);
-    Column::do_insert(row_ndx, value_2, num_rows); // Throws
+    insert_without_updating_index(row_ndx, value_2, num_rows); // Throws
 
     if (m_search_index) {
         bool is_append = row_ndx == realm::npos;
@@ -92,7 +98,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
     size_t key_ndx = GetKeyNdxOrAdd(value);
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     int64_t value_2 = int64_t(key_ndx);
-    Column::do_insert(row_ndx_2, value_2, num_rows); // Throws
+    insert_without_updating_index(row_ndx_2, value_2, num_rows); // Throws
 
     if (m_search_index)
         m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
@@ -110,7 +116,7 @@ void ColumnStringEnum::do_erase(size_t ndx, bool is_last)
     if (m_search_index)
         m_search_index->erase<StringData>(ndx, is_last);
 
-    Column::do_erase(ndx, is_last);
+    erase_without_updating_index(ndx, is_last);
 }
 
 
@@ -131,14 +137,14 @@ void ColumnStringEnum::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
         }
     }
 
-    Column::do_move_last_over(row_ndx, last_row_ndx); // Throws
+    move_last_over_without_updating_index(row_ndx, last_row_ndx); // Throws
 }
 
 
 void ColumnStringEnum::do_clear()
 {
     // Note that clearing a StringEnum does not remove keys
-    Column::do_clear();
+    clear_without_updating_index();
 
     if (m_search_index)
         m_search_index->clear();
@@ -257,7 +263,7 @@ StringIndex* ColumnStringEnum::create_search_index()
     REALM_ASSERT(!m_search_index);
 
     std::unique_ptr<StringIndex> index;
-    index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
+    index.reset(new StringIndex(this, get_alloc())); // Throws
 
     // Populate the index
     size_t num_rows = size();
@@ -272,19 +278,15 @@ StringIndex* ColumnStringEnum::create_search_index()
     return m_search_index.get();
 }
 
-
 void ColumnStringEnum::destroy_search_index() REALM_NOEXCEPT
 {
     m_search_index.reset();
 }
 
 
-void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent,
-                                            size_t ndx_in_parent, bool allow_duplicate_valaues)
+StringData ColumnStringEnum::get_index_data(std::size_t ndx, char*) const REALM_NOEXCEPT
 {
-    REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                         !allow_duplicate_valaues, m_array->get_alloc())); // Throws
+    return get(ndx);
 }
 
 
@@ -298,7 +300,7 @@ void ColumnStringEnum::install_search_index(std::unique_ptr<StringIndex> index) 
 {
     REALM_ASSERT(!m_search_index);
 
-    index->set_target(this, &get_string);
+    index->set_target(this);
     m_search_index = std::move(index); // we now own this index
 }
 
@@ -312,8 +314,8 @@ void ColumnStringEnum::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
     // Refresh search index
     if (m_search_index) {
-        size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        m_search_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+        size_t ndx_in_parent = get_root_array()->get_ndx_in_parent();
+        m_search_index->set_ndx_in_parent(ndx_in_parent + 1);
         m_search_index->refresh_accessor_tree(col_ndx, spec); // Throws
     }
 }
@@ -346,8 +348,8 @@ void ColumnStringEnum::Verify(const Table& table, size_t col_ndx) const
     bool has_search_index = (attr & col_attr_Indexed) != 0;
     REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
     if (has_search_index) {
-        REALM_ASSERT_3(m_search_index->get_root_array()->get_ndx_in_parent(), ==,
-                       m_array->get_ndx_in_parent() + 1);
+        REALM_ASSERT_3(m_search_index->get_ndx_in_parent(), ==,
+                       get_root_array()->get_ndx_in_parent() + 1);
     }
 }
 
@@ -382,7 +384,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 
 void ColumnStringEnum::do_dump_node_structure(ostream& out, int level) const
 {
-    m_array->dump_bptree_structure(out, level, &leaf_dumper);
+    get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;
     out << setw(indent) << "" << "Search index\n";
     m_search_index->do_dump_node_structure(out, level+1);

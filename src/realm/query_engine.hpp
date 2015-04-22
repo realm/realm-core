@@ -207,8 +207,6 @@ public:
 
     SequentialGetter() {}
 
-    SequentialGetter(const SequentialGetter&) = delete;
-
     SequentialGetter(const Table& table, size_t column_ndx)
     {
         if (column_ndx != not_found)
@@ -225,7 +223,7 @@ public:
 
     void init(const ColType* column)
     {
-        m_array_ptr.reset(nullptr);
+        m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
         m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayType(column->get_alloc()));
         m_column = column;
         m_leaf_end = 0;
@@ -235,8 +233,9 @@ public:
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
+            typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
             std::size_t ndx_in_leaf;
-            m_leaf_ptr = &m_column->get_leaf(index, ndx_in_leaf, *m_array_ptr);
+            m_column->get_leaf(index, ndx_in_leaf, leaf);
             m_leaf_start = index - ndx_in_leaf;
             const size_t leaf_size = m_leaf_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -289,8 +288,8 @@ class ParentNode {
     typedef ParentNode ThisType;
 public:
 
-    ParentNode(): m_table(0) 
-    { 
+    ParentNode(): m_table(0)
+    {
     }
 
     void gather_children(std::vector<ParentNode*>& v)
@@ -356,7 +355,7 @@ public:
 
         // TResult: type of query result
         // TSourceColumn: type of aggregate source
-        TSourceColumn av = (TSourceColumn)0;
+        TSourceColumn av = static_cast<TSourceColumn>(0);
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
             REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
@@ -444,7 +443,7 @@ public:
         return to_size_t(m_tv.m_row_indexes.get(n));
     }
 
-    virtual void init(const Table& table) override
+    void init(const Table& table) override
     {
         m_table = &table;
 
@@ -471,7 +470,7 @@ public:
         return tableindex(r);
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new ListviewNode(*this);
     }
@@ -522,7 +521,7 @@ public:
             m_child2->init(table);
     }
 
-    std::string validate()
+    std::string validate() override
     {
         if (error_code != "")
             return error_code;
@@ -538,7 +537,7 @@ public:
         REALM_ASSERT(m_child);
 
         for (size_t s = start; s < end; ++s) {
-            const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
+            ConstTableRef subtable = m_table->get_subtable(m_column, s);
 
             if (subtable->is_degenerate())
                 return not_found;
@@ -553,23 +552,23 @@ public:
         return not_found;
     }
 
-    ParentNode* child_criteria()
+    ParentNode* child_criteria() override
     {
         return m_child2;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new SubtableNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_child2 = mapping.find(m_child2)->second;
     }
 
-    SubtableNode(const SubtableNode& from) 
+    SubtableNode(const SubtableNode& from)
         : ParentNode(from)
     {
         m_child2 = from.m_child2;
@@ -640,7 +639,7 @@ public:
     void init(const Table& table) override
     {
         ParentNode::init(table);
-        m_array_ptr.reset();
+        m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
         m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayInteger(table.get_alloc()));
     }
 
@@ -661,13 +660,14 @@ public:
     void get_leaf(const Column& col, std::size_t ndx)
     {
         std::size_t ndx_in_leaf;
-        m_leaf_ptr = &col.get_leaf(ndx, ndx_in_leaf, *m_array_ptr);
+        Column::LeafInfo leaf_info{&m_leaf_ptr, m_array_ptr.get()};
+        col.get_leaf(ndx, ndx_in_leaf, leaf_info);
         m_leaf_start = ndx - ndx_in_leaf;
         m_leaf_end = m_leaf_start + m_leaf_ptr->size();
     }
 
 private:
-    typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type m_leaf_accessor_storage;
+    std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type m_leaf_accessor_storage;
     std::unique_ptr<ArrayInteger, PlacementDelete> m_array_ptr;
 };
 
@@ -782,7 +782,7 @@ public:
                 end2 = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_leaf_ptr->find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                bool cont = m_leaf_ptr->find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 if (!cont)
                     return not_found;
             }
@@ -850,7 +850,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new IntegerNode<TConditionValue, TConditionFunction>(*this);
     }
@@ -912,7 +912,7 @@ public:
     }
 
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new FloatDoubleNode(*this);
     }
@@ -974,7 +974,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new BinaryNode(*this);
     }
@@ -1018,7 +1018,8 @@ public:
 
         // FIXME: Store these in std::string instead.
         // '*6' because case converted strings can take up more space. Todo, investigate
-        char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
+        char* data;
+        data = v.data() ? new char[6 * v.size()] : nullptr; // FIXME: Arithmetic is prone to overflow
         memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
     }
@@ -1045,10 +1046,10 @@ public:
         m_leaf.reset(nullptr);
     }
 
-    StringNodeBase(const StringNodeBase& from) 
+    StringNodeBase(const StringNodeBase& from)
         : ParentNode(from)
     {
-        char* data = new char[from.m_value.size()];
+        char* data = from.m_value.data() ? new char[from.m_value.size()] : nullptr;
         memcpy(data, from.m_value.data(), from.m_value.size());
         m_value = StringData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
@@ -1155,7 +1156,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new StringNode<TConditionFunction>(*this);
     }
@@ -1210,11 +1211,9 @@ public:
         m_dD = 10.0;
         StringNodeBase::init(table);
 
-        m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
-
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
-            m_key_ndx = (static_cast<const ColumnStringEnum*>(m_condition_column))->GetKeyNdx(m_value);
+            m_key_ndx = static_cast<const ColumnStringEnum*>(m_condition_column)->GetKeyNdx(m_value);
         }
         else if (m_condition_column->has_search_index()) {
             m_dT = 0.0;
@@ -1268,9 +1267,8 @@ public:
 
         }
         else if (m_column_type != col_type_String) {
-            m_cse.m_column = static_cast<const ColumnStringEnum*>(m_condition_column);
-            m_cse.m_leaf_end = 0;
-            m_cse.m_leaf_start = 0;
+            REALM_ASSERT_DEBUG(dynamic_cast<const ColumnStringEnum*>(m_condition_column));
+            m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
         }
 
         if (m_child)
@@ -1364,7 +1362,7 @@ public:
     }
 
 public:
-    virtual ParentNode* clone() override
+    ParentNode* clone() override
     {
         return new StringNode<Equal>(*this);
     }
@@ -1488,12 +1486,12 @@ public:
         return "";
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new OrNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         for (size_t i = 0; i < m_cond.size(); ++i)
@@ -1559,18 +1557,18 @@ public:
         return "";
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new NotNode(*this);
     }
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
+    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
         m_cond = mapping.find(m_cond)->second;
     }
 
-    NotNode(const NotNode& from) 
+    NotNode(const NotNode& from)
         : ParentNode(from)
     {
         // here we are just copying the pointers - they'll be remapped by "translate_pointers"
@@ -1623,7 +1621,9 @@ public:
         m_dD = 100.0;
         m_table = &table;
 
-        const ColType* c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx1));
+        const ColumnBase* cb = &get_column_base(table, m_condition_column_idx1);
+        REALM_ASSERT_DEBUG(dynamic_cast<const ColType*>(cb));
+        const ColType* c = static_cast<const ColType*>(cb);
         m_getter1.init(c);
 
         c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx2));
@@ -1679,7 +1679,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new TwoColumnsNode<TConditionValue, TConditionFunction>(*this);
     }
@@ -1742,12 +1742,12 @@ public:
         return res;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new ExpressionNode(*this);
     }
 
-    ExpressionNode(ExpressionNode& from) 
+    ExpressionNode(ExpressionNode& from)
         : ParentNode(from)
     {
         m_compare = from.m_compare;
@@ -1803,7 +1803,7 @@ public:
         return ret;
     }
 
-    virtual ParentNode* clone()
+    ParentNode* clone() override
     {
         return new LinksToNode(*this);
     }

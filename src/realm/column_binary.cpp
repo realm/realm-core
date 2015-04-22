@@ -41,7 +41,8 @@ ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
             return;
         }
         // Big blobs root leaf
-        ArrayBigBlobs* root = new ArrayBigBlobs(alloc); // Throws
+        // fixme, modify the 'nullable' arguments to constructor to support null for binary columns
+        ArrayBigBlobs* root = new ArrayBigBlobs(alloc, false); // Throws
         root->init_from_mem(mem);
         m_array.reset(root);
         return;
@@ -66,7 +67,7 @@ struct SetLeafElem: Array::UpdateHandler {
     {
         bool is_big = Array::get_context_flag_from_header(mem.m_addr);
         if (is_big) {
-            ArrayBigBlobs leaf(m_alloc);
+            ArrayBigBlobs leaf(m_alloc, false);
             leaf.init_from_mem(mem);
             leaf.set_parent(parent, ndx_in_parent);
             leaf.set(elem_ndx_in_leaf, m_value, m_add_zero_term); // Throws
@@ -80,7 +81,7 @@ struct SetLeafElem: Array::UpdateHandler {
             return;
         }
         // Upgrade leaf from small to big blobs
-        ArrayBigBlobs new_leaf(m_alloc);
+        ArrayBigBlobs new_leaf(m_alloc, false);
         new_leaf.create(); // Throws
         new_leaf.set_parent(parent, ndx_in_parent); // Throws
         new_leaf.update_parent(); // Throws
@@ -180,7 +181,7 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
     InsertState& state_2 = static_cast<InsertState&>(state);
     bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
     if (is_big) {
-        ArrayBigBlobs leaf(alloc);
+        ArrayBigBlobs leaf(alloc, false);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(&parent, ndx_in_parent);
         return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
@@ -193,7 +194,7 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
                                        state); // Throws
     // Upgrade leaf from small to big blobs
-    ArrayBigBlobs new_leaf(alloc);
+    ArrayBigBlobs new_leaf(alloc, false);
     new_leaf.create(); // Throws
     new_leaf.set_parent(&parent, ndx_in_parent);
     new_leaf.update_parent(); // Throws
@@ -204,10 +205,11 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 }
 
 
-class ColumnBinary::EraseLeafElem: public ColumnBase::EraseHandlerBase {
+class ColumnBinary::EraseLeafElem: public Array::EraseHandler {
 public:
+    ColumnBinary& m_column;
     EraseLeafElem(ColumnBinary& column) REALM_NOEXCEPT:
-        EraseHandlerBase(column) {}
+        m_column(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) override
@@ -215,7 +217,7 @@ public:
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Small blobs
-            ArrayBinary leaf(get_alloc());
+            ArrayBinary leaf(m_column.get_alloc());
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
             REALM_ASSERT_3(leaf.size(), >=, 1);
@@ -229,7 +231,7 @@ public:
             return false;
         }
         // Big blobs
-        ArrayBigBlobs leaf(get_alloc());
+        ArrayBigBlobs leaf(m_column.get_alloc(), false);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
         REALM_ASSERT_3(leaf.size(), >=, 1);
@@ -244,7 +246,7 @@ public:
     }
     void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
     {
-        Array::destroy_deep(leaf_mem, get_alloc());
+        Array::destroy_deep(leaf_mem, m_column.get_alloc());
     }
     void replace_root_by_leaf(MemRef leaf_mem) override
     {
@@ -252,24 +254,24 @@ public:
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Small blobs
-            ArrayBinary* leaf_2 = new ArrayBinary(get_alloc()); // Throws
+            ArrayBinary* leaf_2 = new ArrayBinary(m_column.get_alloc()); // Throws
             leaf_2->init_from_mem(leaf_mem);
             leaf = leaf_2;
         }
         else {
             // Big blobs
-            ArrayBigBlobs* leaf_2 = new ArrayBigBlobs(get_alloc()); // Throws
+            ArrayBigBlobs* leaf_2 = new ArrayBigBlobs(m_column.get_alloc(), false); // Throws
             leaf_2->init_from_mem(leaf_mem);
             leaf = leaf_2;
         }
-        replace_root(leaf); // Throws, but accessor ownership is passed to callee
+        m_column.replace_root_array(std::unique_ptr<Array>(leaf)); // Throws, but accessor ownership is passed to callee
     }
     void replace_root_by_empty_leaf() override
     {
         std::unique_ptr<ArrayBinary> leaf;
-        leaf.reset(new ArrayBinary(get_alloc())); // Throws
+        leaf.reset(new ArrayBinary(m_column.get_alloc())); // Throws
         leaf->create(); // Throws
-        replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
+        m_column.replace_root_array(std::move(leaf)); // Throws, but accessor ownership is passed to callee
     }
 };
 
@@ -324,9 +326,7 @@ void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
     copy(value.data(), value.data()+value.size(), buffer.get());
     BinaryData copy_of_value(buffer.get(), value.size());
-
     set(row_ndx, copy_of_value); // Throws
-
     bool is_last = true;
     erase(last_row_ndx, is_last); // Throws
 }
@@ -377,7 +377,7 @@ bool ColumnBinary::upgrade_root_leaf(size_t value_size)
     ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
     Allocator& alloc = leaf->get_alloc();
     std::unique_ptr<ArrayBigBlobs> new_leaf;
-    new_leaf.reset(new ArrayBigBlobs(alloc)); // Throws
+    new_leaf.reset(new ArrayBigBlobs(alloc, false)); // Throws
     new_leaf->create(); // Throws
     new_leaf->set_parent(leaf->get_parent(), leaf->get_ndx_in_parent());
     new_leaf->update_parent(); // Throws
@@ -421,7 +421,7 @@ public:
             return leaf.slice(offset, size, target_alloc); // Throws
         }
         // Big blobs
-        ArrayBigBlobs leaf(m_alloc);
+        ArrayBigBlobs leaf(m_alloc, false);
         leaf.init_from_mem(leaf_mem);
         return leaf.slice(offset, size, target_alloc); // Throws
     }
@@ -511,7 +511,7 @@ void ColumnBinary::refresh_accessor_tree(size_t, const Spec&)
         }
         else {
             // New root is 'big blobs' leaf
-            ArrayBigBlobs* root = new ArrayBigBlobs(alloc); // Throws
+            ArrayBigBlobs* root = new ArrayBigBlobs(alloc, false); // Throws
             root->init_from_mem(root_mem);
             new_root = root;
         }
@@ -544,7 +544,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
         return leaf.size();
     }
     // Big blobs
-    ArrayBigBlobs leaf(alloc);
+    ArrayBigBlobs leaf(alloc, false);
     leaf.init_from_mem(mem);
     leaf.Verify();
     return leaf.size();
@@ -598,7 +598,7 @@ void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
         return;
     }
     // Big blobs
-    ArrayBigBlobs leaf(m_array->get_alloc());
+    ArrayBigBlobs leaf(m_array->get_alloc(), false); // fixme, null support for to_dot
     leaf.init_from_mem(leaf_mem);
     leaf.set_parent(parent, ndx_in_parent);
     leaf.to_dot(out, is_strings);
@@ -621,7 +621,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
     }
     else {
         // Big blobs
-        ArrayBigBlobs leaf(alloc);
+        ArrayBigBlobs leaf(alloc, false); // fixme, nulls not yet supported by leaf dumper
         leaf.init_from_mem(mem);
         leaf_size = leaf.size();
         leaf_type = "Big blobs leaf";

@@ -6,7 +6,6 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/impl/destroy_guard.hpp>
 #include <realm/column.hpp>
 #include <realm/column_table.hpp>
 #include <realm/column_mixed.hpp>
@@ -20,14 +19,27 @@ using namespace std;
 using namespace realm;
 using namespace realm::util;
 
+void ColumnBase::move_assign(ColumnBase&) REALM_NOEXCEPT
+{
+    destroy();
+}
+
+void ColumnBaseWithIndex::move_assign(ColumnBaseWithIndex& col) REALM_NOEXCEPT
+{
+    ColumnBase::move_assign(col);
+    m_search_index = std::move(col.m_search_index);
+}
+
 void ColumnBase::set_string(size_t, StringData)
 {
     throw LogicError(LogicError::type_mismatch);
 }
 
-void ColumnBase::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    m_array->update_from_parent(old_baseline);
+    if (m_search_index) {
+        m_search_index->update_from_parent(old_baseline);
+    }
 }
 
 
@@ -42,6 +54,13 @@ void ColumnBase::cascade_break_backlinks_to_all_rows(size_t, CascadeState&)
     // No-op by default
 }
 
+void ColumnBaseWithIndex::destroy() REALM_NOEXCEPT
+{
+    if (m_search_index) {
+        m_search_index->destroy();
+    }
+}
+
 
 #ifdef REALM_DEBUG
 
@@ -51,6 +70,16 @@ void ColumnBase::Verify(const Table&, size_t) const
 }
 
 #endif // REALM_DEBUG
+
+void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
+{
+    // FIXME: Duplicated from bptree.cpp.
+    ArrayParent* parent = m_array->get_parent();
+    std::size_t ndx_in_parent = m_array->get_ndx_in_parent();
+    leaf->set_parent(parent, ndx_in_parent);
+    leaf->update_parent(); // Throws
+    m_array = std::move(leaf);
+}
 
 
 namespace {
@@ -378,7 +407,7 @@ ref_type ColumnBase::write(const Array* root, size_t slice_offset, size_t slice_
 }
 
 
-void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
+void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
                                     bool is_append)
 {
     // At this point the original root and its new sibling is either
@@ -387,8 +416,8 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     // to be on the compact form if is_append is true and both
     // siblings are either leaves or inner nodes on the compact form.
 
-    Array* orig_root = m_array.get();
-    Allocator& alloc = orig_root->get_alloc();
+    Array* orig_root = get_root_array();
+    Allocator& alloc = get_alloc();
     std::unique_ptr<Array> new_root(new Array(alloc)); // Throws
     new_root->create(Array::type_InnerBptreeNode); // Throws
     new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
@@ -418,7 +447,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
     new_root->add(1 + 2*v); // Throws
-    m_array = std::move(new_root);
+    replace_root_array(std::move(new_root));
 }
 
 
@@ -475,175 +504,6 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
     }
 }
 
-// fixme, must m_search_index be copied here?
-Column::Column(Allocator& alloc, ref_type ref)
-{
-    m_array.reset(new Array(alloc)); // Throws
-    m_array->init_from_ref(ref);
-}
-
-Column::Column(unattached_root_tag, Allocator& alloc)
-{
-    m_array.reset(new Array(alloc)); // Throws
-
-}
-
-Column::Column(Column&& col) REALM_NOEXCEPT
-{
-    m_array = std::move(col.m_array);
-    m_search_index = std::move(col.m_search_index);
-}
-
-Column::Column(ArrayInteger* root) REALM_NOEXCEPT:
-    ColumnBase(root)
-{
-}
-
-
-void Column::destroy() REALM_NOEXCEPT
-{
-    if (m_search_index) {
-        m_search_index->destroy();
-    }
-
-    if (m_array)
-        m_array->destroy_deep();
-}
-
-Column::~Column() REALM_NOEXCEPT
-{
-}
-
-
-void Column::move_assign(Column& col)
-{
-    destroy();
-    m_array = std::move(col.m_array);
-    col.m_array = 0;
-    m_search_index = std::move(col.m_search_index);
-}
-
-void Column::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
-{
-    m_array->update_from_parent(old_baseline);
-
-    if (m_search_index)
-        m_search_index->update_from_parent(old_baseline);
-}
-
-namespace {
-
-struct SetLeafElem: Array::UpdateHandler {
-    Array m_leaf;
-    const int_fast64_t m_value;
-    SetLeafElem(Allocator& alloc, int_fast64_t value) REALM_NOEXCEPT:
-        m_leaf(alloc), m_value(value) {}
-    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) override
-    {
-        m_leaf.init_from_mem(mem);
-        m_leaf.set_parent(parent, ndx_in_parent);
-        m_leaf.set(elem_ndx_in_leaf, m_value); // Throws
-    }
-};
-
-struct AdjustLeafElem: Array::UpdateHandler {
-    Array m_leaf;
-    const int_fast64_t m_value;
-    AdjustLeafElem(Allocator& alloc, int_fast64_t value) REALM_NOEXCEPT:
-    m_leaf(alloc), m_value(value) {}
-    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) override
-    {
-        m_leaf.init_from_mem(mem);
-        m_leaf.set_parent(parent, ndx_in_parent);
-        m_leaf.adjust(elem_ndx_in_leaf, m_value); // Throws
-    }
-};
-
-} // anonymous namespace
-
-void Column::set(size_t ndx, int64_t value)
-{
-    REALM_ASSERT_DEBUG(ndx < size());
-
-    if (m_search_index) {
-        m_search_index->set(ndx, value);
-    }
-
-    if (!m_array->is_inner_bptree_node()) {
-        array()->set(ndx, value); // Throws
-        return;
-    }
-
-    SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
-    array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
-}
-
-// When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values
-// are converted from the native representation to 2's complement, but the opposite conversion is left as undefined.
-// realm::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
-// which reduces to a no-op when 2's complement is the native representation of negative values.
-void Column::set_uint(size_t ndx, uint64_t value)
-{
-    set(ndx, from_twos_compl<int_fast64_t>(value));
-}
-
-void Column::set_as_ref(size_t ndx, ref_type ref)
-{
-    set(ndx, from_ref(ref));
-}
-
-void Column::adjust(size_t ndx, int_fast64_t diff)
-{
-    REALM_ASSERT_3(ndx, <, size());
-
-    if (!m_array->is_inner_bptree_node()) {
-        array()->adjust(ndx, diff); // Throws
-        return;
-    }
-
-    AdjustLeafElem set_leaf_elem(array()->get_alloc(), diff);
-    array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
-}
-
-
-// int64_t specific:
-
-size_t Column::count(int64_t target) const
-{
-    if (m_search_index)
-        return m_search_index->count(target);
-
-    return size_t(aggregate<int64_t, int64_t, act_Count, Equal>(target, 0, size()));
-}
-
-int64_t Column::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
-{
-    return aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit, return_ndx);
-}
-
-double Column::average(size_t start, size_t end, size_t limit, size_t* return_ndx) const
-{
-    if (end == size_t(-1))
-        end = size();
-    size_t size = end - start;
-    if(limit < size)
-        size = limit;
-    int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit, return_ndx);
-    double avg = double(sum) / double(size == 0 ? 1 : size);
-    return avg;
-}
-
-int64_t Column::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
-{
-    return aggregate<int64_t, int64_t, act_Min, None>(0, start, end, limit, return_ndx);
-}
-
-int64_t Column::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
-{
-    return aggregate<int64_t, int64_t, act_Max, None>(0, start, end, limit, return_ndx);
-}
 
 
 /*
@@ -679,466 +539,21 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 */
 
 
-void Column::destroy_subtree(size_t ndx, bool clear_value)
-{
-    int_fast64_t value = get(ndx);
-
-    // Null-refs indicate empty subtrees
-    if (value == 0)
-        return;
-
-    // A ref is always 8-byte aligned, so the lowest bit
-    // cannot be set. If it is, it means that it should not be
-    // interpreted as a ref.
-    if (value % 2 != 0)
-        return;
-
-    // Delete subtree
-    ref_type ref = to_ref(value);
-    Allocator& alloc = get_alloc();
-    Array::destroy_deep(ref, alloc);
-
-    if (clear_value)
-        set(ndx, 0); // Throws
-}
-
-
-namespace {
-
-template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
-    ArrayInteger m_leaf;
-    const int_fast64_t m_limit, m_diff;
-    AdjustHandler(Allocator& alloc, int_fast64_t limit, int_fast64_t diff) REALM_NOEXCEPT:
-        m_leaf(alloc), m_limit(limit), m_diff(diff) {}
-    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t) override
-    {
-        m_leaf.init_from_mem(mem);
-        m_leaf.set_parent(parent, ndx_in_parent);
-        if (with_limit) {
-            m_leaf.adjust_ge(m_limit, m_diff); // Throws
-        }
-        else {
-            m_leaf.adjust(0, m_leaf.size(), m_diff); // Throws
-        }
-    }
-};
-
-} // anonymous namespace
-
-
-void Column::adjust(int_fast64_t diff)
-{
-    if (!array()->is_inner_bptree_node()) {
-        array()->adjust(0, m_array->size(), diff); // Throws
-        return;
-    }
-
-    const bool with_limit = false;
-    int_fast64_t dummy_limit = 0;
-    AdjustHandler<with_limit> leaf_handler(array()->get_alloc(), dummy_limit, diff);
-    array()->update_bptree_leaves(leaf_handler); // Throws
-}
-
-
-void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
-{
-    if (!m_array->is_inner_bptree_node()) {
-        array()->adjust_ge(limit, diff); // Throws
-        return;
-    }
-
-    const bool with_limit = true;
-    AdjustHandler<with_limit> leaf_handler(array()->get_alloc(), limit, diff);
-    array()->update_bptree_leaves(leaf_handler); // Throws
-}
-
-namespace {
-
-    // Getter function for index. For integer index, the caller must supply a buffer that we can store the
-    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
-    // String index).
-    StringData get_string(void* column, size_t ndx, char* buffer)
-    {
-        int64_t i = static_cast<Column*>(column)->get(ndx);
-        *reinterpret_cast<int64_t*>(buffer) = i;
-        StringData s = to_str(*reinterpret_cast<int64_t*>(buffer));
-        return s;
-    }
-
-} // anonymous namespace
-
-StringIndex* Column::create_search_index()
-{
-    REALM_ASSERT(!m_search_index);
-    std::unique_ptr<StringIndex> index(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
-
-    // Populate the index
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        int64_t value = get(row_ndx);
-        size_t num_rows = 1;
-        bool is_append = true;
-        index->insert(row_ndx, value, num_rows, is_append); // Throws
-    }
-
-    m_search_index = std::move(index);
-    return m_search_index.get();
-}
-
-StringIndex* Column::get_search_index() REALM_NOEXCEPT
-{
-    return m_search_index.get();
-}
-
-const StringIndex* Column::get_search_index() const REALM_NOEXCEPT
-{
-    return m_search_index.get();
-}
-
-void Column::destroy_search_index() REALM_NOEXCEPT
+void ColumnBaseWithIndex::destroy_search_index() REALM_NOEXCEPT
 {
     m_search_index.reset();
 }
 
-void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
+void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent,
     size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-        !allow_duplicate_valaues, m_array->get_alloc())); // Throws
-}
-
-size_t Column::find_first(int64_t value, size_t begin, size_t end) const
-{
-    REALM_ASSERT_3(begin, <=, size());
-    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
-
-    if (m_search_index && begin == 0 && end == npos)
-        return m_search_index->find_first(value);
-
-    if (root_is_leaf())
-        return m_array->find_first(value, begin, end); // Throws (maybe)
-
-    // FIXME: It would be better to always require that 'end' is
-    // specified explicitely, since Table has the size readily
-    // available, and Array::get_bptree_size() is deprecated.
-    if (end == npos)
-        end = m_array->get_bptree_size();
-
-    Array leaf(m_array->get_alloc());
-    size_t ndx_in_tree = begin;
-    while (ndx_in_tree < end) {
-        pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
-        leaf.init_from_mem(p.first);
-        size_t ndx_in_leaf = p.second;
-        size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
-        size_t end_in_leaf = min(leaf.size(), end - leaf_offset);
-        size_t ndx = leaf.find_first(value, ndx_in_leaf, end_in_leaf); // Throws (maybe)
-        if (ndx != not_found)
-            return leaf_offset + ndx;
-        ndx_in_tree = leaf_offset + end_in_leaf;
-    }
-
-    return not_found;
-}
-
-
-void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) const
-{
-    REALM_ASSERT_3(begin, <=, size());
-    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
-
-    if (m_search_index && begin == 0 && end == size_t(-1))
-        return m_search_index->find_all(result, value);
-
-    if (root_is_leaf()) {
-        size_t leaf_offset = 0;
-        m_array->find_all(&result, value, leaf_offset, begin, end); // Throws
-        return;
-    }
-
-    // FIXME: It would be better to always require that 'end' is
-    // specified explicitely, since Table has the size readily
-    // available, and Array::get_bptree_size() is deprecated.
-    if (end == npos)
-        end = m_array->get_bptree_size();
-
-    Array leaf(m_array->get_alloc());
-    size_t ndx_in_tree = begin;
-    while (ndx_in_tree < end) {
-        pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
-        leaf.init_from_mem(p.first);
-        size_t ndx_in_leaf = p.second;
-        size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
-        size_t end_in_leaf = min(leaf.size(), end - leaf_offset);
-        leaf.find_all(&result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
-        ndx_in_tree = leaf_offset + end_in_leaf;
-    }
-}
-
-
-bool Column::compare_int(const Column& c) const REALM_NOEXCEPT
-{
-    size_t n = size();
-    if (c.size() != n)
-        return false;
-    for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i))
-            return false;
-    }
-    return true;
-}
-
-
-void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
-{
-    REALM_ASSERT_DEBUG(row_ndx == realm::npos || row_ndx < size());
-
-    ref_type new_sibling_ref;
-    Array::TreeInsert<Column> state;
-    for (size_t i = 0; i != num_rows; ++i) {
-        size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
-        if (root_is_leaf()) {
-            REALM_ASSERT_DEBUG(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
-            new_sibling_ref = m_array->bptree_leaf_insert(row_ndx_2, value, state); // Throws
-        }
-        else {
-            state.m_value = value;
-            if (row_ndx_2 == realm::npos) {
-                new_sibling_ref = m_array->bptree_append(state); // Throws
-            }
-            else {
-                new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
-            }
-        }
-        if (REALM_UNLIKELY(new_sibling_ref)) {
-            bool is_append = row_ndx_2 == realm::npos;
-            introduce_new_root(new_sibling_ref, state, is_append); // Throws
-        }
-    }
-
-
-    if (m_search_index) {
-        bool is_append = row_ndx == realm::npos;
-        size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
-    }
-
-}
-
-
-class Column::EraseLeafElem: public EraseHandlerBase {
-public:
-    Array m_leaf;
-    bool m_leaves_have_refs;
-    EraseLeafElem(Column& column) REALM_NOEXCEPT:
-        EraseHandlerBase(column), m_leaf(get_alloc()),
-        m_leaves_have_refs(false) {}
-    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
-                         size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) override
-    {
-        m_leaf.init_from_mem(leaf_mem);
-        REALM_ASSERT_3(m_leaf.size(), >=, 1);
-        size_t last_ndx = m_leaf.size() - 1;
-        if (last_ndx == 0) {
-            m_leaves_have_refs = m_leaf.has_refs();
-            return true;
-        }
-        m_leaf.set_parent(parent, leaf_ndx_in_parent);
-        size_t ndx = elem_ndx_in_leaf;
-        if (ndx == npos)
-            ndx = last_ndx;
-        m_leaf.erase(ndx); // Throws
-        return false;
-    }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
-    {
-        // FIXME: Seems like this would cause file space leaks if
-        // m_leaves_have_refs is true, but consider carefully how
-        // m_leaves_have_refs get its value.
-        get_alloc().free_(leaf_mem);
-    }
-    void replace_root_by_leaf(MemRef leaf_mem) override
-    {
-        Array* leaf = new Array(get_alloc()); // Throws
-        leaf->init_from_mem(leaf_mem);
-        replace_root(leaf); // Throws, but callee takes ownership of accessor
-    }
-    void replace_root_by_empty_leaf() override
-    {
-        std::unique_ptr<Array> leaf(new Array(get_alloc())); // Throws
-        leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
-                     Array::type_Normal); // Throws
-        replace_root(leaf.release()); // Throws, but callee takes ownership of accessor
-    }
-};
-
-
-void Column::do_erase(size_t ndx, bool is_last)
-{
-    REALM_ASSERT_DEBUG(ndx < size());
-    REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
-
-    if (m_search_index)
-        m_search_index->erase<StringData>(ndx, is_last);
-
-    if (!m_array->is_inner_bptree_node()) {
-        m_array->erase(ndx); // Throws
-        return;
-    }
-
-    size_t ndx_2 = is_last ? npos : ndx;
-    EraseLeafElem handler(*this);
-    Array::erase_bptree_elem(m_array.get(), ndx_2, handler); // Throws
-}
-
-
-void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
-{
-    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
-    REALM_ASSERT_DEBUG(last_row_ndx + 1 == size());
-
-    if (m_search_index) {
-        // remove the value to be overwritten from index
-        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
-
-        // update index to point to new location
-        if (row_ndx != last_row_ndx) {
-            int_fast64_t moved_value = get(last_row_ndx);
-            m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
-        }
-    }
-
-    // Copy value from last row over
-    int_fast64_t value = get(last_row_ndx);
-    if (array()->is_inner_bptree_node()) {
-        SetLeafElem set_leaf_elem(array()->get_alloc(), value);
-        array()->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
-    }
-    else {
-        array()->set(row_ndx, value); // Throws
-    }
-
-    // Discard last row
-    if (array()->is_inner_bptree_node()) {
-        size_t row_ndx_2 = realm::npos;
-        EraseLeafElem handler(*this);
-        Array::erase_bptree_elem(array(), row_ndx_2, handler); // Throws
-    }
-    else {
-        array()->erase(last_row_ndx); // Throws
-    }
-}
-
-
-void Column::do_clear()
-{
-    if (m_search_index)
-        m_search_index->clear();
-
-    m_array->clear_and_destroy_children();
-    if (m_array->is_inner_bptree_node())
-        m_array->set_type(Array::type_Normal);
-}
-
-
-class Column::CreateHandler: public ColumnBase::CreateHandler {
-public:
-    CreateHandler(Array::Type leaf_type, int_fast64_t value, Allocator& alloc):
-        m_leaf_type(leaf_type), m_value(value), m_alloc(alloc) {}
-    ref_type create_leaf(size_t size) override
-    {
-        bool context_flag = false;
-        MemRef mem = ArrayInteger::create_array(m_leaf_type, context_flag, size,
-                                         m_value, m_alloc); // Throws
-        return mem.m_ref;
-    }
-private:
-    const Array::Type m_leaf_type;
-    const int_fast64_t m_value;
-    Allocator& m_alloc;
-};
-
-ref_type Column::create(Allocator& alloc, Array::Type leaf_type, size_t size, int_fast64_t value)
-{
-    CreateHandler handler(leaf_type, value, alloc);
-    return ColumnBase::create(alloc, size, handler);
-}
-
-
-class Column::SliceHandler: public ColumnBase::SliceHandler {
-public:
-    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
-    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) override
-    {
-        m_leaf.init_from_mem(leaf_mem);
-        return m_leaf.slice_and_clone_children(offset, size, target_alloc); // Throws
-    }
-private:
-    Array m_leaf;
-};
-
-ref_type Column::write(size_t slice_offset, size_t slice_size,
-                       size_t table_size, _impl::OutputStream& out) const
-{
-    ref_type ref;
-    if (root_is_leaf()) {
-        Allocator& alloc = Allocator::get_default();
-        MemRef mem = m_array->slice_and_clone_children(slice_offset, slice_size, alloc); // Throws
-        Array slice(alloc);
-        _impl::DeepArrayDestroyGuard dg(&slice);
-        slice.init_from_mem(mem);
-        bool recurse = true;
-        size_t pos = slice.write(out, recurse); // Throws
-        ref = pos;
-    }
-    else {
-        SliceHandler handler(get_alloc());
-        ref = ColumnBase::write(m_array.get(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
-    }
-    return ref;
-}
-
-
-void Column::refresh_accessor_tree(size_t, const Spec&)
-{
-    // With this type of column (Column), `m_array` is always an instance of
-    // Array. This is true because all leafs are instances of Array, and when
-    // the root is an inner B+-tree node, only the top array of the inner node
-    // is cached. This means that we never have to change the type of the cached
-    // root array.
-    m_array->init_from_parent();
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
+        !allow_duplicate_valaues, get_alloc())); // Throws
 }
 
 
 #ifdef REALM_DEBUG
-
-namespace {
-
-size_t verify_leaf(MemRef mem, Allocator& alloc)
-{
-    Array leaf(alloc);
-    leaf.init_from_mem(mem);
-    leaf.Verify();
-    return leaf.size();
-}
-
-} // anonymous namespace
-
-void Column::Verify() const
-{
-    if (root_is_leaf()) {
-        m_array->Verify();
-        return;
-    }
-
-    m_array->verify_bptree(&verify_leaf);
-}
-
 
 class ColumnBase::LeafToDot: public Array::ToDotHandler {
 public:
@@ -1151,10 +566,15 @@ public:
     }
 };
 
-void ColumnBase::tree_to_dot(ostream& out) const
+void ColumnBaseSimple::tree_to_dot(ostream& out) const
+{
+    ColumnBase::bptree_to_dot(get_root_array(), out);
+}
+
+void ColumnBase::bptree_to_dot(const Array* root, ostream& out) const
 {
     LeafToDot handler(*this);
-    m_array->bptree_to_dot(out, handler);
+    root->bptree_to_dot(out, handler);
 }
 
 void ColumnBase::dump_node_structure() const
@@ -1162,39 +582,10 @@ void ColumnBase::dump_node_structure() const
     do_dump_node_structure(cerr, 0);
 }
 
+namespace realm {
+namespace _impl {
 
-void Column::to_dot(ostream& out, StringData title) const
-{
-    ref_type ref = m_array->get_ref();
-    out << "subgraph cluster_integer_column" << ref << " {" << endl;
-    out << " label = \"Integer column";
-    if (title.size() != 0)
-        out << "\\n'" << title << "'";
-    out << "\";" << endl;
-    tree_to_dot(out);
-    out << "}" << endl;
-}
-
-void Column::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                         ostream& out) const
-{
-    Array leaf(m_array->get_alloc());
-    leaf.init_from_mem(leaf_mem);
-    leaf.set_parent(parent, ndx_in_parent);
-    leaf.to_dot(out);
-}
-
-MemStats Column::stats() const
-{
-    MemStats stats;
-    m_array->stats(stats);
-
-    return stats;
-}
-
-namespace {
-
-void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
@@ -1215,16 +606,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
     out << setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
 }
 
-} // anonymous namespace
-
-void Column::do_dump_node_structure(ostream& out, int level) const
-{
-    dump_node_structure(*m_array, out, level);
-}
-
-void Column::dump_node_structure(const Array& root,  ostream& out, int level)
-{
-    root.dump_bptree_structure(out, level, &leaf_dumper);
-}
+} // namespace _impl
+} // namespace realm
 
 #endif // REALM_DEBUG

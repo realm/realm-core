@@ -16,7 +16,7 @@ ColumnMixed::~ColumnMixed() REALM_NOEXCEPT
 
 void ColumnMixed::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    if (!m_array->update_from_parent(old_baseline))
+    if (!get_root_array()->update_from_parent(old_baseline))
         return;
 
     m_types->update_from_parent(old_baseline);

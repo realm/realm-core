@@ -9,7 +9,7 @@ using namespace realm::util;
 
 void ColumnSubtableParent::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    if (!m_array->update_from_parent(old_baseline))
+    if (!get_root_array()->update_from_parent(old_baseline))
         return;
     m_subtable_map.update_from_parent(old_baseline);
 }
@@ -33,12 +33,12 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 void ColumnSubtableParent::Verify() const
 {
     if (root_is_leaf()) {
-        m_array->Verify();
-        REALM_ASSERT(m_array->has_refs());
+        get_root_array()->Verify();
+        REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
 
-    m_array->verify_bptree(&verify_leaf);
+    get_root_array()->verify_bptree(&verify_leaf);
 }
 
 void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
@@ -255,7 +255,7 @@ void ColumnSubtableParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in
 
 pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
     return make_pair(p.first.m_ref, p.second);
 }
 
@@ -405,7 +405,7 @@ void ColumnTable::Verify(const Table& table, size_t col_ndx) const
 
 void ColumnTable::to_dot(ostream& out, StringData title) const
 {
-    ref_type ref = m_array->get_ref();
+    ref_type ref = get_root_array()->get_ref();
     out << "subgraph cluster_subtable_column" << ref << " {" << endl;
     out << " label = \"Subtable column";
     if (title.size() != 0)
@@ -437,7 +437,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 
 void ColumnTable::do_dump_node_structure(ostream& out, int level) const
 {
-    m_array->dump_bptree_structure(out, level, &leaf_dumper);
+    get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
 #endif // REALM_DEBUG
