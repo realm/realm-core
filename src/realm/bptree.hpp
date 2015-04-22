@@ -55,7 +55,6 @@ public:
     bool root_is_leaf() const REALM_NOEXCEPT;
     void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append);
     void replace_root(std::unique_ptr<Array> leaf);
-    void clear();
 
     // FIXME: This is only applicable for linklist columns, which
     // derive from the integer Column.
@@ -110,6 +109,7 @@ public:
     void insert(std::size_t ndx, T value, std::size_t num_rows = 1);
     void erase(std::size_t ndx, bool is_last = false);
     void move_last_over(std::size_t ndx, std::size_t last_row_ndx);
+	void clear();
     T front() const REALM_NOEXCEPT;
     T back() const REALM_NOEXCEPT;
 
@@ -225,15 +225,6 @@ inline
 MemRef BpTreeBase::clone_deep(Allocator& alloc) const
 {
     return m_root->clone_deep(alloc);
-}
-
-inline
-void BpTreeBase::clear()
-{
-    m_root->clear_and_destroy_children();
-    if (!root_is_leaf()) {
-        m_root->set_type(Array::type_Normal);
-    }
 }
 
 inline
@@ -433,6 +424,24 @@ void BpTree<T, N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
     int_fast64_t value = get(last_row_ndx);
     set(row_ndx, value);
     erase(last_row_ndx, true);
+}
+
+template <class T, bool N>
+void BpTree<T,N>::clear()
+{
+	if (root_is_leaf()) {
+		root_as_leaf().clear();
+	}
+	else {
+		root().clear_and_destroy_children();
+		
+		// Reinitialize the root's memory as a leaf.
+		Allocator& alloc = get_alloc();
+		std::unique_ptr<LeafType> new_root(new LeafType(alloc));
+		new_root->init_from_mem(MemRef{root().get_ref(), alloc});
+		new_root->set_type(Array::type_Normal);
+		replace_root(std::move(new_root));
+	}
 }
 
 
