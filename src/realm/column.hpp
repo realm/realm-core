@@ -44,9 +44,9 @@ class StringIndex;
 template <> struct GetLeafType<int64_t, false> {
     using type = ArrayInteger;
 };
-// template <> struct GetLeafType<int64_t, true> {
-//     using type = ArrayIntNull;
-// };
+template <> struct GetLeafType<int64_t, true> {
+    using type = ArrayIntNull;
+};
 
 struct ColumnTemplateBase
 {
