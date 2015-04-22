@@ -479,6 +479,9 @@ void GroupWriter::commit(ref_type new_top_ref)
     // update selector - must happen after write of all data and top pointer
     file_header[16+7] = char(select_field); // swap
 
+ //   file_header[16 + 4 + new_valid_ref] = m_alloc.get_file_format();
+ //   REALM_ASSERT_3(m_alloc.get_file_format(), == , default_file_format_version);
+
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
     m_file_map.sync(); // Throws

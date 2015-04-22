@@ -60,7 +60,10 @@ enum ColumnAttr {
 
     /// Specifies that the links of this column are strong, not weak. Applies
     /// only to link columns (`type_Link` and `type_LinkList`).
-    col_attr_StrongLinks = 8
+    col_attr_StrongLinks = 8,
+
+    /// Specifies that elements in the column can be null.
+    col_attr_Nullable = 16
 };
 
 

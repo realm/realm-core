@@ -30,6 +30,12 @@
 
 namespace realm {
 
+#if REALM_NULL_STRINGS == 1
+    // Bumped to 3 because of null support of String columns and because of new format of index
+    const int default_file_format_version = 3;
+#else
+    const int default_file_format_version = 2;
+#endif
 
 // Pre-declarations
 class Group;
@@ -113,6 +119,8 @@ public:
     ///
     /// \throw InvalidDatabase
     ref_type attach_buffer(char* data, std::size_t size);
+
+    unsigned char get_file_format() const;
 
     /// Attach this allocator to an empty buffer.
     ///
@@ -327,6 +335,8 @@ private:
     /// less padding between members due to alignment requirements.
     FeeeSpaceState m_free_space_state;
 
+    unsigned char m_file_format_version;
+
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;
     slabs m_slabs;
@@ -377,7 +387,8 @@ private:
 
 inline SlabAlloc::SlabAlloc():
     m_attach_mode(attach_None),
-    m_free_space_state(free_space_Clean)
+    m_free_space_state(free_space_Clean),
+    m_file_format_version(default_file_format_version)
 {
     m_baseline = 0; // Unattached
 #ifdef REALM_DEBUG

@@ -73,7 +73,7 @@ enum Instruction {
     instr_ClearTable            = 30, // Remove all rows in selected table
     instr_OptimizeTable         = 31,
     instr_SelectDescriptor      = 32, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 33, // Insert new column into to selected descriptor
+    instr_InsertColumn          = 33, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
     instr_InsertLinkColumn      = 34, // do, but for a link-type column
     instr_EraseColumn           = 35, // Remove column from selected descriptor
     instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
@@ -89,7 +89,8 @@ enum Instruction {
     instr_LinkListMove          = 46, // Move an entry within a link list
     instr_LinkListErase         = 47, // Remove an entry from a link list
     instr_LinkListClear         = 48, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 49  // Assign to link list entry
+    instr_LinkListSetAll        = 49, // Assign to link list entry
+    instr_InsertNullableColumn = 50   // Insert nullable column  
 };
 
 
@@ -171,7 +172,7 @@ public:
 
     // Must have descriptor selected:
     bool insert_link_column(std::size_t col_ndx, DataType, StringData name, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx);
-    bool insert_column(std::size_t col_ndx, DataType, StringData name);
+    bool insert_column(std::size_t col_ndx, DataType, StringData name, bool nullable = false);
     bool erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx);
     bool erase_column(std::size_t col_ndx);
     bool rename_column(std::size_t col_ndx, StringData new_name);
@@ -250,7 +251,7 @@ public:
     void erase_group_level_table(std::size_t table_ndx, std::size_t num_tables);
     void rename_group_level_table(std::size_t table_ndx, StringData new_name);
     void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name,
-                       const Table* link_target_table);
+                       const Table* link_target_table, bool nullable = false);
     void erase_column(const Descriptor&, std::size_t col_ndx);
     void rename_column(const Descriptor&, std::size_t col_ndx, StringData name);
 
@@ -635,9 +636,12 @@ void TransactLogEncoder::string_cmd(Instruction instr, std::size_t col_ndx,
 inline
 void TransactLogEncoder::string_value(const char* data, std::size_t size)
 {
+    if (!data)
+        size = static_cast<size_t>(-1);
+
     char* buf = reserve(max_required_bytes_for_string_value(size));
     buf = encode_int(buf, uint64_t(size));
-    buf = std::copy(data, data + size, buf);
+    buf = std::copy(data, data + (data ? size : 0), buf);
     advance(buf);
 }
 
@@ -732,9 +736,9 @@ inline void TransactLogConvenientEncoder::rename_group_level_table(std::size_t t
     m_encoder.rename_group_level_table(table_ndx, new_name);
 }
 
-inline bool TransactLogEncoder::insert_column(std::size_t col_ndx, DataType type, StringData name)
+inline bool TransactLogEncoder::insert_column(std::size_t col_ndx, DataType type, StringData name, bool nullable)
 {
-    simple_cmd(instr_InsertColumn, util::tuple(col_ndx, int(type), name.size()));
+    simple_cmd(nullable ? instr_InsertNullableColumn : instr_InsertColumn, util::tuple(col_ndx, int(type), name.size()));
     append(name.data(), name.size());
     return true;
 }
@@ -752,7 +756,7 @@ inline bool TransactLogEncoder::insert_link_column(std::size_t col_ndx, DataType
 
 
 inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, std::size_t col_ndx, DataType type,
-                                       StringData name, const Table* link_target_table)
+                                       StringData name, const Table* link_target_table, bool nullable)
 {
     select_desc(desc); // Throws
     if (link_target_table) {
@@ -767,7 +771,7 @@ inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, 
         m_encoder.insert_link_column(col_ndx, type, name, target_table_ndx, backlink_col_ndx); // Throws
     }
     else {
-        m_encoder.insert_column(col_ndx, type, name);
+        m_encoder.insert_column(col_ndx, type, name, nullable);
     }
 }
 
@@ -1707,13 +1711,15 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
                     parser_error();
                 continue;
             }
-            case instr_InsertColumn: {
+            case instr_InsertColumn:
+            case instr_InsertNullableColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 int type = read_int<int>(); // Throws
                 if (!is_valid_data_type(type))
                     parser_error();
                 StringData name = read_string(m_string_buffer); // Throws
-                if (!handler.insert_column(col_ndx, DataType(type), name)) // Throws
+                bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
+                if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
                     parser_error();
                 continue;
             }
@@ -1884,6 +1890,9 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
     std::size_t size = read_int<std::size_t>(); // Throws
 
+    if (size == static_cast<size_t>(-1))
+        return StringData(nullptr, 0);
+
     const std::size_t avail = m_input_end - m_input_begin;
     if (avail >= size) {
         m_input_begin += size;
@@ -1891,6 +1900,9 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     }
 
     buf.clear();
+    if (size == static_cast<size_t>(-1)) {
+        return StringData(nullptr, 0); // null        
+    }
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);
     return StringData(buf.data(), size);

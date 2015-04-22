@@ -81,6 +81,11 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// found'. It is similar in function to std::string::npos.
 const std::size_t npos = std::size_t(-1);
 
+// Represents null in Query, find(), get(), set(), etc.
+struct null {
+    operator StringData() { return StringData(0, 0); }
+};
+
 /// Alias for realm::npos.
 const std::size_t not_found = npos;
 
@@ -453,10 +458,6 @@ public:
     /// specified value.
     void ensure_minimum_width(int64_t value);
 
-    // Direct access methods
-    const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                          bool use_retval = false) const REALM_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
-
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
     void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const;
@@ -815,6 +816,7 @@ public:
 
     template<class TreeTraits> struct TreeInsert: TreeInsertBase {
         typename TreeTraits::value_type m_value;
+        bool m_nullable;
     };
 
     /// Same as bptree_insert() but insert after the last element.
@@ -839,8 +841,10 @@ public:
 
     /// Like get(const char*, std::size_t) but gets two consecutive
     /// elements.
-    static std::pair<int_least64_t, int_least64_t> get_two(const char* header,
+    static std::pair<int64_t, int64_t> get_two(const char* header,
                                                            std::size_t ndx) REALM_NOEXCEPT;
+
+    static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
@@ -928,12 +932,11 @@ protected:
 
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
-
-    template <IndexMethod method, class T> size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const;
+    template <IndexMethod method, class T> 
+    size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, 
+                        StringGetter get_func) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
-
-    void CreateFromHeaderDirect(char* header, ref_type = 0) REALM_NOEXCEPT;
 
     // Includes array header. Not necessarily 8-byte aligned.
     virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
@@ -1021,7 +1024,7 @@ protected:
     static MemRef create(Type, bool context_flag, WidthType, std::size_t size,
                          int_fast64_t value, Allocator&);
 
-    static MemRef clone(const char* header, Allocator& alloc, Allocator& target_alloc);
+    static MemRef clone(MemRef header, Allocator& alloc, Allocator& target_alloc);
 
     /// Get the address of the header of this array.
     char* get_header() REALM_NOEXCEPT;
@@ -1854,8 +1857,8 @@ inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has
 
 inline MemRef Array::clone_deep(Allocator& target_alloc) const
 {
-    const char* header = get_header_from_data(m_data);
-    return clone(header, m_alloc, target_alloc); // Throws
+    char* header = get_header_from_data(m_data);
+    return clone(MemRef(header, m_ref), m_alloc, target_alloc); // Throws
 }
 
 inline void Array::move_assign(Array& a) REALM_NOEXCEPT

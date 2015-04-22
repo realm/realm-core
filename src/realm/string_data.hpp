@@ -64,11 +64,7 @@ namespace realm {
 /// externally provided guarantee.
 ///
 /// This class makes it possible to distinguish between a 'null' reference and a
-/// reference to the empty string (see is_null()). However, most functions of
-/// the Realm API do not care about this distinction. In particular, the
-/// comparison operators of this class make no distinction between a null
-/// reference and a reference to the empty string. This is possible because in
-/// both cases, size() returns zero.
+/// reference to the empty string (see is_null()).
 ///
 /// \sa BinaryData
 /// \sa Mixed
@@ -110,12 +106,6 @@ public:
     /// of the result of calling this function. In other words, a StringData
     /// object is converted to true if it is not the null reference, otherwise
     /// it is converted to false.
-    ///
-    /// It is important to understand that all of the functions and operators in
-    /// this class, and most of the functions in the Realm API in general
-    /// makes no distinction between a null reference and a reference to the
-    /// empty string. These functions and operators never look at the stored
-    /// pointer if the stored size is zero.
     bool is_null() const REALM_NOEXCEPT;
 
     friend bool operator==(const StringData&, const StringData&) REALM_NOEXCEPT;
@@ -219,7 +209,7 @@ inline bool StringData::is_null() const REALM_NOEXCEPT
 
 inline bool operator==(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
-    return a.m_size == b.m_size && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
+    return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator!=(const StringData& a, const StringData& b) REALM_NOEXCEPT
@@ -250,16 +240,23 @@ inline bool operator>=(const StringData& a, const StringData& b) REALM_NOEXCEPT
 
 inline bool StringData::begins_with(StringData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
 inline bool StringData::ends_with(StringData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
 inline bool StringData::contains(StringData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
+
     return d.m_size == 0 ||
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }

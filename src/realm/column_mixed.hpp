@@ -53,7 +53,7 @@ public:
     ///
     /// \param table If this column is used as part of a table you
     /// must pass a pointer to that table. Otherwise you must pass
-    /// null.
+    /// null
     ///
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
@@ -102,7 +102,7 @@ public:
     void set_datetime(std::size_t ndx, DateTime value);
     void set_float(std::size_t ndx, float value);
     void set_double(std::size_t ndx, double value);
-    void set_string(std::size_t ndx, StringData value);
+    void set_string(std::size_t ndx, StringData value) override;
     void set_binary(std::size_t ndx, BinaryData value);
     void set_subtable(std::size_t ndx, const Table* value);
 

@@ -132,29 +132,6 @@ public:
     const Array* get_root_array() const REALM_NOEXCEPT { return m_array.get(); }
     //@}
 
-    /// Provides access to the leaf that contains the element at the
-    /// specified index. Upon return \a ndx_in_leaf will be set to the
-    /// corresponding index relative to the beginning of the leaf.
-    ///
-    /// When the root is a leaf, this function returns a pointer to
-    /// the array accessor cached inside this column
-    /// accessor. Otherwise this function attaches the specified
-    /// fallback accessor to the identified leaf, and returns a
-    /// pointer to the fallback accessor.
-    ///
-    /// This function cannot be used for modifying operations as it
-    /// does not ensure the presence of an unbroken chain of parent
-    /// accessors. For this reason, the identified leaf should always
-    /// be accessed through the returned const-qualified reference,
-    /// and never directly through the specfied fallback accessor.
-    const Array& get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                          Array& fallback) const REALM_NOEXCEPT;
-
-    // FIXME: Is almost identical to get_leaf(), but uses ill-defined
-    // aspects of the Array API. Should be eliminated.
-    const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                          bool use_retval = false) const REALM_NOEXCEPT;
-
     inline void detach(void);
     inline bool is_attached(void) const REALM_NOEXCEPT;
 
@@ -387,22 +364,40 @@ class Column: public ColumnBase, public ColumnTemplate<int64_t> {
 public:
     typedef int64_t value_type;
 
-    int64_t get_val(size_t row) const { return get(row); }
+    int64_t get_val(size_t row) const override { return get(row); }
 
     Column(Allocator&, ref_type);
-    inline bool has_search_index() const REALM_NOEXCEPT;
+    inline bool has_search_index() const REALM_NOEXCEPT override;
     struct unattached_root_tag {};
     Column(unattached_root_tag, Allocator&);
 
     Column(Column&&) REALM_NOEXCEPT;
 
     ~Column() REALM_NOEXCEPT override;
-    void destroy() REALM_NOEXCEPT;
+    void destroy() REALM_NOEXCEPT override;
     void move_assign(Column&);
-    bool IsIntColumn() const REALM_NOEXCEPT { return true; }
+    bool IsIntColumn() const REALM_NOEXCEPT override { return true; }
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+
+    /// Provides access to the leaf that contains the element at the
+    /// specified index. Upon return \a ndx_in_leaf will be set to the
+    /// corresponding index relative to the beginning of the leaf.
+    ///
+    /// When the root is a leaf, this function returns a pointer to
+    /// the array accessor cached inside this column
+    /// accessor. Otherwise this function attaches the specified
+    /// fallback accessor to the identified leaf, and returns a
+    /// pointer to the fallback accessor.
+    ///
+    /// This function cannot be used for modifying operations as it
+    /// does not ensure the presence of an unbroken chain of parent
+    /// accessors. For this reason, the identified leaf should always
+    /// be accessed through the returned const-qualified reference,
+    /// and never directly through the specfied fallback accessor.
+    const ArrayInteger& get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                          ArrayInteger& fallback) const REALM_NOEXCEPT;
 
     // Getting and setting values
     int_fast64_t get(std::size_t ndx) const REALM_NOEXCEPT;
@@ -441,10 +436,12 @@ public:
     void find_all(Column& result, int64_t value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
-    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues);
-    StringIndex* create_search_index();
-    StringIndex* get_search_index() REALM_NOEXCEPT;
-    const StringIndex* get_search_index() const REALM_NOEXCEPT;
+    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues) override;
+    StringIndex* create_search_index() override;
+    StringIndex* get_search_index() REALM_NOEXCEPT override;
+    const StringIndex* get_search_index() const REALM_NOEXCEPT override;
+    void populate_search_index();
+
     void destroy_search_index() REALM_NOEXCEPT override;
 
     //@{
@@ -473,7 +470,7 @@ public:
     void move_last_over(std::size_t, std::size_t, bool) override;
     void clear(std::size_t, bool) override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
-    void update_from_parent(size_t old_baseline) REALM_NOEXCEPT;
+    void update_from_parent(size_t old_baseline) REALM_NOEXCEPT override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
@@ -675,23 +672,17 @@ inline void ColumnBase::set_parent(ArrayParent* parent, std::size_t ndx_in_paren
     m_array->set_parent(parent, ndx_in_parent);
 }
 
-inline const Array& ColumnBase::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                                         Array& fallback) const REALM_NOEXCEPT
+inline const ArrayInteger& Column::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+                                         ArrayInteger& fallback) const REALM_NOEXCEPT
 {
     if (!m_array->is_inner_bptree_node()) {
         ndx_in_leaf = ndx;
-        return *m_array;
+        return static_cast<const ArrayInteger&>(*m_array);
     }
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
     fallback.init_from_mem(p.first);
     ndx_in_leaf = p.second;
     return fallback;
-}
-
-inline const Array* ColumnBase::GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
-                                         bool use_retval) const REALM_NOEXCEPT
-{
-    return m_array->GetBlock(ndx, arr, off, use_retval);
 }
 
 inline std::size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& alloc)

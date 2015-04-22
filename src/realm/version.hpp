@@ -24,7 +24,7 @@
 #include <sstream>
 
 #define REALM_VER_MAJOR 0
-#define REALM_VER_MINOR 89
+#define REALM_VER_MINOR 90
 #define REALM_VER_PATCH 0
 #define REALM_PRODUCT_NAME "realm-core"
 

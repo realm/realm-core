@@ -206,39 +206,6 @@ void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
     set_width(m_width);
 }
 
-// FIXME: This is a very crude and error prone misuse of Array,
-// especially since its use is not isolated inside the array
-// class. There seems to be confusion about how to construct an array
-// to be used with this method. Somewhere (e.g. in
-// Column::find_first()) we use Array(Allocator&). In other places
-// (TableViewBase::aggregate()) we use Array(no_prealloc_tag). We must
-// at least document the rules governing the use of
-// CreateFromHeaderDirect().
-//
-// FIXME: If we want to keep this method, we should formally define
-// what can be termed 'direct read-only' use of an Array instance, and
-// what rules apply in this case. Currently Array::clone() just passes
-// zero for the 'ref' argument.
-//
-// FIXME: Assuming that this method is only used for what can be
-// termed 'direct read-only' use, the type of the header argument
-// should be changed to 'const char*', and a const_cast should be
-// added below. This would avoid the need for const_cast's in places
-// like Array::clone().
-void Array::CreateFromHeaderDirect(char* header, ref_type ref) REALM_NOEXCEPT
-{
-    // Parse header
-    // We only need limited info for direct read-only use
-    m_width    = get_width_from_header(header);
-    m_size     = get_size_from_header(header);
-
-    m_ref = ref;
-    m_data = get_data_from_header(header);
-
-    set_width(m_width);
-}
-
-
 void Array::set_type(Type type)
 {
     REALM_ASSERT(is_attached());
@@ -331,8 +298,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
 
         ref_type ref = to_ref(value);
         Allocator& alloc = get_alloc();
-        const char* subheader = alloc.translate(ref);
-        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.m_ref);
         value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
         slice.add(value); // Throws
@@ -1431,8 +1397,9 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
     return total_bits / width;
 }
 
-MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_alloc)
+MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
+    const char* header = mem.m_addr;
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
         // copy, which is more efficient.
@@ -1441,8 +1408,8 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         size_t size = get_byte_size_from_header(header);
 
         // Create the new array
-        MemRef mem = target_alloc.alloc(size); // Throws
-        char* clone_header = mem.m_addr;
+        MemRef clone_mem = target_alloc.alloc(size); // Throws
+        char* clone_header = clone_mem.m_addr;
 
         // Copy contents
         const char* src_begin = header;
@@ -1453,14 +1420,14 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         // Update with correct capacity
         set_header_capacity(size, clone_header);
 
-        return mem;
+        return clone_mem;
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
     REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
 
-    Array array((Array::no_prealloc_tag()));
-    array.CreateFromHeaderDirect(const_cast<char*>(header));
+    Array array { alloc };
+    array.init_from_mem(mem);
 
     // Create new empty array of refs
     Array new_array(target_alloc);
@@ -1484,8 +1451,7 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         }
 
         ref_type ref = to_ref(value);
-        const char* subheader = alloc.translate(ref);
-        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.m_ref);
         value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
         new_array.add(value); // Throws
@@ -2436,17 +2402,29 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) REALM_NOEX
 }
 
 
-template<int width>
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
+template<int width> inline pair<int64_t, int64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
 {
-    return make_pair(to_size_t(get_direct<width>(data, ndx+0)),
-                     to_size_t(get_direct<width>(data, ndx+1)));
+    return make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
+                     to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
-                                                size_t ndx) REALM_NOEXCEPT
+inline pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) REALM_NOEXCEPT
 {
     REALM_TEMPEX(return get_two, width, (data, ndx));
+}
+
+
+template<int width>
+inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    v0 = to_ref(get_direct<width>(data, ndx + 0));
+    v1 = to_ref(get_direct<width>(data, ndx + 1));
+    v2 = to_ref(get_direct<width>(data, ndx + 2));
+}
+
+inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(get_three, width, (data, ndx, v0, v1, v2));
 }
 
 
@@ -2763,25 +2741,6 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-// Get containing array block direct through column b+-tree without instatiating any Arrays. Calling with
-// use_retval = true will return itself if leaf and avoid unneccesary header initialization.
-const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
-                             bool use_retval) const REALM_NOEXCEPT
-{
-    // Reduce time overhead for cols with few entries
-    if (!is_inner_bptree_node()) {
-        if (!use_retval)
-            arr.CreateFromHeaderDirect(get_header_from_data(m_data));
-        off = 0;
-        return this;
-    }
-
-    pair<MemRef, size_t> p = get_bptree_leaf(ndx);
-    arr.CreateFromHeaderDirect(p.first.m_addr);
-    off = ndx - p.second;
-    return &arr;
-}
-
 template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
 {
     bool first(method == index_FindFirst);
@@ -2796,10 +2755,11 @@ template <IndexMethod method, class T> size_t Array::index_string(StringData val
     bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
+    size_t stringoffset = 0;
 
 top:
     // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
+    key = StringIndex::create_key(value, stringoffset);
 
     for (;;) {
         // Get subnode table
@@ -2870,7 +2830,7 @@ top:
                 // for integer index, get_func fills out 'buffer' and makes str point at it
                 char buffer[8];
                 StringData str = (*get_func)(column, first_row_ref, buffer);
-                if (str != value) {
+                if (str.is_null() != value.is_null() || str != value) {
                     if (count)
                         return 0;
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
@@ -2926,10 +2886,10 @@ top:
         width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
 
-        if (value_2.size() <= 4)
-            value_2 = StringData();
+        if (value.size() - stringoffset >= 4)
+            stringoffset += 4;
         else
-            value_2 = value_2.substr(4);
+            stringoffset += value.size() - stringoffset + 1;
 
         goto top;
     }
@@ -3584,10 +3544,18 @@ int_fast64_t Array::get(const char* header, size_t ndx) REALM_NOEXCEPT
 }
 
 
-pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
+pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
-    pair<int_fast64_t, int_fast64_t> p = ::get_two(data, width, ndx);
-    return make_pair(int_least64_t(p.first), int_least64_t(p.second));
+    pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
+    return make_pair(p.first, p.second);
+}
+
+
+void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    const char* data = get_data_from_header(header);
+    int width = get_width_from_header(header);
+    ::get_three(data, width, ndx, v0, v1, v2);
 }

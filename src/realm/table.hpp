@@ -106,6 +106,8 @@ public:
 
     ~Table() REALM_NOEXCEPT;
 
+    Allocator& get_alloc() const;
+
     /// Construct a new freestanding top-level table with dynamic lifetime.
     static TableRef create(Allocator& = Allocator::get_default());
 
@@ -153,6 +155,9 @@ public:
     /// string.
     StringData get_name() const REALM_NOEXCEPT;
 
+    // Whether or not elements can be null. 
+    bool is_nullable(size_t col_ndx) const;
+
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
@@ -185,9 +190,22 @@ public:
     ///
     /// \sa has_shared_type()
     /// \sa get_descriptor()
-    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
-    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+
+    std::size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = 0);
+    void insert_column(std::size_t column_ndx, DataType type, StringData name, bool nullable = false,
                        DescriptorRef* subdesc = 0);
+
+    // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error 
+    // prone (optional arguments and implicit bool to null-ptr conversion)
+    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc)
+    {
+        return add_column(type, name, false, subdesc);
+    }
+    void insert_column(std::size_t column_ndx, DataType type, StringData name, DescriptorRef* subdesc)
+    {
+        insert_column(column_ndx, type, name, false, subdesc);
+    }
+
     std::size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
     void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
                             LinkType link_type = link_Weak);
@@ -231,6 +249,7 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(std::size_t column_ndx) const REALM_NOEXCEPT;
+//    void remove_search_index(size_t col_ndx);
     void add_search_index(std::size_t column_ndx);
     void remove_search_index(std::size_t column_ndx);
     bool has_primary_key() const REALM_NOEXCEPT;
@@ -682,8 +701,9 @@ public:
 
     Table& link(size_t link_column);
 
-    // Optimizing
-    void optimize();
+    // Optimizing. enforce == true will enforce enumeration of all string columns; 
+    // enforce == false will auto-evaluate if they should be enumerated or not
+    void optimize(bool enforce = false);
 
     /// Write this table (or a slice of this table) to the specified
     /// output stream.
@@ -866,6 +886,8 @@ private:
     void do_clear(bool broken_reciprocal_backlinks);
     std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
 
+    void upgrade_file_format();
+
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
     /// calls to sync_if_needed() will bring the view up to date by reexecuting the
@@ -916,7 +938,7 @@ private:
     std::size_t do_find_pkey_string(StringData) const;
 
     static void do_insert_column(Descriptor&, std::size_t col_ndx, DataType type,
-                                 StringData name, Table* link_target_table);
+                                 StringData name, Table* link_target_table, bool nullable = false);
     static void do_erase_column(Descriptor&, std::size_t col_ndx);
     static void do_rename_column(Descriptor&, std::size_t col_ndx, StringData name);
 
@@ -925,9 +947,9 @@ private:
     struct RenameSubtableColumns;
 
     void insert_root_column(std::size_t col_ndx, DataType type, StringData name,
-                            Table* link_target_table);
+                            Table* link_target_table, bool nullable = false);
     void erase_root_column(std::size_t col_ndx);
-    void do_insert_root_column(std::size_t col_ndx, ColumnType, StringData name);
+    void do_insert_root_column(std::size_t col_ndx, ColumnType, StringData name, bool nullable = false);
     void do_erase_root_column(std::size_t col_ndx);
     void do_set_link_type(std::size_t col_ndx, LinkType);
     void insert_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
@@ -1326,6 +1348,7 @@ private:
     friend class LinksToNode;
     friend class LinkMap;
     friend class LinkView;
+    friend class Group;
 };
 
 
@@ -1440,7 +1463,7 @@ inline StringData Table::get_name() const REALM_NOEXCEPT
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     ArrayParent* parent = real_top.get_parent();
     if (!parent)
-        return StringData();
+        return StringData("");
     std::size_t index_in_parent = real_top.get_ndx_in_parent();
     REALM_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->get_child_name(index_in_parent);
@@ -1581,6 +1604,11 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
     m_ref_count = 0; // Lifetime managed by reference counting
     m_descriptor = 0;
     m_row_accessors = 0;
+}
+
+inline Allocator& Table::get_alloc() const
+{
+    return m_top.get_alloc();
 }
 
 inline TableRef Table::create(Allocator& alloc)
@@ -2071,9 +2099,9 @@ public:
     }
 
     static void insert_column(Descriptor& desc, std::size_t column_ndx, DataType type,
-                              StringData name, Table* link_target_table)
+                              StringData name, Table* link_target_table, bool nullable = false)
     {
-        Table::do_insert_column(desc, column_ndx, type, name, link_target_table); // Throws
+        Table::do_insert_column(desc, column_ndx, type, name, link_target_table, nullable); // Throws
     }
 
     static void erase_column(Descriptor& desc, std::size_t column_ndx)

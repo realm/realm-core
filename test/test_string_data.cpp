@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 
+#include <realm.hpp>
 #include <realm/string_data.hpp>
 
 #include "test.hpp"
@@ -64,8 +65,8 @@ TEST(StringData_Null)
 TEST(StringData_Equal)
 {
     // Test operator==() and operator!=()
-    StringData sd_00_1;
-    StringData sd_00_2;
+    StringData sd_00_1("");
+    StringData sd_00_2("");
     StringData sd_00_3("");
     StringData sd_01_1("x");
     StringData sd_01_2("x");
@@ -167,7 +168,7 @@ TEST(StringData_LexicographicCompare)
     string s_8_22(8, c_22);
     string s_9_11(9, c_11);
     string s_9_22(9, c_22);
-    StringData sd_0;
+    StringData sd_0("");
     StringData sd_8_11(s_8_11);
     StringData sd_8_22(s_8_22);
     StringData sd_9_11(s_9_11);
@@ -232,29 +233,65 @@ TEST(StringData_LexicographicCompare)
 
 TEST(StringData_Substrings)
 {
-    StringData sd_0;
-    CHECK(sd_0.begins_with(sd_0));
-    CHECK(sd_0.begins_with(""));
-    CHECK(sd_0.ends_with(sd_0));
-    CHECK(sd_0.ends_with(""));
-    CHECK(sd_0.contains(sd_0));
-    CHECK(sd_0.contains(""));
-    CHECK(!sd_0.begins_with("x"));
-    CHECK(!sd_0.ends_with("x"));
-    CHECK(!sd_0.contains("x"));
-    CHECK_EQUAL("", sd_0.prefix(0));
-    CHECK_EQUAL("", sd_0.suffix(0));
-    CHECK_EQUAL("", sd_0.substr(0));
-    CHECK_EQUAL("", sd_0.substr(0,0));
+    // Reasoning behind behaviour is that if you append strings A + B then B is a suffix of a, and hence A
+    // "ends with" B, and B "begins with" A. This is true even though appending a null or empty string keeps the 
+    // original unchanged
+
+    StringData empty("");
+    StringData null = realm::null();
+    StringData data("x");
+
+    // null.
+    CHECK(null.begins_with(null));
+    CHECK(!null.begins_with(empty));
+    CHECK(!null.begins_with("x"));
+
+    CHECK(null.ends_with(null));
+    CHECK(!null.ends_with(empty));
+    CHECK(!null.ends_with(""));
+    CHECK(!null.ends_with("x"));
+
+    CHECK(empty.begins_with(null));
+    CHECK(empty.ends_with(null));
+
+    CHECK(data.begins_with(null));
+    CHECK(data.ends_with(null));
+
+    CHECK(data.contains(null));
+    CHECK(!null.contains(data));
+
+    CHECK(empty.contains(null));
+    CHECK(!empty.contains(data));
+
+    CHECK(null.contains(null));
+    CHECK(!null.contains(data));
+
+    CHECK(!null.contains(empty));
+    CHECK(empty.contains(null));
+
+    // non-nulls
+    CHECK(empty.begins_with(empty));
+    CHECK(empty.begins_with(""));
+    CHECK(empty.ends_with(empty));
+    CHECK(empty.ends_with(""));
+    CHECK(empty.contains(empty));
+    CHECK(empty.contains(""));
+    CHECK(!empty.begins_with("x"));
+    CHECK(!empty.ends_with("x"));
+    CHECK(!empty.contains("x"));
+    CHECK_EQUAL("", empty.prefix(0));
+    CHECK_EQUAL("", empty.suffix(0));
+    CHECK_EQUAL("", empty.substr(0));
+    CHECK_EQUAL("", empty.substr(0,0));
 
     StringData sd("Minkowski");
-    CHECK(sd.begins_with(sd_0));
+    CHECK(sd.begins_with(empty));
     CHECK(sd.begins_with(""));
     CHECK(sd.begins_with("Min"));
-    CHECK(sd.ends_with(sd_0));
+    CHECK(sd.ends_with(empty));
     CHECK(sd.ends_with(""));
     CHECK(sd.ends_with("ski"));
-    CHECK(sd.contains(sd_0));
+    CHECK(sd.contains(empty));
     CHECK(sd.contains(""));
     CHECK(sd.contains("Min"));
     CHECK(sd.contains("kow"));
