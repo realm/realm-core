@@ -193,6 +193,9 @@ template<class T> char* in_place_deep_clone(T* in)
 
 char* in_place_deep_clone(StringData* in)
 {
+    if (in->is_null())
+        return nullptr;
+
     char* payload = new char[in->size()];
     memcpy(payload, in->data(), in->size());
     *in = StringData(payload, in->size());
