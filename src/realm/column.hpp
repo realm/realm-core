@@ -41,6 +41,13 @@ namespace realm {
 // Pre-definitions
 class StringIndex;
 
+template <> struct GetLeafType<int64_t, false> {
+    using type = ArrayInteger;
+};
+// template <> struct GetLeafType<int64_t, true> {
+//     using type = ArrayIntNull;
+// };
+
 struct ColumnTemplateBase
 {
     virtual int compare_values(size_t row1, size_t row2) const = 0;
