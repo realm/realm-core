@@ -306,7 +306,9 @@ void BpTree<T, N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
         std::size_t row_ndx_2 = row_ndx == npos ? npos : row_ndx + i;
         if (root_is_leaf()) {
             REALM_ASSERT_DEBUG(row_ndx_2 == npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
-            new_sibling_ref = m_root->bptree_leaf_insert(row_ndx_2, value, state); // Throws
+			std::size_t row_ndx_3 = row_ndx_2 == npos ? root_as_leaf().size() : row_ndx_2;
+			root_as_leaf().insert(row_ndx_3, std::move(value)); // Throws
+			new_sibling_ref = 0;
         }
         else {
             state.m_value = value;
