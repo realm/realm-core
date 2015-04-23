@@ -293,6 +293,7 @@ typename BpTree<T,N>::LeafType&
 BpTree<T,N>::root_as_leaf()
 {
     REALM_ASSERT_DEBUG(root_is_leaf());
+    REALM_ASSERT_DEBUG(dynamic_cast<LeafType*>(m_root.get()) != nullptr);
     return static_cast<LeafType&>(root());
 }
 
@@ -301,6 +302,7 @@ const typename BpTree<T,N>::LeafType&
 BpTree<T,N>::root_as_leaf() const
 {
     REALM_ASSERT_DEBUG(root_is_leaf());
+    REALM_ASSERT_DEBUG(dynamic_cast<const LeafType*>(m_root.get()) != nullptr);
     return static_cast<const LeafType&>(root());
 }
 
