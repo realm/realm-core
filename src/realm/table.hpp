@@ -158,6 +158,9 @@ public:
     // Whether or not elements can be null. 
     bool is_nullable(size_t col_ndx) const;
 
+    // Whether or not a column of the given type can be made nullable.
+    bool is_nullable_type(ColumnType type) const;
+
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
