@@ -1558,4 +1558,162 @@ TEST_IF(ColumnIntNull_PrependMany, TEST_DURATION >= 1)
     a.destroy();
 }
 
+// First test if width expansion (nulls->empty string, nulls->non-empty string, empty string->non-empty string, etc)
+// works. Then do a fuzzy test at the end.
+TEST(ColumnIntNull_Null)
+{
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(0);
+        size_t t = a.find_first(0);
+        CHECK_EQUAL(t, 0);
+
+        a.destroy();
+    }
+
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(123);
+        a.add(0);
+        a.add(realm::null());
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK(a.get(0) == 123);
+
+        // Test set
+        a.set_null(0);
+        a.set_null(1);
+        a.set_null(2);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(2), true);
+
+        a.destroy();
+    }
+
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(realm::null());
+        a.add(0);
+        a.add(123);
+
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == 123);
+
+        // Test insert
+        a.insert(0, realm::null());
+        a.insert(2, realm::null());
+        a.insert(4, realm::null());
+
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK_EQUAL(a.is_null(3), false);
+        CHECK_EQUAL(a.is_null(4), true);
+        CHECK_EQUAL(a.is_null(5), false);
+
+        a.destroy();
+    }
+
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(0);
+        a.add(realm::null());
+        a.add(123);
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == 123);
+
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), false);
+
+        a.destroy();
+    }
+
+    Random random(random_int<unsigned long>());
+
+    for (size_t t = 0; t < 50; t++) {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        // vector that is kept in sync with the ArrayIntNull so that we can compare with it
+        std::vector<int64_t> v;
+
+        // ArrayString capacity starts at 128 bytes, so we need lots of elements
+        // to test if relocation works
+        for (size_t i = 0; i < 100; i++) {
+            unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+
+            // Add more often than removing, so that we grow
+            if (rnd < 80 && a.size() > 0) {
+                size_t del = rnd % a.size();
+                a.erase(del);
+                v.erase(v.begin() + del);
+            }
+            else {
+                int number = random.draw_int<int>();
+                bool null = false;
+
+                if (random.draw_int<int>() > 100) {
+                    null = true;
+                    a.add(realm::null());
+                    v.push_back(int64_t(INT_MAX) + 1);
+                }
+
+                if (random.draw_int<int>() > 100) {
+                    if (null) {
+                        a.add(realm::null());
+                        v.push_back(int64_t(INT_MAX) + 1);
+                    }
+                    else {
+                        a.add(number);
+                        v.push_back(number);
+                    }
+                }
+                else if (a.size() > 0) {
+                    size_t pos = rnd % a.size();
+                    if (null) {
+                        a.insert(pos, realm::null());
+                        v.insert(v.begin() + pos, int64_t(INT_MAX) + 1);
+                    }
+                    else {
+                        a.insert(pos, number);
+                        v.insert(v.begin() + pos, number);
+                    }
+                }
+
+                CHECK_EQUAL(a.size(), v.size());
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (v[i] == int64_t(INT_MAX) + 1) {
+                        CHECK(a.is_null(i));
+                    }
+                    else {
+                        CHECK(a.get(i) == v[i]);
+                    }
+                }
+            }
+        }
+        a.destroy();
+    }
+
+}
+
 #endif // TEST_COLUMN

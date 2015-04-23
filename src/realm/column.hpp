@@ -460,10 +460,15 @@ public:
     // Getting and setting values
     T get_val(std::size_t ndx) const REALM_NOEXCEPT final { return get(ndx); }
     T get(std::size_t ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
     T back() const REALM_NOEXCEPT;
     void set(std::size_t, T value);
+    void set(std::size_t, null);
+    void set_null(std::size_t);
     void add(T value = T{});
+    void add(null);
     void insert(std::size_t ndx, T value = T{}, std::size_t num_rows = 1);
+    void insert(std::size_t ndx, null, std::size_t num_rows = 1);
     void erase(std::size_t ndx);
     void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void clear();
@@ -710,6 +715,22 @@ void TColumn<T, N>::set(std::size_t ndx, T value)
         m_search_index->set(ndx, value);
     }
     set_without_updating_index(ndx, std::move(value));
+}
+
+template <class T, bool N>
+void TColumn<T, N>::set_null(std::size_t ndx)
+{
+    set(ndx, null{});
+}
+
+template <class T, bool N>
+void TColumn<T, N>::set(std::size_t ndx, null)
+{
+    REALM_ASSERT_DEBUG(ndx < size());
+    if (has_search_index()) {
+        m_search_index->set(ndx, null{});
+    }
+    m_tree.set(ndx, null{});
 }
 
 // When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values
@@ -1044,6 +1065,12 @@ T TColumn<T,N>::get(std::size_t ndx) const REALM_NOEXCEPT
 }
 
 template <class T, bool N>
+bool TColumn<T,N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
+{
+    return m_tree.is_null(ndx);
+}
+
+template <class T, bool N>
 T TColumn<T,N>::back() const REALM_NOEXCEPT
 {
     return m_tree.back();
@@ -1069,6 +1096,12 @@ void TColumn<T,N>::add(T value)
 }
 
 template <class T, bool N>
+void TColumn<T,N>::add(null)
+{
+    insert(npos, null{});
+}
+
+template <class T, bool N>
 void TColumn<T,N>::insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows)
 {
     std::size_t size = this->size(); // Slow
@@ -1090,6 +1123,21 @@ void TColumn<T,N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
     if (has_search_index()) {
         row_ndx = is_append ? size : row_ndx;
         m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    }
+}
+
+template <class T, bool N>
+void TColumn<T,N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
+{
+    std::size_t size = this->size(); // Slow
+    bool is_append = row_ndx == size || row_ndx == npos;
+    std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
+
+    m_tree.insert(ndx_or_npos_if_append, null{}, num_rows); // Throws
+
+    if (has_search_index()) {
+        row_ndx = is_append ? size : row_ndx;
+        m_search_index->insert(row_ndx, null{}, num_rows, is_append); // Throws
     }
 }
 
