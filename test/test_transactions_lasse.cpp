@@ -67,7 +67,7 @@ namespace {
 REALM_FORCEINLINE void rand_sleep(Random& random)
 {
     const int64_t ms = 500000;
-    unsigned char r = random.draw_int<int>();
+    unsigned char r = static_cast<unsigned char>(random.draw_int<unsigned int>());
 
     if (r <= 244)
         return;

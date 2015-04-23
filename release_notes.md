@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed bug in equal(null) in next-generation-syntax queries. Behaviour of .begins_with(null), .contains(null), .ends_with(null) adjusted; see description in TEST(Query_NextGen_StringConditions)
 
 ### API breaking changes:
 

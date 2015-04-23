@@ -287,4 +287,5 @@ TEST(ColumnBinary_Basic)
     c.destroy();
 }
 
+
 #endif // TEST_COLUMN_BINARY
