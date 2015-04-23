@@ -414,7 +414,7 @@ public:
     template<typename T>
     Handover<T>* export_for_handover(const T& accessor, ConstSourcePayload mode)
     {
-        // TODO: lock
+        util::LockGuard lg(m_handover_lock);
         Handover<T>* result = new Handover<T>();
         // often, the return value from clone will be T*, BUT it may be ptr to some base of T
         // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
@@ -422,14 +422,13 @@ public:
         // either T or derived from T.
         result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode));
         result->version = get_version_of_current_transaction();
-        // TODO: unlock
         return result;
     }
     // specialization for handover of Rows
     template<typename T>
     Handover<BasicRow<T>>* export_for_handover(const BasicRow<T>& accessor)
     {
-        // TODO: lock
+        util::LockGuard lg(m_handover_lock);
         Handover<BasicRow<T>>* result = new Handover<BasicRow<T>>();
         // often, the return value from clone will be T*, BUT it may be ptr to some base of T
         // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
@@ -437,7 +436,6 @@ public:
         // either T or derived from T.
         result->clone = dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch));
         result->version = get_version_of_current_transaction();
-        // TODO: unlock
         return result;
     }
     // destructive export (mode is Move)
@@ -505,6 +503,7 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
+    util::Mutex m_handover_lock;
 #ifndef _WIN32
     util::PlatformSpecificCondVar m_room_to_write;
     util::PlatformSpecificCondVar m_work_to_do;

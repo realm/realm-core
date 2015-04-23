@@ -1273,6 +1273,9 @@ void SharedGroup::advance_read(VersionID specific_version)
 {
     REALM_ASSERT(m_transact_stage == transact_Reading);
 
+    // protect against any concurrent handover export:
+    util::LockGuard lg(m_handover_lock);
+
     ReadLockInfo old_readlock = m_readlock;
     bool same_as_before;
     Replication* repl = _impl::GroupFriend::get_replication(m_group);
@@ -1421,6 +1424,8 @@ void SharedGroup::commit_and_continue_as_read()
 
 void SharedGroup::rollback_and_continue_as_read()
 {
+    util::LockGuard lg(m_handover_lock);
+
     // Mark all managed space (beyond the attached file) as free.
     m_group.m_alloc.reset_free_space_tracking(); // Throws
 
@@ -1521,6 +1526,7 @@ void SharedGroup::rollback() REALM_NOEXCEPT
 
     if (m_group.is_attached()) {
         REALM_ASSERT(m_transact_stage == transact_Writing);
+        util::LockGuard lg(m_handover_lock);
 
 #ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = m_group.get_replication())
