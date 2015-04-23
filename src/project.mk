@@ -14,7 +14,7 @@ endif
 
 ifeq ($(OS),Darwin)
   CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++
-  VALGRIND_FLAGS += --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
+  VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
 endif
 
 # FIXME: '-fno-elide-constructors' currently causes Realm to fail
