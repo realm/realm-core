@@ -929,7 +929,7 @@ template <class T, bool N>
 TColumn<T,N>::TColumn(Allocator& alloc, ref_type ref) : m_tree(alloc)
 {
     // fixme, must m_search_index be copied here?
-    m_tree.root().init_from_ref(ref);
+    m_tree.init_from_ref(ref);
 }
 
 template <class T, bool N>

@@ -106,6 +106,7 @@ public:
     explicit BpTree(std::unique_ptr<Array> root) : BpTreeBase(std::move(root)) {}
     BpTree(BpTree<T, Nullable>&&) = default;
     BpTree<T, Nullable>& operator=(BpTree<T, Nullable>&&) = default;
+    void init_from_ref(ref_type ref);
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -263,6 +264,21 @@ BpTree<T,N>::BpTree() : BpTree(Allocator::get_default())
 template <class T, bool N>
 BpTree<T,N>::BpTree(Allocator& alloc) : BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))
 {
+}
+
+template <class T, bool N>
+void BpTree<T,N>::init_from_ref(ref_type ref)
+{
+    const char* header = get_alloc().translate(ref);
+    if (Array::get_is_inner_bptree_node_from_header(header)) {
+        m_root.reset(new Array{get_alloc()});
+        m_root->init_from_ref(ref);
+    }
+    else {
+        std::unique_ptr<LeafType> leaf { new LeafType{get_alloc()} };
+        leaf->init_from_ref(ref);
+        m_root = std::move(leaf);
+    }
 }
 
 template <class T, bool N>
