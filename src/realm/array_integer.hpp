@@ -98,7 +98,7 @@ public:
     static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
 
     void set_null(std::size_t ndx) REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) REALM_NOEXCEPT;
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
     int64_t null_value() const REALM_NOEXCEPT;
 
     int64_t operator[](std::size_t ndx) const REALM_NOEXCEPT;
@@ -356,7 +356,7 @@ void ArrayIntNull::set_null(std::size_t ndx) REALM_NOEXCEPT
 }
 
 inline
-bool ArrayIntNull::is_null(std::size_t ndx) REALM_NOEXCEPT
+bool ArrayIntNull::is_null(std::size_t ndx) const REALM_NOEXCEPT
 {
     return Array::get(ndx + 1) == null_value();
 }
