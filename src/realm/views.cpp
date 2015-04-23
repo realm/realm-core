@@ -44,9 +44,8 @@ RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
     if (mode == ConstSourcePayload::Copy) {
         const Array* root = source.m_row_indexes.get_root_array();
         MemRef mem = root->clone_deep(Allocator::get_default());
-        ArrayInteger* ia = new ArrayInteger(Allocator::get_default());
-        ia->init_from_mem(mem);
-        new(static_cast<void*>(&m_row_indexes)) Column(ia);
+        Array* target = m_row_indexes.get_root_array();
+        target->init_from_mem(mem);
     }
 }
 

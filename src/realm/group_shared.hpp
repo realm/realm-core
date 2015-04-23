@@ -407,6 +407,7 @@ public:
         typename T::Handover_patch* patch;
         T* clone;
         VersionID version;
+        ~Handover() { delete patch; delete clone; }
     };
     // thread-safe/const export (mode is Stay or Copy)
     // during export, the following operations on the shared group is locked:

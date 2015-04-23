@@ -38,13 +38,17 @@ struct Query_Handover_patch {
     bool m_has_table;
     TableView_Handover_patch* table_view_data;
     LinkView_Handover_patch* link_view_data;
+    ~Query_Handover_patch();
 };
 
 struct TableView_Handover_patch {
     std::size_t table_num;
     Query_Handover_patch query_patch;
     LinkView_Handover_patch* linkview_patch;
+    ~TableView_Handover_patch() { delete linkview_patch; }
 };
+
+inline Query_Handover_patch::~Query_Handover_patch() { delete table_view_data; delete link_view_data; }
 
 struct RowBase_Handover_patch {
     std::size_t table_num;

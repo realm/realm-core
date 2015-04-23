@@ -282,7 +282,7 @@ public:
     template<class U> BasicRow& operator=(BasicRow<U>) REALM_NOEXCEPT;
     BasicRow& operator=(const BasicRow<T>&) REALM_NOEXCEPT;
 
-    ~BasicRow() REALM_NOEXCEPT;
+    virtual ~BasicRow() REALM_NOEXCEPT;
 
 private:
     T* impl_get_table() const REALM_NOEXCEPT;

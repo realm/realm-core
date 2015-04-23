@@ -344,7 +344,7 @@ template<class Spec> class BasicTable<Spec>::Query:
         public Spec::template ColNames<QueryCol, Query*> {
 public:
     Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
-    ~Query() REALM_NOEXCEPT {}
+    virtual ~Query() REALM_NOEXCEPT {}
 
     Query& group() { m_impl.group(); return *this; }
 
