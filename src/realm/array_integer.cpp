@@ -104,12 +104,17 @@ bool ArrayIntNull::can_use_as_null(int64_t candidate)
 
 void ArrayIntNull::replace_nulls_with(int64_t new_null)
 {
-    // FIXME: Optimize!
     int64_t old_null = Array::get(0);
     Array::set(0, new_null);
-    for (size_t i = 0; i < size(); ++i) {
-        if (Array::get(i+1) == old_null) {
-            Array::set(i+1, new_null);
+    std::size_t i = 1;
+    while (true) {
+        std::size_t found = Array::find_first(old_null, i);
+        if (found < Array::size()) {
+            Array::set(found, new_null);
+            i = found + 1;
+        }
+        else {
+            break;
         }
     }
 }
