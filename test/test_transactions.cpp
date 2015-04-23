@@ -8,7 +8,6 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/util/bind.hpp>
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/table_macros.hpp>

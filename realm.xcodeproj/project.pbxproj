@@ -254,7 +254,6 @@
 		52D6E070175BDC6500B423E5 /* timer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E060175BDBDD00B423E5 /* timer.cpp */; };
 		52D6E071175BDD6300B423E5 /* test-util.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 52D6E04E175BD9BC00B423E5 /* test-util.a */; };
 		52D7C47D1852A01700633748 /* assert.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C4671852A01700633748 /* assert.hpp */; };
-		52D7C47E1852A01700633748 /* bind.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C4681852A01700633748 /* bind.hpp */; };
 		52D7C47F1852A01700633748 /* bind_ptr.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C4691852A01700633748 /* bind_ptr.hpp */; };
 		52D7C4801852A01700633748 /* buffer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C46A1852A01700633748 /* buffer.hpp */; };
 		52D7C4811852A01700633748 /* features.h in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C46C1852A01700633748 /* features.h */; };
@@ -577,7 +576,6 @@
 		52D6E060175BDBDD00B423E5 /* timer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = timer.cpp; sourceTree = "<group>"; };
 		52D6E062175BDBDD00B423E5 /* timer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = timer.hpp; sourceTree = "<group>"; };
 		52D7C4671852A01700633748 /* assert.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = assert.hpp; sourceTree = "<group>"; };
-		52D7C4681852A01700633748 /* bind.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = bind.hpp; sourceTree = "<group>"; };
 		52D7C4691852A01700633748 /* bind_ptr.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = bind_ptr.hpp; sourceTree = "<group>"; };
 		52D7C46A1852A01700633748 /* buffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = buffer.hpp; sourceTree = "<group>"; };
 		52D7C46B1852A01700633748 /* config.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = config.sh; sourceTree = "<group>"; };
@@ -958,7 +956,6 @@
 			children = (
 				52D7C4671852A01700633748 /* assert.hpp */,
 				52D7C4691852A01700633748 /* bind_ptr.hpp */,
-				52D7C4681852A01700633748 /* bind.hpp */,
 				52D7C46A1852A01700633748 /* buffer.hpp */,
 				3F1967AA1A9530AA0072FE29 /* config.h */,
 				52D7C46B1852A01700633748 /* config.sh */,
@@ -1023,7 +1020,6 @@
 				365CCE3C157CC37D00172BF8 /* array_string_long.hpp in Headers */,
 				52D7C47D1852A01700633748 /* assert.hpp in Headers */,
 				365CCE41157CC37D00172BF8 /* binary_data.hpp in Headers */,
-				52D7C47E1852A01700633748 /* bind.hpp in Headers */,
 				52D7C47F1852A01700633748 /* bind_ptr.hpp in Headers */,
 				52D7C4801852A01700633748 /* buffer.hpp in Headers */,
 				365CCE54157CC37D00172BF8 /* column.hpp in Headers */,
