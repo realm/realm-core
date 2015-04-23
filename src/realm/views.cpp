@@ -50,7 +50,7 @@ RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
     }
 }
 
-RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload mode)
+RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
     : m_row_indexes(std::move(source.m_row_indexes))
 {
 #ifdef REALM_COOKIE_CHECK

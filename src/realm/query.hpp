@@ -306,6 +306,7 @@ public:
 private:
     struct PartialCopyTag {};
     Query(const Query& src, PartialCopyTag);
+    void copy_nodes(const Query& source);
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);

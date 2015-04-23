@@ -81,20 +81,8 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
     *this = copy;
 }
 
-Query& Query::operator = (const Query& source)
+void Query::copy_nodes(const Query& source)
 {
-    REALM_ASSERT(source.do_delete);
-
-    if (this != &source) {
-        // free destination object
-        delete_nodes();
-        all_nodes.clear();
-        first.clear();
-        update.clear();
-        pending_not.clear();
-        update_override.clear();
-        subtables.clear();
-
         Create();
         first = source.first;
         std::map<ParentNode*, ParentNode*> node_mapping;
@@ -111,10 +99,6 @@ Query& Query::operator = (const Query& source)
         for (size_t t = 0; t < first.size(); t++) {
             first[t] = node_mapping[first[t]];
         }
-        m_table = source.m_table;
-        m_view = source.m_view;
-        m_source_link_view = source.m_source_link_view;
-        m_source_table_view = source.m_source_table_view;
 
         if (first[0]) {
             ParentNode* node_to_update = first[0];
@@ -123,6 +107,27 @@ Query& Query::operator = (const Query& source)
             }
             update[0] = &node_to_update->m_child;
         }
+}
+
+Query& Query::operator = (const Query& source)
+{
+    REALM_ASSERT(source.do_delete);
+
+    if (this != &source) {
+        // free destination object
+        delete_nodes();
+        all_nodes.clear();
+        first.clear();
+        update.clear();
+        pending_not.clear();
+        update_override.clear();
+        subtables.clear();
+
+        m_table = source.m_table;
+        m_view = source.m_view;
+        m_source_link_view = source.m_source_link_view;
+        m_source_table_view = source.m_source_table_view;
+        copy_nodes(source);
     }
     return *this;
 }
@@ -144,8 +149,19 @@ void Query::delete_nodes() REALM_NOEXCEPT
 
 Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
 {
-    // FIXME: todo
-    REALM_ASSERT(false);
+    patch.m_has_table = bool(source.m_table);
+    if (patch.m_has_table) {
+        patch.m_table_num = source.m_table.get()->get_index_in_group();
+    }
+    if (source.m_source_table_view) {
+        m_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+    }
+    else patch.table_view_data = 0;
+    LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
+    m_view = m_source_link_view.get();
+
+    // copy actual query payload
+    copy_nodes(source);
 }
 
 Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode)
@@ -163,30 +179,7 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
     m_view = m_source_link_view.get();
 
     // copy actual query payload
-    Create();
-    first = source.first;
-    std::map<ParentNode*, ParentNode*> node_mapping;
-    node_mapping[nullptr] = nullptr;
-    std::vector<ParentNode*>::const_iterator i;
-    for (i = source.all_nodes.begin(); i != source.all_nodes.end(); ++i) {
-        ParentNode* new_node = (*i)->clone();
-        all_nodes.push_back(new_node);
-        node_mapping[*i] = new_node;
-    }
-    for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
-        (*i)->translate_pointers(node_mapping);
-    }
-    for (size_t t = 0; t < first.size(); t++) {
-        first[t] = node_mapping[first[t]];
-    }
-
-    if (first[0]) {
-        ParentNode* node_to_update = first[0];
-        while (node_to_update->m_child) {
-            node_to_update = node_to_update->m_child;
-        }
-        update[0] = &node_to_update->m_child;
-    }
+    copy_nodes(source);
 }
 
 
