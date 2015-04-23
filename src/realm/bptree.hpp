@@ -432,7 +432,14 @@ template <class T, bool N>
 void BpTree<T,N>::clear()
 {
 	if (root_is_leaf()) {
-		root_as_leaf().clear();
+        if ((std::is_same<T, int64_t>::value && !N) && root().get_type() == Array::type_HasRefs) {
+            // FIXME: This is necessary because ColumnSubtable
+            // uses an integer column to store refs internally.
+            root().clear_and_destroy_children();
+        }
+        else {
+            root_as_leaf().clear();
+        }
 	}
 	else {
 		root().clear_and_destroy_children();

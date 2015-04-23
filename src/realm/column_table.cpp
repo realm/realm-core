@@ -9,8 +9,7 @@ using namespace realm::util;
 
 void ColumnSubtableParent::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    if (!get_root_array()->update_from_parent(old_baseline))
-        return;
+    Column::update_from_parent(old_baseline);
     m_subtable_map.update_from_parent(old_baseline);
 }
 
@@ -33,7 +32,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 void ColumnSubtableParent::Verify() const
 {
     if (root_is_leaf()) {
-        get_root_array()->Verify();
+        Column::Verify();
         REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
