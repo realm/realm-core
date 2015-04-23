@@ -72,7 +72,9 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
 namespace {
     int64_t next_null_candidate(int64_t previous_candidate) {
         uint64_t x = static_cast<uint64_t>(previous_candidate);
-        x += 127; // really any prime number will do.
+        // Increment by a prime number. This guarantees that we will
+        // eventually hit every possible integer in the 2^64 range.
+        x += 0xfffffffbULL;
         return static_cast<int64_t>(x);
     }
 }
