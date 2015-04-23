@@ -6971,7 +6971,7 @@ TEST(LangBindHelper_HandoverQuery)
             LangBindHelper::commit_and_continue_as_read(sg_w);
             vid = sg_w.get_version_of_current_transaction();
             TestTableInts::Query query(table->where());
-            handover.reset(sg_w.export_for_handover(query, PayloadHandoverMode::Copy));
+            handover.reset(sg_w.export_for_handover(query, ConstSourcePayload::Copy));
         }
         {
             LangBindHelper::advance_read(sg,vid);
@@ -7019,7 +7019,7 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv[i].first);
-            handover.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
+            handover.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
             CHECK(tv.is_attached());
         }
         {
@@ -7058,12 +7058,12 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv.get_int(0,i));
-            handover2.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
+            handover2.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
             CHECK(tv.is_attached());
             // Aaaaand rows!
             row = (*table)[7];
             CHECK_EQUAL(7, row.get_int(0));
-            handover_row.reset(sg_w.export_for_handover(row, PayloadHandoverMode::Copy));
+            handover_row.reset(sg_w.export_for_handover(row));
             CHECK(row.is_attached());
         }
         {
@@ -7123,7 +7123,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv2.get_int(0,i));
-            handover2.reset(sg_w.export_for_handover(tv2, PayloadHandoverMode::Copy));
+            handover2.reset(sg_w.export_for_handover(tv2, ConstSourcePayload::Copy));
             CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
         }
@@ -7205,7 +7205,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         // TableView tv2 = lvr->get_sorted_view(0);
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
-        handover.reset(sg_w.export_for_handover(tv, PayloadHandoverMode::Copy));
+        handover.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
     }
     {
         LangBindHelper::advance_read(sg, vid);
@@ -7333,7 +7333,7 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv2.get_int(0,i));
-            handover2.reset(sg_w.export_for_handover(tv1, PayloadHandoverMode::Copy));
+            handover2.reset(sg_w.export_for_handover(tv1, ConstSourcePayload::Copy));
             CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
         }

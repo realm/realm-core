@@ -229,7 +229,7 @@ protected:
     RowBase() { m_prev = m_next = 0; };
 
     typedef RowBase_Handover_patch Handover_patch;
-    RowBase(const RowBase& source, Handover_patch& patch, PayloadHandoverMode mode);
+    RowBase(const RowBase& source, Handover_patch& patch);
     void apply_patch(Handover_patch& patch, Group& group);
 private:
     RowBase* m_prev; // Null if first, undefined if detached.
@@ -296,10 +296,10 @@ private:
     // for any U.
     template<class> friend class BasicRow;
 
-    virtual BasicRow<T>* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
+    virtual BasicRow<T>* clone_for_handover(Handover_patch*& patch) const
     {
         patch = new Handover_patch;
-        return new BasicRow<T>(*this, *patch, mode);
+        return new BasicRow<T>(*this, *patch);
     }
 
     virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
@@ -314,8 +314,8 @@ private:
         RowBase::apply_patch(patch, group);
     }
 
-    BasicRow(const BasicRow<T>& source, Handover_patch& patch, PayloadHandoverMode mode)
-        : RowBase(source, patch, mode)
+    BasicRow(const BasicRow<T>& source, Handover_patch& patch)
+        : RowBase(source, patch)
     {
     }
 

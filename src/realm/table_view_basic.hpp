@@ -117,7 +117,11 @@ protected:
 
     BasicTableViewBase() {}
     BasicTableViewBase(Impl i): m_impl(move(i)) {}
-    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch, PayloadHandoverMode mode)
+    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+                       ConstSourcePayload mode)
+        : m_impl(tv.m_impl, patch, mode) { }
+    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+                       MutableSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode) { }
 
     Impl* get_impl() REALM_NOEXCEPT { return &m_impl; }
@@ -192,7 +196,14 @@ public:
     typedef TableView_Handover_patch Handover_patch;
 
     BasicTableView<Tab>*
-    clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
+    clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const
+    {
+        patch = new Handover_patch;
+        return new BasicTableView<Tab>(*this, *patch, mode);
+    }
+
+    BasicTableView<Tab>*
+    clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode)
     {
         patch = new Handover_patch;
         return new BasicTableView<Tab>(*this, *patch, mode);
@@ -206,7 +217,12 @@ public:
     }
 
     BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch, 
-                   PayloadHandoverMode mode)
+                   ConstSourcePayload mode)
+        : Base(source, patch, mode)
+    {}
+
+    BasicTableView(BasicTableView<Tab>& source, Handover_patch& patch, 
+                   MutableSourcePayload mode)
         : Base(source, patch, mode)
     {}
 

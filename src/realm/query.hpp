@@ -281,7 +281,13 @@ public:
     std::vector<bool> pending_not;
     typedef Query_Handover_patch Handover_patch;
 
-    virtual Query* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
+    virtual Query* clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const
+    {
+        patch = new Handover_patch;
+        return new Query(*this, *patch, mode);
+    }
+
+    virtual Query* clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode)
     {
         patch = new Handover_patch;
         return new Query(*this, *patch, mode);
@@ -295,7 +301,8 @@ public:
     }
 
     void apply_patch(Handover_patch& patch, Group& group);
-    Query(const Query& source, Handover_patch& patch, PayloadHandoverMode mode);
+    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode);
+    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode);
 private:
     struct PartialCopyTag {};
     Query(const Query& src, PartialCopyTag);

@@ -341,9 +341,6 @@ protected:
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
 
-    /// Copy constructor with configurable handling of data payload
-    TableViewBase(TableViewBase&, PayloadHandoverMode mode);
-
     /// Moving constructor.
     TableViewBase(TableViewBase*) REALM_NOEXCEPT;
 
@@ -361,11 +358,20 @@ protected:
     // handover machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
-    virtual TableViewBase* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const
+    virtual TableViewBase* clone_for_handover(Handover_patch*& patch, 
+                                              ConstSourcePayload mode) const
     {
         patch = new Handover_patch;
         return new TableViewBase(*this, *patch, mode);
     }
+
+    virtual TableViewBase* clone_for_handover(Handover_patch*& patch, 
+                                              MutableSourcePayload mode)
+    {
+        patch = new Handover_patch;
+        return new TableViewBase(*this, *patch, mode);
+    }
+
     virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
     {
         apply_patch(*patch, group);
@@ -374,7 +380,10 @@ protected:
     }
     // handover machinery entry points based on static type
     void apply_patch(Handover_patch& patch, Group& group);
-    TableViewBase(const TableViewBase& source, Handover_patch& patch, PayloadHandoverMode mode);
+    TableViewBase(const TableViewBase& source, Handover_patch& patch, 
+                  ConstSourcePayload mode);
+    TableViewBase(TableViewBase& source, Handover_patch& patch, 
+                  MutableSourcePayload mode);
 
 private:
     void detach() const REALM_NOEXCEPT; // may have to remove const
@@ -500,7 +509,13 @@ public:
     Table& get_parent() REALM_NOEXCEPT;
     const Table& get_parent() const REALM_NOEXCEPT;
 
-    TableViewBase* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const override
+    TableViewBase* clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const override
+    {
+        patch = new Handover_patch;
+        return new TableView(*this, *patch, mode);
+    }
+
+    TableViewBase* clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode) override
     {
         patch = new Handover_patch;
         return new TableView(*this, *patch, mode);
@@ -515,7 +530,13 @@ public:
         patch = 0;
     }
 
-    TableView(const TableView& src, Handover_patch& patch, PayloadHandoverMode mode)
+    TableView(const TableView& src, Handover_patch& patch, ConstSourcePayload mode)
+        : TableViewBase(src, patch, mode)
+    {
+        // empty
+    }
+
+    TableView(TableView& src, Handover_patch& patch, MutableSourcePayload mode)
         : TableViewBase(src, patch, mode)
     {
         // empty
@@ -590,7 +611,13 @@ public:
 
     const Table& get_parent() const REALM_NOEXCEPT;
 
-    TableViewBase* clone_for_handover(Handover_patch*& patch, PayloadHandoverMode mode) const override
+    TableViewBase* clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const override
+    {
+        patch = new Handover_patch;
+        return new ConstTableView(*this, *patch, mode);
+    }
+
+    TableViewBase* clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode) override
     {
         patch = new Handover_patch;
         return new ConstTableView(*this, *patch, mode);
@@ -605,7 +632,13 @@ public:
         patch = 0;
     }
 
-    ConstTableView(const ConstTableView& src, Handover_patch& patch, PayloadHandoverMode mode)
+    ConstTableView(const ConstTableView& src, Handover_patch& patch, ConstSourcePayload mode)
+        : TableViewBase(src, patch, mode)
+    {
+        // empty
+    }
+
+    ConstTableView(ConstTableView& src, Handover_patch& patch, MutableSourcePayload mode)
         : TableViewBase(src, patch, mode)
     {
         // empty

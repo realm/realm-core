@@ -55,11 +55,9 @@ void RowBase::impl_detach() REALM_NOEXCEPT
     }
 }
 
-RowBase::RowBase(const RowBase& source, Handover_patch& patch, 
-                 PayloadHandoverMode mode)
+RowBase::RowBase(const RowBase& source, Handover_patch& patch)
     : m_table(TableRef())
 {
-    static_cast<void>(mode);
     patch.table_num = source.m_table->get_index_in_group();
     patch.row_ndx = source.m_row_ndx;
 }

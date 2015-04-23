@@ -412,7 +412,7 @@ public:
     // during export, the following operations on the shared group is locked:
     // - advance_read(), promote_to_write(), close()
     template<typename T>
-    Handover<T>* export_for_handover(const T& accessor, PayloadHandoverMode mode)
+    Handover<T>* export_for_handover(const T& accessor, ConstSourcePayload mode)
     {
         // TODO: lock
         Handover<T>* result = new Handover<T>();
@@ -425,15 +425,30 @@ public:
         // TODO: unlock
         return result;
     }
+    // specialization for handover of Rows
+    template<typename T>
+    Handover<BasicRow<T>>* export_for_handover(const BasicRow<T>& accessor)
+    {
+        // TODO: lock
+        Handover<BasicRow<T>>* result = new Handover<BasicRow<T>>();
+        // often, the return value from clone will be T*, BUT it may be ptr to some base of T
+        // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
+        // clone() will clone the actual accessor instance, and hence return a type which is 
+        // either T or derived from T.
+        result->clone = dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch));
+        result->version = get_version_of_current_transaction();
+        // TODO: unlock
+        return result;
+    }
     // destructive export (mode is Move)
     template<typename T>
-    Handover<T>* export_for_handover(T& accessor)
+    Handover<T>* export_for_handover(T& accessor, MutableSourcePayload mode)
     {
         // We do not lock anything, must be called by thread already
         // associated with this shared group.
         Handover<T>* result = new Handover<T>();
         // see above re dynamic_cast.
-        result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch));
+        result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode));
         result->version = get_version_of_current_transaction();
         return result;
     }

@@ -142,7 +142,13 @@ void Query::delete_nodes() REALM_NOEXCEPT
 }
 
 
-Query::Query(const Query& source, Handover_patch& patch, PayloadHandoverMode mode)
+Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
+{
+    // FIXME: todo
+    REALM_ASSERT(false);
+}
+
+Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
 {
     patch.m_has_table = bool(source.m_table);

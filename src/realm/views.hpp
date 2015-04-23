@@ -28,7 +28,8 @@ public:
         m_row_indexes(std::move(col)) 
     {}
 
-    RowIndexes(const RowIndexes& source, PayloadHandoverMode mode);
+    RowIndexes(const RowIndexes& source, ConstSourcePayload mode);
+    RowIndexes(RowIndexes& source, MutableSourcePayload mode);
 
     virtual ~RowIndexes()
     {
