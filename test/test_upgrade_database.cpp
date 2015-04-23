@@ -12,6 +12,7 @@
 
 #include <realm.hpp>
 #include <realm/util/file.hpp>
+#include <realm/commit_log.hpp>
 
 #include "test.hpp"
 
@@ -205,7 +206,29 @@ TEST(Upgrade_Database_2_3)
         }
     }
 
+    // Automatic upgrade from SharedGroup with replication
+    {
+      CHECK(File::copy(path, temp_copy));
 
+      SharedGroup sg(*makeWriteLogCollector(temp_copy));
+      ReadTransaction rt(sg);
+      ConstTableRef t = rt.get_table("table");
+
+      CHECK(t->has_search_index(0));
+      CHECK(t->has_search_index(1));
+
+      for (int i = 0; i < 1000; i++) {
+          // These tests utilize the Integer and String index. That will crash if the database is still
+          // in version 2 format, because the on-disk format of index has changed in version 3.
+          string str = std::to_string(i);
+          StringData sd(str);
+          size_t f = t->find_first_string(0, sd);
+          CHECK_EQUAL(f, i);
+          
+          f = t->find_first_int(1, i);
+          CHECK_EQUAL(f, i);
+      }
+    }
 
 #else   
     // For creating a version 2 database; use in OLD (0.84) core
