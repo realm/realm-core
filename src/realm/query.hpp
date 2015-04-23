@@ -344,6 +344,7 @@ private:
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
     LinkViewRef m_source_link_view; // link views are refcounted and shared.
     TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
+    bool m_owns_source_table_view;
 };
 
 // Implementation:

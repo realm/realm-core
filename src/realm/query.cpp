@@ -12,14 +12,14 @@
 using namespace std;
 using namespace realm;
 
-Query::Query() : m_view(nullptr), m_source_table_view(0)
+Query::Query() : m_view(nullptr), m_source_table_view(0), m_owns_source_table_view(false)
 {
     Create();
 //    expression(static_cast<Expression*>(this));
 }
 
 Query::Query(Table& table, TableViewBase* tv) 
-    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv)
+    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
     Create();
@@ -28,14 +28,14 @@ Query::Query(Table& table, TableViewBase* tv)
 Query::Query(const Table& table, const LinkViewRef& lv):
     m_table((const_cast<Table&>(table)).get_table_ref()),
     m_view(lv.get()),
-    m_source_link_view(lv), m_source_table_view(0)
+    m_source_link_view(lv), m_source_table_view(0), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
 Query::Query(const Table& table, TableViewBase* tv) 
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv)
+    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
     Create();
@@ -66,6 +66,7 @@ Query::Query(const Query& copy)
     m_view = copy.m_view;
     m_source_link_view = copy.m_source_link_view;
     m_source_table_view = copy.m_source_table_view;
+    m_owns_source_table_view = false;
     copy.do_delete = false;
     do_delete = true;
 }
@@ -78,6 +79,7 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
     // We can call the copyassignment operator even if this destination is uninitialized - the do_delete flag 
     // just needs to be false.
     do_delete = false;
+    m_owns_source_table_view = false;
     *this = copy;
 }
 
@@ -134,6 +136,8 @@ Query& Query::operator = (const Query& source)
 
 Query::~Query() REALM_NOEXCEPT
 {
+    if (m_owns_source_table_view)
+        delete m_source_table_view;
     delete_nodes();
 }
 
@@ -155,6 +159,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
     }
     if (source.m_source_table_view) {
         m_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_owns_source_table_view = true;
     }
     else patch.table_view_data = 0;
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
@@ -173,6 +178,7 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
     }
     if (source.m_source_table_view) {
         m_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_owns_source_table_view = true;
     }
     else patch.table_view_data = 0;
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
