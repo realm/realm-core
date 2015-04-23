@@ -10,7 +10,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -156,7 +155,7 @@ public:
 private:
     Mutex m_mutex;
     CondVar m_nonempty_or_closed, m_nonfull;
-    queue<int> m_queue;
+    std::queue<int> m_queue;
     bool m_closed;
 
     static const unsigned max_queue_size = 8;

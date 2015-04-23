@@ -38,7 +38,7 @@ Design:
 
 import_csv(csv file handle, realm table)
     Calls tokenize(csv file handle):
-        reads payload chunk and returns vector<vector<string>> with the right dimensions filled with rows and columns of
+        reads payload chunk and returns std::vector<std::vector<std::string>> with the right dimensions filled with rows and columns of
         the chunk payload
     Calls parse_float(), parse_bool(), etc, which tests for type and returns converted values
     Calls table.add_empty_row(), table.set_float(), table.set_bool()
@@ -62,7 +62,6 @@ const size_t print_width = 25;
 #include <vector>
 #include <realm.hpp>
 
-using namespace std;
 using namespace realm;
 
 class Importer
@@ -72,7 +71,7 @@ public:
     size_t import_csv_auto(FILE* file, Table& table, size_t type_detection_rows = 1000,
                             size_t import_rows = static_cast<size_t>(-1));
 
-    size_t import_csv_manual(FILE* file, Table& table, vector<DataType> scheme, vector<string> column_names,
+    size_t import_csv_manual(FILE* file, Table& table, std::vector<DataType> scheme, std::vector<std::string> column_names,
                              size_t skip_first_rows = 0, size_t import_rows = static_cast<size_t>(-1));
 
     bool Quiet;              // Quiet mode, only print to screen upon errors
@@ -80,16 +79,16 @@ public:
     bool Empty_as_string;    // Import columns that have occurences of empty strings as String type column
 
 private:
-    size_t import_csv(FILE* file, Table& table, vector<DataType> *scheme, vector<string> *column_names,
+    size_t import_csv(FILE* file, Table& table, std::vector<DataType> *scheme, std::vector<std::string> *column_names,
                       size_t type_detection_rows, size_t skip_first_rows, size_t import_rows);
     template <bool can_fail> float parse_float(const char*col, bool* success = nullptr);
     template <bool can_fail> double parse_double(const char* col, bool* success = nullptr, size_t* significants = nullptr);
     template <bool can_fail> int64_t parse_integer(const char* col, bool* success = nullptr);
     template <bool can_fail> bool parse_bool(const char*col, bool* success = nullptr);
-    vector<DataType> types (vector<string> v);
-    size_t tokenize(vector<vector<string>> & payload, size_t records);
-    vector<DataType> detect_scheme (vector<vector<string>> payload, size_t begin, size_t end);
-    vector<DataType> lowest_common (vector<DataType> types1, vector<DataType> types2);
+    std::vector<DataType> types (std::vector<std::string> v);
+    size_t tokenize(std::vector<std::vector<std::string>> & payload, size_t records);
+    std::vector<DataType> detect_scheme (std::vector<std::vector<std::string>> payload, size_t begin, size_t end);
+    std::vector<DataType> lowest_common (std::vector<DataType> types1, std::vector<DataType> types2);
 
     char src[2*chunk_size];    // .csv input buffer
     size_t m_top;              // points at top of buffer

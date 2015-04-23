@@ -15,49 +15,48 @@
 #include "timer.hpp"
 #include "benchmark_results.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace test_util;
 
 
 namespace {
 
-string format_elapsed_time(double seconds)
+std::string format_elapsed_time(double seconds)
 {
-    ostringstream out;
+    std::ostringstream out;
     Timer::format(seconds, out);
     return out.str();
 }
 
-string format_change_percent(double baseline, double seconds)
+std::string format_change_percent(double baseline, double seconds)
 {
-    ostringstream out;
+    std::ostringstream out;
     double percent = (seconds - baseline) / baseline * 100;
     out.precision(3);
-    out.setf(ios_base::showpos);
+    out.setf(std::ios_base::showpos);
     out << percent << "%";
     return out.str();
 }
 
-string format_drop_factor(double baseline, double seconds)
+std::string format_drop_factor(double baseline, double seconds)
 {
-    ostringstream out;
+    std::ostringstream out;
     double factor = baseline / seconds;
     out.precision(3);
     out << factor << ":1";
     return out.str();
 }
 
-string format_rise_factor(double baseline, double seconds)
+std::string format_rise_factor(double baseline, double seconds)
 {
-    ostringstream out;
+    std::ostringstream out;
     double factor = seconds / baseline;
     out.precision(3);
     out << "1:" << factor;
     return out.str();
 }
 
-string format_change(double baseline, double input, BenchmarkResults::ChangeType change_type)
+std::string format_change(double baseline, double input, BenchmarkResults::ChangeType change_type)
 {
     switch (change_type) {
         case BenchmarkResults::change_Percent:
@@ -119,14 +118,14 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
     std::ostream& out = std::cout;
 
     // Print Lead Text
-    out.setf(ios_base::left, ios_base::adjustfield);
-    m_max_lead_text_width = max(m_max_lead_text_width, int(lead_text.size()));
+    out.setf(std::ios_base::left, std::ios_base::adjustfield);
+    m_max_lead_text_width = std::max(m_max_lead_text_width, int(lead_text.size()));
     std::string lead_text_2 = lead_text + ":";
-    out << setw(m_max_lead_text_width + 1 + 3) << lead_text_2;
+    out << std::setw(m_max_lead_text_width + 1 + 3) << lead_text_2;
 
     Results::const_iterator it = m_results.find(ident);
     if (it == m_results.end()) {
-        out << "(no measurements)" << endl;
+        out << "(no measurements)" << std::endl;
         return;
     }
 
@@ -134,44 +133,44 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
 
     const size_t time_width = 8;
 
-    out.setf(ios_base::right, ios_base::adjustfield);
+    out.setf(std::ios_base::right, std::ios_base::adjustfield);
     if (baseline_iter != m_baseline_results.end()) {
         const Result& br = baseline_iter->second;
-        out << "min " << setw(time_width) << format_elapsed_time(r.min)   << " (" << format_change(br.min, r.min, change_type) << ")     ";
-        out << "max " << setw(time_width) << format_elapsed_time(r.max)   << " (" << format_change(br.max, r.max, change_type) << ")     ";
-        out << "avg " << setw(time_width) << format_elapsed_time(r.avg()) << " (" << format_change(br.avg(), r.avg(), change_type) << ")     ";
+        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " (" << format_change(br.min, r.min, change_type) << ")     ";
+        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " (" << format_change(br.max, r.max, change_type) << ")     ";
+        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << " (" << format_change(br.avg(), r.avg(), change_type) << ")     ";
         out << "reps " << r.rep;
     }
     else {
-        out << "min " << setw(time_width) << format_elapsed_time(r.min)   << "     ";
-        out << "max " << setw(time_width) << format_elapsed_time(r.max)   << "     ";
-        out << "avg " << setw(time_width) << format_elapsed_time(r.avg()) << "     ";
+        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << "     ";
+        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << "     ";
+        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << "     ";
         out << "reps " << r.rep;
     }
-    out << endl;
+    out << std::endl;
 }
 
 
 void BenchmarkResults::try_load_baseline_results()
 {
-    string baseline_file = m_results_file_stem;
+    std::string baseline_file = m_results_file_stem;
     baseline_file += ".baseline";
     if (util::File::exists(baseline_file)) {
-        ifstream in(baseline_file.c_str());
+        std::ifstream in(baseline_file.c_str());
         BaselineResults baseline_results;
         bool error = false;
-        string line;
+        std::string line;
         while (getline(in, line)) {
-            istringstream line_in(line);
-            string ident;
+            std::istringstream line_in(line);
+            std::string ident;
             char space;
             Result r;
-            line_in >> ident >> noskipws >> space >> skipws >> r.min >> space >> r.max >> space >> r.total >> r.rep;
+            line_in >> ident >> std::noskipws >> space >> std::skipws >> r.min >> space >> r.max >> space >> r.total >> r.rep;
             if (!line_in || !isspace(space, line_in.getloc()))
                 error = true;
             if (!line_in.eof()) {
                 line_in >> space;
-                if (line_in.rdstate() != (ios_base::failbit | ios_base::eofbit))
+                if (line_in.rdstate() != (std::ios_base::failbit | std::ios_base::eofbit))
                     error = true;
             }
             if (error)
@@ -179,7 +178,7 @@ void BenchmarkResults::try_load_baseline_results()
             baseline_results[ident] = r;
         }
         if (error) {
-            cerr << "WARNING: Failed to parse '"<<baseline_file<<"'\n";
+            std::cerr << "WARNING: Failed to parse '"<<baseline_file<<"'\n";
         }
         else {
             m_baseline_results = baseline_results;
@@ -194,21 +193,21 @@ void BenchmarkResults::save_results()
     localtime(&now);
     struct tm local;
     localtime_r(&now,  &local);
-    ostringstream name_out;
+    std::ostringstream name_out;
     name_out << m_results_file_stem << ".";
     // Format: YYYYMMDD_hhmmss;
     name_out.fill('0');
     name_out << (1900 + local.tm_year) << ""
-        "" << setw(2) << (1 + local.tm_mon) << ""
-        "" << setw(2) << local.tm_mday << "_"
-        "" << setw(2) << local.tm_hour << ""
-        "" << setw(2) << local.tm_min << ""
-        "" << setw(2) << local.tm_sec;
-    string name = name_out.str();
-    string csv_name = name + ".csv";
+        "" << std::setw(2) << (1 + local.tm_mon) << ""
+        "" << std::setw(2) << local.tm_mday << "_"
+        "" << std::setw(2) << local.tm_hour << ""
+        "" << std::setw(2) << local.tm_min << ""
+        "" << std::setw(2) << local.tm_sec;
+    std::string name = name_out.str();
+    std::string csv_name = name + ".csv";
     {
-        ofstream out(name.c_str());
-        ofstream csv_out(csv_name.c_str());
+        std::ofstream out(name.c_str());
+        std::ofstream csv_out(csv_name.c_str());
 
         csv_out << "ident,min,max,avg,reps,total" << '\n';
         csv_out.setf(std::ios_base::fixed, std::ios_base::floatfield);
@@ -225,8 +224,8 @@ void BenchmarkResults::save_results()
         }
     }
 
-    string baseline_file = m_results_file_stem;
-    string latest_csv_file = m_results_file_stem + ".latest.csv";
+    std::string baseline_file = m_results_file_stem;
+    std::string latest_csv_file = m_results_file_stem + ".latest.csv";
     baseline_file += ".baseline";
     int r;
     if (!util::File::exists(baseline_file)) {

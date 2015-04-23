@@ -15,7 +15,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -52,7 +51,7 @@ using namespace realm::util;
 
 TEST(Upgrade_Database_2_3)
 {
-    const string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
     // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
     // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
@@ -124,7 +123,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = std::to_string(i);
+            std::string str = std::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -147,7 +146,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = std::to_string(i);
+            std::string str = std::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -175,7 +174,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = std::to_string(i);
+            std::string str = std::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -195,7 +194,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = std::to_string(i);
+            std::string str = std::to_string(i);
             StringData sd(str);
             size_t f = t2->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -239,7 +238,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
@@ -382,7 +381,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified

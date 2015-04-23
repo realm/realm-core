@@ -4,7 +4,6 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -43,7 +42,7 @@ int main()
 
         int n_inner = 100;
         for (int i=0; i<n_outer; ++i) {
-            cerr << ".";
+            std::cerr << ".";
             for (int j=0; j<n_inner; ++j) {
                 {
                     WriteTransaction wt(sg);
@@ -74,10 +73,10 @@ int main()
                 }
             }
         }
-        cerr << "\n";
+        std::cerr << "\n";
 
         time_t end = time(0);
-        cerr << "Small write transactions per second = " << (( n_outer*n_inner*7 / double(end - begin) )) << endl;
+        std::cerr << "Small write transactions per second = " << (( n_outer*n_inner*7 / double(end - begin) )) << std::endl;
     }
 
     {
@@ -85,7 +84,7 @@ int main()
 
         int n_inner = 10;
         for (int i=0; i<n_outer; ++i) {
-            cerr << "x";
+            std::cerr << "x";
             for (int j=0; j<n_inner; ++j) {
                 {
                     WriteTransaction wt(sg);
@@ -96,9 +95,9 @@ int main()
                 }
             }
         }
-        cerr << "\n";
+        std::cerr << "\n";
 
         time_t end = time(0);
-        cerr << "Large write transactions per second = " << (( n_outer*n_inner / double(end - begin) )) << endl;
+        std::cerr << "Large write transactions per second = " << (( n_outer*n_inner / double(end - begin) )) << std::endl;
     }
 }

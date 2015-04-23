@@ -16,7 +16,6 @@
 #include <realm/index_string.hpp>
 #include <realm/array_integer.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -256,7 +255,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (int_multiply_with_overflow_detect(next_level_elems_per_child,
                                                   REALM_MAX_BPNODE_SIZE))
-                throw runtime_error("Overflow in number of elements per child");
+                throw std::runtime_error("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
                                                       next_level_elems_per_child)); // Throws
         }
@@ -321,8 +320,8 @@ public:
         else {
             // Slice the leaf
             Allocator& slice_alloc = Allocator::get_default();
-            size_t begin = max(leaf_begin, m_begin);
-            size_t end   = min(leaf_end,   m_end);
+            size_t begin = std::max(leaf_begin, m_begin);
+            size_t end   = std::min(leaf_end,   m_end);
             size_t offset = begin - leaf_begin;
             size = end - begin;
             MemRef mem =
@@ -427,7 +426,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 {
     size_t rest_size = *rest_size_ptr;
     size_t orig_rest_size = rest_size;
-    size_t leaf_size = min(size_t(REALM_MAX_BPNODE_SIZE), rest_size);
+    size_t leaf_size = std::min(size_t(REALM_MAX_BPNODE_SIZE), rest_size);
     rest_size -= leaf_size;
     ref_type node = handler.create_leaf(leaf_size);
     size_t height = 1;
@@ -832,11 +831,11 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
     Array leaf(m_array->get_alloc());
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
-        pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
         leaf.init_from_mem(p.first);
         size_t ndx_in_leaf = p.second;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
-        size_t end_in_leaf = min(leaf.size(), end - leaf_offset);
+        size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
         size_t ndx = leaf.find_first(value, ndx_in_leaf, end_in_leaf); // Throws (maybe)
         if (ndx != not_found)
             return leaf_offset + ndx;
@@ -870,11 +869,11 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
     Array leaf(m_array->get_alloc());
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
-        pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
         leaf.init_from_mem(p.first);
         size_t ndx_in_leaf = p.second;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
-        size_t end_in_leaf = min(leaf.size(), end - leaf_offset);
+        size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
         leaf.find_all(&result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
         ndx_in_tree = leaf_offset + end_in_leaf;
     }
@@ -1149,13 +1148,13 @@ public:
     const ColumnBase& m_column;
     LeafToDot(const ColumnBase& column): m_column(column) {}
     void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                ostream& out) override
+                std::ostream& out) override
     {
         m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);
     }
 };
 
-void ColumnBase::tree_to_dot(ostream& out) const
+void ColumnBase::tree_to_dot(std::ostream& out) const
 {
     LeafToDot handler(*this);
     m_array->bptree_to_dot(out, handler);
@@ -1163,24 +1162,24 @@ void ColumnBase::tree_to_dot(ostream& out) const
 
 void ColumnBase::dump_node_structure() const
 {
-    do_dump_node_structure(cerr, 0);
+    do_dump_node_structure(std::cerr, 0);
 }
 
 
-void Column::to_dot(ostream& out, StringData title) const
+void Column::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = m_array->get_ref();
-    out << "subgraph cluster_integer_column" << ref << " {" << endl;
+    out << "subgraph cluster_integer_column" << ref << " {" << std::endl;
     out << " label = \"Integer column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
     tree_to_dot(out);
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 void Column::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                         ostream& out) const
+                         std::ostream& out) const
 {
     Array leaf(m_array->get_alloc());
     leaf.init_from_mem(leaf_mem);
@@ -1198,14 +1197,14 @@ MemStats Column::stats() const
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << setw(indent) << "" << "Integer leaf (ref: "<<leaf.get_ref()<<", "
+    out << std::setw(indent) << "" << "Integer leaf (ref: "<<leaf.get_ref()<<", "
         "size: "<<leaf.size()<<")\n";
-    ostringstream out_2;
+    std::ostringstream out_2;
     for (size_t i = 0; i != leaf.size(); ++i) {
         if (i != 0) {
             out_2 << ", ";
@@ -1216,17 +1215,17 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
         }
         out_2 << leaf.get(i);
     }
-    out << setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
+    out << std::setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
 }
 
 } // anonymous namespace
 
-void Column::do_dump_node_structure(ostream& out, int level) const
+void Column::do_dump_node_structure(std::ostream& out, int level) const
 {
     dump_node_structure(*m_array, out, level);
 }
 
-void Column::dump_node_structure(const Array& root,  ostream& out, int level)
+void Column::dump_node_structure(const Array& root, std::ostream& out, int level)
 {
     root.dump_bptree_structure(out, level, &leaf_dumper);
 }
