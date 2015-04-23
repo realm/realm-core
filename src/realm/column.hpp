@@ -926,10 +926,10 @@ inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHan
 }
 
 template <class T, bool N>
-TColumn<T,N>::TColumn(Allocator& alloc, ref_type ref) : m_tree(alloc)
+TColumn<T,N>::TColumn(Allocator& alloc, ref_type ref) : m_tree(BpTreeBase::unattached_tag{})
 {
     // fixme, must m_search_index be copied here?
-    m_tree.init_from_ref(ref);
+    m_tree.init_from_ref(alloc, ref);
 }
 
 template <class T, bool N>

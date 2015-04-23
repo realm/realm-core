@@ -38,6 +38,8 @@ class ArrayIntNull;
 
 class BpTreeBase {
 public:
+    struct unattached_tag {};
+
     // Accessor concept:
     Allocator& get_alloc() const REALM_NOEXCEPT;
     void destroy() REALM_NOEXCEPT;
@@ -102,11 +104,12 @@ public:
     };
 
     BpTree();
+    explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
     explicit BpTree(std::unique_ptr<Array> root) : BpTreeBase(std::move(root)) {}
     BpTree(BpTree<T, Nullable>&&) = default;
     BpTree<T, Nullable>& operator=(BpTree<T, Nullable>&&) = default;
-    void init_from_ref(ref_type ref);
+    void init_from_ref(Allocator& alloc, ref_type ref);
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -171,7 +174,6 @@ private:
 
 inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> root) : m_root(std::move(root))
 {
-    REALM_ASSERT_DEBUG(m_root);
 }
 
 inline
@@ -267,15 +269,20 @@ BpTree<T,N>::BpTree(Allocator& alloc) : BpTreeBase(std::unique_ptr<Array>(new Le
 }
 
 template <class T, bool N>
-void BpTree<T,N>::init_from_ref(ref_type ref)
+BpTree<T,N>::BpTree(BpTreeBase::unattached_tag) : BpTreeBase(nullptr)
 {
-    const char* header = get_alloc().translate(ref);
+}
+
+template <class T, bool N>
+void BpTree<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
+{
+    const char* header = alloc.translate(ref);
     if (Array::get_is_inner_bptree_node_from_header(header)) {
-        m_root.reset(new Array{get_alloc()});
+        m_root.reset(new Array{alloc});
         m_root->init_from_ref(ref);
     }
     else {
-        std::unique_ptr<LeafType> leaf { new LeafType{get_alloc()} };
+        std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
         leaf->init_from_ref(ref);
         m_root = std::move(leaf);
     }
