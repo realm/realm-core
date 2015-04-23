@@ -47,6 +47,7 @@ Static library*/
 
 /realm.xcodeproj/project.xcworkspace
 /realm.xcodeproj/xcuserdata
+*.dSYM
 
 # ref doc
 /doc/ref_cpp/html/*
