@@ -74,7 +74,7 @@ public:
     /// Construct a binary array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
     /// initialized to zero size blobs.
-    static MemRef create_array(std::size_t size, Allocator&);
+    static MemRef create_array(std::size_t size, Allocator&, bool nullable = false);
 
     /// Construct a copy of the specified slice of this binary array
     /// using the specified target allocator.
@@ -87,6 +87,7 @@ public:
 private:
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
+    Array m_nulls;
 };
 
 
@@ -96,10 +97,11 @@ private:
 // Implementation:
 
 inline ArrayBinary::ArrayBinary(Allocator& alloc) REALM_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc)
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(alloc)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
+    m_nulls.set_parent(this, 2);
 }
 
 inline void ArrayBinary::create()
