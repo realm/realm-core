@@ -109,6 +109,7 @@ public:
     BpTree(BpTree<T, Nullable>&&) = default;
     BpTree<T, Nullable>& operator=(BpTree<T, Nullable>&&) = default;
     void init_from_ref(Allocator& alloc, ref_type ref);
+	void init_from_parent();
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -268,15 +269,24 @@ template <class T, bool N>
 void BpTree<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
 {
     const char* header = alloc.translate(ref);
-    if (Array::get_is_inner_bptree_node_from_header(header)) {
-        m_root.reset(new Array{alloc});
-        m_root->init_from_ref(ref);
-    }
-    else {
-        std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
-        leaf->init_from_ref(ref);
-        m_root = std::move(leaf);
-    }
+	std::unique_ptr<Array> new_root;
+	if (Array::get_is_inner_bptree_node_from_header(header)) {
+		new_root.reset(new Array{alloc});
+		new_root->init_from_ref(ref);
+	}
+	else {
+		std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
+		leaf->init_from_ref(ref);
+		new_root = std::move(leaf);
+	}
+	replace_root(std::move(new_root));
+}
+
+template <class T, bool N>
+void BpTree<T,N>::init_from_parent()
+{
+	ref_type ref = root().get_ref_from_parent();
+	init_from_ref(get_alloc(), ref);
 }
 
 template <class T, bool N>

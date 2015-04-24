@@ -411,6 +411,8 @@ public:
     TColumn(unattached_root_tag, Allocator&);
     TColumn(TColumn<T, Nullable>&&) REALM_NOEXCEPT = default;
     ~TColumn() REALM_NOEXCEPT override;
+	
+	void init_from_parent();
 
     // Accessor concept:
     void destroy() REALM_NOEXCEPT override;
@@ -945,6 +947,12 @@ TColumn<T,N>::TColumn(std::unique_ptr<Array> root) REALM_NOEXCEPT : m_tree(std::
 template <class T, bool N>
 TColumn<T,N>::~TColumn() REALM_NOEXCEPT
 {
+}
+
+template <class T, bool N>
+void TColumn<T,N>::init_from_parent()
+{
+	m_tree.init_from_parent();
 }
 
 template <class T, bool N>
