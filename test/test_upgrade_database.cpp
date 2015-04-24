@@ -210,7 +210,8 @@ TEST(Upgrade_Database_2_3)
     {
       CHECK(File::copy(path, temp_copy));
 
-      SharedGroup sg(*makeWriteLogCollector(temp_copy));
+      auto replication = makeWriteLogCollector(temp_copy);
+      SharedGroup sg(*replication);
       ReadTransaction rt(sg);
       ConstTableRef t = rt.get_table("table");
 
