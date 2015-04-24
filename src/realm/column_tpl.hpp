@@ -88,9 +88,7 @@ namespace _impl {
 template <class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
 			std::size_t limit, std::size_t* return_ndx)
-{
-	using ArrType = typename ColType::LeafType;
-	
+{	
 	if (end == npos)
 		end = column.size();
 	
