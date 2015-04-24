@@ -46,7 +46,7 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
         REALM_ASSERT_3(link_ndx, ==, 0);
         ref_type ref = Column::create(m_origin_column.get_alloc()); // Throws
         m_origin_column.set_row_ref(origin_row_ndx, ref); // Throws
-        m_row_indexes.get_root_array()->init_from_parent(); // re-attach
+        m_row_indexes.init_from_parent(); // re-attach
     }
 
     m_row_indexes.insert(link_ndx, target_row_ndx); // Throws

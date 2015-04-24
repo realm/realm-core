@@ -4,10 +4,13 @@ using namespace realm;
 
 void BpTreeBase::replace_root(std::unique_ptr<Array> leaf)
 {
-    ArrayParent* parent = m_root->get_parent();
-    std::size_t ndx_in_parent = m_root->get_ndx_in_parent();
-    leaf->set_parent(parent, ndx_in_parent);
-    leaf->update_parent(); // Throws
+	if (m_root) {
+		// Maintain parent.
+		ArrayParent* parent = m_root->get_parent();
+		std::size_t ndx_in_parent = m_root->get_ndx_in_parent();
+		leaf->set_parent(parent, ndx_in_parent);
+		leaf->update_parent(); // Throws
+	}
     m_root = std::move(leaf);
 }
 

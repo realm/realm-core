@@ -38,6 +38,8 @@ class ArrayIntNull;
 
 class BpTreeBase {
 public:
+    struct unattached_tag {};
+
     // Accessor concept:
     Allocator& get_alloc() const REALM_NOEXCEPT;
     void destroy() REALM_NOEXCEPT;
@@ -94,10 +96,13 @@ public:
     };
 
     BpTree();
+    explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
     explicit BpTree(std::unique_ptr<Array> root) : BpTreeBase(std::move(root)) {}
     BpTree(BpTree<T, Nullable>&&) = default;
     BpTree<T, Nullable>& operator=(BpTree<T, Nullable>&&) = default;
+    void init_from_ref(Allocator& alloc, ref_type ref);
+	void init_from_parent();
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -168,7 +173,6 @@ private:
 
 inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> root) : m_root(std::move(root))
 {
-    REALM_ASSERT_DEBUG(m_root);
 }
 
 inline
@@ -255,10 +259,40 @@ BpTree<T,N>::BpTree(Allocator& alloc) : BpTreeBase(std::unique_ptr<Array>(new Le
 }
 
 template <class T, bool N>
+BpTree<T,N>::BpTree(BpTreeBase::unattached_tag) : BpTreeBase(nullptr)
+{
+}
+
+template <class T, bool N>
+void BpTree<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
+{
+    const char* header = alloc.translate(ref);
+	std::unique_ptr<Array> new_root;
+	if (Array::get_is_inner_bptree_node_from_header(header)) {
+		new_root.reset(new Array{alloc});
+		new_root->init_from_ref(ref);
+	}
+	else {
+		std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
+		leaf->init_from_ref(ref);
+		new_root = std::move(leaf);
+	}
+	replace_root(std::move(new_root));
+}
+
+template <class T, bool N>
+void BpTree<T,N>::init_from_parent()
+{
+	ref_type ref = root().get_ref_from_parent();
+	init_from_ref(get_alloc(), ref);
+}
+
+template <class T, bool N>
 typename BpTree<T,N>::LeafType&
 BpTree<T,N>::root_as_leaf()
 {
     REALM_ASSERT_DEBUG(root_is_leaf());
+    REALM_ASSERT_DEBUG(dynamic_cast<LeafType*>(m_root.get()) != nullptr);
     return static_cast<LeafType&>(root());
 }
 
@@ -267,6 +301,7 @@ const typename BpTree<T,N>::LeafType&
 BpTree<T,N>::root_as_leaf() const
 {
     REALM_ASSERT_DEBUG(root_is_leaf());
+    REALM_ASSERT_DEBUG(dynamic_cast<const LeafType*>(m_root.get()) != nullptr);
     return static_cast<const LeafType&>(root());
 }
 
@@ -533,18 +568,18 @@ template <class T, bool N>
 void BpTree<T,N>::clear()
 {
 	if (root_is_leaf()) {
-        if ((std::is_same<T, int64_t>::value && !N) && root().get_type() == Array::type_HasRefs) {
-            // FIXME: This is necessary because ColumnSubtable
-            // uses an integer column to store refs internally.
-            root().clear_and_destroy_children();
-        }
-        else {
-            root_as_leaf().clear();
-        }
+		if (std::is_same<T, int64_t>::value && !N && root().get_type() == Array::type_HasRefs) {
+			// FIXME: This is because some column types rely on integer columns
+			// to contain refs.
+			root().clear_and_destroy_children();
+		}
+		else {
+			root_as_leaf().clear();
+		}
 	}
 	else {
 		root().clear_and_destroy_children();
-
+		
 		// Reinitialize the root's memory as a leaf.
 		Allocator& alloc = get_alloc();
 		std::unique_ptr<LeafType> new_root(new LeafType(alloc));
