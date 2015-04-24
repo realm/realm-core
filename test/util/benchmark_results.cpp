@@ -161,22 +161,50 @@ void BenchmarkResults::try_load_baseline_results()
         BaselineResults baseline_results;
         bool error = false;
         string line;
+        int lineno = 1;
         while (getline(in, line)) {
             istringstream line_in(line);
             string ident;
             char space;
             Result r;
-            line_in >> ident >> noskipws >> space >> skipws >> r.min >> space >> r.max >> space >> r.total >> r.rep;
-            if (!line_in || !isspace(space, line_in.getloc()))
-                error = true;
-            if (!line_in.eof()) {
+            if (line_in >> ident) {
                 line_in >> space;
-                if (line_in.rdstate() != (ios_base::failbit | ios_base::eofbit))
-                    error = true;
+                double* numbers[] = {&r.min, &r.max, &r.total};
+                for (size_t i = 0; i < 3; ++i) {
+                    if (!(line_in >> *numbers[i])) {
+                        cerr << "Expected number: line " << lineno << "\n";
+                        error = true;
+                        break;
+                    }
+                    if (!(line_in >> space)) {
+                        cerr << "Expected space: line " << lineno << "\n";
+                        error = true;
+                        break;
+                    }
+                }
+                if (!error) {
+                    if (!(line_in >> r.rep)) {
+                        cerr << "Expected integer: line " << lineno << "\n";
+                        error = true;
+                    }
+                    if (!(line_in >> skipws)) {
+                        cerr << "Expected whitespace: line " << lineno << '\n';
+                        error = true;
+                    }
+                }
+            }
+            else {
+                cerr << "Expected identifier: line " << lineno << "\n";
+                error = true;
+            }
+            if (!line_in) {
+                cerr << "Unknown error: line " << lineno << '\n';
+                error = true;
             }
             if (error)
                 break;
             baseline_results[ident] = r;
+            ++lineno;
         }
         if (error) {
             cerr << "WARNING: Failed to parse '"<<baseline_file<<"'\n";
