@@ -50,8 +50,10 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-ONLY(Upgrade_Database_2_3)
+TEST(Upgrade_Database_2_3)
 {
+    const string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+
     // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
     // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
     // even read using Get()) without upgrading the database first.
@@ -63,162 +65,145 @@ ONLY(Upgrade_Database_2_3)
     // and this unit test will not upgrade the file. The REALM_NULL_STRINGS flag was introduced to be able to merge
     // null branch into master but without activating version 3 yet.
 #if 1
+    SHARED_GROUP_TEST_PATH(temp_copy);
 
 #if 0 // Not possible to upgrade from Group (needs write access to file)
     // Automatic upgrade from Group
-{
-    // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    {
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        CHECK(File::copy(path, temp_copy);
 
-    File::copy(path, path + ".tmp");
+        // Open copy. Group constructor will upgrade automatically if needed, also even though user requested ReadOnly. Todo,
+        // discuss if this is OK.
+        Group g(temp_copy, 0, Group::mode_ReadOnly);
 
-    // Open copy. Group constructor will upgrade automatically if needed, also even though user requested ReadOnly. Todo,
-    // discuss if this is OK.
-    Group g(path + ".tmp", 0, Group::mode_ReadOnly);
-
-    TableRef t = g.get_table("table");
+        TableRef t = g.get_table("table");
 
 #if REALM_NULL_STRINGS == 1
-    CHECK_EQUAL(g.get_file_format(), 3);
+        CHECK_EQUAL(g.get_file_format(), 3);
 #else
-    CHECK_EQUAL(g.get_file_format(), 2);
+        CHECK_EQUAL(g.get_file_format(), 2);
 #endif
 
-    CHECK(t->has_search_index(0));
-    CHECK(t->has_search_index(1));
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
 
-    for (int i = 0; i < 1000; i++) {
-        // These tests utilize the Integer and String index. That will crash if the database is still
-        // in version 2 format, because the on-disk format of index has changed in version 3.
-        string str = std::to_string(i);
-        StringData sd(str);
-        size_t f = t->find_first_string(0, sd);
-        CHECK_EQUAL(f, i);
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = std::to_string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
 
-        f = t->find_first_int(1, i);
-        CHECK_EQUAL(f, i);
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
+
+        g.commit();
+
+        // Test an assert that guards against writing version 2 file to disk
+        File::try_remove(path + ".tmp2");
+        g.write(path + ".tmp2");
+
     }
-
-    g.commit();
-
-    // Test an assert that guards against writing version 2 file to disk
-    File::try_remove(path + ".tmp2");
-    g.write(path + ".tmp2");
-
-}
 #endif
 
-// Automatic upgrade from SharedGroup
-{
-    // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "default.realm";
+    // Automatic upgrade from SharedGroup
+    {
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        CHECK(File::copy(path, temp_copy));
 
-    File::copy(path, path + ".tmp");
+        SharedGroup sg(temp_copy);
+        ReadTransaction rt(sg);
+        ConstTableRef t = rt.get_table("table");
 
-    SharedGroup sg(path + ".tmp");
-    ReadTransaction rt(sg);
-    ConstTableRef t = rt.get_table(2);
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
 
-    for (int i = 0; i < t->size(); i++)
-        cerr << t->get_string(0, i) << "\n";
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = std::to_string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
 
-
-    size_t r = t->find_first_string(0, "g");
-    CHECK(r == 6);
-
-    return;
-
-    //      CHECK(t->has_search_index(0));
-    //      CHECK(t->has_search_index(1));
-
-    for (int i = 0; i < 1000; i++) {
-        // These tests utilize the Integer and String index. That will crash if the database is still
-        // in version 2 format, because the on-disk format of index has changed in version 3.
-        string str = std::to_string(i);
-        StringData sd(str);
-        size_t f = t->find_first_string(0, sd);
-        CHECK_EQUAL(f, i);
-
-        f = t->find_first_int(1, i);
-        CHECK_EQUAL(f, i);
-    }
-}
-
-
-// Now see if we can open the upgraded file and also commit to it
-{
-    // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
-
-    SharedGroup sg(path + ".tmp");
-    WriteTransaction rt(sg);
-    TableRef t = rt.get_table("table");
-
-    CHECK(t->has_search_index(0));
-    CHECK(t->has_search_index(1));
-
-    for (int i = 0; i < 1000; i++) {
-        // These tests utilize the Integer and String index. That will crash if the database is still
-        // in version 2 format, because the on-disk format of index has changed in version 3.
-        string str = std::to_string(i);
-        StringData sd(str);
-        size_t f = t->find_first_string(0, sd);
-        CHECK_EQUAL(f, i);
-
-        f = t->find_first_int(1, i);
-        CHECK_EQUAL(f, i);
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
     }
 
-    sg.commit();
-}
 
+    // Now see if we can open the upgraded file and also commit to it
+    {
+        SharedGroup sg(temp_copy);
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("table");
 
-// Begin from scratch; see if we can upgrade file and then use a write transaction
-{
-    // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
 
-    File::copy(path, path + ".tmp");
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = std::to_string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
 
-    SharedGroup sg(path + ".tmp");
-    WriteTransaction rt(sg);
-    TableRef t = rt.get_table("table");
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
 
-    CHECK(t->has_search_index(0));
-    CHECK(t->has_search_index(1));
-
-    for (int i = 0; i < 1000; i++) {
-        // These tests utilize the Integer and String index. That will crash if the database is still
-        // in version 2 format, because the on-disk format of index has changed in version 3.
-        string str = std::to_string(i);
-        StringData sd(str);
-        size_t f = t->find_first_string(0, sd);
-        CHECK_EQUAL(f, i);
-
-        f = t->find_first_int(1, i);
-        CHECK_EQUAL(f, i);
+        sg.commit();
     }
 
-    sg.commit();
 
-    WriteTransaction rt2(sg);
-    TableRef t2 = rt.get_table("table");
+    // Begin from scratch; see if we can upgrade file and then use a write transaction
+    {
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        CHECK(File::copy(path, temp_copy));
 
-    CHECK(t2->has_search_index(0));
-    CHECK(t2->has_search_index(1));
+        SharedGroup sg(temp_copy);
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("table");
 
-    for (int i = 0; i < 1000; i++) {
-        // These tests utilize the Integer and String index. That will crash if the database is still
-        // in version 2 format, because the on-disk format of index has changed in version 3.
-        string str = std::to_string(i);
-        StringData sd(str);
-        size_t f = t2->find_first_string(0, sd);
-        CHECK_EQUAL(f, i);
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
 
-        f = t2->find_first_int(1, i);
-        CHECK_EQUAL(f, i);
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = std::to_string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
+
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
+
+        sg.commit();
+
+        WriteTransaction rt2(sg);
+        TableRef t2 = rt.get_table("table");
+
+        CHECK(t2->has_search_index(0));
+        CHECK(t2->has_search_index(1));
+
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = std::to_string(i);
+            StringData sd(str);
+            size_t f = t2->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
+
+            f = t2->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
     }
-}
 
 
 
@@ -226,7 +211,6 @@ ONLY(Upgrade_Database_2_3)
     // For creating a version 2 database; use in OLD (0.84) core
     char leafsize[20];
     sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + leafsize + "_1.realm";
     File::try_remove(path);
 
     Group g;
@@ -255,12 +239,14 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
+    const string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
-    File::copy(path, path + ".tmp");
-    SharedGroup g(path + ".tmp", 0);
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    CHECK(File::copy(path, temp_copy));
+    SharedGroup g(temp_copy, 0);
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -342,7 +328,6 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     }
 #else
     // Create database file (run this from old core)
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     File::try_remove(path);
 
     Group g;
@@ -397,12 +382,15 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
+    const string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
-    File::copy(path, path + ".tmp");
-    SharedGroup g(path + ".tmp", 0);
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    CHECK(File::copy(path, temp_copy));
+    SharedGroup g(temp_copy, 0);
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -482,7 +470,6 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     }
 #else
     // Create database file (run this from old core)
-    string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     File::try_remove(path);
 
     Group g;
