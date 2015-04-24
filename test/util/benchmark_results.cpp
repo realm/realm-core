@@ -33,8 +33,9 @@ string format_change_percent(double baseline, double seconds)
 {
     ostringstream out;
     double percent = (seconds - baseline) / baseline * 100;
-    out.precision(3);
+    out.precision(2);
     out.setf(ios_base::showpos);
+    out << fixed;
     out << percent << "%";
     return out.str();
 }
@@ -59,15 +60,31 @@ string format_rise_factor(double baseline, double seconds)
 
 string format_change(double baseline, double input, BenchmarkResults::ChangeType change_type)
 {
+    std::string str;
     switch (change_type) {
         case BenchmarkResults::change_Percent:
-            return format_change_percent(baseline, input);
+            str = format_change_percent(baseline, input);
+            break;
         case BenchmarkResults::change_DropFactor:
-            return format_drop_factor(baseline, input);
+            str = format_drop_factor(baseline, input);
+            break;
         case BenchmarkResults::change_RiseFactor:
-            return format_rise_factor(baseline, input);
+            str = format_rise_factor(baseline, input);
+            break;
     }
-    REALM_UNREACHABLE();
+    std::ostringstream os;
+    os << '(' << str << ')';
+    return os.str();
+}
+
+string pad_right(string str, size_t width, char padding = ' ')
+{
+    ostringstream ss;
+    ss << setw(width);
+    ss << setfill(padding);
+    ss << left;
+    ss << str;
+    return ss.str();
 }
 
 } // anonymous namespace
@@ -137,9 +154,9 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
     out.setf(ios_base::right, ios_base::adjustfield);
     if (baseline_iter != m_baseline_results.end()) {
         const Result& br = baseline_iter->second;
-        out << "min " << setw(time_width) << format_elapsed_time(r.min)   << " (" << format_change(br.min, r.min, change_type) << ")     ";
-        out << "max " << setw(time_width) << format_elapsed_time(r.max)   << " (" << format_change(br.max, r.max, change_type) << ")     ";
-        out << "avg " << setw(time_width) << format_elapsed_time(r.avg()) << " (" << format_change(br.avg(), r.avg(), change_type) << ")     ";
+        out << "min " << setw(time_width) << format_elapsed_time(r.min)   << " " << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
+        out << "max " << setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "     ";
+        out << "avg " << setw(time_width) << format_elapsed_time(r.avg()) << " " << pad_right(format_change(br.avg(), r.avg(), change_type), 15) << "     ";
         out << "reps " << r.rep;
     }
     else {
