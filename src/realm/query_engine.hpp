@@ -1126,6 +1126,7 @@ public:
             else {
                 // short or long
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
+                REALM_ASSERT_3(s, <, asc->size());
                 if (s >= m_end_s || s < m_leaf_start) {
                     // we exceeded current leaf's range
                     clear_leaf_state();
