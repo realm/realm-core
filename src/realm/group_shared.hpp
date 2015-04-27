@@ -611,6 +611,16 @@ inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
 {
 }
 
+#ifdef REALM_ENABLE_REPLICATION
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
+m_group(Group::shared_tag())
+{
+    open(repl, dlevel, key);
+
+    upgrade_file_format();
+}
+#endif
+
 inline bool SharedGroup::is_attached() const REALM_NOEXCEPT
 {
     return m_file_map.is_attached();
@@ -632,16 +642,6 @@ inline void SharedGroup::upgrade_file_format() {
         commit();
     }
 }
-
-#ifdef REALM_ENABLE_REPLICATION
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
-    m_group(Group::shared_tag())
-{
-    open(repl, dlevel, key);
-
-    upgrade_file_format();
-}
-#endif
 
 } // namespace realm
 
