@@ -485,7 +485,25 @@ TEST(Query_NextGenSyntax)
 }
 
 
-// This tests the new string conditions now available for the expression syntax
+/*
+This tests the new string conditions now available for the expression syntax.
+
+Null behaviour (+ means concatenation): 
+
+If A + B == B, then A is a prefix of B, and B is a suffix of A. This is valid for any A and B, including null and 
+empty strings. Some examples:
+
+1)    "" both begins with null and ends with null and contains null.
+2)    "foobar" begins with null, ends with null and contains null.
+3)    "foobar" begins with "", ends with "" and contains ""
+4)    null does not contain, begin with, or end with ""
+5)    null contains null, begins with null and ends with null
+
+See TEST(StringData_Substrings) for more unit tests for null, isolated to using only StringData class with no
+columns or queries involved
+*/
+
+
 TEST(Query_NextGen_StringConditions)
 {
     Group group;
@@ -574,6 +592,123 @@ TEST(Query_NextGen_StringConditions)
 
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
+
+    // Test various compare operations with null
+    TableRef table2 = group.add_table("table2");
+    table2->add_column(type_String, "str1", true);
+
+    table2->add_empty_row();
+    table2->set_string(0, 0, "foo");
+    table2->add_empty_row();
+    table2->set_string(0, 1, "!");
+    table2->add_empty_row();
+    table2->set_string(0, 2, realm::null());
+    table2->add_empty_row();
+    table2->set_string(0, 3, "bar");
+
+    m = table2->column<String>(0).contains(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).begins_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).ends_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).equal(StringData("")).count();
+    CHECK_EQUAL(m, 0);
+
+    m = table2->column<String>(0).not_equal(StringData("")).count();
+    CHECK_EQUAL(m, 4);
+
+    m = table2->column<String>(0).equal(realm::null()).count();
+    CHECK_EQUAL(m, 1);
+
+    m = table2->column<String>(0).not_equal(realm::null()).count();
+    CHECK_EQUAL(m, 3);
+
+
+    m = table2->column<String>(0).contains(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).begins_with(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).ends_with(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).equal(StringData(""), false).count();
+    CHECK_EQUAL(m, 0);
+
+    m = table2->column<String>(0).not_equal(StringData(""), false).count();
+    CHECK_EQUAL(m, 4);
+
+    m = table2->column<String>(0).equal(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
+
+    m = table2->column<String>(0).not_equal(realm::null(), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table2->column<String>(0).contains(realm::null(), false).count();
+    CHECK_EQUAL(m, 3);
+
+    TableRef table3 = group.add_table(StringData("table3"));
+    table3->add_column_link(type_Link, "link1", *table2);
+
+    table3->add_empty_row();
+    table3->set_link(0, 0, 0);
+    table3->add_empty_row();
+    table3->set_link(0, 1, 1);
+    table3->add_empty_row();
+    table3->set_link(0, 2, 2);
+    table3->add_empty_row();
+    table3->set_link(0, 3, 3);
+
+    m = table3->link(0).column<String>(0).contains(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table3->link(0).column<String>(0).begins_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table3->link(0).column<String>(0).ends_with(StringData("")).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table3->link(0).column<String>(0).equal(StringData("")).count();
+    CHECK_EQUAL(m, 0);
+
+    m = table3->link(0).column<String>(0).not_equal(StringData("")).count();
+    CHECK_EQUAL(m, 4);
+
+    m = table3->link(0).column<String>(0).equal(realm::null()).count();
+    CHECK_EQUAL(m, 1);
+
+    m = table3->link(0).column<String>(0).not_equal(realm::null()).count();
+    CHECK_EQUAL(m, 3);
+
+
+    m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table3->link(0).column<String>(0).begins_with(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table3->link(0).column<String>(0).ends_with(StringData(""), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table3->link(0).column<String>(0).equal(StringData(""), false).count();
+    CHECK_EQUAL(m, 0);
+
+    m = table3->link(0).column<String>(0).not_equal(StringData(""), false).count();
+    CHECK_EQUAL(m, 4);
+
+    m = table3->link(0).column<String>(0).equal(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
+
+    m = table3->link(0).column<String>(0).not_equal(realm::null(), false).count();
+    CHECK_EQUAL(m, 3);
+
+    m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
+    CHECK_EQUAL(m, 3);
 }
 
 
@@ -5777,7 +5912,7 @@ TEST(Query_Nulls_Fuzzy)
             // ArrayString capacity starts at 128 bytes, so we need lots of elements
             // to test if relocation works
             for (size_t i = 0; i < 100; i++) {
-                unsigned char action = random.draw_int_max<int>(100);
+                unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
 
                 if (action > 48 && table.size() < 10) {
                     // Generate string with equal probability of being empty, null, short, medium and long, and with 
@@ -5819,7 +5954,7 @@ TEST(Query_Nulls_Fuzzy)
                                 if (fastrand(100) > 20)
                                     buf2[t] = 0;                        // zero byte
                                 else
-                                    buf2[t] = fastrand(255);  // random byte
+                                    buf2[t] = static_cast<char>(fastrand(255));  // random byte
                             }
                             // no generated string can equal "null" (our vector magic value for null) because 
                             // len == 4 is not possible

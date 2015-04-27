@@ -237,62 +237,61 @@ TEST(StringData_Substrings)
     // "ends with" B, and B "begins with" A. This is true even though appending a null or empty string keeps the 
     // original unchanged
 
-    StringData sd_0("");
-    StringData ns = realm::null();
+    StringData empty("");
+    StringData null = realm::null();
     StringData data("x");
 
     // null.
-    CHECK(ns.begins_with(ns));
-    CHECK(ns.begins_with(sd_0));
-    CHECK(ns.begins_with(""));
-    CHECK(!ns.begins_with("x"));
+    CHECK(null.begins_with(null));
+    CHECK(!null.begins_with(empty));
+    CHECK(!null.begins_with("x"));
 
-    CHECK(ns.ends_with(ns));
-    CHECK(ns.ends_with(sd_0));
-    CHECK(ns.ends_with(""));
-    CHECK(!ns.ends_with("x"));
+    CHECK(null.ends_with(null));
+    CHECK(!null.ends_with(empty));
+    CHECK(!null.ends_with(""));
+    CHECK(!null.ends_with("x"));
 
-    CHECK(sd_0.begins_with(ns));
-    CHECK(sd_0.ends_with(ns));
+    CHECK(empty.begins_with(null));
+    CHECK(empty.ends_with(null));
 
-    CHECK(data.begins_with(ns));
-    CHECK(data.ends_with(ns));
+    CHECK(data.begins_with(null));
+    CHECK(data.ends_with(null));
 
-    CHECK(data.contains(ns));
-    CHECK(!ns.contains(data));
+    CHECK(data.contains(null));
+    CHECK(!null.contains(data));
 
-    CHECK(sd_0.contains(ns));
-    CHECK(!sd_0.contains(data));
+    CHECK(empty.contains(null));
+    CHECK(!empty.contains(data));
 
-    CHECK(ns.contains(ns));
-    CHECK(!ns.contains(data));
+    CHECK(null.contains(null));
+    CHECK(!null.contains(data));
 
-    CHECK(ns.contains(sd_0));
-    CHECK(sd_0.contains(ns));
+    CHECK(!null.contains(empty));
+    CHECK(empty.contains(null));
 
     // non-nulls
-    CHECK(sd_0.begins_with(sd_0));
-    CHECK(sd_0.begins_with(""));
-    CHECK(sd_0.ends_with(sd_0));
-    CHECK(sd_0.ends_with(""));
-    CHECK(sd_0.contains(sd_0));
-    CHECK(sd_0.contains(""));
-    CHECK(!sd_0.begins_with("x"));
-    CHECK(!sd_0.ends_with("x"));
-    CHECK(!sd_0.contains("x"));
-    CHECK_EQUAL("", sd_0.prefix(0));
-    CHECK_EQUAL("", sd_0.suffix(0));
-    CHECK_EQUAL("", sd_0.substr(0));
-    CHECK_EQUAL("", sd_0.substr(0,0));
+    CHECK(empty.begins_with(empty));
+    CHECK(empty.begins_with(""));
+    CHECK(empty.ends_with(empty));
+    CHECK(empty.ends_with(""));
+    CHECK(empty.contains(empty));
+    CHECK(empty.contains(""));
+    CHECK(!empty.begins_with("x"));
+    CHECK(!empty.ends_with("x"));
+    CHECK(!empty.contains("x"));
+    CHECK_EQUAL("", empty.prefix(0));
+    CHECK_EQUAL("", empty.suffix(0));
+    CHECK_EQUAL("", empty.substr(0));
+    CHECK_EQUAL("", empty.substr(0,0));
 
     StringData sd("Minkowski");
-    CHECK(sd.begins_with(sd_0));
+    CHECK(sd.begins_with(empty));
     CHECK(sd.begins_with(""));
     CHECK(sd.begins_with("Min"));
-    CHECK(sd.ends_with(sd_0));
+    CHECK(sd.ends_with(empty));
     CHECK(sd.ends_with(""));
     CHECK(sd.ends_with("ski"));
-    CHECK(sd.contains(sd_0));
+    CHECK(sd.contains(empty));
     CHECK(sd.contains(""));
     CHECK(sd.contains("Min"));
     CHECK(sd.contains("kow"));

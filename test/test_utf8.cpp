@@ -76,7 +76,7 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
 
     for (size_t iter = 0; iter < 1000000; iter++) {
         for (size_t t = 0; t < size; t++) {
-            in[t] = random.draw_int<int>();
+            in[t] = static_cast<char>(random.draw_int<int>());
         }
 
         const char* in2 = in;

@@ -240,16 +240,23 @@ inline bool operator>=(const StringData& a, const StringData& b) REALM_NOEXCEPT
 
 inline bool StringData::begins_with(StringData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
 inline bool StringData::ends_with(StringData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
 inline bool StringData::contains(StringData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
+
     return d.m_size == 0 ||
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
