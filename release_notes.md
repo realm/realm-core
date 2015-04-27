@@ -3,6 +3,7 @@
 ### Bugfixes:
 
 * Fixed bug in equal(null) in next-generation-syntax queries. Behaviour of .begins_with(null), .contains(null), .ends_with(null) adjusted; see description in TEST(Query_NextGen_StringConditions)
+* Fixed `remove_search_index()` removing the wrong column when multiple columns were indexed.
 
 ### API breaking changes:
 
