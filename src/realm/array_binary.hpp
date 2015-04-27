@@ -87,6 +87,7 @@ public:
 private:
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
+    ArrayInteger m_nulls;
 };
 
 
@@ -96,10 +97,13 @@ private:
 // Implementation:
 
 inline ArrayBinary::ArrayBinary(Allocator& alloc) REALM_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc)
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(alloc)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
+
+    if(Array::size() == 3)
+        m_nulls.set_parent(this, 2);
 }
 
 inline void ArrayBinary::create()

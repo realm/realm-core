@@ -14,9 +14,16 @@ using namespace realm;
 void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
 {
     Array::init_from_mem(mem);
-    ref_type offsets_ref = get_as_ref(0), blob_ref = get_as_ref(1);
+    ref_type offsets_ref = get_as_ref(0);
+    ref_type blob_ref = get_as_ref(1);
+    
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
+
+    if (size() == 3) {
+        ref_type nulls_ref = get_as_ref(1);
+        m_nulls.init_from_ref(nulls_ref);        
+    }
 }
 
 
@@ -32,6 +39,9 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
     if (!m_offsets.is_empty())
         offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
     m_offsets.add(offset);
+
+    if (Array::size() == 3)
+        m_nulls.add(value.is_null());
 }
 
 void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
@@ -47,6 +57,9 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     ssize_t diff =  (start + stored_size) - current_end;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
+
+    if (Array::size() == 3)
+        m_nulls.set(ndx, value.is_null());
 }
 
 void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
@@ -62,6 +75,9 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
         ++stored_size;
     m_offsets.insert(ndx, pos + stored_size);
     m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
+
+    if (Array::size() == 3)
+        m_nulls.insert(ndx, value.is_null());
 }
 
 void ArrayBinary::erase(size_t ndx)
@@ -74,11 +90,23 @@ void ArrayBinary::erase(size_t ndx)
     m_blob.erase(start, end);
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
+
+    if (Array::size() == 3)
+        m_nulls.erase(ndx);
 }
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
-    pair<int_least64_t, int_least64_t> p = get_two(header, 0);
+    if (get_size_from_header(header, alloc) == 3) {
+        pair<int64_t, int64_t> p = get_two(header, 1);
+        const char* nulls_header = alloc.translate(to_ref(p.second));
+        bool null = Array::get(nulls_header, ndx);
+        if (null)
+            return BinaryData(0, 0);        
+    }
+    
+    pair<int64_t, int64_t> p = get_two(header, 0);
+
     const char* offsets_header = alloc.translate(to_ref(p.first));
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
@@ -135,10 +163,10 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
     _impl::DeepArrayRefDestroyGuard dg_2(alloc);
     {
         bool context_flag = false;
-        int_fast64_t value = 0;
+        int64_t value = 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
@@ -146,7 +174,19 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
         size_t blobs_size = 0;
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
+    }
+
+    if (false)
+    {
+        // Create m_nulls array
+        bool context_flag = false;
+        int64_t value = 1; // all entries are null by default if column is nullable
+        MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
