@@ -1401,6 +1401,10 @@ void Table::remove_search_index(size_t col_ndx)
         return;
 
     // Remove the index column
+    Spec::ColumnInfo info;
+    m_spec.get_column_info(col_ndx, info);
+    size_t column_pos = info.m_column_ref_ndx;
+
     ColumnBase& col = get_column_base(col_ndx);
     col.get_search_index()->destroy();
     col.destroy_search_index();
@@ -1409,7 +1413,7 @@ void Table::remove_search_index(size_t col_ndx)
     attr &= ~col_attr_Indexed;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-    m_columns.erase(col_ndx + 1);
+    m_columns.erase(column_pos + 1);
     refresh_column_accessors(col_ndx + 1); // Throws
 
 #ifdef REALM_ENABLE_REPLICATION
