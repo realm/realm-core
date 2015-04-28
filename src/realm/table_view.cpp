@@ -35,8 +35,21 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
       m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
-    // TODO
-    REALM_ASSERT(false);
+    patch.table_num = src.m_table->get_index_in_group();
+    // must be group level table!
+    if (patch.table_num == npos) {
+        throw std::runtime_error("TableView handover failed: not a group level table");
+    }
+    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
+    m_table = TableRef();
+    m_last_seen_version = 0;
+    m_distinct_column_source = src.m_distinct_column_source;
+    m_sorting_predicate = src.m_sorting_predicate;
+    m_auto_sort = src.m_auto_sort;
+    m_start = src.m_start;
+    m_end = src.m_end;
+    m_limit = src.m_limit;
+    m_num_detached_refs = 0;
 }
 
 TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch, 
