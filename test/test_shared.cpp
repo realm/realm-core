@@ -119,7 +119,7 @@ void writer(std::string path, int id)
 
 #if !defined(__APPLE__) && !defined(_WIN32) && !defined REALM_ENABLE_ENCRYPTION
 
-void killer(TestResults& test_results, int pid, string path, int id)
+void killer(TestResults& test_results, int pid, std::string path, int id)
 {
     {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
@@ -1768,7 +1768,7 @@ namespace  {
 
 #define multiprocess_increments 100
 
-void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_ndx)
+void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
 {
     TestResults& test_results = *test_results_ptr;
 
@@ -1807,7 +1807,7 @@ void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_
 }
 
 
-void multiprocess_make_table(std::string path, string lock_path, string alone_path, size_t rows)
+void multiprocess_make_table(std::string path, std::string lock_path, std::string alone_path, size_t rows)
 {
     static_cast<void>(lock_path);
     // Create first table in group
@@ -1877,7 +1877,7 @@ void multiprocess_make_table(std::string path, string lock_path, string alone_pa
 #endif
 }
 
-void multiprocess_threaded(TestResults& test_results, string path, size_t num_threads, size_t base)
+void multiprocess_threaded(TestResults& test_results, std::string path, size_t num_threads, size_t base)
 {
     // Do some changes in a async db
     std::unique_ptr<test_util::ThreadWrapper[]> threads;
@@ -1913,7 +1913,7 @@ void multiprocess_threaded(TestResults& test_results, string path, size_t num_th
     }
 }
 
-void multiprocess_validate_and_clear(TestResults& test_results, string path, string lock_path,
+void multiprocess_validate_and_clear(TestResults& test_results, std::string path, std::string lock_path,
                                      size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
@@ -1937,7 +1937,7 @@ void multiprocess_validate_and_clear(TestResults& test_results, string path, str
     }
 }
 
-void multiprocess(TestResults& test_results, string path, int num_procs, size_t num_threads)
+void multiprocess(TestResults& test_results, std::string path, int num_procs, size_t num_threads)
 {
     int* pids = new int[num_procs];
     for (int i = 0; i != num_procs; ++i) {
