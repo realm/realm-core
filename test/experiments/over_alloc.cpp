@@ -4,7 +4,6 @@
 #include <realm/util/file.hpp>
 
 using namespace realm;
-using namespace std;
 
 namespace {
 

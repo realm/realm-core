@@ -13,7 +13,6 @@
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -21,7 +20,7 @@ using namespace realm::util;
 namespace {
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
-map<ref_type, void*> malloc_debug_map;
+std::map<ref_type, void*> malloc_debug_map;
 #endif
 
 class InvalidFreeSpace: std::exception {
@@ -129,7 +128,7 @@ SlabAlloc::~SlabAlloc() REALM_NOEXCEPT
                 if (!is_all_free()) {
                     print();
 #  ifndef REALM_SLAB_ALLOC_DEBUG
-                    cerr << "To get the stack-traces of the corresponding allocations,"
+                    std::cerr << "To get the stack-traces of the corresponding allocations,"
                         "first compile with REALM_SLAB_ALLOC_DEBUG defined,"
                         "then run under Valgrind with --leak-check=full\n";
                     REALM_TERMINATE("SlabAlloc detected a leak");
@@ -183,7 +182,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
 #ifdef REALM_DEBUG
                 if (m_debug_out)
-                    cerr << "Alloc ref: " << ref << " size: " << size << "\n";
+                    std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
                 char* addr = translate(ref);
@@ -216,7 +215,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     }
     REALM_ASSERT_DEBUG(0 < new_size);
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
-    fill(mem.get(), mem.get()+new_size, 0);
+    std::fill(mem.get(), mem.get()+new_size, 0);
 
     // Add to list of slabs
     Slab slab;
@@ -236,7 +235,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
 #ifdef REALM_DEBUG
     if (m_debug_out)
-        cerr << "Alloc ref: " << ref << " size: " << size << "\n";
+        std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
@@ -269,7 +268,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
     if (m_debug_out)
-        cerr << "Free ref: " << ref << " size: " << size << "\n";
+        std::cerr << "Free ref: " << ref << " size: " << size << "\n";
 #endif
 
     if (m_free_space_state == free_space_Invalid)
@@ -345,14 +344,14 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
     // Copy existing segment
     char* new_addr = new_mem.m_addr;
-    copy(addr, addr+old_size, new_addr);
+    std::copy(addr, addr+old_size, new_addr);
 
     // Add old segment to freelist
     do_free(ref, addr);
 
 #ifdef REALM_DEBUG
     if (m_debug_out) {
-        cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
+        std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
             "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
     }
 #endif // REALM_DEBUG
@@ -376,7 +375,7 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
 }
 
 
-ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only,
+ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool read_only,
                                 bool no_create, bool skip_validate,
                                 const char* encryption_key, bool server_sync_mode)
 {
@@ -456,15 +455,15 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
             header = reinterpret_cast<Header*>(m_data);
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode != stored_server_sync_mode)
-                throw runtime_error(path + ": failed to write!");
+                throw std::runtime_error(path + ": failed to write!");
         }
         else {
             header = reinterpret_cast<Header*>(m_data);
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode &&  !stored_server_sync_mode)
-                throw runtime_error(path + ": expected db in server sync mode, found local mode");
+                throw std::runtime_error(path + ": expected db in server sync mode, found local mode");
             if (!server_sync_mode &&  stored_server_sync_mode)
-                throw runtime_error(path + ": found db in server sync mode, expected local mode");
+                throw std::runtime_error(path + ": found db in server sync mode, expected local mode");
         }
 
         int select_field = header->m_flags;
@@ -559,7 +558,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
             return false;
         m_file_on_streaming_form = true;
     }
-    if (ref >= size || ref % 8 != 0 || ref > numeric_limits<ref_type>::max())
+    if (ref >= size || ref % 8 != 0 || ref > std::numeric_limits<ref_type>::max())
         return false; // invalid top_ref
 
     top_ref = ref_type(ref);
@@ -712,46 +711,46 @@ void SlabAlloc::print() const
         free += m_free_space[i].size;
 
     size_t allocated = allocated_for_slabs - free;
-    cout << "Attached: " << (m_data ? m_baseline : 0) << " Allocated: " << allocated << "\n";
+    std::cout << "Attached: " << (m_data ? m_baseline : 0) << " Allocated: " << allocated << "\n";
 
     if (!m_slabs.empty()) {
-        cout << "Slabs: ";
+        std::cout << "Slabs: ";
         ref_type first_ref = m_baseline;
         typedef slabs::const_iterator iter;
         for (iter i = m_slabs.begin(); i != m_slabs.end(); ++i) {
             if (i != m_slabs.begin())
-                cout << ", ";
+                std::cout << ", ";
             ref_type last_ref = i->ref_end - 1;
             size_t size = i->ref_end - first_ref;
             void* addr = i->addr;
-            cout << "("<<first_ref<<"->"<<last_ref<<", size="<<size<<", addr="<<addr<<")";
+            std::cout << "("<<first_ref<<"->"<<last_ref<<", size="<<size<<", addr="<<addr<<")";
             first_ref = i->ref_end;
         }
-        cout << "\n";
+        std::cout << "\n";
     }
     if (!m_free_space.empty()) {
-        cout << "FreeSpace: ";
+        std::cout << "FreeSpace: ";
         typedef chunks::const_iterator iter;
         for (iter i = m_free_space.begin(); i != m_free_space.end(); ++i) {
             if (i != m_free_space.begin())
-                cout << ", ";
+                std::cout << ", ";
             ref_type last_ref = i->ref + i->size - 1;
-            cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
         }
-        cout << "\n";
+        std::cout << "\n";
     }
     if (!m_free_read_only.empty()) {
-        cout << "FreeSpace (ro): ";
+        std::cout << "FreeSpace (ro): ";
         typedef chunks::const_iterator iter;
         for (iter i = m_free_read_only.begin(); i != m_free_read_only.end(); ++i) {
             if (i != m_free_read_only.begin())
-                cout << ", ";
+                std::cout << ", ";
             ref_type last_ref = i->ref + i->size - 1;
-            cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
         }
-        cout << "\n";
+        std::cout << "\n";
     }
-    cout << flush;
+    std::cout << std::flush;
 }
 
 #endif // REALM_DEBUG

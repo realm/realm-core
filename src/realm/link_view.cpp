@@ -27,7 +27,6 @@
 #endif
 #include <realm/table_view.hpp>
 
-using namespace std;
 using namespace realm;
 
 void LinkView::generate_patch(const ConstLinkViewRef& ref, Handover_patch*& patch)
@@ -238,7 +237,7 @@ void LinkView::clear()
         target_row.table_ndx = target_table.get_index_in_group();
         target_row.row_ndx   = target_row_ndx;
         typedef ColumnBase::CascadeState::row_set::iterator iter;
-        iter i = ::upper_bound(state.rows.begin(), state.rows.end(), target_row);
+        iter i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
         // This target row cannot already be in state.rows
         REALM_ASSERT(i == state.rows.begin() || i[-1] != target_row);
         state.rows.insert(i, target_row);
@@ -294,8 +293,7 @@ void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
     RowIndexes::sort(predicate);
 }
 
-
-TableView LinkView::get_sorted_view(vector<size_t> column_indexes, vector<bool> ascending) const
+TableView LinkView::get_sorted_view(std::vector<size_t> column_indexes, std::vector<bool> ascending) const
 {
     TableView v(m_origin_column.get_target_table()); // sets m_table
     v.m_last_seen_version = m_origin_table->m_version;
@@ -311,8 +309,8 @@ TableView LinkView::get_sorted_view(vector<size_t> column_indexes, vector<bool> 
 
 TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
 {
-    vector<size_t> vec;
-    vector<bool> a;
+    std::vector<size_t> vec;
+    std::vector<bool> a;
     vec.push_back(column_index);
     a.push_back(ascending);
     TableView v = get_sorted_view(vec, a);

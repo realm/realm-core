@@ -7,7 +7,6 @@
 #include "test.hpp"
 
 using namespace realm;
-using namespace std;
 using namespace realm::util;
 using namespace realm::test_util;
 
@@ -369,7 +368,7 @@ TEST(ArrayStringLong_Null)
         a.create();
 
         // vector that is kept in sync with the ArrayString so that we can compare with it
-        vector<string> v;
+        std::vector<std::string> v;
 
         for (size_t i = 0; i < 2000; i++) {
             unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
@@ -391,7 +390,7 @@ TEST(ArrayStringLong_Null)
                     len = 0;
 
                 StringData sd;
-                string stdstr;
+                std::string stdstr;
 
                 if (random.draw_int<int>() > 100) {
                     sd = realm::null();
@@ -399,7 +398,7 @@ TEST(ArrayStringLong_Null)
                 }
                 else {
                     sd = StringData(str, len);
-                    stdstr = string(str, len);
+                    stdstr = std::string(str, len);
                 }
 
                 if (random.draw_int<int>() > 100) {

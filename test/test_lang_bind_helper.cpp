@@ -28,7 +28,6 @@
 #include "test.hpp"
 #include "crypt_key.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -162,7 +161,7 @@ class ShortCircuitTransactLogManager:
 public:
     typedef Replication::version_type version_type;
 
-    ShortCircuitTransactLogManager(const string& database_file):
+    ShortCircuitTransactLogManager(const std::string& database_file):
         TrivialReplication(database_file)
     {
     }
@@ -179,7 +178,7 @@ public:
         override
     {
         std::unique_ptr<char[]> log(new char[size]); // Throws
-        copy(data, data+size, log.get());
+        std::copy(data, data+size, log.get());
         m_transact_logs[new_version] = BinaryData(log.get(), size); // Throws
         log.release();
     }
@@ -195,7 +194,7 @@ public:
     }
 
 private:
-    typedef map<uint_fast64_t, BinaryData> TransactLogs;
+    typedef std::map<uint_fast64_t, BinaryData> TransactLogs;
     TransactLogs m_transact_logs;
 };
 
@@ -611,26 +610,26 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         { 0, leaf_x4 }, { 3071, 1 }, { 0, leaf_x4 }, { 4095, 1 }, { 0, leaf_x4 }, { 6143, 1 },
         { 0, leaf_x4 }, { 8191, 1 }
     };
-    ostringstream out;
-    out << left;
+    std::ostringstream out;
+    out << std::left;
 
     for (size_t i = 0; i < sizeof steps / sizeof *steps; ++i) {
         Step step = steps[i];
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "A";
-        string str_1 = out.str();
+        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "A";
+        std::string str_1 = out.str();
         StringData str(str_1);
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "B";
-        string str_2 = out.str();
+        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "B";
+        std::string str_2 = out.str();
         BinaryData bin(str_2);
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "C";
-        string str_3 = out.str();
+        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "C";
+        std::string str_3 = out.str();
         StringData str_mix(str_3);
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "D";
-        string str_4 = out.str();
+        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "D";
+        std::string str_4 = out.str();
         BinaryData bin_mix(str_4);
         {
             WriteTransaction wt(sg_w);
@@ -5785,7 +5784,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     const Group& group = rt.get_group();
     CHECK_EQUAL(0, group.size());
 
-    string names[4];
+    std::string names[4];
     {
         WriteTransaction wt(sg_w);
         wt.add_table("alpha");
@@ -6368,7 +6367,7 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 
 namespace {
 
-void multiple_trackers_writer_thread(string path)
+void multiple_trackers_writer_thread(std::string path)
 {
     Random random(random_int<unsigned long>());
     std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
@@ -6389,7 +6388,7 @@ void multiple_trackers_writer_thread(string path)
     }
 }
 
-void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
+void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>());
@@ -6444,11 +6443,11 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     }
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
-        threads[i].start(bind(multiple_trackers_writer_thread, string(path)));
+        threads[i].start(bind(multiple_trackers_writer_thread, std::string(path)));
     sched_yield();
     for (int i = 0; i < read_thread_count; ++i) {
         threads[write_thread_count + i].start(bind(multiple_trackers_reader_thread,
-                                                   &test_results, string(path)));
+                                                   &test_results, std::string(path)));
     }
 
     // Wait for all writer threads to complete
@@ -6501,7 +6500,7 @@ TEST(LangBindHelper_Logfiles)
             WriteTransaction wt(sg);
         }
     }
-    util::File::try_remove(string(path) + ".log_b");
+    util::File::try_remove(std::string(path) + ".log_b");
     {
         // enable sync (to get persistent log files)
         bool did_throw = false;
@@ -6510,7 +6509,7 @@ TEST(LangBindHelper_Logfiles)
             SharedGroup sg(*repl);
         } catch (LogFileError& e) 
         {
-            CHECK_EQUAL(string(path), e.what());
+            CHECK_EQUAL(std::string(path), e.what());
             did_throw = true;
         };
         CHECK(did_throw);
@@ -6539,8 +6538,8 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
         } 
         catch (std::runtime_error& e)
         {
-            string error_report = e.what();
-            if (error_report == string(path) + ": found db in server sync mode, expected local mode")
+            std::string error_report = e.what();
+            if (error_report == std::string(path) + ": found db in server sync mode, expected local mode")
                 did_throw = true;
         }
         CHECK(did_throw);
@@ -6569,8 +6568,8 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
         } 
         catch (std::runtime_error& e)
         {
-            string error_report = e.what();
-            if (error_report == string(path) + ": expected db in server sync mode, found local mode")
+            std::string error_report = e.what();
+            if (error_report == std::string(path) + ": expected db in server sync mode, found local mode")
             did_throw = true;
         }
         CHECK(did_throw);
@@ -6615,7 +6614,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < write_process_count; ++i) {
         writepids[i] = fork();
         if (writepids[i] == 0) {
-            multiple_trackers_writer_thread(string(path));
+            multiple_trackers_writer_thread(std::string(path));
             exit(0);
         }
     }
@@ -6624,7 +6623,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < read_process_count; ++i) {
         readpids[i] = fork();
         if (readpids[i] == 0) {
-            multiple_trackers_reader_thread(&test_results, string(path));
+            multiple_trackers_reader_thread(&test_results, std::string(path));
             exit(0);
         }
     }
@@ -7381,7 +7380,7 @@ TEST(LangBindHelper_VersionControl)
         // including a "step on the spot" (from version 0 to 0)
         {
             for (int k = 0; k < num_versions; ++k) {
-                // cerr << "Advancing from initial version to version " << k << endl;
+                // std::cerr << "Advancing from initial version to version " << k << std::endl;
                 const Group& g = sg_w.begin_read(versions[0]);
                 MyTable::ConstRef t = g.get_table<MyTable>("test");
                 CHECK(versions[k] >= versions[0]);
@@ -7395,7 +7394,7 @@ TEST(LangBindHelper_VersionControl)
 
         // step through the versions backward:
         for (int i = num_versions-1; i >= 0; --i) {
-            // cerr << "Jumping directly to version " << i << endl;
+            // std::cerr << "Jumping directly to version " << i << std::endl;
             const Group& g = sg_w.begin_read(versions[i]);
             g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
@@ -7409,7 +7408,7 @@ TEST(LangBindHelper_VersionControl)
             g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
             for (int k = 0; k < num_versions; ++k) {
-                // cerr << "Advancing to version " << k << endl;
+                // std::cerr << "Advancing to version " << k << std::endl;
                 CHECK(k==0 || versions[k] >= versions[k-1]);
                 LangBindHelper::advance_read(sg_w, versions[k]);
                 g.Verify();
@@ -7426,7 +7425,7 @@ TEST(LangBindHelper_VersionControl)
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
             int new_version = random() % num_versions;
-            // cerr << "Random jump: version " << old_version << " -> " << new_version << endl;
+            // std::cerr << "Random jump: version " << old_version << " -> " << new_version << std::endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
                 sg_w.end_read();
@@ -7532,7 +7531,7 @@ TEST(LangBindHelper_MixedCommitSizes)
     LangBindHelper::commit_and_continue_as_read(sg);
 
     std::unique_ptr<char[]> buffer(new char[65536]);
-    fill(buffer.get(), buffer.get() + 65536, 0);
+    std::fill(buffer.get(), buffer.get() + 65536, 0);
 
     // 4 large commits so that both write log files are large and fully
     // initialized (with both iv slots being non-zero when encryption is

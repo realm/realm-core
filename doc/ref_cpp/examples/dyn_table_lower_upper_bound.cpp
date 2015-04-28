@@ -2,7 +2,6 @@
 // @@Fold@@
 #include <realm.hpp>
 
-using namespace std;
 using namespace realm;
 
 // @@EndFold@@

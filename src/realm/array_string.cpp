@@ -10,7 +10,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -88,14 +87,14 @@ void ArrayString::set(size_t ndx, StringData value)
                 {
                     // extend 0-padding
                     char* new_begin = new_end - (new_width - m_width);
-                    fill(new_begin, new_end, 0);
+                    std::fill(new_begin, new_end, 0);
                     new_end = new_begin;
                 }
                 {
                     // copy string payload
                     const char* old_begin = old_end - (m_width - 1);
                     if (static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
-                        new_end = copy_backward(old_begin, old_end, new_end);
+                        new_end = std::copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
             }
@@ -107,7 +106,7 @@ void ArrayString::set(size_t ndx, StringData value)
                 *--new_end = static_cast<char>(new_width); 
                 {
                     char* new_begin = new_end - (new_width - 1);
-                    fill(new_begin, new_end, 0); // Fill with zero bytes
+                    std::fill(new_begin, new_end, 0); // Fill with zero bytes
                     new_end = new_begin;
                 }
             }
@@ -121,8 +120,8 @@ void ArrayString::set(size_t ndx, StringData value)
     // Set the value
     char* begin = m_data + (ndx * m_width);
     char* end = begin + (m_width - 1);
-    begin = copy(value.data(), value.data() + value.size(), begin);
-    fill(begin, end, 0); // Pad with zero bytes
+    begin = std::copy(value.data(), value.data() + value.size(), begin);
+    std::fill(begin, end, 0); // Pad with zero bytes
     REALM_STATIC_ASSERT(max_width <= max_width, "Padding size must fit in 7-bits");
 
     if (value.is_null()) {
@@ -173,7 +172,7 @@ void ArrayString::erase(size_t ndx)
         char* new_begin = m_data + ndx*m_width;
         char* old_begin = new_begin + m_width;
         char* old_end = m_data + m_size*m_width;
-        copy(old_begin, old_end, new_begin);
+        std::copy(old_begin, old_end, new_begin);
     }
 
     --m_size;
@@ -360,41 +359,41 @@ void ArrayString::string_stats() const
     size_t zeroes = size - total;
     size_t zavg = zeroes / (m_size ? m_size : 1); // avoid possible div by zero
 
-    cout << "Size: " << m_size << "\n";
-    cout << "Width: " << m_width << "\n";
-    cout << "Total: " << size << "\n";
-    cout << "Capacity: " << m_capacity << "\n\n";
-    cout << "Bytes string: " << total << "\n";
-    cout << "     longest: " << longest << "\n";
-    cout << "Bytes zeroes: " << zeroes << "\n";
-    cout << "         avg: " << zavg << "\n";
+    std::cout << "Size: " << m_size << "\n";
+    std::cout << "Width: " << m_width << "\n";
+    std::cout << "Total: " << size << "\n";
+    std::cout << "Capacity: " << m_capacity << "\n\n";
+    std::cout << "Bytes string: " << total << "\n";
+    std::cout << "     longest: " << longest << "\n";
+    std::cout << "Bytes zeroes: " << zeroes << "\n";
+    std::cout << "         avg: " << zavg << "\n";
 }
 
 
-void ArrayString::to_dot(ostream& out, StringData title) const
+void ArrayString::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
     if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << endl;
-        out << " label = \"" << title << "\";" << endl;
-        out << " color = white;" << endl;
+        out << "subgraph cluster_" << ref << " {" << std::endl;
+        out << " label = \"" << title << "\";" << std::endl;
+        out << " color = white;" << std::endl;
     }
 
-    out << "n" << hex << ref << dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
+    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
-    out << "0x" << hex << ref << dec << "</FONT></TD>" << endl;
+    out << "0x" << std::hex << ref << std::dec << "</FONT></TD>" << std::endl;
 
     for (size_t i = 0; i < m_size; ++i)
-        out << "<TD>\"" << get(i) << "\"</TD>" << endl;
+        out << "<TD>\"" << get(i) << "\"</TD>" << std::endl;
 
-    out << "</TR></TABLE>>];" << endl;
+    out << "</TR></TABLE>>];" << std::endl;
 
     if (title.size() != 0)
-        out << "}" << endl;
+        out << "}" << std::endl;
 
     to_dot_parent_edge(out);
 }

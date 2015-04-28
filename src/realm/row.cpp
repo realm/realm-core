@@ -22,7 +22,6 @@
 #include <realm/table.hpp>
 #include <realm/group.hpp>
 
-using namespace std;
 using namespace realm;
 
 

@@ -8,8 +8,6 @@
 #define TO_STR(x) TO_STR2(x)
 #define TO_STR2(x) #x
 
-using namespace std;
-
 
 namespace {
 
@@ -38,15 +36,15 @@ bool dirty = false;
 void emit_flags(const char*str)
 {
     if (dirty)
-        cout << ' ';
-    cout << str;
+        std::cout << ' ';
+    std::cout << str;
     dirty = true;
 }
 
 void flush()
 {
     if (dirty)
-        cout << '\n';
+        std::cout << '\n';
 }
 
 void emit_flags()
@@ -162,8 +160,8 @@ int main(int argc, char* argv[])
             error = true;
 
         if (error || help) {
-            string msg =
-                "Synopsis: "+string(prog)+"\n\n"
+            std::string msg =
+                "Synopsis: "+std::string(prog)+"\n\n"
                 "Options:\n"
                 "  --version     Show the version of Realm that this command was installed\n"
                 "                as part of\n"
@@ -177,10 +175,10 @@ int main(int argc, char* argv[])
                 "  --libexecdir  Show the directory holding the Realm executables to be run\n"
                 "                by programs rather than by users\n";
             if (error) {
-                cerr << "ERROR: Bad command line.\n\n" << msg;
+                std::cerr << "ERROR: Bad command line.\n\n" << msg;
                 return 1;
             }
-            cout << msg;
+            std::cout << msg;
             return 0;
         }
     }
@@ -191,25 +189,25 @@ int main(int argc, char* argv[])
             emit_flags();
             break;
         case func_ShowVersion:
-            cout << REALM_VERSION "\n";
+            std::cout << REALM_VERSION "\n";
             break;
         case func_ShowPrefix:
-            cout << REALM_INSTALL_PREFIX "\n";
+            std::cout << REALM_INSTALL_PREFIX "\n";
             break;
         case func_ShowExecPrefix:
-            cout << REALM_INSTALL_EXEC_PREFIX "\n";
+            std::cout << REALM_INSTALL_EXEC_PREFIX "\n";
             break;
         case func_ShowIncludedir:
-            cout << REALM_INSTALL_INCLUDEDIR "\n";
+            std::cout << REALM_INSTALL_INCLUDEDIR "\n";
             break;
         case func_ShowBindir:
-            cout << REALM_INSTALL_BINDIR "\n";
+            std::cout << REALM_INSTALL_BINDIR "\n";
             break;
         case func_ShowLibdir:
-            cout << REALM_INSTALL_LIBDIR "\n";
+            std::cout << REALM_INSTALL_LIBDIR "\n";
             break;
         case func_ShowLibexecdir:
-            cout << REALM_INSTALL_LIBEXECDIR "\n";
+            std::cout << REALM_INSTALL_LIBEXECDIR "\n";
             break;
     }
 }

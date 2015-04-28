@@ -966,7 +966,7 @@ If all link columns are type_Link, then LinkMapFunction is only invoked for a si
 columns are type_LinkList, then it may result in multiple row indexes.
 
 The reason we use this map pattern is that we can exit the link-tree-traversal as early as possible, e.g. when we've
-found the first link that points to row '5'. Other solutions could be a vector<size_t> harvest_all_links(), or an
+found the first link that points to row '5'. Other solutions could be a std::vector<size_t> harvest_all_links(), or an
 iterator pattern. First solution can't exit, second solution requires internal state.
 */
 class LinkMap

@@ -14,7 +14,6 @@
 #include <stdint.h>
 #endif
 
-using namespace std;
 using namespace realm;
 
 namespace {
@@ -31,19 +30,19 @@ enum Days {
 
 struct TestTable {
     int first;
-    string second;
+    std::string second;
     int third;
     Days fourth;
 };
 
 class match_second {
 public:
-    match_second(const string& target) : m_target(target) {}
+    match_second(const std::string& target) : m_target(target) {}
     bool operator()(const TestTable& v) const {
         return v.second == m_target;
     }
 private:
-    const string& m_target;
+    const std::string& m_target;
 };
 
 class match_third {
@@ -83,13 +82,13 @@ int main()
     const size_t ROWS = 250000;
     const size_t TESTS = 100;
 
-    vector<TestTable> table;
+    std::vector<TestTable> table;
 
-    cout << "Create random content with "<<ROWS<<" rows.\n\n";
+    std::cout << "Create random content with "<<ROWS<<" rows.\n\n";
     for (size_t i = 0; i < ROWS; ++i) {
         // create random string
         const int n = rand() % 1000;// * 10 + rand();
-        const string s = test_util::number_name(n);
+        const std::string s = test_util::number_name(n);
 
         TestTable t = {n, s, 100, Wed};
         table.push_back(t);
@@ -99,7 +98,7 @@ int main()
     TestTable t = {0, "abcde", 100, Wed};
     table.push_back(t);
 
-    cout << "Memory usage:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
 
     test_util::Timer timer;
 
@@ -109,13 +108,13 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
-            vector<TestTable>::const_iterator res = find_if(table.begin(), table.end(), match_fourth(Tue));
+            std::vector<TestTable>::const_iterator res = std::find_if(table.begin(), table.end(), match_fourth(Tue));
             if (res != table.end()) {
-                cout << "error\n";
+                std::cout << "error\n";
             }
         }
 
-        cout << "Search (small integer):\t"<<timer<<"\n";
+        std::cout << "Search (small integer):\t"<<timer<<"\n";
     }
 
     // Search byte-sized integer column
@@ -124,13 +123,13 @@ int main()
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
-            vector<TestTable>::const_iterator res = find_if(table.begin(), table.end(), match_third(50));
+            std::vector<TestTable>::const_iterator res = std::find_if(table.begin(), table.end(), match_third(50));
             if (res != table.end()) {
-                cout << "error\n";
+                std::cout << "error\n";
             }
         }
 
-        cout << "Search (byte-sized int)\t"<<timer<<"\n";
+        std::cout << "Search (byte-sized int)\t"<<timer<<"\n";
     }
 
     // Search string column
@@ -138,33 +137,33 @@ int main()
         timer.reset();
 
         // Do a search over entire column (value not found)
-        const string target = "abcde";
+        const std::string target = "abcde";
         for (size_t i = 0; i < TESTS; ++i) {
-            vector<TestTable>::const_iterator res = find_if(table.begin(), table.end(), match_second(target));
+            std::vector<TestTable>::const_iterator res = std::find_if(table.begin(), table.end(), match_second(target));
             if (res == table.end()) {
-                cout << "error\n";
+                std::cout << "error\n";
             }
         }
 
-        cout << "Search (string):\t"<<timer<<"\n";
+        std::cout << "Search (string):\t"<<timer<<"\n";
     }
 
     // Add index
-    multimap<int, TestTable> mapTable;
+    std::multimap<int, TestTable> mapTable;
     {
         timer.reset();
 
         // Copy data to map
-        for (vector<TestTable>::const_iterator p = table.begin(); p != table.end(); ++p) {
-            mapTable.insert(pair<int,TestTable>(p->first,*p));
+        for (std::vector<TestTable>::const_iterator p = table.begin(); p != table.end(); ++p) {
+            mapTable.insert(std::pair<int,TestTable>(p->first,*p));
         }
 
         // free memory used by table
-        vector<TestTable>().swap(table);
+        std::vector<TestTable>().swap(table);
 
-        cout << "\nAdd index:\t\t"<<timer<<"\n";
+        std::cout << "\nAdd index:\t\t"<<timer<<"\n";
 
-        cout << "Memory usage2:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
+        std::cout << "Memory usage2:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
     }
 
     // Search with index
@@ -173,18 +172,18 @@ int main()
 
         for (size_t i = 0; i < TESTS*10; ++i) {
             const size_t n = rand() % 1000;
-            multimap<int, TestTable>::const_iterator p = mapTable.find(n);
+            std::multimap<int, TestTable>::const_iterator p = mapTable.find(n);
             if (p->second.fourth == Fri) { // to avoid above find being optimized away
-                cout << "error\n";
+                std::cout << "error\n";
             }
         }
 
-        cout << "Search index:\t\t"<<timer<<"\n";
+        std::cout << "Search index:\t\t"<<timer<<"\n";
     }
-    cout << "\nDone.\n";
+    std::cout << "\nDone.\n";
 
 #ifdef _MSC_VER
-    cin.get();
+    std::cin.get();
 #endif
     return 0;
 }

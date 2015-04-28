@@ -17,7 +17,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using test_util::unit_test::TestResults;
@@ -332,7 +331,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         int num = 8;
         for (int i=0; i<num; ++i)
             subsubtable->add(i, 0);
-        vector<MySubsubtable::Ref> subsubsubtables;
+        std::vector<MySubsubtable::Ref> subsubsubtables;
         for (int i=0; i<num; ++i)
             subsubsubtables.push_back(subsubtable[i].bar);
         for (int i=0; i<3; ++i) {
@@ -394,7 +393,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
 }
 
 
-void thread(TestResults* test_results, int index, string path)
+void thread(TestResults* test_results, int index, std::string path)
 {
     for (int i=0; i<num_rounds; ++i) {
         SharedGroup db(path);
@@ -415,14 +414,14 @@ TEST(Transactions_General)
 
         // Start threads
         for (int i = 0; i != num_threads; ++i)
-            threads[i].start(bind(&thread, &test_results, i, string(path)));
+            threads[i].start(std::bind(&thread, &test_results, i, std::string(path)));
 
         // Wait for threads to finish
         for (int i = 0; i != num_threads; ++i) {
             bool thread_has_thrown = false;
-            string except_msg;
+            std::string except_msg;
             if (threads[i].join(except_msg)) {
-                cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+                std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
                 thread_has_thrown = true;
             }
             CHECK(!thread_has_thrown);

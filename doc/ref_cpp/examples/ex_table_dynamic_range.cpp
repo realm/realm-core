@@ -2,7 +2,6 @@
 // @@Fold@@
 #include <realm.hpp>
 
-using namespace std;
 using namespace realm;
 
 // @@EndFold@@
@@ -19,7 +18,7 @@ int main()
     }
 
     TableView tv = t.get_range_view(10, 20);
-    cout << tv.size() << " numbers: " << tv.sum_int(0) << endl;
+    std::cout << tv.size() << " numbers: " << tv.sum_int(0) << std::endl;
 }
 // @@EndFold@@
 // @@EndExample@@

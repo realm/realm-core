@@ -9,7 +9,6 @@
 #include <realm/table_view.hpp>
 #include <realm/link_view.hpp>
 
-using namespace std;
 using namespace realm;
 
 Query::Query() : m_view(nullptr), m_source_table_view(0), m_owns_source_table_view(false)
@@ -1029,7 +1028,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
         Column& refs = ret.m_row_indexes;
-        size_t end_pos = (limit != size_t(-1)) ? min(end, start + limit) : end;
+        size_t end_pos = (limit != size_t(-1)) ? std::min(end, start + limit) : end;
 
         if (m_view) {
             for (size_t i = start; i < end_pos; ++i)
@@ -1219,8 +1218,8 @@ void* Query::query_thread(void* arg)
     static_cast<void>(arg);
     thread_state* ts = static_cast<thread_state*>(arg);
 
-    vector<size_t> res;
-    vector<pair<size_t, size_t>> chunks;
+    std::vector<size_t> res;
+    std::vector<pair<size_t, size_t>> chunks;
 
     for (;;) {
         // Main waiting loop that waits for a query to start
@@ -1254,7 +1253,7 @@ void* Query::query_thread(void* arg)
             pthread_mutex_lock(&ts->result_mutex);
             ts->done_job += chunk;
             if (res.size() > 0) {
-                ts->chunks.push_back(pair<size_t, size_t>(mine, ts->results.size()));
+                ts->chunks.push_back(std::pair<size_t, size_t>(mine, ts->results.size()));
                 ts->count += res.size();
                 for (size_t i = 0; i < res.size(); i++) {
                     ts->results.push_back(res[i]);
@@ -1274,7 +1273,7 @@ void* Query::query_thread(void* arg)
 
 #endif // REALM_MULTITHREADQUERY
 
-string Query::validate()
+std::string Query::validate()
 {
     if (first.size() == 0)
         return "";
@@ -1293,7 +1292,7 @@ void Query::Init(const Table& table) const
     if (first[0] != nullptr) {
         ParentNode* top = first[0];
         top->init(table);
-        vector<ParentNode*> v;
+        std::vector<ParentNode*> v;
         top->gather_children(v);
     }
 }
@@ -1326,7 +1325,7 @@ size_t Query::FindInternal(size_t start, size_t end) const
         return r;
 }
 
-bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
+bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b)
 {
     return a.first < b.first;
 }
@@ -1410,7 +1409,7 @@ Query Query::operator&&(Query q)
 Query Query::operator!()
 {
     if (first[0] == nullptr)
-        throw runtime_error("negation of empty query is not supported");
+        throw std::runtime_error("negation of empty query is not supported");
     Query q(*this->m_table);
     q.Not();
     q.and_query(*this);

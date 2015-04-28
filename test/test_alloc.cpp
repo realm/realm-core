@@ -9,7 +9,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -251,7 +250,7 @@ TEST(Alloc_BadBuffer)
 TEST(Alloc_Fuzzy)
 {
     SlabAlloc alloc;
-    vector<MemRef> refs;
+    std::vector<MemRef> refs;
     alloc.attach_empty();
     const size_t iterations = 10000;
 
