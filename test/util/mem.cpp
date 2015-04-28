@@ -12,7 +12,6 @@
 
 #include "mem.hpp"
 
-using namespace std;
 
 
 #ifdef _WIN32
@@ -39,7 +38,7 @@ DWORD calculate_ws_private(DWORD process_id)
 
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, process_id);
 
-    if (hProcess) throw runtime_error("Failed");
+    if (hProcess) throw std::runtime_error("Failed");
 
     __try {
         if (!QueryWorkingSet(hProcess, dWorkingSetPages, sizeof (dWorkingSetPages)))
@@ -95,7 +94,7 @@ DWORD calculate_ws_private(DWORD process_id)
     __finally {
         CloseHandle(hProcess);
     }
-    throw runtime_error("Failed");
+    throw std::runtime_error("Failed");
 }
 
 } // anonymous namespace
@@ -139,7 +138,7 @@ size_t get_mem_usage()
 
 #else
 
-    throw runtime_error("Not supported");
+    throw std::runtime_error("Not supported");
 
 #endif
 }

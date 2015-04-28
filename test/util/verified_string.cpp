@@ -2,7 +2,6 @@
 
 #include "verified_string.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::test_util;
 
@@ -83,7 +82,7 @@ void VerifiedString::clear()
 
 size_t VerifiedString::find_first(StringData value)
 {
-    std::vector<string>::iterator it = std::find(v.begin(), v.end(), value);
+    std::vector<std::string>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
     size_t index2 = u.find_first(value);
     static_cast<void>(index2);
@@ -100,8 +99,8 @@ size_t VerifiedString::size()
 // todo/fixme, end ignored
 void VerifiedString::find_all(Column& c, StringData value, size_t start, size_t end)
 {
-    std::vector<string>::iterator ita = v.begin() + start;
-    std::vector<string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
+    std::vector<std::string>::iterator ita = v.begin() + start;
+    std::vector<std::string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
     std::vector<size_t> result;
     while (ita != itb) {
         ita = std::find(ita, itb, value);

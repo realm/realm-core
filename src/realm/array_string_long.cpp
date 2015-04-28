@@ -9,7 +9,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -165,7 +164,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
             return realm::null();
     }
     else {
-        pair<int64_t, int64_t> p = get_two(header, 0);
+        std::pair<int64_t, int64_t> p = get_two(header, 0);
         offsets_ref = to_ref(p.first);
         blob_ref = to_ref(p.second);
     }
@@ -173,7 +172,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     const char* offsets_header = alloc.translate(offsets_ref);
     size_t begin, end;
     if (0 < ndx) {
-        pair<int64_t, int64_t> p = get_two(offsets_header, ndx - 1);
+        std::pair<int64_t, int64_t> p = get_two(offsets_header, ndx - 1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }
@@ -281,21 +280,21 @@ MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_allo
 
 #ifdef REALM_DEBUG
 
-void ArrayStringLong::to_dot(ostream& out, StringData title) const
+void ArrayStringLong::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
-    out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
+    out << "subgraph cluster_arraystringlong" << ref << " {" << std::endl;
     out << " label = \"ArrayStringLong";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
 
     Array::to_dot(out, "stringlong_top");
     m_offsets.to_dot(out, "offsets");
     m_blob.to_dot(out, "blob");
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 #endif // REALM_DEBUG

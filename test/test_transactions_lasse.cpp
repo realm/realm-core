@@ -23,7 +23,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::test_util;
 using unit_test::TestResults;
@@ -121,7 +120,7 @@ const int ITER1 =    2000;
 const int READERS1 =   10;
 const int WRITERS1 =   10;
 
-void write_thread(TestResults* test_results_ptr, string path, int thread_ndx)
+void write_thread(TestResults* test_results_ptr, std::string path, int thread_ndx)
 {
     TestResults& test_results = *test_results_ptr;
     int_least64_t w = thread_ndx;
@@ -144,7 +143,7 @@ void write_thread(TestResults* test_results_ptr, string path, int thread_ndx)
     }
 }
 
-void read_thread(TestResults* test_results_ptr, string path)
+void read_thread(TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -183,10 +182,10 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
 #endif
 
     for (int i = 0; i < READERS1; ++i)
-        read_threads[i].start(util::bind(&read_thread, &test_results, string(path)));
+        read_threads[i].start(util::bind(&read_thread, &test_results, std::string(path)));
 
     for (int i = 0; i < WRITERS1; ++i)
-        write_threads[i].start(util::bind(&write_thread, &test_results, string(path), i));
+        write_threads[i].start(util::bind(&write_thread, &test_results, std::string(path), i));
 
     for (int i = 0; i < READERS1; ++i) {
         bool reader_has_thrown = read_threads[i].join();
@@ -212,7 +211,7 @@ const int      THREADS2 = 30;
 const int      ITER2    = 2000;
 const unsigned GROUPS2  = 30;
 
-void create_groups(string path)
+void create_groups(std::string path)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     std::vector<SharedGroup*> groups;
@@ -245,7 +244,7 @@ TEST_IF(Transactions_Stress2, TEST_DURATION >= 3)
     SHARED_GROUP_TEST_PATH(path);
 
     for (int i = 0; i < THREADS2; ++i)
-        threads[i].start(util::bind(&create_groups, string(path)));
+        threads[i].start(util::bind(&create_groups, std::string(path)));
 
     for (int i = 0; i < THREADS2; ++i) {
         bool thread_has_thrown = threads[i].join();
@@ -282,7 +281,7 @@ const int READERS3 =   4;
 const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if REALM_MAX_BPNODE_SIZE = 1000
 volatile bool terminate3 = false;
 
-void write_thread3(string path)
+void write_thread3(std::string path)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     FastRand fast_rand;
@@ -312,7 +311,7 @@ void write_thread3(string path)
     }
 }
 
-void read_thread3(TestResults* test_results_ptr, string path)
+void read_thread3(TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -352,10 +351,10 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
 #endif
 
     for (int i = 0; i < WRITERS3; ++i)
-        write_threads[i].start(util::bind(&write_thread3, string(path)));
+        write_threads[i].start(util::bind(&write_thread3, std::string(path)));
 
     for (int i = 0; i < READERS3; ++i)
-        read_threads[i].start(util::bind(&read_thread3, &test_results, string(path)));
+        read_threads[i].start(util::bind(&read_thread3, &test_results, std::string(path)));
 
     for (int i = 0; i < WRITERS3; ++i) {
         bool writer_has_thrown = write_threads[i].join();
@@ -385,7 +384,7 @@ const int READERS4 =   20;
 const int WRITERS4 =   20;
 volatile bool terminate4 = false;
 
-void write_thread4(TestResults* test_results_ptr, string path, int thread_ndx)
+void write_thread4(TestResults* test_results_ptr, std::string path, int thread_ndx)
 {
     TestResults& test_results = *test_results_ptr;
     int_least64_t w = thread_ndx;
@@ -408,7 +407,7 @@ void write_thread4(TestResults* test_results_ptr, string path, int thread_ndx)
     }
 }
 
-void read_thread4(TestResults* test_results_ptr, string path)
+void read_thread4(TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -448,10 +447,10 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
 #endif
 
     for (int i = 0; i < READERS4; ++i)
-        read_threads[i].start(util::bind(&read_thread4, &test_results, string(path)));
+        read_threads[i].start(util::bind(&read_thread4, &test_results, std::string(path)));
 
     for (int i = 0; i < WRITERS4; ++i)
-        write_threads[i].start(util::bind(&write_thread4, &test_results, string(path), i));
+        write_threads[i].start(util::bind(&write_thread4, &test_results, std::string(path), i));
 
     for (int i = 0; i < WRITERS4; ++i) {
         bool writer_has_thrown = write_threads[i].join();

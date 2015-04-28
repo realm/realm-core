@@ -13,7 +13,6 @@
 #include "wildcard.hpp"
 #include "unit_test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -31,7 +30,7 @@ namespace {
 
 struct SharedContext {
     Reporter& m_reporter;
-    vector<Test*> m_tests;
+    std::vector<Test*> m_tests;
     Mutex m_mutex;
     size_t m_next_test;
 
@@ -43,16 +42,16 @@ struct SharedContext {
 };
 
 
-void replace_char(string& str, char c, const string& replacement)
+void replace_char(std::string& str, char c, const std::string& replacement)
 {
-    for (size_t pos = str.find(c); pos != string::npos; pos = str.find(c, pos + 1))
+    for (size_t pos = str.find(c); pos != std::string::npos; pos = str.find(c, pos + 1))
         str.replace(pos, 1, replacement);
 }
 
 
-string xml_escape(const string& value)
+std::string xml_escape(const std::string& value)
 {
-    string value_2 = value;
+    std::string value_2 = value;
     replace_char(value_2, '&',  "&amp;");
     replace_char(value_2, '<',  "&lt;");
     replace_char(value_2, '>',  "&gt;");
@@ -64,7 +63,7 @@ string xml_escape(const string& value)
 
 class XmlReporter: public Reporter {
 public:
-    XmlReporter(ostream& out):
+    XmlReporter(std::ostream& out):
         m_out(out)
     {
     }
@@ -79,7 +78,7 @@ public:
         t.m_details = details;
     }
 
-    void fail(const TestDetails& details, const string& message) override
+    void fail(const TestDetails& details, const std::string& message) override
     {
         failure f;
         f.m_details = details;
@@ -117,10 +116,10 @@ public:
                 continue;
             }
             m_out << ">\n";
-            typedef vector<failure>::const_iterator fail_iter;
+            typedef std::vector<failure>::const_iterator fail_iter;
             fail_iter fails_end = t.m_failures.end();
             for (fail_iter i_2 = t.m_failures.begin(); i_2 != fails_end; ++i_2) {
-                string msg = xml_escape(i_2->m_message);
+                std::string msg = xml_escape(i_2->m_message);
                 m_out << "    <failure message=\"" << i_2->m_details.file_name << ""
                     "(" << i_2->m_details.line_number << ") : " << msg << "\"/>\n";
             }
@@ -133,28 +132,28 @@ public:
 protected:
     struct failure {
         TestDetails m_details;
-        string m_message;
+        std::string m_message;
     };
 
     struct test {
         TestDetails m_details;
-        vector<failure> m_failures;
+        std::vector<failure> m_failures;
         double m_elapsed_seconds;
     };
 
-    typedef map<long, test> tests; // Key is test index
+    typedef std::map<long, test> tests; // Key is test index
     tests m_tests;
 
-    ostream& m_out;
+    std::ostream& m_out;
 };
 
 
 class WildcardFilter: public Filter {
 public:
-    WildcardFilter(const string& filter)
+    WildcardFilter(const std::string& filter)
     {
         bool exclude = false;
-        typedef string::const_iterator iter;
+        typedef std::string::const_iterator iter;
         iter i = filter.begin(), end = filter.end();
         for (;;) {
             // Skip space
@@ -184,7 +183,7 @@ public:
                 continue;
             }
 
-            string word(word_begin, word_end);
+            std::string word(word_begin, word_end);
             patterns& p = exclude ? m_exclude : m_include;
             p.push_back(wildcard_pattern(word));
         }
@@ -226,7 +225,7 @@ public:
     }
 
 private:
-    typedef vector<wildcard_pattern> patterns;
+    typedef std::vector<wildcard_pattern> patterns;
     patterns m_include, m_exclude;
 };
 
@@ -312,13 +311,13 @@ void TestList::ExecContext::run()
         try {
             test->test_run();
         }
-        catch (exception& ex) {
-            string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
+        catch (std::exception& ex) {
+            std::string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
             test->test_results.test_failed(message);
         }
         catch (...) {
             m_errors_seen = true;
-            string message = "Unhandled exception of unknown type";
+            std::string message = "Unhandled exception of unknown type";
             test->test_results.test_failed(message);
         }
 
@@ -334,7 +333,7 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
     Reporter fallback_reporter;
     Reporter& reporter_2 = reporter ? *reporter : fallback_reporter;
     if (num_threads < 1 || num_threads > 1024)
-        throw runtime_error("Bad number of threads");
+        throw std::runtime_error("Bad number of threads");
 
     SharedContext shared(reporter_2);
     size_t num_tests = m_tests.size(), num_disabled = 0;
@@ -416,7 +415,7 @@ void TestResults::check_succeeded()
 }
 
 
-void TestResults::check_failed(const char* file, long line, const string& message)
+void TestResults::check_failed(const char* file, long line, const std::string& message)
 {
     {
         LockGuard lock(m_context->m_mutex);
@@ -435,7 +434,7 @@ void TestResults::check_failed(const char* file, long line, const string& messag
 }
 
 
-void TestResults::test_failed(const string& message)
+void TestResults::test_failed(const std::string& message)
 {
     {
         LockGuard lock(m_context->m_mutex);
@@ -452,16 +451,16 @@ void TestResults::test_failed(const string& message)
 void TestResults::cond_failed(const char* file, long line, const char* macro_name,
                               const char* cond_text)
 {
-    string msg = string(macro_name)+"("+cond_text+") failed";
+    std::string msg = std::string(macro_name)+"("+cond_text+") failed";
     check_failed(file, line, msg);
 }
 
 
 void TestResults::compare_failed(const char* file, long line, const char* macro_name,
                                  const char* a_text, const char* b_text,
-                                 const string& a_val, const string& b_val)
+                                 const std::string& a_val, const std::string& b_val)
 {
-    string msg = string(macro_name)+"("+a_text+", "+b_text+") failed with ("+a_val+", "+b_val+")";
+    std::string msg = std::string(macro_name)+"("+a_text+", "+b_text+") failed with ("+a_val+", "+b_val+")";
     check_failed(file, line, msg);
 }
 
@@ -471,8 +470,8 @@ void TestResults::inexact_compare_failed(const char* file, long line, const char
                                          const char* eps_text, long double a, long double b,
                                          long double eps)
 {
-    ostringstream out;
-    out.precision(numeric_limits<long double>::digits10 + 1);
+    std::ostringstream out;
+    out.precision(std::numeric_limits<long double>::digits10 + 1);
     out << macro_name<<"("<<a_text<<", "<<b_text<<", "<<eps_text<<") "
         "failed with ("<<a<<", "<<b<<", "<<eps<<")";
     check_failed(file, line, out.str());
@@ -482,7 +481,7 @@ void TestResults::inexact_compare_failed(const char* file, long line, const char
 void TestResults::throw_failed(const char* file, long line, const char* expr_text,
                                const char* exception_name)
 {
-    ostringstream out;
+    std::ostringstream out;
     out << "CHECK_THROW("<<expr_text<<", "<<exception_name<<") failed: Did not throw";
     check_failed(file, line, out.str());
 }
@@ -491,7 +490,7 @@ void TestResults::throw_failed(const char* file, long line, const char* expr_tex
 void TestResults::throw_ex_failed(const char* file, long line, const char* expr_text,
                                   const char* exception_name, const char* exception_cond_text)
 {
-    ostringstream out;
+    std::ostringstream out;
     out << "CHECK_THROW_EX("<<expr_text<<", "<<exception_name<<", "<<
         exception_cond_text<<") failed: Did not throw";
     check_failed(file, line, out.str());
@@ -501,7 +500,7 @@ void TestResults::throw_ex_failed(const char* file, long line, const char* expr_
 void TestResults::throw_ex_cond_failed(const char* file, long line, const char* expr_text,
                                        const char* exception_name, const char* exception_cond_text)
 {
-    ostringstream out;
+    std::ostringstream out;
     out << "CHECK_THROW_EX("<<expr_text<<", "<<exception_name<<", "<<
         exception_cond_text<<") failed: Did throw, but condition failed";
     check_failed(file, line, out.str());
@@ -510,7 +509,7 @@ void TestResults::throw_ex_cond_failed(const char* file, long line, const char* 
 
 void TestResults::throw_any_failed(const char* file, long line, const char* expr_text)
 {
-    ostringstream out;
+    std::ostringstream out;
     out << "CHECK_THROW_ANY("<<expr_text<<") failed: Did not throw";
     check_failed(file, line, out.str());
 }
@@ -520,7 +519,7 @@ void Reporter::begin(const TestDetails&)
 {
 }
 
-void Reporter::fail(const TestDetails&, const string&)
+void Reporter::fail(const TestDetails&, const std::string&)
 {
 }
 
@@ -535,10 +534,10 @@ void Reporter::summary(const Summary&)
 
 class PatternBasedFileOrder::state: public RefCountBase {
 public:
-    typedef map<TestDetails*, int> major_map;
+    typedef std::map<TestDetails*, int> major_map;
     major_map m_major_map;
 
-    typedef vector<wildcard_pattern> patterns;
+    typedef std::vector<wildcard_pattern> patterns;
     patterns m_patterns;
 
     state(const char** patterns_begin, const char** patterns_end)
@@ -608,46 +607,46 @@ void SimpleReporter::begin(const TestDetails& details)
     if (!m_report_progress)
         return;
 
-    cout << details.file_name << ":" << details.line_number << ": "
+    std::cout << details.file_name << ":" << details.line_number << ": "
         "Begin " << details.test_name << "\n";
 }
 
-void SimpleReporter::fail(const TestDetails& details, const string& message)
+void SimpleReporter::fail(const TestDetails& details, const std::string& message)
 {
-    cerr << details.file_name << ":" << details.line_number << ": "
+    std::cerr << details.file_name << ":" << details.line_number << ": "
         "ERROR in " << details.test_name << ": " << message << "\n";
 }
 
 void SimpleReporter::summary(const Summary& summary)
 {
-    cout << "\n";
+    std::cout << "\n";
     if (summary.num_failed_tests == 0) {
-        cout << "Success: All "<<summary.num_included_tests<<" tests passed "
+        std::cout << "Success: All "<<summary.num_included_tests<<" tests passed "
             "("<<summary.num_checks<<" checks).\n";
     }
     else {
-        cerr << "FAILURE: "<<summary.num_failed_tests<<" "
+        std::cerr << "FAILURE: "<<summary.num_failed_tests<<" "
             "out of "<<summary.num_included_tests<<" tests failed "
             "("<<summary.num_failed_checks<<" "
             "out of "<<summary.num_checks<<" checks failed).\n";
     }
-    cout << "Test time: "<<Timer::format(summary.elapsed_seconds)<<"\n";
+    std::cout << "Test time: "<<Timer::format(summary.elapsed_seconds)<<"\n";
     if (summary.num_excluded_tests == 1) {
-        cout << "\nNote: One test was excluded!\n";
+        std::cout << "\nNote: One test was excluded!\n";
     }
     else if (summary.num_excluded_tests > 1) {
-        cout << "\nNote: "<<summary.num_excluded_tests<<" tests were excluded!\n";
+        std::cout << "\nNote: "<<summary.num_excluded_tests<<" tests were excluded!\n";
     }
 }
 
 
-Reporter* create_xml_reporter(ostream& out)
+Reporter* create_xml_reporter(std::ostream& out)
 {
     return new XmlReporter(out);
 }
 
 
-Filter* create_wildcard_filter(const string& filter)
+Filter* create_wildcard_filter(const std::string& filter)
 {
     return new WildcardFilter(filter);
 }

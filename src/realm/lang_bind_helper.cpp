@@ -1,7 +1,6 @@
 #include <realm/column_table.hpp>
 #include <realm/lang_bind_helper.hpp>
 
-using namespace std;
 using namespace realm;
 
 

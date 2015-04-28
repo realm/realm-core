@@ -5,7 +5,6 @@
 #  include <realm/replication.hpp>
 #endif
 
-using namespace std;
 using namespace realm;
 
 
@@ -449,12 +448,12 @@ void Spec::Verify() const
 }
 
 
-void Spec::to_dot(ostream& out, StringData) const
+void Spec::to_dot(std::ostream& out, StringData) const
 {
     ref_type ref = m_top.get_ref();
 
-    out << "subgraph cluster_specset" << ref << " {" << endl;
-    out << " label = \"specset\";" << endl;
+    out << "subgraph cluster_specset" << ref << " {" << std::endl;
+    out << " label = \"specset\";" << std::endl;
 
     m_top.to_dot(out);
     m_types.to_dot(out, "types");
@@ -491,7 +490,7 @@ void Spec::to_dot(ostream& out, StringData) const
         }
     }
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 #endif // REALM_DEBUG

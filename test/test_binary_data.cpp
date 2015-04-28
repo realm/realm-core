@@ -7,7 +7,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 
 
@@ -143,10 +142,10 @@ TEST(BinaryData_LexicographicCompare)
     // Test lexicographic ordering (<, >, <=, >=)
     char c_11 = 11;
     char c_22 = 22;
-    string s_8_11(8, c_11);
-    string s_8_22(8, c_22);
-    string s_9_11(9, c_11);
-    string s_9_22(9, c_22);
+    std::string s_8_11(8, c_11);
+    std::string s_8_22(8, c_22);
+    std::string s_9_11(9, c_11);
+    std::string s_9_22(9, c_22);
     BinaryData bd_0;
     BinaryData bd_8_11(s_8_11.data(), s_8_11.size());
     BinaryData bd_8_22(s_8_22.data(), s_8_22.size());

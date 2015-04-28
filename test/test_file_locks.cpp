@@ -13,7 +13,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm::util;
 
 
@@ -61,7 +60,7 @@ const int num_rounds = 1000000;
 
 const int num_slaves = 2;
 
-map<int, int> results;
+std::map<int, int> results;
 
 Mutex mutex;
 CondVar cond;
@@ -87,7 +86,7 @@ void master()
     }
 }
 
-void slave(int ndx, string path)
+void slave(int ndx, std::string path)
 {
     File file(path, File::mode_Write);
     for (int i = 0; i != num_rounds; ++i) {
@@ -123,17 +122,17 @@ TEST(File_NoSpuriousTryLockFailures)
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
-        slaves[i].start(bind(&slave, i, string(path)));
+        slaves[i].start(bind(&slave, i, std::string(path)));
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
         slaves[i].join();
 
 /*
-    typedef map<int, int>::const_iterator iter;
+    typedef std::map<int, int>::const_iterator iter;
     iter end = results.end();
     for (iter i = results.begin(); i != end; ++i)
-        cout << i->first << " -> " << i->second << "\n";
+        std::cout << i->first << " -> " << i->second << "\n";
 */
 
     // Check that there are no cases where no one got the lock

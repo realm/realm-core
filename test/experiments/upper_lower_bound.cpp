@@ -20,7 +20,6 @@
 #include "unit_test.hpp"
 
 using namespace realm;
-using namespace std;
 
 
 TEST(bounds)
@@ -149,7 +148,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, random indexing:     \t" << best << "\n";
+        std::cerr << "byte array, random indexing:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -163,7 +162,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, average direction:  \t" << best << "\n";
+        std::cerr << "byte array, average direction:  \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -177,7 +176,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, always go left:     \t" << best << "\n";
+        std::cerr << "byte array, always go left:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -191,7 +190,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, always go right:    \t" << best << "\n";
+        std::cerr << "byte array, always go right:    \t" << best << "\n";
         score += best;
     }
 
@@ -224,7 +223,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, random indexing:     \t" << best << "\n";
+        std::cerr << "32-bit array, random indexing:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -238,7 +237,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, average direction:\t" << best << "\n";
+        std::cerr << "32-bit array, average direction:\t" << best << "\n";
 
         best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
@@ -251,7 +250,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, always go left:   \t" << best << "\n";
+        std::cerr << "32-bit array, always go left:   \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -265,12 +264,12 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, always go right:  \t" << best << "\n";
+        std::cerr << "32-bit array, always go right:  \t" << best << "\n";
         score += best;
     }
 
 
 
 
-    cerr << "sum: " << score;
+    std::cerr << "sum: " << score;
 }

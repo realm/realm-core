@@ -7,7 +7,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -885,7 +884,7 @@ TEST(Links_RandomizedOperations)
         Group group;
         TableRef refs[tests]; // 'tests' is max number of tables that can be produced
 
-        vector<vector<size_t>> tables;
+        std::vector<std::vector<size_t>> tables;
 
         for (size_t inner_iter = 0; inner_iter < tests; inner_iter++) {
             int action = rnd.draw_int_mod(100);
@@ -915,7 +914,7 @@ TEST(Links_RandomizedOperations)
             else if (tables.size() < 10) {
                 // create table
                 refs[tables.size()] = group.get_or_add_table("table"); // FIXME: Lasse, did you really want to re-get the same table every time?
-                tables.push_back(vector<size_t>());
+                tables.push_back(std::vector<size_t>());
             }
         }
     }

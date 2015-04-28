@@ -9,7 +9,6 @@
 #include "test.hpp"
 
 using namespace realm;
-using namespace std;
 using namespace realm::util;
 using namespace realm::test_util;
 
@@ -121,7 +120,7 @@ TEST(ArrayBlob_AdaptiveStringLeak)
     ref_type col_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col(Allocator::get_default(), col_ref);
     for (size_t i = 0; i != 2 * REALM_MAX_BPNODE_SIZE; ++i)
-        col.insert(0, string(100, 'a'));  // use constant larger than 'medium_string_max_size'
+        col.insert(0, std::string(100, 'a'));  // use constant larger than 'medium_string_max_size'
 
     col.destroy();
 }
@@ -220,7 +219,7 @@ TEST(ArrayBlob_Null)
         a.clear();
 
         // vector that is kept in sync with the ArrayString so that we can compare with it
-        vector<string> v;
+        std::vector<std::string> v;
 
         for (size_t i = 0; i < 2000; i++) {
             unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
@@ -242,7 +241,7 @@ TEST(ArrayBlob_Null)
                     len = 0;
 
                 StringData sd;
-                string stdstr;
+                std::string stdstr;
 
                 if (random.draw_int<int>() > 100) {
                     sd = realm::null();
@@ -250,7 +249,7 @@ TEST(ArrayBlob_Null)
                 }
                 else {
                     sd = StringData(str, len);
-                    stdstr = string(str, len);
+                    stdstr = std::string(str, len);
                 }
 
                 if (random.draw_int<int>() > 100) {

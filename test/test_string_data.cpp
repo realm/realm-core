@@ -10,7 +10,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 
 
@@ -164,10 +163,10 @@ TEST(StringData_LexicographicCompare)
     // Test lexicographic ordering (<, >, <=, >=)
     char c_11 = 11;
     char c_22 = 22;
-    string s_8_11(8, c_11);
-    string s_8_22(8, c_22);
-    string s_9_11(9, c_11);
-    string s_9_22(9, c_22);
+    std::string s_8_11(8, c_11);
+    std::string s_8_22(8, c_22);
+    std::string s_9_11(9, c_11);
+    std::string s_9_22(9, c_22);
     StringData sd_0("");
     StringData sd_8_11(s_8_11);
     StringData sd_8_22(s_8_22);
@@ -311,12 +310,12 @@ TEST(StringData_STL_String)
     const char* pre = "hilbert";
     const char* suf_1 = "banachA";
     const char* suf_2 = "banachB";
-    string s_1;
+    std::string s_1;
     s_1 += pre;
     s_1 += char(); // Null
     s_1 += suf_1;
     CHECK_EQUAL(strlen(pre) + 1 + strlen(suf_1), s_1.size());
-    string s_2;
+    std::string s_2;
     s_2 += pre;
     s_2 += char(); // Null
     s_2 += suf_2;
@@ -329,9 +328,9 @@ TEST(StringData_STL_String)
     sd_2 = s_2;
     CHECK_EQUAL(s_2, sd_2);
     CHECK(sd_1 != sd_2);
-    string t_1(sd_1);
+    std::string t_1(sd_1);
     CHECK_EQUAL(sd_1, t_1);
-    string t_2;
+    std::string t_2;
     t_2 = sd_2;
     CHECK_EQUAL(sd_2, t_2);
     CHECK(sd_1 != sd_2);
@@ -344,12 +343,12 @@ TEST(StringData_STL_Stream)
 {
     const char* pre = "hilbert";
     const char* suf = "banach";
-    string s;
+    std::string s;
     s += pre;
     s += char(); // Null
     s += suf;
     StringData sd(s);
-    ostringstream out;
+    std::ostringstream out;
     out << sd;
     CHECK_EQUAL(s, out.str());
 }

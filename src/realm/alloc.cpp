@@ -5,7 +5,6 @@
 
 #include <realm/alloc_slab.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -48,7 +47,7 @@ public:
         char* addr = static_cast<char*>(::malloc(size));
         if (REALM_UNLIKELY(!addr)) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
-            throw bad_alloc();
+            throw std::bad_alloc();
         }
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
         fill(addr, addr+size, 0);
@@ -62,7 +61,7 @@ public:
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (REALM_UNLIKELY(!new_addr)) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
-            throw bad_alloc();
+            throw std::bad_alloc();
         }
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
         fill(new_addr+old_size, new_addr+new_size, 0);
@@ -105,7 +104,7 @@ MemRef Allocator::do_realloc(ref_type ref, const char* addr, size_t old_size,
 
     // Copy existing contents
     char* new_addr = new_mem.m_addr;
-    copy(addr, addr+old_size, new_addr);
+    std::copy(addr, addr+old_size, new_addr);
 
     // Free old chunk
     do_free(ref, addr);

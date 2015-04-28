@@ -8,7 +8,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -48,8 +47,8 @@ TEST(ColumnMixed_Int)
     ref_type ref = ColumnMixed::create(Allocator::get_default());
     ColumnMixed c(Allocator::get_default(), ref, 0, 0);
 
-    int64_t max_val = numeric_limits<int64_t>::max();
-    int64_t min_val = numeric_limits<int64_t>::min();
+    int64_t max_val = std::numeric_limits<int64_t>::max();
+    int64_t min_val = std::numeric_limits<int64_t>::min();
     int64_t all_bit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
 
     c.insert_int(0,       2);
@@ -92,8 +91,8 @@ TEST(ColumnMixed_Float)
     uint32_t v = 0xFFFFFFFF;
     float f = float(v);
     float fval1[] = { 0.0f, 100.123f, -111.222f, f };
-    float fval2[] = { -0.0f, -100.123f, numeric_limits<float>::max(),
-                      numeric_limits<float>::min() };
+    float fval2[] = { -0.0f, -100.123f, std::numeric_limits<float>::max(),
+                      std::numeric_limits<float>::min() };
 
     // Test insert
     for (size_t i=0; i<4; ++i)
@@ -127,7 +126,7 @@ TEST(ColumnMixed_Double)
     uint64_t v = 0xFFFFFFFFFFFFFFFFULL;
     double d = double(v);
     double fval1[] = {1.0, 200.123, -111.222, d};
-    double fval2[] = {-1.0, -100.123, numeric_limits<double>::max(), numeric_limits<double>::min()};
+    double fval2[] = {-1.0, -100.123, std::numeric_limits<double>::max(), std::numeric_limits<double>::min()};
 
     // Test insert
     for (size_t i=0; i<4; ++i)

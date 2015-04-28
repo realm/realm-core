@@ -2,7 +2,6 @@
 #include <realm/column_backlink.hpp>
 #include <realm/table.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -31,7 +30,7 @@ void ColumnLinkBase::check_cascade_break_backlinks_to(size_t target_table_ndx, s
     target_row.table_ndx = target_table_ndx;
     target_row.row_ndx   = target_row_ndx;
     typedef CascadeState::row_set::iterator iter;
-    iter i = ::upper_bound(state.rows.begin(), state.rows.end(), target_row);
+    iter i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
     bool already_seen = i != state.rows.begin() && i[-1] == target_row;
     if (already_seen)
         return;

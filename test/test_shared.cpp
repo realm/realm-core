@@ -29,7 +29,6 @@
 #include "test.hpp"
 #include "crypt_key.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -93,15 +92,15 @@ REALM_TABLE_4(TestTableShared,
 
 
 
-void writer(string path, int id)
+void writer(std::string path, int id)
 {
-    // cerr << "Started writer " << endl;
+    // std::cerr << "Started writer " << std::endl;
     try {
         bool done = false;
         SharedGroup sg(path, true, SharedGroup::durability_Full);
-        // cerr << "Opened sg " << endl;
+        // std::cerr << "Opened sg " << std::endl;
         for (int i=0; !done; ++i) {
-            // cerr << "       - " << getpid() << endl;
+            // std::cerr << "       - " << getpid() << std::endl;
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             done = t1[id].third;
@@ -111,9 +110,9 @@ void writer(string path, int id)
             sched_yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
-        // cerr << "Ended pid " << getpid() << endl;
+        // std::cerr << "Ended pid " << getpid() << std::endl;
     } catch (...) {
-        // cerr << "Exception from " << getpid() << endl;
+        // std::cerr << "Exception from " << getpid() << std::endl;
     }
 }
 
@@ -143,11 +142,11 @@ void killer(TestResults& test_results, int pid, string path, int id)
     int ret_pid = waitpid(pid, &stat_loc, options);
     if (ret_pid == pid_t(-1)) {
         if (errno == EINTR)
-            cerr << "waitpid was interrupted" << endl;
+            std::cerr << "waitpid was interrupted" << std::endl;
         if (errno == EINVAL)
-            cerr << "waitpid got bad arguments" << endl;
+            std::cerr << "waitpid got bad arguments" << std::endl;
         if (errno == ECHILD)
-            cerr << "waitpid tried to wait for the wrong child: " << pid << endl;
+            std::cerr << "waitpid tried to wait for the wrong child: " << pid << std::endl;
         REALM_TERMINATE("waitpid failed");
     }
     bool child_exited_from_signal = WIFSIGNALED(stat_loc);
@@ -204,11 +203,11 @@ TEST(Shared_PipelinedWritesWithKills)
                 _exit(0);
             }
             else {
-                // cerr << "New process " << pid << " killing old " << pid2 << endl;
+                // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
                 killer(test_results, pid2, path, k-1);
             }
         }
-        // cerr << "Killing last one: " << pid << endl;
+        // std::cerr << "Killing last one: " << pid << std::endl;
         killer(test_results, pid, path, num_processes-1);
     }
 }
@@ -218,8 +217,8 @@ TEST(Shared_PipelinedWritesWithKills)
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
-    string old_path = path;
-    string tmp_path = string(path)+".tmp";
+    std::string old_path = path;
+    std::string tmp_path = std::string(path)+".tmp";
     Thread writer_thread;
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full);
@@ -243,7 +242,7 @@ TEST(Shared_CompactingOnTheFly)
                 ReadTransaction rt(sg);
                 TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
                 waiting = t1[41].first == 0;
-                // cerr << t1[41].first << endl;
+                // std::cerr << t1[41].first << std::endl;
             }
 
             // since the writer is running, we cannot compact:
@@ -362,8 +361,8 @@ TEST(Shared_StaleLockFileFaked)
 TEST(Shared_StaleLockFileRenamed)
 {
     SHARED_GROUP_TEST_PATH(path);
-    string lock_path   = path.get_lock_path();
-    string lock_path_2 = path.get_lock_path() + ".backup";
+    std::string lock_path   = path.get_lock_path();
+    std::string lock_path_2 = path.get_lock_path() + ".backup";
     File::try_remove(lock_path_2);
     bool no_create = false;
     {
@@ -372,12 +371,12 @@ TEST(Shared_StaleLockFileRenamed)
 #ifdef _WIN32
         // Requires ntfs to work
         if (!CreateHardLinkA(lock_path_2.c_str(), lock_path.c_str(), 0)) {
-            cerr << "Creating a hard link failed, test abandoned" << endl;
+            std::cerr << "Creating a hard link failed, test abandoned" << std::endl;
             return;
         }
 #else
         if (link(lock_path.c_str(), lock_path_2.c_str())) {
-            cerr << "Creating a hard link failed, test abandoned" << endl;
+            std::cerr << "Creating a hard link failed, test abandoned" << std::endl;
             return;
         }
 #endif
@@ -1139,7 +1138,7 @@ TEST(Shared_WritesSpecialOrder)
 
 namespace  {
 
-void writer_threads_thread(TestResults* test_results_ptr, string path, size_t row_ndx)
+void writer_threads_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
 {
     TestResults& test_results = *test_results_ptr;
 
@@ -1200,7 +1199,7 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i)
-            threads[i].start(bind(&writer_threads_thread, &test_results, string(path), i));
+            threads[i].start(bind(&writer_threads_thread, &test_results, std::string(path), i));
 
         // Wait for all threads to complete
         for (size_t i = 0; i < thread_count; ++i)
@@ -1682,7 +1681,7 @@ TEST(Shared_StringIndexBug3)
             TableRef table = group.get_table("users");
             if (table->size() > 0) {
                 size_t del = random.draw_int_mod(table->size());
-                //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
+                //cerr << "-" << del << ": " << table->get_string(0, del) << std::endl;
                 table->remove(del);
                 table->Verify();
             }
@@ -1696,7 +1695,7 @@ TEST(Shared_StringIndexBug3)
             char txt[100];
             rand_str(random, txt, 8);
             txt[8] = 0;
-            //cerr << "+" << txt << endl;
+            //cerr << "+" << txt << std::endl;
             table->set_string(0, table->size() - 1, txt);
             table->Verify();
             db.commit();
@@ -1740,7 +1739,7 @@ TEST_IF(Shared_Async, allow_async)
         SharedGroup db(path, no_create, SharedGroup::durability_Async);
 
         for (size_t i = 0; i < 100; ++i) {
-//            cout << "t "<<n<<"\n";
+//            std::cout << "t "<<n<<"\n";
             WriteTransaction wt(db);
             wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
@@ -1808,7 +1807,7 @@ void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_
 }
 
 
-void multiprocess_make_table(string path, string lock_path, string alone_path, size_t rows)
+void multiprocess_make_table(std::string path, string lock_path, string alone_path, size_t rows)
 {
     static_cast<void>(lock_path);
     // Create first table in group
@@ -1891,9 +1890,9 @@ void multiprocess_threaded(TestResults& test_results, string path, size_t num_th
     // Wait for threads to finish
     for (size_t i = 0; i != num_threads; ++i) {
         bool thread_has_thrown = false;
-        string except_msg;
+        std::string except_msg;
         if (threads[i].join(except_msg)) {
-            cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+            std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
             thread_has_thrown = true;
         }
         CHECK(!thread_has_thrown);
@@ -2002,7 +2001,7 @@ int shared_state[num_threads];
 SharedGroup* sgs[num_threads];
 Mutex* muu;
 
-void waiter(string path, int i)
+void waiter(std::string path, int i)
 {
     SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
     {
@@ -2055,7 +2054,7 @@ TEST(Shared_WaitForChange)
     SharedGroup sg(path, false, SharedGroup::durability_Full);
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
-        threads[j].start(bind(&waiter, string(path), j));
+        threads[j].start(bind(&waiter, std::string(path), j));
     bool try_again = true;
     while (try_again) {
         try_again = false;
@@ -2267,8 +2266,8 @@ TEST(Shared_MixedWithNonShared)
         {
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key()); // Create the very empty group
         }
-        ifstream in(path.c_str());
-        string buffer((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+        std::ifstream in(path.c_str());
+        std::string buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         bool take_ownership = false;
         Group group(BinaryData(buffer), take_ownership);
         group.Verify();
@@ -2445,7 +2444,7 @@ TEST(Shared_MovingEnumStringColumn)
         CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
         for (int i = 0; i < 64; ++i) {
-            string value = table->get_string(0, i);
+            std::string value = table->get_string(0, i);
             if (i%2 == 0) {
                 CHECK_EQUAL("a", value);
             }
@@ -2485,7 +2484,7 @@ TEST(Shared_MovingEnumStringColumn)
         ConstTableRef table = rt.get_table("foo");
         CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
         for (int i = 0; i < 64; ++i) {
-            string value = table->get_string(0, i);
+            std::string value = table->get_string(0, i);
             if (i == 0) {
                 CHECK_EQUAL("bar0", value);
             }
@@ -2520,7 +2519,7 @@ TEST(Shared_MovingSearchIndex)
         table->add_column(type_String, "enum");
         table->add_empty_row(64);
         for (int i = 0; i < 64; ++i) {
-            ostringstream out;
+            std::ostringstream out;
             out << "foo" << i;
             table->set_string(0, i, out.str());
             table->set_string(1, i, "bar");

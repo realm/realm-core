@@ -5,7 +5,6 @@
 #include <iostream>
 
 using namespace realm;
-using namespace std;
 
 int main(int argc, char* argv[])
 {
@@ -24,7 +23,7 @@ int main(int argc, char* argv[])
     if (pid == 0) { // in daemon process:
 
 #ifdef REALM_ENABLE_LOGFILE
-        cerr << "Daemon starting" << endl;
+        std::cerr << "Daemon starting" << std::endl;
 #endif
         SharedGroup::unattached_tag tag;
         SharedGroup async_committer(tag);
