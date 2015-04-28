@@ -38,7 +38,7 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ArrayBinary_Basic)
+ONLY(ArrayBinary_Basic)
 {
     ArrayBinary c(Allocator::get_default());
     c.create();
@@ -225,6 +225,32 @@ TEST(ArrayBinary_Basic)
     // TEST(ArrayBinary_Destroy)
 
     c.destroy();
+
+
+
+    {
+
+        ArrayBinary c(Allocator::get_default(), true);
+        c.create();
+
+        c.add(BinaryData());
+        c.add(BinaryData("", 0));
+
+        CHECK(c.get(0).is_null());
+        CHECK(!c.get(1).is_null());
+
+
+    }
+
+}
+
+TEST(ArrayBinary_Null)
+{
+    ArrayBinary c(Allocator::get_default(), true);
+    c.create();
+
+    c.add(BinaryData());
+    c.add(BinaryData("", 0));
 }
 
 #endif // TEST_ARRAY_BINARY

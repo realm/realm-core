@@ -20,8 +20,8 @@ void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
 
-    if (size() == 3) {
-        ref_type nulls_ref = get_as_ref(1);
+    if (m_nullable) {
+        ref_type nulls_ref = get_as_ref(2);
         m_nulls.init_from_ref(nulls_ref);        
     }
 }
@@ -40,7 +40,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
     m_offsets.add(offset);
 
-    if (Array::size() == 3)
+    if (m_nullable)
         m_nulls.add(value.is_null());
 }
 
@@ -91,12 +91,13 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 
-    if (Array::size() == 3)
+    if (m_nullable)
         m_nulls.erase(ndx);
 }
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
+    // Column is nullable if-and-only-if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
     if (get_size_from_header(header, alloc) == 3) {
         pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
@@ -119,7 +120,11 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) RE
         begin = 0;
         end   = to_size_t(Array::get(offsets_header, ndx));
     }
-    return BinaryData(ArrayBlob::get(blob_header, begin), end-begin);
+    BinaryData bd = BinaryData(ArrayBlob::get(blob_header, begin), end - begin);
+
+    // Should never return null for non-nullable columns
+    REALM_ASSERT(!bd.is_null());
+    return bd;
 }
 
 // FIXME: Not exception safe (leaks are possible).
@@ -154,7 +159,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
 }
 
 
-MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
+MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, bool nullable)
 {
     Array top(alloc);
     _impl::DeepArrayDestroyGuard dg(&top);
@@ -179,7 +184,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
         dg_2.release();
     }
 
-    if (false)
+    if (nullable)
     {
         // Create m_nulls array
         bool context_flag = false;
