@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 -----------
 
