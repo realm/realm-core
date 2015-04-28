@@ -1,3 +1,24 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Fixed bug in "index rebuilding" (would delete the wrong column, causing crash). See https://github.com/realm/realm-core/pull/798 ;  "Remove the correct column when removing search indexes #798"
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
 # 0.89.0 Release notes
 
 ### Bugfixes:
