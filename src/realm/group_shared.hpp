@@ -632,6 +632,21 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const
     m_group(Group::shared_tag())
 {
     open(repl, dlevel, key);
+
+    // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set
+    // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
+    // call returns immediately if it finds that the upgrade is already complete.
+    begin_read();
+    bool upgrade = m_group.get_file_format() < default_file_format_version;
+    end_read();
+
+    // Only create write transaction if needed; that's why we test whether to upgrade or not in a separate read
+    // transaction. Else unit tests would fail.
+    if (upgrade) {
+        begin_write();
+        m_group.upgrade_file_format();
+        commit();
+    }
 }
 #endif
 
