@@ -220,7 +220,7 @@ TEST(Upgrade_Database_2_3)
       for (int i = 0; i < 1000; i++) {
           // These tests utilize the Integer and String index. That will crash if the database is still
           // in version 2 format, because the on-disk format of index has changed in version 3.
-          string str = std::to_string(i);
+          std::string str = std::to_string(i);
           StringData sd(str);
           size_t f = t->find_first_string(0, sd);
           CHECK_EQUAL(f, i);
