@@ -417,10 +417,12 @@ size_t Spec::get_column_ndx_in_parent(size_t column_ndx) const
 }
 
 
-void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const REALM_NOEXCEPT
+Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const REALM_NOEXCEPT
 {
+    ColumnInfo info;
     info.m_column_ref_ndx = get_column_ndx_in_parent(column_ndx);
     info.m_has_search_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
+    return info;
 }
 
 

@@ -792,8 +792,7 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
 {
     m_spec.insert_column(ndx, type, name, nullable ? col_attr_Nullable : col_attr_None); // Throws
 
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(ndx, info);
+    Spec::ColumnInfo info = m_spec.get_column_info(ndx);
     size_t ndx_in_parent = info.m_column_ref_ndx;
     ref_type col_ref = create_column(type, m_size, m_columns.get_alloc()); // Throws
     m_columns.insert(ndx_in_parent, col_ref); // Throws
@@ -802,8 +801,7 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
 
 void Table::do_erase_root_column(size_t ndx)
 {
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(ndx, info);
+    Spec::ColumnInfo info = m_spec.get_column_info(ndx);
     m_spec.erase_column(ndx); // Throws
 
     // Remove ref from m_columns, and destroy node structure
@@ -1381,8 +1379,7 @@ void Table::add_search_index(size_t col_ndx)
 
     REALM_ASSERT(!m_primary_key);
 
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(col_ndx, info);
+    Spec::ColumnInfo info = m_spec.get_column_info(col_ndx);
     size_t column_pos = info.m_column_ref_ndx;
     ref_type index_ref = 0;
 
@@ -1430,8 +1427,7 @@ void Table::remove_search_index(size_t col_ndx)
         return;
 
     // Remove the index column
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(col_ndx, info);
+    Spec::ColumnInfo info = m_spec.get_column_info(col_ndx);
     size_t column_pos = info.m_column_ref_ndx;
 
     ColumnBase& col = get_column_base(col_ndx);
@@ -3799,8 +3795,7 @@ void Table::optimize(bool enforce)
             if (!res)
                 continue;
 
-            Spec::ColumnInfo info;
-            m_spec.get_column_info(i, info);
+            Spec::ColumnInfo info = m_spec.get_column_info(i);
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             m_spec.upgrade_string_to_enum(i, keys_ref, keys_parent, keys_ndx_in_parent);
