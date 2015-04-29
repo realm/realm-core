@@ -36,16 +36,20 @@ void RowIndexes::sort(Sorter& sorting_predicate)
 // FIXME: this only works (and is only used) for row indexes with memory
 // managed by the default allocator, e.q. for TableViews.
 RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
-    : m_row_indexes(Column::unattached_root_tag(), Allocator::get_default())
+    : m_row_indexes(Allocator::get_default(), Column::create(Allocator::get_default()))
 {
 #ifdef REALM_COOKIE_CHECK
     cookie = source.cookie;
 #endif
     if (mode == ConstSourcePayload::Copy) {
         const Array* root = source.m_row_indexes.get_root_array();
-        MemRef mem = root->clone_deep(Allocator::get_default());
-        Array* target = m_row_indexes.get_root_array();
-        target->init_from_mem(mem);
+        if (root) {
+            // we only clone if there is something to clone:
+            m_row_indexes.destroy();
+            MemRef mem = root->clone_deep(Allocator::get_default());
+            Array* target = m_row_indexes.get_root_array();
+            target->init_from_mem(mem);
+        }
     }
 }
 

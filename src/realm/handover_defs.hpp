@@ -43,6 +43,7 @@ struct Query_Handover_patch {
 
 struct TableView_Handover_patch {
     std::size_t table_num;
+    bool was_in_sync;
     Query_Handover_patch query_patch;
     LinkView_Handover_patch* linkview_patch;
     ~TableView_Handover_patch() { delete linkview_patch; }

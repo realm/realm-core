@@ -35,6 +35,7 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
       m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
+    patch.was_in_sync = src.is_in_sync();
     patch.table_num = src.m_table->get_index_in_group();
     // must be group level table!
     if (patch.table_num == npos) {
@@ -42,6 +43,7 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
     }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
+    src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
     m_sorting_predicate = src.m_sorting_predicate;
@@ -58,6 +60,10 @@ TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
       m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
+    if (mode == ConstSourcePayload::Stay)
+        patch.was_in_sync = false;
+    else
+        patch.was_in_sync = src.is_in_sync();
     patch.table_num = src.m_table->get_index_in_group();
     // must be group level table!
     if (patch.table_num == npos) {
@@ -79,7 +85,10 @@ void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
 {
     TableRef tr = group.get_table(patch.table_num);
     m_table = tr;
-    m_last_seen_version = tr->m_version;
+    if (patch.was_in_sync)
+        m_last_seen_version = tr->m_version;
+    else
+        m_last_seen_version = -1;
     tr->register_view(this);
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);

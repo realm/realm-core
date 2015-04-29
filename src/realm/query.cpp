@@ -151,6 +151,7 @@ void Query::delete_nodes() REALM_NOEXCEPT
 
 
 Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
 {
     patch.m_has_table = bool(source.m_table);
     if (patch.m_has_table) {
