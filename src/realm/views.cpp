@@ -54,8 +54,18 @@ RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
 }
 
 RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
-    : m_row_indexes(std::move(source.m_row_indexes))
+    : m_row_indexes(Allocator::get_default(), Column::create(Allocator::get_default()))
 {
+    // move the data payload, but make sure to leave the source array intact or
+    // attempts to reuse it for a query rerun will crash (or assert, if lucky)
+    Array* src_root = source.m_row_indexes.get_root_array();
+    Array* dst_root = m_row_indexes.get_root_array();
+    // There really *has* to be a way where we don't need to first create an empty
+    // array, and then destroy it
+    dst_root->destroy();
+    dst_root->init_from_mem(src_root->get_mem());
+    src_root->init_from_mem(Array::create_empty_array(Array::type_Normal, false, Allocator::get_default()));
+
 #ifdef REALM_COOKIE_CHECK
     cookie = source.cookie;
 #endif

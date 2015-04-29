@@ -7081,6 +7081,9 @@ TEST(LangBindHelper_HandoverAccessors)
             handover7.reset(sg_w.export_for_handover(tv, MutableSourcePayload::Move));
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
+            // and verify, that even though it was out of sync, we can bring it in sync again
+            tv.sync_if_needed();
+            CHECK(tv.is_in_sync());
 
             // Aaaaand rows!
             row = (*table)[7];
