@@ -1379,27 +1379,25 @@ void Table::add_search_index(size_t col_ndx)
 
     REALM_ASSERT(!m_primary_key);
 
-    Spec::ColumnInfo info = m_spec.get_column_info(col_ndx);
-    size_t column_pos = info.m_column_ref_ndx;
-    ref_type index_ref = 0;
-
     // Create the index
     ColumnBase& col = get_column_base(col_ndx);
     StringIndex* index = col.create_search_index(); // Throws
-    if (index) {
-        index->set_parent(&m_columns, column_pos + 1);
-        index_ref = index->get_ref();
-    } else {
+    if (!index) {
         throw LogicError(LogicError::illegal_combination);
     }
 
-    // Insert ref into list of column refs after the owning column
-    m_columns.insert(column_pos+1, index_ref); // Throws
+    // The index goes in the list of column refs immediate after the owning column
+    size_t index_pos = m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
+    index->set_parent(&m_columns, index_pos);
+    m_columns.insert(index_pos, index->get_ref()); // Throws
 
+    // Mark the column as having an index
     int attr = m_spec.get_column_attr(col_ndx);
     attr |= col_attr_Indexed;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
+    // Update column accessors for all columns after the one we just added an
+    // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx+1); // Throws
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -1426,19 +1424,22 @@ void Table::remove_search_index(size_t col_ndx)
     if (!has_search_index(col_ndx))
         return;
 
-    // Remove the index column
-    Spec::ColumnInfo info = m_spec.get_column_info(col_ndx);
-    size_t column_pos = info.m_column_ref_ndx;
-
+    // Destroy and remove the index column
     ColumnBase& col = get_column_base(col_ndx);
     col.get_search_index()->destroy();
     col.destroy_search_index();
 
+    // The index is always immediately after the column in m_columns
+    size_t index_pos = m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
+    m_columns.erase(index_pos);
+
+    // Mark the column as no longer having an index
     int attr = m_spec.get_column_attr(col_ndx);
     attr &= ~col_attr_Indexed;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-    m_columns.erase(column_pos + 1);
+    // Update column accessors for all columns after the one we just removed the
+    // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx + 1); // Throws
 
 #ifdef REALM_ENABLE_REPLICATION
