@@ -1,3 +1,11 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Fixed encryption on Android ARM64 devices.
+
+----------------------------------------------
+
 # 0.89.1 Release notes
 
 ### Bugfixes:
