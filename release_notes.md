@@ -1,3 +1,10 @@
+# 0.89.3 Release notes
+
+### Enhancements:
+
+* Automatically log assertion messages to Crashlytics if it's loaded into the
+  current process.
+
 # 0.89.2 Release notes
 
 ### Bugfixes:
