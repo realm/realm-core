@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.89.2 Release notes
 
 ### Bugfixes:
 
