@@ -35,7 +35,7 @@ class ColumnBinary: public ColumnBase {
 public:
     typedef BinaryData value_type;
 
-    ColumnBinary(Allocator&, ref_type);
+    ColumnBinary(Allocator&, ref_type, bool nullable = false);
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -108,6 +108,8 @@ private:
     /// necessary. Returns true if, and only if the root is a 'big
     /// blobs' leaf upon return.
     bool upgrade_root_leaf(std::size_t value_size);
+
+    bool m_nullable = false;
 
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,

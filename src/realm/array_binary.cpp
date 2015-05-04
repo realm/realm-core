@@ -10,7 +10,6 @@
 using namespace std;
 using namespace realm;
 
-
 void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
 {
     Array::init_from_mem(mem);
@@ -20,7 +19,7 @@ void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
 
-    if (m_nullable) {
+    if (Array::size() == 3) {
         ref_type nulls_ref = get_as_ref(2);
         m_nulls.init_from_ref(nulls_ref);        
     }
@@ -31,6 +30,9 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT(value.size() == 0 || value.data());
 
+    if (value.is_null() && !Array::size() == 3)
+        throw LogicError(LogicError::column_not_nullable);
+
     m_blob.add(value.data(), value.size(), add_zero_term);
     size_t stored_size = value.size();
     if (add_zero_term)
@@ -40,7 +42,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
     m_offsets.add(offset);
 
-    if (m_nullable)
+    if(Array::size() == 3)
         m_nulls.add(value.is_null());
 }
 
@@ -48,6 +50,9 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
+
+    if (value.is_null() && !Array::size() == 3)
+        throw LogicError(LogicError::column_not_nullable);
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t current_end = to_size_t(m_offsets.get(ndx));
@@ -66,6 +71,9 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <=, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
+
+    if (value.is_null() && !Array::size() == 3)
+        throw LogicError(LogicError::column_not_nullable);
 
     size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
@@ -91,13 +99,13 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 
-    if (m_nullable)
+    if(Array::size() == 3)
         m_nulls.erase(ndx);
 }
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
-    // Column is nullable if-and-only-if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
+    // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
     if (get_size_from_header(header, alloc) == 3) {
         pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
@@ -121,9 +129,6 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) RE
         end   = to_size_t(Array::get(offsets_header, ndx));
     }
     BinaryData bd = BinaryData(ArrayBlob::get(blob_header, begin), end - begin);
-
-    // Should never return null for non-nullable columns
-    REALM_ASSERT(!bd.is_null());
     return bd;
 }
 
@@ -159,7 +164,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
 }
 
 
-MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, bool nullable)
+MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
 {
     Array top(alloc);
     _impl::DeepArrayDestroyGuard dg(&top);
@@ -183,12 +188,13 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, bool nullable)
         top.add(v); // Throws
         dg_2.release();
     }
-
-    if (nullable)
     {
-        // Create m_nulls array
+        // Always create a m_nulls array, regardless if its column is marked as nullable or not. NOTE: This is new
+        // - existing binary arrays from earier versions of core will not have this third array. All methods on ArrayBinary
+        // must thus check if this array exists before trying to access it. If it doesn't, it must be interpreted as if its 
+        // column isn't nullable.
         bool context_flag = false;
-        int64_t value = 1; // all entries are null by default if column is nullable
+        int64_t value = 1; // all entries are null by default
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)

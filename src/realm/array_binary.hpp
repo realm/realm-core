@@ -23,13 +23,14 @@
 #include <realm/binary_data.hpp>
 #include <realm/array_blob.hpp>
 #include <realm/array_integer.hpp>
+#include <realm/exceptions.hpp>
 
 namespace realm {
 
 
 class ArrayBinary: public Array {
 public:
-    explicit ArrayBinary(Allocator&, bool nullable = false) REALM_NOEXCEPT;
+    explicit ArrayBinary(Allocator&) REALM_NOEXCEPT;
     ~ArrayBinary() REALM_NOEXCEPT override {}
 
     /// Create a new empty binary array and attach this accessor to
@@ -74,7 +75,7 @@ public:
     /// Construct a binary array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
     /// initialized to zero size blobs.
-    static MemRef create_array(std::size_t size, Allocator&, bool nullable = false);
+    static MemRef create_array(std::size_t size, Allocator&);
 
     /// Construct a copy of the specified slice of this binary array
     /// using the specified target allocator.
@@ -89,8 +90,6 @@ private:
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
     ArrayInteger m_nulls;
-
-    bool m_nullable = false;
 };
 
 
@@ -99,21 +98,19 @@ private:
 
 // Implementation:
 
-inline ArrayBinary::ArrayBinary(Allocator& alloc, bool nullable) REALM_NOEXCEPT:
+inline ArrayBinary::ArrayBinary(Allocator& alloc) REALM_NOEXCEPT:
     Array(alloc), m_offsets(alloc), m_blob(alloc), 
-    m_nulls(nullable ? alloc : Allocator::get_default()), m_nullable(nullable)
+    m_nulls(alloc)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
-
-    if(nullable)
-        m_nulls.set_parent(this, 2);
+    m_nulls.set_parent(this, 2);
 }
 
 inline void ArrayBinary::create()
 {
     std::size_t size = 0;
-    MemRef mem = create_array(size, get_alloc(), m_nullable); // Throws
+    MemRef mem = create_array(size, get_alloc()); // Throws
     init_from_mem(mem);
 }
 
@@ -144,7 +141,7 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    if (m_nullable)
+    if (Array::size() == 3)
         if (m_nulls.get(ndx))
             return BinaryData();
 
@@ -165,7 +162,7 @@ inline void ArrayBinary::truncate(std::size_t size)
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
-    if (m_nullable)
+    if (Array::size() == 3)
         m_nulls.truncate(size);
 }
 
@@ -173,7 +170,7 @@ inline void ArrayBinary::clear()
 {
     m_blob.clear();
     m_offsets.clear();
-    if (m_nullable)
+    if (Array::size() == 3)
         m_nulls.clear();
 }
 
@@ -181,7 +178,7 @@ inline void ArrayBinary::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
-    if (m_nullable)
+    if (Array::size() == 3)
         m_nulls.destroy();
     Array::destroy();
 }
@@ -200,7 +197,7 @@ inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) REALM_NOEX
     if (res) {
         m_blob.update_from_parent(old_baseline);
         m_offsets.update_from_parent(old_baseline);
-        if (m_nullable)
+        if (Array::size() == 3)
             m_nulls.update_from_parent(old_baseline);
     }
     return res;

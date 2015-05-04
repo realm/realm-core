@@ -44,7 +44,7 @@ using namespace realm;
 TEST(ColumnBinary_Basic)
 {
     ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref);
+    ColumnBinary c(Allocator::get_default(), ref, true);
 
     // TEST(ColumnBinary_MultiEmpty)
 
