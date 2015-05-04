@@ -2354,7 +2354,7 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
         size_t len = to_size_t(m_free_lengths.get(i));
 
         char* p = map.get_addr() + pos;
-        fill(p, p+len, 0);
+        std::fill(p, p+len, 0);
     }
 }
 */

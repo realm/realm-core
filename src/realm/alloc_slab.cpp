@@ -187,7 +187,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
                 char* addr = translate(ref);
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
-                fill(addr, addr+size, 0);
+                std::fill(addr, addr+size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
@@ -239,7 +239,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
-    fill(slab.addr, slab.addr+size, 0);
+    std::fill(slab.addr, slab.addr+size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
