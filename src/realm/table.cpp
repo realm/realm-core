@@ -365,7 +365,8 @@ void Table::cascade_break_backlinks_to_all_rows(CascadeState& state)
 }
 
 
-void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
+std::size_t Table::remove_backlink_broken_rows(const CascadeState::row_set& rows,
+                                               std::size_t skip_table_ndx, std::size_t skip_row_ndx)
 {
     Group& group = *get_parent_group();
 
@@ -378,15 +379,22 @@ void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
         typedef _impl::GroupFriend gf;
         Table& table = gf::get_table(group, i->table_ndx);
 
+        // Skip reporting a cascaded erase for the rows being erased by the
+        // top-level command
+        if (i->table_ndx != skip_table_ndx || (i->row_ndx != skip_row_ndx && skip_row_ndx != npos)) {
 #ifdef REALM_ENABLE_REPLICATION
-        if (Replication* repl = table.get_repl()) {
-            bool move_last_over = true;
-            repl->erase_row(&table, i->row_ndx, move_last_over); // Throws
-        }
+            if (Replication* repl = table.get_repl())
+                repl->cascade_erase_row(&table, i->row_ndx); // Throws
 #endif
-        bool broken_reciprocal_backlinks = true;
-        table.do_move_last_over(i->row_ndx, broken_reciprocal_backlinks);
+        }
+        // Adjust the row index to skip replication for if it's about to be
+        // swapped by do_move_last_over
+        else if (i->table_ndx == skip_table_ndx && skip_row_ndx == size() + 1)
+            skip_row_ndx = i->row_ndx;
+        table.do_move_last_over(i->row_ndx);
     }
+
+    return skip_row_ndx;
 }
 
 
@@ -1946,21 +1954,6 @@ void Table::remove(size_t row_ndx)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(row_ndx, <, m_size);
 
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl()) {
-        bool move_last_over = false;
-        repl->erase_row(this, row_ndx, move_last_over); // Throws
-    }
-#endif
-
-    do_remove(row_ndx);
-}
-
-
-// Replication instruction 'erase-row(unordered=false)' calls this function
-// directly.
-void Table::do_remove(size_t row_ndx)
-{
     bool is_last = row_ndx == m_size - 1;
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
@@ -1970,6 +1963,13 @@ void Table::do_remove(size_t row_ndx)
     adj_row_acc_erase_row(row_ndx);
     --m_size;
     bump_version();
+
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_repl()) {
+        bool move_last_over = false;
+        repl->erase_row(this, row_ndx, move_last_over); // Throws
+    }
+#endif
 }
 
 
@@ -1980,15 +1980,14 @@ void Table::move_last_over(size_t row_ndx)
 
     size_t table_ndx = get_index_in_group();
     if (table_ndx == realm::npos) {
+        do_move_last_over(row_ndx);
+
 #ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl()) {
             bool move_last_over = true;
             repl->erase_row(this, row_ndx, move_last_over); // Throws
         }
 #endif
-
-        bool broken_reciprocal_backlinks = false;
-        do_move_last_over(row_ndx, broken_reciprocal_backlinks);
         return;
     }
 
@@ -2002,19 +2001,25 @@ void Table::move_last_over(size_t row_ndx)
 
     cascade_break_backlinks_to(row_ndx, state); // Throws
 
-    remove_backlink_broken_rows(state.rows); // Throws
+    row_ndx = remove_backlink_broken_rows(state.rows, table_ndx, row_ndx); // Throws
+
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_repl()) {
+        bool move_last_over = true;
+        repl->erase_row(this, row_ndx, move_last_over); // Throws
+    }
+#endif
 }
 
 
-// Replication instruction 'erase-row(unordered=true)' calls this function
-// directly with broken_reciprocal_backlinks=false.
-void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
+// Replication instruction 'erase-row(unordered=true)' calls this function directly
+void Table::do_move_last_over(size_t row_ndx)
 {
     size_t last_row_ndx = m_size - 1;
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
-        column.move_last_over(row_ndx, last_row_ndx, broken_reciprocal_backlinks); // Throws
+        column.move_last_over(row_ndx, last_row_ndx); // Throws
     }
     adj_row_acc_move_over(last_row_ndx, row_ndx);
     --m_size;
@@ -2026,44 +2031,33 @@ void Table::clear()
 {
     REALM_ASSERT(is_attached());
 
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->clear_table(this); // Throws
-#endif
+    CascadeState state;
+    state.stop_on_table = this;
 
     size_t table_ndx = get_index_in_group();
-    if (table_ndx == realm::npos) {
-        bool broken_reciprocal_backlinks = false;
-        do_clear(broken_reciprocal_backlinks);
-        return;
-    }
 
     // Group-level tables may have links, so in those cases we need to discover
     // all the rows that need to be cascade-removed.
-    CascadeState state;
-    state.stop_on_table = this;
-    cascade_break_backlinks_to_all_rows(state); // Throws
+    if (table_ndx != realm::npos)
+        cascade_break_backlinks_to_all_rows(state); // Throws
 
-    bool broken_reciprocal_backlinks = true;
-    do_clear(broken_reciprocal_backlinks);
-
-    remove_backlink_broken_rows(state.rows); // Throws
-}
-
-
-// Replication instruction 'clear-table' calls this function
-// directly with broken_reciprocal_backlinks=false.
-void Table::do_clear(bool broken_reciprocal_backlinks)
-{
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
-        column.clear(m_size, broken_reciprocal_backlinks); // Throws
+        column.clear(m_size); // Throws
     }
     m_size = 0;
 
     discard_row_accessors();
     bump_version();
+
+    if (table_ndx != realm::npos)
+        remove_backlink_broken_rows(state.rows, table_ndx); // Throws
+
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->clear_table(this); // Throws
+#endif
 }
 
 
@@ -2779,11 +2773,12 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
         repl->set_link(this, col_ndx, row_ndx, target_row_ndx); // Throws
 #endif
 
-    size_t old_target_row_ndx = do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
+    ColumnLink& col = get_column_link(col_ndx);
+    size_t old_target_row_ndx = col.set_link(row_ndx, target_row_ndx);
+    bump_version();
+
     if (old_target_row_ndx == realm::npos)
         return;
-
-    ColumnLink& col = get_column_link(col_ndx);
     if (col.get_weak_links())
         return;
 
@@ -2800,17 +2795,6 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     target_table.cascade_break_backlinks_to(old_target_row_ndx, state); // Throws
 
     remove_backlink_broken_rows(state.rows); // Throws
-}
-
-
-// Replication instruction 'set_link' calls this function directly.
-size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    ColumnLink& col = get_column_link(col_ndx);
-    size_t old_target_row_ndx = col.set_link(row_ndx, target_row_ndx);
-    bump_version();
-    return old_target_row_ndx;
 }
 
 

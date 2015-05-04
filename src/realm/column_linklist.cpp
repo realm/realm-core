@@ -27,23 +27,10 @@
 using namespace realm;
 
 
-void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,
-                                    bool broken_reciprocal_backlinks)
+void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
     REALM_ASSERT_3(last_row_ndx + 1, ==, size());
-
-    // Remove backlinks to the delete row
-    if (!broken_reciprocal_backlinks) {
-        if (ref_type ref = get_as_ref(row_ndx)) {
-            Column link_list(get_alloc(), ref);
-            size_t n = link_list.size();
-            for (size_t i = 0; i < n; ++i) {
-                size_t target_row_ndx = to_size_t(link_list.get(i));
-                m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
-            }
-        }
-    }
 
     // Update backlinks to last row to point to its new position
     if (row_ndx != last_row_ndx) {
@@ -67,13 +54,8 @@ void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,
 }
 
 
-void ColumnLinkList::clear(size_t, bool broken_reciprocal_backlinks)
+void ColumnLinkList::clear(size_t)
 {
-    if (!broken_reciprocal_backlinks) {
-        size_t num_target_rows = m_target_table->size();
-        m_backlink_column->remove_all_backlinks(num_target_rows); // Throws
-    }
-
     // Do the actual deletion
     do_clear(); // Throws
     // FIXME: This one is needed because Column::do_clear() forgets about the

@@ -210,7 +210,7 @@ void ColumnBackLink::erase(size_t, bool)
 }
 
 
-void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx, bool)
+void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
     REALM_ASSERT_DEBUG(row_ndx <= last_row_ndx);
     REALM_ASSERT_DEBUG(last_row_ndx + 1 == size());
@@ -251,7 +251,7 @@ void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx, bool)
 }
 
 
-void ColumnBackLink::clear(std::size_t num_rows, bool)
+void ColumnBackLink::clear(std::size_t num_rows)
 {
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
         // Column::clear() handles the destruction of subtrees

@@ -112,7 +112,7 @@ private:
 
     std::size_t do_set(std::size_t link_ndx, std::size_t target_row_ndx);
     std::size_t do_remove(std::size_t link_ndx);
-    void do_clear(bool broken_reciprocal_backlinks);
+    void do_clear();
 
     void do_nullify_link(std::size_t old_target_row_ndx);
     void do_update_link(std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
@@ -339,28 +339,6 @@ inline Replication* LinkView::get_repl() REALM_NOEXCEPT
     return tf::get_repl(*m_origin_table);
 }
 #endif
-
-
-// The purpose of this class is to give internal access to some, but not all of
-// the non-public parts of LinkView.
-class _impl::LinkListFriend {
-public:
-    static void do_set(LinkView& list, std::size_t link_ndx, std::size_t target_row_ndx)
-    {
-        list.do_set(link_ndx, target_row_ndx);
-    }
-
-    static void do_remove(LinkView& list, std::size_t link_ndx)
-    {
-        list.do_remove(link_ndx);
-    }
-
-    static void do_clear(LinkView& list)
-    {
-        bool broken_reciprocal_backlinks = false;
-        list.do_clear(broken_reciprocal_backlinks);
-    }
-};
 
 } // namespace realm
 

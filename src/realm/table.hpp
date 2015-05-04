@@ -881,11 +881,6 @@ private:
     mutable uint_fast64_t m_version;
 #endif
 
-    void do_remove(std::size_t row_ndx);
-    void do_move_last_over(std::size_t row_ndx, bool broken_reciprocal_backlinks);
-    void do_clear(bool broken_reciprocal_backlinks);
-    std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-
     void upgrade_file_format();
 
     /// Update the version of this table and all tables which have links to it.
@@ -1168,23 +1163,6 @@ private:
     /// because a non-initiating row is added to \a state.rows only when the
     /// last backlink originating from it is lost.
     ///
-    /// Each row removal is replicated individually (as opposed to one
-    /// replication instruction for the entire cascading operation). This is
-    /// done because it provides an easy way for Group::advance_transact() to
-    /// know which tables are affected by the cascade. Note that this has
-    /// several important consequences: First of all, the replication log
-    /// receiver must execute the row removal instructions in a non-cascading
-    /// fashion, meaning that there will be an asymmetry between the two sides
-    /// in how the effect of the cascade is brought about. While this is fine
-    /// for simple 1-to-1 replication, it may end up interfering badly with
-    /// *transaction merging*, when that feature is introduced. Imagine for
-    /// example that the cascade initiating operation gets canceled during
-    /// conflict resolution, but some, or all of the induced row removals get to
-    /// stay. That would break causal consistency. It is important, however, for
-    /// transaction merging that the cascaded row removals are explicitly
-    /// mentioned in the replication log, such that they can be used to adjust
-    /// row indexes during the *operational transform*.
-    ///
     /// cascade_break_backlinks_to_all_rows() has the same affect as calling
     /// cascade_break_backlinks_to() once for each row in the table. When
     /// calling this function, \a state.stop_on_table must be set to the origin
@@ -1197,12 +1175,14 @@ private:
     typedef ColumnBase::CascadeState CascadeState;
     void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState& state);
     void cascade_break_backlinks_to_all_rows(CascadeState& state);
-    void remove_backlink_broken_rows(const CascadeState::row_set&);
+    std::size_t remove_backlink_broken_rows(const CascadeState::row_set&,
+                                            std::size_t skip_table_ndx=npos,
+                                            std::size_t skip_row_ndx=npos);
 
     //@}
 
-    /// Remove the specified row by the 'move last over' method, and submit the
-    /// operation to the replication subsystem.
+    /// Remove the specified row by the 'move last over' method, without
+    /// cascading or submitting to the replication subsystem
     void do_move_last_over(std::size_t row_ndx);
 
     // Precondition: 1 <= end - begin
@@ -2047,29 +2027,6 @@ public:
     static ColumnBase& get_column(const Table& table, std::size_t col_ndx)
     {
         return *table.m_cols[col_ndx];
-    }
-
-    static void do_remove(Table& table, std::size_t row_ndx)
-    {
-        table.do_remove(row_ndx); // Throws
-    }
-
-    static void do_move_last_over(Table& table, std::size_t row_ndx)
-    {
-        bool broken_reciprocal_backlinks = false;
-        table.do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
-    }
-
-    static void do_clear(Table& table)
-    {
-        bool broken_reciprocal_backlinks = false;
-        table.do_clear(broken_reciprocal_backlinks); // Throws
-    }
-
-    static void do_set_link(Table& table, std::size_t col_ndx, std::size_t row_ndx,
-                            std::size_t target_row_ndx)
-    {
-        table.do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
     }
 
     static std::size_t get_num_strong_backlinks(const Table& table,

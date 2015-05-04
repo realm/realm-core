@@ -419,13 +419,13 @@ inline void ColumnMixed::erase(std::size_t row_ndx, bool is_last)
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnMixed::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+inline void ColumnMixed::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnMixed::clear(std::size_t num_rows, bool)
+inline void ColumnMixed::clear(std::size_t num_rows)
 {
     do_clear(num_rows); // Throws
 }

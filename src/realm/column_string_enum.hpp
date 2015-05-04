@@ -124,8 +124,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) override;
     void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
-    void clear(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t) override;
+    void clear(std::size_t) override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
@@ -243,13 +243,13 @@ inline void ColumnStringEnum::erase(std::size_t row_ndx, bool is_last)
 }
 
 // Overriding virtual method of Column.
-inline void ColumnStringEnum::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+inline void ColumnStringEnum::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 // Overriding virtual method of Column.
-inline void ColumnStringEnum::clear(std::size_t, bool)
+inline void ColumnStringEnum::clear(std::size_t)
 {
     do_clear(); // Throws
 }

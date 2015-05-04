@@ -69,6 +69,7 @@ enum Instruction {
     instr_RowInsertComplete     = 26,
     instr_InsertEmptyRows       = 27,
     instr_EraseRows             = 28, // Remove (multiple) rows
+    instr_CascadeEraseRow       = 51, // A row was removed by cascading deletes caused by the next operation
     instr_AddIntToColumn        = 29, // Add an integer value to all cells in a column
     instr_ClearTable            = 30, // Remove all rows in selected table
     instr_OptimizeTable         = 31,
@@ -90,7 +91,7 @@ enum Instruction {
     instr_LinkListErase         = 47, // Remove an entry from a link list
     instr_LinkListClear         = 48, // Ramove all entries from a link list
     instr_LinkListSetAll        = 49, // Assign to link list entry
-    instr_InsertNullableColumn = 50   // Insert nullable column  
+    instr_InsertNullableColumn  = 50   // Insert nullable column
 };
 
 
@@ -144,6 +145,7 @@ public:
     // Must have table selected:
     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered);
     bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered);
+    bool cascade_erase_row(std::size_t row_ndx, std::size_t tbl_sz);
     bool clear_table();
     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t);
     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool);
@@ -282,6 +284,7 @@ public:
     void row_insert_complete(const Table*);
     void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
     void erase_row(const Table*, std::size_t row_ndx, bool move_last_over);
+    void cascade_erase_row(const Table* t, std::size_t row_ndx);
     void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
     void remove_search_index(const Table*, std::size_t col_ndx);
@@ -1133,6 +1136,7 @@ inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, std:
     m_encoder.insert_empty_rows(row_ndx, num_rows, t->size(), unordered); // Throws
 }
 
+
 inline bool TransactLogEncoder::erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
 {
     std::size_t last_row_ndx = tbl_sz - 1;
@@ -1140,12 +1144,26 @@ inline bool TransactLogEncoder::erase_rows(std::size_t row_ndx, std::size_t num_
     return true;
 }
 
-
 inline void TransactLogConvenientEncoder::erase_row(const Table* t, std::size_t row_ndx, bool move_last_over)
 {
     select_table(t); // Throws
     std::size_t num_rows = 1; // FIXME: might want to make this parameter externally visible?
-    m_encoder.erase_rows(row_ndx, num_rows, t->size(), move_last_over); // Throws
+    std::size_t tbl_size = t->size() + 1; // we're called after the row is erased, so size is off by one
+    m_encoder.erase_rows(row_ndx, num_rows, tbl_size, move_last_over); // Throws
+}
+
+
+inline bool TransactLogEncoder::cascade_erase_row(std::size_t row_ndx, std::size_t tbl_sz)
+{
+    std::size_t last_row_ndx = tbl_sz - 1;
+    simple_cmd(instr_CascadeEraseRow, util::tuple(row_ndx, last_row_ndx));
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::cascade_erase_row(const Table* t, std::size_t row_ndx)
+{
+    select_table(t); // Throws
+    m_encoder.cascade_erase_row(row_ndx, t->size()); // Throws
 }
 
 inline bool TransactLogEncoder::add_int_to_column(std::size_t col_ndx, int_fast64_t value)
@@ -1595,6 +1613,13 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t tbl_sz = read_int<std::size_t>(); // Throws
                 bool unordered = read_int<bool>(); // Throws
                 if (!handler.erase_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
+                    parser_error();
+                continue;
+            }
+            case instr_CascadeEraseRow: {
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+                if (!handler.cascade_erase_row(row_ndx, tbl_sz)) // Throws
                     parser_error();
                 continue;
             }

@@ -339,14 +339,12 @@ void ColumnTable::erase(size_t row_ndx, bool is_last)
 }
 
 
-void ColumnTable::move_last_over(size_t row_ndx, size_t last_row_ndx,
-                                 bool broken_reciprocal_backlinks)
+void ColumnTable::move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
     REALM_ASSERT_3(last_row_ndx + 1, ==, size());
     destroy_subtable(row_ndx);
-    ColumnSubtableParent::move_last_over(row_ndx, last_row_ndx,
-                                         broken_reciprocal_backlinks); // Throws
+    ColumnSubtableParent::move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 

@@ -1216,6 +1216,12 @@ public:
         return true;
     }
 
+    bool cascade_erase_row(size_t row_ndx, size_t table_sz) REALM_NOEXCEPT
+    {
+        erase_rows(row_ndx, 1, table_sz, true);
+        return true;
+    }
+
     bool clear_table() REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
@@ -1718,6 +1724,11 @@ public:
         m_encoder.insert_empty_rows(idx, num_rows, tbl_sz, unordered);
         append_instruction();
         return true;
+    }
+
+    bool cascade_erase_row(size_t, size_t) REALM_NOEXCEPT
+    {
+        return true; // No-op
     }
 
     bool add_int_to_column(size_t, int_fast64_t)

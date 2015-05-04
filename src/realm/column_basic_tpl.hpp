@@ -317,13 +317,13 @@ template<class T> inline void BasicColumn<T>::erase(std::size_t row_ndx, bool is
 
 // Implementing pure virtual method of ColumnBase.
 template<class T>
-void BasicColumn<T>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+void BasicColumn<T>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-template<class T> void BasicColumn<T>::clear(std::size_t, bool)
+template<class T> void BasicColumn<T>::clear(std::size_t)
 {
     do_clear(); // Throws
 }

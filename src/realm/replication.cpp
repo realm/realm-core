@@ -175,10 +175,9 @@ public:
                 }
             }
 #endif
-            typedef _impl::TableFriend tf;
             // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
             size_t target_row_ndx = value - size_t(1);
-            tf::do_set_link(*m_table, col_ndx, row_ndx, target_row_ndx); // Throws
+            m_table->set_link(col_ndx, row_ndx, target_row_ndx); // Throws
             return true;
         }
         return false;
@@ -364,21 +363,29 @@ public:
             return false;
         if (REALM_UNLIKELY(num_rows != 1))
             return false;
-        typedef _impl::TableFriend tf;
         if (unordered) {
 #ifdef REALM_DEBUG
             if (m_log)
                 *m_log << "table->move_last_over("<<row_ndx<<")\n";
 #endif
-            tf::do_move_last_over(*m_table, row_ndx); // Throws
+            m_table->move_last_over(row_ndx); // Throws
         }
         else {
 #ifdef REALM_DEBUG
             if (m_log)
                 *m_log << "table->remove("<<row_ndx<<")\n";
 #endif
-            tf::do_remove(*m_table, row_ndx); // Throws
+            m_table->remove(row_ndx); // Throws
         }
+        return true;
+    }
+
+    bool cascade_erase_row(size_t, size_t) REALM_NOEXCEPT
+    {
+        // no-op: the subsequent operation that caused this cascade will perform
+        // the same operation when it is replayed. If it could cascade
+        // differently (due to merging write transactions), we'd need to use
+        // this information to know how much to offset row indices later.
         return true;
     }
 
@@ -445,8 +452,7 @@ public:
             if (m_log)
                 *m_log << "table->clear()\n";
 #endif
-            typedef _impl::TableFriend tf;
-            tf::do_clear(*m_table); // Throws
+            m_table->clear();
             return true;
         }
         return false;
@@ -730,8 +736,7 @@ public:
         if (m_log)
             *m_log << "link_list->set("<<link_ndx<<", "<<value<<")\n";
 #endif
-        typedef _impl::LinkListFriend llf;
-        llf::do_set(*m_link_list, link_ndx, value); // Throws
+        m_link_list->set(link_ndx, value);
         return true;
     }
 
@@ -776,8 +781,7 @@ public:
         if (m_log)
             *m_log << "link_list->remove("<<link_ndx<<")\n";
 #endif
-        typedef _impl::LinkListFriend llf;
-        llf::do_remove(*m_link_list, link_ndx); // Throws
+        m_link_list->remove(link_ndx);
         return true;
     }
 
@@ -789,8 +793,7 @@ public:
         if (m_log)
             *m_log << "link_list->clear()\n";
 #endif
-        typedef _impl::LinkListFriend llf;
-        llf::do_clear(*m_link_list); // Throws
+        m_link_list->clear();
         return true;
     }
 

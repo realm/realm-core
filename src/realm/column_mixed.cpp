@@ -141,18 +141,16 @@ void ColumnMixed::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Remove refs or binary data
     clear_value(row_ndx, mixcol_Int); // Throws
 
-    bool broken_reciprocal_backlinks = false; // Value is immaterial for these column types
-    m_types->move_last_over(row_ndx, last_row_ndx, broken_reciprocal_backlinks); // Throws
-    m_data->move_last_over(row_ndx, last_row_ndx, broken_reciprocal_backlinks); // Throws
+    m_types->move_last_over(row_ndx, last_row_ndx); // Throws
+    m_data->move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 
 void ColumnMixed::do_clear(size_t num_rows)
 {
     discard_child_accessors();
-    bool broken_reciprocal_backlinks = false; // Value is immaterial for these column types
-    m_types->clear(num_rows, broken_reciprocal_backlinks); // Throws
-    m_data->clear(num_rows, broken_reciprocal_backlinks);  // Throws
+    m_types->clear(num_rows); // Throws
+    m_data->clear(num_rows);  // Throws
     if (m_binary_data) {
         m_binary_data->clear(); // Throws
     }

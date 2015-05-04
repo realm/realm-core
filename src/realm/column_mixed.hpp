@@ -134,8 +134,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) override;
     void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
-    void clear(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t) override;
+    void clear(std::size_t) override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;

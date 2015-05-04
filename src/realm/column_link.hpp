@@ -56,8 +56,8 @@ public:
 
     //@}
 
-    void move_last_over(std::size_t, std::size_t, bool) override;
-    void clear(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t) override;
+    void clear(std::size_t) override;
     void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
 
@@ -70,9 +70,6 @@ protected:
     void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                         std::size_t new_target_row_ndx) override;
-
-private:
-    void remove_backlinks(std::size_t row_ndx);
 };
 
 

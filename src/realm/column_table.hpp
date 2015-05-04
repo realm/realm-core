@@ -43,8 +43,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) override;
     void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
-    void clear(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t) override;
+    void clear(std::size_t) override;
     void discard_subtable_accessor(std::size_t) REALM_NOEXCEPT override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
@@ -210,7 +210,7 @@ public:
     using ColumnSubtableParent::insert;
 
     void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t) override;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
@@ -258,8 +258,7 @@ inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last)
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
-                                                 bool)
+inline void ColumnSubtableParent::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 
@@ -271,7 +270,7 @@ inline void ColumnSubtableParent::move_last_over(std::size_t row_ndx, std::size_
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::clear(std::size_t, bool)
+inline void ColumnSubtableParent::clear(std::size_t)
 {
     discard_child_accessors();
     do_clear(); // Throws

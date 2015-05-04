@@ -69,8 +69,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) override;
     void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
-    void clear(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t) override;
+    void clear(std::size_t) override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
@@ -254,13 +254,13 @@ inline void ColumnBinary::erase(std::size_t row_ndx, bool is_last)
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnBinary::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+inline void ColumnBinary::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnBinary::clear(std::size_t, bool)
+inline void ColumnBinary::clear(std::size_t)
 {
     do_clear(); // Throws
 }

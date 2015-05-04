@@ -77,11 +77,7 @@ public:
     /// Remove all elements from this column.
     ///
     /// \param num_rows The total number of rows in this column.
-    ///
-    /// \param broken_reciprocal_backlinks If true, link columns must assume
-    /// that reciprocal backlinks have already been removed. Non-link columns,
-    /// and backlink columns should ignore this argument.
-    virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
+    virtual void clear(std::size_t num_rows) = 0;
 
     /// Remove the specified entry from this column. Set \a is_last to
     /// true when deleting the last element. This is important to
@@ -92,12 +88,7 @@ public:
     /// Remove the specified row by moving the last row over it. This reduces the
     /// number of elements by one. The specified last row index must always be
     /// one less than the number of rows in the column.
-    ///
-    /// \param broken_reciprocal_backlinks If true, link columns must assume
-    /// that reciprocal backlinks have already been removed for the specified
-    /// row. Non-link columns, and backlink columns should ignore this argument.
-    virtual void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
-                                bool broken_reciprocal_backlinks) = 0;
+    virtual void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx) = 0;
 
     virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
 
@@ -467,8 +458,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) override;
     void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
-    void clear(std::size_t, bool) override;
+    void move_last_over(std::size_t, std::size_t) override;
+    void clear(std::size_t) override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
     void update_from_parent(size_t old_baseline) REALM_NOEXCEPT override;
 
@@ -835,13 +826,13 @@ inline void Column::erase(std::size_t row_ndx, bool is_last)
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void Column::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+inline void Column::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void Column::clear(std::size_t, bool)
+inline void Column::clear(std::size_t)
 {
     do_clear(); // Throws
 }

@@ -90,7 +90,6 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
 }
 
 
-// Replication instruction 'link-list-set' calls this function directly.
 size_t LinkView::do_set(size_t link_ndx, size_t target_row_ndx)
 {
     size_t old_target_row_ndx = m_row_indexes.get(link_ndx);
@@ -160,7 +159,6 @@ void LinkView::remove(size_t link_ndx)
 }
 
 
-// Replication instruction 'link-list-erase' calls this function directly.
 size_t LinkView::do_remove(size_t link_ndx)
 {
     size_t target_row_ndx = m_row_indexes.get(link_ndx);
@@ -187,8 +185,13 @@ void LinkView::clear()
 #endif
 
     if (m_origin_column.m_weak_links) {
-        bool broken_reciprocal_backlinks = false;
-        do_clear(broken_reciprocal_backlinks); // Throws
+        size_t origin_row_ndx = get_origin_row_index();
+        size_t num_links = m_row_indexes.size();
+        for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
+            size_t target_row_ndx = m_row_indexes.get(link_ndx);
+            m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
+        }
+        do_clear(); // Throws
         return;
     }
 
@@ -217,24 +220,15 @@ void LinkView::clear()
         tf::cascade_break_backlinks_to(target_table, target_row_ndx, state); // Throws
     }
 
-    bool broken_reciprocal_backlinks = true;
-    do_clear(broken_reciprocal_backlinks); // Throws
+    do_clear(); // Throws
 
     tf::remove_backlink_broken_rows(*m_origin_table, state.rows); // Throws
 }
 
 
-// Replication instruction 'link-list-clear' calls this function directly.
-void LinkView::do_clear(bool broken_reciprocal_backlinks)
+void LinkView::do_clear()
 {
     size_t origin_row_ndx = get_origin_row_index();
-    if (!broken_reciprocal_backlinks) {
-        size_t num_links = m_row_indexes.size();
-        for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
-            size_t target_row_ndx = m_row_indexes.get(link_ndx);
-            m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
-        }
-    }
 
     m_row_indexes.destroy();
     m_origin_column.set_row_ref(origin_row_ndx, 0); // Throws
