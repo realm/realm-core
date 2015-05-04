@@ -7135,6 +7135,138 @@ TEST(LangBindHelper_HandoverAccessors)
 
 }
 
+namespace {
+// support threads for handover stealing. The setup is as follows:
+// thread A writes a stream of updates to the database,
+// thread B listens and continously does advance_read to see the updates.
+// thread B also has a table view, which it continuosly keeps in sync in response
+// to the updates. It then hands over the result to thread C.
+// thread C continously recieves copies of the results obtained in thead B and
+// verifies them (by comparing with its own local, but identical query)
+REALM_TABLE_1(TheTable, first, Int)
+
+struct HandoverControl {
+    Mutex m_lock;
+    CondVar m_changed;
+    SharedGroup::VersionID m_version;
+    SharedGroup::Handover<TableView>* m_handover = 0;
+    void put(SharedGroup::Handover<TableView>* h, SharedGroup::VersionID v)
+    {
+        LockGuard lg(m_lock);
+        //std::cout << "put " << h << std::endl;
+        while (m_handover != 0) m_changed.wait(lg);
+        //std::cout << " -- put " << h << std::endl;
+        m_handover = h;
+        m_version = v;
+        m_changed.notify_all();
+    }
+    void get(SharedGroup::Handover<TableView>*& h, SharedGroup::VersionID &v)
+    {
+        LockGuard lg(m_lock);
+        //std::cout << "get " << std::endl;
+        while (m_handover == 0) m_changed.wait(lg);
+        //std::cout << " -- get " << m_handover << std::endl;
+        h = m_handover;
+        v = m_version;
+        m_handover = 0;
+        m_changed.notify_all();
+    }
+    HandoverControl(const HandoverControl&) = delete;
+    HandoverControl() {}
+};
+
+void handover_writer(std::string path)
+{
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TheTable::Ref table = g.get_table<TheTable>("table");
+    Random random(random_int<unsigned long>());
+    for (int i = 1; i < 100; ++i)
+    {
+        LangBindHelper::promote_to_write(sg);
+        table->add(1 + random.draw_int_mod(100));
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    LangBindHelper::promote_to_write(sg);
+    table[0].first = 0; // <---- signals other threads to stop
+    LangBindHelper::commit_and_continue_as_read(sg);
+    sg.end_read();
+}
+
+void handover_querier(HandoverControl* control, TestResults* test_results_ptr, std::string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TableRef table = g.get_table("table");
+    TableView tv = table->where().greater(0,50).find_all();
+    for (;;) {
+        sg.wait_for_change();
+        LangBindHelper::advance_read(sg);
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK(tv.is_in_sync());
+        control->put(sg.export_for_handover(tv, ConstSourcePayload::Copy), 
+                     sg.get_version_of_current_transaction());
+        if (table->size() > 0 && table->get_int(0,0) == 0)
+            break;
+    }
+    sg.end_read();
+}
+
+void handover_verifier(HandoverControl* control, TestResults* test_results_ptr, std::string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    for (;;) {
+        SharedGroup::Handover<TableView>* handover;
+        SharedGroup::VersionID version;
+        control->get(handover, version);
+        Group& g = const_cast<Group&>(sg.begin_read(version));
+        TableRef table = g.get_table("table");
+        TableView tv = table->where().greater(0,50).find_all();
+        CHECK(tv.is_in_sync());
+        TableView* tv2 = sg.import_from_handover(handover);
+        CHECK(tv.is_in_sync());
+        CHECK(tv2->is_in_sync());
+        CHECK(tv.size() == tv2->size());
+        for (std::size_t k=0; k<tv.size(); ++k)
+            CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
+        delete tv2;
+        if (table->size() > 0 && table->get_int(0,0) == 0)
+            break;
+        sg.end_read();
+    }
+}
+
+}
+
+TEST(LangBindHelper_HandoverBetweenThreads)
+{
+    SHARED_GROUP_TEST_PATH(p);
+    std::string path(p);
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = sg.begin_write();
+    TheTable::Ref table = g.add_table<TheTable>("table");
+    sg.commit();
+    sg.begin_read();
+    table = g.get_table<TheTable>("table");
+    CHECK(bool(table));
+    sg.end_read();
+    HandoverControl control;
+    Thread writer, querier, verifier;
+    writer.start(bind(&handover_writer, path));
+    querier.start(bind(&handover_querier, &control, &test_results, path));
+    verifier.start(bind(&handover_verifier, &control, &test_results, path));
+    writer.join();
+    querier.join();
+    verifier.join();
+}
+
 TEST(LangBindHelper_HandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
