@@ -162,6 +162,8 @@ public:
 private:
     LeafType& root_as_leaf();
     const LeafType& root_as_leaf() const;
+    
+    std::unique_ptr<Array> create_root_from_ref(Allocator& alloc, ref_type ref);
 
     struct EraseHandler;
     struct UpdateHandler;
@@ -266,19 +268,26 @@ BpTree<T,N>::BpTree(BpTreeBase::unattached_tag) : BpTreeBase(nullptr)
 }
 
 template <class T, bool N>
-void BpTree<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
+std::unique_ptr<Array> BpTree<T,N>::create_root_from_ref(Allocator& alloc, ref_type ref)
 {
     const char* header = alloc.translate(ref);
-	std::unique_ptr<Array> new_root;
-	if (Array::get_is_inner_bptree_node_from_header(header)) {
-		new_root.reset(new Array{alloc});
-		new_root->init_from_ref(ref);
-	}
-	else {
-		std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
-		leaf->init_from_ref(ref);
-		new_root = std::move(leaf);
-	}
+    std::unique_ptr<Array> new_root;
+    if (Array::get_is_inner_bptree_node_from_header(header)) {
+        new_root.reset(new Array{alloc});
+        new_root->init_from_ref(ref);
+    }
+    else {
+        std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
+        leaf->init_from_ref(ref);
+        new_root = std::move(leaf);
+    }
+    return new_root;
+}
+
+template <class T, bool N>
+void BpTree<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
+{
+    auto new_root = create_root_from_ref(alloc, ref);
 	replace_root(std::move(new_root));
 }
 
@@ -286,7 +295,9 @@ template <class T, bool N>
 void BpTree<T,N>::init_from_parent()
 {
 	ref_type ref = root().get_ref_from_parent();
-	init_from_ref(get_alloc(), ref);
+    auto new_root = create_root_from_ref(get_alloc(), ref);
+    new_root->set_parent(m_root->get_parent(), m_root->get_ndx_in_parent());
+    m_root = std::move(new_root);
 }
 
 template <class T, bool N>

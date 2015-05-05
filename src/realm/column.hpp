@@ -1300,13 +1300,7 @@ ref_type TColumn<T,N>::write(size_t slice_offset, size_t slice_size,
 template <class T, bool N>
 void TColumn<T,N>::refresh_accessor_tree(size_t, const Spec&)
 {
-    // With this type of column (Column), `m_array` is always an instance of
-    // Array. This is true because all leafs are instances of Array, and when
-    // the root is an inner B+-tree node, only the top array of the inner node
-    // is cached. This means that we never have to change the type of the cached
-    // root array.
-    // FIXME: XXX!
-    get_root_array()->init_from_parent();
+    m_tree.init_from_parent();
 }
 
 #if defined(REALM_DEBUG)
