@@ -604,18 +604,20 @@ TEST(Query_NextGen_StringConditions)
     table2->set_string(0, 2, realm::null());
     table2->add_empty_row();
     table2->set_string(0, 3, "bar");
+    table2->add_empty_row();
+    table2->set_string(0, 4, "");
 
     m = table2->column<String>(0).contains(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).begins_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).ends_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).equal(StringData("")).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(StringData("")).count();
     CHECK_EQUAL(m, 4);
@@ -624,20 +626,20 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(realm::null()).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
 
     m = table2->column<String>(0).contains(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).begins_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).ends_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).equal(StringData(""), false).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -646,10 +648,10 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     TableRef table3 = group.add_table(StringData("table3"));
     table3->add_column_link(type_Link, "link1", *table2);
@@ -662,18 +664,20 @@ TEST(Query_NextGen_StringConditions)
     table3->set_link(0, 2, 2);
     table3->add_empty_row();
     table3->set_link(0, 3, 3);
+    table3->add_empty_row();
+    table3->set_link(0, 4, 4);
 
     m = table3->link(0).column<String>(0).contains(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).begins_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).ends_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).equal(StringData("")).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(StringData("")).count();
     CHECK_EQUAL(m, 4);
@@ -682,20 +686,20 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(realm::null()).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
 
     m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).begins_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).ends_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).equal(StringData(""), false).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -704,10 +708,10 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 }
 
 
