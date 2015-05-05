@@ -443,8 +443,8 @@ public:
     template<typename T>
     Handover<T>* export_for_handover(T& accessor, MutableSourcePayload mode)
     {
-        // We do not lock anything, must be called by thread already
-        // associated with this shared group.
+        // We'll take a lock here for the benefit of users truly knowing what they are doing.
+        util::LockGuard lg(m_handover_lock);
         Handover<T>* result = new Handover<T>();
         // see above re dynamic_cast.
         result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode));

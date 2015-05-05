@@ -7136,7 +7136,7 @@ TEST(LangBindHelper_HandoverAccessors)
 }
 
 namespace {
-// support threads for handover stealing. The setup is as follows:
+// support threads for handover test. The setup is as follows:
 // thread A writes a stream of updates to the database,
 // thread B listens and continously does advance_read to see the updates.
 // thread B also has a table view, which it continuosly keeps in sync in response
@@ -7145,12 +7145,13 @@ namespace {
 // verifies them (by comparing with its own local, but identical query)
 REALM_TABLE_1(TheTable, first, Int)
 
+template<typename T>
 struct HandoverControl {
     Mutex m_lock;
     CondVar m_changed;
     SharedGroup::VersionID m_version;
-    SharedGroup::Handover<TableView>* m_handover = 0;
-    void put(SharedGroup::Handover<TableView>* h, SharedGroup::VersionID v)
+    T* m_handover = 0;
+    void put(T* h, SharedGroup::VersionID v)
     {
         LockGuard lg(m_lock);
         //std::cout << "put " << h << std::endl;
@@ -7160,7 +7161,7 @@ struct HandoverControl {
         m_version = v;
         m_changed.notify_all();
     }
-    void get(SharedGroup::Handover<TableView>*& h, SharedGroup::VersionID &v)
+    void get(T*& h, SharedGroup::VersionID &v)
     {
         LockGuard lg(m_lock);
         //std::cout << "get " << std::endl;
@@ -7170,6 +7171,16 @@ struct HandoverControl {
         v = m_version;
         m_handover = 0;
         m_changed.notify_all();
+    }
+    bool try_get(T*& h, SharedGroup::VersionID& v)
+    {
+        LockGuard lg(m_lock);
+        if (m_handover == 0) return false;
+        h = m_handover;
+        v = m_version;
+        m_handover = 0;
+        m_changed.notify_all();
+        return true;
     }
     HandoverControl(const HandoverControl&) = delete;
     HandoverControl() {}
@@ -7182,7 +7193,7 @@ void handover_writer(std::string path)
     Group& g = const_cast<Group&>(sg.begin_read());
     TheTable::Ref table = g.get_table<TheTable>("table");
     Random random(random_int<unsigned long>());
-    for (int i = 1; i < 100; ++i)
+    for (int i = 1; i < 500; ++i)
     {
         LangBindHelper::promote_to_write(sg);
         table->add(1 + random.draw_int_mod(100));
@@ -7194,7 +7205,8 @@ void handover_writer(std::string path)
     sg.end_read();
 }
 
-void handover_querier(HandoverControl* control, TestResults* test_results_ptr, std::string path)
+void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control, 
+                      TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
     std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
@@ -7208,7 +7220,7 @@ void handover_querier(HandoverControl* control, TestResults* test_results_ptr, s
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
-        control->put(sg.export_for_handover(tv, ConstSourcePayload::Copy), 
+        control->put(sg.export_for_handover(tv, MutableSourcePayload::Move), 
                      sg.get_version_of_current_transaction());
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
@@ -7216,7 +7228,8 @@ void handover_querier(HandoverControl* control, TestResults* test_results_ptr, s
     sg.end_read();
 }
 
-void handover_verifier(HandoverControl* control, TestResults* test_results_ptr, std::string path)
+void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control, 
+                       TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
     std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
@@ -7257,7 +7270,7 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     table = g.get_table<TheTable>("table");
     CHECK(bool(table));
     sg.end_read();
-    HandoverControl control;
+    HandoverControl<SharedGroup::Handover<TableView>> control;
     Thread writer, querier, verifier;
     writer.start(bind(&handover_writer, path));
     querier.start(bind(&handover_querier, &control, &test_results, path));
@@ -7266,6 +7279,111 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     querier.join();
     verifier.join();
 }
+
+namespace {
+// for stealing, we need to expose the shared group of the thread we're stealing from,
+// as well as the tableview we want to steal. Stealing can be done while the shared group
+// is advancing, BUT care must be taken to ensure that the object we're stealing remains
+// valid and unchanged until stealing is complete.
+struct StealingInfo {
+    SharedGroup* sg;
+    TableView* tv;
+};
+
+
+void stealing_querier(HandoverControl<StealingInfo>* control, 
+                      TestResults* test_results_ptr, std::string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TableRef table = g.get_table("table");
+    TableView tv = table->where().greater(0,50).find_all();
+    for (;;) {
+        sg.wait_for_change();
+        LangBindHelper::advance_read(sg);
+        CHECK(!tv.is_in_sync());
+        tv.sync_if_needed();
+        CHECK(tv.is_in_sync());
+        StealingInfo* info = new StealingInfo;
+        info->sg = &sg;
+        info->tv = &tv;
+        control->put(info, sg.get_version_of_current_transaction());
+        if (table->size() > 0 && table->get_int(0,0) == 0) {
+            // we need to wait for the verifier to steal our latest payload.
+            // if we go out of scope too early, the payload will become invalid
+            sg.wait_for_change();
+            LangBindHelper::advance_read(sg);
+            if (table->get_int(0,0) == -1)
+                break;
+        }
+    }
+    sg.end_read();
+}
+
+void stealing_verifier(HandoverControl<StealingInfo>* control, 
+                       TestResults* test_results_ptr, std::string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    for (;;) {
+        StealingInfo* info;
+        SharedGroup::Handover<TableView>* handover;
+        SharedGroup::VersionID version;
+        control->get(info, version);
+        Group& g = const_cast<Group&>(sg.begin_read(version));
+        TableRef table = g.get_table("table");
+        TableView tv = table->where().greater(0,50).find_all();
+        CHECK(tv.is_in_sync());
+        // Actually steal the payload:
+        handover = info->sg->export_for_handover(*info->tv, MutableSourcePayload::Move);
+        TableView* tv2 = sg.import_from_handover(handover);
+        CHECK(tv.is_in_sync());
+        CHECK(tv2->is_in_sync());
+        CHECK(tv.size() == tv2->size());
+        for (std::size_t k=0; k<tv.size(); ++k)
+            CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
+        delete tv2;
+        if (table->size() > 0 && table->get_int(0,0) == 0) {
+            LangBindHelper::promote_to_write(sg);
+            table->set_int(0,0,-1);
+            sg.commit();
+            break;
+        } 
+        else
+            sg.end_read();
+    }
+}
+
+}
+
+TEST(LangBindHelper_HandoverStealing)
+{
+    SHARED_GROUP_TEST_PATH(p);
+    std::string path(p);
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = sg.begin_write();
+    TheTable::Ref table = g.add_table<TheTable>("table");
+    sg.commit();
+    sg.begin_read();
+    table = g.get_table<TheTable>("table");
+    CHECK(bool(table));
+    sg.end_read();
+    HandoverControl<StealingInfo> control;
+    Thread writer, querier, verifier;
+    writer.start(bind(&handover_writer, path));
+
+    querier.start(bind(&stealing_querier, &control, &test_results, path));
+    verifier.start(bind(&stealing_verifier, &control, &test_results, path));
+    writer.join();
+    querier.join();
+    verifier.join();
+
+}
+
 
 TEST(LangBindHelper_HandoverDependentViews)
 {
