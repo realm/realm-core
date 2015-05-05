@@ -4,6 +4,7 @@
 #include <cstring>
 #include <algorithm>
 #include <queue>
+#include <functional>
 
 #include <realm/util/thread.hpp>
 

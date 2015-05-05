@@ -4,6 +4,7 @@
 #include <cassert>
 #include <map>
 #include <iostream>
+#include <functional>
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
