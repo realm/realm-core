@@ -5891,6 +5891,211 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg(tlm, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg_w);
+        Table& origin = *wt.add_table("origin");
+        Table& target = *wt.add_table("target");
+        origin.add_column_link(type_Link, "o_1", target, link_Strong);
+        target.add_column(type_Int, "t_1");
+        wt.commit();
+    }
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    const Table& target = *group.get_table("target");
+
+    ConstRow target_row_0, target_row_1;
+
+    auto perform_change = [&](std::function<void (Table&)> func) {
+        // Ensure there are two rows in each table, with each row in `origin`
+        // pointing to the corresponding row in `target`
+        {
+            WriteTransaction wt(sg_w);
+            Table& origin_w = *wt.get_table("origin");
+            Table& target_w = *wt.get_table("target");
+
+            origin_w.clear();
+            target_w.clear();
+            origin_w.add_empty_row(2);
+            target_w.add_empty_row(2);
+            origin_w[0].set_link(0, 0);
+            origin_w[1].set_link(0, 1);
+
+            wt.commit();
+        }
+
+        // Grab the row accessors before applying the modification being tested
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        target_row_0 = target.get(0);
+        target_row_1 = target.get(1);
+
+        // Perform the modification
+        {
+            WriteTransaction wt(sg_w);
+            func(*wt.get_table("origin"));
+            wt.commit();
+        }
+
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        // Leave `group` and the target accessors in a state which can be tested
+        // with the changes applied
+    };
+
+    // Break link by nullifying
+    perform_change([](Table& origin) {
+        origin[1].nullify_link(0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by reassign
+    perform_change([](Table& origin) {
+        origin[1].set_link(0, 0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Avoid breaking link by reassigning self
+    perform_change([](Table& origin) {
+        origin[1].set_link(0, 1);
+    });
+    // Should not delete anything
+    CHECK(target_row_0 && target_row_1);
+    CHECK_EQUAL(target.size(), 2);
+
+    // Break link by explicit row removal
+    perform_change([](Table& origin) {
+        origin[1].move_last_over();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by clearing table
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 0);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg(tlm, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg_w);
+        Table& origin = *wt.add_table("origin");
+        Table& target = *wt.add_table("target");
+        origin.add_column_link(type_LinkList, "o_1", target, link_Strong);
+        target.add_column(type_Int, "t_1");
+        wt.commit();
+    }
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    const Table& target = *group.get_table("target");
+
+    ConstRow target_row_0, target_row_1;
+
+    auto perform_change = [&](std::function<void (Table&)> func) {
+        // Ensure there are two rows in each table, with the first row in `origin`
+        // linking to the first row in `target`, and the second row in `origin`
+        // linking to both rows in `target`
+        {
+            WriteTransaction wt(sg_w);
+            Table& origin_w = *wt.get_table("origin");
+            Table& target_w = *wt.get_table("target");
+
+            origin_w.clear();
+            target_w.clear();
+            origin_w.add_empty_row(2);
+            target_w.add_empty_row(2);
+            origin_w[0].get_linklist(0)->add(0);
+            origin_w[1].get_linklist(0)->add(0);
+            origin_w[1].get_linklist(0)->add(1);
+
+
+            wt.commit();
+        }
+
+        // Grab the row accessors before applying the modification being tested
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        target_row_0 = target.get(0);
+        target_row_1 = target.get(1);
+
+        // Perform the modification
+        {
+            WriteTransaction wt(sg_w);
+            func(*wt.get_table("origin"));
+            wt.commit();
+        }
+
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        // Leave `group` and the target accessors in a state which can be tested
+        // with the changes applied
+    };
+
+    // Break link by clearing list
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->clear();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by removal from list
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->remove(1);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by reassign
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->set(1, 0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Avoid breaking link by reassigning self
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->set(1, 1);
+    });
+    // Should not delete anything
+    CHECK(target_row_0 && target_row_1);
+    CHECK_EQUAL(target.size(), 2);
+
+    // Break link by explicit row removal
+    perform_change([](Table& origin) {
+        origin[1].move_last_over();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by clearing table
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 0);
+}
+
 
 TEST(LangBindHelper_ImplicitTransactions)
 {
