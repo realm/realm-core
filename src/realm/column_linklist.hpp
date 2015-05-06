@@ -46,7 +46,7 @@ class TransactLogConvenientEncoder;
 /// ref.
 class ColumnLinkList: public ColumnLinkBase, public ArrayParent {
 public:
-    ColumnLinkList(Allocator&, ref_type, Table*, std::size_t column_ndx);
+    using ColumnLinkBase::ColumnLinkBase;
     ~ColumnLinkList() REALM_NOEXCEPT override;
 
     static ref_type create(Allocator&, std::size_t size = 0);
@@ -80,12 +80,6 @@ protected:
     void do_discard_child_accessors() REALM_NOEXCEPT override;
 
 private:
-    // A pointer to the table that this column is part of.
-    Table* const m_table;
-
-    // The index of this column within m_table.m_cols.
-    std::size_t m_column_ndx;
-
     struct list_entry {
         std::size_t m_row_ndx;
         LinkView* m_list;
@@ -138,13 +132,6 @@ private:
 
 
 // Implementation
-
-inline ColumnLinkList::ColumnLinkList(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx):
-    ColumnLinkBase(alloc, ref), // Throws
-    m_table(table),
-    m_column_ndx(column_ndx)
-{
-}
 
 inline ColumnLinkList::~ColumnLinkList() REALM_NOEXCEPT
 {

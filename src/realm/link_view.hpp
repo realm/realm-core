@@ -114,7 +114,7 @@ private:
     std::size_t do_remove(std::size_t link_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
 
-    void do_nullify_link(std::size_t old_target_row_ndx);
+    void do_nullify_link(std::size_t old_target_row_ndx, std::size_t col_ndx);
     void do_update_link(std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
 
     void bind_ref() const REALM_NOEXCEPT;
