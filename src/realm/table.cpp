@@ -1255,7 +1255,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_Link:
             // Target table will be set by group after entire table has been created
-            col = new ColumnLink(alloc, ref); // Throws
+            col = new ColumnLink(alloc, ref, this, col_ndx); // Throws
             break;
         case col_type_LinkList:
             // Target table will be set by group after entire table has been created

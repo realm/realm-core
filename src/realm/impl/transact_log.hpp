@@ -57,44 +57,46 @@ enum Instruction {
     instr_SetTable              = 12,
     instr_SetMixed              = 13,
     instr_SetLink               = 14,
-    instr_SetNull               = 51, // FIXME: Re-enumerate
-    instr_InsertInt             = 15,
-    instr_InsertBool            = 16,
-    instr_InsertFloat           = 17,
-    instr_InsertDouble          = 18,
-    instr_InsertString          = 19,
-    instr_InsertBinary          = 20,
-    instr_InsertDateTime        = 21,
-    instr_InsertTable           = 22,
-    instr_InsertMixed           = 23,
-    instr_InsertLink            = 24,
-    instr_InsertLinkList        = 25,
-    instr_RowInsertComplete     = 26,
-    instr_InsertEmptyRows       = 27,
-    instr_EraseRows             = 28, // Remove (multiple) rows
-    instr_AddIntToColumn        = 29, // Add an integer value to all cells in a column
-    instr_ClearTable            = 30, // Remove all rows in selected table
-    instr_OptimizeTable         = 31,
-    instr_SelectDescriptor      = 32, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 33, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 34, // do, but for a link-type column
-    instr_InsertNullableColumn  = 50, // Insert nullable column                                    // FIXME: Re-enumerate
-    instr_EraseColumn           = 35, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 37, // Rename column in selected descriptor
-    instr_AddSearchIndex        = 38, // Add a search index to a column
-    instr_RemoveSearchIndex     = 39, // Remove a search index from a column
-    instr_AddPrimaryKey         = 40, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 41, // Remove primary key from a table
-    instr_SetLinkType           = 42, // Strong/weak
-    instr_SelectLinkList        = 43,
-    instr_LinkListSet           = 44, // Assign to link list entry
-    instr_LinkListInsert        = 45, // Insert entry into link list
-    instr_LinkListMove          = 46, // Move an entry within a link list
-    instr_LinkListSwap          = 52, // Swap two entries within a link list
-    instr_LinkListErase         = 47, // Remove an entry from a link list
-    instr_LinkListClear         = 48, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 49  // Assign to link list entry
+    instr_NullifyLink           = 15, // Set link to null due to target being erased
+    instr_SetNull               = 16,
+    instr_InsertInt             = 17,
+    instr_InsertBool            = 18,
+    instr_InsertFloat           = 19,
+    instr_InsertDouble          = 20,
+    instr_InsertString          = 21,
+    instr_InsertBinary          = 22,
+    instr_InsertDateTime        = 23,
+    instr_InsertTable           = 24,
+    instr_InsertMixed           = 25,
+    instr_InsertLink            = 26,
+    instr_InsertLinkList        = 27,
+    instr_RowInsertComplete     = 28,
+    instr_InsertEmptyRows       = 29,
+    instr_EraseRows             = 30, // Remove (multiple) rows
+    instr_AddIntToColumn        = 31, // Add an integer value to all cells in a column
+    instr_ClearTable            = 32, // Remove all rows in selected table
+    instr_OptimizeTable         = 33,
+    instr_SelectDescriptor      = 34, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 35, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 36, // do, but for a link-type column
+    instr_InsertNullableColumn  = 37, // Insert nullable column
+    instr_EraseColumn           = 38, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 39, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 40, // Rename column in selected descriptor
+    instr_AddSearchIndex        = 41, // Add a search index to a column
+    instr_RemoveSearchIndex     = 42, // Remove a search index from a column
+    instr_AddPrimaryKey         = 43, // Add a primary key to a table
+    instr_RemovePrimaryKey      = 44, // Remove primary key from a table
+    instr_SetLinkType           = 45, // Strong/weak
+    instr_SelectLinkList        = 46,
+    instr_LinkListSet           = 47, // Assign to link list entry
+    instr_LinkListInsert        = 48, // Insert entry into link list
+    instr_LinkListMove          = 49, // Move an entry within a link list
+    instr_LinkListSwap          = 50, // Swap two entries within a link list
+    instr_LinkListErase         = 51, // Remove an entry from a link list
+    instr_LinkListNullify       = 52, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 53, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 54, // Assign to link list entry
 };
 
 
@@ -172,6 +174,7 @@ public:
     bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
     bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
     bool set_null(std::size_t, std::size_t) { return true; }
+    bool nullify_link(std::size_t, std::size_t, std::size_t) { return true; }
     bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
     bool optimize_table() { return true; };
 
@@ -193,6 +196,7 @@ public:
     bool link_list_move(std::size_t, std::size_t) { return true; }
     bool link_list_swap(std::size_t, std::size_t) { return true; }
     bool link_list_erase(std::size_t) { return true; }
+    bool link_list_nullify(std::size_t, std::size_t) { return true; }
     bool link_list_clear() { return true; }
 
     void parse_complete() {}
@@ -239,6 +243,7 @@ public:
     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&);
     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t);
     bool set_null(std::size_t col_ndx, std::size_t row_ndx);
+    bool nullify_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t old_value);
     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value);
     bool optimize_table();
 
@@ -261,6 +266,7 @@ public:
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     bool link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx);
     bool link_list_erase(std::size_t link_ndx);
+    bool link_list_nullify(std::size_t link_ndx, std::size_t old_target_row_ndx);
     bool link_list_clear();
 
     /// End of methods expected by parser.
@@ -341,6 +347,7 @@ public:
     void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_link_list(const LinkView&, const Column& values);
 
+    void nullify_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t old_value);
 
     void insert_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
     void insert_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
@@ -371,6 +378,7 @@ public:
     void link_list_move(const LinkView&, std::size_t old_link_ndx, std::size_t new_link_ndx);
     void link_list_swap(const LinkView&, std::size_t link1_ndx, std::size_t link2_ndx);
     void link_list_erase(const LinkView&, std::size_t link_ndx);
+    void link_list_nullify(const LinkView&, std::size_t link_ndx, std::size_t old_target_row_ndx);
     void link_list_clear(const LinkView&);
 
     void on_table_destroyed(const Table*) REALM_NOEXCEPT;
@@ -1059,6 +1067,18 @@ inline void TransactLogConvenientEncoder::set_null(const Table* t, std::size_t c
     m_encoder.set_null(col_ndx, row_ndx); // Throws
 }
 
+inline bool TransactLogEncoder::nullify_link(std::size_t col_ndx, std::size_t ndx, std::size_t old_value)
+{
+    simple_cmd(instr_NullifyLink, util::tuple(col_ndx, ndx, old_value)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::nullify_link(const Table* t, std::size_t col_ndx, std::size_t ndx, std::size_t old_value)
+{
+    select_table(t); // Throws
+    m_encoder.nullify_link(col_ndx, ndx, old_value); // Throws
+}
+
 
 inline bool TransactLogEncoder::insert_int(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, int_fast64_t value)
 {
@@ -1364,6 +1384,18 @@ inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, st
     m_encoder.link_list_set(link_ndx, value); // Throws
 }
 
+inline bool TransactLogEncoder::link_list_nullify(std::size_t link_ndx, std::size_t old_target_row_ndx)
+{
+    simple_cmd(instr_LinkListNullify, util::tuple(link_ndx, old_target_row_ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, std::size_t link_ndx, std::size_t old_target_row_ndx)
+{
+    select_link_list(list); // Throws
+    m_encoder.link_list_nullify(link_ndx, old_target_row_ndx); // Throws
+}
+
 inline bool TransactLogEncoder::link_list_set_all(const Column& values)
 {
     simple_cmd(instr_LinkListSetAll, util::tuple(values.size())); // Throws
@@ -1607,6 +1639,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_NullifyLink: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t old_target_row_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.nullify_link(col_ndx, row_ndx, old_target_row_ndx)) // Throws
+                parser_error();
+            return;
+        }
         case instr_InsertInt: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
@@ -1804,6 +1844,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_LinkListErase: {
             std::size_t link_ndx = read_int<std::size_t>(); // Throws
             if (!handler.link_list_erase(link_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_LinkListNullify: {
+            std::size_t link_ndx = read_int<std::size_t>(); // Throws
+            std::size_t old_target_row_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_nullify(link_ndx, old_target_row_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -2478,6 +2525,20 @@ public:
     bool link_list_clear()
     {
         return true; // No-op
+    }
+
+    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t old_target_row_ndx)
+    {
+        m_encoder.set_link(col_ndx, row_ndx, old_target_row_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool link_list_nullify(size_t link_ndx, size_t old_target_row_ndx)
+    {
+        m_encoder.link_list_insert(link_ndx, old_target_row_ndx);
+        append_instruction();
+        return true;
     }
 
 private:
