@@ -168,16 +168,25 @@ inline bool operator>=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 
 inline bool BinaryData::begins_with(BinaryData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
+
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
 inline bool BinaryData::ends_with(BinaryData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
+
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
 inline bool BinaryData::contains(BinaryData d) const REALM_NOEXCEPT
 {
+    if (is_null() && !d.is_null())
+        return false;
+
     return d.m_size == 0 ||
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
