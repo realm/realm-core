@@ -38,7 +38,7 @@ namespace realm {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() REALM_NOEXCEPT: m_data(0), m_size(0) {}
+    BinaryData() REALM_NOEXCEPT : m_data(0), m_size(0) {}
     BinaryData(const char* data, std::size_t size) REALM_NOEXCEPT: m_data(data), m_size(size) {}
     template<std::size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
     template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
@@ -134,7 +134,7 @@ inline bool BinaryData::is_null() const REALM_NOEXCEPT
 
 inline bool operator==(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
-    return a.m_size == b.m_size && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
+    return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator!=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
@@ -144,6 +144,9 @@ inline bool operator!=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 
 inline bool operator<(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
 {
+    if (a.is_null() || b.is_null())
+        return !a.is_null() < !b.is_null();
+
     return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
                                         b.m_data, b.m_data + b.m_size);
 }

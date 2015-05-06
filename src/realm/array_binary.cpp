@@ -106,7 +106,11 @@ void ArrayBinary::erase(size_t ndx)
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
-    if (get_size_from_header(header, alloc) == 3) {
+  
+    REALM_ASSERT_3(Array::get_size_from_header(header), >= , 2);
+    REALM_ASSERT_3(Array::get_size_from_header(header), <=, 3);
+    
+    if (Array::get_size_from_header(header) == 3) {
         pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
         bool null = Array::get(nulls_header, ndx);
