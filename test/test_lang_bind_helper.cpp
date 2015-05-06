@@ -12,7 +12,6 @@
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
 #  include <realm/commit_log.hpp>
-#  include <realm/util/bind.hpp>
 #endif
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -6443,10 +6442,10 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     }
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
-        threads[i].start(bind(multiple_trackers_writer_thread, std::string(path)));
+        threads[i].start(std::bind(multiple_trackers_writer_thread, std::string(path)));
     sched_yield();
     for (int i = 0; i < read_thread_count; ++i) {
-        threads[write_thread_count + i].start(bind(multiple_trackers_reader_thread,
+        threads[write_thread_count + i].start(std::bind(multiple_trackers_reader_thread,
                                                    &test_results, std::string(path)));
     }
 

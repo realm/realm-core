@@ -2,9 +2,9 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <functional>
 
 #include <memory>
-#include <realm/util/bind.hpp>
 #include <realm/util/thread.hpp>
 
 #include "demangle.hpp"
@@ -363,7 +363,7 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
     else {
         std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
         for (int i = 0; i != num_threads; ++i)
-            threads[i].start(bind(&ExecContext::run, &thread_contexts[i]));
+            threads[i].start(std::bind(&ExecContext::run, &thread_contexts[i]));
         for (int i = 0; i != num_threads; ++i)
             threads[i].join();
     }
