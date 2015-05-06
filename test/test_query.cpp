@@ -6003,7 +6003,7 @@ TEST(Query_BinaryNull)
     table.set_binary(0, 0, BinaryData());
     table.set_binary(0, 1, BinaryData("", 0)); // NOTE: Specify size = 0, else size turns into 1!
     table.set_binary(0, 2, BinaryData("foo"));
-        
+    
     size_t t;
 
     t = table.where().equal(0, BinaryData()).find();
@@ -6014,6 +6014,12 @@ TEST(Query_BinaryNull)
 
     t = table.where().equal(0, BinaryData("foo")).find();
     CHECK_EQUAL(2, t);
+
+    t = table.where().not_equal(0, BinaryData()).find();
+    CHECK_EQUAL(1, t);
+
+    t = table.where().not_equal(0, BinaryData("", 0)).find();
+    CHECK_EQUAL(0, t);
 }
 
 #endif
