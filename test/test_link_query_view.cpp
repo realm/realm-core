@@ -1416,4 +1416,34 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
     CHECK_EQUAL(0, tv.size());
 }
 
+TEST(LinkList_QueryUnsortedListWithOr)
+{
+    Group group;
+
+    TableRef data_table = group.add_table("data");
+    data_table->add_column(type_Int, "col");
+
+    TableRef link_table = group.add_table("link");
+    link_table->add_column_link(type_LinkList, "col", *data_table);
+
+    const size_t count = 5;
+    data_table->add_empty_row(count);
+    link_table->add_empty_row();
+    LinkViewRef lvr = link_table->get_linklist(0, 0);
+
+    // Populate data and add rows to the linkview in the opposite order of the
+    // table's order
+    for (size_t i = 0; i < count; ++i) {
+        data_table->set_int(0, i, i);
+        lvr->add(count - i - 1);
+    }
+
+    // Verify that a query with Or() returns all results
+    TableView tv = data_table->where(lvr).group().equal(0, 1000).Or().between(0, 2, 4).end_group().find_all();
+    CHECK_EQUAL(3, tv.size());
+    CHECK_EQUAL(4, tv[0].get_index());
+    CHECK_EQUAL(3, tv[1].get_index());
+    CHECK_EQUAL(2, tv[2].get_index());
+}
+
 #endif
