@@ -68,7 +68,7 @@ namespace realm {
 // - It does not matter whether the delete is done in-line (as part of the current transaction),
 //   or if it is done implicitly as part of advance_read() or promote_to_write().
 //
-// FIXME: The choice between reflective and imperative views should be represented by a
+// The choice between reflective and imperative views might eventually be represented by a
 // switch on the tableview, but isn't yet. For now, clients (bindings) must call sync_if_needed()
 // to get reflective behavior.
 //
@@ -85,15 +85,26 @@ namespace realm {
 // may be too costly to be acceptable on the main thread. Instead you want to run the query
 // on a worker thread, but display it on the main thread. To achieve this, you need two
 // SharedGroups locked on to the same version of the database. If you have that, you can
-// *handover* a view from one thread/SharedGroup to the other. Currently, Handover is limited
-// to views without a restricting view (see above) and to views created from a toplevel table
-// (not a LinkView).
+// *handover* a view from one thread/SharedGroup to the other.
 //
-// You can handover both reflective and imperative views. But most often it will only make
-// sense to handover an imperative view, because it is guaranteed not to rerun its query.
+// Handover is a two-step procedure. First, the accessors are *exported* from one SharedGroup,
+// called the sourcing group, then it is *imported* into another SharedGroup, called the
+// receiving group. Normally, the thread associated with the sourcing SharedGroup will be
+// responsible for the export operation, while the thread associated with the receiving
+// SharedGroup will do the import operation. This is different for "stealing" - see below.
+// See group_shared.hpp for more details on handover. 
 //
-// Handover is expressed using a templated type 'Handover' available from SharedGroup. See
-// group_shared.hpp for more details on handover.
+// 2b. Stealing
+// This is a special variant of handover, where the sourcing thread/shared group has its
+// TableView "stolen" from it, in the sense that the sourcing thread is *not* responsible
+// for exporting the view. This form of handover is limited, because the export operation
+// may happen in parallel with operations in the sourcing thread. The export operation is
+// mutually exclusive with advance_read or promote_to_write, so the sourcing thread is
+// free to move forward with these even though another thread is stealing its TableViews.
+// HOWEVER: All other accesses to the TableView is *not* interlocked, including indirect
+// accesses triggered by changes to other TableViews or Tables on which the TableView depend.
+// FIXME: If we truly need to interlock all accesses to the TableView, it is possible
+// to add this feature, BUT the runtime cost must be carefully considered.
 //
 // 3. Iterating a view and changing data
 // The third use case (and a motivator behind the imperative view) is when you want
@@ -102,8 +113,10 @@ namespace realm {
 //
 //    promote_to_write();
 //    view = table.where().less_than(salary_column,limit).find_all();
-//    for (size_t i = 0; i < view.size(); ++i)
+//    for (size_t i = 0; i < view.size(); ++i) {
 //        view.set_int(salary_column, i, limit);
+//        // add this to get reflective mode: view.sync_if_needed();
+//    }
 //    commit_and_continue_as_read();
 //
 // This is idiomatic imperative code and it works if the view is operated in imperative mode.
@@ -113,12 +126,6 @@ namespace realm {
 // view implicitly. view[0] is removed, view[1] moves to view[0] and so forth. But the next
 // loop iteration has i=1 and refers to view[1], thus skipping view[0]. The end result is that
 // every other employee get a raise, while the others don't.
-//
-// One way of dealing with use case 3 without supporting imperative views, is to *require* that
-// the loop body is expressed as a lambda, which we'll call. This allows us to ensure that the
-// lambda is only called with a valid iterator. Unfortunately, it also adds restrictions on what
-// can be allowed inside the lambda. One of the things you can not easily allow is calling
-// advance_read() or promote_to_write().
 //
 // 4. Iterating intermixed with implicit updates
 // This leads us to use case 4, which is similar to use case 3, but uses promote_to_write()
@@ -140,13 +147,15 @@ namespace realm {
 //    view = table.where().less_than(salary_column,limit).find_all();
 //    for (size_t i = 0; i < view.size(); ++i) {
 //        promote_to_write();
-//        Row r = view[i];
-//        if (r.is_attached())
+//        // add r.sync_if_needed(); to get reflective mode
+//        if (r.is_row_attached(i)) {
+//            Row r = view[i];
 //            r.set_int(salary_column, limit);
+//        }
 //        commit_and_continue_as_write();
 //    }
 //
-// This is safe, and we just aim for providing low level safety: is_attached() can tell
+// This is safe, and we just aim for providing low level safety: is_row_attached() can tell
 // if the reference is valid, and the references in the view continue to point to the
 // same object at all times, also following implicit updates. The rest is up to the
 // application logic.
@@ -158,15 +167,13 @@ namespace realm {
 // employee could recieve a (different, larger) raise which would then be overwritten and lost.
 // However, these are problems that you should expect, since the activity is spread over multiple
 // transactions.
-//
-// 5. Cross-thread stealing
-// TBD - or see description in group_shared.hpp
 
 
 /// Common base class for TableView and ConstTableView.
 class TableViewBase : public RowIndexes {
 public:
-// - not in use / implemented yet:
+// - not in use / implemented yet:   ... explicit calls to sync_if_needed() must be used
+//                                       to get 'reflective' mode.
 //    enum mode { mode_Reflective, mode_Imperative };
 //    void set_operating_mode(mode);
 //    mode get_operating_mode();

@@ -1685,12 +1685,11 @@ void SharedGroup::reserve(size_t size)
 
 SharedGroup::Handover<LinkView>* SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 {
-    // TODO: lock
+    LockGuard lg(m_handover_lock);
     Handover<LinkView>* result = new Handover<LinkView>();
     LinkView::generate_patch(accessor, result->patch);
     result->clone = 0; // not used for LinkView - maybe specialize Handover<LinkView> ?
     result->version = get_version_of_current_transaction();
-    // TODO: unlock
     return result;
 }
 

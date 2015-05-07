@@ -218,12 +218,6 @@ protected:
     void attach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
     void reattach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
     void impl_detach() REALM_NOEXCEPT;
-
-    void move_assign(RowBase& src_row)
-    {
-        reattach(src_row.m_table.get(), src_row.m_row_ndx);
-        src_row.impl_detach();
-    }
 protected:
     // FIXME: not confident about exposing this one:
     RowBase() { m_prev = m_next = 0; };
@@ -317,11 +311,6 @@ private:
     BasicRow(const BasicRow<T>& source, Handover_patch& patch)
         : RowBase(source, patch)
     {
-    }
-
-    void move_assign(BasicRow<T>& row)
-    {
-        RowBase::move_assign(row);
     }
     friend class SharedGroup;
 };
