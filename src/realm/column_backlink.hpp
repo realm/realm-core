@@ -94,7 +94,8 @@ private:
     TableRef        m_origin_table;
     ColumnLinkBase* m_origin_column;
 
-    void nullify_links(std::size_t row_ndx, bool do_destroy);
+    template<typename Func>
+    std::size_t for_each_link(std::size_t row_ndx, bool do_destroy, Func&& f);
 };
 
 

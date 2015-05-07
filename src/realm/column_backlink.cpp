@@ -174,17 +174,16 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
 }
 
 
-void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
+template<typename Func>
+std::size_t ColumnBackLink::for_each_link(std::size_t row_ndx, bool do_destroy, Func&& func)
 {
-    // Nullify all links pointing to the row being deleted
     uint64_t value = Column::get_uint(row_ndx);
     if (value != 0) {
         if ((value & 1) != 0) {
             size_t origin_row_ndx = to_size_t(value >> 1);
-            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx); // Throws
+            func(origin_row_ndx); // Throws
         }
         else {
-            // nullify entire list of links
             ref_type ref = to_ref(value);
             Column backlink_list(get_alloc(), ref); // Throws
 
@@ -192,13 +191,14 @@ void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
             for (size_t i = 0; i < n; ++i) {
                 int_fast64_t value_2 = backlink_list.get(i);
                 size_t origin_row_ndx = to_size_t(value_2);
-                m_origin_column->do_nullify_link(origin_row_ndx, row_ndx); // Throws
+                func(origin_row_ndx); // Throws
             }
 
             if (do_destroy)
                 backlink_list.destroy();
         }
     }
+    return value;
 }
 
 
@@ -217,31 +217,19 @@ void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx, bool)
 
     // Nullify all links pointing to the row being deleted
     bool do_destroy = true;
-    nullify_links(row_ndx, do_destroy); // Throws
+    for_each_link(row_ndx, do_destroy, [=](size_t origin_row_ndx) {
+        m_origin_column->do_nullify_link(origin_row_ndx, row_ndx);  // Throws
+    });
 
     // Update all links to the last row to point to the new row instead
-    uint64_t value = Column::get_uint(last_row_ndx);
-    if (row_ndx != last_row_ndx) {
-        if (value != 0) {
-            if ((value & 1) != 0) {
-                size_t origin_row_ndx = to_size_t(value >> 1);
-                m_origin_column->do_update_link(origin_row_ndx, last_row_ndx,
-                                                row_ndx); // Throws
-            }
-            else {
-                // update entire list of links
-                ref_type ref = to_ref(value);
-                Column backlink_list(get_alloc(), ref); // Throws
-
-                size_t n = backlink_list.size();
-                for (size_t i = 0; i < n; ++i) {
-                    int_fast64_t value_2 = backlink_list.get(i);
-                    size_t origin_row_ndx = to_size_t(value_2);
-                    m_origin_column->do_update_link(origin_row_ndx, last_row_ndx,
-                                                    row_ndx); // Throws
-                }
-            }
-        }
+    uint64_t value;
+    if (row_ndx == last_row_ndx)
+        value = Column::get_uint(last_row_ndx);
+    else {
+        do_destroy = false;
+        value = for_each_link(last_row_ndx, do_destroy, [=](size_t origin_row_ndx) {
+            m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, row_ndx); // Throws
+        });
     }
 
     // Do the actual move
@@ -256,7 +244,9 @@ void ColumnBackLink::clear(std::size_t num_rows, bool)
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
         // Column::clear() handles the destruction of subtrees
         bool do_destroy = false;
-        nullify_links(row_ndx, do_destroy); // Throws
+        for_each_link(row_ndx, do_destroy, [=](size_t origin_row_ndx) {
+            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx);  // Throws
+        });
     }
 
     clear_without_updating_index(); // Throws
