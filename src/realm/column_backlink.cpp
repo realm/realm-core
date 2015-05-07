@@ -22,6 +22,7 @@
 
 #include <realm/column_backlink.hpp>
 #include <realm/column_link.hpp>
+#include <realm/group.hpp>
 #include <realm/table.hpp>
 
 using namespace realm;
@@ -265,6 +266,29 @@ void ColumnBackLink::update_child_ref(size_t child_ndx, ref_type new_ref)
 ref_type ColumnBackLink::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
 {
     return Column::get_as_ref(child_ndx);
+}
+
+void ColumnBackLink::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
+{
+    if (state.track_link_nullifications) {
+        bool do_destroy = false;
+        for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
+            state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx, row_ndx});
+        });
+    }
+}
+
+void ColumnBackLink::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
+{
+    if (state.track_link_nullifications) {
+        for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
+            // Column::clear() handles the destruction of subtrees
+            bool do_destroy = false;
+            for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
+                state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx, row_ndx});
+            });
+        }
+    }
 }
 
 

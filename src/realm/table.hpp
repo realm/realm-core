@@ -391,8 +391,10 @@ public:
     std::size_t add_empty_row(std::size_t num_rows = 1);
     void insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
     void remove(std::size_t row_ndx);
+    void remove(const Column& rows);
     void remove_last();
     void move_last_over(std::size_t row_ndx);
+    void move_last_over(const Column& rows);
     void clear();
 
     //@}
@@ -1195,10 +1197,9 @@ private:
     /// It is immaterial which table remove_backlink_broken_rows() is called on,
     /// as long it that table is in the same group as the specified rows.
 
-    typedef ColumnBase::CascadeState CascadeState;
     void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState& state);
     void cascade_break_backlinks_to_all_rows(CascadeState& state);
-    void remove_backlink_broken_rows(const CascadeState::row_set&);
+    void remove_backlink_broken_rows(const CascadeState&);
 
     //@}
 
@@ -2077,12 +2078,12 @@ public:
     }
 
     static void cascade_break_backlinks_to(Table& table, std::size_t row_ndx,
-                                           Table::CascadeState& state)
+                                           CascadeState& state)
     {
         table.cascade_break_backlinks_to(row_ndx, state); // Throws
     }
 
-    static void remove_backlink_broken_rows(Table& table, const Table::CascadeState::row_set& rows)
+    static void remove_backlink_broken_rows(Table& table, const CascadeState& rows)
     {
         table.remove_backlink_broken_rows(rows); // Throws
     }

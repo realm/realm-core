@@ -85,6 +85,8 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 * SharedGroup::compact() will now throw a runtime_error if called in detached state.
 * Make the start index of `ListView::find()` overrideable for finding multiple
   occurances of a given row in a LinkList.
+* Add `Group::set_cascade_notification_handler()` to simplify tracking changes
+  due to link nullification and cascading deletes.
 
 ### Internals:
 
