@@ -1,3 +1,10 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Fixed incorrect results for Or() when querying via a LinkView with a
+  different order than the target table.
+
 # 0.89.2 Release notes
 
 ### Bugfixes:
