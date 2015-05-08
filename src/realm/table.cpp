@@ -276,6 +276,11 @@ template<> struct ColumnTypeTraits3<DateTime> {
     const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
 };
+template<> struct ColumnTypeTraits3<BinaryData> {
+    const static ColumnType ct_id = col_type_Binary;
+    const static ColumnType ct_id_real = col_type_Binary;
+    typedef ColumnBinary column_type;
+};
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -1432,6 +1437,10 @@ void Table::remove_search_index(size_t col_ndx)
         return;
 
     // Remove the index column
+    Spec::ColumnInfo info;
+    m_spec.get_column_info(col_ndx, info);
+    size_t column_pos = info.m_column_ref_ndx;
+
     ColumnBase& col = get_column_base(col_ndx);
     col.get_search_index()->destroy();
     col.destroy_search_index();
@@ -1440,7 +1449,7 @@ void Table::remove_search_index(size_t col_ndx)
     attr &= ~col_attr_Indexed;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-    m_columns.erase(col_ndx + 1);
+    m_columns.erase(column_pos + 1);
     refresh_column_accessors(col_ndx + 1); // Throws
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -3234,10 +3243,9 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
     return column.find_first(value);
 }
 
-size_t Table::find_first_binary(size_t, BinaryData) const
+size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    // FIXME: Implement this!
-    throw runtime_error("Not implemented");
+    return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
 }
 
 

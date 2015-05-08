@@ -48,6 +48,7 @@ public:
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
+    size_t find_first(BinaryData value) const;
 
     // Requires that the specified entry was inserted as StringData.
     StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
@@ -230,6 +231,16 @@ inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
 }
+
+inline size_t ColumnBinary::find_first(BinaryData value) const
+{
+    for (size_t t = 0; t < size(); t++)
+        if (get(t) == value)
+            return t;
+
+    return not_found;
+}
+
 
 inline void ColumnBinary::erase(std::size_t row_ndx)
 {

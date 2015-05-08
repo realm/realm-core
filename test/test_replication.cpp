@@ -498,7 +498,7 @@ TEST(Replication_Links)
 }
 
 
-ONLY(Replication_NullStrings)
+TEST(Replication_NullStrings)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);

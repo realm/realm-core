@@ -543,5 +543,90 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 
 
 
+// Test reading/writing of old version 2 ColumnBinary.
+ONLY(Upgrade_Database_Binary)
+{
+    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
+    // version 2 database file. Then copy it into the /test directory of this current Realm core.
+    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
+
+#if 1
+    size_t f;
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    CHECK(File::copy(path, temp_copy));
+    SharedGroup g(temp_copy, 0);
+
+    WriteTransaction wt(g);
+    TableRef t = wt.get_table(0);
+
+    // small blob (< 64 bytes)
+    f = t->find_first_binary(0, BinaryData("", 0));
+    CHECK_EQUAL(f, 0);
+    f = t->where().equal(0, BinaryData("", 0)).find();
+    CHECK_EQUAL(f, 0);
+    CHECK(t->get_binary(0, 0) == BinaryData("", 0));
+    f = t->where().not_equal(0, BinaryData("", 0)).find();
+    CHECK(f == 1);
+    f = t->where().not_equal(0, BinaryData("foo")).find();
+    CHECK(f == 0);
+
+    // make small blob expand, to see if expansion works
+    t->add_empty_row();
+    t->set_binary(0, 2, BinaryData("1234567890123456789012345678901234567890123456789012345678901234567890"));
+
+    // repeat all previous tests again on new big blob
+    f = t->find_first_binary(0, BinaryData("", 0));
+    CHECK_EQUAL(f, 0);
+    f = t->where().equal(0, BinaryData("", 0)).find();
+    CHECK_EQUAL(f, 0);
+    CHECK(t->get_binary(0, 0) == BinaryData("", 0));
+    f = t->where().not_equal(0, BinaryData("", 0)).find();
+    CHECK(f == 1);
+    f = t->where().not_equal(0, BinaryData("foo")).find();
+    CHECK(f == 0);
+
+
+    // long blobs
+    t = wt.get_table(1);
+    f = t->find_first_binary(0, BinaryData("", 0));
+    CHECK_EQUAL(f, 0);
+    f = t->where().equal(0, BinaryData("", 0)).find();
+    CHECK_EQUAL(f, 0);
+    CHECK(t->get_binary(0, 0) == BinaryData("", 0));
+    f = t->where().not_equal(0, BinaryData("", 0)).find();
+    CHECK(f == 1);
+    f = t->where().not_equal(0, BinaryData("foo")).find();
+    CHECK(f == 0);
+
+
+#else
+    // Create database file (run this from old core)
+    File::try_remove(path);
+
+    Group g;
+    TableRef t;
+
+    // small blob size (< 64 bytes)
+    t = g.add_table("short");
+    t->add_column(type_Binary, "bin");
+    t->add_empty_row(2);
+    t->set_binary(0, 0, BinaryData("", 0)); // Empty string. Remember 0, else it will take up 1 byte!
+    t->set_binary(0, 1, BinaryData("foo"));
+
+    // long blocs
+    t = g.add_table("long");
+    t->add_column(type_Binary, "bin");
+    t->add_empty_row(2);
+    t->set_binary(0, 0, BinaryData("", 0)); // Empty string. Remember 0, else it will take up 1 byte!
+    t->set_binary(0, 0, BinaryData("foo")); // Empty string. Remember 0, else it will take up 1 byte!
+    t->set_binary(0, 1, BinaryData("1234567890123456789012345678901234567890123456789012345678901234567890"));
+
+    g.write(path);
+#endif
+}
+
 
 #endif 
