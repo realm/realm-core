@@ -30,7 +30,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT(value.size() == 0 || value.data());
 
-    if (value.is_null() && !Array::size() == 3)
+    if (value.is_null() && !(Array::size() == 3))
         throw LogicError(LogicError::column_not_nullable);
 
     m_blob.add(value.data(), value.size(), add_zero_term);
@@ -51,7 +51,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     REALM_ASSERT_3(ndx, <, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
-    if (value.is_null() && !Array::size() == 3)
+    if (value.is_null() && !(Array::size() == 3))
         throw LogicError(LogicError::column_not_nullable);
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
@@ -72,7 +72,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     REALM_ASSERT_3(ndx, <=, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
-    if (value.is_null() && !Array::size() == 3)
+    if (value.is_null() && !(Array::size() == 3))
         throw LogicError(LogicError::column_not_nullable);
 
     size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
