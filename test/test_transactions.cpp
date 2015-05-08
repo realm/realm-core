@@ -535,4 +535,20 @@ TEST(Transactions_General)
     // End of read transaction
 }
 
+ONLY(File_Upgrade)
+{
+    SharedGroup sg("android-079.realm");
+    ReadTransaction rt(sg);
+
+    // Try to access row index 15 subcategory column
+    CHECK(rt.has_table("class_AppCategory"));
+    Table const *t = rt.get_table("class_AppCategory").get();
+    CHECK_EQUAL(t->get_column_index("subCategory"), 1);
+    CHECK(t->has_search_index(1) == false);
+    CHECK(t->get_column_type(1) == type_String);
+    StringData s = t->get_string(1, 15);
+    CHECK_EQUAL(s, "finance");
+}
+
+
 #endif // TEST_TRANSACTIONS
