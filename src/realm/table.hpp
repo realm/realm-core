@@ -1207,8 +1207,7 @@ private:
 
     //@}
 
-    /// Remove the specified row by the 'move last over' method, and submit the
-    /// operation to the replication subsystem.
+    /// Remove the specified row by the 'move last over' method.
     void do_move_last_over(std::size_t row_ndx);
 
     // Precondition: 1 <= end - begin
