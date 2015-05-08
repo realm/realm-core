@@ -27,6 +27,32 @@
 
 namespace realm {
 
+/* 
+STORAGE FORMAT
+---------------------------------------------------------------------------------------
+ArrayBinary stores binary elements using two ArrayInteger and one ArrayBlob. The ArrayBlob can only store one 
+single concecutive array of bytes (contrary to its 'Array' name that misleadingly indicates it could store multiple
+elements).
+
+Assume we have the strings "a", "", "abc", null, "ab". Then the three arrays will contain:
+
+ArrayInteger    m_offsets   1, 1, 5, 5, 6
+ArrayBlob       m_blob      aabcab
+ArrayInteger    m_nulls     0, 0, 0, 1, 0 // 1 indicates null, 0 indicates non-null 
+
+So for each element the ArrayInteger, the ArrayInteger points into the ArrayBlob at the position of the first
+byte of the next element.
+
+m_nulls is always present (except for old database files; see below), so any ArrayBinary is always nullable! 
+The nullable property (such as throwing exception upon set(null) on non-nullable column, etc) is handled on 
+column level only.
+
+DATABASE FILE VERSION CHANGES
+---------------------------------------------------------------------------------------
+Old database files do not have any m_nulls array. To be backwardscompatible, many methods will have tests like 
+`if(Array::size() == 3)` and have a backwards compatible code paths for these (e.g. avoid writing to m_nulls 
+in set(), etc). This way no file format upgrade is needed to support nulls for BinaryData.
+*/
 
 class ArrayBinary: public Array {
 public:
@@ -40,6 +66,10 @@ public:
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
     void create();
+
+    // Old database files will not have the m_nulls array, so we need code paths for
+    // backwards compatibility for these cases.
+    bool new_array_type() const REALM_NOEXCEPT;
 
     //@{
     /// Overriding functions of Array
@@ -132,6 +162,19 @@ inline bool ArrayBinary::is_empty() const REALM_NOEXCEPT
     return m_offsets.is_empty();
 }
 
+// Old database files will not have the m_nulls array, so we need code paths for
+// backwards compatibility for these cases. We can test if m_nulls exists by looking
+// at number of references in this ArrayBinary.
+inline bool ArrayBinary::new_array_type() const REALM_NOEXCEPT
+{
+    if (Array::size() == 3)
+        return true;            // New database file
+    else if (Array::size() == 2)
+        return false;           // Old database file
+    else
+        REALM_ASSERT(false);  // Should never happen
+}
+
 inline std::size_t ArrayBinary::size() const REALM_NOEXCEPT
 {
     return m_offsets.size();
@@ -141,17 +184,19 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    if (Array::size() == 3)
+    if (new_array_type()) {
         if (m_nulls.get(ndx))
             return BinaryData();
+    }
+    else {
+        std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
+        std::size_t end = to_size_t(m_offsets.get(ndx));
 
-    std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    std::size_t end   = to_size_t(m_offsets.get(ndx));
-
-    BinaryData bd = BinaryData(m_blob.get(begin), end-begin);
-    // non-nullable column should never return null
-    REALM_ASSERT(!bd.is_null());
-    return bd;
+        BinaryData bd = BinaryData(m_blob.get(begin), end - begin);
+        // Old database file (non-nullable column should never return null)
+        REALM_ASSERT(!bd.is_null());
+        return bd;
+    }
 }
 
 inline void ArrayBinary::truncate(std::size_t size)
@@ -162,7 +207,7 @@ inline void ArrayBinary::truncate(std::size_t size)
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
-    if (Array::size() == 3)
+    if (new_array_type())
         m_nulls.truncate(size);
 }
 
@@ -170,7 +215,7 @@ inline void ArrayBinary::clear()
 {
     m_blob.clear();
     m_offsets.clear();
-    if (Array::size() == 3)
+    if (new_array_type())
         m_nulls.clear();
 }
 
@@ -178,7 +223,7 @@ inline void ArrayBinary::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
-    if (Array::size() == 3)
+    if (new_array_type())
         m_nulls.destroy();
     Array::destroy();
 }
@@ -197,7 +242,7 @@ inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) REALM_NOEX
     if (res) {
         m_blob.update_from_parent(old_baseline);
         m_offsets.update_from_parent(old_baseline);
-        if (Array::size() == 3)
+        if (new_array_type())
             m_nulls.update_from_parent(old_baseline);
     }
     return res;

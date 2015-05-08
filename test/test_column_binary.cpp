@@ -270,7 +270,7 @@ TEST(ColumnBinary_Basic)
     c.clear();
     s.clear();
     for (int i = 0; i < 100; ++i)
-        c.add();
+        c.add(BinaryData("", 0));
     for (int i = 0; i < 100; ++i) {
         c.set(i, BinaryData(s.c_str(), s.size()));
         s += 'x';

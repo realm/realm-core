@@ -19,7 +19,7 @@ void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
 
-    if (Array::size() == 3) {
+    if (new_array_type()) {
         ref_type nulls_ref = get_as_ref(2);
         m_nulls.init_from_ref(nulls_ref);        
     }
@@ -30,7 +30,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT(value.size() == 0 || value.data());
 
-    if (value.is_null() && !(Array::size() == 3))
+    if (value.is_null() && !new_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
     m_blob.add(value.data(), value.size(), add_zero_term);
@@ -42,7 +42,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
     m_offsets.add(offset);
 
-    if(Array::size() == 3)
+    if(new_array_type())
         m_nulls.add(value.is_null());
 }
 
@@ -51,7 +51,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     REALM_ASSERT_3(ndx, <, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
-    if (value.is_null() && !(Array::size() == 3))
+    if (value.is_null() && !new_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
@@ -63,7 +63,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
 
-    if (Array::size() == 3)
+    if (new_array_type())
         m_nulls.set(ndx, value.is_null());
 }
 
@@ -72,7 +72,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     REALM_ASSERT_3(ndx, <=, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
-    if (value.is_null() && !(Array::size() == 3))
+    if (value.is_null() && !new_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
     size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
@@ -84,7 +84,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     m_offsets.insert(ndx, pos + stored_size);
     m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
 
-    if (Array::size() == 3)
+    if (new_array_type())
         m_nulls.insert(ndx, value.is_null());
 }
 
@@ -99,14 +99,14 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 
-    if(Array::size() == 3)
+    if(new_array_type())
         m_nulls.erase(ndx);
 }
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
-  
+    // See comment in new_array_type() and also in array_binary.hpp
     REALM_ASSERT_3(Array::get_size_from_header(header), >= , 2);
     REALM_ASSERT_3(Array::get_size_from_header(header), <=, 3);
     

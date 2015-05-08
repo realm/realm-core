@@ -1215,7 +1215,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = new AdaptiveStringColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Binary:
-            col = new ColumnBinary(alloc, ref); // Throws
+            col = new ColumnBinary(alloc, ref, nullable); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
