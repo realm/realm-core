@@ -290,7 +290,7 @@ TEST(ColumnBinary_Basic)
 TEST(ColumnBinary_Nulls)
 {
     ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref);
+    ColumnBinary c(Allocator::get_default(), ref, true);
     
     c.add(BinaryData());
     c.add(BinaryData("hello"));

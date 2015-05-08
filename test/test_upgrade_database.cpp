@@ -544,7 +544,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 
 
 // Test reading/writing of old version 2 ColumnBinary.
-ONLY(Upgrade_Database_Binary)
+TEST(Upgrade_Database_Binary)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.

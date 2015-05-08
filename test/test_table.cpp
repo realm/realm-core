@@ -138,12 +138,7 @@ TEST(Table_Null)
         CHECK(!table->get_string(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
-        try {
-            table->set_string(0, 0, realm::null());
-            CHECK(false);
-        }
-        catch (...) {
-        }
+        CHECK_THROW_ANY(table->set_string(0, 0, realm::null()));
     }
 
 }
@@ -4596,7 +4591,7 @@ TEST(Table_RowAccessor)
     table.add_column(type_Float,    "");
     table.add_column(type_Double,   "");
     table.add_column(type_String,   "");
-    table.add_column(type_Binary,   "");
+    table.add_column(type_Binary,   "", true);
     table.add_column(type_DateTime, "");
     table.add_column(type_Table,    "", &subdesc);
     table.add_column(type_Mixed,    "");

@@ -184,9 +184,8 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    if (new_array_type()) {
-        if (m_nulls.get(ndx))
-            return BinaryData();
+    if (new_array_type() && m_nulls.get(ndx)) {
+        return BinaryData();
     }
     else {
         std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;

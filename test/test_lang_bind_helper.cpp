@@ -555,7 +555,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         WriteTransaction wt(sg_w);
         TableRef strings_w = wt.add_table("strings");
         strings_w->add_column(type_String, "a");
-        strings_w->add_column(type_Binary, "b");
+        strings_w->add_column(type_Binary, "b", true);
         strings_w->add_column(type_Mixed,  "c"); // Strings
         strings_w->add_column(type_Mixed,  "d"); // Binary data
         strings_w->add_empty_row();
