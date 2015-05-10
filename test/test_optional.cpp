@@ -220,3 +220,14 @@ TEST(Optional_StreamingMap)
         >> [](int x) { return x > 300 ? some<int>(x + 300) : none; };
     CHECK(result2);
 }
+
+TEST(Optional_Chaining)
+{
+    struct Foo {
+        int bar() { return 123; }
+    };
+    Optional<Foo> foo { Foo{} };
+    auto r = foo >> std::mem_fn(&Foo::bar);
+    CHECK(r);
+    CHECK_EQUAL(r.value(), 123);
+}
