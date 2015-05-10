@@ -30,6 +30,12 @@
 namespace realm {
 namespace util {
 
+template <class T> class Optional;
+
+// some() should be the equivalent of the proposed C++17 `make_optional`.
+template <class T, class... Args> Optional<T> some(Args&&...);
+template <class T> struct Some;
+
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
 static REALM_CONSTEXPR struct None { REALM_CONSTEXPR None(int) {} } none { 0 };
 static REALM_CONSTEXPR struct InPlace { REALM_CONSTEXPR InPlace() {} } in_place;
@@ -102,6 +108,8 @@ private:
 };
 
 /// An Optional<void> is functionally equivalent to a bool.
+/// Note: C++17 does not (yet) specify this specialization, but it is convenient
+/// as a "safer bool", especially in the presence of `fmap`.
 template <>
 class Optional<void> {
 public:
@@ -110,18 +118,12 @@ public:
     Optional(Optional<void>&&) = default;
     Optional(const Optional<void>&) = default;
     explicit operator bool() const { return m_engaged; }
-
-    static Optional<void> some()
-    {
-        Optional<void> opt;
-        opt.m_engaged = true;
-        return opt;
-    }
 private:
     bool m_engaged = false;
+    friend struct Some<void>;
 };
 
-/// An Optional<T&> is functionally equivalent to a pointer (but safer)
+/// An Optional<T&> is a non-owning nullable pointer that throws on dereference.
 template <class T>
 class Optional<T&> {
 public:
@@ -130,15 +132,16 @@ public:
 
     Optional() {}
     Optional(None) : Optional() {}
-    Optional(Optional<T&>&& other) = default;
     Optional(const Optional<T&>& other) = default;
+    template <class U>
+    Optional(const Optional<U&>& other) : m_ptr(other.m_ptr) {}
     template <class U>
     Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get()) {}
 
     Optional(T& value) : m_ptr(&value) {}
+    Optional(T&& value) = delete; // Catches accidental references to rvalue temporaries.
 
     Optional<T&>& operator=(None) { m_ptr = nullptr; return *this; }
-    Optional<T&>& operator=(Optional<T&>&& other) { std::swap(m_ptr, other.m_ptr); return *this; }
     Optional<T&>& operator=(const Optional<T&>& other) { m_ptr = other.m_ptr; return *this; }
 
     template <class U>
@@ -155,7 +158,37 @@ public:
     void swap(Optional<T&> other); // FIXME: Add noexcept() clause
 private:
     T* m_ptr = nullptr;
+
+    template <class U> friend class Optional;
 };
+
+/// Implementation:
+
+template <class T>
+struct Some {
+    template <class... Args>
+    static Optional<T> some(Args&&... args)
+    {
+        return Optional<T>{std::forward<Args>(args)...};
+    }
+};
+
+template <>
+struct Some<void> {
+    static Optional<void> some()
+    {
+        Optional<void> opt;
+        opt.m_engaged = true;
+        return opt;
+    }
+};
+
+template <class T, class... Args>
+Optional<T> some(Args&&... args)
+{
+    return Some<T>::some(std::forward<Args>(args)...);
+}
+
 
 template <class T>
 Optional<T>::Optional()
@@ -403,13 +436,22 @@ REALM_CONSTEXPR Optional<typename std::decay<T>::type>
 make_optional(T&& value)
 {
     using Type = typename std::decay<T>::type;
-    return Optional<Type>(std::forward<T>(value));
+    return some<Type>(std::forward<T>(value));
 }
+
+template <class T>
+struct RemoveOptional {
+    using Type = T;
+};
+template <class T>
+struct RemoveOptional<Optional<T>> {
+    using Type = typename RemoveOptional<T>::Type;
+};
 
 template <class R>
 struct FMapResult {
     template <class F>
-    static auto get(F&& func) -> Optional<decltype(func())>
+    static auto get(F&& func) -> Optional<typename RemoveOptional<decltype(func())>::Type>
     {
         return func();
     }
@@ -420,12 +462,14 @@ struct FMapResult<void> {
     static auto get(F&& func) -> Optional<void>
     {
         func();
-        return Optional<void>::some();
+        return some<void>();
     }
 };
 
+
+
 template <class T, class F>
-auto fmap(Optional<T>& opt, F&& func) -> Optional<decltype(func(std::declval<T>()))>
+auto fmap(Optional<T>& opt, F&& func) -> Optional<typename RemoveOptional<decltype(func(std::declval<T>()))>::Type>
 {
     using R = decltype(func(std::declval<T>()));
     if (opt) {
@@ -435,7 +479,7 @@ auto fmap(Optional<T>& opt, F&& func) -> Optional<decltype(func(std::declval<T>(
 }
 
 template <class T, class F>
-auto fmap(Optional<T>&& opt, F&& func) -> Optional<decltype(func(std::declval<T>()))>
+auto fmap(Optional<T>&& opt, F&& func) -> Optional<typename RemoveOptional<decltype(func(std::declval<T>()))>::Type>
 {
     using R = decltype(func(std::declval<T>()));
     if (opt) {
@@ -445,7 +489,7 @@ auto fmap(Optional<T>&& opt, F&& func) -> Optional<decltype(func(std::declval<T>
 }
 
 template <class T, class F>
-auto fmap(const Optional<T>& opt, F&& func) -> Optional<decltype(func(std::declval<T>()))>
+auto fmap(const Optional<T>& opt, F&& func) -> Optional<typename RemoveOptional<decltype(func(std::declval<T>()))>::Type>
 {
     using R = decltype(func(std::declval<T>()));
     if (opt) {
@@ -517,6 +561,12 @@ template <class T>
 bool operator<(const T& lhs, const Optional<T>& rhs)
 {
     return rhs ? std::less<T>{}(lhs, *rhs) : false;
+}
+
+template <class T, class F>
+auto operator>>(Optional<T> lhs, F&& rhs) -> decltype(fmap(lhs, std::forward<F>(rhs)))
+{
+    return fmap(lhs, std::forward<F>(rhs));
 }
 
 } // namespace util
