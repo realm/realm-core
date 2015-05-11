@@ -7222,7 +7222,12 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
-        sg.wait_for_change();
+        // wait here for writer to change the database. Kind of wasteful, but wait_for_change
+        // is not available on osx.
+        if (!sg.has_changed()) {
+            sched_yield();
+            continue;
+        }
         LangBindHelper::advance_read(sg);
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
