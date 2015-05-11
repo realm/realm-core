@@ -10,6 +10,7 @@
 ### Bugfixes:
 
 * Fixed encryption on Android ARM64 devices.
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 ----------------------------------------------
 
