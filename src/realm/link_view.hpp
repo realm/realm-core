@@ -88,7 +88,7 @@ public:
     /// by its index in the target table). If found, the index of the link to
     /// that row within this list is returned, otherwise `realm::not_found` is
     /// returned.
-    std::size_t find(std::size_t target_row_ndx) const REALM_NOEXCEPT;
+    std::size_t find(std::size_t target_row_ndx, std::size_t start=0) const REALM_NOEXCEPT;
 
     const ColumnBase& get_column_base(size_t index) const;
     const Table& get_origin_table() const REALM_NOEXCEPT;
@@ -266,15 +266,16 @@ inline void LinkView::add(std::size_t target_row_ndx)
     insert(ins_pos, target_row_ndx);
 }
 
-inline std::size_t LinkView::find(std::size_t target_row_ndx) const REALM_NOEXCEPT
+inline std::size_t LinkView::find(std::size_t target_row_ndx, std::size_t start) const REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
+    REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
+    REALM_ASSERT_3(start, <=, size());
 
     if (!m_row_indexes.is_attached())
         return not_found;
 
-    return m_row_indexes.find_first(target_row_ndx);
+    return m_row_indexes.find_first(target_row_ndx, start);
 }
 
 inline const ColumnBase& LinkView::get_column_base(size_t index) const

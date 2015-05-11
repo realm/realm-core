@@ -2,50 +2,6 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
-
-----------------------------------------------
-
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
-
-----------------------------------------------
-
-# NEXT RELEASE
-
-### Bugfixes:
-
 * Fixed LinkViews containing incorrect data after a write transaction
   containing a table clear is rolled back.
 * Fixed errors when a changes to a table with an indexed int column are rolled
@@ -59,6 +15,8 @@
 
 * Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 * SharedGroup::compact() will now throw a runtime_error if called in detached state.
+* Make the start index of `ListView::find()` overrideable for finding multiple
+  occurances of a given row in a LinkList.
 
 ### Internals:
 
