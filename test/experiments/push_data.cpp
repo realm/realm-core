@@ -6,7 +6,6 @@
 #include <realm.hpp>
 #include <realm/group_shared.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -25,7 +24,7 @@ int main(int argc, const char* const argv[])
 
     deque<string> positional_args;
     for (int i=1; i<argc; ++i) {
-        const string arg = argv[i];
+        const std::string arg = argv[i];
         if (arg.size() < 2 || arg.substr(0,2) != "--") {
             positional_args.push_back(arg);
             continue;
@@ -42,7 +41,7 @@ int main(int argc, const char* const argv[])
 
     if (positional_args.size() < 2) {
     bad_command_line:
-        cerr <<
+        std::cerr <<
             "ERROR: Bad command line.\n\n"
             "Synopsis: "<<argv[0]<<"  NUM-REPS  TEXT...\n\n"
             "Options:\n"

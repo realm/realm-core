@@ -10,7 +10,6 @@
 #include <realm/query_engine.hpp>
 #include <realm/column_tpl.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -354,39 +353,39 @@ void ColumnStringEnum::Verify(const Table& table, size_t col_ndx) const
 }
 
 
-void ColumnStringEnum::to_dot(ostream& out, StringData title) const
+void ColumnStringEnum::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = m_keys.get_ref();
-    out << "subgraph cluster_string_enum_column" << ref << " {" << endl;
+    out << "subgraph cluster_string_enum_column" << ref << " {" << std::endl;
     out << " label = \"String enum column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
 
     m_keys.to_dot(out, "keys");
     Column::to_dot(out, "values");
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << setw(indent) << "" << "String enumeration leaf (size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << "" << "String enumeration leaf (size: "<<leaf.size()<<")\n";
 }
 
 } // anonymous namespace
 
-void ColumnStringEnum::do_dump_node_structure(ostream& out, int level) const
+void ColumnStringEnum::do_dump_node_structure(std::ostream& out, int level) const
 {
     get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;
-    out << setw(indent) << "" << "Search index\n";
+    out << std::setw(indent) << "" << "Search index\n";
     m_search_index->do_dump_node_structure(out, level+1);
 }
 

@@ -3,7 +3,6 @@
 #include <iostream>
 #include <realm.hpp>
 
-using namespace std;
 using namespace realm;
 
 void fill_in_data(SharedGroup&)

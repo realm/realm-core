@@ -24,7 +24,6 @@
 #include <realm/column_linklist.hpp>
 #include <realm/link_view.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -107,7 +106,7 @@ void ColumnLinkList::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
     size_t link_ndx = 0;
     size_t num_links = root.get_bptree_size();
     while (link_ndx < num_links) {
-        pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
+        std::pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
         MemRef leaf_mem = p.first;
         leaf.init_from_mem(leaf_mem);
         cascade_break_backlinks_to__leaf(row_ndx, leaf, state); // Throws
@@ -166,7 +165,7 @@ void ColumnLinkList::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
         size_t link_ndx = 0;
         size_t num_links = root.get_bptree_size();
         while (link_ndx < num_links) {
-            pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
+            std::pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
             MemRef leaf_mem = p.first;
             leaf.init_from_mem(leaf_mem);
             cascade_break_backlinks_to_all_rows__leaf(leaf, state); // Throws
@@ -251,7 +250,7 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
 }
 
 
-void ColumnLinkList::to_json_row(size_t row_ndx, ostream& out) const
+void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
 {
     LinkViewRef links1 = const_cast<ColumnLinkList*>(this)->get(row_ndx);
     for (size_t t = 0; t < links1->size(); t++) {
@@ -369,7 +368,7 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
 {
     ColumnLinkBase::Verify(table, col_ndx);
 
-    vector<ColumnBackLink::VerifyPair> pairs;
+    std::vector<ColumnBackLink::VerifyPair> pairs;
     m_backlink_column->get_backlinks(pairs);
 
     // For each link list, verify the accessor, then check that the contents of
@@ -382,14 +381,14 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
     for (size_t i = 0; i != n; ++i) {
         ConstLinkViewRef link_list = get(i);
         link_list->Verify(i);
-        multiset<size_t> links_1, links_2;
+        std::multiset<size_t> links_1, links_2;
         size_t m = link_list->size();
         for (size_t j = 0; j < m; ++j)
             links_1.insert(link_list->get(j).get_index());
-        typedef vector<ColumnBackLink::VerifyPair>::const_iterator iter;
+        typedef std::vector<ColumnBackLink::VerifyPair>::const_iterator iter;
         ColumnBackLink::VerifyPair search_value;
         search_value.origin_row_ndx = i;
-        pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         for (iter j = range.first; j != range.second; ++j)
             links_2.insert(j->target_row_ndx);
         REALM_ASSERT(links_1 == links_2);
@@ -401,10 +400,10 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
 }
 
 
-pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
-    return make_pair(p.first.m_ref, p.second);
+    std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
+    return std::make_pair(p.first.m_ref, p.second);
 }
 
 #endif // REALM_DEBUG

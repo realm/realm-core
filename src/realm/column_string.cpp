@@ -15,7 +15,6 @@
 #include <realm/index_string.hpp>
 #include <realm/table.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -147,7 +146,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const REALM_NOEXCEPT
     }
 
     // Non-leaf root
-    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
     size_t ndx_in_leaf = p.second;
     bool long_strings = Array::get_hasrefs_from_header(leaf_header);
@@ -549,7 +548,7 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    copy(value.data(), value.data()+value.size(), buffer.get());
+    std::copy(value.data(), value.data()+value.size(), buffer.get());
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
 
     if (m_search_index) {
@@ -670,7 +669,7 @@ size_t AdaptiveStringColumn::count(StringData value) const
     // available, and Array::get_bptree_size() is deprecated.
     size_t begin = 0, end = m_array->get_bptree_size();
     while (begin < end) {
-        pair<MemRef, size_t> p = m_array->get_bptree_leaf(begin);
+        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(begin);
         MemRef leaf_mem = p.first;
         REALM_ASSERT_3(p.second, ==, 0);
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
@@ -742,7 +741,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
-        pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
         MemRef leaf_mem = p.first;
         size_t ndx_in_leaf = p.second, end_in_leaf;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
@@ -751,7 +750,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
             // Small strings
             ArrayString leaf(m_array->get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
-            end_in_leaf = min(leaf.size(), end - leaf_offset);
+            end_in_leaf = std::min(leaf.size(), end - leaf_offset);
             size_t ndx = leaf.find_first(value, ndx_in_leaf, end_in_leaf);
             if (ndx != not_found)
                 return leaf_offset + ndx;
@@ -762,7 +761,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
                 // Medium strings
                 ArrayStringLong leaf(m_array->get_alloc(), m_nullable);
                 leaf.init_from_mem(leaf_mem);
-                end_in_leaf = min(leaf.size(), end - leaf_offset);
+                end_in_leaf = std::min(leaf.size(), end - leaf_offset);
                 size_t ndx = leaf.find_first(value, ndx_in_leaf, end_in_leaf);
                 if (ndx != not_found)
                     return leaf_offset + ndx;
@@ -771,7 +770,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
                 // Big strings
                 ArrayBigBlobs leaf(m_array->get_alloc(), m_nullable);
                 leaf.init_from_mem(leaf_mem);
-                end_in_leaf = min(leaf.size(), end - leaf_offset);
+                end_in_leaf = std::min(leaf.size(), end - leaf_offset);
                 BinaryData bin(value.data(), value.size());
                 bool is_string = true;
                 size_t ndx = leaf.find_first(bin, is_string, ndx_in_leaf, end_in_leaf);
@@ -830,7 +829,7 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
 
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
-        pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
         MemRef leaf_mem = p.first;
         size_t ndx_in_leaf = p.second, end_in_leaf;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
@@ -839,7 +838,7 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
             // Small strings
             ArrayString leaf(m_array->get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
-            end_in_leaf = min(leaf.size(), end - leaf_offset);
+            end_in_leaf = std::min(leaf.size(), end - leaf_offset);
             leaf.find_all(result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
         }
         else {
@@ -848,14 +847,14 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
                 // Medium strings
                 ArrayStringLong leaf(m_array->get_alloc(), m_nullable);
                 leaf.init_from_mem(leaf_mem);
-                end_in_leaf = min(leaf.size(), end - leaf_offset);
+                end_in_leaf = std::min(leaf.size(), end - leaf_offset);
                 leaf.find_all(result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
             }
             else {
                 // Big strings
                 ArrayBigBlobs leaf(m_array->get_alloc(), m_nullable);
                 leaf.init_from_mem(leaf_mem);
-                end_in_leaf = min(leaf.size(), end - leaf_offset);
+                end_in_leaf = std::min(leaf.size(), end - leaf_offset);
                 BinaryData bin(value.data(), value.size());
                 bool is_string = true;
                 leaf.find_all(result, bin, is_string, leaf_offset, ndx_in_leaf,
@@ -1224,7 +1223,7 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
         return leaf_type_Small;
     }
 
-    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
     off = ndx - p.second;
     bool long_strings = Array::get_hasrefs_from_header(p.first.m_addr);
     if (long_strings) {
@@ -1515,20 +1514,20 @@ void AdaptiveStringColumn::Verify(const Table& table, size_t col_ndx) const
 }
 
 
-void AdaptiveStringColumn::to_dot(ostream& out, StringData title) const
+void AdaptiveStringColumn::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = m_array->get_ref();
-    out << "subgraph cluster_string_column" << ref << " {" << endl;
+    out << "subgraph cluster_string_column" << ref << " {" << std::endl;
     out << " label = \"String column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
     tree_to_dot(out);
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 void AdaptiveStringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                                       ostream& out) const
+                                       std::ostream& out) const
 {
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
     if (!long_strings) {
@@ -1559,7 +1558,7 @@ void AdaptiveStringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, siz
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     // todo, support null (will now just show up in dump as empty strings)
     size_t leaf_size;
@@ -1590,16 +1589,16 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
         }
     }
     int indent = level * 2;
-    out << setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
 }
 
 } // anonymous namespace
 
-void AdaptiveStringColumn::do_dump_node_structure(ostream& out, int level) const
+void AdaptiveStringColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;
-    out << setw(indent) << "" << "Search index\n";
+    out << std::setw(indent) << "" << "Search index\n";
     m_search_index->do_dump_node_structure(out, level+1);
 }
 

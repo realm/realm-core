@@ -1313,15 +1313,14 @@ void TColumn<T,N>::Verify() const
 template <class T, bool N>
 void TColumn<T,N>::to_dot(std::ostream& out, StringData title) const
 {
-    using std::endl;
     ref_type ref = get_root_array()->get_ref();
-    out << "subgraph cluster_integer_column" << ref << " {" << endl;
+    out << "subgraph cluster_integer_column" << ref << " {" << std::endl;
     out << " label = \"Integer column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
     tree_to_dot(out);
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 template <class T, bool N>

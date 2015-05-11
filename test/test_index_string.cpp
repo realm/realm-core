@@ -10,7 +10,6 @@
 
 using namespace realm;
 using namespace util;
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -955,7 +954,7 @@ TEST(StringIndex_Integer_Increasing)
     table.add_column(type_Int, "int");
     table.add_search_index(0);
 
-    vector<int64_t> reference;
+    std::vector<int64_t> reference;
 
     for (size_t row = 0; row < rows; row++) {
         int64_t r = fastrand(0x100000);

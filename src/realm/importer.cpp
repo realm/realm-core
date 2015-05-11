@@ -28,17 +28,16 @@
 #include <realm/util/assert.hpp>
 #include <realm/importer.hpp>
 
-using namespace std;
 using namespace realm;
 
 namespace {
 
-string set_width(string s, size_t w)
+std::string set_width(std::string s, size_t w)
 {
     if(s.size() > w)
         s = s.substr(0, w - 3) + "...";
     else
-        s = s + string(w - s.size(), ' ');
+        s = s + std::string(w - s.size(), ' ');
     return s;
 }
 
@@ -70,20 +69,20 @@ const char* DataTypeToText(DataType t)
 
 void print_col_names(Table& table)
 {
-    cout << "\n";
+    std::cout << "\n";
     for(size_t t = 0; t < table.get_column_count(); t++) {
-        string s = string(table.get_column_name(t).data());
+        std::string s = std::string(table.get_column_name(t).data());
         s = set_width(s, print_width);
-        cout << s.c_str() << " ";
+        std::cout << s.c_str() << " ";
     }
-    cout << "\n";
+    std::cout << "\n";
     for(size_t t = 0; t < table.get_column_count(); t++) {
-        string s = "Type: " + string(DataTypeToText(table.get_column_type(t)));
+        std::string s = "Type: " + std::string(DataTypeToText(table.get_column_type(t)));
         s = set_width(s, print_width);
-        cout << s.c_str() << " ";
+        std::cout << s.c_str() << " ";
     }
 
-    cout << "\n" << string(table.get_column_count() * (print_width + 1), '-').c_str() << "\n";
+    std::cout << "\n" << std::string(table.get_column_count() * (print_width + 1), '-').c_str() << "\n";
 }
 
 // Prints row 'r' of a Realm table
@@ -107,11 +106,11 @@ void print_row(Table& table, size_t r)
             snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
 #endif
         }
-        string s = string(buf);
+        std::string s = std::string(buf);
         s = set_width(s, print_width);
-        cout << s.c_str() << " ";
+        std::cout << s.c_str() << " ";
     }
-    cout << "\n";
+    std::cout << "\n";
 }
 
 
@@ -358,9 +357,9 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 // Takes a row of payload and returns a vector of Realm types that can represent them. If a value can be represented
 // by multiple Realm types, it prioritizes Bool > Int > Float > Double > String. If Empty_as_string == true, then
 // empty strings turns into String type.
-vector<DataType> Importer::types (vector<string> v)
+std::vector<DataType> Importer::types (std::vector<std::string> v)
 {
-    vector<DataType> res;
+    std::vector<DataType> res;
 
     for(size_t t = 0; t < v.size(); t++) {
         bool i;
@@ -388,9 +387,9 @@ vector<DataType> Importer::types (vector<string> v)
 }
 
 // Takes two vectors of Realm types, and for each field finds best type that can represent both.
-vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataType> types2)
+std::vector<DataType> Importer::lowest_common(std::vector<DataType> types1, std::vector<DataType> types2)
 {
-    vector<DataType> res;
+    std::vector<DataType> res;
 
     for(size_t t = 0; t < types1.size(); t++) {
         // All choices except for the last must be ||. The last must be &&
@@ -418,19 +417,19 @@ vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataTyp
 }
 
 // Takes payload vectors, and for each field finds best type that can represent all rows.
-vector<DataType> Importer::detect_scheme(vector<vector<string>> payload, size_t begin, size_t end)
+std::vector<DataType> Importer::detect_scheme(std::vector<std::vector<std::string>> payload, size_t begin, size_t end)
 {
-    vector<DataType> res;
+    std::vector<DataType> res;
     res = types(payload[begin]);
 
     for(size_t t = begin + 1; t < end && t < payload.size(); t++) {
-        vector<DataType> t2 = types(payload[t]);
+        std::vector<DataType> t2 = types(payload[t]);
         res = lowest_common(res, t2);
     }
     return res;
 }
 
-size_t Importer::tokenize(vector<vector<string>> & payload, size_t records)
+size_t Importer::tokenize(std::vector<std::vector<std::string>> & payload, size_t records)
 {
     size_t original_size = payload.size();
 
@@ -453,7 +452,7 @@ nextrecord:
     if(src[m_curpos] == 0)
         goto end;
 
-    payload.push_back(vector<string>());
+    payload.push_back(std::vector<std::string>());
 
 nextfield:
     payload.back().push_back("");
@@ -526,11 +525,11 @@ payload:
             if(payload[payload.size() - 2].size() != payload[payload.size()- 1].size()) {
                 // We don't use n-versions of printf because windows needs some macro tweaking for it
                 char buf[500];
-                string s = payload[payload.size() - 1][0];
+                std::string s = payload[payload.size() - 1][0];
                 if(s.length() > 100)
                     s = s.substr(0, 100);
                 sprintf(buf, "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters of line: %s", static_cast<unsigned long long>(m_row - 1),  s.c_str());
-                throw runtime_error(buf);
+                throw std::runtime_error(buf);
             }
         }
 
@@ -544,14 +543,14 @@ end:
     return payload.size() - original_size;
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2, vector<string> *column_names,
+size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *scheme2, std::vector<std::string> *column_names,
                             size_t type_detection_rows, size_t skip_first_rows,
                             size_t import_rows)
 {
-    vector<vector<string>> payload;      // Used to build a 2D string vector with rows and columns of .csv content.
-    vector<string> header;                // Column names (will be either auto-detected or read from cmd line args)
-    vector<DataType> scheme;              // Scheme (will be either auto-detected or read from cmd line args)
-    bool header_present = false;          // Used only in auto-detection mode.
+    std::vector<std::vector<std::string>> payload;  // Used to build a 2D string vector with rows and columns of .csv content.
+    std::vector<std::string> header;                // Column names (will be either auto-detected or read from cmd line args)
+    std::vector<DataType> scheme;                   // Scheme (will be either auto-detected or read from cmd line args)
+    bool header_present = false;                    // Used only in auto-detection mode.
 
     m_top = 0;
     m_curpos = 0;
@@ -570,14 +569,14 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
         // To detect empty strings for case 2 above, we need to temporarely disable Empty_as_string
         bool original_empty_as_string_flag = Empty_as_string;
         Empty_as_string = false;
-        vector<DataType> scheme1 = detect_scheme(payload, 0, 1);
+        std::vector<DataType> scheme1 = detect_scheme(payload, 0, 1);
 
         // First row is best one to detect number of fields since it's less likely to contain embedded line breaks
         // (field payload that contains a line break) because it some times is a header.
         m_fields = scheme1.size();
 
 
-        vector<DataType> scheme2 = detect_scheme(payload, 1, 2);
+        std::vector<DataType> scheme2 = detect_scheme(payload, 1, 2);
         bool only_strings1 = true;
         bool only_strings2 = true;
         for(size_t t = 0; t < scheme1.size() - 1; t++) {
@@ -656,7 +655,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                 return imported_rows;
 
             if(!Quiet && imported_rows % 123 == 0)
-                cout << imported_rows << " rows\r";
+                std::cout << imported_rows << " rows\r";
 
             // Add empty row to Realm
             table.add_empty_row();
@@ -705,7 +704,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                         ", but in row " << imported_rows << " of cvs file," << "the field contained '" <<
                         payload[row][col].c_str() << "' which is of another type";
 
-                    throw runtime_error(sstm.str());
+                    throw std::runtime_error(sstm.str());
                 }
             }
 
@@ -714,7 +713,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                 if(imported_rows < 10)
                     print_row(table, imported_rows);
                 else if(imported_rows == 11)
-                    cout << "\nOnly showing first few rows...\n";
+                    std::cout << "\nOnly showing first few rows...\n";
             }
 
             imported_rows++;
@@ -733,7 +732,7 @@ size_t Importer::import_csv_auto(FILE* file, Table& table, size_t type_detection
     return import_csv(file, table, nullptr, nullptr, type_detection_rows, 0, import_rows);
 }
 
-size_t Importer::import_csv_manual(FILE* file, Table& table, vector<DataType> scheme, vector<string> column_names,
+size_t Importer::import_csv_manual(FILE* file, Table& table, std::vector<DataType> scheme, std::vector<std::string> column_names,
                                    size_t skip_first_rows, size_t import_rows)
 {
     return import_csv(file, table, &scheme, &column_names, 0, skip_first_rows, import_rows);

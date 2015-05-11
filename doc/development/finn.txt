@@ -11,7 +11,7 @@ Move ParentNode::aggregate() to some place outside nodes (maybe into query.cpp?)
 
 Idea
 ********************************************************************************************************
-Note: All nodes contain a list of all nodes the vector<ParentNode*>m_children vector (so that they can call methods on eachother). Pointer to self is also stored, always in entry 0. The m_children lists are populated in the init() methods from the m_child pointers of all nodes in the node chain that query.cpp costructs when the user calls condition methods:
+Note: All nodes contain a list of all nodes the std::vector<ParentNode*>m_children vector (so that they can call methods on eachother). Pointer to self is also stored, always in entry 0. The m_children lists are populated in the init() methods from the m_child pointers of all nodes in the node chain that query.cpp costructs when the user calls condition methods:
 
 IntegerNode		  +---------> StringNode      +--------> ORNode             +-------> IntegerNode
 m_child -----------           m_child ---------          m_child = ----------         m_child = NULL

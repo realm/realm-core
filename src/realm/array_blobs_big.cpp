@@ -8,7 +8,6 @@
 #include <realm/column.hpp>
 
 
-using namespace std;
 using namespace realm;
 
 
@@ -126,7 +125,7 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
                 size_t blob_size = get_size_from_header(blob_header);
                 if (blob_size == full_size) {
                     const char* blob_value = ArrayBlob::get(blob_header, 0);
-                    if (equal(blob_value, blob_value + value_size, value.data()))
+                    if (std::equal(blob_value, blob_value + value_size, value.data()))
                         return i;
                 }
             }
@@ -204,11 +203,11 @@ void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 {
     ref_type ref = get_ref();
 
-    out << "subgraph cluster_binary" << ref << " {" << endl;
+    out << "subgraph cluster_binary" << ref << " {" << std::endl;
     out << " label = \"ArrayBinary";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
 
     Array::to_dot(out, "big_blobs_leaf");
 
@@ -220,7 +219,7 @@ void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
         blob.to_dot(out);
     }
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 
     to_dot_parent_edge(out);
 }

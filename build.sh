@@ -2777,9 +2777,10 @@ EOF
         ;;
 
     "jenkins-valgrind")
+        # Run by Jenkins. Relies on the WORKSPACE environment variable provided by Jenkins itself
         REALM_ENABLE_REPLICATION=1 REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
         sh build.sh clean || exit 1
-        VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=/var/jenkins/workspace/core_valgrind/realm-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
+        VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=${WORKSPACE}/realm-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
         exit 0
         ;;
 

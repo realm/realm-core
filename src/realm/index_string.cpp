@@ -6,7 +6,6 @@
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -811,7 +810,7 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 }
 
 
-void StringIndex::dump_node_structure(const Array& node, ostream& out, int level)
+void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
 {
     int indent = level * 2;
     Allocator& alloc = node.get_alloc();
@@ -822,14 +821,14 @@ void StringIndex::dump_node_structure(const Array& node, ostream& out, int level
 
     bool node_is_leaf = !node.is_inner_bptree_node();
     if (node_is_leaf) {
-        out << setw(indent) << "" << "Leaf (B+ tree) (ref: "<<node.get_ref()<<")\n";
+        out << std::setw(indent) << "" << "Leaf (B+ tree) (ref: "<<node.get_ref()<<")\n";
     }
     else {
-        out << setw(indent) << "" << "Inner node (B+ tree) (ref: "<<node.get_ref()<<")\n";
+        out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: "<<node.get_ref()<<")\n";
     }
 
     subnode.init_from_ref(to_ref(node.front()));
-    out << setw(indent) << "" << "  Keys (keys_ref: "
+    out << std::setw(indent) << "" << "  Keys (keys_ref: "
         ""<<subnode.get_ref()<<", ";
     if (subnode.is_empty()) {
         out << "no keys";
@@ -849,17 +848,17 @@ void StringIndex::dump_node_structure(const Array& node, ostream& out, int level
             int_fast64_t value = node.get(i);
             bool is_single_row_index = value % 2 != 0;
             if (is_single_row_index) {
-                out << setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
+                out << std::setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
                 continue;
             }
             subnode.init_from_ref(to_ref(value));
             bool is_subindex = subnode.get_context_flag();
             if (is_subindex) {
-                out << setw(indent) << "" << "  Subindex\n";
+                out << std::setw(indent) << "" << "  Subindex\n";
                 dump_node_structure(subnode, out, level+2);
                 continue;
             }
-            out << setw(indent) << "" << "  List of row indexes\n";
+            out << std::setw(indent) << "" << "  List of row indexes\n";
             Column::dump_node_structure(subnode, out, level+2);
         }
         return;
@@ -882,33 +881,33 @@ void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
 }
 
 
-void StringIndex::to_dot(ostream& out, StringData title) const
+void StringIndex::to_dot(std::ostream& out, StringData title) const
 {
-    out << "digraph G {" << endl;
+    out << "digraph G {" << std::endl;
 
     to_dot_2(out, title);
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 
-void StringIndex::to_dot_2(ostream& out, StringData title) const
+void StringIndex::to_dot_2(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
-    out << "subgraph cluster_string_index" << ref << " {" << endl;
+    out << "subgraph cluster_string_index" << ref << " {" << std::endl;
     out << " label = \"String index";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
 
     array_to_dot(out, *m_array);
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 
-void StringIndex::array_to_dot(ostream& out, const Array& array)
+void StringIndex::array_to_dot(std::ostream& out, const Array& array)
 {
     if (!array.get_context_flag()) {
         Column col(array.get_alloc(), array.get_ref()); // Throws
@@ -924,18 +923,18 @@ void StringIndex::array_to_dot(ostream& out, const Array& array)
     ref_type ref  = array.get_ref();
 
     if (array.is_inner_bptree_node()) {
-        out << "subgraph cluster_string_index_inner_node" << ref << " {" << endl;
-        out << " label = \"Inner node\";" << endl;
+        out << "subgraph cluster_string_index_inner_node" << ref << " {" << std::endl;
+        out << " label = \"Inner node\";" << std::endl;
     }
     else {
-        out << "subgraph cluster_string_index_leaf" << ref << " {" << endl;
-        out << " label = \"Leaf\";" << endl;
+        out << "subgraph cluster_string_index_leaf" << ref << " {" << std::endl;
+        out << " label = \"Leaf\";" << std::endl;
     }
 
     array.to_dot(out);
     keys_to_dot(out, offsets, "keys");
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 
     size_t count = array.size();
     for (size_t i = 1; i < count; ++i) {
@@ -950,27 +949,27 @@ void StringIndex::array_to_dot(ostream& out, const Array& array)
 }
 
 
-void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title)
+void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData title)
 {
     ref_type ref = array.get_ref();
 
     if (0 < title.size()) {
-        out << "subgraph cluster_" << ref << " {" << endl;
-        out << " label = \"" << title << "\";" << endl;
-        out << " color = white;" << endl;
+        out << "subgraph cluster_" << ref << " {" << std::endl;
+        out << " label = \"" << title << "\";" << std::endl;
+        out << " color = white;" << std::endl;
     }
 
-    out << "n" << hex << ref << dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
+    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << hex << ref << dec << "<BR/>";
+    out << "0x" << std::hex << ref << std::dec << "<BR/>";
     if (array.is_inner_bptree_node())
         out << "IsNode<BR/>";
     if (array.has_refs())
         out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << endl;
+    out << "</FONT></TD>" << std::endl;
 
     // Values
     size_t count = array.size();
@@ -984,16 +983,16 @@ void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title
         str[0] = char((v >> 24) & 0xFF);
         const char* s = str;
 
-        out << "<TD>" << s << "</TD>" << endl;
+        out << "<TD>" << s << "</TD>" << std::endl;
     }
 
-    out << "</TR></TABLE>>];" << endl;
+    out << "</TR></TABLE>>];" << std::endl;
     if (0 < title.size())
-        out << "}" << endl;
+        out << "}" << std::endl;
 
     array.to_dot_parent_edge(out);
 
-    out << endl;
+    out << std::endl;
 }
 
 

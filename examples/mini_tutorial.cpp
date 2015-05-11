@@ -1,7 +1,6 @@
 #include <iostream>
 #include <realm.hpp>
 
-using namespace std;
 using namespace realm;
 
 // defining a table
@@ -39,12 +38,12 @@ int main()
         MyTable::ConstRef table = tr.get_table<MyTable>("persons");
 
         // calculate number of rows and total age
-        cout << table->size() << " " << table->column().age.sum() << endl;
+        std::cout << table->size() << " " << table->column().age.sum() << std::endl;
 
         // find persons in the forties
         MyTable::View view = table->where().age.between(40, 49).find_all();
         for (size_t i = 0; i < view.size(); ++i) {
-            cout << view[i].name << endl;
+            std::cout << view[i].name << std::endl;
         }
     }
 }

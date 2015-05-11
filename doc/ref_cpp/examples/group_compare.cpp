@@ -4,7 +4,6 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
-using namespace std;
 using namespace realm;
 
 int main()
@@ -17,7 +16,7 @@ int main()
     Group group_1("people_1.realm");
     Group group_2("people_2.realm");
 
-    if (group_1 == group_2) cout << "EQUAL\n";
+    if (group_1 == group_2) std::cout << "EQUAL\n";
 // @@Fold@@
     util::File::remove("people_1.realm");
     util::File::remove("people_2.realm");

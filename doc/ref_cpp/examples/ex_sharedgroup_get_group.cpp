@@ -5,7 +5,6 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
-using namespace std;
 using namespace realm;
 
 // Define schema for main table
@@ -18,17 +17,17 @@ REALM_TABLE_3(PeopleTable,
 void traverse(const Group& group)
 {
     if (!group.is_empty()) {
-        cout << "Tables in group and number of columns in them:" << endl;
+        std::cout << "Tables in group and number of columns in them:" << std::endl;
         size_t n = group.size();
         for (size_t i = 0; i < n; ++i) {
             StringData table_name = group.get_table_name(i);
             ConstTableRef table = group.get_table(table_name);
-            cout << table_name << " " << table->get_column_count() << "\n";
+            std::cout << table_name << " " << table->get_column_count() << "\n";
         }
-        cout << "End of group contents" << endl;
+        std::cout << "End of group contents" << std::endl;
     }
     else {
-        cout << "Group is empty" << endl;
+        std::cout << "Group is empty" << std::endl;
     }
 }
 
