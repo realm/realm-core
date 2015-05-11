@@ -6,7 +6,6 @@
 #include "../util/mem.hpp"
 #include "../util/number_names.hpp"
 
-using namespace std;
 using namespace realm;
 
 namespace {
@@ -54,13 +53,13 @@ int main()
     for (size_t i = 0; i < 250000; ++i) {
         // create random string
         const size_t n = rand() % 1000;// * 10 + rand();
-        const string s = test_util::number_name(n);
+        const std::string s = test_util::number_name(n);
 
         table.add(n, s.c_str(), 100, Wed);
     }
     table.add(0, "abcde", 100, Wed);
 
-    cout << "Memory usage: "<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage: "<<test_util::get_mem_usage()<<" bytes\n";
 
     test_util::Timer timer;
 
@@ -72,11 +71,11 @@ int main()
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.column().fourth.find_first(Tue);
             if (res != size_t(-1)) {
-                cout << "error\n";
+                std::cout << "error\n";
             }
         }
 
-        cout << "Search (small integer): "<<timer<<"\n";
+        std::cout << "Search (small integer): "<<timer<<"\n";
     }
 
     // Search byte-size integer column
@@ -87,11 +86,11 @@ int main()
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.column().third.find_first(50);
             if (res != size_t(-1)) {
-                cout << "error\n";
+                std::cout << "error\n";
             }
         }
 
-        cout << "Search (byte-size integer): "<<timer<<"\n";
+        std::cout << "Search (byte-size integer): "<<timer<<"\n";
     }
 
     // Search string column
@@ -102,11 +101,11 @@ int main()
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.column().second.find_first("abcde");
             if (res != 250000) {
-                cerr << "error\n";
+                std::cerr << "error\n";
             }
         }
 
-        cout << "Search (string): "<<timer<<"\n";
+        std::cout << "Search (string): "<<timer<<"\n";
     }
 
     // Add index
@@ -115,10 +114,10 @@ int main()
 
         table.column().first.add_search_index();
 
-        cout << "Add index: "<<timer<<"\n";
+        std::cout << "Add index: "<<timer<<"\n";
     }
 
-    cout << "Memory usage2: "<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage2: "<<test_util::get_mem_usage()<<" bytes\n";
 
     // Search with index
     {
@@ -128,14 +127,14 @@ int main()
             const size_t n = rand() % 1000;
             const size_t res = table.column().first.find_first(n);
             if (res == 2500002) { // to avoid above find being optimized away
-                cout << "error\n";
+                std::cout << "error\n";
             }
         }
 
-        cout << "Search index: "<<timer<<"\n";
+        std::cout << "Search index: "<<timer<<"\n";
     }
 
 #ifdef _MSC_VER
-    cin.get();
+    std::cin.get();
 #endif
 }

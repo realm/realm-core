@@ -27,7 +27,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -93,7 +92,7 @@ void fix_max_open_files()
             if (new_soft_limit > soft_limit) {
                 set_soft_rlimit(resource_NumOpenFiles, new_soft_limit);
 /*
-                cout << "\n"
+                std::cout << "\n"
                     "MaxOpenFiles: "<<soft_limit<<" --> "<<new_soft_limit<<"\n";
 */
             }
@@ -158,7 +157,7 @@ void display_build_config()
 
     const char* cpu_avx = realm::sseavx<1>() ? "Yes" : "No";
 
-    cout <<
+    std::cout <<
         "\n"
         "Realm version: "<<Version::get_version()<<"\n"
         "  with Debug "<<with_debug<<"\n"
@@ -204,7 +203,7 @@ public:
         SimpleReporter::summary(summary);
 
         size_t max_n = 5;
-        size_t n = min<size_t>(max_n, m_results.size());
+        size_t n = std::min<size_t>(max_n, m_results.size());
         if (n < 2)
             return;
 
@@ -221,20 +220,20 @@ public:
         }
         name_col_width += 2;
         size_t full_width = name_col_width + time_col_width;
-        cout.fill('-');
-        cout << "\nTop "<<n<<" time usage:\n"<<setw(int(full_width)) << "" << "\n";
-        cout.fill(' ');
+        std::cout.fill('-');
+        std::cout << "\nTop " << n << " time usage:\n" << std::setw(int(full_width)) << "" << "\n";
+        std::cout.fill(' ');
         for(size_t i = 0; i != n; ++i) {
             const result& r = m_results[i];
-            cout <<
-                left  << setw(int(name_col_width)) << r.m_test_name <<
-                right << setw(int(time_col_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
+            std::cout <<
+                std::left  << std::setw(int(name_col_width)) << r.m_test_name <<
+                std::right << std::setw(int(time_col_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
         }
     }
 
 private:
     struct result {
-        string m_test_name;
+        std::string m_test_name;
         double m_elapsed_seconds;
         bool operator<(const result& r) const
         {
@@ -242,7 +241,7 @@ private:
         }
     };
 
-    vector<result> m_results;
+    std::vector<result> m_results;
 };
 
 
@@ -256,15 +255,15 @@ bool run_tests()
                 seed = produce_nondeterministic_random_seed();
             }
             else {
-                istringstream in(str);
-                in.imbue(locale::classic());
-                in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
+                std::istringstream in(str);
+                in.imbue(std::locale::classic());
+                in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
                 in >> seed;
-                bool bad = !in || in.get() != char_traits<char>::eof();
+                bool bad = !in || in.get() != std::char_traits<char>::eof();
                 if (bad)
-                    throw runtime_error("Bad random seed");
+                    throw std::runtime_error("Bad random seed");
             }
-            cout << "Random seed: "<<seed<<"\n\n";
+            std::cout << "Random seed: "<<seed<<"\n\n";
             random_seed(seed);
         }
     }
@@ -279,7 +278,7 @@ bool run_tests()
     std::unique_ptr<Filter> filter;
 
     // Set up reporter
-    ofstream xml_file;
+    std::ofstream xml_file;
     bool xml;
 #ifdef REALM_MOBILE
     xml = true;
@@ -288,8 +287,8 @@ bool run_tests()
     xml = (xml_str && strlen(xml_str) != 0);
 #endif
     if (xml) {
-        string path = get_test_path_prefix();
-        string xml_path = path + "unit-test-report.xml";
+        std::string path = get_test_path_prefix();
+        std::string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
         reporter.reset(create_xml_reporter(xml_file));
     }
@@ -311,16 +310,16 @@ bool run_tests()
     {
         const char* str = getenv("UNITTEST_THREADS");
         if (str && strlen(str) != 0) {
-            istringstream in(str);
-            in.imbue(locale::classic());
-            in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
             in >> num_threads;
-            bool bad = !in || in.get() != char_traits<char>::eof() ||
+            bool bad = !in || in.get() != std::char_traits<char>::eof() ||
                 num_threads < 1 || num_threads > 1024;
             if (bad)
-                throw runtime_error("Bad number of threads");
+                throw std::runtime_error("Bad number of threads");
             if (num_threads > 1)
-                cout << "Number of test threads: "<<num_threads<<"\n\n";
+                std::cout << "Number of test threads: "<<num_threads<<"\n\n";
         }
     }
 
@@ -337,10 +336,10 @@ bool run_tests()
     bool success = list.run(reporter.get(), filter.get(), num_threads, shuffle);
 
     if (test_only)
-        cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
+        std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
     if (!xml)
-        cout << "\n";
+        std::cout << "\n";
 
     return success;
 }
@@ -350,9 +349,9 @@ bool run_tests()
 
 int test_all(int argc, char* argv[])
 {
-    // Disable buffering on cout so that progress messages can be related to
+    // Disable buffering on std::cout so that progress messages can be related to
     // error messages.
-    cout.setf(ios::unitbuf);
+    std::cout.setf(std::ios::unitbuf);
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 

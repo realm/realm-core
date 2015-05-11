@@ -5,7 +5,6 @@
 #include <memory>
 #include <realm/column_binary.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -323,7 +322,7 @@ void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Copying binary data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    copy(value.data(), value.data()+value.size(), buffer.get());
+    std::copy(value.data(), value.data()+value.size(), buffer.get());
     BinaryData copy_of_value(buffer.get(), value.size());
     set(row_ndx, copy_of_value); // Throws
     bool is_last = true;
@@ -571,20 +570,20 @@ void ColumnBinary::Verify() const
 }
 
 
-void ColumnBinary::to_dot(ostream& out, StringData title) const
+void ColumnBinary::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = m_array->get_ref();
-    out << "subgraph cluster_binary_column" << ref << " {" << endl;
+    out << "subgraph cluster_binary_column" << ref << " {" << std::endl;
     out << " label = \"Binary column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
     tree_to_dot(out);
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                               ostream& out) const
+                               std::ostream& out) const
 {
     bool is_strings = false; // FIXME: Not necessarily the case
     bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
@@ -606,7 +605,7 @@ void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     size_t leaf_size;
     const char* leaf_type;
@@ -626,12 +625,12 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
         leaf_type = "Big blobs leaf";
     }
     int indent = level * 2;
-    out << setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
 }
 
 } // anonymous namespace
 
-void ColumnBinary::do_dump_node_structure(ostream& out, int level) const
+void ColumnBinary::do_dump_node_structure(std::ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }

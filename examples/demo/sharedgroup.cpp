@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 using namespace realm;
-using namespace std;
 
 struct thread_info {
     pthread_t thread_id;
@@ -31,19 +30,19 @@ void* reader(void*)
     {
         const Group& g = sg.begin_read();
         Books::ConstRef t = g.get_table<Books>("books");
-        cout << "Books: " << t->size() << endl;
+        std::cout << "Books: " << t->size() << std::endl;
         sg.end_read();
     }
 
     while (!sg.has_changed()) { // wait for an update
         sleep(2);
-        cout << "No updates" << endl;
+        std::cout << "No updates" << std::endl;
     }
 
     {
         const Group& g = sg.begin_read();
         Books::ConstRef t = g.get_table<Books>("books");
-        cout << "Books: " << t->size() << endl;
+        std::cout << "Books: " << t->size() << std::endl;
         sg.end_read();
     }
 
@@ -58,7 +57,7 @@ void* writer(void*)
 
     // Write transaction
     {
-        cout << "Adding book" << endl;
+        std::cout << "Adding book" << std::endl;
         Group& g = sg.begin_write();
         Books::Ref t = g.get_table<Books>("books");
         t->add("Solaris", "Stanislaw Lem");

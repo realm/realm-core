@@ -10,7 +10,6 @@
 
 #include "demangle.hpp"
 
-using namespace std;
 using namespace realm;
 
 namespace {
@@ -32,14 +31,14 @@ namespace test_util {
 //
 // FIXME: Could use the Autoconf macro 'ax_cxx_gcc_abi_demangle'. See
 // http://autoconf-archive.cryp.to.
-string demangle(const string& mangled_name)
+std::string demangle(const std::string& mangled_name)
 {
 #ifdef REALM_HAVE_CXXABI_DEMANGLE
     int status = 0;
     std::unique_ptr<char[], Free> buffer(abi::__cxa_demangle(mangled_name.c_str(), 0, 0, &status));
     if (!buffer)
         return mangled_name;
-    string demangled_name = buffer.get();
+    std::string demangled_name = buffer.get();
     return demangled_name;
 #else
     return mangled_name;

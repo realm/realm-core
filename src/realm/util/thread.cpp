@@ -54,7 +54,6 @@
 #endif
 
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -92,7 +91,7 @@ void free_threadpool()
 void Thread::join()
 {
     if (!m_joinable)
-        throw runtime_error("Thread is not joinable");
+        throw std::runtime_error("Thread is not joinable");
     void** value_ptr = 0; // Ignore return value
     int r = pthread_join(m_id, value_ptr);
     if (REALM_UNLIKELY(r != 0))
@@ -102,13 +101,13 @@ void Thread::join()
 
 REALM_NORETURN void Thread::create_failed(int)
 {
-    throw runtime_error("pthread_create() failed");
+    throw std::runtime_error("pthread_create() failed");
 }
 
 REALM_NORETURN void Thread::join_failed(int)
 {
     // It is intentional that the argument is ignored here.
-    throw runtime_error("pthread_join() failed.");
+    throw std::runtime_error("pthread_join() failed.");
 }
 
 void Mutex::init_as_process_shared(bool robust_if_available)
@@ -136,7 +135,7 @@ void Mutex::init_as_process_shared(bool robust_if_available)
         init_failed(r);
 #else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
     static_cast<void>(robust_if_available);
-    throw runtime_error("No support for process-shared mutexes");
+    throw std::runtime_error("No support for process-shared mutexes");
 #endif
 }
 
@@ -144,9 +143,9 @@ REALM_NORETURN void Mutex::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw bad_alloc();
+            throw std::bad_alloc();
         default:
-            throw runtime_error("pthread_mutex_init() failed");
+            throw std::runtime_error("pthread_mutex_init() failed");
     }
 }
 
@@ -154,9 +153,9 @@ REALM_NORETURN void Mutex::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw bad_alloc();
+            throw std::bad_alloc();
         default:
-            throw runtime_error("pthread_mutexattr_init() failed");
+            throw std::runtime_error("pthread_mutexattr_init() failed");
     }
 }
 
@@ -239,7 +238,7 @@ CondVar::CondVar(process_shared_tag)
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
 #else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
-    throw runtime_error("No support for process-shared condition variables");
+    throw std::runtime_error("No support for process-shared condition variables");
 #endif
 }
 
@@ -247,9 +246,9 @@ REALM_NORETURN void CondVar::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw bad_alloc();
+            throw std::bad_alloc();
         default:
-            throw runtime_error("pthread_cond_init() failed");
+            throw std::runtime_error("pthread_cond_init() failed");
     }
 }
 
@@ -270,9 +269,9 @@ REALM_NORETURN void CondVar::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
-            throw bad_alloc();
+            throw std::bad_alloc();
         default:
-            throw runtime_error("pthread_condattr_init() failed");
+            throw std::runtime_error("pthread_condattr_init() failed");
     }
 }
 

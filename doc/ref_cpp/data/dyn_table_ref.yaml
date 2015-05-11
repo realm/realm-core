@@ -243,8 +243,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_add_column
         DESCR  :
-# TODO:    size_t      add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name);
-#          void        remove_column(const vector<size_t>& column_path);
+# TODO:    size_t      add_subcolumn(const std::vector<size_t>& column_path, DataType type, StringData name);
+#          void        remove_column(const std::vector<size_t>& column_path);
 
   - g_dyn_table_remove_column:
       NAME     : remove_column
@@ -275,7 +275,7 @@ CATEGORIES :
 # TODO: Add when vector indexing has been fixed
 #      SIGNATURE: |
 #                 void rename_column(size_t column_ndx, StringData name);
-#                 void rename_column(const vector<size_t>& column_path, StringData name);
+#                 void rename_column(const std::vector<size_t>& column_path, StringData name);
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t

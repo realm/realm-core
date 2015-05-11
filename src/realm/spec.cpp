@@ -5,7 +5,6 @@
 #  include <realm/replication.hpp>
 #endif
 
-using namespace std;
 using namespace realm;
 
 
@@ -418,10 +417,12 @@ size_t Spec::get_column_ndx_in_parent(size_t column_ndx) const
 }
 
 
-void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const REALM_NOEXCEPT
+Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const REALM_NOEXCEPT
 {
+    ColumnInfo info;
     info.m_column_ref_ndx = get_column_ndx_in_parent(column_ndx);
     info.m_has_search_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
+    return info;
 }
 
 
@@ -449,12 +450,12 @@ void Spec::Verify() const
 }
 
 
-void Spec::to_dot(ostream& out, StringData) const
+void Spec::to_dot(std::ostream& out, StringData) const
 {
     ref_type ref = m_top.get_ref();
 
-    out << "subgraph cluster_specset" << ref << " {" << endl;
-    out << " label = \"specset\";" << endl;
+    out << "subgraph cluster_specset" << ref << " {" << std::endl;
+    out << " label = \"specset\";" << std::endl;
 
     m_top.to_dot(out);
     m_types.to_dot(out, "types");
@@ -491,7 +492,7 @@ void Spec::to_dot(ostream& out, StringData) const
         }
     }
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 #endif // REALM_DEBUG

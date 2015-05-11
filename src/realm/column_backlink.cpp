@@ -24,7 +24,6 @@
 #include <realm/column_link.hpp>
 #include <realm/table.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -321,7 +320,7 @@ void ColumnBackLink::Verify(const Table& table, size_t col_ndx) const
 }
 
 
-void ColumnBackLink::get_backlinks(vector<VerifyPair>& pairs)
+void ColumnBackLink::get_backlinks(std::vector<VerifyPair>& pairs)
 {
     VerifyPair pair;
     size_t n = size();
@@ -337,10 +336,10 @@ void ColumnBackLink::get_backlinks(vector<VerifyPair>& pairs)
 }
 
 
-pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
-    return make_pair(p.first.m_ref, p.second);
+    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    return std::make_pair(p.first.m_ref, p.second);
 }
 
 #endif // REALM_DEBUG
