@@ -180,11 +180,10 @@ void BenchmarkResults::try_load_baseline_results()
         int lineno = 1;
         while (getline(in, line)) {
             std::istringstream line_in(line);
+            line_in >> std::skipws;
             std::string ident;
-            char space;
             Result r;
             if (line_in >> ident) {
-                line_in >> space;
                 double* numbers[] = {&r.min, &r.max, &r.total};
                 for (size_t i = 0; i < 3; ++i) {
                     if (!(line_in >> *numbers[i])) {
@@ -192,19 +191,10 @@ void BenchmarkResults::try_load_baseline_results()
                         error = true;
                         break;
                     }
-                    if (!(line_in >> space)) {
-                        std::cerr << "Expected space: line " << lineno << "\n";
-                        error = true;
-                        break;
-                    }
                 }
                 if (!error) {
                     if (!(line_in >> r.rep)) {
                         std::cerr << "Expected integer: line " << lineno << "\n";
-                        error = true;
-                    }
-                    if (!(line_in >> std::skipws)) {
-                        std::cerr << "Expected whitespace: line " << lineno << '\n';
                         error = true;
                     }
                 }
