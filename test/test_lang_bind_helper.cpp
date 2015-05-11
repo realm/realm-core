@@ -7313,7 +7313,12 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
-        sg.wait_for_change();
+        // wait here for writer to change the database. Kind of wasteful, but wait_for_change
+        // is not available on osx.
+        if (!sg.has_changed()) {
+            sched_yield();
+            continue;
+        }
         LangBindHelper::advance_read(sg);
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
@@ -7325,7 +7330,11 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
         if (table->size() > 0 && table->get_int(0,0) == 0) {
             // we need to wait for the verifier to steal our latest payload.
             // if we go out of scope too early, the payload will become invalid
-            sg.wait_for_change();
+            // wait here for writer to change the database. Kind of wasteful, but wait_for_change
+            // is not available on osx.
+            while (!sg.has_changed()) {
+                sched_yield();
+            }
             LangBindHelper::advance_read(sg);
             if (table->get_int(0,0) == -1)
                 break;
