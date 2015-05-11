@@ -302,6 +302,10 @@
 		F490EB6A1AE0E526003E5CFA /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F490EB661AE0E520003E5CFA /* bptree.cpp */; };
 		F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
+		F4D0FC1D1B00E0E40040956A /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
+		F4D0FC1E1B00E0E40040956A /* test-util.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 52D6E04E175BD9BC00B423E5 /* test-util.a */; };
+		F4D0FC201B00E1020040956A /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4D0FC1F1B00E1020040956A /* main.cpp */; };
+		F4D0FC221B00E14F0040956A /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -369,6 +373,15 @@
 			runOnlyForDeploymentPostprocessing = 1;
 		};
 		36E6085C1459972100CCC3E8 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		F4D0FC141B00E0D70040956A /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -622,6 +635,8 @@
 		F490EB661AE0E520003E5CFA /* bptree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bptree.cpp; path = realm/bptree.cpp; sourceTree = "<group>"; };
 		F490EB671AE0E520003E5CFA /* bptree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = bptree.hpp; path = realm/bptree.hpp; sourceTree = "<group>"; };
 		F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = query_engine.cpp; path = realm/query_engine.cpp; sourceTree = "<group>"; };
+		F4D0FC161B00E0D70040956A /* benchmark-common-tasks */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "benchmark-common-tasks"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4D0FC1F1B00E1020040956A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -671,6 +686,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4D0FC131B00E0D70040956A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4D0FC221B00E14F0040956A /* CoreFoundation.framework in Frameworks */,
+				F4D0FC1D1B00E0E40040956A /* librealm.a in Frameworks */,
+				F4D0FC1E1B00E0E40040956A /* test-util.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -815,6 +840,7 @@
 		3647DFF214209CE600D56FD7 /* test */ = {
 			isa = PBXGroup;
 			children = (
+				F4D0FC211B00E1090040956A /* benchmark-common-tasks */,
 				3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */,
 				52F2E0E017D5F8F500415958 /* large_tests */,
 				3647DFF414209CE600D56FD7 /* Makefile */,
@@ -914,6 +940,7 @@
 				4142C9951623478700B3B902 /* liblibrealm ios.a */,
 				3647E0E714209E6B00D56FD7 /* librealm.a */,
 				52D6E04E175BD9BC00B423E5 /* test-util.a */,
+				F4D0FC161B00E0D70040956A /* benchmark-common-tasks */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1005,6 +1032,14 @@
 				52F2E0E417D5F93D00415958 /* test_strings.cpp */,
 			);
 			name = large_tests;
+			sourceTree = "<group>";
+		};
+		F4D0FC211B00E1090040956A /* benchmark-common-tasks */ = {
+			isa = PBXGroup;
+			children = (
+				F4D0FC1F1B00E1020040956A /* main.cpp */,
+			);
+			path = "benchmark-common-tasks";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1288,6 +1323,23 @@
 			productReference = 52D6E04E175BD9BC00B423E5 /* test-util.a */;
 			productType = "com.apple.product-type.library.static";
 		};
+		F4D0FC151B00E0D70040956A /* benchmark-common-tasks */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4D0FC1C1B00E0D70040956A /* Build configuration list for PBXNativeTarget "benchmark-common-tasks" */;
+			buildPhases = (
+				F4D0FC121B00E0D70040956A /* Sources */,
+				F4D0FC131B00E0D70040956A /* Frameworks */,
+				F4D0FC141B00E0D70040956A /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "benchmark-common-tasks";
+			productName = "benchmark-common-tasks";
+			productReference = F4D0FC161B00E0D70040956A /* benchmark-common-tasks */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1296,6 +1348,11 @@
 			attributes = {
 				LastUpgradeCheck = 0620;
 				ORGANIZATIONNAME = Realm;
+				TargetAttributes = {
+					F4D0FC151B00E0D70040956A = {
+						CreatedOnToolsVersion = 6.3.1;
+					};
+				};
 			};
 			buildConfigurationList = 3611F2FF14209B7000017263 /* Build configuration list for PBXProject "realm" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -1315,6 +1372,7 @@
 				4142C9391623478700B3B902 /* librealm ios */,
 				52D6E04D175BD9BC00B423E5 /* test-utils */,
 				36AD7F7117FB94F800F046FC /* realmd-noinst */,
+				F4D0FC151B00E0D70040956A /* benchmark-common-tasks */,
 			);
 		};
 /* End PBXProject section */
@@ -1519,6 +1577,14 @@
 				5219EB6918FB026100FF9232 /* verified_integer.cpp in Sources */,
 				5219EB6D18FB028300FF9232 /* verified_string.cpp in Sources */,
 				B159627818DB14C4008B9421 /* wildcard.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4D0FC121B00E0D70040956A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4D0FC201B00E1020040956A /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1841,6 +1907,70 @@
 			};
 			name = Release;
 		};
+		F4D0FC1A1B00E0D70040956A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4D0FC1B1B00E0D70040956A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1906,6 +2036,14 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		F4D0FC1C1B00E0D70040956A /* Build configuration list for PBXNativeTarget "benchmark-common-tasks" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4D0FC1A1B00E0D70040956A /* Debug */,
+				F4D0FC1B1B00E0D70040956A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
 		};
 /* End XCConfigurationList section */
 	};
