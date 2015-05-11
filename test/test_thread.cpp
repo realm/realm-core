@@ -4,8 +4,8 @@
 #include <cstring>
 #include <algorithm>
 #include <queue>
+#include <functional>
 
-#include <realm/util/bind.hpp>
 #include <realm/util/thread.hpp>
 
 #include "test.hpp"
@@ -85,7 +85,7 @@ struct Robust {
 
     void simulate_death()
     {
-        m_mutex.lock(util::bind(&Robust::recover, this));
+        m_mutex.lock(std::bind(&Robust::recover, this));
         // Do not unlock
     }
 
@@ -186,7 +186,7 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 TEST(Thread_Join)
 {
     int i = 0;
-    Thread thread(util::bind(&increment, &i));
+    Thread thread(std::bind(&increment, &i));
     CHECK(thread.joinable());
     thread.join();
     CHECK(!thread.joinable());
@@ -199,7 +199,7 @@ TEST(Thread_Start)
     int i = 0;
     Thread thread;
     CHECK(!thread.joinable());
-    thread.start(util::bind(&increment, &i));
+    thread.start(std::bind(&increment, &i));
     CHECK(thread.joinable());
     thread.join();
     CHECK(!thread.joinable());
@@ -237,7 +237,7 @@ TEST(Thread_CriticalSection)
     shared.m_value = 0;
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
-        threads[i].start(util::bind(&Shared::increment_10000_times, &shared));
+        threads[i].start(std::bind(&Shared::increment_10000_times, &shared));
     for (int i = 0; i < 10; ++i)
         threads[i].join();
     CHECK_EQUAL(100000, shared.m_value);
@@ -250,7 +250,7 @@ TEST(Thread_CriticalSection2)
     shared.m_value = 0;
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
-        threads[i].start(util::bind(&Shared::increment_10000_times2, &shared));
+        threads[i].start(std::bind(&Shared::increment_10000_times2, &shared));
     for (int i = 0; i < 10; ++i)
         threads[i].join();
     CHECK_EQUAL(100000, shared.m_value);
@@ -269,57 +269,57 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
 
     // Check that lock/unlock cycle works and does not involve recovery
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(!robust.m_recover_called);
     robust.m_mutex.unlock();
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(!robust.m_recover_called);
     robust.m_mutex.unlock();
 
     // Check recovery by simulating a death
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death, &robust));
+        Thread thread(std::bind(&Robust::simulate_death, &robust));
         thread.join();
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(robust.m_recover_called);
     robust.m_mutex.unlock();
 
     // One more round of recovery
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death, &robust));
+        Thread thread(std::bind(&Robust::simulate_death, &robust));
         thread.join();
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(robust.m_recover_called);
     robust.m_mutex.unlock();
 
     // Simulate a case where recovery fails or is impossible
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death, &robust));
+        Thread thread(std::bind(&Robust::simulate_death, &robust));
         thread.join();
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(util::bind(&Robust::recover_throw, &robust)),
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)),
                 RobustMutex::NotRecoverable);
     CHECK(robust.m_recover_called);
 
     // Check that successive attempts at locking will throw
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(util::bind(&Robust::recover, &robust)),
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
                 RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(util::bind(&Robust::recover, &robust)),
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
                 RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
 }
@@ -340,7 +340,7 @@ TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
     // Bring the mutex into the 'inconsistent' state
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death, &robust));
+        Thread thread(std::bind(&Robust::simulate_death, &robust));
         thread.join();
     }
     CHECK(!robust.m_recover_called);
@@ -348,7 +348,7 @@ TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
     // Die while recovering
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death_during_recovery, &robust));
+        Thread thread(std::bind(&Robust::simulate_death_during_recovery, &robust));
         thread.join();
     }
     CHECK(robust.m_recover_called);
@@ -356,42 +356,42 @@ TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
     // The mutex is still in the 'inconsistent' state if another
     // attempt at locking it calls the recovery function
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(robust.m_recover_called);
     robust.m_mutex.unlock();
 
     // Now that the mutex is fully recovered, we should be able to
     // carry out a regular round of lock/unlock
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(!robust.m_recover_called);
     robust.m_mutex.unlock();
 
     // Try a double death during recovery
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death, &robust));
+        Thread thread(std::bind(&Robust::simulate_death, &robust));
         thread.join();
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death_during_recovery, &robust));
+        Thread thread(std::bind(&Robust::simulate_death_during_recovery, &robust));
         thread.join();
     }
     CHECK(robust.m_recover_called);
     robust.m_recover_called = false;
     {
-        Thread thread(util::bind(&Robust::simulate_death_during_recovery, &robust));
+        Thread thread(std::bind(&Robust::simulate_death_during_recovery, &robust));
         thread.join();
     }
     CHECK(robust.m_recover_called);
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(robust.m_recover_called);
     robust.m_mutex.unlock();
     robust.m_recover_called = false;
-    robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
+    robust.m_mutex.lock(std::bind(&Robust::recover, &robust));
     CHECK(!robust.m_recover_called);
     robust.m_mutex.unlock();
 }
@@ -407,9 +407,9 @@ TEST(Thread_CondVar)
     memset(consumed_counts, 0, sizeof consumed_counts);
 
     for (int i = 0; i < num_producers; ++i)
-        producers[i].start(util::bind(&producer_thread, &queue, i));
+        producers[i].start(std::bind(&producer_thread, &queue, i));
     for (int i = 0; i < num_consumers; ++i)
-        consumers[i].start(util::bind(&consumer_thread, &queue, &consumed_counts[i][0]));
+        consumers[i].start(std::bind(&consumer_thread, &queue, &consumed_counts[i][0]));
     for (int i = 0; i < num_producers; ++i)
         producers[i].join();
     queue.close(); // Stop consumers when queue is empty

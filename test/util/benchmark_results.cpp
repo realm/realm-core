@@ -32,8 +32,9 @@ std::string format_change_percent(double baseline, double seconds)
 {
     std::ostringstream out;
     double percent = (seconds - baseline) / baseline * 100;
-    out.precision(3);
+    out.precision(2);
     out.setf(std::ios_base::showpos);
+    out << std::fixed;
     out << percent << "%";
     return out.str();
 }
@@ -58,15 +59,31 @@ std::string format_rise_factor(double baseline, double seconds)
 
 std::string format_change(double baseline, double input, BenchmarkResults::ChangeType change_type)
 {
+    std::string str;
     switch (change_type) {
         case BenchmarkResults::change_Percent:
-            return format_change_percent(baseline, input);
+            str = format_change_percent(baseline, input);
+            break;
         case BenchmarkResults::change_DropFactor:
-            return format_drop_factor(baseline, input);
+            str = format_drop_factor(baseline, input);
+            break;
         case BenchmarkResults::change_RiseFactor:
-            return format_rise_factor(baseline, input);
+            str = format_rise_factor(baseline, input);
+            break;
     }
-    REALM_UNREACHABLE();
+    std::ostringstream os;
+    os << '(' << str << ')';
+    return os.str();
+}
+
+std::string pad_right(std::string str, size_t width, char padding = ' ')
+{
+    std::ostringstream ss;
+    ss << std::setw(width);
+    ss << std::setfill(padding);
+    ss << std::left;
+    ss << str;
+    return ss.str();
 }
 
 } // anonymous namespace
@@ -136,9 +153,9 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
     out.setf(std::ios_base::right, std::ios_base::adjustfield);
     if (baseline_iter != m_baseline_results.end()) {
         const Result& br = baseline_iter->second;
-        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " (" << format_change(br.min, r.min, change_type) << ")     ";
-        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " (" << format_change(br.max, r.max, change_type) << ")     ";
-        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << " (" << format_change(br.avg(), r.avg(), change_type) << ")     ";
+        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " " << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
+        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "     ";
+        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << " " << pad_right(format_change(br.avg(), r.avg(), change_type), 15) << "     ";
         out << "reps " << r.rep;
     }
     else {
@@ -160,22 +177,40 @@ void BenchmarkResults::try_load_baseline_results()
         BaselineResults baseline_results;
         bool error = false;
         std::string line;
+        int lineno = 1;
         while (getline(in, line)) {
             std::istringstream line_in(line);
+            line_in >> std::skipws;
             std::string ident;
-            char space;
             Result r;
-            line_in >> ident >> std::noskipws >> space >> std::skipws >> r.min >> space >> r.max >> space >> r.total >> r.rep;
-            if (!line_in || !isspace(space, line_in.getloc()))
+            if (line_in >> ident) {
+                double* numbers[] = {&r.min, &r.max, &r.total};
+                for (size_t i = 0; i < 3; ++i) {
+                    if (!(line_in >> *numbers[i])) {
+                        std::cerr << "Expected number: line " << lineno << "\n";
+                        error = true;
+                        break;
+                    }
+                }
+                if (!error) {
+                    if (!(line_in >> r.rep)) {
+                        std::cerr << "Expected integer: line " << lineno << "\n";
+                        error = true;
+                    }
+                }
+            }
+            else {
+                std::cerr << "Expected identifier: line " << lineno << "\n";
                 error = true;
-            if (!line_in.eof()) {
-                line_in >> space;
-                if (line_in.rdstate() != (std::ios_base::failbit | std::ios_base::eofbit))
-                    error = true;
+            }
+            if (!line_in) {
+                std::cerr << "Unknown error: line " << lineno << '\n';
+                error = true;
             }
             if (error)
                 break;
             baseline_results[ident] = r;
+            ++lineno;
         }
         if (error) {
             std::cerr << "WARNING: Failed to parse '"<<baseline_file<<"'\n";

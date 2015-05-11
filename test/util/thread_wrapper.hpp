@@ -24,7 +24,6 @@
 #include <string>
 #include <iostream>
 
-#include <realm/util/bind.hpp>
 #include <realm/util/thread.hpp>
 
 namespace realm {
@@ -38,7 +37,7 @@ public:
     template<class F> void start(const F& func)
     {
         m_except = false;
-        m_thread.start(util::bind(&Runner<F>::run, func, this));
+        m_thread.start([=] { Runner<F>::run(func, this); });
     }
 
     /// Returns 'true' if thread has thrown an exception. In that case

@@ -20,7 +20,6 @@
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
 #include <memory>
-#include <realm/util/bind.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/thread.hpp>
@@ -233,7 +232,7 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            writer_thread.start(bind(&writer, old_path, 41));
+            writer_thread.start(std::bind(&writer, old_path, 41));
 
             // make sure writer has started:
             bool waiting = true;
@@ -1199,7 +1198,7 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i)
-            threads[i].start(bind(&writer_threads_thread, &test_results, std::string(path), i));
+            threads[i].start(std::bind(&writer_threads_thread, &test_results, std::string(path), i));
 
         // Wait for all threads to complete
         for (size_t i = 0; i < thread_count; ++i)
@@ -1885,7 +1884,7 @@ void multiprocess_threaded(TestResults& test_results, std::string path, size_t n
 
     // Start threads
     for (size_t i = 0; i != num_threads; ++i)
-        threads[i].start(bind(&multiprocess_thread, &test_results, path, base+i));
+        threads[i].start(std::bind(&multiprocess_thread, &test_results, path, base+i));
 
     // Wait for threads to finish
     for (size_t i = 0; i != num_threads; ++i) {
@@ -2054,7 +2053,7 @@ TEST(Shared_WaitForChange)
     SharedGroup sg(path, false, SharedGroup::durability_Full);
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
-        threads[j].start(bind(&waiter, std::string(path), j));
+        threads[j].start(std::bind(&waiter, std::string(path), j));
     bool try_again = true;
     while (try_again) {
         try_again = false;

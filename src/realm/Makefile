@@ -9,7 +9,6 @@ util/terminate.hpp \
 util/type_list.hpp \
 util/tuple.hpp \
 util/type_traits.hpp \
-util/bind.hpp \
 util/safe_int_ops.hpp \
 util/bind_ptr.hpp \
 util/buffer.hpp \

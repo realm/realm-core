@@ -4,9 +4,9 @@
 #include <cassert>
 #include <map>
 #include <iostream>
+#include <functional>
 
 #include <realm/util/features.h>
-#include <realm/util/bind.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/features.h>
@@ -122,7 +122,7 @@ TEST(File_NoSpuriousTryLockFailures)
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
-        slaves[i].start(bind(&slave, i, std::string(path)));
+        slaves[i].start(std::bind(&slave, i, std::string(path)));
     }
     master();
     for (int i = 0; i != num_slaves; ++i)

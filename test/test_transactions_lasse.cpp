@@ -16,7 +16,6 @@
 #include <realm.hpp>
 #include <realm/column.hpp>
 #include <realm/utilities.hpp>
-#include <realm/util/bind.hpp>
 #include <realm/util/file.hpp>
 
 #include "util/thread_wrapper.hpp"
@@ -182,10 +181,10 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
 #endif
 
     for (int i = 0; i < READERS1; ++i)
-        read_threads[i].start(util::bind(&read_thread, &test_results, std::string(path)));
+        read_threads[i].start(std::bind(&read_thread, &test_results, std::string(path)));
 
     for (int i = 0; i < WRITERS1; ++i)
-        write_threads[i].start(util::bind(&write_thread, &test_results, std::string(path), i));
+        write_threads[i].start(std::bind(&write_thread, &test_results, std::string(path), i));
 
     for (int i = 0; i < READERS1; ++i) {
         bool reader_has_thrown = read_threads[i].join();
@@ -244,7 +243,7 @@ TEST_IF(Transactions_Stress2, TEST_DURATION >= 3)
     SHARED_GROUP_TEST_PATH(path);
 
     for (int i = 0; i < THREADS2; ++i)
-        threads[i].start(util::bind(&create_groups, std::string(path)));
+        threads[i].start(std::bind(&create_groups, std::string(path)));
 
     for (int i = 0; i < THREADS2; ++i) {
         bool thread_has_thrown = threads[i].join();
@@ -351,10 +350,10 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
 #endif
 
     for (int i = 0; i < WRITERS3; ++i)
-        write_threads[i].start(util::bind(&write_thread3, std::string(path)));
+        write_threads[i].start(std::bind(&write_thread3, std::string(path)));
 
     for (int i = 0; i < READERS3; ++i)
-        read_threads[i].start(util::bind(&read_thread3, &test_results, std::string(path)));
+        read_threads[i].start(std::bind(&read_thread3, &test_results, std::string(path)));
 
     for (int i = 0; i < WRITERS3; ++i) {
         bool writer_has_thrown = write_threads[i].join();
@@ -447,10 +446,10 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
 #endif
 
     for (int i = 0; i < READERS4; ++i)
-        read_threads[i].start(util::bind(&read_thread4, &test_results, std::string(path)));
+        read_threads[i].start(std::bind(&read_thread4, &test_results, std::string(path)));
 
     for (int i = 0; i < WRITERS4; ++i)
-        write_threads[i].start(util::bind(&write_thread4, &test_results, std::string(path), i));
+        write_threads[i].start(std::bind(&write_thread4, &test_results, std::string(path), i));
 
     for (int i = 0; i < WRITERS4; ++i) {
         bool writer_has_thrown = write_threads[i].join();
