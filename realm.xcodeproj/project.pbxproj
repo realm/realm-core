@@ -1653,7 +1653,6 @@
 					};
 					F4D0FC261B00F4010040956A = {
 						CreatedOnToolsVersion = 6.3.1;
-						DevelopmentTeam = 9GCBJ97HG6;
 					};
 					F4D0FC511B00F4B00040956A = {
 						CreatedOnToolsVersion = 6.3.1;
@@ -2749,6 +2748,7 @@
 				F45013D11B01022800CD4A7E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		F4D0FC1C1B00E0D70040956A /* Build configuration list for PBXNativeTarget "benchmark-common-tasks" */ = {
 			isa = XCConfigurationList;
