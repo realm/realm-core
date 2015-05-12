@@ -134,7 +134,12 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
             double x = s - mean;
             sum_variance += x * x;
         }
-        double variance = sum_variance / double(r.rep);
+
+        // Subtract one because this is a "sample standard deviation" (Bessel's Correction)
+        // See: http://en.wikipedia.org/wiki/Bessel%27s_correction
+        double n = double(r.rep - 1);
+
+        double variance = sum_variance / n;
         r.stddev = std::sqrt(variance);
         REALM_ASSERT_RELEASE(r.stddev != 0);
     }
