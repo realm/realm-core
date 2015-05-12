@@ -2,7 +2,7 @@
 
 #include "test_path.hpp"
 
-extern "C" int benchmark_common_tasks_main(int, const char**);
+extern "C" int benchmark_common_tasks_main();
 
 @interface ViewController ()
 
@@ -18,7 +18,7 @@ extern "C" int benchmark_common_tasks_main(int, const char**);
     realm::test_util::set_test_path_prefix(tmp_dir);
     
     [[NSProcessInfo processInfo] performActivityWithOptions:NSActivityLatencyCritical reason:@"benchmark-common-tasks" usingBlock:^{
-        benchmark_common_tasks_main(0, NULL);
+        benchmark_common_tasks_main();
     }];
     
     exit(0);
