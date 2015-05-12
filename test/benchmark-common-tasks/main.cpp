@@ -7,6 +7,7 @@
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
+#include "../util/test_path.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -26,7 +27,6 @@ using namespace realm::test_util;
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
 */
 
-static const char realm_path[] = "/tmp/benchmark-common-tasks.realm";
 static const size_t min_repetitions = 10;
 static const size_t max_repetitions = 100;
 static const double min_duration_s = 0.05;
@@ -299,23 +299,32 @@ void run_benchmark(BenchmarkResults& results)
 #else
     const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
 #endif
+    
+    static long test_counter = 0;
 
     Timer timer(Timer::type_UserTime);
     for (size_t i = 0; i < num_durabilities; ++i) {
-        // Open a SharedGroup:
-        File::try_remove(realm_path);
-        std::unique_ptr<SharedGroup> group;
         SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
-        group.reset(new SharedGroup(realm_path, false, level));
-
         B benchmark;
-
+        
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
         lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ")";
         ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level);
         std::string ident = ident_ss.str();
+        
+        realm::test_util::unit_test::TestDetails test_details;
+        test_details.test_index = test_counter++;
+        test_details.suite_name = "BenchmarkCommonTasks";
+        test_details.test_name = ident.c_str();
+        test_details.file_name = __FILE__;
+        test_details.line_number = __LINE__;
+        
+        // Open a SharedGroup:
+        SHARED_GROUP_TEST_PATH(realm_path);
+        std::unique_ptr<SharedGroup> group;
+        group.reset(new SharedGroup(realm_path, false, level));
 
         // Warm-up and initial measuring:
         Timer t_unused(Timer::type_UserTime);
@@ -336,9 +345,10 @@ void run_benchmark(BenchmarkResults& results)
 }
 
 
-int main(int, const char**)
+extern "C" int benchmark_common_tasks_main()
 {
-    BenchmarkResults results(40);
+    std::string results_file_stem = test_util::get_test_path_prefix() + "/results";
+    BenchmarkResults results(40, results_file_stem.c_str());
 
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);
@@ -354,3 +364,10 @@ int main(int, const char**)
 
     return 0;
 }
+
+#if !defined(REALM_IOS)
+int main(int, const char**)
+{
+    return benchmark_common_tasks_main();
+}
+#endif
