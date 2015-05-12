@@ -375,6 +375,10 @@ void run_benchmark(BenchmarkResults& results)
         // Warm-up and initial measuring:
         Timer t_unused(Timer::type_UserTime);
         run_benchmark_once(benchmark, *group, t_unused);
+        run_benchmark_once(benchmark, *group, t_unused);
+        run_benchmark_once(benchmark, *group, t_unused);
+        run_benchmark_once(benchmark, *group, t_unused);
+        run_benchmark_once(benchmark, *group, t_unused);
 
         size_t rep;
         double total = 0;
