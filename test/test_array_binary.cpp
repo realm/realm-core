@@ -224,7 +224,7 @@ TEST(ArrayBinary_Basic)
     c.destroy();
 }
 
-ONLY(ArrayBinary_Nulls)
+TEST(ArrayBinary_Nulls)
 {
     ArrayBinary c(Allocator::get_default());
     c.create();

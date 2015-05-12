@@ -6004,22 +6004,53 @@ TEST(Query_BinaryNull)
     table.set_binary(0, 1, BinaryData("", 0)); // NOTE: Specify size = 0, else size turns into 1!
     table.set_binary(0, 2, BinaryData("foo"));
     
-    size_t t;
+    TableView t;
 
-    t = table.where().equal(0, BinaryData()).find();
-    CHECK_EQUAL(0, t);
+    t = table.where().equal(0, BinaryData()).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
 
-    t = table.where().equal(0, BinaryData("", 0)).find();
-    CHECK_EQUAL(1, t);
+    t = table.where().equal(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
 
-    t = table.where().equal(0, BinaryData("foo")).find();
-    CHECK_EQUAL(2, t);
+    t = table.where().equal(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
 
-    t = table.where().not_equal(0, BinaryData()).find();
-    CHECK_EQUAL(1, t);
+    t = table.where().not_equal(0, BinaryData()).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
 
-    t = table.where().not_equal(0, BinaryData("", 0)).find();
-    CHECK_EQUAL(0, t);
+    t = table.where().not_equal(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+
+    t = table.where().begins_with(0, BinaryData()).find_all();
+    CHECK_EQUAL(3, t.size());
+
+    t = table.where().begins_with(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = table.where().begins_with(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+
+    t = table.where().ends_with(0, BinaryData()).find_all();
+    CHECK_EQUAL(3, t.size());
+
+    t = table.where().ends_with(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = table.where().ends_with(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
 }
 
 #endif
