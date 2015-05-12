@@ -900,6 +900,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 
 void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
+    std::lock_guard<std::mutex> lock(m_row_accessor_mutex);
     row->m_prev = 0;
     row->m_next = m_row_accessors;
     if (m_row_accessors)
@@ -909,6 +910,13 @@ void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 
 void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
+{
+    std::lock_guard<std::mutex> lock(m_row_accessor_mutex);
+    do_unregister_row_accessor(row);
+}
+
+
+void Table::do_unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
     if (row->m_prev) {
         row->m_prev->m_next = row->m_next;
@@ -923,6 +931,7 @@ void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 void Table::discard_row_accessors() REALM_NOEXCEPT
 {
+    std::lock_guard<std::mutex> lock(m_row_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
     m_row_accessors = 0;
@@ -4711,6 +4720,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXC
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after insertion of new rows
+    std::lock_guard<std::mutex> lock(m_row_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next) {
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
@@ -4725,12 +4735,13 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after removal of a row
+    std::lock_guard<std::mutex> lock(m_row_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx > row_ndx) {
             --row->m_row_ndx;
@@ -4746,12 +4757,13 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
+    std::lock_guard<std::mutex> lock(m_row_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == to_row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx == from_row_ndx) {
             row->m_row_ndx = to_row_ndx;
@@ -5020,6 +5032,7 @@ void Table::Verify() const
 
     // Verify row accessors
     {
+        std::lock_guard<std::mutex> lock(m_row_accessor_mutex);
         for (RowBase* row = m_row_accessors; row; row = row->m_next) {
             // Check that it is attached to this table
             REALM_ASSERT_3(row->m_table.get(), ==, this);
