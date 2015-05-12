@@ -20,11 +20,16 @@ extern "C" int benchmark_common_tasks_main(int, const char**);
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    
     NSURL* tmpUrl = [[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
     NSString* tmpDir = tmpUrl.path;
     std::string tmp_dir{tmpDir.UTF8String, tmpDir.length};
     realm::test_util::set_test_path_prefix(tmp_dir + '/');
-    benchmark_common_tasks_main(0, NULL);
+    
+    [[NSProcessInfo processInfo] performActivityWithOptions:NSActivityLatencyCritical reason:@"benchmark-common-tasks" usingBlock:^{
+        benchmark_common_tasks_main(0, NULL);
+    }];
+    
     exit(0);
 }
 
