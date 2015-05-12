@@ -4,6 +4,8 @@
 
 * Fixed incorrect results for Or() when querying via a LinkView with a
   different order than the target table.
+* Fixed incorrect results when getting the count for a query where the only
+  condition is checking for non-equality to an int.
 
 ### Enhancements:
 

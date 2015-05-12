@@ -685,7 +685,7 @@ public:
 
     template<size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
     template<bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
-    template<size_t width> uint64_t cascade(uint64_t a) const;                 // Sets uppermost bits of non-zero elements
+    template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
     template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template<size_t width> inline int64_t LowerBits() const;                   // Return chunk with lower bit set in each element
     std::size_t FirstSetBit(unsigned int v) const;
@@ -2208,17 +2208,19 @@ bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64
 }
 
 
-template<size_t width> uint64_t Array::cascade(uint64_t a) const
+template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 {
-    // Takes a chunk of values as argument and sets the uppermost bit for each element which is 0. Example:
-    // width == 4 and v = 01000000 00001000 10000001 00001000 00000000 10100100 00001100 00111110 01110100 00010000 00000000 00000001 10000000 01111110
-    // will return:       00001000 00010000 00010000 00010000 00010001 00000000 00010000 00000000 00000000 00000001 00010001 00010000 00000001 00000000
+    // Takes a chunk of values as argument and sets the least significant bit for each
+    // element which is zero or non-zero, depending on the template parameter.
+    // Example for zero=true:
+    // width == 4 and a = 0x5fd07a107610f610
+    // will return:       0x0001000100010001
 
     // static values needed for fast population count
     const uint64_t m1  = 0x5555555555555555ULL;
 
     if (width == 1) {
-        return ~a;
+        return zero ? ~a : a;
     }
     else if (width == 2) {
         // Masks to avoid spillover between segments in cascades
@@ -2226,7 +2228,8 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a &= m1;     // isolate single bit in each segment
-        a ^= m1;     // reverse isolated bits
+        if (zero)
+            a ^= m1; // reverse isolated bits if checking for zeroed segments
 
         return a;
     }
@@ -2240,7 +2243,8 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
         a &= m;     // isolate single bit in each segment
-        a ^= m;     // reverse isolated bits
+        if (zero)
+            a ^= m; // reverse isolated bits if checking for zeroed segments
 
         return a;
     }
@@ -2256,7 +2260,8 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
         a |= (a >> 2) & c2;
         a |= (a >> 4) & c3;
         a &= m;     // isolate single bit in each segment
-        a ^= m;     // reverse isolated bits
+        if (zero)
+            a ^= m; // reverse isolated bits if checking for zeroed segments
 
         return a;
     }
@@ -2274,7 +2279,8 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
         a |= (a >> 4) & c3;
         a |= (a >> 8) & c4;
         a &= m;     // isolate single bit in each segment
-        a ^= m;     // reverse isolated bits
+        if (zero)
+            a ^= m; // reverse isolated bits if checking for zeroed segments
 
         return a;
     }
@@ -2295,12 +2301,13 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
         a |= (a >> 8) & c4;
         a |= (a >> 16) & c5;
         a &= m;     // isolate single bit in each segment
-        a ^= m;     // reverse isolated bits
+        if (zero)
+            a ^= m; // reverse isolated bits if checking for zeroed segments
 
         return a;
     }
     else if (width == 64) {
-        return a == 0 ? 1 : 0;
+        return (a == 0) == zero;
     }
     else {
         REALM_ASSERT_DEBUG(false);
@@ -2736,7 +2743,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 
             while (eq ? TestZero<width>(v2) : v2) {
 
-                if (find_action_pattern<action, Callback>(start + baseindex, cascade<width>(eq ? v2 : ~v2), state, callback))
+                if (find_action_pattern<action, Callback>(start + baseindex, cascade<width, eq>(v2), state, callback))
                     break; // consumed
 
                 size_t t = FindZero<eq, width>(v2);
