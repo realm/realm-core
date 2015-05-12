@@ -83,8 +83,8 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         BenchmarkWithStringsTable::setup(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(REALM_MAX_BPNODE_SIZE - 1);
-        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE - 1; ++i) {
+        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
+        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
             t->set_string(0, i, ss.str());
@@ -102,6 +102,41 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         t->insert_empty_row(0);
         // This should be enough to upgrade the entire array:
         t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, REALM_MAX_BPNODE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, REALM_MAX_BPNODE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, REALM_MAX_BPNODE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
+        tr.commit();
+    }
+};
+
+struct BenchmarkWithIntsTable : Benchmark {
+    void setup(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("IntOnly");
+        t->add_column(type_Int, "ints");
+        tr.commit();
+    }
+
+    void teardown(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table("IntOnly");
+        group.commit();
+    }
+};
+
+struct BenchmarkWithInts : BenchmarkWithIntsTable {
+    void setup(SharedGroup& group)
+    {
+        BenchmarkWithIntsTable::setup(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+            t->set_int(0, i, r.draw_int<int64_t>());
+        }
         tr.commit();
     }
 };
@@ -136,6 +171,17 @@ struct BenchmarkSort : BenchmarkWithStrings {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->get_sorted_view(0);
+    }
+};
+
+struct BenchmarkSortInt : BenchmarkWithInts {
+    const char* name() const { return "SortInt"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
         ConstTableView view = table->get_sorted_view(0);
     }
 };
@@ -345,6 +391,7 @@ int main(int, const char**)
     run_benchmark<BenchmarkQueryNot>(results);
     run_benchmark<BenchmarkSize>(results);
     run_benchmark<BenchmarkSort>(results);
+    run_benchmark<BenchmarkSortInt>(results);
     run_benchmark<BenchmarkInsert>(results);
     run_benchmark<BenchmarkGetString>(results);
     run_benchmark<BenchmarkSetString>(results);
