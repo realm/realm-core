@@ -5,6 +5,13 @@
 * Fixed incorrect results for Or() when querying via a LinkView with a
   different order than the target table.
 
+### Enhancements:
+
+* Automatically log assertion messages to Crashlytics if it's loaded into the
+  current process.
+
+----------------------------------------------
+
 # 0.89.2 Release notes
 
 ### Bugfixes:
