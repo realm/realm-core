@@ -153,16 +153,14 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
     out.setf(std::ios_base::right, std::ios_base::adjustfield);
     if (baseline_iter != m_baseline_results.end()) {
         const Result& br = baseline_iter->second;
+        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << " " << pad_right(format_change(br.avg(), r.avg(), change_type), 15) << "     ";
         out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " " << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
         out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "     ";
-        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << " " << pad_right(format_change(br.avg(), r.avg(), change_type), 15) << "     ";
-        out << "reps " << r.rep;
     }
     else {
+        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << "     ";
         out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << "     ";
         out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << "     ";
-        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << "     ";
-        out << "reps " << r.rep;
     }
     out << std::endl;
 }
