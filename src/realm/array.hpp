@@ -685,7 +685,7 @@ public:
 
     template<size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
     template<bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
-    template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets uppermost bits of zero or non-zero elements
+    template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
     template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template<size_t width> inline int64_t LowerBits() const;                   // Return chunk with lower bit set in each element
     std::size_t FirstSetBit(unsigned int v) const;
