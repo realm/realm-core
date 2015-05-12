@@ -341,12 +341,12 @@ T BpTree<T, N>::get(std::size_t ndx) const REALM_NOEXCEPT
     if (root_is_leaf()) {
         return root_as_leaf().get(ndx);
     }
-    LeafType fallback(get_alloc());
-    const LeafType* leaf;
-    LeafInfo leaf_info { &leaf, &fallback };
-    std::size_t ndx_in_leaf;
-    get_leaf(ndx, ndx_in_leaf, leaf_info);
-    return leaf->get(ndx_in_leaf);
+    
+    // Use direct getter to avoid initializing leaf array:
+    std::pair<MemRef, std::size_t> p = root().get_bptree_leaf(ndx);
+    const char* leaf_header = p.first.m_addr;
+    std::size_t ndx_in_leaf = p.second;
+    return LeafType::get(leaf_header, ndx_in_leaf);
 }
 
 template <class T, bool N>
