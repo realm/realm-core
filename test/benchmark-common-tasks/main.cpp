@@ -397,7 +397,7 @@ void run_benchmark(BenchmarkResults& results)
 
 extern "C" int benchmark_common_tasks_main()
 {
-    std::string results_file_stem = test_util::get_test_path_prefix() + "/results";
+    std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
     run_benchmark<AddTable>(results);
