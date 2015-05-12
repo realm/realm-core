@@ -27,14 +27,13 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/string_buffer.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
 namespace {
 #ifdef _WIN32 // Windows - GetLastError()
 
-string get_last_error_msg(const char* prefix, DWORD err)
+std::string get_last_error_msg(const char* prefix, DWORD err)
 {
     StringBuffer buffer;
     buffer.append_c_str(prefix);
@@ -47,7 +46,7 @@ string get_last_error_msg(const char* prefix, DWORD err)
         FormatMessageA(flags, 0, err, language_id, buffer.data()+offset,
                        static_cast<DWORD>(max_msg_size), 0);
     if (0 < size)
-        return string(buffer.data(), offset+size);
+        return std::string(buffer.data(), offset+size);
     buffer.resize(offset);
     buffer.append_c_str("Unknown error");
     return buffer.str();
@@ -63,7 +62,7 @@ namespace realm {
 namespace util {
 
 
-void make_dir(const string& path)
+void make_dir(const std::string& path)
 {
 #ifdef _WIN32
     if (_mkdir(path.c_str()) == 0)
@@ -73,7 +72,7 @@ void make_dir(const string& path)
         return;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("open() failed: ", err);
+    std::string msg = get_errno_msg("open() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -87,12 +86,12 @@ void make_dir(const string& path)
         case ENOTDIR:
             throw File::AccessError(msg);
         default:
-            throw runtime_error(msg);
+            throw std::runtime_error(msg);
     }
 }
 
 
-void remove_dir(const string& path)
+void remove_dir(const std::string& path)
 {
 #ifdef _WIN32
     if (_rmdir(path.c_str()) == 0)
@@ -102,7 +101,7 @@ void remove_dir(const string& path)
         return;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("open() failed: ", err);
+    std::string msg = get_errno_msg("open() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -119,39 +118,39 @@ void remove_dir(const string& path)
         case ENOTDIR:
             throw File::AccessError(msg);
         default:
-            throw runtime_error(msg);
+            throw std::runtime_error(msg);
     }
 }
 
 
-string make_temp_dir()
+std::string make_temp_dir()
 {
 #ifdef _WIN32 // Windows version
 
     StringBuffer buffer1;
     buffer1.resize(MAX_PATH+1);
     if (GetTempPathA(MAX_PATH+1, buffer1.data()) == 0)
-        throw runtime_error("CreateDirectory() failed");
+        throw std::runtime_error("CreateDirectory() failed");
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
     for (;;) {
         if (GetTempFileNameA(buffer1.c_str(), "rlm", 0, buffer2.data()) == 0)
-            throw runtime_error("GetTempFileName() failed");
+            throw std::runtime_error("GetTempFileName() failed");
         if (DeleteFileA(buffer2.c_str()) == 0)
-            throw runtime_error("DeleteFile() failed");
+            throw std::runtime_error("DeleteFile() failed");
         if (CreateDirectoryA(buffer2.c_str(), 0) != 0)
             break;
         if (GetLastError() != ERROR_ALREADY_EXISTS)
-            throw runtime_error("CreateDirectory() failed");
+            throw std::runtime_error("CreateDirectory() failed");
     }
-    return string(buffer2.c_str());
+    return std::string(buffer2.c_str());
 
 #else // POSIX.1-2008 version
 
     StringBuffer buffer;
     buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
     if (mkdtemp(buffer.c_str()) == 0)
-        throw runtime_error("mkdtemp() failed");
+        throw std::runtime_error("mkdtemp() failed");
     return buffer.str();
 
 #endif
@@ -162,7 +161,7 @@ string make_temp_dir()
 } // namespace realm
 
 
-void File::open_internal(const string& path, AccessMode a, CreateMode c, int flags, bool* success)
+void File::open_internal(const std::string& path, AccessMode a, CreateMode c, int flags, bool* success)
 {
     REALM_ASSERT_RELEASE(!is_attached());
 
@@ -217,7 +216,7 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         *success = false;
         return;
     }
-    string msg = get_last_error_msg("CreateFile() failed: ", err);
+    std::string msg = get_last_error_msg("CreateFile() failed: ", err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
@@ -227,7 +226,7 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         case ERROR_FILE_EXISTS:
             throw Exists(msg);
         default:
-            throw runtime_error(msg);
+            throw std::runtime_error(msg);
     }
 
 #else // POSIX version
@@ -272,7 +271,7 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         *success = false;
         return;
     }
-    string msg = get_errno_msg("open() failed: ", err);
+    std::string msg = get_errno_msg("open() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -289,7 +288,7 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         case ENXIO:
             throw AccessError(msg);
         default:
-            throw runtime_error(msg);
+            throw std::runtime_error(msg);
     }
 
 #endif
@@ -329,7 +328,7 @@ size_t File::read(char* data, size_t size)
 
     char* const data_0 = data;
     while (0 < size) {
-        DWORD n = numeric_limits<DWORD>::max();
+        DWORD n = std::numeric_limits<DWORD>::max();
         if (int_less_than(size, n))
             n = static_cast<DWORD>(size);
         DWORD r = 0;
@@ -345,8 +344,8 @@ size_t File::read(char* data, size_t size)
 
 error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    string msg = get_last_error_msg("ReadFile() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_last_error_msg("ReadFile() failed: ", err);
+    throw std::runtime_error(msg);
 
 #else // POSIX version
 
@@ -361,7 +360,7 @@ error:
     char* const data_0 = data;
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
-        size_t n = min(size, size_t(SSIZE_MAX));
+        size_t n = std::min(size, size_t(SSIZE_MAX));
         ssize_t r = ::read(m_fd, data, n);
         if (r == 0)
             break;
@@ -375,8 +374,8 @@ error:
 
 error:
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("read(): failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_errno_msg("read(): failed: ", err);
+    throw std::runtime_error(msg);
 
 #endif
 }
@@ -389,7 +388,7 @@ void File::write(const char* data, size_t size)
 #ifdef _WIN32 // Windows version
 
     while (0 < size) {
-        DWORD n = numeric_limits<DWORD>::max();
+        DWORD n = std::numeric_limits<DWORD>::max();
         if (int_less_than(size, n))
             n = static_cast<DWORD>(size);
         DWORD r = 0;
@@ -403,8 +402,8 @@ void File::write(const char* data, size_t size)
 
   error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    string msg = get_last_error_msg("WriteFile() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_last_error_msg("WriteFile() failed: ", err);
+    throw std::runtime_error(msg);
 
 #else // POSIX version
 
@@ -418,7 +417,7 @@ void File::write(const char* data, size_t size)
 
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
-        size_t n = min(size, size_t(SSIZE_MAX));
+        size_t n = std::min(size, size_t(SSIZE_MAX));
         ssize_t r = ::write(m_fd, data, n);
         if (r < 0)
             goto error;
@@ -431,8 +430,8 @@ void File::write(const char* data, size_t size)
 
   error:
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("write(): failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_errno_msg("write(): failed: ", err);
+    throw std::runtime_error(msg);
 
 #endif
 }
@@ -448,10 +447,10 @@ File::SizeType File::get_size() const
     if (GetFileSizeEx(m_handle, &large_int)) {
         SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
-            throw runtime_error("File size overflow");
+            throw std::runtime_error("File size overflow");
         return size;
     }
-    throw runtime_error("GetFileSizeEx() failed");
+    throw std::runtime_error("GetFileSizeEx() failed");
 
 #else // POSIX version
 
@@ -459,12 +458,12 @@ File::SizeType File::get_size() const
     if (::fstat(m_fd, &statbuf) == 0) {
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
-            throw runtime_error("File size overflow");
+            throw std::runtime_error("File size overflow");
         if (m_encryption_key)
             return encrypted_size_to_data_size(size);
         return size;
     }
-    throw runtime_error("fstat() failed");
+    throw std::runtime_error("fstat() failed");
 
 #endif
 }
@@ -481,7 +480,7 @@ void File::resize(SizeType size)
 
     seek(size);
     if (!SetEndOfFile(m_handle))
-        throw runtime_error("SetEndOfFile() failed");
+        throw std::runtime_error("SetEndOfFile() failed");
 
     // Restore file position
     seek(p);
@@ -493,13 +492,13 @@ void File::resize(SizeType size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw runtime_error("File size overflow");
+        throw std::runtime_error("File size overflow");
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
     if (::ftruncate(m_fd, size2) == 0)
         return;
-    throw runtime_error("ftruncate() failed");
+    throw std::runtime_error("ftruncate() failed");
 
 #endif
 }
@@ -516,7 +515,7 @@ void File::prealloc(SizeType offset, size_t size)
 #else // Non-atomic fallback
 
     if (int_add_with_overflow_detect(offset, size))
-        throw runtime_error("File size overflow");
+        throw std::runtime_error("File size overflow");
     if (get_size() < offset)
         resize(offset);
 
@@ -537,13 +536,13 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw runtime_error("File size overflow");
+        throw std::runtime_error("File size overflow");
 
     if (::posix_fallocate(m_fd, offset, size2) == 0)
         return;
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("posix_fallocate() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_errno_msg("posix_fallocate() failed: ", err);
+    throw std::runtime_error(msg);
 
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
@@ -582,25 +581,26 @@ void File::seek(SizeType position)
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
-        throw runtime_error("File position overflow");
+        throw std::runtime_error("File position overflow");
 
     if (!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN))
-        throw runtime_error("SetFilePointerEx() failed");
+        throw std::runtime_error("SetFilePointerEx() failed");
 
 #else // POSIX version
 
     off_t position2;
     if (int_cast_with_overflow_detect(position, position2))
-        throw runtime_error("File position overflow");
+        throw std::runtime_error("File position overflow");
 
     if (0 <= ::lseek(m_fd, position2, SEEK_SET))
         return;
-    throw runtime_error("lseek() failed");
+    throw std::runtime_error("lseek() failed");
 
 #endif
 }
 
-
+// We might be able to use lseek() with offset=0 as cross platform method, because we fortunatly
+// do not require to operate on files larger than 4 GB on 32-bit platforms
 File::SizeType File::get_file_position()
 {
     REALM_ASSERT_RELEASE(is_attached());
@@ -609,11 +609,12 @@ File::SizeType File::get_file_position()
     LARGE_INTEGER liOfs = { 0 };
     LARGE_INTEGER liNew = { 0 };
     if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
-        throw runtime_error("SetFilePointerEx() failed");
+        throw std::runtime_error("SetFilePointerEx() failed");
     return liNew.QuadPart;
 #else 
     // POSIX version not needed because it's only used by Windows version of resize().
     REALM_ASSERT(false);
+    return 0;
 #endif
 }
 
@@ -630,13 +631,13 @@ void File::sync()
 
     if (FlushFileBuffers(m_handle))
         return;
-    throw runtime_error("FlushFileBuffers() failed");
+    throw std::runtime_error("FlushFileBuffers() failed");
 
 #else // POSIX version
 
     if (::fsync(m_fd) == 0)
         return;
-    throw runtime_error("fsync() failed");
+    throw std::runtime_error("fsync() failed");
 
 #endif
 }
@@ -670,8 +671,8 @@ bool File::lock(bool exclusive, bool non_blocking)
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     if (err == ERROR_LOCK_VIOLATION)
         return false;
-    string msg = get_last_error_msg("LockFileEx() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_last_error_msg("LockFileEx() failed: ", err);
+    throw std::runtime_error(msg);
 
 #else // BSD / Linux flock()
 
@@ -701,8 +702,8 @@ bool File::lock(bool exclusive, bool non_blocking)
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
-    string msg = get_errno_msg("flock() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_errno_msg("flock() failed: ", err);
+    throw std::runtime_error(msg);
 
 #endif
 }
@@ -750,11 +751,11 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     }
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(size, large_int.QuadPart))
-        throw runtime_error("Map size is too large");
+        throw std::runtime_error("Map size is too large");
     HANDLE map_handle =
         CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
     if (REALM_UNLIKELY(!map_handle))
-        throw runtime_error("CreateFileMapping() failed");
+        throw std::runtime_error("CreateFileMapping() failed");
     void* addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
     {
         BOOL r = CloseHandle(map_handle);
@@ -763,8 +764,8 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     if (REALM_LIKELY(addr))
         return addr;
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
+    throw std::runtime_error(msg);
 
 #else // POSIX version
 
@@ -815,7 +816,7 @@ void File::sync_map(void* addr, size_t size)
 
     if (FlushViewOfFile(addr, size))
         return;
-    throw runtime_error("FlushViewOfFile() failed");
+    throw std::runtime_error("FlushViewOfFile() failed");
 
 #else // POSIX version
 
@@ -825,7 +826,7 @@ void File::sync_map(void* addr, size_t size)
 }
 
 
-bool File::exists(const string& path)
+bool File::exists(const std::string& path)
 {
 #ifdef _WIN32
     if (_access(path.c_str(), 0) == 0)
@@ -841,22 +842,22 @@ bool File::exists(const string& path)
         case ENOTDIR:
             return false;
     }
-    string msg = get_errno_msg("access() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_errno_msg("access() failed: ", err);
+    throw std::runtime_error(msg);
 }
 
 
-void File::remove(const string& path)
+void File::remove(const std::string& path)
 {
     if (try_remove(path))
         return;
     int err = ENOENT;
-    string msg = get_errno_msg("open() failed: ", err);
+    std::string msg = get_errno_msg("open() failed: ", err);
     throw NotFound(msg);
 }
 
 
-bool File::try_remove(const string& path)
+bool File::try_remove(const std::string& path)
 {
 #ifdef _WIN32
     if (_unlink(path.c_str()) == 0)
@@ -866,7 +867,7 @@ bool File::try_remove(const string& path)
         return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("unlink() failed: ", err);
+    std::string msg = get_errno_msg("unlink() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -882,18 +883,18 @@ bool File::try_remove(const string& path)
         case ENOTDIR:
             throw AccessError(msg);
         default:
-            throw runtime_error(msg);
+            throw std::runtime_error(msg);
     }
 }
 
 
-void File::move(const string& old_path, const string& new_path)
+void File::move(const std::string& old_path, const std::string& new_path)
 {
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
         return;
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("rename() failed: ", err);
+    std::string msg = get_errno_msg("rename() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -913,10 +914,33 @@ void File::move(const string& old_path, const string& new_path)
         case ENOTDIR:
             throw AccessError(msg);
         default:
-            throw runtime_error(msg);
+            throw std::runtime_error(msg);
     }
 }
 
+bool File::copy(std::string source, std::string destination)
+{
+    // Quick and dirty file copy, only used for unit tests. Todo, make more robust if used by Core.
+    char buf[1024];
+    size_t read;
+    File::try_remove(destination);
+    FILE* src = fopen(source.c_str(), "rb");
+    if (!src)
+        return false;
+
+    FILE* dst = fopen(destination.c_str(), "wb");
+    if (!dst) {
+        fclose(src);
+        return false;
+    }
+
+    while ((read = fread(buf, 1, 1024, src))) {
+        fwrite(buf, 1, read, dst);
+    }
+    fclose(src);
+    fclose(dst);
+    return true;
+}
 
 bool File::is_same_file(const File& f) const
 {
@@ -954,8 +978,8 @@ bool File::is_same_file(const File& f) const
 */
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
+    throw std::runtime_error(msg);
 
 #else // POSIX version
 
@@ -967,8 +991,8 @@ bool File::is_same_file(const File& f) const
             return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
     }
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("fstat() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_errno_msg("fstat() failed: ", err);
+    throw std::runtime_error(msg);
 
 #endif
 }
@@ -987,7 +1011,7 @@ bool File::is_removed() const
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0)
         return statbuf.st_nlink == 0;
-    throw runtime_error("fstat() failed");
+    throw std::runtime_error("fstat() failed");
 
 #endif
 }
@@ -1005,7 +1029,7 @@ void File::set_encryption_key(const char* key)
     }
 #else
     if (key) {
-        throw runtime_error("Encryption not enabled");
+        throw std::runtime_error("Encryption not enabled");
     }
 #endif
 }

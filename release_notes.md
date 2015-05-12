@@ -2,11 +2,7 @@
 
 ### Bugfixes:
 
-* Added a check for NUL bytes in indexed strings to avoid corrupting data structures.
-* Fixed bug in SharedGroup::compact(). The bug left the freelist outdated in some situations,
-  which could cause crash later, if work continued on the same shared group. The bug did not
-  affect the data written to the compacted database, but later commits working on the outdated
-  freelist might have. The fix forces proper (re)initialization of the free list.
+* Fixed bug in equal(null) in next-generation-syntax queries. Behaviour of .begins_with(null), .contains(null), .ends_with(null) adjusted; see description in TEST(Query_NextGen_StringConditions)
 
 ### API breaking changes:
 
@@ -14,9 +10,7 @@
 
 ### Enhancements:
 
-* Improved performance of advance_read() over commits with string or binary data insertions.
-* Improved performance sorting TableView and LinkView.
-* Added Table::remove_search_index().
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 -----------
 
@@ -26,11 +20,66 @@
 
 ----------------------------------------------
 
+# 0.90.0 Release notes
+
+### API breaking changes:
+
+* Merged lr_nulls into master (support for null in String column and bugfix in
+String index with 0 bytes). If you want to disable all this again, then #define
+REALM_NULL_STRINGS to 0 in features.h. Else API is as follows: Call add_column()
+with nullable = true. You can then use tightdb::null() in place of any
+StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
+also call Table::is_null(), Table::set_null() and StringData::is_null(). This
+upgrades the database file from version 2 to 3 initially the first time a file
+is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.1 Release notes
+
+### Bugfixes:
+
+* Fixed bug in "index rebuilding" (would delete the wrong column, causing crash). See https://github.com/realm/realm-core/pull/798 ;  "Remove the correct column when removing search indexes #798"
+
+----------------------------------------------
+
+# 0.89.0 Release notes
+
+### Bugfixes:
+
+* Added a check for NUL bytes in indexed strings to avoid corrupting data
+  structures.
+* Fixed bug in SharedGroup::compact(). The bug left the freelist outdated in
+  some situations, which could cause crash later, if work continued on the same
+  shared group. The bug did not affect the data written to the compacted
+  database, but later commits working on the outdated freelist might have. The
+  fix forces proper (re)initialization of the free list.
+* Fixed incorrect results in querying on an indexed string column via a
+  LinkView.
+* Fixed corruption of indexes when using move_last_over() on rows with
+  duplicated values for indexed properties.
+
+### API breaking changes:
+
+* Changed the `tightdb` namespace to `realm`.
+* We switched to C++11, and removed functionality that was duplicated from the
+  C++11 standard library, including `null_ptr` and `util::UniquePtr`.
+
+### Enhancements:
+
+* Improved performance of advance_read() over commits with string or binary data
+  insertions.
+* Improved performance sorting TableView and LinkView.
+* Added Table::remove_search_index().
+
+----------------------------------------------
+
 # 0.88.6 Release notes
 
 ### Bugfixes:
 
-* Fixed bug in Integer index that could make it crash or return bad results (String index not affected)
+* Fixed bug in Integer index that could make it crash or return bad results
+  (String index not affected)
 
 ----------------------------------------------
 

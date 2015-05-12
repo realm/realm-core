@@ -30,8 +30,8 @@ public:
     explicit ArrayBlob(Allocator&) REALM_NOEXCEPT;
     ~ArrayBlob() REALM_NOEXCEPT override {}
 
-    const char* get(std::size_t pos) const REALM_NOEXCEPT;
-
+    const char* get(std::size_t index) const REALM_NOEXCEPT;
+    bool is_null(std::size_t index) const REALM_NOEXCEPT;
     void add(const char* data, std::size_t size, bool add_zero_term = false);
     void insert(std::size_t pos, const char* data, std::size_t size, bool add_zero_term = false);
     void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
@@ -42,7 +42,7 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static const char* get(const char* header, std::size_t pos) REALM_NOEXCEPT;
+    static const char* get(const char* header, std::size_t index) REALM_NOEXCEPT;
 
     /// Create a new empty blob (binary) array and attach this
     /// accessor to it. This does not modify the parent reference
@@ -80,9 +80,14 @@ inline ArrayBlob::ArrayBlob(Allocator& alloc) REALM_NOEXCEPT:
 {
 }
 
-inline const char* ArrayBlob::get(std::size_t pos) const REALM_NOEXCEPT
+inline bool ArrayBlob::is_null(std::size_t index) const REALM_NOEXCEPT
 {
-    return m_data + pos;
+    return (get(index) == nullptr);
+}
+
+inline const char* ArrayBlob::get(std::size_t index) const REALM_NOEXCEPT
+{
+    return m_data + index;
 }
 
 inline void ArrayBlob::add(const char* data, std::size_t size, bool add_zero_term)

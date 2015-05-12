@@ -106,6 +106,9 @@
     <ClCompile Include="..\..\src\realm\query_engine.cpp" />
     <ClCompile Include="..\..\src\realm\util\encrypted_file_mapping.cpp" />
     <ClCompile Include="..\..\src\realm\util\memory_stream.cpp" />
+    <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
+    <ClCompile Include="..\..\test\test_destroy_guard.cpp" />
+    <ClCompile Include="..\..\test\test_replication.cpp" />
     <ClCompile Include="..\..\src\realm\impl\transact_log.cpp" />
     <ClCompile Include="..\..\test\test_array_integer.cpp" />
     <ClCompile Include="..\..\src\realm\array_integer.cpp" />
@@ -200,7 +203,6 @@
     <ClInclude Include="..\..\src\realm\link_view_fwd.hpp" />
     <ClInclude Include="..\..\src\realm\table_basic_fwd.hpp" />
     <ClInclude Include="..\..\src\realm\util\assert.hpp" />
-    <ClInclude Include="..\..\src\realm\util\bind.hpp" />
     <ClInclude Include="..\..\src\realm\util\buffer.hpp" />
     <ClInclude Include="..\..\src\realm\util\encrypted_file_mapping.hpp" />
     <ClInclude Include="..\..\src\realm\util\file.hpp" />
@@ -210,6 +212,7 @@
     <ClInclude Include="..\..\src\realm\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\realm\impl\transact_log.hpp" />
     <ClInclude Include="..\..\src\realm\array_integer.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\array_writer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

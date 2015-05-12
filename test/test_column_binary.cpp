@@ -7,7 +7,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 
 
@@ -48,9 +47,9 @@ TEST(ColumnBinary_Basic)
 
     // TEST(ColumnBinary_MultiEmpty)
 
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
+    c.add(BinaryData());
+    c.add(BinaryData());
+    c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());
@@ -255,7 +254,7 @@ TEST(ColumnBinary_Basic)
 
     // Insert all sizes
     c.clear();
-    string s;
+    std::string s;
     for (int i = 0; i < 100; ++i) {
         c.add(BinaryData(s.c_str(), s.size()));
         s += 'x';
@@ -286,5 +285,6 @@ TEST(ColumnBinary_Basic)
 
     c.destroy();
 }
+
 
 #endif // TEST_COLUMN_BINARY

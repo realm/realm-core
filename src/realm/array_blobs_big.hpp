@@ -29,7 +29,7 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
-    explicit ArrayBigBlobs(Allocator&) REALM_NOEXCEPT;
+    explicit ArrayBigBlobs(Allocator&, bool nullable) REALM_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -65,7 +65,7 @@ public:
     void add_string(StringData value);
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
-    static StringData get_string(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
+    static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool nullable) REALM_NOEXCEPT;
     ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
     //@}
 
@@ -85,20 +85,26 @@ public:
     void Verify() const;
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
+
+private:
+    bool m_nullable;
 };
 
 
 
 // Implementation:
 
-inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc) REALM_NOEXCEPT:
-    Array(alloc)
+inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc, bool nullable) REALM_NOEXCEPT:
+                                    Array(alloc), m_nullable(nullable)
 {
 }
 
 inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     ref_type ref = get_as_ref(ndx);
+    if (ref == 0)
+        return BinaryData(); // realm::null();
+
     const char* blob_header = get_alloc().translate(ref);
     const char* value = ArrayBlob::get(blob_header, 0);
     size_t size = get_size_from_header(blob_header);
@@ -109,6 +115,9 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
                                      Allocator& alloc) REALM_NOEXCEPT
 {
     ref_type blob_ref = to_ref(Array::get(header, ndx));
+    if (blob_ref == 0)
+        return BinaryData();
+
     const char* blob_header = alloc.translate(blob_ref);
     const char* blob_data = Array::get_data_from_header(blob_header);
     size_t blob_size = Array::get_size_from_header(blob_header);
@@ -118,7 +127,9 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 inline void ArrayBigBlobs::erase(std::size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
-    Array::destroy(blob_ref, get_alloc()); // Shallow
+    if (blob_ref != 0) { // nothing to destroy if null
+        Array::destroy(blob_ref, get_alloc()); // Shallow
+    }
     Array::erase(ndx);
 }
 
@@ -140,11 +151,15 @@ inline void ArrayBigBlobs::destroy()
 inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const REALM_NOEXCEPT
 {
     BinaryData bin = get(ndx);
-    return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+    if (bin.is_null())
+        return realm::null();
+    else
+        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
 inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
 {
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     set(ndx, bin, add_zero_term);
@@ -152,6 +167,7 @@ inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
 
 inline void ArrayBigBlobs::add_string(StringData value)
 {
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     add(bin, add_zero_term);
@@ -159,21 +175,28 @@ inline void ArrayBigBlobs::add_string(StringData value)
 
 inline void ArrayBigBlobs::insert_string(std::size_t ndx, StringData value)
 {
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     insert(ndx, bin, add_zero_term);
 }
 
 inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
-                                            Allocator& alloc) REALM_NOEXCEPT
+                                            Allocator& alloc, bool nullable) REALM_NOEXCEPT
 {
+    static_cast<void>(nullable);
     BinaryData bin = get(header, ndx, alloc);
-    return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+    REALM_ASSERT_DEBUG(!(!nullable && bin.is_null()));
+    if (bin.is_null())
+        return realm::null();
+    else
+        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
 inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(std::size_t ndx, StringData value,
                                                          TreeInsertBase& state)
 {
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     return bptree_leaf_insert(ndx, bin, add_zero_term, state);

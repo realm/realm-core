@@ -5,7 +5,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm::util;
 using namespace realm::test_util::unit_test;
 
@@ -377,8 +376,8 @@ TEST_EX(Success_String, success_list, true) // Test #4, accum checks = 57 + 16 =
     const char* t = "foo";
     std::unique_ptr<char[]> t_1(new char[strlen(t)+1]);
     std::unique_ptr<char[]> t_2(new char[strlen(t)+1]);
-    copy(t, t + strlen(t) + 1, t_1.get());
-    copy(t, t + strlen(t) + 1, t_2.get());
+    std::copy(t, t + strlen(t) + 1, t_1.get());
+    std::copy(t, t + strlen(t) + 1, t_2.get());
     CHECK_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_1.get()));
     CHECK_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
     CHECK_LESS_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
@@ -406,8 +405,8 @@ TEST_EX(Failure_String, failure_list, true) // Test #4, accum checks = 77 + 16 =
     const char* t = "foo";
     std::unique_ptr<char[]> t_1(new char[strlen(t)+1]);
     std::unique_ptr<char[]> t_2(new char[strlen(t)+1]);
-    copy(t, t + strlen(t) + 1, t_1.get());
-    copy(t, t + strlen(t) + 1, t_2.get());
+    std::copy(t, t + strlen(t) + 1, t_1.get());
+    std::copy(t, t + strlen(t) + 1, t_2.get());
     CHECK_NOT_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_1.get()));
     CHECK_NOT_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
     CHECK_LESS(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
@@ -454,7 +453,7 @@ TEST_EX(Failure_Pointer, failure_list, true) // Test #5, accum checks = 93 + 12 
 
 struct FooException {};
 
-struct BarException: exception {
+struct BarException: std::exception {
     const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
     {
         return "bar";

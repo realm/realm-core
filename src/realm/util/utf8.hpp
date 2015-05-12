@@ -91,8 +91,7 @@ template<class Char16, class Traits16>
 inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const char* const in_end,
                                                 Char16*& out_begin, Char16* const out_end)
 {
-    using namespace std;
-    typedef char_traits<char> traits8;
+        typedef std::char_traits<char> traits8;
     bool invalid = false;
     const char* in = in_begin;
     Char16* out = out_begin;
@@ -217,8 +216,7 @@ template<class Char16, class Traits16>
 inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& in_begin,
                                                                   const char* const in_end)
 {
-    using namespace std;
-    typedef char_traits<char> traits8;
+        typedef std::char_traits<char> traits8;
     size_t num_out = 0;
     const char* in = in_begin;
     while (in != in_end) {
@@ -274,8 +272,7 @@ template<class Char16, class Traits16>
 inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Char16* const in_end,
                                                char*& out_begin, char* const out_end)
 {
-    using namespace std;
-    typedef char_traits<char> traits8;
+        typedef std::char_traits<char> traits8;
     typedef typename traits8::int_type traits8_int_type;
     bool invalid = false;
     const Char16* in = in_begin;
@@ -357,8 +354,7 @@ template<class Char16, class Traits16>
 inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& in_begin,
                                                                  const Char16* const in_end)
 {
-    using namespace std;
-    size_t num_out = 0;
+        size_t num_out = 0;
     const Char16* in = in_begin;
     while (in != in_end) {
         REALM_ASSERT(&in[0] >= in_begin && &in[0] < in_end);

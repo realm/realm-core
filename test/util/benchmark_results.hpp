@@ -56,13 +56,20 @@ private:
         double min;
         double max;
         double total;
+        double stddev;
         size_t rep;
 
         double avg() const;
     };
+    
+    struct Measurement {
+        std::vector<double> samples;
+        
+        Result finish() const;
+    };
 
-    typedef std::map<std::string, Result> Results;
-    Results m_results;
+    typedef std::map<std::string, Measurement> Measurements;
+    Measurements m_measurements;
     typedef std::map<std::string, Result> BaselineResults;
     BaselineResults m_baseline_results;
 
@@ -83,7 +90,7 @@ inline BenchmarkResults::BenchmarkResults(int max_lead_text_width, const char* r
 
 inline BenchmarkResults::~BenchmarkResults()
 {
-    if (!m_results.empty())
+    if (!m_measurements.empty())
         save_results();
 }
 

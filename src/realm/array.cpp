@@ -150,7 +150,6 @@
 // insertion and removal, this shall not be guaranteed.
 
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -205,39 +204,6 @@ void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
 
     set_width(m_width);
 }
-
-// FIXME: This is a very crude and error prone misuse of Array,
-// especially since its use is not isolated inside the array
-// class. There seems to be confusion about how to construct an array
-// to be used with this method. Somewhere (e.g. in
-// Column::find_first()) we use Array(Allocator&). In other places
-// (TableViewBase::aggregate()) we use Array(no_prealloc_tag). We must
-// at least document the rules governing the use of
-// CreateFromHeaderDirect().
-//
-// FIXME: If we want to keep this method, we should formally define
-// what can be termed 'direct read-only' use of an Array instance, and
-// what rules apply in this case. Currently Array::clone() just passes
-// zero for the 'ref' argument.
-//
-// FIXME: Assuming that this method is only used for what can be
-// termed 'direct read-only' use, the type of the header argument
-// should be changed to 'const char*', and a const_cast should be
-// added below. This would avoid the need for const_cast's in places
-// like Array::clone().
-void Array::CreateFromHeaderDirect(char* header, ref_type ref) REALM_NOEXCEPT
-{
-    // Parse header
-    // We only need limited info for direct read-only use
-    m_width    = get_width_from_header(header);
-    m_size     = get_size_from_header(header);
-
-    m_ref = ref;
-    m_data = get_data_from_header(header);
-
-    set_width(m_width);
-}
-
 
 void Array::set_type(Type type)
 {
@@ -331,8 +297,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
 
         ref_type ref = to_ref(value);
         Allocator& alloc = get_alloc();
-        const char* subheader = alloc.translate(ref);
-        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.m_ref);
         value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
         slice.add(value); // Throws
@@ -356,7 +321,7 @@ void Array::Preset(size_t width, size_t size)
 
 void Array::Preset(int64_t min, int64_t max, size_t count)
 {
-    size_t w = ::max(bit_width(max), bit_width(min));
+    size_t w = std::max(bit_width(max), bit_width(min));
     Preset(w, count);
 }
 
@@ -471,7 +436,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     const char* begin_2 = m_data + begin      * bytes_per_elem;
     const char* end_2   = m_data + end        * bytes_per_elem;
     char* dest_begin_2  = m_data + dest_begin * bytes_per_elem;
-    copy(begin_2, end_2, dest_begin_2);
+    std::copy(begin_2, end_2, dest_begin_2);
 }
 
 void Array::move_backward(size_t begin, size_t end, size_t dest_end)
@@ -498,7 +463,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     const char* begin_2 = m_data + begin    * bytes_per_elem;
     const char* end_2   = m_data + end      * bytes_per_elem;
     char* dest_end_2    = m_data + dest_end * bytes_per_elem;
-    copy_backward(begin_2, end_2, dest_end_2);
+    std::copy_backward(begin_2, end_2, dest_end_2);
 }
 
 void Array::add_to_column(Column* column, int64_t value)
@@ -597,7 +562,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
         char* src_begin = base + ndx*w;
         char* src_end   = base + m_size*w;
         char* dst_end   = src_end + w;
-        copy_backward(src_begin, src_end, dst_end);
+        std::copy_backward(src_begin, src_end, dst_end);
     }
 
     // Insert the new value
@@ -1380,7 +1345,7 @@ size_t Array::count(int64_t value) const REALM_NOEXCEPT
 size_t Array::calc_aligned_byte_size(size_t size, int width)
 {
     REALM_ASSERT(width != 0 && (width & (width - 1)) == 0); // Is a power of two
-    size_t max = numeric_limits<size_t>::max();
+    size_t max = std::numeric_limits<size_t>::max();
     size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
     bool overflow;
     size_t byte_size;
@@ -1398,7 +1363,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
         byte_size = header_size + size * bytes_per_elem;
     }
     if (overflow)
-        throw runtime_error("Byte size overflow");
+        throw std::runtime_error("Byte size overflow");
     REALM_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
@@ -1424,15 +1389,16 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 size_t Array::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
 {
     if (width == 0)
-        return numeric_limits<size_t>::max(); // Zero width gives "infinite" space
+        return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
 
     size_t bytes_data = bytes - header_size; // ignore 8 byte header
     size_t total_bits = bytes_data * 8;
     return total_bits / width;
 }
 
-MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_alloc)
+MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
+    const char* header = mem.m_addr;
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
         // copy, which is more efficient.
@@ -1441,26 +1407,26 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         size_t size = get_byte_size_from_header(header);
 
         // Create the new array
-        MemRef mem = target_alloc.alloc(size); // Throws
-        char* clone_header = mem.m_addr;
+        MemRef clone_mem = target_alloc.alloc(size); // Throws
+        char* clone_header = clone_mem.m_addr;
 
         // Copy contents
         const char* src_begin = header;
         const char* src_end   = header + size;
         char*       dst_begin = clone_header;
-        copy(src_begin, src_end, dst_begin);
+        std::copy(src_begin, src_end, dst_begin);
 
         // Update with correct capacity
         set_header_capacity(size, clone_header);
 
-        return mem;
+        return clone_mem;
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
     REALM_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
 
-    Array array((Array::no_prealloc_tag()));
-    array.CreateFromHeaderDirect(const_cast<char*>(header));
+    Array array { alloc };
+    array.init_from_mem(mem);
 
     // Create new empty array of refs
     Array new_array(target_alloc);
@@ -1484,8 +1450,7 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
         }
 
         ref_type ref = to_ref(value);
-        const char* subheader = alloc.translate(ref);
-        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.m_ref);
         value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
         new_array.add(value); // Throws
@@ -1513,7 +1478,7 @@ void Array::copy_on_write()
     const char* old_begin = get_header_from_data(m_data);
     const char* old_end   = get_header_from_data(m_data) + size;
     char* new_begin = mref.m_addr;
-    copy(old_begin, old_end, new_begin);
+    std::copy(old_begin, old_end, new_begin);
 
     ref_type old_ref = m_ref;
 
@@ -1577,23 +1542,23 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) REALM_NOEXCEPT
         *p = uchar((*p & ~(0x0F << bit_ndx)) | (int(value) & 0x0F) << bit_ndx);
     }
     else if (width == 8) {
-        REALM_ASSERT_DEBUG(numeric_limits<int8_t>::min() <= value &&
-                             value <= numeric_limits<int8_t>::max());
+        REALM_ASSERT_DEBUG(std::numeric_limits<int8_t>::min() <= value &&
+                             value <= std::numeric_limits<int8_t>::max());
         *(reinterpret_cast<int8_t*>(data) + ndx) = int8_t(value);
     }
     else if (width == 16) {
-        REALM_ASSERT_DEBUG(numeric_limits<int16_t>::min() <= value &&
-                             value <= numeric_limits<int16_t>::max());
+        REALM_ASSERT_DEBUG(std::numeric_limits<int16_t>::min() <= value &&
+                             value <= std::numeric_limits<int16_t>::max());
         *(reinterpret_cast<int16_t*>(data) + ndx) = int16_t(value);
     }
     else if (width == 32) {
-        REALM_ASSERT_DEBUG(numeric_limits<int32_t>::min() <= value &&
-                             value <= numeric_limits<int32_t>::max());
+        REALM_ASSERT_DEBUG(std::numeric_limits<int32_t>::min() <= value &&
+                             value <= std::numeric_limits<int32_t>::max());
         *(reinterpret_cast<int32_t*>(data) + ndx) = int32_t(value);
     }
     else if (width == 64) {
-        REALM_ASSERT_DEBUG(numeric_limits<int64_t>::min() <= value &&
-                             value <= numeric_limits<int64_t>::max());
+        REALM_ASSERT_DEBUG(std::numeric_limits<int64_t>::min() <= value &&
+                             value <= std::numeric_limits<int64_t>::max());
         *(reinterpret_cast<int64_t*>(data) + ndx) = int64_t(value);
     }
     else {
@@ -1637,7 +1602,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     }
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
-    size_t byte_size = max(byte_size_0, initial_capacity+0);
+    size_t byte_size = std::max(byte_size_0, initial_capacity+0);
     MemRef mem = alloc.alloc(byte_size); // Throws
     char* header = mem.m_addr;
 
@@ -2031,13 +1996,13 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
 
 void Array::print() const
 {
-    cout << hex << get_ref() << dec << ": (" << size() << ") ";
+    std::cout << std::hex << get_ref() << std::dec << ": (" << size() << ") ";
     for (size_t i = 0; i < size(); ++i) {
         if (i)
-            cout << ", ";
-        cout << get(i);
+            std::cout << ", ";
+        std::cout << get(i);
     }
-    cout << "\n";
+    std::cout << "\n";
 }
 
 void Array::Verify() const
@@ -2153,7 +2118,7 @@ void Array::verify_bptree(LeafVerifier leaf_verifier) const
     ::verify_bptree(*this, leaf_verifier);
 }
 
-void Array::dump_bptree_structure(ostream& out, int level, LeafDumper leaf_dumper) const
+void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_dumper) const
 {
     bool root_is_leaf = !is_inner_bptree_node();
     if (root_is_leaf) {
@@ -2162,22 +2127,22 @@ void Array::dump_bptree_structure(ostream& out, int level, LeafDumper leaf_dumpe
     }
 
     int indent = level * 2;
-    out << setw(indent) << "" << "Inner node (B+ tree) (ref: "<<get_ref()<<")\n";
+    out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: "<<get_ref()<<")\n";
 
     size_t num_elems_in_subtree = size_t(back() / 2);
-    out << setw(indent) << "" << "  Number of elements in subtree: "
+    out << std::setw(indent) << "" << "  Number of elements in subtree: "
         ""<<num_elems_in_subtree<<"\n";
 
     bool compact_form = front() % 2 != 0;
     if (compact_form) {
         size_t elems_per_child = size_t(front() / 2);
-        out << setw(indent) << "" << "  Compact form (elements per child: "
+        out << std::setw(indent) << "" << "  Compact form (elements per child: "
             ""<<elems_per_child<<")\n";
     }
     else { // General form
         Array offsets(m_alloc);
         offsets.init_from_ref(to_ref(front()));
-        out << setw(indent) << "" << "  General form (offsets_ref: "
+        out << std::setw(indent) << "" << "  General form (offsets_ref: "
             ""<<offsets.get_ref()<<", ";
         if (offsets.is_empty()) {
             out << "no offsets";
@@ -2203,7 +2168,7 @@ void Array::dump_bptree_structure(ostream& out, int level, LeafDumper leaf_dumpe
     }
 }
 
-void Array::bptree_to_dot(ostream& out, ToDotHandler& handler) const
+void Array::bptree_to_dot(std::ostream& out, ToDotHandler& handler) const
 {
     bool root_is_leaf = !is_inner_bptree_node();
     if (root_is_leaf) {
@@ -2212,8 +2177,8 @@ void Array::bptree_to_dot(ostream& out, ToDotHandler& handler) const
     }
 
     ref_type ref  = get_ref();
-    out << "subgraph cluster_inner_pbtree_node" << ref << " {" << endl;
-    out << " label = \"\";" << endl;
+    out << "subgraph cluster_inner_pbtree_node" << ref << " {" << std::endl;
+    out << " label = \"\";" << std::endl;
 
     to_dot(out);
 
@@ -2226,7 +2191,7 @@ void Array::bptree_to_dot(ostream& out, ToDotHandler& handler) const
         offsets.to_dot(out, "Offsets");
     }
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 
     size_t num_children = size() - 2;
     size_t child_ref_begin = 1;
@@ -2240,27 +2205,27 @@ void Array::bptree_to_dot(ostream& out, ToDotHandler& handler) const
 }
 
 
-void Array::to_dot(ostream& out, StringData title) const
+void Array::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
     if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << endl;
-        out << " label = \"" << title << "\";" << endl;
-        out << " color = white;" << endl;
+        out << "subgraph cluster_" << ref << " {" << std::endl;
+        out << " label = \"" << title << "\";" << std::endl;
+        out << " color = white;" << std::endl;
     }
 
-    out << "n" << hex << ref << dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
+    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << hex << ref << dec << "<BR/>";
+    out << "0x" << std::hex << ref << std::dec << "<BR/>";
     if (m_is_inner_bptree_node)
         out << "IsNode<BR/>";
     if (m_has_refs)
         out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << endl;
+    out << "</FONT></TD>" << std::endl;
 
     // Values
     for (size_t i = 0; i < m_size; ++i) {
@@ -2277,32 +2242,32 @@ void Array::to_dot(ostream& out, StringData title) const
         else {
             out << "<TD>" << v;
         }
-        out << "</TD>" << endl;
+        out << "</TD>" << std::endl;
     }
 
-    out << "</TR></TABLE>>];" << endl;
+    out << "</TR></TABLE>>];" << std::endl;
 
     if (title.size() != 0)
-        out << "}" << endl;
+        out << "}" << std::endl;
 
     to_dot_parent_edge(out);
 }
 
-void Array::to_dot_parent_edge(ostream& out) const
+void Array::to_dot_parent_edge(std::ostream& out) const
 {
     if (ArrayParent* parent = get_parent()) {
         size_t ndx_in_parent = get_ndx_in_parent();
-        pair<ref_type, size_t> p = parent->get_to_dot_parent(ndx_in_parent);
+        std::pair<ref_type, size_t> p = parent->get_to_dot_parent(ndx_in_parent);
         ref_type real_parent_ref = p.first;
         size_t ndx_in_real_parent = p.second;
-        out << "n" << hex << real_parent_ref << dec << ":" << ndx_in_real_parent << ""
-            " -> n" << hex << get_ref() << dec << endl;
+        out << "n" << std::hex << real_parent_ref << std::dec << ":" << ndx_in_real_parent << ""
+            " -> n" << std::hex << get_ref() << std::dec << std::endl;
     }
 }
 
-pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    return make_pair(get_ref(), ndx_in_parent);
+    return std::make_pair(get_ref(), ndx_in_parent);
 }
 
 
@@ -2436,17 +2401,29 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) REALM_NOEX
 }
 
 
-template<int width>
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
+template<int width> inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
 {
-    return make_pair(to_size_t(get_direct<width>(data, ndx+0)),
-                     to_size_t(get_direct<width>(data, ndx+1)));
+    return std::make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
+                     to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
-                                                size_t ndx) REALM_NOEXCEPT
+inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) REALM_NOEXCEPT
 {
     REALM_TEMPEX(return get_two, width, (data, ndx));
+}
+
+
+template<int width>
+inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    v0 = to_ref(get_direct<width>(data, ndx + 0));
+    v1 = to_ref(get_direct<width>(data, ndx + 1));
+    v2 = to_ref(get_direct<width>(data, ndx + 2));
+}
+
+inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    REALM_TEMPEX(get_three, width, (data, ndx, v0, v1, v2));
 }
 
 
@@ -2763,25 +2740,6 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-// Get containing array block direct through column b+-tree without instatiating any Arrays. Calling with
-// use_retval = true will return itself if leaf and avoid unneccesary header initialization.
-const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
-                             bool use_retval) const REALM_NOEXCEPT
-{
-    // Reduce time overhead for cols with few entries
-    if (!is_inner_bptree_node()) {
-        if (!use_retval)
-            arr.CreateFromHeaderDirect(get_header_from_data(m_data));
-        off = 0;
-        return this;
-    }
-
-    pair<MemRef, size_t> p = get_bptree_leaf(ndx);
-    arr.CreateFromHeaderDirect(p.first.m_addr);
-    off = ndx - p.second;
-    return &arr;
-}
-
 template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
 {
     bool first(method == index_FindFirst);
@@ -2796,10 +2754,11 @@ template <IndexMethod method, class T> size_t Array::index_string(StringData val
     bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
+    size_t stringoffset = 0;
 
 top:
     // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
+    key = StringIndex::create_key(value, stringoffset);
 
     for (;;) {
         // Get subnode table
@@ -2870,7 +2829,7 @@ top:
                 // for integer index, get_func fills out 'buffer' and makes str point at it
                 char buffer[8];
                 StringData str = (*get_func)(column, first_row_ref, buffer);
-                if (str != value) {
+                if (str.is_null() != value.is_null() || str != value) {
                     if (count)
                         return 0;
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
@@ -2926,10 +2885,10 @@ top:
         width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
 
-        if (value_2.size() <= 4)
-            value_2 = StringData();
+        if (value.size() - stringoffset >= 4)
+            stringoffset += 4;
         else
-            value_2 = value_2.substr(4);
+            stringoffset += value.size() - stringoffset + 1;
 
         goto top;
     }
@@ -2954,7 +2913,7 @@ void Array::IndexStringFindAll(Column& result, StringData value, void* column, S
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
     Column dummy;
-    return (FindRes)index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func);
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func));
 }
 
 
@@ -2974,7 +2933,7 @@ namespace {
 // the specified 'offsets' array.
 //
 // Returns (child_ndx, ndx_in_child).
-template<int width> inline pair<size_t, size_t>
+template<int width> inline std::pair<size_t, size_t>
 find_child_from_offsets(const char* offsets_header, size_t elem_ndx) REALM_NOEXCEPT
 {
     const char* offsets_data = Array::get_data_from_header(offsets_header);
@@ -2983,12 +2942,12 @@ find_child_from_offsets(const char* offsets_header, size_t elem_ndx) REALM_NOEXC
     size_t elem_ndx_offset = child_ndx == 0 ? 0 :
         to_size_t(get_direct<width>(offsets_data, child_ndx-1));
     size_t ndx_in_child = elem_ndx - elem_ndx_offset;
-    return make_pair(child_ndx, ndx_in_child);
+    return std::make_pair(child_ndx, ndx_in_child);
 }
 
 
 // Returns (child_ndx, ndx_in_child)
-inline pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t ndx,
+inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t ndx,
                                               const Allocator& alloc) REALM_NOEXCEPT
 {
     size_t child_ndx;
@@ -3007,17 +2966,17 @@ inline pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t n
         ref_type offsets_ref = to_ref(first_value);
         char* offsets_header = alloc.translate(offsets_ref);
         int offsets_width = Array::get_width_from_header(offsets_header);
-        pair<size_t, size_t> p;
+        std::pair<size_t, size_t> p;
         REALM_TEMPEX(p = find_child_from_offsets, offsets_width, (offsets_header, ndx));
         child_ndx    = p.first;
         ndx_in_child = p.second;
     }
-    return make_pair(child_ndx, ndx_in_child);
+    return std::make_pair(child_ndx, ndx_in_child);
 }
 
 
 // Returns (child_ndx, ndx_in_child)
-inline pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) REALM_NOEXCEPT
+inline std::pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) REALM_NOEXCEPT
 {
     int_fast64_t first_value = node.get(0);
     return find_bptree_child(first_value, ndx, node.get_alloc());
@@ -3026,15 +2985,15 @@ inline pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) REALM_NOE
 
 // Returns (child_ref, ndx_in_child)
 template<int width>
-inline pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
+inline std::pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
                                                 const Allocator& alloc) REALM_NOEXCEPT
 {
     int_fast64_t first_value = get_direct<width>(data, 0);
-    pair<size_t, size_t> p = find_bptree_child(first_value, ndx, alloc);
+    std::pair<size_t, size_t> p = find_bptree_child(first_value, ndx, alloc);
     size_t child_ndx    = p.first;
     size_t ndx_in_child = p.second;
     ref_type child_ref = to_ref(get_direct<width>(data, 1 + child_ndx));
-    return make_pair(child_ref, ndx_in_child);
+    return std::make_pair(child_ref, ndx_in_child);
 }
 
 
@@ -3225,7 +3184,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
         const char* data = Array::get_data_from_header(header);
         int width = Array::get_width_from_header(header);
         size_t ndx = 0;
-        pair<int_fast64_t, int_fast64_t> p = get_two(data, width, ndx);
+        std::pair<int_fast64_t, int_fast64_t> p = get_two(data, width, ndx);
         int_fast64_t first_value = p.first;
         ref_type child_ref = to_ref(p.second);
 
@@ -3297,7 +3256,7 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
 } // anonymous namespace
 
 
-pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const REALM_NOEXCEPT
+std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT(is_inner_bptree_node());
 
@@ -3306,7 +3265,7 @@ pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const REALM_NOEXCEPT
     const char* data = m_data;
 
     for (;;) {
-        pair<ref_type, size_t> p;
+        std::pair<ref_type, size_t> p;
         REALM_TEMPEX(p = find_bptree_child, width, (data, ndx_2, m_alloc));
         ref_type child_ref  = p.first;
         size_t ndx_in_child = p.second;
@@ -3314,7 +3273,7 @@ pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const REALM_NOEXCEPT
         bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
             MemRef mem(child_header, child_ref);
-            return make_pair(mem, ndx_in_child);
+            return std::make_pair(mem, ndx_in_child);
         }
         ndx_2 = ndx_in_child;
         width = get_width_from_header(child_header);
@@ -3384,7 +3343,7 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
 {
     REALM_ASSERT(is_inner_bptree_node());
 
-    pair<size_t, size_t> p = find_bptree_child(*this, elem_ndx);
+    std::pair<size_t, size_t> p = find_bptree_child(*this, elem_ndx);
     size_t child_ndx    = p.first;
     size_t ndx_in_child = p.second;
     size_t child_ref_ndx = 1 + child_ndx;
@@ -3493,7 +3452,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
 
         // FIXME: Can we pass 'offsets' to find_bptree_child() to
         // speed it up?
-        pair<size_t, size_t> p = find_bptree_child(*this, elem_ndx);
+        std::pair<size_t, size_t> p = find_bptree_child(*this, elem_ndx);
         child_ndx    = p.first;
         ndx_in_child = p.second;
     }
@@ -3584,10 +3543,18 @@ int_fast64_t Array::get(const char* header, size_t ndx) REALM_NOEXCEPT
 }
 
 
-pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
+std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
-    pair<int_fast64_t, int_fast64_t> p = ::get_two(data, width, ndx);
-    return make_pair(int_least64_t(p.first), int_least64_t(p.second));
+    std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
+    return std::make_pair(p.first, p.second);
+}
+
+
+void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+{
+    const char* data = get_data_from_header(header);
+    int width = get_width_from_header(header);
+    ::get_three(data, width, ndx, v0, v1, v2);
 }

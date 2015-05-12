@@ -4,9 +4,6 @@
 //#include <realm/query_expr.hpp>
 #include "query_expr.hpp"
 
-using namespace std;
-
-
 
 struct MySubtableSpec: realm::SpecBase {
     typedef typename realm::TypeAppend< void, int >::type Columns1;
@@ -74,6 +71,6 @@ size_t my_exists(const MyTable& table)
 int main()
 {
     MyTable t;
-    cout << my_count(t) << endl;
+    std::cout << my_count(t) << std::endl;
     return 0;
 }

@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstdlib> // size_t
 #include <algorithm>
+#include <cstdio>
 
 #ifdef _MSC_VER
 #  include <win32/types.h>
@@ -121,8 +122,7 @@ void checksum_init(checksum_t* t);
 // popcount
 int fast_popcount32(int32_t x);
 int fast_popcount64(int64_t x);
-
-
+uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 
 // Implementation:
 
@@ -167,7 +167,7 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 {
 #if defined(_MSC_VER) && defined(_DEBUG)
 
-    // Windows has a special check in debug mode against passing null
+    // Windows has a special check in debug mode against passing realm::null()
     // pointer to std::equal(). It's uncertain if this is allowed by the C++ standard. For details, see
     // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
     // Below check 'first1==last1' is to prevent failure in debug mode.
@@ -185,6 +185,15 @@ private:
     T m_value;
 };
 
+// PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
+// placement new. It simply calls the object's destructor without freeing the memory.
+struct PlacementDelete {
+    template <class T>
+    void operator()(T* v) const
+    {
+        v->~T();
+    }
+};
 
 } // namespace realm
 

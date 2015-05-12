@@ -33,7 +33,6 @@
 typedef uint_fast64_t version_type;
 
 using namespace util;
-using namespace std;
 
 namespace realm {
 
@@ -71,10 +70,10 @@ namespace _impl {
 
 class WriteLogCollector: public Replication {
 public:
-    WriteLogCollector(string database_name, bool server_synchronization_mode,
+    WriteLogCollector(std::string database_name, bool server_synchronization_mode,
                       const char* encryption_key);
     ~WriteLogCollector() REALM_NOEXCEPT;
-    string do_get_database_path() override { return m_database_name; }
+    std::string do_get_database_path() override { return m_database_name; }
     void do_begin_write_transact(SharedGroup& sg) override;
     version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version)
         override;
@@ -83,10 +82,10 @@ public:
     void do_clear_interrupt() REALM_NOEXCEPT override {};
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
-    virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    virtual void submit_transact_log(BinaryData);
-    virtual void stop_logging() override;
-    virtual void reset_log_management(version_type last_version) override;
+    bool is_in_server_synchronization_mode() override{ return m_is_persisting; }
+    void submit_transact_log(BinaryData) override;
+    void stop_logging() override;
+    void reset_log_management(version_type last_version) override;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
         REALM_NOEXCEPT;
     virtual void set_last_version_synced(version_type last_seen_version_number) REALM_NOEXCEPT;
@@ -172,14 +171,14 @@ protected:
     // Metadata for a file (in memory):
     struct CommitLogMetadata {
         util::File file;
-        string name;
+        std::string name;
         util::File::Map<CommitLogHeader> map;
         util::File::SizeType last_seen_size;
-        CommitLogMetadata(string name): name(name) {}
+        CommitLogMetadata(std::string name): name(name) {}
     };
 
-    string m_database_name;
-    string m_header_name;
+    std::string m_database_name;
+    std::string m_header_name;
     CommitLogMetadata m_log_a;
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
@@ -395,7 +394,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         && preamble->last_version_synced < preamble->last_version_seen_locally)
         last_seen_version_number = preamble->last_version_synced;
 
-    // cerr << "oldest_version(" << last_seen_version_number << ")" << endl;
+    // std::cerr << "oldest_version(" << last_seen_version_number << ")" << std::endl;
     if (last_seen_version_number >= preamble->begin_newest_commit_range) {
         // oldest file holds only stale commitlogs, so let's swap files and
         // update the range
@@ -445,7 +444,7 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast6
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
     *reinterpret_cast<uint64_t*>(write_ptr) = size;
     write_ptr += sizeof (uint64_t);
-    copy(data, data+size, write_ptr);
+    std::copy(data, data+size, write_ptr);
     active_log->map.sync();
 
     // update metadata to reflect the added commit log
@@ -590,7 +589,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     // - make sure the files are open and mapped, possibly update stale mappings
     remap_if_needed(m_log_a);
     remap_if_needed(m_log_b);
-    // cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << endl;
+    // std::cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << std::endl;
     const char* buffer;
     const char* second_buffer;
     get_buffers_in_order(preamble, buffer, second_buffer);
@@ -599,14 +598,14 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     if ((m_read_version != from_version) || (m_read_version < preamble->begin_oldest_commit_range)) {
         m_read_version = preamble->begin_oldest_commit_range;
         m_read_offset = 0;
-        // cerr << "  -- reset tracking" << endl;
+        // std::cerr << "  -- reset tracking" << std::endl;
     }
 
     // switch buffer if we are starting scanning in the second file:
     if (m_read_version >= preamble->begin_newest_commit_range) {
         buffer = second_buffer;
         second_buffer = 0;
-        // cerr << "  -- resuming directly in second file" << endl;
+        // std::cerr << "  -- resuming directly in second file" << std::endl;
         // The saved offset (m_read_offset) should still be valid
     }
 
@@ -622,7 +621,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
             buffer = second_buffer;
             second_buffer = 0;
             m_read_offset = 0;
-            // cerr << "  -- switching from first to second file" << endl;
+            // std::cerr << "  -- switching from first to second file" << std::endl;
         }
 
         // this condition cannot be moved to be a condition for the entire while
@@ -635,7 +634,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
             *reinterpret_cast<const uint64_t*>(buffer + m_read_offset);
         uint_fast64_t tmp_offset = m_read_offset + sizeof (uint64_t);
         if (m_read_version >= from_version) {
-            // cerr << "  --at: " << m_read_offset << ", " << size << endl;
+            // std::cerr << "  --at: " << m_read_offset << ", " << size << std::endl;
             *logs_buffer = BinaryData(buffer + tmp_offset, size);
             ++logs_buffer;
         }
@@ -691,7 +690,7 @@ void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) REALM_NOEXCE
 void WriteLogCollector::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
 {
     transact_log_reserve(size, new_begin, new_end);
-    *new_begin = copy(data, data + size, *new_begin);
+    *new_begin = std::copy(data, data + size, *new_begin);
 }
 
 
@@ -706,7 +705,7 @@ void WriteLogCollector::transact_log_reserve(size_t size, char** new_begin, char
 }
 
 
-WriteLogCollector::WriteLogCollector(string database_name,
+WriteLogCollector::WriteLogCollector(std::string database_name,
                                      bool server_synchronization_mode,
                                      const char* encryption_key):
     m_log_a(database_name + ".log_a"),
@@ -725,7 +724,7 @@ WriteLogCollector::WriteLogCollector(string database_name,
 
 
 
-std::unique_ptr<Replication> makeWriteLogCollector(string database_name,
+std::unique_ptr<Replication> makeWriteLogCollector(std::string database_name,
                                                    bool server_synchronization_mode,
                                                    const char* encryption_key)
 {

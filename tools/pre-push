@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# This pre-push hook should prevent pushing to the wrong remote
+
+################
+# Variables
+################
+
+declare -a authorized_remotes=(
+    'git@github.com:realm/realm-core.git'
+    'https://github.com/realm/realm-core.git'
+    'git@github.com:kspangsege/realm-core.git'
+    'https://github.com/kspangsege/realm-core.git'
+)
+repo_name='realm-core'
+
+################
+# Functions
+################
+
+verify_remote() {
+    for current_authorized_remote in "${authorized_remotes[@]}"; do
+        if [[ "$1" = *"$current_authorized_remote"* ]]; then
+            return
+        fi
+    done
+    echo >&2 "attempting to push to a repo other than $repo_name or git remotes contains a repo other than $repo_name. aborting..."
+    exit 1
+}
+
+################
+# Script
+################
+
+# current_remote_name="$1"
+current_remote_url="$2"
+
+verify_remote "$current_remote_url"
+
+saved_remotes="$(git remote -v)"
+while read -r remote_line; do
+    verify_remote "$remote_line"
+done <<< "$saved_remotes"
+
+exit 0

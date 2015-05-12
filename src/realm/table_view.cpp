@@ -7,7 +7,6 @@
 #include <realm/util/utf8.hpp>
 #include <realm/index_string.hpp>
 
-using namespace std;
 using namespace realm;
 
 // Searching
@@ -97,7 +96,8 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     // Array object instantiation must NOT allocate initial memory (capacity)
     // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call destroy() on array.
-    ArrType arr((Array::no_prealloc_tag()));
+    ArrType arr(column->get_alloc());
+    const ArrType* arrp = nullptr;
     size_t leaf_start = 0;
     size_t leaf_end = 0;
     size_t row_ndx;
@@ -116,12 +116,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
         row_ndx = to_size_t(m_row_indexes.get(ss));
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
-            column->GetBlock(row_ndx, arr, leaf_start);
-            const size_t leaf_size = arr.size();
-            leaf_end = leaf_start + leaf_size;
+            size_t ndx_in_leaf;
+            arrp = &column->get_leaf(row_ndx, ndx_in_leaf, arr);
+            leaf_start = row_ndx - ndx_in_leaf;
+            leaf_end = leaf_start + arrp->size();
         }
 
-        T v = arr.get(row_ndx - leaf_start);
+        T v = arrp->get(row_ndx - leaf_start);
 
         if (function == act_Sum)
             res += static_cast<R>(v);
@@ -231,7 +232,7 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
     m_table->aggregate(group_by_column, aggr_column, op, result, &m_row_indexes);
 }
 
-void TableViewBase::to_json(ostream& out) const
+void TableViewBase::to_json(std::ostream& out) const
 {
     check_cookie();
 
@@ -249,12 +250,12 @@ void TableViewBase::to_json(ostream& out) const
     out << "]";
 }
 
-void TableViewBase::to_string(ostream& out, size_t limit) const
+void TableViewBase::to_string(std::ostream& out, size_t limit) const
 {
     check_cookie();
 
     // Print header (will also calculate widths)
-    vector<size_t> widths;
+    std::vector<size_t> widths;
     m_table->to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
@@ -274,14 +275,14 @@ void TableViewBase::to_string(ostream& out, size_t limit) const
     }
 }
 
-void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
+void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
 {
     check_cookie();
 
     REALM_ASSERT(row_ndx < m_row_indexes.size());
 
     // Print header (will also calculate widths)
-    vector<size_t> widths;
+    std::vector<size_t> widths;
     m_table->to_string_header(out, widths);
 
     // Print row contents
@@ -411,7 +412,7 @@ void TableView::clear()
     }
     else {
         // sort tableview
-        vector<size_t> v;
+        std::vector<size_t> v;
         for (size_t t = 0; t < size(); t++)
             v.push_back(to_size_t(m_row_indexes.get(t)));
         std::sort(v.begin(), v.end());

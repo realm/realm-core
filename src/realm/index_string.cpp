@@ -3,7 +3,6 @@
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -33,6 +32,11 @@ void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
 
 void StringIndex::validate_value(StringData str) const
 {
+    // The "nulls on String column" branch fixed all known bugs in the index
+#if REALM_NULL_STRINGS == 1
+    return;
+#endif
+
     if (std::find(str.data(), str.data() + str.size(), '\0') != str.data() + str.size())
         throw std::invalid_argument("Cannot add string with embedded NULs to indexed column");
 }
@@ -77,8 +81,7 @@ StringIndex::key_type StringIndex::GetLastKey() const
 void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
 {
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
-
+    key_type key = create_key(value, offset);
     TreeInsert(row_ndx, key, offset, value); // Throws
 }
 
@@ -88,7 +91,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
     REALM_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     // Get subnode table
     Allocator& alloc = m_array->get_alloc();
@@ -562,7 +565,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     REALM_ASSERT(array()->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     const size_t pos = values.lower_bound(key);
     const size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -633,7 +636,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     REALM_ASSERT(array()->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     size_t pos = values.lower_bound(key);
     size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -662,9 +665,25 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
             else {
                 Column sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(array(), pos_refs);
-                size_t r = sub.find_first(row_ndx);
-                REALM_ASSERT(r != not_found);
-                sub.set(r, new_row_ndx);
+
+                size_t old_pos = sub.find_first(row_ndx);
+                size_t new_pos = sub.lower_bound_int(new_row_ndx);
+                REALM_ASSERT(old_pos != not_found);
+                REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
+
+                // shift each entry between the old and new position over one
+                if (new_pos < old_pos) {
+                    for (size_t i = old_pos; i > new_pos; --i)
+                        sub.set(i, sub.get(i - 1));
+                }
+                else if (new_pos > old_pos) {
+                    // we're removing the old entry from before the new entry,
+                    // so shift back one
+                    --new_pos;
+                    for (size_t i = old_pos; i < new_pos; ++i)
+                        sub.set(i, sub.get(i + 1));
+                }
+                sub.set(new_pos, new_row_ndx);
             }
         }
     }
@@ -784,7 +803,7 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 }
 
 
-void StringIndex::dump_node_structure(const Array& node, ostream& out, int level)
+void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
 {
     int indent = level * 2;
     Allocator& alloc = node.get_alloc();
@@ -795,14 +814,14 @@ void StringIndex::dump_node_structure(const Array& node, ostream& out, int level
 
     bool node_is_leaf = !node.is_inner_bptree_node();
     if (node_is_leaf) {
-        out << setw(indent) << "" << "Leaf (B+ tree) (ref: "<<node.get_ref()<<")\n";
+        out << std::setw(indent) << "" << "Leaf (B+ tree) (ref: "<<node.get_ref()<<")\n";
     }
     else {
-        out << setw(indent) << "" << "Inner node (B+ tree) (ref: "<<node.get_ref()<<")\n";
+        out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: "<<node.get_ref()<<")\n";
     }
 
     subnode.init_from_ref(to_ref(node.front()));
-    out << setw(indent) << "" << "  Keys (keys_ref: "
+    out << std::setw(indent) << "" << "  Keys (keys_ref: "
         ""<<subnode.get_ref()<<", ";
     if (subnode.is_empty()) {
         out << "no keys";
@@ -822,17 +841,17 @@ void StringIndex::dump_node_structure(const Array& node, ostream& out, int level
             int_fast64_t value = node.get(i);
             bool is_single_row_index = value % 2 != 0;
             if (is_single_row_index) {
-                out << setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
+                out << std::setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
                 continue;
             }
             subnode.init_from_ref(to_ref(value));
             bool is_subindex = subnode.get_context_flag();
             if (is_subindex) {
-                out << setw(indent) << "" << "  Subindex\n";
+                out << std::setw(indent) << "" << "  Subindex\n";
                 dump_node_structure(subnode, out, level+2);
                 continue;
             }
-            out << setw(indent) << "" << "  List of row indexes\n";
+            out << std::setw(indent) << "" << "  List of row indexes\n";
             Column::dump_node_structure(subnode, out, level+2);
         }
         return;
@@ -855,33 +874,33 @@ void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
 }
 
 
-void StringIndex::to_dot(ostream& out, StringData title) const
+void StringIndex::to_dot(std::ostream& out, StringData title) const
 {
-    out << "digraph G {" << endl;
+    out << "digraph G {" << std::endl;
 
     to_dot_2(out, title);
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 
-void StringIndex::to_dot_2(ostream& out, StringData title) const
+void StringIndex::to_dot_2(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
-    out << "subgraph cluster_string_index" << ref << " {" << endl;
+    out << "subgraph cluster_string_index" << ref << " {" << std::endl;
     out << " label = \"String index";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
 
     array_to_dot(out, *m_array);
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 
-void StringIndex::array_to_dot(ostream& out, const Array& array)
+void StringIndex::array_to_dot(std::ostream& out, const Array& array)
 {
     if (!array.get_context_flag()) {
         Column col(array.get_alloc(), array.get_ref()); // Throws
@@ -897,18 +916,18 @@ void StringIndex::array_to_dot(ostream& out, const Array& array)
     ref_type ref  = array.get_ref();
 
     if (array.is_inner_bptree_node()) {
-        out << "subgraph cluster_string_index_inner_node" << ref << " {" << endl;
-        out << " label = \"Inner node\";" << endl;
+        out << "subgraph cluster_string_index_inner_node" << ref << " {" << std::endl;
+        out << " label = \"Inner node\";" << std::endl;
     }
     else {
-        out << "subgraph cluster_string_index_leaf" << ref << " {" << endl;
-        out << " label = \"Leaf\";" << endl;
+        out << "subgraph cluster_string_index_leaf" << ref << " {" << std::endl;
+        out << " label = \"Leaf\";" << std::endl;
     }
 
     array.to_dot(out);
     keys_to_dot(out, offsets, "keys");
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 
     size_t count = array.size();
     for (size_t i = 1; i < count; ++i) {
@@ -923,27 +942,27 @@ void StringIndex::array_to_dot(ostream& out, const Array& array)
 }
 
 
-void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title)
+void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData title)
 {
     ref_type ref = array.get_ref();
 
     if (0 < title.size()) {
-        out << "subgraph cluster_" << ref << " {" << endl;
-        out << " label = \"" << title << "\";" << endl;
-        out << " color = white;" << endl;
+        out << "subgraph cluster_" << ref << " {" << std::endl;
+        out << " label = \"" << title << "\";" << std::endl;
+        out << " color = white;" << std::endl;
     }
 
-    out << "n" << hex << ref << dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
+    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << hex << ref << dec << "<BR/>";
+    out << "0x" << std::hex << ref << std::dec << "<BR/>";
     if (array.is_inner_bptree_node())
         out << "IsNode<BR/>";
     if (array.has_refs())
         out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << endl;
+    out << "</FONT></TD>" << std::endl;
 
     // Values
     size_t count = array.size();
@@ -957,16 +976,16 @@ void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title
         str[0] = char((v >> 24) & 0xFF);
         const char* s = str;
 
-        out << "<TD>" << s << "</TD>" << endl;
+        out << "<TD>" << s << "</TD>" << std::endl;
     }
 
-    out << "</TR></TABLE>>];" << endl;
+    out << "</TR></TABLE>>];" << std::endl;
     if (0 < title.size())
-        out << "}" << endl;
+        out << "}" << std::endl;
 
     array.to_dot_parent_edge(out);
 
-    out << endl;
+    out << std::endl;
 }
 
 
