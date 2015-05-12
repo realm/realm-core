@@ -76,7 +76,7 @@ std::string format_change(double baseline, double input, BenchmarkResults::Chang
     return os.str();
 }
 
-std::string pad_right(std::string str, size_t width, char padding = ' ')
+std::string pad_right(std::string str, int width, char padding = ' ')
 {
     std::ostringstream ss;
     ss << std::setw(width);
