@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <cmath>
 #include <float.h> // DBL_MIN, DBL_MAX
 
 #include <unistd.h> // link, unlink
@@ -107,15 +108,41 @@ void BenchmarkResults::submit_single(const char* ident, const char* lead_text,
 
 void BenchmarkResults::submit(const char* ident, double seconds)
 {
-    Results::iterator it = m_results.find(ident);
-    if (it == m_results.end()) {
-        it = m_results.insert(std::make_pair(ident, Result())).first;
+    Measurements::iterator it = m_measurements.find(ident);
+    if (it == m_measurements.end()) {
+        it = m_measurements.insert(std::make_pair(ident, Measurement())).first;
     }
-    Result& r = it->second;
-    if (r.min > seconds) r.min = seconds;
-    if (r.max < seconds) r.max = seconds;
-    r.total += seconds;
-    r.rep += 1;
+    Measurement& r = it->second;
+    r.samples.push_back(seconds);
+}
+
+BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
+{
+    Result r;
+    r.rep = samples.size();
+    for (auto s: samples) {
+        if (r.min > s) r.min = s;
+        if (r.max < s) r.max = s;
+        r.total += s;
+    }
+    
+    // Calculate standard deviation
+    if (r.rep > 1) {
+        double mean = r.avg();
+        double sum_variance = 0.0;
+        for (auto s: samples) {
+            double x = s - mean;
+            sum_variance += x * x;
+        }
+        double variance = sum_variance / double(r.rep);
+        r.stddev = std::sqrt(variance);
+        REALM_ASSERT_RELEASE(r.stddev != 0);
+    }
+    else {
+        r.stddev = 0;
+    }
+    
+    return r;
 }
 
 void BenchmarkResults::finish(const std::string& ident, const std::string& lead_text, ChangeType change_type)
@@ -140,27 +167,37 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
     std::string lead_text_2 = lead_text + ":";
     out << std::setw(m_max_lead_text_width + 1 + 3) << lead_text_2;
 
-    Results::const_iterator it = m_results.find(ident);
-    if (it == m_results.end()) {
+    Measurements::const_iterator it = m_measurements.find(ident);
+    if (it == m_measurements.end()) {
         out << "(no measurements)" << std::endl;
         return;
     }
 
-    const Result& r = it->second;
+    Result r = it->second.finish();
 
     const size_t time_width = 8;
 
     out.setf(std::ios_base::right, std::ios_base::adjustfield);
     if (baseline_iter != m_baseline_results.end()) {
         const Result& br = baseline_iter->second;
-        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << " " << pad_right(format_change(br.avg(), r.avg(), change_type), 15) << "     ";
+        double avg = r.avg();
+        double baseline_avg = br.avg();
+        if ((avg - baseline_avg) > r.stddev) {
+            out << "* ";
+        }
+        else {
+            out << "  ";
+        }
+        out << "avg " << std::setw(time_width) << format_elapsed_time(avg) << " " << pad_right(format_change(baseline_avg, avg, change_type), 15) << "     ";
         out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " " << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
         out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "     ";
+        out << "stddev" << std::setw(time_width) << format_elapsed_time(r.stddev) << " " << pad_right(format_change(br.stddev, r.stddev, change_type), 15);
     }
     else {
         out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << "     ";
         out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << "     ";
         out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << "     ";
+        out << "stddev " << std::setw(time_width) << format_elapsed_time(r.stddev);
     }
     out << std::endl;
 }
@@ -182,8 +219,8 @@ void BenchmarkResults::try_load_baseline_results()
             std::string ident;
             Result r;
             if (line_in >> ident) {
-                double* numbers[] = {&r.min, &r.max, &r.total};
-                for (size_t i = 0; i < 3; ++i) {
+                double* numbers[] = {&r.min, &r.max, &r.stddev, &r.total};
+                for (size_t i = 0; i < 4; ++i) {
                     if (!(line_in >> *numbers[i])) {
                         std::cerr << "Expected number: line " << lineno << "\n";
                         error = true;
@@ -242,18 +279,18 @@ void BenchmarkResults::save_results()
         std::ofstream out(name.c_str());
         std::ofstream csv_out(csv_name.c_str());
 
-        csv_out << "ident,min,max,avg,reps,total" << '\n';
+        csv_out << "ident,min,max,avg,stddev,reps,total" << '\n';
         csv_out.setf(std::ios_base::fixed, std::ios_base::floatfield);
 
-        typedef Results::const_iterator iter;
-        for (iter it = m_results.begin(); it != m_results.end(); ++it) {
-            const Result& r = it->second;
+        typedef Measurements::const_iterator iter;
+        for (iter it = m_measurements.begin(); it != m_measurements.end(); ++it) {
+            Result r = it->second.finish();
 
             out << it->first << ' ';
-            out << r.min << " " << r.max << " " << r.total << " " << r.rep << '\n';
+            out << r.min << " " << r.max << " " << r.stddev << " " << r.total << " " << r.rep << '\n';
 
             csv_out << '"' << it->first << "\",";
-            csv_out << r.min << ',' << r.max << ',' << r.avg() << ',' << r.rep << ',' << r.total << '\n';
+            csv_out << r.min << ',' << r.max << ',' << r.avg() << ',' << r.stddev << ',' << r.rep << ',' << r.total << '\n';
         }
     }
 
