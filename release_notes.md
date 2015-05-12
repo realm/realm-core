@@ -1,15 +1,23 @@
-# 0.89.3 Release notes
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Fixed incorrect results for Or() when querying via a LinkView with a
+  different order than the target table.
 
 ### Enhancements:
 
 * Automatically log assertion messages to Crashlytics if it's loaded into the
   current process.
 
+----------------------------------------------
+
 # 0.89.2 Release notes
 
 ### Bugfixes:
 
 * Fixed encryption on Android ARM64 devices.
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 ----------------------------------------------
 

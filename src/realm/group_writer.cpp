@@ -344,7 +344,11 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // 'stop_doubling_size'. This is to achieve a reasonable
     // compromise between minimizing fragmentation (maximizing
     // performance) and minimizing over-allocation.
+#ifdef REALM_MOBILE
+    size_t stop_doubling_size = 16 * (1024*1024L); // = 16 MiB
+#else
     size_t stop_doubling_size = 128 * (1024*1024L); // = 128 MiB
+#endif
     REALM_ASSERT_3(stop_doubling_size % 8, ==, 0);
 
     size_t new_file_size = logical_file_size;
