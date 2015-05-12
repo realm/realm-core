@@ -2210,11 +2210,11 @@ bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64
 
 template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 {
-    // Takes a chunk of values as argument and sets the uppermost bit for each
+    // Takes a chunk of values as argument and sets the least significant bit for each
     // element which is zero or non-zero, depending on the template parameter.
     // Example for zero=true:
-    // width == 4 and v = 01000000 00001000 10000001 00001000 00000000 10100100 00001100 00111110 01110100 00010000 00000000 00000001 10000000 01111110
-    // will return:       00001000 00010000 00010000 00010000 00010001 00000000 00010000 00000000 00000000 00000001 00010001 00010000 00000001 00000000
+    // width == 4 and a = 0x5fd07a107610f610
+    // will return:       0x0001000100010001
 
     // static values needed for fast population count
     const uint64_t m1  = 0x5555555555555555ULL;
