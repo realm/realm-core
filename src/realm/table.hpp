@@ -26,6 +26,7 @@
 #include <typeinfo>
 
 #include <realm/util/features.h>
+#include <realm/util/thread.hpp>
 #include <realm/util/tuple.hpp>
 #include <memory>
 #include <realm/column_fwd.hpp>
@@ -851,7 +852,7 @@ private:
     mutable RowBase* m_row_accessors = nullptr;
 
     // Mutex which must be locked any time the row accessor chain is used
-    mutable std::mutex m_row_accessor_mutex;
+    mutable util::Mutex m_row_accessor_mutex;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
