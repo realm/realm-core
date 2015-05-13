@@ -12,8 +12,6 @@
 
 * Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
------------
-
 ### Internals:
 
 * Lorem ipsum.
