@@ -3241,12 +3241,7 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 
 size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-<<<<<<< HEAD
     return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
-=======
-    // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
->>>>>>> 72d7e253e2fef5b8cc838cf8ddacd9bd40988030
 }
 
 

@@ -2,6 +2,8 @@
 #  include <win32/types.h>
 #endif
 
+#include <utility> // pair
+
 #include <realm/array_binary.hpp>
 #include <realm/array_blob.hpp>
 #include <realm/array_integer.hpp>
@@ -104,14 +106,13 @@ void ArrayBinary::erase(size_t ndx)
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
-<<<<<<< HEAD
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
     // See comment in new_array_type() and also in array_binary.hpp.
     size_t siz = Array::get_size_from_header(header);
     REALM_ASSERT_7(siz, ==, 2, ||, siz, ==, 3);
     
     if (siz == 3) {
-        pair<int64_t, int64_t> p = get_two(header, 1);
+        std::pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
         int64_t n = ArrayInteger::get(nulls_header, ndx);
         // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
@@ -122,11 +123,7 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) RE
             return BinaryData(0, 0);        
     }
     
-    pair<int64_t, int64_t> p = get_two(header, 0);
-
-=======
-    std::pair<int_least64_t, int_least64_t> p = get_two(header, 0);
->>>>>>> 72d7e253e2fef5b8cc838cf8ddacd9bd40988030
+    std::pair<int64_t, int64_t> p = get_two(header, 0);
     const char* offsets_header = alloc.translate(to_ref(p.first));
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;

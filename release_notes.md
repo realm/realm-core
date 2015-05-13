@@ -1,26 +1,30 @@
-<<<<<<< HEAD
-# 0.89.3 Release notes
+# NEXT RELEASE
 
 ### Bugfixes:
 
-* Fixed incorrect results for Or() when querying via a LinkView with a
-  different order than the target table.
-* Fixed incorrect results when getting the count for a query where the only
-  condition is checking for non-equality to an int.
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Now supports nulls for BinaryData columns. Use `BinaryData()` as null everywhere.
 
 ### Enhancements:
 
-* Automatically log assertion messages to Crashlytics if it's loaded into the
-  current process.
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
 
 ----------------------------------------------
 
-# 0.89.2 Release notes
+# NEXT RELEASE
 
 ### Bugfixes:
 
 * Fixed bug in equal(null) in next-generation-syntax queries. Behaviour of .begins_with(null), .contains(null), .ends_with(null) adjusted; see description in TEST(Query_NextGen_StringConditions)
-* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 ### API breaking changes:
 
@@ -28,7 +32,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 -----------
 
@@ -50,13 +54,6 @@ StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
 is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
-=======
-# 0.89.1 Release notes
-
-### Bugfixes:
-
-* Fixed bug in "index rebuilding" (would delete the wrong column, causing crash). See https://github.com/realm/realm-core/pull/798 ;  "Remove the correct column when removing search indexes #798"
->>>>>>> 72d7e253e2fef5b8cc838cf8ddacd9bd40988030
 
 ----------------------------------------------
 
