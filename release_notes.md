@@ -6,11 +6,11 @@
 * 
 ### API breaking changes:
 
-* Now supports null for BinaryData columns. Use BinaryData() as null anywhere.
+* Lorem ipsum.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 -----------
 
