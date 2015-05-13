@@ -293,9 +293,61 @@ TEST(ColumnBinary_Nulls)
     ColumnBinary c(Allocator::get_default(), ref, true);
     
     c.add(BinaryData());
-    c.add(BinaryData("hello"));
+    c.add(BinaryData("", 0));
+    c.add(BinaryData("foo"));
+
+    CHECK(c.get(0).is_null());
+    CHECK(!c.get(1).is_null());
+    CHECK(!c.get(1).is_null());
+
+    // Contains
+    //      Null
+    CHECK(c.get(0).contains(c.get(0)));
+    CHECK(!c.get(0).contains(c.get(1)));
+    CHECK(!c.get(0).contains(c.get(2)));
+
+    //      Empty string
+    CHECK(c.get(1).contains(c.get(0)));
+    CHECK(c.get(1).contains(c.get(1)));
+    CHECK(!c.get(1).contains(c.get(2)));
+
+    //      "foo"
+    CHECK(c.get(2).contains(c.get(0)));
+    CHECK(c.get(2).contains(c.get(1)));
+    CHECK(c.get(2).contains(c.get(2)));
 
 
+    // Begins with
+    //      Null
+    CHECK(c.get(0).begins_with(c.get(0)));
+    CHECK(!c.get(0).begins_with(c.get(1)));
+    CHECK(!c.get(0).begins_with(c.get(2)));
+
+    //      Empty string
+    CHECK(c.get(1).begins_with(c.get(0)));
+    CHECK(c.get(1).begins_with(c.get(1)));
+    CHECK(!c.get(1).begins_with(c.get(2)));
+
+    //      "foo"
+    CHECK(c.get(2).begins_with(c.get(0)));
+    CHECK(c.get(2).begins_with(c.get(1)));
+    CHECK(c.get(2).begins_with(c.get(2)));
+
+    // Ends with
+    //      Null
+    CHECK(c.get(0).ends_with(c.get(0)));
+    CHECK(!c.get(0).ends_with(c.get(1)));
+    CHECK(!c.get(0).ends_with(c.get(2)));
+
+    //      Empty string
+    CHECK(c.get(1).ends_with(c.get(0)));
+    CHECK(c.get(1).ends_with(c.get(1)));
+    CHECK(!c.get(1).ends_with(c.get(2)));
+
+    //      "foo"
+    CHECK(c.get(2).ends_with(c.get(0)));
+    CHECK(c.get(2).ends_with(c.get(1)));
+    CHECK(c.get(2).ends_with(c.get(2)));
 }
 
 #endif // TEST_COLUMN_BINARY

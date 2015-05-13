@@ -865,6 +865,7 @@ bool SharedGroup::compact()
         SharedInfo* r_info = m_reader_map.get_addr();
         Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
         REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
+        static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
     }
     end_read();
 

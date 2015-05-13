@@ -1,8 +1,25 @@
-# NEXT RELEASE
+# 0.89.3 Release notes
+
+### Bugfixes:
+
+* Fixed incorrect results for Or() when querying via a LinkView with a
+  different order than the target table.
+* Fixed incorrect results when getting the count for a query where the only
+  condition is checking for non-equality to an int.
+
+### Enhancements:
+
+* Automatically log assertion messages to Crashlytics if it's loaded into the
+  current process.
+
+----------------------------------------------
+
+# 0.89.2 Release notes
 
 ### Bugfixes:
 
 * Fixed bug in equal(null) in next-generation-syntax queries. Behaviour of .begins_with(null), .contains(null), .ends_with(null) adjusted; see description in TEST(Query_NextGen_StringConditions)
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
 
 ### API breaking changes:
 

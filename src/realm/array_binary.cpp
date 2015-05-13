@@ -106,14 +106,18 @@ void ArrayBinary::erase(size_t ndx)
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
-    // See comment in new_array_type() and also in array_binary.hpp
-    REALM_ASSERT_3(Array::get_size_from_header(header), >= , 2);
-    REALM_ASSERT_3(Array::get_size_from_header(header), <=, 3);
+    // See comment in new_array_type() and also in array_binary.hpp.
+    size_t siz = Array::get_size_from_header(header);
+    REALM_ASSERT_7(siz, ==, 2, ||, siz, ==, 3);
     
-    if (Array::get_size_from_header(header) == 3) {
+    if (siz == 3) {
         pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
-        bool null = Array::get(nulls_header, ndx);
+        int64_t n = ArrayInteger::get(nulls_header, ndx);
+        // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
+        REALM_ASSERT_3(n == 1, ||, n == 0);
+        bool null = (n != 0);
+        ArrayInteger::get(nulls_header, ndx);
         if (null)
             return BinaryData(0, 0);        
     }
@@ -180,7 +184,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
         int64_t value = 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v = from_ref(mem.m_ref);
         top.add(v); // Throws
         dg_2.release();
     }
@@ -188,7 +192,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
         size_t blobs_size = 0;
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v = from_ref(mem.m_ref);
         top.add(v); // Throws
         dg_2.release();
     }
@@ -201,7 +205,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
         int64_t value = 1; // all entries are null by default
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v = from_ref(mem.m_ref);
         top.add(v); // Throws
         dg_2.release();
     }
