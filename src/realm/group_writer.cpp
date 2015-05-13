@@ -6,7 +6,6 @@
 #include <realm/group.hpp>
 #include <realm/alloc_slab.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -78,7 +77,7 @@ size_t GroupWriter::write_group()
     // maximum number that is required. This ensures that even if we end up
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
-    pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
+    std::pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
     size_t reserve_ndx  = reserve.first;
     size_t reserve_size = reserve.second;
 
@@ -224,7 +223,7 @@ size_t GroupWriter::get_free_space(size_t size)
 {
     REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
 
-    pair<size_t, size_t> p = reserve_free_space(size);
+    std::pair<size_t, size_t> p = reserve_free_space(size);
 
     ArrayInteger& positions = m_group.m_free_positions;
     ArrayInteger& lengths   = m_group.m_free_lengths;
@@ -253,7 +252,7 @@ size_t GroupWriter::get_free_space(size_t size)
 }
 
 
-pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
+std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
     ArrayInteger& lengths  = m_group.m_free_lengths;
     ArrayInteger& versions = m_group.m_free_versions;
@@ -280,7 +279,7 @@ pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             }
 
             // Match found!
-            return make_pair(i, chunk_size);
+            return std::make_pair(i, chunk_size);
         }
     }
 
@@ -295,7 +294,7 @@ pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 }
 
 
-pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
+std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 {
     ArrayInteger& positions = m_group.m_free_positions;
     ArrayInteger& lengths   = m_group.m_free_lengths;
@@ -337,7 +336,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
     size_t min_file_size = logical_file_size;
     if (int_add_with_overflow_detect(min_file_size, extend_size))
-        throw runtime_error("File size overflow");
+        throw std::runtime_error("File size overflow");
 
     // We double the size until we reach 'stop_doubling_size'. From
     // then on we increment the size in steps of
@@ -359,12 +358,12 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
             // iterations will be finite.
             REALM_ASSERT_3(new_file_size, !=, 0);
             // Be sure that the doubling does not overflow
-            REALM_ASSERT_3(stop_doubling_size, <=, numeric_limits<size_t>::max() / 2);
+            REALM_ASSERT_3(stop_doubling_size, <=, std::numeric_limits<size_t>::max() / 2);
             new_file_size *= 2;
         }
         else {
             if (int_add_with_overflow_detect(new_file_size, stop_doubling_size)) {
-                new_file_size = numeric_limits<size_t>::max();
+                new_file_size = std::numeric_limits<size_t>::max();
                 new_file_size &= ~size_t(7); // 8-byte alignment
             }
         }
@@ -402,7 +401,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // Update the logical file size
     m_group.m_top.set(2, 1 + 2*new_file_size); // Throws
 
-    return make_pair(chunk_ndx, chunk_size);
+    return std::make_pair(chunk_ndx, chunk_size);
 }
 
 
@@ -414,7 +413,7 @@ void GroupWriter::write(const char* data, size_t size)
 
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
-    copy(data, data+size, dest_addr);
+    std::copy(data, data+size, dest_addr);
 }
 
 
@@ -428,11 +427,11 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
     char* dest_addr = m_file_map.get_addr() + pos;
 #ifdef REALM_DEBUG
     const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
-    copy(cksum_bytes, cksum_bytes+4, dest_addr);
-    copy(data+4, data+size, dest_addr+4);
+    std::copy(cksum_bytes, cksum_bytes+4, dest_addr);
+    std::copy(data+4, data+size, dest_addr+4);
 #else
     static_cast<void>(checksum);
-    copy(data, data+size, dest_addr);
+    std::copy(data, data+size, dest_addr);
 #endif
 
     // return the position it was written
@@ -449,10 +448,10 @@ void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 #ifdef REALM_DEBUG
     uint_fast32_t dummy_checksum = 0x01010101UL;
     const char* cksum_bytes = reinterpret_cast<const char*>(&dummy_checksum);
-    copy(cksum_bytes, cksum_bytes+4, dest_addr);
-    copy(data+4, data+size, dest_addr+4);
+    std::copy(cksum_bytes, cksum_bytes+4, dest_addr);
+    std::copy(data+4, data+size, dest_addr+4);
 #else
-    copy(data, data+size, dest_addr);
+    std::copy(data, data+size, dest_addr);
 #endif
 }
 
@@ -503,16 +502,16 @@ void GroupWriter::dump()
     bool is_shared = m_group.m_is_shared;
 
     size_t count = flengths.size();
-    cout << "count: " << count << ", m_size = " << m_file_map.get_size() << ", "
+    std::cout << "count: " << count << ", m_size = " << m_file_map.get_size() << ", "
         "version >= " << m_readlock_version << "\n";
     if (!is_shared) {
         for (size_t i = 0; i < count; ++i) {
-            cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << "\n";
+            std::cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << "\n";
         }
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << " - "
+            std::cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << " - "
                 "" << fversions.get(i) << "\n";
         }
     }

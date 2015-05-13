@@ -4,7 +4,6 @@
 #include <iostream>
 #include <realm.hpp>
 
-using namespace std;
 using namespace realm;
 
 REALM_TABLE_2(PeopleTable,
@@ -16,7 +15,7 @@ void optional_table(const Group& group)
 // @@EndFold@@
     PeopleTable::ConstRef table = group.get_table<PeopleTable>("people");
     if (table)
-        cout << table->get_column_count() << "\n";
+        std::cout << table->get_column_count() << "\n";
 // @@Fold@@
 }
 

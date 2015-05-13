@@ -4,7 +4,6 @@
 #include <assert.h>
 
 using namespace realm;
-using namespace std;
 
 int main()
 {
@@ -36,7 +35,7 @@ int main()
     table->add_column(type_String, "Names");
     table->add_column(type_Table, "Scores");
 
-    vector<size_t> path;
+    std::vector<size_t> path;
     path.push_back(1);
     table->add_subcolumn(path, type_Int, "Score");
 

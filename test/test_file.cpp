@@ -9,7 +9,6 @@
 #include "test.hpp"
 #include "crypt_key.hpp"
 
-using namespace std;
 using namespace realm::util;
 
 
@@ -75,19 +74,19 @@ TEST(File_Streambuf)
     {
         File f(path, File::mode_Write);
         File::Streambuf b(&f);
-        ostream out(&b);
-        out << "Line " << 1 << endl;
-        out << "Line " << 2 << endl;
+        std::ostream out(&b);
+        out << "Line " << 1 << std::endl;
+        out << "Line " << 2 << std::endl;
     }
     {
         File f(path, File::mode_Read);
         char buffer[256];
         size_t n = f.read(buffer);
-        string s_1(buffer, buffer+n);
-        ostringstream out;
-        out << "Line " << 1 << endl;
-        out << "Line " << 2 << endl;
-        string s_2 = out.str();
+        std::string s_1(buffer, buffer+n);
+        std::ostringstream out;
+        out << "Line " << 1 << std::endl;
+        out << "Line " << 2 << std::endl;
+        std::string s_2 = out.str();
         CHECK(s_1 == s_2);
     }
 }

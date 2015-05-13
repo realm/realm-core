@@ -14,7 +14,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace test_util;
 using namespace realm::util;
@@ -973,12 +972,12 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(2).get_index(), 1);
 
     // Test multi-column sorting
-    vector<size_t> v;
-    vector<bool> a;
+    std::vector<size_t> v;
+    std::vector<bool> a;
     a.push_back(true);
     a.push_back(true);
 
-    vector<bool> a_false;
+    std::vector<bool> a_false;
     a_false.push_back(false);
     a_false.push_back(false);
 

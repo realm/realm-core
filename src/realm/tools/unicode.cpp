@@ -32,7 +32,7 @@ std::cout << "static const uint32_t collation_order[] = {\n";
 for (size_t t = 0; t < end; t++) {
     std::cout << (t == 0 ? "" : ", ") << inverse[t];
     if (t != 0 && t % 100 == 0)
-        cerr << "\n";
+        std::cerr << "\n";
 }
 std::cout << "};";
 */

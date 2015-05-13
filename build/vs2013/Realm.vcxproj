@@ -1113,7 +1113,6 @@
     <ClInclude Include="..\..\src\realm\table_basic_fwd.hpp" />
     <ClInclude Include="..\..\src\realm\unicode.hpp" />
     <ClInclude Include="..\..\src\realm\util\assert.hpp" />
-    <ClInclude Include="..\..\src\realm\util\bind.hpp" />
     <ClInclude Include="..\..\src\realm\util\buffer.hpp" />
     <ClInclude Include="..\..\src\realm\util\encrypted_file_mapping.hpp" />
     <ClInclude Include="..\..\src\realm\util\errno.hpp" />

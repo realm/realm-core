@@ -7,7 +7,6 @@
 #include <realm/array_integer.hpp>
 #include <realm/impl/destroy_guard.hpp>
 
-using namespace std;
 using namespace realm;
 
 void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
@@ -105,6 +104,7 @@ void ArrayBinary::erase(size_t ndx)
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
 {
+<<<<<<< HEAD
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
     // See comment in new_array_type() and also in array_binary.hpp.
     size_t siz = Array::get_size_from_header(header);
@@ -124,6 +124,9 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) RE
     
     pair<int64_t, int64_t> p = get_two(header, 0);
 
+=======
+    std::pair<int_least64_t, int_least64_t> p = get_two(header, 0);
+>>>>>>> 72d7e253e2fef5b8cc838cf8ddacd9bd40988030
     const char* offsets_header = alloc.translate(to_ref(p.first));
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
@@ -235,21 +238,21 @@ MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) c
 
 #ifdef REALM_DEBUG
 
-void ArrayBinary::to_dot(ostream& out, bool, StringData title) const
+void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
 {
     ref_type ref = get_ref();
 
-    out << "subgraph cluster_binary" << ref << " {" << endl;
+    out << "subgraph cluster_binary" << ref << " {" << std::endl;
     out << " label = \"ArrayBinary";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
 
     Array::to_dot(out, "binary_top");
     m_offsets.to_dot(out, "offsets");
     m_blob.to_dot(out, "blob");
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 #endif // REALM_DEBUG

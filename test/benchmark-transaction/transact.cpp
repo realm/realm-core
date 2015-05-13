@@ -20,7 +20,6 @@
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -67,17 +66,17 @@ double wall_time;
 void usage(const char *msg)
 {
     if (strlen(msg) > 0)
-        cout << "Error: " << msg << endl << endl;
-    cout << "Usage:" << endl;
-    cout << " -h   : this text" << endl;
-    cout << " -w   : number of writers" << endl;
-    cout << " -r   : number of readers" << endl;
-    cout << " -f   : database file" << endl;
-    cout << " -d   : database (realm, sqlite, sqlite-wal or mysql)" << endl;
-    cout << " -t   : duration (in secs)" << endl;
-    cout << " -n   : number of rows" << endl;
-    cout << " -v   : verbose" << endl;
-    cout << " -s   : single run" << endl;
+        std::cout << "Error: " << msg << std::endl << std::endl;
+    std::cout << "Usage:" << std::endl;
+    std::cout << " -h   : this text" << std::endl;
+    std::cout << " -w   : number of writers" << std::endl;
+    std::cout << " -r   : number of readers" << std::endl;
+    std::cout << " -f   : database file" << std::endl;
+    std::cout << " -d   : database (realm, sqlite, sqlite-wal or mysql)" << std::endl;
+    std::cout << " -t   : duration (in secs)" << std::endl;
+    std::cout << " -n   : number of rows" << std::endl;
+    std::cout << " -v   : verbose" << std::endl;
+    std::cout << " -s   : single run" << std::endl;
     exit(-1);
 }
 
@@ -190,7 +189,7 @@ static void *sqlite_reader(void *arg)
         c += sqlite3_column_int(s, 0);
 
         if (sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg) == SQLITE_BUSY) {
-            cout << "Oops" << endl;
+            std::cout << "Oops" << std::endl;
         }
         sqlite3_clear_bindings(s);
         sqlite3_reset(s);
@@ -201,7 +200,7 @@ static void *sqlite_reader(void *arg)
     }
     sqlite3_close(db);
     if (verbose) {
-        cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
+        std::cout << "Reader threads " << tinfo->thread_num << ":" << c << std::endl;
     }
     return NULL;
 }
@@ -220,7 +219,7 @@ static void *mysql_reader(void *arg)
     // open mysql
     db = mysql_init(NULL);
     if (mysql_real_connect(db, DB_HOST, DB_USER, DB_PASS, DB_NAME, 0, NULL, 0) == NULL) {
-        cout << "Cannot connect to MySQL" << endl;
+        std::cout << "Cannot connect to MySQL" << std::endl;
     }
     mysql_autocommit(db, 0);
 
@@ -235,19 +234,19 @@ static void *mysql_reader(void *arg)
 
         // execute transaction
         if (mysql_query(db, "START TRANSACTION;")) {
-            cout << "MySQL error: " << mysql_errno(db) << endl;
+            std::cout << "MySQL error: " << mysql_errno(db) << std::endl;
         }
         randy = random() % 1000;
         sprintf(sql, "SELECT COUNT(*) FROM %s WHERE y = %ld", tinfo->datfile, randy);
         if (mysql_query(db, sql)) {
-            cout << "MySQL error in " << sql << ": " << mysql_errno(db) << endl;
+            std::cout << "MySQL error in " << sql << ": " << mysql_errno(db) << std::endl;
         }
         MYSQL_RES *res = mysql_use_result(db);
         MYSQL_ROW row = mysql_fetch_row(res);
         c += atoi(row[0]);
         mysql_free_result(res);
         if (mysql_query(db, "COMMIT;")) {
-            cout << "Cannot commit" << endl;
+            std::cout << "Cannot commit" << std::endl;
         }
 
         // update statistics
@@ -255,7 +254,7 @@ static void *mysql_reader(void *arg)
         update_reader(ts_1, ts_2);
     }
     if (verbose) {
-        cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
+        std::cout << "Reader threads " << tinfo->thread_num << ":" << c << std::endl;
     }
     mysql_close(db);
 }
@@ -290,7 +289,7 @@ static void *realm_reader(void *arg)
         update_reader(ts_1, ts_2);
     }
     if (verbose) {
-        cout << "Reader threads " << tinfo->thread_num << ":" << c << endl;
+        std::cout << "Reader threads " << tinfo->thread_num << ":" << c << std::endl;
     }
     return NULL;
 }
@@ -330,7 +329,7 @@ static void *sqlite_writer(void *arg)
         sqlite3_step(s);
         sqlite3_free(errmsg);
         if (sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg) == SQLITE_BUSY) {
-            cout << "Ooops" << endl;
+            std::cout << "Ooops" << std::endl;
         }
         sqlite3_clear_bindings(s);
         sqlite3_reset(s);
@@ -368,16 +367,16 @@ static void *mysql_writer(void *arg)
 
         // execute transaction
         if (mysql_query(db, "START TRANSACTION;")) {
-            cout << "MySQL error: " << mysql_errno(db) << endl;
+            std::cout << "MySQL error: " << mysql_errno(db) << std::endl;
         }
         randx = random() % 1000;
         randy = random() % 1000;
         sprintf(sql, "UPDATE %s SET x=%ld WHERE y = %ld", tinfo->datfile, randx, randy);
         if (mysql_query(db, sql)) {
-            cout << "MySQL error in " << sql << ": " << mysql_errno(db) << endl;
+            std::cout << "MySQL error in " << sql << ": " << mysql_errno(db) << std::endl;
         }
         if (mysql_query(db, "COMMIT;")) {
-            cout << "Cannot commit" << endl;
+            std::cout << "Cannot commit" << std::endl;
         }
 
         // update statistics
@@ -435,7 +434,7 @@ void sqlite_create(const char *f, long n, bool wal)
     srandom(1);
 
     if (sqlite3_config(SQLITE_CONFIG_MULTITHREAD, 1) == SQLITE_ERROR) {
-        cout << "SQLite has no multi-threading support" << endl;
+        std::cout << "SQLite has no multi-threading support" << std::endl;
     }
     sqlite3_open(f, &db);
     if (wal) {
@@ -471,7 +470,7 @@ void mysql_create(const char *f, long n)
     sprintf(sql, "CREATE TABLE %s (x INT, y INT) ENGINE=innodb", f);
     mysql_query(db, sql);
     if (mysql_query(db, "START TRANSACTION;")) {
-        cout << "MySQL error: " << mysql_errno(db) << endl;
+        std::cout << "MySQL error: " << mysql_errno(db) << std::endl;
     }
     for(i=0; i<n; ++i) {
         randx = random() % 1000;
@@ -480,7 +479,7 @@ void mysql_create(const char *f, long n)
         mysql_query(db, sql);
     }
     if (mysql_query(db, "COMMIT;")) {
-        cout << "Cannot commit" << endl;
+        std::cout << "Cannot commit" << std::endl;
     }
     mysql_close(db);
 }
@@ -519,7 +518,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     runnable          = true;
 
     if (!single) {
-        if (verbose) cout << "Copying file" << endl;
+        if (verbose) std::cout << "Copying file" << std::endl;
         if (database == DB_MYSQL) {
             copy_db(datfile, ("tmp"+string(datfile)).c_str());
         }
@@ -545,7 +544,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
         }
     }
 
-    if (verbose) cout << "Starting threads" << endl;
+    if (verbose) std::cout << "Starting threads" << std::endl;
     struct timespec ts_1;
     clock_gettime(CLOCK_REALTIME, &ts_1);
     for(int i=0; i<n_readers; ++i) {
@@ -579,16 +578,16 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
         }
     }
 
-    if (verbose) cout << "Waiting for " << duration << " seconds" << endl;
+    if (verbose) std::cout << "Waiting for " << duration << " seconds" << std::endl;
     sleep(duration);
 
-    if (verbose) cout << "Cancelling threads" << endl;
+    if (verbose) std::cout << "Cancelling threads" << std::endl;
     pthread_mutex_lock(&mtx_runnable);
     runnable = false;
     pthread_mutex_unlock(&mtx_runnable);
 
     if (verbose)
-        cout << "Waiting for threads" << endl;
+        std::cout << "Waiting for threads" << std::endl;
     for(int i=0; i<n_readers; ++i) {
         pthread_join(tinfo[i].thread_id, &res);
     }
@@ -680,7 +679,7 @@ int main(int argc, char *argv[])
         sqlite3_config(SQLITE_CONFIG_SERIALIZED);
     }
 
-    if (verbose) cout << "Creating test data for " << database << endl;
+    if (verbose) std::cout << "Creating test data for " << database << std::endl;
     switch (database) {
     case DB_REALM:
         realm_create(datfile, n_records);
@@ -701,25 +700,25 @@ int main(int argc, char *argv[])
 
     if (single) {
         benchmark(true, database, datfile, n_readers, n_writers, duration);
-        cout << wall_time << " " << iteration_readers << " " << dt_readers
-             << " " << iteration_writers << " " << dt_writers << endl;
+        std::cout << wall_time << " " << iteration_readers << " " << dt_readers
+             << " " << iteration_writers << " " << dt_writers << std::endl;
     }
     else {
-        cout << "# Columns: "                   << endl;
-        cout << "# 1. number of readers"        << endl;
-        cout << "# 2. number of writers"        << endl;
-        cout << "# 3. wall time"                << endl;
-        cout << "# 4. read transactions"        << endl;
-        cout << "# 5. read time"                << endl;
-        cout << "# 6. writer transactions"      << endl;
-        cout << "# 7. writer time"              << endl;
+        std::cout << "# Columns: "                   << std::endl;
+        std::cout << "# 1. number of readers"        << std::endl;
+        std::cout << "# 2. number of writers"        << std::endl;
+        std::cout << "# 3. wall time"                << std::endl;
+        std::cout << "# 4. read transactions"        << std::endl;
+        std::cout << "# 5. read time"                << std::endl;
+        std::cout << "# 6. writer transactions"      << std::endl;
+        std::cout << "# 7. writer time"              << std::endl;
         for(int i=0; i<=n_readers; ++i) {
             for(int j=0; j<=n_writers; ++j) {
                 benchmark(false, database, "test_db", i, j, duration);
-                cout << i << " " << j << " ";
-                cout << wall_time << " " << iteration_readers
+                std::cout << i << " " << j << " ";
+                std::cout << wall_time << " " << iteration_readers
                      << " " << dt_readers << " " << iteration_writers
-                     << " " << dt_writers << endl;
+                     << " " << dt_writers << std::endl;
             }
         }
     }
