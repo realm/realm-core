@@ -1,3 +1,62 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Fixed bug in equal(null) in next-generation-syntax queries. Behaviour of .begins_with(null), .contains(null), .ends_with(null) adjusted; see description in TEST(Query_NextGen_StringConditions)
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.90.0 Release notes
+
+### API breaking changes:
+
+* Merged lr_nulls into master (support for null in String column and bugfix in
+String index with 0 bytes). If you want to disable all this again, then #define
+REALM_NULL_STRINGS to 0 in features.h. Else API is as follows: Call add_column()
+with nullable = true. You can then use tightdb::null() in place of any
+StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
+also call Table::is_null(), Table::set_null() and StringData::is_null(). This
+upgrades the database file from version 2 to 3 initially the first time a file
+is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
 # 0.89.1 Release notes
 
 ### Bugfixes:
