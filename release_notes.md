@@ -2,28 +2,6 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Now supports nulls for BinaryData columns. Use `BinaryData()` as null everywhere.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
-
-----------------------------------------------
-
-# NEXT RELEASE
-
-### Bugfixes:
-
 * Fixed bug in equal(null) in next-generation-syntax queries. Behaviour of .begins_with(null), .contains(null), .ends_with(null) adjusted; see description in TEST(Query_NextGen_StringConditions)
 
 ### API breaking changes:
