@@ -57,6 +57,14 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 
 ----------------------------------------------
 
+# 0.89.1 Release notes
+
+### Bugfixes:
+
+* Fixed bug in "index rebuilding" (would delete the wrong column, causing crash). See https://github.com/realm/realm-core/pull/798 ;  "Remove the correct column when removing search indexes #798"
+
+----------------------------------------------
+
 # 0.89.0 Release notes
 
 ### Bugfixes:
