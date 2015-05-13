@@ -21,6 +21,7 @@
 #include <sstream>
 
 #ifdef __APPLE__
+#include <dlfcn.h>
 #include <execinfo.h>
 #include <CoreFoundation/CoreFoundation.h>
 #endif
@@ -45,6 +46,14 @@ namespace util {
 void nslog(const char *message) {
     CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
     CFShow(str);
+
+    // Log the message to Crashlytics if it's loaded into the process
+    void* addr = dlsym(RTLD_DEFAULT, "CLSLog");
+    if (addr) {
+        auto fn = reinterpret_cast<void (*)(CFStringRef, ...)>(reinterpret_cast<size_t>(addr));
+        fn(CFSTR("%@"), str);
+    }
+
     CFRelease(str);
 }
 #endif

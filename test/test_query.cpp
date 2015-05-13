@@ -179,7 +179,8 @@ TEST(Query_Count)
         Table table;
         table.add_column(type_Int, "i");
 
-        size_t count = 0;
+        size_t matching = 0;
+        size_t not_matching = 0;
         size_t rows = random.draw_int_mod(5 * REALM_MAX_BPNODE_SIZE); // to cross some leaf boundaries
 
         for (size_t i = 0; i < rows; ++i) {
@@ -187,13 +188,14 @@ TEST(Query_Count)
             int64_t val = random.draw_int_mod(5);
             table.set_int(0, i, val);
             if (val == 2)
-                count++;
+                matching++;
+            else
+                not_matching++;
         }
 
-        size_t count2 = table.where().equal(0, 2).count();
-        CHECK_EQUAL(count, count2);
+        CHECK_EQUAL(matching, table.where().equal(0, 2).count());
+        CHECK_EQUAL(not_matching, table.where().not_equal(0, 2).count());
     }
-
 }
 
 

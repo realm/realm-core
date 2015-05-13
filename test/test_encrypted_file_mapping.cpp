@@ -6,6 +6,7 @@
 #include "test.hpp"
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // Test independence and thread-safety
