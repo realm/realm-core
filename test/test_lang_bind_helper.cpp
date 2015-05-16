@@ -7354,12 +7354,19 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
         SharedGroup::Handover<TableView>* handover;
         SharedGroup::VersionID version;
         control->get(info, version);
+        // Actually steal the payload:
+        handover = info->sg->export_for_handover(*info->tv, MutableSourcePayload::Move);
+        // we need to use the same version as the exported one.
+        // if we had used the version obtained from control->get(),
+        // we would risk using a stale version, because the producing
+        // thread might advance_read() after control->put() but
+        // before we did the export_for_handover() above.
+        version = handover->version;
         Group& g = const_cast<Group&>(sg.begin_read(version));
         TableRef table = g.get_table("table");
         TableView tv = table->where().greater(0,50).find_all();
         CHECK(tv.is_in_sync());
-        // Actually steal the payload:
-        handover = info->sg->export_for_handover(*info->tv, MutableSourcePayload::Move);
+
         TableView* tv2 = sg.import_from_handover(handover);
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
