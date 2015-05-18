@@ -11,7 +11,8 @@
 
 * Automatically log assertion messages to Crashlytics if it's loaded into the
   current process.
-* Detaching (and thus destroying) row acessors can now be done safely from any thread.
+* Detaching (and thus destroying) row acessors and TableViews can now be done
+  safely from any thread.
 
 ----------------------------------------------
 

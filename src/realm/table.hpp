@@ -851,8 +851,8 @@ private:
     // Points to first bound row accessor, or is null if there are none.
     mutable RowBase* m_row_accessors = nullptr;
 
-    // Mutex which must be locked any time the row accessor chain is used
-    mutable util::Mutex m_row_accessor_mutex;
+    // Mutex which must be locked any time the row accessor chain or m_views is used
+    mutable util::Mutex m_accessor_mutex;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
