@@ -352,10 +352,10 @@ public:
         TSourceColumn av = static_cast<TSourceColumn>(0);
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
-            REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
+            REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
         }
-        REALM_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
+        REALM_ASSERT_DEBUG(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
         bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
         return cont;
     }
