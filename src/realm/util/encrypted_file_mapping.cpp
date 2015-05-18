@@ -78,9 +78,12 @@ AESCryptor::AESCryptor(const uint8_t* key) {
     // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
     // into every process with every version of Android, so we can get to it
     // with dlsym
+    // FIXME: Don't know where to write the following info:
     // on linux, we add -ldl to the linking step to get dlsym to work,
     // and set LD_PRELOAD to the location of libcrypto when running the executable.
     // (on linux mint this is currently: "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libcrypto.so")
+    // To be able to debug with gdb, use the command "handle SIGSEGV noprint"
+    // before running the program.
     dlsym_cast(AES_set_encrypt_key, "AES_set_encrypt_key");
     dlsym_cast(AES_set_decrypt_key, "AES_set_decrypt_key");
     dlsym_cast(AES_cbc_encrypt, "AES_cbc_encrypt");
