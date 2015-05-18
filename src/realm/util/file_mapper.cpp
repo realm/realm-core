@@ -41,6 +41,7 @@
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
+#include <string.h> // for memset
 
 #ifdef __APPLE__
 #   include <mach/mach.h>
