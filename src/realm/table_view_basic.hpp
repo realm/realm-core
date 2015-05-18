@@ -116,7 +116,7 @@ protected:
     Impl m_impl;
 
     BasicTableViewBase() {}
-    BasicTableViewBase(Impl i): m_impl(move(i)) {}
+    BasicTableViewBase(Impl i): m_impl(std::move(i)) {}
 
     Impl* get_impl() REALM_NOEXCEPT { return &m_impl; }
     const Impl* get_impl() const REALM_NOEXCEPT { return &m_impl; }
@@ -160,7 +160,7 @@ private:
 
 public:
     BasicTableView() {}
-    BasicTableView& operator=(BasicTableView tv) { Base::m_impl = move(tv.m_impl); return *this; }
+    BasicTableView& operator=(BasicTableView tv) { Base::m_impl = std::move(tv.m_impl); return *this; }
     friend BasicTableView move(BasicTableView& tv) { return BasicTableView(&tv); }
 
     // Deleting
@@ -183,7 +183,7 @@ public:
 
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
-    BasicTableView(TableView tv): Base(move(tv)) {}
+    BasicTableView(TableView tv): Base(std::move(tv)) {}
 
     template<class Subtab> Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx)
     {
@@ -222,13 +222,13 @@ public:
 
     /// Construct BasicTableView<const Tab> from BasicTableView<Tab>.
     ///
-    BasicTableView(BasicTableView<Tab> tv): Base(move(tv.m_impl)) {}
+        BasicTableView(BasicTableView<Tab> tv): Base(std::move(tv.m_impl)) {}
 
     /// Assign BasicTableView<Tab> to BasicTableView<const Tab>.
     ///
     BasicTableView& operator=(BasicTableView<Tab> tv)
     {
-        Base::m_impl = move(tv.m_impl);
+        Base::m_impl = std::move(tv.m_impl);
         return *this;
     }
 
@@ -239,7 +239,7 @@ public:
 
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
-    BasicTableView(ConstTableView tv): Base(move(tv)) {}
+    BasicTableView(ConstTableView tv): Base(std::move(tv)) {}
 
     template<class Subtab> const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
     {
