@@ -347,6 +347,8 @@ TEST(ColumnBinary_Nulls)
     CHECK(c.get(2).ends_with(c.get(0)));
     CHECK(c.get(2).ends_with(c.get(1)));
     CHECK(c.get(2).ends_with(c.get(2)));
+
+    c.destroy();
 }
 
 #endif // TEST_COLUMN_BINARY
