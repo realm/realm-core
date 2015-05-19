@@ -81,10 +81,7 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// found'. It is similar in function to std::string::npos.
 const std::size_t npos = std::size_t(-1);
 
-// Represents null in Query, find(), get(), set(), etc.
-struct null {
-    operator StringData() { return StringData(0, 0); }
-};
+
 
 /// Alias for realm::npos.
 const std::size_t not_found = npos;

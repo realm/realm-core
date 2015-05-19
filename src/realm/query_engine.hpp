@@ -940,7 +940,7 @@ public:
         m_child = 0;
 
         // FIXME: Store this in std::string instead.
-        char* data = new char[v.size()];
+        char* data = v.is_null() ? nullptr : new char[v.size()];
         memcpy(data, v.data(), v.size());
         m_value = BinaryData(data, v.size());
     }

@@ -25,7 +25,7 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
+ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -40,8 +40,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
             return;
         }
         // Big blobs root leaf
-        // fixme, modify the 'nullable' arguments to constructor to support null for binary columns
-        ArrayBigBlobs* root = new ArrayBigBlobs(alloc, false); // Throws
+        ArrayBigBlobs* root = new ArrayBigBlobs(alloc, nullable); // Throws
         root->init_from_mem(mem);
         m_array.reset(root);
         return;
@@ -143,14 +142,12 @@ void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
             if (!is_big) {
                 // Small blobs root leaf
                 ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
-                new_sibling_ref =
-                    leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
+                new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
             }
             else {
                 // Big blobs root leaf
                 ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-                new_sibling_ref =
-                    leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
+                new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
             }
         }
         else {
@@ -183,15 +180,13 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         ArrayBigBlobs leaf(alloc, false);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(&parent, ndx_in_parent);
-        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
-                                       state); // Throws
+        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term, state); // Throws
     }
     ArrayBinary leaf(alloc);
     leaf.init_from_mem(leaf_mem);
     leaf.set_parent(&parent, ndx_in_parent);
     if (state_2.m_value.size() <= small_blob_max_size)
-        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
-                                       state); // Throws
+        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term, state); // Throws
     // Upgrade leaf from small to big blobs
     ArrayBigBlobs new_leaf(alloc, false);
     new_leaf.create(); // Throws
@@ -199,8 +194,7 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
     new_leaf.update_parent(); // Throws
     copy_leaf(leaf, new_leaf); // Throws
     leaf.destroy();
-    return new_leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
-                                       state); // Throws
+    return new_leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term, state); // Throws
 }
 
 

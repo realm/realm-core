@@ -512,13 +512,22 @@ TEST(Replication_NullStrings)
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
         table1->add_column(type_String, "c1", true);
+        table1->add_column(type_Binary, "b1", true);
         table1->add_empty_row(3);                   // default value is null
+        
         table1->set_string(0, 1, StringData(""));   // empty string
-        table1->set_string(0, 2, realm::null());  // null
+        table1->set_string(0, 2, realm::null());    // null
+
+        table1->set_binary(1, 1, BinaryData(""));   // empty string
+        table1->set_binary(1, 2, BinaryData());    // null
 
         CHECK(table1->get_string(0, 0).is_null());
         CHECK(!table1->get_string(0, 1).is_null());
         CHECK(table1->get_string(0, 2).is_null());
+
+        CHECK(table1->get_binary(1, 0).is_null());
+        CHECK(!table1->get_binary(1, 1).is_null());
+        CHECK(table1->get_binary(1, 2).is_null());
 
         wt.commit();
     }
@@ -530,6 +539,10 @@ TEST(Replication_NullStrings)
         CHECK(table2->get_string(0, 0).is_null());
         CHECK(!table2->get_string(0, 1).is_null());
         CHECK(table2->get_string(0, 2).is_null());
+
+        CHECK(table2->get_binary(1, 0).is_null());
+        CHECK(!table2->get_binary(1, 1).is_null());
+        CHECK(table2->get_binary(1, 2).is_null());
     }
 }
 

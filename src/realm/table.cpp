@@ -275,6 +275,11 @@ template<> struct ColumnTypeTraits3<DateTime> {
     const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
 };
+template<> struct ColumnTypeTraits3<BinaryData> {
+    const static ColumnType ct_id = col_type_Binary;
+    const static ColumnType ct_id_real = col_type_Binary;
+    typedef ColumnBinary column_type;
+};
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -1188,7 +1193,8 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
     bool nullable = is_nullable(col_ndx);
 
     REALM_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
-                                  col_type != col_type_StringEnum)));
+                                  col_type != col_type_StringEnum &&
+                                  col_type != col_type_Binary)));
 
     switch (col_type) {
         case col_type_Int:
@@ -1206,7 +1212,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = new AdaptiveStringColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Binary:
-            col = new ColumnBinary(alloc, ref); // Throws
+            col = new ColumnBinary(alloc, ref, nullable); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
@@ -3233,10 +3239,9 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
     return column.find_first(value);
 }
 
-size_t Table::find_first_binary(size_t, BinaryData) const
+size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
 }
 
 
