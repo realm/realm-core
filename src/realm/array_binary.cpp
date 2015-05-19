@@ -22,7 +22,7 @@ void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
 
 void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
     m_blob.add(value.data(), value.size(), add_zero_term);
     size_t stored_size = value.size();

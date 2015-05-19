@@ -92,7 +92,8 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin,
     size_t n = m_offsets.size();
     if (end == npos)
         end = n;
-    REALM_ASSERT(begin <= n && end <= n && begin <= end);
+    REALM_ASSERT_7(begin, <= , n, &&, end, <= , n);
+    REALM_ASSERT_3(begin, <=, end);
 
     size_t begin_2 = 0 < begin ? to_size_t(m_offsets.get(begin-1)) : 0;
     for (size_t i = begin; i < end; ++i) {
