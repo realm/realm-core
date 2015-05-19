@@ -74,7 +74,7 @@ AESCryptor::AESCryptor(const uint8_t* key) {
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #else
 
-#if defined(REALM_ANDROID) || defined(__linux__)
+#if defined(__linux__)
     // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
     // into every process with every version of Android, so we can get to it
     // with dlsym
