@@ -242,7 +242,7 @@ inline Table::RowExpr LinkView::get(std::size_t link_ndx) REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT(m_row_indexes.is_attached());
-    REALM_ASSERT(link_ndx < m_row_indexes.size());
+    REALM_ASSERT_3(link_ndx, <, m_row_indexes.size());
 
     Table& target_table = m_origin_column.get_target_table();
     std::size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
@@ -269,7 +269,7 @@ inline void LinkView::add(std::size_t target_row_ndx)
 inline std::size_t LinkView::find(std::size_t target_row_ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
+    REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
 
     if (!m_row_indexes.is_attached())
         return not_found;
