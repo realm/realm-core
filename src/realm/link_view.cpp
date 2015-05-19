@@ -33,8 +33,8 @@ using namespace realm;
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() || link_ndx == 0);
-    REALM_ASSERT(!m_row_indexes.is_attached() || link_ndx <= m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, ||, link_ndx, ==, 0);
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, false, ||, link_ndx, <=, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
