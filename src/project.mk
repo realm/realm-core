@@ -72,6 +72,9 @@ ifneq ($(REALM_HAVE_CONFIG),)
   endif
   ifeq ($(ENABLE_ENCRYPTION),yes)
     PROJECT_CFLAGS += -DREALM_ENABLE_ENCRYPTION
+    ifeq ($(OS),Linux)
+      PROJECT_LDFLAGS += -ldl
+    endif
   endif
 else
   ifneq ($(REALM_ENABLE_REPLICATION),)
