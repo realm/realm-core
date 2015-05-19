@@ -12,6 +12,7 @@
 
 * Detaching (and thus destroying) row acessors and TableViews can now be done
   safely from any thread.
+* Improved performance of Query::find_all() with assertions enabled.
 
 ### Internals:
 
