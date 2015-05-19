@@ -1,3 +1,22 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+*
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Detaching (and thus destroying) row acessors and TableViews can now be done
+  safely from any thread.
+
+### Internals:
+
+* Lorem ipsum.
+
 # 0.89.3 Release notes
 
 ### Bugfixes:
