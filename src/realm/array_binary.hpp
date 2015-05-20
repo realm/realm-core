@@ -69,7 +69,7 @@ public:
 
     // Old database files will not have the m_nulls array, so we need code paths for
     // backwards compatibility for these cases.
-    bool new_array_type() const REALM_NOEXCEPT;
+    bool legacy_array_type() const REALM_NOEXCEPT;
 
     //@{
     /// Overriding functions of Array
@@ -165,14 +165,14 @@ inline bool ArrayBinary::is_empty() const REALM_NOEXCEPT
 // Old database files will not have the m_nulls array, so we need code paths for
 // backwards compatibility for these cases. We can test if m_nulls exists by looking
 // at number of references in this ArrayBinary.
-inline bool ArrayBinary::new_array_type() const REALM_NOEXCEPT
+inline bool ArrayBinary::legacy_array_type() const REALM_NOEXCEPT
 {
     if (Array::size() == 3)
-        return true;            // New database file
+        return false;               // New database file
     else if (Array::size() == 2)
-        return false;           // Old database file
+        return true;                // Old database file
     else
-        REALM_ASSERT(false);  // Should never happen
+        REALM_ASSERT(false);        // Should never happen
 }
 
 inline std::size_t ArrayBinary::size() const REALM_NOEXCEPT
@@ -184,7 +184,7 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    if (new_array_type() && m_nulls.get(ndx)) {
+    if (!legacy_array_type() && m_nulls.get(ndx)) {
         return BinaryData();
     }
     else {
@@ -206,7 +206,7 @@ inline void ArrayBinary::truncate(std::size_t size)
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
-    if (new_array_type())
+    if (!legacy_array_type())
         m_nulls.truncate(size);
 }
 
@@ -214,7 +214,7 @@ inline void ArrayBinary::clear()
 {
     m_blob.clear();
     m_offsets.clear();
-    if (new_array_type())
+    if (!legacy_array_type())
         m_nulls.clear();
 }
 
@@ -222,7 +222,7 @@ inline void ArrayBinary::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
-    if (new_array_type())
+    if (!legacy_array_type())
         m_nulls.destroy();
     Array::destroy();
 }
@@ -241,7 +241,7 @@ inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) REALM_NOEX
     if (res) {
         m_blob.update_from_parent(old_baseline);
         m_offsets.update_from_parent(old_baseline);
-        if (new_array_type())
+        if (!legacy_array_type())
             m_nulls.update_from_parent(old_baseline);
     }
     return res;
