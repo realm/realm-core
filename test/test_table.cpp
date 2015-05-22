@@ -813,6 +813,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
         sub_1->add_column(type_Binary,   "binary");        // 6
         sub_1->add_column(type_Table,    "table", &sub_2); // 7
         sub_1->add_column(type_Mixed,    "mixed");         // 8
+        sub_1->add_column(type_Int,      "int_null", nullptr, true); // 9
         sub_2->add_column(type_Int,        "i");
     }
 
@@ -821,7 +822,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     ConstTableRef degen_child = parent.get_subtable(0,0); // NOTE: Constness is essential here!!!
 
     CHECK_EQUAL(0, degen_child->size());
-    CHECK_EQUAL(9, degen_child->get_column_count());
+    CHECK_EQUAL(10, degen_child->get_column_count());
 
     // Searching:
 
