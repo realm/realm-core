@@ -636,11 +636,12 @@ void TransactLogEncoder::string_cmd(Instruction instr, std::size_t col_ndx,
 inline
 void TransactLogEncoder::string_value(const char* data, std::size_t size)
 {
+    ssize_t real_size = ssize_t(size);
     if (!data)
-        size = static_cast<size_t>(-1);
+        real_size = -1;
 
     char* buf = reserve(max_required_bytes_for_string_value(size));
-    buf = encode_int(buf, uint64_t(size));
+    buf = encode_int(buf, real_size);
     buf = std::copy(data, data + (data ? size : 0), buf);
     advance(buf);
 }
@@ -1888,21 +1889,18 @@ inline double TransactLogParser::read_double()
 
 inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
-    std::size_t size = read_int<std::size_t>(); // Throws
+    ssize_t size = read_int<ssize_t>(); // Throws
 
-    if (size == static_cast<size_t>(-1))
+    if (size < 0)
         return StringData(nullptr, 0);
 
     const std::size_t avail = m_input_end - m_input_begin;
-    if (avail >= size) {
+    if (avail >= std::size_t(size)) {
         m_input_begin += size;
         return StringData(m_input_begin - size, size);
     }
 
     buf.clear();
-    if (size == static_cast<size_t>(-1)) {
-        return StringData(nullptr, 0); // null        
-    }
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);
     return StringData(buf.data(), size);
