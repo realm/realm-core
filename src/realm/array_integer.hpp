@@ -171,6 +171,13 @@ public:
     // Overwrite Array::bptree_leaf_insert to correctly split nodes.
     ref_type bptree_leaf_insert(std::size_t ndx, int64_t value, TreeInsertBase& state);
     ref_type bptree_leaf_insert(std::size_t ndx, null, TreeInsertBase& state);
+
+    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+
+    /// Construct a deep copy of the specified slice of this array using the
+    /// specified target allocator. Subarrays will be cloned.
+    MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
+                                    Allocator& target_alloc) const;
 protected:
     void ensure_not_null(int64_t value);
 private:

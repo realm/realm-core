@@ -215,3 +215,34 @@ ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, null, Array::TreeInse
 {
     return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, null{}, state);
 }
+
+MemRef ArrayIntNull::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const
+{
+    // NOTE: It would be nice to consolidate this with Array::slice somehow.
+
+    REALM_ASSERT(is_attached());
+
+    Array slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&slice);
+    Type type = get_type();
+    slice.create(type, m_context_flag); // Throws
+    slice.add(null_value());
+
+    size_t begin = offset + 1;
+    size_t end   = offset + size + 1;
+    for (size_t i = begin; i != end; ++i) {
+        int_fast64_t value = Array::get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+MemRef ArrayIntNull::slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    // NOTE: It would be nice to consolidate this with Array::slice_and_clone_children somehow.
+
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(!has_refs());
+    return slice(offset, size, target_alloc);
+}
