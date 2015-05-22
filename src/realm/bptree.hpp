@@ -350,6 +350,34 @@ T BpTree<T, N>::back() const REALM_NOEXCEPT
     return get(size()-1);
 }
 
+namespace _impl {
+
+template <class Leaf, bool Nullable> struct NullableOrNothing;
+template <class Leaf>
+struct NullableOrNothing<Leaf, true> {
+    static bool is_null(const Leaf& leaf, std::size_t ndx)
+    {
+        return leaf.is_null(ndx);
+    }
+    static void set_null(Leaf& leaf, std::size_t ndx)
+    {
+        leaf.set_null(ndx);
+    }
+};
+template <class Leaf>
+struct NullableOrNothing<Leaf, false> {
+    static bool is_null(const Leaf&, std::size_t)
+    {
+        return false;
+    }
+    static void set_null(Leaf&, std::size_t)
+    {
+        REALM_ASSERT_RELEASE(false);
+    }
+};
+
+}
+
 template <class T, bool N>
 bool BpTree<T, N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
 {
@@ -359,14 +387,14 @@ bool BpTree<T, N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
     }
 
     if (root_is_leaf()) {
-        return root_as_leaf().is_null(ndx);
+        return _impl::NullableOrNothing<LeafType, N>::is_null(root_as_leaf(), ndx);
     }
     LeafType fallback(get_alloc());
     const LeafType* leaf;
     LeafInfo leaf_info { &leaf, &fallback };
     std::size_t ndx_in_leaf;
     get_leaf(ndx, ndx_in_leaf, leaf_info);
-    return leaf->is_null(ndx_in_leaf);
+    return _impl::NullableOrNothing<LeafType, N>::is_null(*leaf, ndx_in_leaf);
 }
 
 template <class T, bool N>
@@ -491,7 +519,7 @@ struct BpTree<T,N>::SetNullHandler : Array::UpdateHandler
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
-        m_leaf.set(elem_ndx_in_leaf, null{}); // Throws
+        _impl::NullableOrNothing<LeafType,N>::set_null(m_leaf, elem_ndx_in_leaf); // Throws
     }
 };
 
@@ -510,13 +538,22 @@ void BpTree<T, N>::set(std::size_t ndx, T value)
 template <class T, bool N>
 void BpTree<T, N>::set(std::size_t ndx, null)
 {
-    static_assert(N, "Column is not nullable.");
+    set_null(ndx);
+}
+
+template <class T, bool N>
+void BpTree<T,N>::set_null(std::size_t ndx)
+{
+    if (!N) {
+        // Don't bother traversing the tree if we know it can't be null.
+        return;
+    }
     if (root_is_leaf()) {
-        root_as_leaf().set(ndx, null{});
+        _impl::NullableOrNothing<LeafType,N>::set_null(root_as_leaf(), ndx);
     }
     else {
         SetNullHandler set_leaf_elem(*this);
-        m_root->update_bptree_elem(ndx, set_leaf_elem); // Throws
+        m_root->update_bptree_elem(ndx, set_leaf_elem); // Throws;
     }
 }
 
