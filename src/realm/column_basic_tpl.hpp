@@ -294,7 +294,7 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
     }
     else {
         SliceHandler handler(get_alloc());
-        ref = ColumnBase::write(m_array.get(), slice_offset, slice_size,
+        ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
                                 table_size, handler, out); // Throws
     }
     return ref;

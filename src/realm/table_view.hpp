@@ -29,8 +29,6 @@
 
 namespace realm {
 
-using std::size_t;
-
 // Views, tables and synchronization between them:
 //
 // Views are built through queries against either tables or another view.

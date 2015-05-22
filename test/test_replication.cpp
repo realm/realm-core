@@ -15,7 +15,6 @@
 
 #ifdef REALM_ENABLE_REPLICATION
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -56,7 +55,7 @@ namespace {
 
 class MyTrivialReplication: public TrivialReplication {
 public:
-    MyTrivialReplication(string path): TrivialReplication(path) {}
+    MyTrivialReplication(std::string path): TrivialReplication(path) {}
 
     ~MyTrivialReplication() REALM_NOEXCEPT
     {
@@ -66,7 +65,7 @@ public:
             delete[] i->data();
     }
 
-    void replay_transacts(SharedGroup& target, ostream* replay_log = 0)
+    void replay_transacts(SharedGroup& target, std::ostream* replay_log = 0)
     {
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
@@ -81,12 +80,12 @@ private:
     void handle_transact_log(const char* data, size_t size, version_type) override
     {
         std::unique_ptr<char[]> log(new char[size]); // Throws
-        copy(data, data+size, log.get());
+        std::copy(data, data+size, log.get());
         m_transact_logs.push_back(BinaryData(log.get(), size)); // Throws
         log.release();
     }
 
-    typedef vector<BinaryData> TransactLogs;
+    typedef std::vector<BinaryData> TransactLogs;
     TransactLogs m_transact_logs;
 };
 
@@ -172,7 +171,7 @@ TEST(Replication_General)
         wt.commit();
     }
 
-    ostream* replay_log = 0;
+    std::ostream* replay_log = 0;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -214,7 +213,7 @@ TEST(Replication_Links)
         wt.commit();
     }
 
-    ostream* replay_log = 0;
+    std::ostream* replay_log = 0;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -298,7 +297,7 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    ostream* replay_log = 0;
+    std::ostream* replay_log = 0;
 //    replay_log = &cout;
 
     MyTrivialReplication repl(path_1);
@@ -503,7 +502,7 @@ TEST(Replication_NullStrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    ostream* replay_log = 0;
+    std::ostream* replay_log = 0;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -513,13 +512,22 @@ TEST(Replication_NullStrings)
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
         table1->add_column(type_String, "c1", true);
+        table1->add_column(type_Binary, "b1", true);
         table1->add_empty_row(3);                   // default value is null
+        
         table1->set_string(0, 1, StringData(""));   // empty string
-        table1->set_string(0, 2, realm::null());  // null
+        table1->set_string(0, 2, realm::null());    // null
+
+        table1->set_binary(1, 1, BinaryData(""));   // empty string
+        table1->set_binary(1, 2, BinaryData());    // null
 
         CHECK(table1->get_string(0, 0).is_null());
         CHECK(!table1->get_string(0, 1).is_null());
         CHECK(table1->get_string(0, 2).is_null());
+
+        CHECK(table1->get_binary(1, 0).is_null());
+        CHECK(!table1->get_binary(1, 1).is_null());
+        CHECK(table1->get_binary(1, 2).is_null());
 
         wt.commit();
     }
@@ -531,6 +539,10 @@ TEST(Replication_NullStrings)
         CHECK(table2->get_string(0, 0).is_null());
         CHECK(!table2->get_string(0, 1).is_null());
         CHECK(table2->get_string(0, 2).is_null());
+
+        CHECK(table2->get_binary(1, 0).is_null());
+        CHECK(!table2->get_binary(1, 1).is_null());
+        CHECK(table2->get_binary(1, 2).is_null());
     }
 }
 

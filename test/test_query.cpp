@@ -12,7 +12,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -180,7 +179,8 @@ TEST(Query_Count)
         Table table;
         table.add_column(type_Int, "i");
 
-        size_t count = 0;
+        size_t matching = 0;
+        size_t not_matching = 0;
         size_t rows = random.draw_int_mod(5 * REALM_MAX_BPNODE_SIZE); // to cross some leaf boundaries
 
         for (size_t i = 0; i < rows; ++i) {
@@ -188,13 +188,14 @@ TEST(Query_Count)
             int64_t val = random.draw_int_mod(5);
             table.set_int(0, i, val);
             if (val == 2)
-                count++;
+                matching++;
+            else
+                not_matching++;
         }
 
-        size_t count2 = table.where().equal(0, 2).count();
-        CHECK_EQUAL(count, count2);
+        CHECK_EQUAL(matching, table.where().equal(0, 2).count());
+        CHECK_EQUAL(not_matching, table.where().not_equal(0, 2).count());
     }
-
 }
 
 
@@ -605,18 +606,20 @@ TEST(Query_NextGen_StringConditions)
     table2->set_string(0, 2, realm::null());
     table2->add_empty_row();
     table2->set_string(0, 3, "bar");
+    table2->add_empty_row();
+    table2->set_string(0, 4, "");
 
     m = table2->column<String>(0).contains(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).begins_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).ends_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).equal(StringData("")).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(StringData("")).count();
     CHECK_EQUAL(m, 4);
@@ -625,20 +628,20 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(realm::null()).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
 
     m = table2->column<String>(0).contains(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).begins_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).ends_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).equal(StringData(""), false).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -647,10 +650,10 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).not_equal(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     TableRef table3 = group.add_table(StringData("table3"));
     table3->add_column_link(type_Link, "link1", *table2);
@@ -663,18 +666,20 @@ TEST(Query_NextGen_StringConditions)
     table3->set_link(0, 2, 2);
     table3->add_empty_row();
     table3->set_link(0, 3, 3);
+    table3->add_empty_row();
+    table3->set_link(0, 4, 4);
 
     m = table3->link(0).column<String>(0).contains(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).begins_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).ends_with(StringData("")).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).equal(StringData("")).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(StringData("")).count();
     CHECK_EQUAL(m, 4);
@@ -683,20 +688,20 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(realm::null()).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
 
     m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).begins_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).ends_with(StringData(""), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).equal(StringData(""), false).count();
-    CHECK_EQUAL(m, 0);
+    CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -705,10 +710,10 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).not_equal(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 
     m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
-    CHECK_EQUAL(m, 3);
+    CHECK_EQUAL(m, 4);
 }
 
 
@@ -1103,7 +1108,7 @@ TEST(Query_Not)
 
     // applying not to an empty query is forbidden
     realm::Query q4 = table.where();
-    CHECK_THROW(!q4, runtime_error);
+    CHECK_THROW(!q4, std::runtime_error);
 }
 
 
@@ -1858,12 +1863,12 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    vector<size_t> ints1;
-    vector<size_t> ints2;
-    vector<size_t> ints3;
+    std::vector<size_t> ints1;
+    std::vector<size_t> ints2;
+    std::vector<size_t> ints3;
 
-    vector<size_t> floats;
-    vector<size_t> doubles;
+    std::vector<size_t> floats;
+    std::vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -1955,9 +1960,9 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
 
 TEST(Query_TwoColsVaryOperators)
 {
-    vector<size_t> ints1;
-    vector<size_t> floats;
-    vector<size_t> doubles;
+    std::vector<size_t> ints1;
+    std::vector<size_t> floats;
+    std::vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -2151,8 +2156,8 @@ TEST(Query_Huge)
         size_t mdist2 = 1;
         size_t mdist3 = 1;
 
-        string first;
-        string second;
+        std::string first;
+        std::string second;
         int64_t third;
 
         size_t res1 = 0;
@@ -2354,7 +2359,7 @@ TEST(Query_StrIndex3)
 #endif
         TupleTableType ttt;
 
-        vector<size_t> vec;
+        std::vector<size_t> vec;
         size_t row = 0;
 
         size_t n = 0;
@@ -2719,15 +2724,15 @@ TEST(Query_Float4)
 {
     FloatTable3 t;
 
-    t.add(numeric_limits<float>::max(), numeric_limits<double>::max(), 11111);
-    t.add(numeric_limits<float>::infinity(), numeric_limits<double>::infinity(), 11111);
+    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
+    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
     t.add(12345.0, 12345.0, 11111);
 
     FloatTable3::Query q1 = t.where();
     float a1 = q1.col_float.maximum();
     double a2 = q1.col_double.maximum();
-    CHECK_EQUAL(numeric_limits<float>::infinity(), a1);
-    CHECK_EQUAL(numeric_limits<double>::infinity(), a2);
+    CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
+    CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
 
 
     FloatTable3::Query q2 = t.where();
@@ -2774,7 +2779,7 @@ TEST(Query_Float)
     CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
     CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
 
-    double epsilon = numeric_limits<double>::epsilon();
+    double epsilon = std::numeric_limits<double>::epsilon();
 
     // ------ Test sum()
     // ... NO conditions
@@ -3478,7 +3483,7 @@ TEST(Query_SubtableBug)
     q1.subtable(1);
     q1.equal(2, true);
     q1.end_subtable();
-    string s = q1.validate();
+    std::string s = q1.validate();
 
     TableView t1 = q1.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t1.size());
@@ -4936,7 +4941,7 @@ TEST(Query_FindAllContainsUnicode)
 TEST(Query_SyntaxCheck)
 {
     TupleTableType ttt;
-    string s;
+    std::string s;
 
     ttt.add(1, "a");
     ttt.add(2, "a");
@@ -4982,7 +4987,7 @@ TEST(Query_SubtableSyntaxCheck)
 {
     Group group;
     TableRef table = group.add_table("test");
-    string s;
+    std::string s;
 
     // Create specification with sub-table
     DescriptorRef subdesc;
@@ -5907,7 +5912,7 @@ TEST(Query_Nulls_Fuzzy)
             }
 
             // vector that is kept in sync with the column so that we can compare with it
-            vector<string> v;
+            std::vector<std::string> v;
 
             // ArrayString capacity starts at 128 bytes, so we need lots of elements
             // to test if relocation works
@@ -5924,7 +5929,7 @@ TEST(Query_Nulls_Fuzzy)
                     char buf2[] = "                                                                                         ";
 
                     StringData sd;
-                    string st;
+                    std::string st;
 
                     if (fastrand(1) == 0) {
                         // null string
@@ -5946,7 +5951,7 @@ TEST(Query_Nulls_Fuzzy)
                         if (fastrand(1) == 0) {
                             // duplicate string
                             sd = StringData(buf1, len);
-                            st = string(buf1, len);
+                            st = std::string(buf1, len);
                         }
                         else {
                             // random string
@@ -5959,7 +5964,7 @@ TEST(Query_Nulls_Fuzzy)
                             // no generated string can equal "null" (our vector magic value for null) because 
                             // len == 4 is not possible
                             sd = StringData(buf2, len);
-                            st = string(buf2, len);
+                            st = std::string(buf2, len);
                         }
                     }
 
@@ -5994,6 +5999,65 @@ TEST(Query_Nulls_Fuzzy)
         }
     }
 }
+
+TEST(Query_BinaryNull)
+{
+    Table table;
+    table.add_column(type_Binary, "first");
+    table.add_empty_row(3);
+    table.set_binary(0, 0, BinaryData());
+    table.set_binary(0, 1, BinaryData("", 0)); // NOTE: Specify size = 0, else size turns into 1!
+    table.set_binary(0, 2, BinaryData("foo"));
+    
+    TableView t;
+
+    t = table.where().equal(0, BinaryData()).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
+
+    t = table.where().equal(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
+
+    t = table.where().equal(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
+
+    t = table.where().not_equal(0, BinaryData()).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+
+    t = table.where().not_equal(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+
+    t = table.where().begins_with(0, BinaryData()).find_all();
+    CHECK_EQUAL(3, t.size());
+
+    t = table.where().begins_with(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = table.where().begins_with(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+
+    t = table.where().ends_with(0, BinaryData()).find_all();
+    CHECK_EQUAL(3, t.size());
+
+    t = table.where().ends_with(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = table.where().ends_with(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+}
+
 #endif
 
 #endif // TEST_QUERY

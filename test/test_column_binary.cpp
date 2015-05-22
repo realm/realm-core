@@ -7,7 +7,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 
 
@@ -44,7 +43,7 @@ using namespace realm;
 TEST(ColumnBinary_Basic)
 {
     ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref);
+    ColumnBinary c(Allocator::get_default(), ref, true);
 
     // TEST(ColumnBinary_MultiEmpty)
 
@@ -255,7 +254,7 @@ TEST(ColumnBinary_Basic)
 
     // Insert all sizes
     c.clear();
-    string s;
+    std::string s;
     for (int i = 0; i < 100; ++i) {
         c.add(BinaryData(s.c_str(), s.size()));
         s += 'x';
@@ -270,7 +269,7 @@ TEST(ColumnBinary_Basic)
     c.clear();
     s.clear();
     for (int i = 0; i < 100; ++i)
-        c.add();
+        c.add(BinaryData("", 0));
     for (int i = 0; i < 100; ++i) {
         c.set(i, BinaryData(s.c_str(), s.size()));
         s += 'x';
@@ -287,5 +286,69 @@ TEST(ColumnBinary_Basic)
     c.destroy();
 }
 
+TEST(ColumnBinary_Nulls)
+{
+    ref_type ref = ColumnBinary::create(Allocator::get_default());
+    ColumnBinary c(Allocator::get_default(), ref, true);
+    
+    c.add(BinaryData());
+    c.add(BinaryData("", 0));
+    c.add(BinaryData("foo"));
+
+    CHECK(c.get(0).is_null());
+    CHECK(!c.get(1).is_null());
+    CHECK(!c.get(1).is_null());
+
+    // Contains
+    //      Null
+    CHECK(c.get(0).contains(c.get(0)));
+    CHECK(!c.get(0).contains(c.get(1)));
+    CHECK(!c.get(0).contains(c.get(2)));
+
+    //      Empty string
+    CHECK(c.get(1).contains(c.get(0)));
+    CHECK(c.get(1).contains(c.get(1)));
+    CHECK(!c.get(1).contains(c.get(2)));
+
+    //      "foo"
+    CHECK(c.get(2).contains(c.get(0)));
+    CHECK(c.get(2).contains(c.get(1)));
+    CHECK(c.get(2).contains(c.get(2)));
+
+
+    // Begins with
+    //      Null
+    CHECK(c.get(0).begins_with(c.get(0)));
+    CHECK(!c.get(0).begins_with(c.get(1)));
+    CHECK(!c.get(0).begins_with(c.get(2)));
+
+    //      Empty string
+    CHECK(c.get(1).begins_with(c.get(0)));
+    CHECK(c.get(1).begins_with(c.get(1)));
+    CHECK(!c.get(1).begins_with(c.get(2)));
+
+    //      "foo"
+    CHECK(c.get(2).begins_with(c.get(0)));
+    CHECK(c.get(2).begins_with(c.get(1)));
+    CHECK(c.get(2).begins_with(c.get(2)));
+
+    // Ends with
+    //      Null
+    CHECK(c.get(0).ends_with(c.get(0)));
+    CHECK(!c.get(0).ends_with(c.get(1)));
+    CHECK(!c.get(0).ends_with(c.get(2)));
+
+    //      Empty string
+    CHECK(c.get(1).ends_with(c.get(0)));
+    CHECK(c.get(1).ends_with(c.get(1)));
+    CHECK(!c.get(1).ends_with(c.get(2)));
+
+    //      "foo"
+    CHECK(c.get(2).ends_with(c.get(0)));
+    CHECK(c.get(2).ends_with(c.get(1)));
+    CHECK(c.get(2).ends_with(c.get(2)));
+
+    c.destroy();
+}
 
 #endif // TEST_COLUMN_BINARY

@@ -16,7 +16,6 @@
 
 #include "timer.hpp"
 
-using namespace std;
 using namespace realm::test_util;
 
 
@@ -60,7 +59,7 @@ struct TimeBase {
     {
         mach_timebase_info_data_t info;
         kern_return_t err = mach_timebase_info(&info);
-        if (err) throw runtime_error("Failed to get absolute time base");
+        if (err) throw std::runtime_error("Failed to get absolute time base");
         m_seconds_per_tick = (1E-9 * info.numer) / info.denom;
     }
 };

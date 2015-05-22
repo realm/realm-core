@@ -3,7 +3,6 @@
 #include <realm.hpp>
 
 using namespace realm;
-using namespace std;
 
 REALM_TABLE_7(IndexTable,
                 s1, String,

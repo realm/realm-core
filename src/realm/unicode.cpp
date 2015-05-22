@@ -43,7 +43,6 @@
 
 #endif
 
-using namespace std;
 
 namespace realm {
 
@@ -51,7 +50,7 @@ namespace realm {
     {
         if (method == STRING_COMPARE_CPP11) {
 #if defined(REALM_HAVE_CXX11) && !defined(REALM_ANDROID)
-            string l = std::locale("").name();
+            std::string l = std::locale("").name();
             // We cannot use C locale because it puts 'Z' before 'a'
             if (l == "C")
                 return false;
@@ -92,11 +91,11 @@ namespace realm {
         if (begin[0] != begin2[0]) return false;
 
         size_t i = 1;
-        if (static_cast<int>(char_traits<char>::to_int_type(begin[0])) & 0x80) {
+        if (static_cast<int>(std::char_traits<char>::to_int_type(begin[0])) & 0x80) {
             // All following bytes matching '10xxxxxx' will be considered
             // as part of this character.
             while (begin + i != end) {
-                if ((static_cast<int>(char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80)
+                if ((static_cast<int>(std::char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80)
                     break;
                 if (begin[i] != begin2[i]) 
                     return false;
@@ -149,7 +148,7 @@ namespace realm {
         return ret;
     }
 
-    wstring utf8_to_wstring(StringData str)
+    std::wstring utf8_to_wstring(StringData str)
     {
 #if REALM_HAVE_CXX11 && defined(_MSC_VER)
         // __STDC_UTF_16__ seems not to work
@@ -230,8 +229,8 @@ namespace realm {
         else if (string_compare_method == STRING_COMPARE_CPP11) {
             // C++11. Precise sorting in user's current locale. Arbitrary return value (silent error) for invalid utf8
 #if REALM_HAVE_CXX11
-            wstring wstring1 = utf8_to_wstring(string1);
-            wstring wstring2 = utf8_to_wstring(string2);
+            std::wstring wstring1 = utf8_to_wstring(string1);
+            std::wstring wstring2 = utf8_to_wstring(string2);
             std::locale l = std::locale("");
             bool ret = l(wstring1, wstring2);
             return ret;
@@ -300,7 +299,7 @@ namespace realm {
     encode:
     {
     size_t free = dest.size() - dest_offset;
-    if (int_less_than(numeric_limits<int>::max(), free)) free = numeric_limits<int>::max();
+    if (int_less_than(std::numeric_limits<int>::max(), free)) free = std::numeric_limits<int>::max();
     int n = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide_buffer, num_out,
     dest.data() + dest_offset, int(free), 0, 0);
     if (i != 0) {
@@ -310,8 +309,8 @@ namespace realm {
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
     size_t dest_size = dest.size();
     if (int_multiply_with_overflow_detect(dest_size, 2)) {
-    if (dest_size == numeric_limits<size_t>::max()) return false;
-    dest_size = numeric_limits<size_t>::max();
+    if (dest_size == std::numeric_limits<size_t>::max()) return false;
+    dest_size = std::numeric_limits<size_t>::max();
     }
     dest.resize(dest_size);
     goto encode;
@@ -329,11 +328,11 @@ namespace realm {
     // If an output character differs in size, it is simply substituded by
     // the original character. This may of course give wrong search
     // results in very special cases. Todo.
-    string case_map(StringData source, bool upper)
+    std::string case_map(StringData source, bool upper)
     {
         char* dst = new char[source.size()];
         case_map(source, dst, upper);
-        string str(dst, source.size());
+        std::string str(dst, source.size());
         delete[] dst;
         return str;
     }
@@ -376,7 +375,7 @@ namespace realm {
             if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) 
                 return false;
             if (n3 != n) {
-                copy(begin, begin + n, target); // Cannot handle different size, copy source
+                std::copy(begin, begin + n, target); // Cannot handle different size, copy source
             }
 
             begin += n;
@@ -391,7 +390,7 @@ namespace realm {
         // GNU has something to offer too.
 
         // For now we handle just the ASCII subset
-        typedef char_traits<char> traits;
+        typedef std::char_traits<char> traits;
         if (upper) {
             size_t n = source.size();
             for (size_t i = 0; i<n; ++i) {

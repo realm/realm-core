@@ -15,7 +15,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -106,7 +105,7 @@ TEST(Table_ManyColumnsCrash2)
 
 #endif
             if((counter % 1000) == 0){
-           //     cerr << counter << "\n";
+           //     std::cerr << counter << "\n";
             }
         }
     }
@@ -138,12 +137,7 @@ TEST(Table_Null)
         CHECK(!table->get_string(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
-        try {
-            table->set_string(0, 0, realm::null());
-            CHECK(false);
-        }
-        catch (...) {
-        }
+        CHECK_THROW_ANY(table->set_string(0, 0, realm::null()));
     }
 
 }
@@ -572,9 +566,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_double(4, i, 9876.54321*sign);
     }
-    vector<string> strings;
+    std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
-        stringstream out;
+        std::stringstream out;
         out << "string" << i;
         strings.push_back(out.str());
     }
@@ -585,7 +579,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i) {
         switch (i % 2) {
             case 0: {
-                string s = strings[i];
+                std::string s = strings[i];
                 s += " very long string.........";
                 for (int j = 0; j != 4; ++j)
                     s += " big blobs big blobs big blobs"; // +30
@@ -975,28 +969,28 @@ TEST(Table_ToString)
     Table table;
     setup_multi_table(table, 15, 6);
 
-    stringstream ss;
+    std::stringstream ss;
     table.to_string(ss);
-    const string result = ss.str();
-    string file_name = get_test_resource_path();
+    const std::string result = ss.str();
+    std::string file_name = get_test_resource_path();
     file_name += "expect_string.txt";
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream test_file(file_name.c_str(), ios::out);
+    std::ofstream test_file(file_name.c_str(), ios::out);
     test_file << result;
-    cerr << "to_string() test:\n" << result << endl;
+    std::cerr << "to_string() test:\n" << result << std::endl;
 #else
-    ifstream test_file(file_name.c_str(), ios::in);
+    std::ifstream test_file(file_name.c_str(), std::ios::in);
     CHECK(!test_file.fail());
-    string expected;
-    expected.assign( istreambuf_iterator<char>(test_file),
-                     istreambuf_iterator<char>() );
+    std::string expected;
+    expected.assign( std::istreambuf_iterator<char>(test_file),
+                     std::istreambuf_iterator<char>() );
     bool test_ok = test_util::equal_without_cr(result, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
         TEST_PATH(path);
         File out(path, File::mode_Write);
         out.write(result);
-        cerr << "\n error result in '"<<string(path)<<"'\n";
+        std::cerr << "\n error result in '" << std::string(path) << "'\n";
     }
 #endif
 }
@@ -1008,22 +1002,22 @@ TEST(Table_RowToString)
     Table table;
     setup_multi_table(table, 2, 2);
 
-    stringstream ss;
+    std::stringstream ss;
     table.row_to_string(1, ss);
-    const string row_str = ss.str();
+    const std::string row_str = ss.str();
 #if 0
-    ofstream test_file("row_to_string.txt", ios::out);
+    std::ofstream test_file("row_to_string.txt", ios::out);
     test_file << row_str;
 #endif
 
-    string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
+    std::string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
                       "1:   -1   true  1970-01-01 03:25:45  -1.234560e+002  -9.876543e+003  string1  string1 very long st...  enum2          7 bytes     -1     [3]\n";
     bool test_ok = test_util::equal_without_cr(row_str, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        cerr << "row_to_string() failed\n"
+        std::cerr << "row_to_string() failed\n"
              << "Expected: " << expected << "\n"
-             << "Got     : " << row_str << endl;
+             << "Got     : " << row_str << std::endl;
     }
 }
 
@@ -1209,11 +1203,11 @@ TEST(Table_Multi_Sort)
     table.set_int(0, 4, 1);
     table.set_int(1, 4, 14);
 
-    vector<size_t> col_ndx1;
+    std::vector<size_t> col_ndx1;
     col_ndx1.push_back(0);
     col_ndx1.push_back(1);
 
-    vector<bool> asc;
+    std::vector<bool> asc;
     asc.push_back(true);
     asc.push_back(true);
 
@@ -1226,7 +1220,7 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
     CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
 
-    vector<size_t> col_ndx2;
+    std::vector<size_t> col_ndx2;
     col_ndx2.push_back(1);
     col_ndx2.push_back(0);
 
@@ -1903,7 +1897,7 @@ TEST(Table_AutoEnumerationOptimize)
     TestTableEnum4 t;
 
     // Insert non-optimzable strings
-    string s;
+    std::string s;
     for (size_t i = 0; i < 10; ++i) {
         t.add(s.c_str(), s.c_str(), s.c_str(), s.c_str());
         s += "x";
@@ -1958,7 +1952,7 @@ TEST(Table_OptimizeSubtable)
     {
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[0].subtab;
-        string s;
+        std::string s;
         for (int i=0; i<100; ++i) {
             r->add(s.c_str());
             s += 'x';
@@ -1978,7 +1972,7 @@ TEST(Table_OptimizeSubtable)
     {
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[0].subtab;
-        string s;
+        std::string s;
         for (size_t i = 0; i < r->size(); ++i) {
             CHECK_EQUAL(s.c_str(), r[i].str);
             s += 'x';
@@ -2119,7 +2113,7 @@ TEST(Table_SpecColumnPath)
     TableRef table = group.add_table("test");
 
     // Create path to sub-table column (starting with root)
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
 
     // Create specification with sub-table
     table->add_subcolumn(column_path, type_Int,    "first");
@@ -2162,7 +2156,7 @@ TEST(Table_SpecRenameColumns)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -2213,7 +2207,7 @@ TEST(Table_SpecDeleteColumns)
     table->add_column(type_String, "fourth"); // will be auto-enumerated
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -2378,7 +2372,7 @@ TEST(Table_SpecAddColumns)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -2512,7 +2506,7 @@ TEST(Table_SpecDeleteColumnsBug)
     table->add_column(type_Table,  "phones");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(3); // phones
 
     table->add_subcolumn(column_path, type_String, "type");
@@ -2809,7 +2803,7 @@ TEST(Table_SubtableSizeAndClear)
 TEST(Table_LowLevelSubtables)
 {
     Table table;
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     table.add_column(type_Table, "subtab");
     table.add_column(type_Mixed, "mixed");
     column_path.push_back(0);
@@ -2860,7 +2854,7 @@ TEST(Table_LowLevelSubtables)
 
         table.clear_subtable(1, i_1); // Mixed
         TableRef subtab_mix = table.get_subtable(1, i_1);
-        vector<size_t> subcol_path;
+        std::vector<size_t> subcol_path;
         subtab_mix->add_column(type_Table, "subtab");
         subtab_mix->add_column(type_Mixed, "mixed");
         subcol_path.push_back(0);
@@ -3101,7 +3095,7 @@ TEST(Table_DateAndBinary)
     t.add(8, BinaryData(data, size));
     CHECK_EQUAL(t[0].date, 8);
     CHECK_EQUAL(t[0].bin.size(), size);
-    CHECK(equal(t[0].bin.data(), t[0].bin.data()+size, data));
+    CHECK(std::equal(t[0].bin.data(), t[0].bin.data()+size, data));
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
@@ -3155,7 +3149,7 @@ TEST(Table_SetSubTableByExample1)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -3209,7 +3203,7 @@ TEST(Table_SetSubTableByExample2)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -3326,7 +3320,7 @@ TEST(Table_Aggregates)
     d_sum += 1.2 + 12.0 + 3.0;
     double size = TBL_SIZE + 3;
 
-    double epsilon = numeric_limits<double>::epsilon();
+    double epsilon = std::numeric_limits<double>::epsilon();
 
     // minimum
     CHECK_EQUAL(1, table.column().c_int.minimum());
@@ -3467,7 +3461,7 @@ TEST(Table_Pivot)
         Table result_avg;
         table.aggregate(0, 1, Table::aggr_avg, result_avg);
         if (false) {
-            ostringstream ss;
+            std::ostringstream ss;
             result_avg.to_string(ss);
             std::cerr << "\nMax:\n" << ss.str();
         }
@@ -3624,14 +3618,14 @@ void test_write_slice_name(TestResults& test_results, const Table& table,
                            StringData expect_name, bool override_name)
 {
     size_t offset = 0, size = 0;
-    ostringstream out;
+    std::ostringstream out;
     if (override_name) {
         table.write(out, offset, size, expect_name);
     }
     else {
         table.write(out, offset, size);
     }
-    string str = out.str();
+    std::string str = out.str();
     BinaryData buffer(str.data(), str.size());
     bool take_ownership = false;
     Group group(buffer, take_ownership);
@@ -3642,9 +3636,9 @@ void test_write_slice_name(TestResults& test_results, const Table& table,
 void test_write_slice_contents(TestResults& test_results, const Table& table,
                                size_t offset, size_t size)
 {
-    ostringstream out;
+    std::ostringstream out;
     table.write(out, offset, size);
-    string str = out.str();
+    std::string str = out.str();
     BinaryData buffer(str.data(), str.size());
     bool take_ownership = false;
     Group group(buffer, take_ownership);
@@ -4596,7 +4590,7 @@ TEST(Table_RowAccessor)
     table.add_column(type_Float,    "");
     table.add_column(type_Double,   "");
     table.add_column(type_String,   "");
-    table.add_column(type_Binary,   "");
+    table.add_column(type_Binary,   "", true);
     table.add_column(type_DateTime, "");
     table.add_column(type_Table,    "", &subdesc);
     table.add_column(type_Mixed,    "");
@@ -5813,11 +5807,11 @@ TEST(Table_IndexStringDelete)
     t.add_column(type_String, "str");
     t.add_search_index(0);
 
-    ostringstream out;
+    std::ostringstream out;
 
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.str(string());
+        out.str(std::string());
         out << i;
         t.set_string(0, i, out.str());
     }
@@ -5826,7 +5820,7 @@ TEST(Table_IndexStringDelete)
 
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.str(string());
+        out.str(std::string());
         out << i;
         t.set_string(0, i, out.str());
     }

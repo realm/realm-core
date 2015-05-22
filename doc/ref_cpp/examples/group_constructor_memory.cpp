@@ -5,7 +5,6 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
-using namespace std;
 using namespace realm;
 
 REALM_TABLE_2(PeopleTable,

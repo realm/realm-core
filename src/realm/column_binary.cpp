@@ -5,7 +5,6 @@
 #include <memory>
 #include <realm/column_binary.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -26,7 +25,7 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
+ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -41,8 +40,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
             return;
         }
         // Big blobs root leaf
-        // fixme, modify the 'nullable' arguments to constructor to support null for binary columns
-        ArrayBigBlobs* root = new ArrayBigBlobs(alloc, false); // Throws
+        ArrayBigBlobs* root = new ArrayBigBlobs(alloc, nullable); // Throws
         root->init_from_mem(mem);
         m_array.reset(root);
         return;
@@ -144,14 +142,12 @@ void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
             if (!is_big) {
                 // Small blobs root leaf
                 ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
-                new_sibling_ref =
-                    leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
+                new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
             }
             else {
                 // Big blobs root leaf
                 ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-                new_sibling_ref =
-                    leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
+                new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
             }
         }
         else {
@@ -184,15 +180,13 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         ArrayBigBlobs leaf(alloc, false);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(&parent, ndx_in_parent);
-        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
-                                       state); // Throws
+        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term, state); // Throws
     }
     ArrayBinary leaf(alloc);
     leaf.init_from_mem(leaf_mem);
     leaf.set_parent(&parent, ndx_in_parent);
     if (state_2.m_value.size() <= small_blob_max_size)
-        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
-                                       state); // Throws
+        return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term, state); // Throws
     // Upgrade leaf from small to big blobs
     ArrayBigBlobs new_leaf(alloc, false);
     new_leaf.create(); // Throws
@@ -200,8 +194,7 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
     new_leaf.update_parent(); // Throws
     copy_leaf(leaf, new_leaf); // Throws
     leaf.destroy();
-    return new_leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
-                                       state); // Throws
+    return new_leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term, state); // Throws
 }
 
 
@@ -324,7 +317,7 @@ void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Copying binary data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    copy(value.data(), value.data()+value.size(), buffer.get());
+    std::copy(value.data(), value.data()+value.size(), buffer.get());
     BinaryData copy_of_value(buffer.get(), value.size());
     set(row_ndx, copy_of_value); // Throws
     bool is_last = true;
@@ -455,7 +448,7 @@ ref_type ColumnBinary::write(size_t slice_offset, size_t slice_size,
     }
     else {
         SliceHandler handler(get_alloc());
-        ref = ColumnBase::write(m_array.get(), slice_offset, slice_size,
+        ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
                                 table_size, handler, out); // Throws
     }
     return ref;
@@ -572,20 +565,20 @@ void ColumnBinary::Verify() const
 }
 
 
-void ColumnBinary::to_dot(ostream& out, StringData title) const
+void ColumnBinary::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = m_array->get_ref();
-    out << "subgraph cluster_binary_column" << ref << " {" << endl;
+    out << "subgraph cluster_binary_column" << ref << " {" << std::endl;
     out << " label = \"Binary column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
     tree_to_dot(out);
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                               ostream& out) const
+                               std::ostream& out) const
 {
     bool is_strings = false; // FIXME: Not necessarily the case
     bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
@@ -607,7 +600,7 @@ void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     size_t leaf_size;
     const char* leaf_type;
@@ -627,12 +620,12 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
         leaf_type = "Big blobs leaf";
     }
     int indent = level * 2;
-    out << setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
 }
 
 } // anonymous namespace
 
-void ColumnBinary::do_dump_node_structure(ostream& out, int level) const
+void ColumnBinary::do_dump_node_structure(std::ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }

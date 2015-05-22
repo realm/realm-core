@@ -29,7 +29,6 @@
 #include <realm/importer.hpp>
 #include <stdarg.h>
 
-using namespace std;
 using namespace realm;
 
 FILE* out_file;
@@ -103,9 +102,9 @@ int main(int argc, char* argv[])
 
     abort2(argc < 3, legend);
 
-    vector<DataType> scheme;
-    vector<string> column_names;
-    string tablename = "table";
+    std::vector<DataType> scheme;
+    std::vector<std::string> column_names;
+    std::string tablename = "table";
 
     // Parse from 1'st argument until before source and destination args
     for(int a = 1; a < argc - 2; ++a) {
@@ -172,7 +171,7 @@ int main(int argc, char* argv[])
         util::File::try_remove(argv[argc - 1]);
 
     in_file = open_files(argv[argc - 2]);
-    string path = argv[argc - 1];
+    std::string path = argv[argc - 1];
     Group group;
     TableRef table2 = group.add_table(tablename);
     Table &table = *table2;
@@ -199,15 +198,15 @@ int main(int argc, char* argv[])
         }
 
     }
-    catch (const runtime_error& error) {
-        cerr << error.what();
+    catch (const std::runtime_error& error) {
+        std::cerr << error.what();
         exit(-1);
     }
 
     group.write(path);
 
     if(!quiet_flag)
-        cout << "Imported " << imported_rows << " rows into table named '" << tablename << "'\n";
+        std::cout << "Imported " << imported_rows << " rows into table named '" << tablename << "'\n";
 
     return 0;
 

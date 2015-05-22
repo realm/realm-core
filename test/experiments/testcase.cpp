@@ -30,7 +30,6 @@
 #include "../util/thread_wrapper.hpp"
 #include "../util/random.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;

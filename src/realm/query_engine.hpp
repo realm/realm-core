@@ -947,7 +947,7 @@ public:
         m_child = 0;
 
         // FIXME: Store this in std::string instead.
-        char* data = new char[v.size()];
+        char* data = v.is_null() ? nullptr : new char[v.size()];
         memcpy(data, v.data(), v.size());
         m_value = BinaryData(data, v.size());
     }
@@ -1133,6 +1133,7 @@ public:
             else {
                 // short or long
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
+                REALM_ASSERT_3(s, <, asc->size());
                 if (s >= m_end_s || s < m_leaf_start) {
                     // we exceeded current leaf's range
                     clear_leaf_state();
@@ -1425,6 +1426,9 @@ public:
 
         std::vector<ParentNode*> v;
 
+        m_start.clear();
+        m_start.resize(m_cond.size(), 0);
+
         m_last.clear();
         m_last.resize(m_cond.size(), 0);
 
@@ -1451,20 +1455,28 @@ public:
         size_t index = not_found;
 
         for (size_t c = 0; c < m_cond.size(); ++c) {
-            if (m_last[c] >= end)
+            // out of order search; have to discard cached results
+            if (start < m_start[c]) {
+                m_last[c] = 0;
+                m_was_match[c] = false;
+            }
+            // already searched this range and didn't match
+            else if (m_last[c] >= end)
                 continue;
-            else if (m_was_match[c] && m_last[c] >= start) {
+            // already search this range and *did* match
+           else if (m_was_match[c] && m_last[c] >= start) {
                 if (index > m_last[c])
                     index = m_last[c];
+               continue;
             }
-            else {
-                size_t fmax = m_last[c] > start ? m_last[c] : start;
-                size_t f = m_cond[c]->find_first(fmax, end);
-                m_was_match[c] = f != not_found;
-                m_last[c] = f == not_found ? end : f;
-                if (f != not_found && index > m_last[c])
-                    index = m_last[c];
-            }
+
+            m_start[c] = start;
+            size_t fmax = std::max(m_last[c], start);
+            size_t f = m_cond[c]->find_first(fmax, end);
+            m_was_match[c] = f != not_found;
+            m_last[c] = f == not_found ? end : f;
+            if (f != not_found && index > m_last[c])
+                index = m_last[c];
         }
 
         return index;
@@ -1505,6 +1517,10 @@ public:
 
     std::vector<ParentNode*> m_cond;
 private:
+    // start index of the last find for each cond
+    std::vector<size_t> m_start;
+    // last looked at index of the lasft find for each cond
+    // is a matching index if m_was_match is true
     std::vector<size_t> m_last;
     std::vector<bool> m_was_match;
 };

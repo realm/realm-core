@@ -72,14 +72,20 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
 namespace {
     int64_t next_null_candidate(int64_t previous_candidate) {
         uint64_t x = static_cast<uint64_t>(previous_candidate);
-        x += 127;
+        // Increment by a prime number. This guarantees that we will
+        // eventually hit every possible integer in the 2^64 range.
+        x += 0xfffffffbULL;
         return static_cast<int64_t>(x);
     }
 }
 
 int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming)
 {
+    // We just need any number -- it could have been `rand()`, but
+    // random numbers are hard, and we don't want to risk locking mutices
+    // or saving state. The top of the stack should be "random enough".
     int64_t candidate = reinterpret_cast<int64_t>(&candidate);
+
     while (true) {
         candidate = next_null_candidate(candidate);
         if (candidate == incoming) {
@@ -98,12 +104,17 @@ bool ArrayIntNull::can_use_as_null(int64_t candidate)
 
 void ArrayIntNull::replace_nulls_with(int64_t new_null)
 {
-    // FIXME: Optimize!
     int64_t old_null = Array::get(0);
     Array::set(0, new_null);
-    for (size_t i = 0; i < size(); ++i) {
-        if (Array::get(i+1) == old_null) {
-            Array::set(i+1, new_null);
+    std::size_t i = 1;
+    while (true) {
+        std::size_t found = Array::find_first(old_null, i);
+        if (found < Array::size()) {
+            Array::set(found, new_null);
+            i = found + 1;
+        }
+        else {
+            break;
         }
     }
 }
@@ -118,7 +129,7 @@ void ArrayIntNull::ensure_not_null(int64_t value)
         }
     }
     else {
-        if (value >= m_ubound) {
+        if (value <= m_lbound || value >= m_ubound) {
             size_t new_width = bit_width(value);
             int64_t new_upper_bound = Array::ubound_for_width(new_width);
 

@@ -6,7 +6,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::test_util;
 
@@ -595,7 +594,7 @@ TEST(ArrayString_Null)
         a.create();
 
         // vector that is kept in sync with the ArrayString so that we can compare with it
-        vector<string> v;
+        std::vector<std::string> v;
 
         // ArrayString capacity starts at 128 bytes, so we need lots of elements
         // to test if relocation works
@@ -619,7 +618,7 @@ TEST(ArrayString_Null)
                     len = 0;
 
                 StringData sd;
-                string stdstr;
+                std::string stdstr;
 
                 if (random.draw_int<int>() > 100) {
                     sd = realm::null();
@@ -627,7 +626,7 @@ TEST(ArrayString_Null)
                 }
                 else {
                     sd = StringData(str, len);
-                    stdstr = string(str, len);
+                    stdstr = std::string(str, len);
                 }
 
                 if (random.draw_int<int>() > 100) {

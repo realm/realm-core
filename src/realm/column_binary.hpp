@@ -35,7 +35,7 @@ class ColumnBinary: public ColumnBaseSimple {
 public:
     typedef BinaryData value_type;
 
-    ColumnBinary(Allocator&, ref_type);
+    ColumnBinary(Allocator&, ref_type, bool nullable = false);
 
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -43,12 +43,13 @@ public:
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
     StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT final;
 
-    void add(BinaryData value = BinaryData());
+    void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void insert(std::size_t ndx, BinaryData value = BinaryData());
+    void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
+    size_t find_first(BinaryData value) const;
 
     // Requires that the specified entry was inserted as StringData.
     StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
@@ -107,6 +108,8 @@ private:
     /// necessary. Returns true if, and only if the root is a 'big
     /// blobs' leaf upon return.
     bool upgrade_root_leaf(std::size_t value_size);
+
+    bool m_nullable = false;
 
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -202,6 +205,9 @@ inline StringData ColumnBinary::get_string(std::size_t ndx) const REALM_NOEXCEPT
 
 inline void ColumnBinary::set_string(std::size_t ndx, StringData value)
 {
+    if (value.is_null() && !m_nullable)
+        throw LogicError(LogicError::column_not_nullable);
+
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     set(ndx, bin, add_zero_term);
@@ -209,6 +215,9 @@ inline void ColumnBinary::set_string(std::size_t ndx, StringData value)
 
 inline void ColumnBinary::add(BinaryData value)
 {
+    if (value.is_null() && !m_nullable)
+        throw LogicError(LogicError::column_not_nullable);
+
     std::size_t row_ndx = realm::npos;
     bool add_zero_term = false;
     std::size_t num_rows = 1;
@@ -217,6 +226,9 @@ inline void ColumnBinary::add(BinaryData value)
 
 inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
 {
+    if (value.is_null() && !m_nullable)
+        throw LogicError(LogicError::column_not_nullable);
+
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
@@ -224,6 +236,16 @@ inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
 }
+
+inline size_t ColumnBinary::find_first(BinaryData value) const
+{
+    for (size_t t = 0; t < size(); t++)
+        if (get(t) == value)
+            return t;
+
+    return not_found;
+}
+
 
 inline void ColumnBinary::erase(std::size_t row_ndx)
 {
@@ -247,7 +269,7 @@ inline void ColumnBinary::clear()
 inline void ColumnBinary::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
     std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
-    BinaryData value = BinaryData();
+    BinaryData value = m_nullable ? BinaryData() : BinaryData("", 0);
     bool add_zero_term = false;
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
 }

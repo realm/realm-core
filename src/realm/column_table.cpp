@@ -3,7 +3,6 @@
 
 #include <realm/column_table.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -252,10 +251,10 @@ void ColumnSubtableParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in
 
 #ifdef REALM_DEBUG
 
-pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
-    return make_pair(p.first.m_ref, p.second);
+    std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
+    return std::make_pair(p.first.m_ref, p.second);
 }
 
 #endif
@@ -402,16 +401,16 @@ void ColumnTable::Verify(const Table& table, size_t col_ndx) const
     }
 }
 
-void ColumnTable::to_dot(ostream& out, StringData title) const
+void ColumnTable::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_root_array()->get_ref();
-    out << "subgraph cluster_subtable_column" << ref << " {" << endl;
+    out << "subgraph cluster_subtable_column" << ref << " {" << std::endl;
     out << " label = \"Subtable column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
     tree_to_dot(out);
-    out << "}" << endl;
+    out << "}" << std::endl;
 
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
@@ -424,17 +423,17 @@ void ColumnTable::to_dot(ostream& out, StringData title) const
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << setw(indent) << "" << "Subtable leaf (size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << "" << "Subtable leaf (size: "<<leaf.size()<<")\n";
 }
 
 } // anonymous namespace
 
-void ColumnTable::do_dump_node_structure(ostream& out, int level) const
+void ColumnTable::do_dump_node_structure(std::ostream& out, int level) const
 {
     get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
 }
