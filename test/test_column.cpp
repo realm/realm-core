@@ -1558,8 +1558,6 @@ TEST_IF(ColumnIntNull_PrependMany, TEST_DURATION >= 1)
     a.destroy();
 }
 
-// First test if width expansion (nulls->empty string, nulls->non-empty string, empty string->non-empty string, etc)
-// works. Then do a fuzzy test at the end.
 TEST(ColumnIntNull_Null)
 {
     {
