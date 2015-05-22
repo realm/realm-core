@@ -88,13 +88,6 @@ private:
 
 template <class T, bool Nullable> struct GetLeafType;
 
-template <> struct GetLeafType<int64_t, false> {
-    using type = ArrayInteger;
-};
-// template <> struct GetLeafType<int64_t, true> {
-//     using type = ArrayIntNull;
-// };
-
 // Default implementation of BpTree. This should work for all types that have monomorphic
 // leaves (i.e. all leaves are of the same type).
 template <class T, bool Nullable>

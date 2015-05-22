@@ -237,7 +237,7 @@ public:
 
 protected:
     using SliceHandler = BpTreeBase::SliceHandler;
-    
+
     ColumnBase() {}
     ColumnBase(ColumnBase&&) = default;
 
@@ -575,6 +575,10 @@ private:
     friend class StringIndex;
 
     BpTree<T, Nullable> m_tree;
+};
+
+template <> struct GetLeafType<int64_t, false> {
+    using type = ArrayInteger;
 };
 
 
