@@ -23,6 +23,8 @@
 
 #include <memory> // std::unique_ptr
 #include <realm/array.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/impl/output_stream.hpp>
 
 namespace realm {
 
@@ -67,6 +69,19 @@ protected:
     explicit BpTreeBase(BpTreeBase&&) = default;
     BpTreeBase& operator=(BpTreeBase&&) = default;
     std::unique_ptr<Array> m_root;
+
+    struct SliceHandler {
+        virtual MemRef slice_leaf(MemRef leaf_mem, std::size_t offset, std::size_t size,
+                                  Allocator& target_alloc) = 0;
+        ~SliceHandler() REALM_NOEXCEPT {}
+    };
+    static ref_type write_subtree(const Array& root, std::size_t slice_offset,
+                                  std::size_t slice_size, std::size_t table_size,
+                                  SliceHandler&, _impl::OutputStream&);
+    friend class ColumnBase;
+    friend class ColumnBaseSimple;
+private:
+    struct WriteSliceHandler;
 
     // FIXME: Move B+Tree functionality from Array to this class.
 };
@@ -148,6 +163,9 @@ public:
     void adjust(std::size_t ndx, T diff);
     void adjust(T diff);
     void adjust_ge(T limit, T diff);
+
+    ref_type write(std::size_t slice_offset, std::size_t slice_size,
+                   std::size_t table_size, _impl::OutputStream& out) const;
 
 #if defined(REALM_DEBUG)
     void verify() const;
@@ -566,6 +584,43 @@ void BpTree<T, N>::adjust_ge(T limit, T diff)
         AdjustGEHandler adjust_leaf_elem(*this, std::move(limit), std::move(diff));
         m_root->update_bptree_leaves(adjust_leaf_elem); // Throws
     }
+}
+
+template <class T, bool N>
+struct BpTree<T,N>::SliceHandler : public BpTreeBase::SliceHandler {
+public:
+    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
+                      Allocator& target_alloc) override
+    {
+        m_leaf.init_from_mem(leaf_mem);
+        return m_leaf.slice_and_clone_children(offset, size, target_alloc); // Throws
+    }
+private:
+    LeafType m_leaf;
+};
+
+template <class T, bool N>
+ref_type BpTree<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
+                            std::size_t table_size, _impl::OutputStream& out) const
+{
+    ref_type ref;
+    if (root_is_leaf()) {
+        Allocator& alloc = Allocator::get_default();
+        MemRef mem = root_as_leaf().slice_and_clone_children(slice_offset, slice_size, alloc); // Throws
+        Array slice(alloc);
+        _impl::DeepArrayDestroyGuard dg(&slice);
+        slice.init_from_mem(mem);
+        bool recurse = true;
+        size_t pos = slice.write(out, recurse); // Throws
+        ref = pos;
+    }
+    else {
+        SliceHandler handler(get_alloc());
+        ref = write_subtree(root(), slice_offset, slice_size,
+                                table_size, handler, out); // Throws
+    }
+    return ref;
 }
 
 template <class T, bool N>

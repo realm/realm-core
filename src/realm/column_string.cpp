@@ -1328,7 +1328,7 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
     }
     else {
         SliceHandler handler(get_alloc(), m_nullable);
-        ref = ColumnBase::write(m_array.get(), slice_offset, slice_size,
+        ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
                                 table_size, handler, out); // Throws
     }
     return ref;

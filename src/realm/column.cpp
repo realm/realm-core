@@ -382,28 +382,10 @@ private:
 };
 
 
-ref_type ColumnBase::write(const Array* root, size_t slice_offset, size_t slice_size,
+ref_type ColumnBaseSimple::write(const Array* root, size_t slice_offset, size_t slice_size,
                            size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
 {
-    REALM_ASSERT(root->is_inner_bptree_node());
-
-    size_t offset = slice_offset;
-    if (slice_size == 0)
-        offset = 0;
-    // At this point we know that `offset` refers to an element that
-    // exists in the tree (this is required by
-    // Array::visit_bptree_leaves()). There are two cases to consider:
-    // First, if `slice_size` is non-zero, then `offset` must already
-    // refer to an existsing element. If `slice_size` is zero, then
-    // `offset` has been set to zero at this point. Zero is the index
-    // of an existing element, because the tree cannot be empty at
-    // this point. This follows from the fact that the root is an
-    // inner node, and that an inner node must contain at least one
-    // element (invar:bptree-nonempty-inner +
-    // invar:bptree-nonempty-leaf).
-    WriteSliceHandler handler_2(offset, slice_size, root->get_alloc(), handler, out);
-    const_cast<Array*>(root)->visit_bptree_leaves(offset, table_size, handler_2); // Throws
-    return handler_2.get_top_ref();
+    return BpTreeBase::write_subtree(*root, slice_offset, slice_size, table_size, handler, out);
 }
 
 

@@ -236,6 +236,8 @@ public:
 #endif
 
 protected:
+    using SliceHandler = BpTreeBase::SliceHandler;
+    
     ColumnBase() {}
     ColumnBase(ColumnBase&&) = default;
 
@@ -264,16 +266,6 @@ protected:
     };
 
     static ref_type create(Allocator&, std::size_t size, CreateHandler&);
-
-    class SliceHandler {
-    public:
-        virtual MemRef slice_leaf(MemRef leaf_mem, std::size_t offset, std::size_t size,
-                                  Allocator& target_alloc) = 0;
-        ~SliceHandler() REALM_NOEXCEPT {}
-    };
-
-    static ref_type write(const Array* root, std::size_t slice_offset, std::size_t slice_size,
-                          std::size_t table_size, SliceHandler&, _impl::OutputStream&);
 
 #ifdef REALM_DEBUG
     class LeafToDot;
@@ -323,6 +315,9 @@ protected:
     /// tree by one.
     void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
                             bool is_append);
+
+    static ref_type write(const Array* root, std::size_t slice_offset, std::size_t slice_size,
+                          std::size_t table_size, SliceHandler&, _impl::OutputStream&);
 
 #if defined(REALM_DEBUG)
     void tree_to_dot(std::ostream&) const;
@@ -1257,44 +1252,10 @@ ref_type TColumn<T,N>::create(Allocator& alloc, Array::Type leaf_type, size_t si
 }
 
 template <class T, bool N>
-class TColumn<T,N>::SliceHandler: public ColumnBase::SliceHandler {
-public:
-    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
-    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) override
-    {
-        m_leaf.init_from_mem(leaf_mem);
-        return m_leaf.slice_and_clone_children(offset, size, target_alloc); // Throws
-    }
-private:
-    // FIXME: This will only work for trees with monomorphic leaves.
-    typename BpTree<T,N>::LeafType m_leaf;
-};
-
-
-template <class T, bool N>
-ref_type TColumn<T,N>::write(size_t slice_offset, size_t slice_size,
-                       size_t table_size, _impl::OutputStream& out) const
+ref_type TColumn<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
+                       std::size_t table_size, _impl::OutputStream& out) const
 {
-    // FIXME: Move this into BpTreeBase where possible.
-    ref_type ref;
-    if (root_is_leaf()) {
-        // FIXME: XXX: This won't work for nullable integer arrays.
-        Allocator& alloc = Allocator::get_default();
-        MemRef mem = get_root_array()->slice_and_clone_children(slice_offset, slice_size, alloc); // Throws
-        Array slice(alloc);
-        _impl::DeepArrayDestroyGuard dg(&slice);
-        slice.init_from_mem(mem);
-        bool recurse = true;
-        size_t pos = slice.write(out, recurse); // Throws
-        ref = pos;
-    }
-    else {
-        SliceHandler handler(get_alloc());
-        ref = ColumnBase::write(get_root_array(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
-    }
-    return ref;
+    return m_tree.write(slice_offset, slice_size, table_size, out);
 }
 
 template <class T, bool N>
