@@ -179,7 +179,8 @@ TEST(Query_Count)
         Table table;
         table.add_column(type_Int, "i");
 
-        size_t count = 0;
+        size_t matching = 0;
+        size_t not_matching = 0;
         size_t rows = random.draw_int_mod(5 * REALM_MAX_BPNODE_SIZE); // to cross some leaf boundaries
 
         for (size_t i = 0; i < rows; ++i) {
@@ -187,13 +188,14 @@ TEST(Query_Count)
             int64_t val = random.draw_int_mod(5);
             table.set_int(0, i, val);
             if (val == 2)
-                count++;
+                matching++;
+            else
+                not_matching++;
         }
 
-        size_t count2 = table.where().equal(0, 2).count();
-        CHECK_EQUAL(count, count2);
+        CHECK_EQUAL(matching, table.where().equal(0, 2).count());
+        CHECK_EQUAL(not_matching, table.where().not_equal(0, 2).count());
     }
-
 }
 
 
@@ -5997,6 +5999,65 @@ TEST(Query_Nulls_Fuzzy)
         }
     }
 }
+
+TEST(Query_BinaryNull)
+{
+    Table table;
+    table.add_column(type_Binary, "first");
+    table.add_empty_row(3);
+    table.set_binary(0, 0, BinaryData());
+    table.set_binary(0, 1, BinaryData("", 0)); // NOTE: Specify size = 0, else size turns into 1!
+    table.set_binary(0, 2, BinaryData("foo"));
+    
+    TableView t;
+
+    t = table.where().equal(0, BinaryData()).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
+
+    t = table.where().equal(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
+
+    t = table.where().equal(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.size());
+
+    t = table.where().not_equal(0, BinaryData()).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+
+    t = table.where().not_equal(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+
+    t = table.where().begins_with(0, BinaryData()).find_all();
+    CHECK_EQUAL(3, t.size());
+
+    t = table.where().begins_with(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = table.where().begins_with(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+
+    t = table.where().ends_with(0, BinaryData()).find_all();
+    CHECK_EQUAL(3, t.size());
+
+    t = table.where().ends_with(0, BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = table.where().ends_with(0, BinaryData("foo")).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+}
+
 #endif
 
 #endif // TEST_QUERY

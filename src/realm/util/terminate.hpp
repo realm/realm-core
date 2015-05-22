@@ -45,6 +45,14 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line, 
     terminate_internal(ss);
 }
 
+template <typename T1, typename T2, typename T3, typename T4>
+REALM_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2, T3 info3, T4 info4) REALM_NOEXCEPT {
+    std::stringstream ss;
+    ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << ", " << info3 << ", " << info4 << "]\n";
+    terminate_internal(ss);
+}
+
+
 } // namespace util
 } // namespace realm
 

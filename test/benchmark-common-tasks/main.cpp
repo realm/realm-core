@@ -13,6 +13,8 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+namespace {
+
 /**
   This bechmark suite represents a number of common use cases,
   from the perspective of the bindings. It does *not* benchmark
@@ -27,9 +29,9 @@ using namespace realm::test_util;
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
 */
 
-static const size_t min_repetitions = 10;
-static const size_t max_repetitions = 100;
-static const double min_duration_s = 0.05;
+const size_t min_repetitions = 10;
+const size_t max_repetitions = 100;
+const double min_duration_s = 0.05;
 
 struct Benchmark
 {
@@ -310,7 +312,7 @@ struct BenchmarkQueryNot : Benchmark {
 
 
 
-static const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
+const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 {
     switch (level) {
         case SharedGroup::durability_Full: return "Full";
@@ -394,8 +396,11 @@ void run_benchmark(BenchmarkResults& results)
     }
 }
 
+} // anonymous namespace
 
-extern "C" int benchmark_common_tasks_main()
+extern "C" int benchmark_common_tasks_main();
+
+int benchmark_common_tasks_main()
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());

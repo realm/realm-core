@@ -143,6 +143,7 @@ typedef realm::DateTime   DateTime;
 typedef float               Float;
 typedef double              Double;
 typedef realm::StringData String;
+typedef realm::BinaryData Binary;
 
 
 // Return StringData if either T or U is StringData, else return T. See description of usage in export2().
