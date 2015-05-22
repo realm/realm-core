@@ -25,7 +25,7 @@
 
 #define REALM_VER_MAJOR 0
 #define REALM_VER_MINOR 89
-#define REALM_VER_PATCH 3
+#define REALM_VER_PATCH 4
 #define REALM_PRODUCT_NAME "realm-core"
 
 #define REALM_QUOTE2(X) #X

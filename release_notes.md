@@ -1,12 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-*
-### API breaking changes:
-
-* Lorem ipsum.
+# 0.89.4 Release notes
 
 ### Enhancements:
 
@@ -14,9 +6,6 @@
   safely from any thread.
 * Improved performance of Query::find_all() with assertions enabled.
 
-### Internals:
-
-* Lorem ipsum.
 
 # 0.89.3 Release notes
 
