@@ -60,7 +60,7 @@
 /// an unexpected exception (such as std::bad_alloc). It is also the **minimum**
 /// level of consistency that is required to be able to properly destroy the
 /// accessor objects (manually, or as a result of stack unwinding).
-///
+/// 
 /// It is supposed to be a library-wide invariant that an accessor hierarchy is
 /// at least minimally consistent, but so far, only some parts of the library
 /// conform to it.
@@ -3286,6 +3286,10 @@ size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
     return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
 }
 
+size_t Table::find_first_null(size_t column_ndx) const
+{
+    return where().equal(column_ndx, null{}).find();
+}
 
 template <class T> TableView Table::find_all(size_t col_ndx, T value)
 {
@@ -3375,6 +3379,16 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
     throw std::runtime_error("Not implemented");
+}
+
+TableView Table::find_all_null(size_t col_ndx)
+{
+    return where().equal(col_ndx, null{}).find_all();
+}
+
+ConstTableView Table::find_all_null(size_t col_ndx) const
+{
+    return const_cast<Table*>(this)->find_all_null(col_ndx);
 }
 
 TableView Table::get_distinct_view(size_t col_ndx)

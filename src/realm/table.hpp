@@ -582,6 +582,7 @@ public:
     std::size_t    find_first_double(std::size_t column_ndx, double value) const;
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
     std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
+    std::size_t    find_first_null(std::size_t column_ndx) const;
 
     TableView      find_all_link(size_t target_row_index);
     ConstTableView find_all_link(size_t target_row_index) const;
@@ -599,6 +600,8 @@ public:
     ConstTableView find_all_string(std::size_t column_ndx, StringData value) const;
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
+    TableView      find_all_null(std::size_t column_ndx);
+    ConstTableView find_all_null(std::size_t column_ndx) const;
 
     /// The following column types are supported: String, Integer, DateTime, Bool
     TableView      get_distinct_view(std::size_t column_ndx);
