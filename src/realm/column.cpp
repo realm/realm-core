@@ -19,6 +19,21 @@ using namespace std;
 using namespace realm;
 using namespace realm::util;
 
+bool ColumnBase::is_nullable() const REALM_NOEXCEPT
+{
+    return false;
+}
+
+bool ColumnBase::is_null(size_t) const REALM_NOEXCEPT
+{
+    return false;
+}
+
+void ColumnBase::set_null(size_t)
+{
+    throw LogicError{LogicError::column_not_nullable};
+}
+
 void ColumnBase::move_assign(ColumnBase&) REALM_NOEXCEPT
 {
     destroy();

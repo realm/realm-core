@@ -34,6 +34,7 @@
 #include <realm/bptree.hpp>
 #include <realm/index_string.hpp>
 #include <realm/impl/destroy_guard.hpp>
+#include <realm/exceptions.hpp>
 
 namespace realm {
 
@@ -81,6 +82,17 @@ public:
 
     /// \throw LogicError Thrown if this column is not string valued.
     virtual void set_string(std::size_t row_ndx, StringData value);
+
+    /// Whether or not this column is nullable.
+    virtual bool is_nullable() const REALM_NOEXCEPT;
+
+    /// Whether or not the value at \a row_ndx is NULL. If the column is not
+    /// nullable, always returns false.
+    virtual bool is_null(std::size_t row_ndx) const REALM_NOEXCEPT;
+
+    /// Sets the value at \a row_ndx to be NULL.
+    /// \throw LogicError Thrown if this column is not nullable.
+    virtual void set_null(std::size_t row_ndx);
 
     /// Insert the specified number of default values into this column starting
     /// at the specified row index. Set `is_append` to true if, and only if
@@ -436,6 +448,7 @@ public:
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+    bool is_nullable() const REALM_NOEXCEPT override;
 
     /// Provides access to the leaf that contains the element at the
     /// specified index. Upon return \a ndx_in_leaf will be set to the
@@ -717,17 +730,20 @@ void TColumn<T, N>::set(std::size_t ndx, T value)
 template <class T, bool N>
 void TColumn<T, N>::set_null(std::size_t ndx)
 {
-    set(ndx, null{});
+    REALM_ASSERT_DEBUG(ndx < size());
+    if (!is_nullable()) {
+        throw LogicError{LogicError::column_not_nullable};
+    }
+    if (has_search_index()) {
+        m_search_index->set(ndx, null{});
+    }
+    m_tree.set_null(ndx);
 }
 
 template <class T, bool N>
 void TColumn<T, N>::set(std::size_t ndx, null)
 {
-    REALM_ASSERT_DEBUG(ndx < size());
-    if (has_search_index()) {
-        m_search_index->set(ndx, null{});
-    }
-    m_tree.set(ndx, null{});
+    set_null(ndx);
 }
 
 // When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values
@@ -1059,6 +1075,12 @@ template <class T, bool N>
 std::size_t TColumn<T,N>::size() const REALM_NOEXCEPT
 {
     return m_tree.size();
+}
+
+template <class T, bool N>
+bool TColumn<T,N>::is_nullable() const REALM_NOEXCEPT
+{
+    return N;
 }
 
 template <class T, bool N>

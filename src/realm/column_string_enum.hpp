@@ -77,6 +77,7 @@ public:
     }
 
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT final;
     void set(std::size_t ndx, StringData value);
     void add();
     void add(StringData value);
@@ -85,7 +86,7 @@ public:
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
-    bool is_nullable() const;
+    bool is_nullable() const REALM_NOEXCEPT final;
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -178,6 +179,11 @@ inline StringData ColumnStringEnum::get(std::size_t ndx) const REALM_NOEXCEPT
     StringData sd = m_keys.get(key_ndx);
     REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd;
+}
+
+inline bool ColumnStringEnum::is_null(std::size_t ndx) const REALM_NOEXCEPT
+{
+    return is_nullable() ? get(ndx).is_null() : false;
 }
 
 inline void ColumnStringEnum::add()

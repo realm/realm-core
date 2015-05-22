@@ -56,7 +56,7 @@ void ColumnStringEnum::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
     m_keys.update_from_parent(old_baseline);
 }
 
-bool ColumnStringEnum::is_nullable() const
+bool ColumnStringEnum::is_nullable() const REALM_NOEXCEPT
 {
     return m_nullable;
 }
