@@ -5,6 +5,8 @@
 #include <algorithm>
 
 #include <realm/column.hpp>
+#include <realm/query_engine.hpp>
+#include <realm/column_tpl.hpp>
 
 #include "test.hpp"
 

@@ -25,8 +25,6 @@
 #include <realm/util/features.h>
 #include <realm/array.hpp>
 #include <realm/array_basic.hpp>
-#include <realm/column.hpp>
-#include <realm/column_fwd.hpp>
 
 namespace realm {
 

@@ -1362,7 +1362,7 @@ void Table::upgrade_file_format()
             else {
                 // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
                 // so this is fine for now.
-                REALM_ASSERT(false); 
+                REALM_ASSERT(false);
             }
 
         }
@@ -1867,23 +1867,8 @@ ref_type Table::clone_columns(Allocator& alloc) const
     for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ref_type new_col_ref;
         const ColumnBase* col = &get_column_base(col_ndx);
-        if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
-            ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
-            bool nullable = is_nullable(col_ndx);
-            AdaptiveStringColumn new_col(alloc, ref, nullable); // Throws
-            // FIXME: Should be optimized with something like
-            // new_col.add(seq_tree_accessor.begin(),
-            // seq_tree_accessor.end())
-            size_t n = enum_col->size();
-            for (size_t i = 0; i < n; ++i)
-                new_col.add(enum_col->get(i)); // Throws
-            new_col_ref = new_col.get_ref();
-        }
-        else {
-            const Array& root = *col->get_root_array();
-            MemRef mem = root.clone_deep(alloc); // Throws
-            new_col_ref = mem.m_ref;
-        }
+        MemRef mem = col->clone_deep(alloc);
+        new_col_ref = mem.m_ref;
         new_columns.add(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();
@@ -3377,7 +3362,7 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
 namespace {
 
 struct AggrState {
-    AggrState(const Table& table) : table(table), block(table.get_alloc()), added_row(false) {}
+    AggrState(const Table& table) : table(table), cache(table.get_alloc()), added_row(false) {}
 
     const Table& table;
     const StringIndex* dst_index;
@@ -3385,7 +3370,8 @@ struct AggrState {
 
     const ColumnStringEnum* enums;
     std::vector<size_t> keys;
-    ArrayInteger block;
+    const ArrayInteger* block = nullptr;
+    ArrayInteger cache;
     size_t offset;
     size_t block_end;
 
@@ -3411,14 +3397,15 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
         std::size_t ndx_in_leaf;
-        state.enums->Column::get_leaf(i, ndx_in_leaf, state.block);
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        state.enums->Column::get_leaf(i, ndx_in_leaf, leaf);
         state.offset = i - ndx_in_leaf;
-        state.block_end = state.offset + state.block.size();
+        state.block_end = state.offset + state.block->size();
     }
 
     // Since we know the exact number of distinct keys,
     // we can use that to avoid index lookups
-    int64_t key = state.block.get(i - state.offset);
+    int64_t key = state.block->get(i - state.offset);
     size_t ndx = state.keys[key];
 
     // Stored position is offset by one, so zero can indicate
@@ -3474,9 +3461,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.keys.assign(key_count, 0);
 
         std::size_t ndx_in_leaf;
-        enums.Column::get_leaf(0, ndx_in_leaf, state.block);
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        enums.Column::get_leaf(0, ndx_in_leaf, leaf);
         state.offset = 0 - ndx_in_leaf;
-        state.block_end = state.offset + state.block.size();
+        state.block_end = state.offset + state.block->size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
     }
     else {
@@ -4420,7 +4408,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
-                break; 
+                break;
             case type_Binary:
                 out.width(widths[col+1]-6); // adjust for " bytes" text
                 out << get_binary(col, row_ndx).size() << " bytes";
@@ -4598,34 +4586,6 @@ bool Table::compare_rows(const Table& t) const
         REALM_ASSERT(false);
     }
     return true;
-}
-
-
-const Array* Table::get_column_root(size_t col_ndx) const REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    return m_cols[col_ndx]->get_root_array();
-}
-
-
-std::pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
-    REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-
-    const ColumnBase* col = m_cols[col_ndx];
-
-    const Array* root = col->get_root_array();
-    const Array* enum_root = 0;
-
-    if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
-        enum_root = c->get_keys().get_root_array();
-    }
-    else {
-        REALM_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));
-    }
-
-    return std::make_pair(root, enum_root);
 }
 
 
@@ -4935,7 +4895,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 
         if (col) {
             // Refresh the column accessor
-            col->get_root_array()->set_ndx_in_parent(ndx_in_parent);
+            col->set_ndx_in_parent(ndx_in_parent);
             col->refresh_accessor_tree(col_ndx, m_spec); // Throws
         }
         else {
@@ -5058,7 +5018,7 @@ void Table::Verify() const
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
             std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
-            REALM_ASSERT_3(ndx_in_parent, ==, column.get_root_array()->get_ndx_in_parent());
+            REALM_ASSERT_3(ndx_in_parent, ==, column.get_ndx_in_parent());
             column.Verify(*this, i);
             REALM_ASSERT_3(column.size(), ==, m_size);
         }

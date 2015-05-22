@@ -31,16 +31,17 @@ namespace realm {
 /// of the column is the root of the B+-tree. Leaf nodes are either of
 /// type ArrayBinary (array of small blobs) or ArrayBigBlobs (array of
 /// big blobs).
-class ColumnBinary: public ColumnBase {
+class ColumnBinary: public ColumnBaseSimple {
 public:
     typedef BinaryData value_type;
 
     ColumnBinary(Allocator&, ref_type, bool nullable = false);
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT final;
 
     void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -82,8 +83,6 @@ public:
 #endif
 
 private:
-    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
-
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
                    std::size_t num_rows);
@@ -125,6 +124,12 @@ private:
 
 
 // Implementation
+
+inline StringData ColumnBinary::get_index_data(std::size_t, char*) const REALM_NOEXCEPT
+{
+    REALM_ASSERT(false && "Index not implemented for ColumnBinary.");
+    REALM_UNREACHABLE();
+}
 
 inline std::size_t ColumnBinary::size() const  REALM_NOEXCEPT
 {

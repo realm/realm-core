@@ -233,8 +233,9 @@ public:
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
+            typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
             std::size_t ndx_in_leaf;
-            m_leaf_ptr = &m_column->get_leaf(index, ndx_in_leaf, *m_array_ptr);
+            m_column->get_leaf(index, ndx_in_leaf, leaf);
             m_leaf_start = index - ndx_in_leaf;
             const size_t leaf_size = m_leaf_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -287,8 +288,8 @@ class ParentNode {
     typedef ParentNode ThisType;
 public:
 
-    ParentNode(): m_table(0) 
-    { 
+    ParentNode(): m_table(0)
+    {
     }
 
     void gather_children(std::vector<ParentNode*>& v)
@@ -567,7 +568,7 @@ public:
         m_child2 = mapping.find(m_child2)->second;
     }
 
-    SubtableNode(const SubtableNode& from) 
+    SubtableNode(const SubtableNode& from)
         : ParentNode(from)
     {
         m_child2 = from.m_child2;
@@ -659,7 +660,8 @@ public:
     void get_leaf(const Column& col, std::size_t ndx)
     {
         std::size_t ndx_in_leaf;
-        m_leaf_ptr = &col.get_leaf(ndx, ndx_in_leaf, *m_array_ptr);
+        Column::LeafInfo leaf_info{&m_leaf_ptr, m_array_ptr.get()};
+        col.get_leaf(ndx, ndx_in_leaf, leaf_info);
         m_leaf_start = ndx - ndx_in_leaf;
         m_leaf_end = m_leaf_start + m_leaf_ptr->size();
     }
@@ -1044,7 +1046,7 @@ public:
         m_leaf.reset(nullptr);
     }
 
-    StringNodeBase(const StringNodeBase& from) 
+    StringNodeBase(const StringNodeBase& from)
         : ParentNode(from)
     {
         char* data = from.m_value.data() ? new char[from.m_value.size()] : nullptr;
@@ -1210,8 +1212,6 @@ public:
         m_dD = 10.0;
         StringNodeBase::init(table);
 
-        m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
-
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
             m_key_ndx = static_cast<const ColumnStringEnum*>(m_condition_column)->GetKeyNdx(m_value);
@@ -1268,9 +1268,8 @@ public:
 
         }
         else if (m_column_type != col_type_String) {
-            m_cse.m_column = static_cast<const ColumnStringEnum*>(m_condition_column);
-            m_cse.m_leaf_end = 0;
-            m_cse.m_leaf_start = 0;
+            REALM_ASSERT_DEBUG(dynamic_cast<const ColumnStringEnum*>(m_condition_column));
+            m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
         }
 
         if (m_child)
@@ -1585,7 +1584,7 @@ public:
         m_cond = mapping.find(m_cond)->second;
     }
 
-    NotNode(const NotNode& from) 
+    NotNode(const NotNode& from)
         : ParentNode(from)
     {
         // here we are just copying the pointers - they'll be remapped by "translate_pointers"
@@ -1638,7 +1637,9 @@ public:
         m_dD = 100.0;
         m_table = &table;
 
-        const ColType* c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx1));
+        const ColumnBase* cb = &get_column_base(table, m_condition_column_idx1);
+        REALM_ASSERT_DEBUG(dynamic_cast<const ColType*>(cb));
+        const ColType* c = static_cast<const ColType*>(cb);
         m_getter1.init(c);
 
         c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx2));
@@ -1762,7 +1763,7 @@ public:
         return new ExpressionNode(*this);
     }
 
-    ExpressionNode(ExpressionNode& from) 
+    ExpressionNode(ExpressionNode& from)
         : ParentNode(from)
     {
         m_compare = from.m_compare;

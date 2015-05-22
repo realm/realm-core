@@ -297,6 +297,10 @@
 		B159814B18CF560000E3C5DF /* demangle.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814818CF560000E3C5DF /* demangle.hpp */; };
 		B159814C18CF560000E3C5DF /* super_int.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814918CF560000E3C5DF /* super_int.hpp */; };
 		B159814E18CF562600E3C5DF /* test_safe_int_ops.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */; };
+		F43098B21B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
+		F43098B31B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
+		F43098B41B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
+		F43098B51B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
 		F45013AA1B01016C00CD4A7E /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F4D0FC2A1B00F4010040956A /* Info.plist */; };
 		F45013B41B01022800CD4A7E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = F45013B31B01022800CD4A7E /* main.m */; };
 		F45013BA1B01022800CD4A7E /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F45013B91B01022800CD4A7E /* ViewController.mm */; };
@@ -754,6 +758,8 @@
 		B159814818CF560000E3C5DF /* demangle.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = demangle.hpp; sourceTree = "<group>"; };
 		B159814918CF560000E3C5DF /* super_int.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = super_int.hpp; sourceTree = "<group>"; };
 		B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_safe_int_ops.cpp; sourceTree = "<group>"; };
+		F43098B01B021C04000A2333 /* bptree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bptree.cpp; path = realm/bptree.cpp; sourceTree = "<group>"; };
+		F43098B11B021C04000A2333 /* bptree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = bptree.hpp; path = realm/bptree.hpp; sourceTree = "<group>"; };
 		F45013AF1B01022800CD4A7E /* unit-tests-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "unit-tests-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F45013B21B01022800CD4A7E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F45013B31B01022800CD4A7E /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -890,6 +896,9 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				F43098B01B021C04000A2333 /* bptree.cpp */,
+				F43098B11B021C04000A2333 /* bptree.hpp */,
+				F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */,
 				3620DF0318B6CA7B003AD498 /* impl */,
 				52D7C4661852A01700633748 /* util */,
 				52F6359316B43C79006117C4 /* alloc.cpp */,
@@ -1259,6 +1268,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				36EE6CC217F0F97400BA9635 /* alloc.hpp in Headers */,
+				F43098B41B021C04000A2333 /* bptree.hpp in Headers */,
 				36EE6CC117F0F97400BA9635 /* alloc_slab.hpp in Headers */,
 				365CCE40157CC37D00172BF8 /* array.hpp in Headers */,
 				36F3823A170D000300C95BCD /* array_basic.hpp in Headers */,
@@ -1379,6 +1389,7 @@
 				4142C9731623478700B3B902 /* lang_bind_helper.hpp in Headers */,
 				4142C9751623478700B3B902 /* mixed.hpp in Headers */,
 				4142C9781623478700B3B902 /* query.hpp in Headers */,
+				F43098B51B021C04000A2333 /* bptree.hpp in Headers */,
 				4142C9761623478700B3B902 /* query_conditions.hpp in Headers */,
 				4142C9771623478700B3B902 /* query_engine.hpp in Headers */,
 				4142C9861623478700B3B902 /* realm.hpp in Headers */,
@@ -1723,6 +1734,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				36A1DC9116C3F2F30086A836 /* alloc.cpp in Sources */,
+				F43098B21B021C04000A2333 /* bptree.cpp in Sources */,
 				365CCE34157CC37D00172BF8 /* alloc_slab.cpp in Sources */,
 				365CCE3F157CC37D00172BF8 /* array.cpp in Sources */,
 				365CCE37157CC37D00172BF8 /* array_binary.cpp in Sources */,
@@ -1877,6 +1889,8 @@
 				F4D0FC7D1B00F62C0040956A /* file_mapper.cpp in Sources */,
 				4142C9491623478700B3B902 /* group.cpp in Sources */,
 				4142C9511623478700B3B902 /* group_shared.cpp in Sources */,
+				F43098B31B021C04000A2333 /* bptree.cpp in Sources */,
+				65D3F7A81AA75E3B00F27CBD /* array_integer.cpp in Sources */,
 				4142C9481623478700B3B902 /* group_writer.cpp in Sources */,
 				4142C9521623478700B3B902 /* index_string.cpp in Sources */,
 				52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */,

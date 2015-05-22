@@ -1,3 +1,4 @@
+
 /*************************************************************************
  *
  * REALM CONFIDENTIAL
@@ -25,6 +26,7 @@
 #include <realm/array_string_long.hpp>
 #include <realm/array_blobs_big.hpp>
 #include <realm/column.hpp>
+#include <realm/column_tpl.hpp>
 
 namespace realm {
 
@@ -44,7 +46,7 @@ class StringIndex;
 /// column.
 ///
 /// FIXME: Rename AdaptiveStringColumn to StringColumn
-class AdaptiveStringColumn: public ColumnBase, public ColumnTemplate<StringData> {
+class AdaptiveStringColumn: public ColumnBaseSimple, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
 
@@ -53,7 +55,7 @@ public:
 
     void destroy() REALM_NOEXCEPT override;
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
@@ -91,6 +93,7 @@ public:
     bool is_nullable() const;
 
     // Search index
+    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT final;
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
@@ -104,7 +107,7 @@ public:
     void destroy_search_index() REALM_NOEXCEPT override;
 
     // Optimizing data layout
-    // Optimizing data layout. enforce == true will enforce enumeration; 
+    // Optimizing data layout. enforce == true will enforce enumeration;
     // enforce == false will auto-evaluate if it should be enumerated or not
     bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;
 
@@ -117,7 +120,6 @@ public:
         leaf_type_Big     ///< ArrayBigBlobs
     };
 
-    
     std::unique_ptr<const ArrayParent> get_leaf(std::size_t ndx, std::size_t& out_ndx_in_parent,
                       LeafType& out_leaf_type) const;
 
@@ -154,8 +156,6 @@ private:
 
     LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
                       bool use_retval = false) const;
-
-    std::size_t do_get_size() const REALM_NOEXCEPT override { return size(); }
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either

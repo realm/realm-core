@@ -53,6 +53,7 @@ Searching: The main finding function is:
 #include <realm/alloc.hpp>
 #include <realm/string_data.hpp>
 #include <realm/query_conditions.hpp>
+#include <realm/column_fwd.hpp>
 
 /*
     MMX: mmintrin.h
@@ -147,7 +148,6 @@ const std::size_t not_found = npos;
 class Array;
 class AdaptiveStringColumn;
 class GroupWriter;
-class Column;
 template<class T> class QueryState;
 namespace _impl { class ArrayWriterBase; }
 
@@ -456,10 +456,10 @@ public:
     void ensure_minimum_width(int64_t value);
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
-    void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const;
-    size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
-    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const;
+    size_t IndexStringFindFirst(StringData value, ColumnBase* column) const;
+    void   IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const;
+    size_t IndexStringCount(StringData value, ColumnBase* column) const;
+    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, ColumnBase* column) const;
 
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().
@@ -929,9 +929,9 @@ protected:
 
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
-    template <IndexMethod method, class T> 
-    size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, 
-                        StringGetter get_func) const;
+    template <IndexMethod method, class T>
+    std::size_t index_string(StringData value, Column& result, ref_type& result_ref,
+                             ColumnBase* column) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
 
