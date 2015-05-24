@@ -426,8 +426,8 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     if (m_width < 8) {
         // FIXME: Should be optimized
         for (size_t i = begin; i != end; ++i) {
-            int_fast64_t v = (this->*m_getter)(i);
-            (this->*m_setter)(dest_begin++, v);
+            int_fast64_t v = (this->*(m_vtable->getter))(i);
+            (this->*(m_vtable->setter))(dest_begin++, v);
         }
         return;
     }
@@ -453,8 +453,8 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     if (m_width < 8) {
         // FIXME: Should be optimized
         for (size_t i = end; i != begin; --i) {
-            int_fast64_t v = (this->*m_getter)(i-1);
-            (this->*m_setter)(--dest_end, v);
+            int_fast64_t v = (this->*(m_vtable->getter))(i-1);
+            (this->*(m_vtable->setter))(--dest_end, v);
         }
         return;
     }
@@ -482,7 +482,7 @@ void Array::set(size_t ndx, int64_t value)
     if (do_expand) {
         size_t width = bit_width(value);
         REALM_ASSERT_DEBUG(width > m_width);
-        Getter old_getter = m_getter;    // Save old getter before width expansion
+        Getter old_getter = m_vtable->getter;    // Save old getter before width expansion
         alloc(m_size, width); // Throws
         set_width(width);
 
@@ -491,12 +491,12 @@ void Array::set(size_t ndx, int64_t value)
         while (i != 0) {
             --i;
             int64_t v = (this->*old_getter)(i);
-            (this->*m_setter)(i, v);
+            (this->*(m_vtable->setter))(i, v);
         }
     }
 
     // Set the value
-    (this->*m_setter)(ndx, value);
+    (this->*(m_vtable->setter))(ndx, value);
 }
 
 void Array::set_as_ref(std::size_t ndx, ref_type ref)
@@ -514,7 +514,7 @@ void Array::AddPositiveLocal(int64_t value)
 
     if (value <= m_ubound) {
         if (m_size < m_capacity) {
-            (this->*m_setter)(m_size, value);
+            (this->*(m_vtable->setter))(m_size, value);
             ++m_size;
             set_header_size(m_size);
             return;
@@ -532,7 +532,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    Getter old_getter = m_getter; // Save old getter before potential width expansion
+    Getter old_getter = m_vtable->getter; // Save old getter before potential width expansion
 
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
@@ -551,7 +551,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
         while (i > ndx) {
             --i;
             int64_t v = (this->*old_getter)(i);
-            (this->*m_setter)(i+1, v);
+            (this->*(m_vtable->setter))(i+1, v);
         }
     }
     else if (ndx != m_size) {
@@ -566,7 +566,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
     }
 
     // Insert the new value
-    (this->*m_setter)(ndx, value);
+    (this->*(m_vtable->setter))(ndx, value);
 
     // Expand values above insertion
     if (do_expand) {
@@ -574,7 +574,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
         while (i != 0) {
             --i;
             int64_t v = (this->*old_getter)(i);
-            (this->*m_setter)(i, v);
+            (this->*(m_vtable->setter))(i, v);
         }
     }
 
@@ -660,7 +660,7 @@ void Array::ensure_minimum_width(int64_t value)
     size_t width = bit_width(value);
     REALM_ASSERT_3(width, >, m_width);
 
-    Getter old_getter = m_getter; // Save old getter before width expansion
+    Getter old_getter = m_vtable->getter; // Save old getter before width expansion
     alloc(m_size, width); // Throws
     set_width(width);
 
@@ -669,7 +669,7 @@ void Array::ensure_minimum_width(int64_t value)
     while (i != 0) {
         --i;
         int64_t v = (this->*old_getter)(i);
-        (this->*m_setter)(i, v);
+        (this->*(m_vtable->setter))(i, v);
     }
 }
 
@@ -1744,6 +1744,27 @@ int_fast64_t Array::ubound_for_width() REALM_NOEXCEPT
     }
 }
 
+
+
+template <size_t width>
+struct Array::VTableForWidth {
+    struct PopulatedVTable : Array::VTable {
+        PopulatedVTable() {
+            getter = &Array::get<width>;
+            setter = &Array::set<width>;
+            chunk_getter = &Array::get_chunk<width>;
+            finder[cond_Equal] = &Array::find<Equal, act_ReturnFirst, width>;
+            finder[cond_NotEqual] = &Array::find<NotEqual, act_ReturnFirst, width>;
+            finder[cond_Greater] = &Array::find<Greater, act_ReturnFirst, width>;
+            finder[cond_Less] = &Array::find<Less, act_ReturnFirst, width>;
+        }
+    };
+    static const PopulatedVTable vtable;
+};
+
+template <size_t width>
+const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
+
 void Array::set_width(size_t width) REALM_NOEXCEPT
 {
     REALM_TEMPEX(set_width, width, ());
@@ -1755,28 +1776,8 @@ template<size_t width> void Array::set_width() REALM_NOEXCEPT
     m_ubound = ubound_for_width<width>();
 
     m_width = width;
-    // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of get() instead of get<n>
-    // if the declaration and association of the getter are on two different source lines
-    Getter temp_getter = &Array::get<width>;
-    m_getter = temp_getter;
 
-    ChunkGetter temp_chunk_getter = &Array::get_chunk<width>;
-    m_chunk_getter = temp_chunk_getter;
-
-    Setter temp_setter = &Array::set<width>;
-    m_setter = temp_setter;
-
-    Finder feq = &Array::find<Equal, act_ReturnFirst, width>;
-    m_finder[cond_Equal] = feq;
-
-    Finder fne = &Array::find<NotEqual, act_ReturnFirst, width>;
-    m_finder[cond_NotEqual]  = fne;
-
-    Finder fg = &Array::find<Greater, act_ReturnFirst, width>;
-    m_finder[cond_Greater] = fg;
-
-    Finder fl =  &Array::find<Less, act_ReturnFirst, width>;
-    m_finder[cond_Less] = fl;
+    m_vtable = &VTableForWidth<width>::vtable;
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to

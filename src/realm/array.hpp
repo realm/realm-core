@@ -602,7 +602,7 @@ public:
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
-    // This is the one installed into the m_finder slots.
+    // This is the one installed into the m_vtable->finder slots.
     template<class cond, Action action, size_t bitwidth>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
@@ -1052,11 +1052,16 @@ protected:
     typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
     typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
+    struct VTable {
+        Getter getter;
+        ChunkGetter chunk_getter;
+        Setter setter;
+        Finder finder[cond_Count]; // one for each COND_XXX enum
+    };
+    template <size_t w> struct VTableForWidth;
+
 private:
-    Getter m_getter;
-    ChunkGetter m_chunk_getter;
-    Setter m_setter;
-    Finder m_finder[cond_Count]; // one for each COND_XXX enum
+    const VTable* m_vtable;
 
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
@@ -1353,7 +1358,7 @@ inline Array::Type Array::get_type() const REALM_NOEXCEPT
 inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ndx < m_size);
-    (this->*m_chunk_getter)(ndx, res);
+    (this->*(m_vtable->chunk_getter))(ndx, res);
 }
 
 
@@ -1361,7 +1366,7 @@ inline int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG(ndx < m_size);
-    return (this->*m_getter)(ndx);
+    return (this->*(m_vtable->getter))(ndx);
 
 // Two ideas that are not efficient but may be worth looking into again:
 /*
@@ -1376,7 +1381,7 @@ inline int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
     if (m_width >= 8 && m_size > ndx + 7)
         return get<64>(ndx >> m_shift) & m_widthmask;
     else
-        return (this->*m_getter)(ndx);
+        return (this->*(m_vtable->getter))(ndx);
 */
 }
 
@@ -2780,7 +2785,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 // There exists a couple of find() functions that take more or less template arguments. Always call the one that
 // takes as most as possible to get best performance.
 
-// This is the one installed into the m_finder slots.
+// This is the one installed into the m_vtable->finder slots.
 template<class cond, Action action, size_t bitwidth>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
@@ -3229,7 +3234,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
     REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, nullptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
-    Finder finder = m_finder[cond::condition];
+    Finder finder = m_vtable->finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 
     return static_cast<size_t>(state.m_state);
