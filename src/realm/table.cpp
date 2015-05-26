@@ -2909,6 +2909,11 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     auto& col = get_column_base(col_ndx);
     REALM_ASSERT(col.is_nullable());
     col.set_null(row_ndx);
+
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->set_null(this, col_ndx, row_ndx); // Throws
+#endif
 }
 
 

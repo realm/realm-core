@@ -1229,6 +1229,14 @@ void TColumn<T,N>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_app
     std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     T value{};
     insert(row_ndx_2, value, num_rows); // Throws
+
+    if (N) {
+        // Default value for nullable columns is NULL.
+        // FIXME: Make faster with an insert_null method.
+        for (size_t i = 0; i < num_rows; ++i) {
+            set_null(row_ndx + i);
+        }
+    }
 }
 
 // Implementing pure virtual method of ColumnBase.
