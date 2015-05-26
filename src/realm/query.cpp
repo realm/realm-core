@@ -361,26 +361,26 @@ Query& Query::links_to(size_t origin_column, size_t target_row)
 // int64 constant vs column
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, NotEqual>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<NotEqual>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Greater>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<Greater>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if (value > LLONG_MIN) {
-        ParentNode* const p = new IntegerNode<int64_t, Greater>(value - 1, column_ndx);
+        ParentNode* const p = new IntegerNode<Greater>(value - 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field >= LLONG_MIN has no effect
@@ -389,7 +389,7 @@ Query& Query::greater_equal(size_t column_ndx, int64_t value)
 Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if (value < LLONG_MAX) {
-        ParentNode* const p = new IntegerNode<int64_t, Less>(value + 1, column_ndx);
+        ParentNode* const p = new IntegerNode<Less>(value + 1, column_ndx);
         UpdatePointers(p, &p->m_child);
     }
     // field <= LLONG_MAX has no effect
@@ -397,7 +397,7 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
 }
 Query& Query::less(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Less>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<Less>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -411,7 +411,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -598,7 +598,7 @@ template <Action action, typename T, typename R, class ColType>
         SequentialGetter<ColType> source_column(*m_table, column_ndx);
 
         if (!m_view) {
-            aggregate_internal(action, ColumnTypeTraits<T>::id, first[0], &st, start, end, &source_column);
+            aggregate_internal(action, ColumnTypeTraits<T>::id, ColType::nullable, first[0], &st, start, end, &source_column);
         }
         else {
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
@@ -627,7 +627,7 @@ template <Action action, typename T, typename R, class ColType>
     *                                                                                                             *
     **************************************************************************************************************/
 
-    void Query::aggregate_internal(Action TAction, DataType TSourceColumn,
+    void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
                                    ParentNode* pn, QueryStateBase* st,
                                    size_t start, size_t end, SequentialGetterBase* source_column) const
     {
@@ -635,7 +635,7 @@ template <Action action, typename T, typename R, class ColType>
             end = m_table->size();
 
         for (size_t c = 0; c < pn->m_children.size(); c++)
-            pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn);
+            pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn, nullable);
 
         size_t td;
 
@@ -979,7 +979,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
     else {
         QueryState<int64_t> st;
         st.init(act_FindAll, &ret.m_row_indexes, limit);
-        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, first[0], &st, start, end, NULL);
     }
 }
 
@@ -1017,7 +1017,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     else {
         QueryState<int64_t> st;
         st.init(act_Count, nullptr, limit);
-        aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+        aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, first[0], &st, start, end, NULL);
         cnt = size_t(st.m_state);
     }
 

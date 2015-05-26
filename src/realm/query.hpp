@@ -292,7 +292,7 @@ private:
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
                     size_t* return_ndx = nullptr) const;
 
-    void aggregate_internal(Action TAction, DataType TSourceColumn,
+    void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
                             ParentNode* pn, QueryStateBase* st, 
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
