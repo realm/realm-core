@@ -166,45 +166,47 @@ void ArrayIntNull::find_all(Column* result, int64_t value, std::size_t col_offse
 }
 
 namespace {
-    // FIXME: Move this logic to BpTree.
-    struct ArrayIntNullLeafInserter {
-        template <class T>
-        static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, std::size_t ndx, T value, Array::TreeInsertBase& state)
-        {
-            size_t leaf_size = self.size();
-            REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
-            if (leaf_size < ndx)
-                ndx = leaf_size;
-            if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-                self.insert(ndx, value); // Throws
-                return 0; // Leaf was not split
-            }
-
-            // Split leaf node
-            ArrayIntNull new_leaf(alloc);
-            new_leaf.create(Array::type_Normal); // Throws
-            if (ndx == leaf_size) {
-                new_leaf.add(value); // Throws
-                state.m_split_offset = ndx;
-            }
-            else {
-                for (size_t i = ndx; i != leaf_size; ++i) {
-                    if (self.is_null(i)) {
-                        new_leaf.add(null{}); // Throws
-                    }
-                    else {
-                        new_leaf.add(self.get(i)); // Throws
-                    }
-                }
-                self.truncate(ndx); // Throws
-                self.add(value); // Throws
-                state.m_split_offset = ndx + 1;
-            }
-            state.m_split_size = leaf_size + 1;
-            return new_leaf.get_ref();
+    
+// FIXME: Move this logic to BpTree.
+struct ArrayIntNullLeafInserter {
+    template <class T>
+    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, std::size_t ndx, T value, Array::TreeInsertBase& state)
+    {
+        size_t leaf_size = self.size();
+        REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
+        if (leaf_size < ndx)
+            ndx = leaf_size;
+        if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
+            self.insert(ndx, value); // Throws
+            return 0; // Leaf was not split
         }
-    };
-}
+
+        // Split leaf node
+        ArrayIntNull new_leaf(alloc);
+        new_leaf.create(Array::type_Normal); // Throws
+        if (ndx == leaf_size) {
+            new_leaf.add(value); // Throws
+            state.m_split_offset = ndx;
+        }
+        else {
+            for (size_t i = ndx; i != leaf_size; ++i) {
+                if (self.is_null(i)) {
+                    new_leaf.add(null{}); // Throws
+                }
+                else {
+                    new_leaf.add(self.get(i)); // Throws
+                }
+            }
+            self.truncate(ndx); // Throws
+            self.add(value); // Throws
+            state.m_split_offset = ndx + 1;
+        }
+        state.m_split_size = leaf_size + 1;
+        return new_leaf.get_ref();
+    }
+};
+
+} // anonymous namespace
 
 ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, int64_t value, Array::TreeInsertBase& state)
 {
