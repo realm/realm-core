@@ -289,7 +289,7 @@ class ParentNode {
     typedef ParentNode ThisType;
 public:
 
-    ParentNode(): m_table(0)
+    ParentNode()
     {
     }
 
@@ -405,18 +405,16 @@ public:
     }
 
 
-    ParentNode* m_child;
-    std::vector<ParentNode*>m_children;
-    size_t m_condition_column_idx; // Column of search criteria
+    ParentNode* m_child = nullptr;
+    std::vector<ParentNode*> m_children;
+    size_t m_condition_column_idx = npos; // Column of search criteria
 
-    size_t m_conds;
+    size_t m_conds = 0;
     double m_dD; // Average row distance between each local match at current position
     double m_dT; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0 for index/tableview
 
-    size_t m_probes;
-    size_t m_matches;
-
-
+    size_t m_probes = 0;
+    size_t m_matches = 0;
 protected:
     typedef bool (ParentNode::* TColumn_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
     TColumn_action_specialized m_column_action_specializer;
@@ -437,7 +435,7 @@ protected:
 // Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
 class ListviewNode: public ParentNode {
 public:
-    ListviewNode(TableView& tv) : m_max(0), m_next(0), m_size(tv.size()), m_tv(tv) { m_child = 0; m_dT = 0.0; }
+    ListviewNode(TableView& tv) : m_size(tv.size()), m_tv(tv) { m_dT = 0.0; }
     ~ListviewNode() REALM_NOEXCEPT override {  }
 
     // Return the n'th table row index contained in the TableView.
@@ -451,8 +449,6 @@ public:
         m_table = &table;
 
         m_dD = m_table->size() / (m_tv.size() + 1.0);
-        m_probes = 0;
-        m_matches = 0;
 
         m_next = 0;
         if (m_size > 0)
@@ -488,8 +484,8 @@ public:
     }
 
 protected:
-    size_t m_max;
-    size_t m_next;
+    size_t m_max = 0;
+    size_t m_next = 0;
     size_t m_size;
 
     TableView& m_tv;
@@ -499,16 +495,13 @@ protected:
 // only if one or more subtable rows match the condition.
 class SubtableNode: public ParentNode {
 public:
-    SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
+    SubtableNode(size_t column): m_column(column) { m_dT = 100.0; }
     SubtableNode() {};
     ~SubtableNode() REALM_NOEXCEPT override {}
 
     void init(const Table& table) override
     {
         m_dD = 10.0;
-        m_probes = 0;
-        m_matches = 0;
-
         m_table = &table;
 
         // m_child is first node in condition of subtable query.
@@ -579,8 +572,8 @@ public:
         m_child = from.m_child;
     }
 
-    ParentNode* m_child2;
-    size_t m_column;
+    ParentNode* m_child2 = nullptr;
+    size_t m_column = npos;
 };
 
 
@@ -624,21 +617,14 @@ public:
 
     IntegerNodeBase()
     {
-        m_child = 0;
-        m_conds = 0;
         m_dT = 1.0 / 4.0;
-        m_probes = 0;
-        m_matches = 0;
     }
 
     IntegerNodeBase(const IntegerNodeBase& from) : ParentNode(from)
     {
         // state is transient/only valid during search, no need to copy
         m_child = from.m_child;
-        m_conds = 0;
         m_dT = 1.0 / 4.0;
-        m_probes = 0;
-        m_matches = 0;
     }
 
     void init(const Table& table) override
@@ -889,7 +875,6 @@ public:
     FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
     {
         m_condition_column_idx = column_ndx;
-        m_child = 0;
         m_dT = 1.0;
     }
     ~FloatDoubleNode() REALM_NOEXCEPT override {}
@@ -944,7 +929,6 @@ public:
     {
         m_dT = 100.0;
         m_condition_column_idx = column;
-        m_child = 0;
 
         // FIXME: Store this in std::string instead.
         char* data = v.is_null() ? nullptr : new char[v.size()];
@@ -1745,7 +1729,6 @@ public:
     ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
-        m_child = 0;
         m_compare = util::SharedPtr<Expression>(compare);
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1786,7 +1769,6 @@ public:
     LinksToNode(size_t origin_column_index, size_t target_row) : m_origin_column(origin_column_index),
                                                                  m_target_row(target_row)
     {
-        m_child = 0;
         m_dD = 10.0;
         m_dT = 50.0;
     }
