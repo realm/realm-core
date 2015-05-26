@@ -24,8 +24,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
-* 
+* Fixed LinkViews containing incorrect data after a write transaction
+  containing a table clear is rolled back.
+
 ### API breaking changes:
 
 * Lorem ipsum.
