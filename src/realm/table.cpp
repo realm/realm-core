@@ -60,7 +60,7 @@
 /// an unexpected exception (such as std::bad_alloc). It is also the **minimum**
 /// level of consistency that is required to be able to properly destroy the
 /// accessor objects (manually, or as a result of stack unwinding).
-/// 
+///
 /// It is supposed to be a library-wide invariant that an accessor hierarchy is
 /// at least minimally consistent, but so far, only some parts of the library
 /// conform to it.
@@ -1067,8 +1067,9 @@ void Table::create_degen_subtab_columns()
     size_t num_cols = m_spec.get_column_count();
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = m_spec.get_column_type(i);
+        bool nullable = (m_spec.get_column_attr(i) & col_attr_Nullable) != 0;
         size_t size = 0;
-        ref_type ref = create_column(type, size, false, alloc); // Throws
+        ref_type ref = create_column(type, size, nullable, alloc); // Throws
         m_columns.add(int_fast64_t(ref)); // Throws
 
         // So far, only root tables can have search indexes, and this is not a
