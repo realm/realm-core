@@ -418,6 +418,7 @@ public:
     using value_type = T;
     using LeafInfo = typename BpTree<T, Nullable>::LeafInfo;
 	using LeafType = typename BpTree<T, Nullable>::LeafType;
+    static const bool nullable = Nullable;
 
     struct unattached_root_tag {};
 

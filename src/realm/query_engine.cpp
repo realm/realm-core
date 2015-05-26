@@ -1,5 +1,16 @@
 #include <realm/query_engine.hpp>
 
+namespace realm {
+namespace _impl {
+
+const double CostHeuristic<Column>::dD = 100.0;
+const double CostHeuristic<Column>::dT = 1.0 / 4.0;
+const double CostHeuristic<ColumnIntNull>::dD = 100.0;
+const double CostHeuristic<ColumnIntNull>::dT = 1.0 / 4.0;
+
+}
+}
+
 using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)
@@ -27,8 +38,10 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
-void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id)
+void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
+    static_cast<void>(nullable);
+
     if (TAction == act_ReturnFirst)
         m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, Column>;
 
