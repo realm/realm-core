@@ -1338,7 +1338,7 @@ private:
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-	using ColType = typename ColumnTypeTraits<T>::column_type;
+    using ColType = typename ColumnTypeTraits<T>::column_type;
 
     Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr), 
                                                                             m_table(nullptr), sg(nullptr),

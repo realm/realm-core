@@ -349,11 +349,11 @@ public:
     template<Action TAction, class TSourceColumn>
     bool column_action_specialization(QueryStateBase* st, SequentialGetterBase* source_column, size_t r)
     {
-		// TResult: type of query result
-		// TSourceValue: type of aggregate source
-		using TSourceValue = typename TSourceColumn::value_type;
-		using TResult = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
-		
+        // TResult: type of query result
+        // TSourceValue: type of aggregate source
+        using TSourceValue = typename TSourceColumn::value_type;
+        using TResult = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
+
         // Sum of float column must accumulate in double
         REALM_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceValue, float>::value &&
                                                         !util::SameType<TResult, double>::value)), "");
@@ -592,9 +592,9 @@ public:
     // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
     template <Action TAction, class ColType> bool match_callback(int64_t v)
     {
-		using TSourceValue = typename ColType::value_type;
-		using QueryStateType = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
-		
+        using TSourceValue = typename ColType::value_type;
+        using QueryStateType = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
+
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
@@ -884,7 +884,7 @@ protected:
 // This node is currently used for floats and doubles only
 template <class ColType, class TConditionFunction> class FloatDoubleNode: public ParentNode {
 public:
-	using TConditionValue = typename ColType::value_type;
+    using TConditionValue = typename ColType::value_type;
 
     FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
     {
@@ -1621,8 +1621,8 @@ private:
 // Compare two columns with eachother row-by-row
 template <class ColType, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
-	using TConditionValue = typename ColType::value_type;
-	
+    using TConditionValue = typename ColType::value_type;
+
     template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     TwoColumnsNode(size_t column1, size_t column2)

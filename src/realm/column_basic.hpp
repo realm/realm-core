@@ -35,17 +35,17 @@ template<> struct AggReturnType<float> {
 
 template <>
 struct GetLeafType<float, false> {
-	using type = BasicArray<float>;
+    using type = BasicArray<float>;
 };
 template <>
 struct GetLeafType<double, false> {
-	using type = BasicArray<double>;
+    using type = BasicArray<double>;
 };
 
 // FIXME: Remove this — it's unused except in tests.
 template <>
 struct GetLeafType<int, false> {
-	using type = ArrayInteger;
+    using type = ArrayInteger;
 };
 
 
@@ -58,8 +58,8 @@ struct GetLeafType<int, false> {
 template<class T>
 class BasicColumn : public ColumnBaseSimple, public ColumnTemplate<T> {
 public:
-	using LeafType = typename GetLeafType<T, false>::type;
-	using value_type = T;
+    using LeafType = typename GetLeafType<T, false>::type;
+    using value_type = T;
     BasicColumn(Allocator&, ref_type);
 
     std::size_t size() const REALM_NOEXCEPT final;
