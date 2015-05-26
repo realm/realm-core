@@ -848,7 +848,7 @@ private:
             case type_Binary:
                 return "type_Binary";
             case type_DateTime:
-                return "type_DataTime";
+                return "type_DateTime";
             case type_Table:
                 return "type_Table";
             case type_Mixed:

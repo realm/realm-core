@@ -71,6 +71,12 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
     m_selected_spec = nullptr;
     m_selected_link_list = nullptr;
     m_selected_table = table;
+
+#ifdef REALM_DEBUG
+    m_log << "table = group->get_table("<<*begin<<");\n";
+    for (size_t i = 0; i < levels; ++i)
+        m_log << "table = group->get_subtable("<<begin[2 * i]<<", "<<begin[2 * i + 1]<<");\n";
+#endif
 }
 
 bool TransactLogEncoder::select_descriptor(size_t levels, const size_t* path)
@@ -116,6 +122,12 @@ void TransactLogConvenientEncoder::do_select_desc(const Descriptor& desc)
 
     m_encoder.select_descriptor(end - begin, begin); // Throws
     m_selected_spec = &df::get_spec(desc);
+
+#ifdef REALM_DEBUG
+    m_log << "desc = table->get_descriptor();\n";
+    for (size_t* col_ndx = begin; col_ndx != end; ++col_ndx)
+        m_log << "desc = desc->get_subdescriptor("<<*col_ndx<<");\n";
+#endif
 }
 
 bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx)
@@ -132,6 +144,10 @@ void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
     size_t row_ndx = list.get_origin_row_index();
     m_encoder.select_link_list(col_ndx, row_ndx); // Throws
     m_selected_link_list = &list;
+
+#ifdef REALM_DEBUG
+    m_log << "link_list = table->get_linklist("<<col_ndx<<", "<<row_ndx<<");\n";
+#endif
 }
 
 REALM_NORETURN

@@ -310,6 +310,8 @@ public:
     void on_spec_destroyed(const Spec*) REALM_NOEXCEPT;
     void on_link_list_destroyed(const LinkView&) REALM_NOEXCEPT;
 
+    void set_debug_log(std::streambuf*) REALM_NOEXCEPT;
+
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
 
@@ -319,6 +321,11 @@ protected:
 
 private:
     TransactLogEncoder m_encoder;
+
+#ifdef REALM_DEBUG
+    std::ostream m_log{nullptr};
+#endif
+
     // These are mutable because they are caches.
     mutable util::Buffer<std::size_t> m_subtab_path_buf;
     mutable const Table*    m_selected_table;
@@ -409,6 +416,15 @@ public:
 
 
 /// Implementation:
+
+inline void TransactLogConvenientEncoder::set_debug_log(std::streambuf *buf) REALM_NOEXCEPT
+{
+#ifdef REALM_DEBUG
+    m_log.rdbuf(buf);
+#else
+    static_cast<void>(buf);
+#endif
+}
 
 inline void TransactLogBufferStream::transact_log_reserve(std::size_t n, char** inout_new_begin, char** out_new_end)
 {
@@ -725,6 +741,9 @@ inline void TransactLogConvenientEncoder::insert_group_level_table(std::size_t t
                                                   StringData name)
 {
     m_encoder.insert_group_level_table(table_ndx, num_tables, name);
+#ifdef REALM_DEBUG
+    m_log << "group->add_table(\""<<name<<"\");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
@@ -736,6 +755,9 @@ inline bool TransactLogEncoder::erase_group_level_table(std::size_t table_ndx, s
 inline void TransactLogConvenientEncoder::erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
 {
     m_encoder.erase_group_level_table(table_ndx, num_tables);
+#ifdef REALM_DEBUG
+    m_log << "group->remove_table("<<table_ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::rename_group_level_table(std::size_t table_ndx, StringData new_name)
@@ -748,6 +770,9 @@ inline bool TransactLogEncoder::rename_group_level_table(std::size_t table_ndx, 
 inline void TransactLogConvenientEncoder::rename_group_level_table(std::size_t table_ndx, StringData new_name)
 {
     m_encoder.rename_group_level_table(table_ndx, new_name);
+#ifdef REALM_DEBUG
+    m_log << "group->rename_table("<<table_ndx<<", \""<<new_name<<"\");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_column(std::size_t col_ndx, DataType type, StringData name, bool nullable)
@@ -768,6 +793,51 @@ inline bool TransactLogEncoder::insert_link_column(std::size_t col_ndx, DataType
     return true;
 }
 
+#ifdef REALM_DEBUG
+namespace {
+const char* data_type_to_str(DataType type)
+{
+    switch (type) {
+        case type_Int:
+            return "type_Int";
+        case type_Bool:
+            return "type_Bool";
+        case type_Float:
+            return "type_Float";
+        case type_Double:
+            return "type_Double";
+        case type_String:
+            return "type_String";
+        case type_Binary:
+            return "type_Binary";
+        case type_DateTime:
+            return "type_DateTime";
+        case type_Table:
+            return "type_Table";
+        case type_Mixed:
+            return "type_Mixed";
+        case type_Link:
+            return "type_Link";
+        case type_LinkList:
+            return "type_LinkList";
+    }
+    REALM_ASSERT(false);
+    return 0;
+}
+
+const char* link_type_to_str(LinkType type)
+{
+    switch (type) {
+        case link_Strong:
+            return "link_Strong";
+        case link_Weak:
+            return "link_Weak";
+    }
+    REALM_ASSERT(false);
+    return 0;
+}
+} // anonymous namespace
+#endif
 
 inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, std::size_t col_ndx, DataType type,
                                        StringData name, const Table* link_target_table, bool nullable)
@@ -783,9 +853,17 @@ inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, 
         std::size_t origin_table_ndx = origin_table.get_index_in_group();
         std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
         m_encoder.insert_link_column(col_ndx, type, name, target_table_ndx, backlink_col_ndx); // Throws
+
+#ifdef REALM_DEBUG
+        m_log << "desc->insert_column_link("<<col_ndx<<", "<<data_type_to_str(type)
+              << ", \""<<name<<"\", *group->get_table("<<link_target_table->get_index_in_group()<<"));\n";
+#endif
     }
     else {
         m_encoder.insert_column(col_ndx, type, name, nullable);
+#ifdef REALM_DEBUG
+        m_log << "desc->insert_column("<<col_ndx<<", "<<data_type_to_str(type)<<", \""<<name<<"\", "<<nullable<<");\n";
+#endif
     }
 }
 
@@ -822,6 +900,9 @@ inline void TransactLogConvenientEncoder::erase_column(const Descriptor& desc, s
         std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
         m_encoder.erase_link_column(col_ndx, target_table_ndx, backlink_col_ndx); // Throws
     }
+#ifdef REALM_DEBUG
+    m_log << "desc->remove_column("<<col_ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::rename_column(std::size_t col_ndx, StringData new_name)
@@ -836,6 +917,9 @@ inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, 
 {
     select_desc(desc); // Throws
     m_encoder.rename_column(col_ndx, name); // Throws
+#ifdef REALM_DEBUG
+    m_log << "desc->rename_column("<<col_ndx<<", \""<<name<<"\");\n";
+#endif
 }
 
 
@@ -850,6 +934,9 @@ inline void TransactLogConvenientEncoder::set_int(const Table* t, std::size_t co
 {
     select_table(t); // Throws
     m_encoder.set_int(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_int("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_bool(std::size_t col_ndx, std::size_t ndx, bool value)
@@ -863,6 +950,9 @@ inline void TransactLogConvenientEncoder::set_bool(const Table* t, std::size_t c
 {
     select_table(t); // Throws
     m_encoder.set_bool(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_bool("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_float(std::size_t col_ndx, std::size_t ndx, float value)
@@ -876,6 +966,9 @@ inline void TransactLogConvenientEncoder::set_float(const Table* t, std::size_t 
 {
     select_table(t); // Throws
     m_encoder.set_float(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_float("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_double(std::size_t col_ndx, std::size_t ndx, double value)
@@ -889,6 +982,9 @@ inline void TransactLogConvenientEncoder::set_double(const Table* t, std::size_t
 {
     select_table(t); // Throws
     m_encoder.set_double(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_double("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_string(std::size_t col_ndx, std::size_t ndx, StringData value)
@@ -902,6 +998,9 @@ inline void TransactLogConvenientEncoder::set_string(const Table* t, std::size_t
 {
     select_table(t); // Throws
     m_encoder.set_string(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_string("<<col_ndx<<", "<<ndx<<", \""<<value<<"\");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_binary(std::size_t col_ndx, std::size_t ndx, BinaryData value)
@@ -915,6 +1014,9 @@ inline void TransactLogConvenientEncoder::set_binary(const Table* t, std::size_t
 {
     select_table(t); // Throws
     m_encoder.set_binary(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_binary("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_date_time(std::size_t col_ndx, std::size_t ndx, DateTime value)
@@ -928,6 +1030,9 @@ inline void TransactLogConvenientEncoder::set_date_time(const Table* t, std::siz
 {
     select_table(t); // Throws
     m_encoder.set_date_time(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_datetime("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_table(std::size_t col_ndx, std::size_t ndx)
@@ -941,6 +1046,9 @@ inline void TransactLogConvenientEncoder::set_table(const Table* t, std::size_t 
 {
     select_table(t); // Throws
     m_encoder.set_table(col_ndx, ndx); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->clear_subtable("<<col_ndx<<", "<<ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_mixed(std::size_t col_ndx, std::size_t ndx, const Mixed& value)
@@ -954,6 +1062,9 @@ inline void TransactLogConvenientEncoder::set_mixed(const Table* t, std::size_t 
 {
     select_table(t); // Throws
     m_encoder.set_mixed(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_mixed("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::set_link(std::size_t col_ndx, std::size_t ndx, std::size_t value)
@@ -970,6 +1081,12 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, std::size_t c
 {
     select_table(t); // Throws
     m_encoder.set_link(col_ndx, ndx, value); // Throws
+#ifdef REALM_DEBUG
+    if (value == realm::npos)
+        m_log << "table->nullify_link("<<col_ndx<<", "<<ndx<<");\n";
+    else
+        m_log << "table->set_link("<<col_ndx<<", "<<ndx<<", "<<value-1<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::nullify_link(std::size_t col_ndx, std::size_t ndx)
@@ -996,6 +1113,9 @@ inline void TransactLogConvenientEncoder::insert_int(const Table* t, std::size_t
 {
     select_table(t); // Throws
     m_encoder.insert_int(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_int("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_bool(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, bool value)
@@ -1009,6 +1129,9 @@ inline void TransactLogConvenientEncoder::insert_bool(const Table* t, std::size_
 {
     select_table(t); // Throws
     m_encoder.insert_bool(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_bool("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_float(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, float value)
@@ -1022,6 +1145,9 @@ inline void TransactLogConvenientEncoder::insert_float(const Table* t, std::size
 {
     select_table(t); // Throws
     m_encoder.insert_float(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_float("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_double(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, double value)
@@ -1035,6 +1161,9 @@ inline void TransactLogConvenientEncoder::insert_double(const Table* t, std::siz
 {
     select_table(t); // Throws
     m_encoder.insert_double(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_double("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_string(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, StringData value)
@@ -1049,6 +1178,9 @@ inline void TransactLogConvenientEncoder::insert_string(const Table* t, std::siz
 {
     select_table(t); // Throws
     m_encoder.insert_string(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_string("<<col_ndx<<", "<<ndx<<", \""<<value<<"\");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_binary(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, BinaryData value)
@@ -1063,6 +1195,9 @@ inline void TransactLogConvenientEncoder::insert_binary(const Table* t, std::siz
 {
     select_table(t); // Throws
     m_encoder.insert_binary(col_ndx, ndx, t->size(), value);
+#ifdef REALM_DEBUG
+    m_log << "table->insert_binary("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_date_time(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, DateTime value)
@@ -1076,6 +1211,9 @@ inline void TransactLogConvenientEncoder::insert_date_time(const Table* t, std::
 {
     select_table(t); // Throws
     m_encoder.insert_date_time(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_date_time("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_table(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz)
@@ -1089,6 +1227,9 @@ inline void TransactLogConvenientEncoder::insert_table(const Table* t, std::size
 {
     select_table(t); // Throws
     m_encoder.insert_table(col_ndx, ndx, t->size()); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_table("<<col_ndx<<", "<<ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_mixed(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, const Mixed& value)
@@ -1103,6 +1244,9 @@ inline void TransactLogConvenientEncoder::insert_mixed(const Table* t, std::size
 {
     select_table(t); // Throws
     m_encoder.insert_mixed(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_mixed("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_link(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, std::size_t value)
@@ -1117,6 +1261,9 @@ inline void TransactLogConvenientEncoder::insert_link(const Table* t, std::size_
 {
     select_table(t); // Throws
     m_encoder.insert_link(col_ndx, ndx, t->size(), value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_link("<<col_ndx<<", "<<ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_link_list(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz)
@@ -1129,6 +1276,9 @@ inline void TransactLogConvenientEncoder::insert_link_list(const Table* t, std::
 {
     select_table(t); // Throws
     m_encoder.insert_link_list(col_ndx, ndx, t->size()); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_link_list("<<col_ndx<<", "<<ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::row_insert_complete()
@@ -1141,6 +1291,9 @@ inline void TransactLogConvenientEncoder::row_insert_complete(const Table* t)
 {
     select_table(t); // Throws
     m_encoder.row_insert_complete(); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_done();\n";
+#endif
 }
 
 inline bool TransactLogEncoder::insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
@@ -1157,6 +1310,9 @@ inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, std:
     // default to unordered, if we are inserting at the end:
     bool unordered = row_ndx == t->size()-num_rows;
     m_encoder.insert_empty_rows(row_ndx, num_rows, t->size(), unordered); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->insert_empty_row("<<row_ndx<<", "<<num_rows<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
@@ -1172,6 +1328,12 @@ inline void TransactLogConvenientEncoder::erase_row(const Table* t, std::size_t 
     select_table(t); // Throws
     std::size_t num_rows = 1; // FIXME: might want to make this parameter externally visible?
     m_encoder.erase_rows(row_ndx, num_rows, t->size(), move_last_over); // Throws
+#ifdef REALM_DEBUG
+    if (move_last_over)
+        m_log << "table->move_last_over("<<row_ndx<<");\n";
+    else
+        m_log << "table->remove("<<row_ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::add_int_to_column(std::size_t col_ndx, int_fast64_t value)
@@ -1184,6 +1346,9 @@ inline void TransactLogConvenientEncoder::add_int_to_column(const Table* t, std:
 {
     select_table(t); // Throws
     m_encoder.add_int_to_column(col_ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->add_int_to_column("<<col_ndx<<", "<<value<<");\n";
+#endif
 }
 
 
@@ -1197,6 +1362,9 @@ inline void TransactLogConvenientEncoder::add_search_index(const Table* t, std::
 {
     select_table(t); // Throws
     m_encoder.add_search_index(col_ndx); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->add_search_index("<<col_ndx<<");\n";
+#endif
 }
 
 
@@ -1210,6 +1378,9 @@ inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, st
 {
     select_table(t); // Throws
     m_encoder.remove_search_index(col_ndx); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->remove_search_index("<<col_ndx<<");\n";
+#endif
 }
 
 
@@ -1223,6 +1394,9 @@ inline void TransactLogConvenientEncoder::add_primary_key(const Table* t, std::s
 {
     select_table(t); // Throws
     m_encoder.add_primary_key(col_ndx); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->add_primary_key("<<col_ndx<<");\n";
+#endif
 }
 
 
@@ -1236,6 +1410,9 @@ inline void TransactLogConvenientEncoder::remove_primary_key(const Table* t)
 {
     select_table(t); // Throws
     m_encoder.remove_primary_key(); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->remove_primary_key();\n";
+#endif
 }
 
 
@@ -1249,6 +1426,9 @@ inline void TransactLogConvenientEncoder::set_link_type(const Table* t, std::siz
 {
     select_table(t); // Throws
     m_encoder.set_link_type(col_ndx, link_type); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->set_link_type("<<col_ndx<<", \""<<link_type_to_str(link_type)<<"\");\n";
+#endif
 }
 
 
@@ -1262,6 +1442,9 @@ inline void TransactLogConvenientEncoder::clear_table(const Table* t)
 {
     select_table(t); // Throws
     m_encoder.clear_table(); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->clear();\n";
+#endif
 }
 
 inline bool TransactLogEncoder::optimize_table()
@@ -1274,6 +1457,9 @@ inline void TransactLogConvenientEncoder::optimize_table(const Table* t)
 {
     select_table(t); // Throws
     m_encoder.optimize_table(); // Throws
+#ifdef REALM_DEBUG
+    m_log << "table->optimize();\n";
+#endif
 }
 
 inline bool TransactLogEncoder::link_list_set(std::size_t link_ndx, std::size_t value)
@@ -1287,6 +1473,9 @@ inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, st
 {
     select_link_list(list); // Throws
     m_encoder.link_list_set(link_ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "link_list->set("<<link_ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::link_list_nullify(std::size_t link_ndx)
@@ -1326,6 +1515,9 @@ inline void TransactLogConvenientEncoder::link_list_insert(const LinkView& list,
 {
     select_link_list(list); // Throws
     m_encoder.link_list_insert(link_ndx, value); // Throws
+#ifdef REALM_DEBUG
+    m_log << "link_list->insert("<<link_ndx<<", "<<value<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx)
@@ -1339,6 +1531,9 @@ inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, s
 {
     select_link_list(list); // Throws
     m_encoder.link_list_move(old_link_ndx, new_link_ndx); // Throws
+#ifdef REALM_DEBUG
+    m_log << "link_list->move("<<old_link_ndx<<", "<<new_link_ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::link_list_erase(std::size_t link_ndx)
@@ -1351,6 +1546,9 @@ inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, 
 {
     select_link_list(list); // Throws
     m_encoder.link_list_erase(link_ndx); // Throws
+#ifdef REALM_DEBUG
+    m_log << "link_list->erase("<<link_ndx<<");\n";
+#endif
 }
 
 inline bool TransactLogEncoder::link_list_clear()
@@ -1363,6 +1561,9 @@ inline void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_clear(); // Throws
+#ifdef REALM_DEBUG
+    m_log << "link_list->clear();\n";
+#endif
 }
 
 inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) REALM_NOEXCEPT
