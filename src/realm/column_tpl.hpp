@@ -63,9 +63,9 @@ struct FindInLeaf {
     {
         Condition cond;
         bool cont = true;
-        for(size_t local_index = local_start; cont && local_index < local_end; local_index++) {
+        for (size_t local_index = local_start; cont && local_index < local_end; local_index++) {
             auto v = leaf.get(local_index);
-            if(cond(v, target)) {
+            if (cond(v, target)) {
                 cont = state.template match<action, false>(leaf_start + local_index , 0, static_cast<R>(v));
             }
         }
