@@ -284,7 +284,7 @@ private:
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
 
-    template<typename T> double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
+    template<typename T, bool Nullable> double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
                                         size_t end=size_t(-1), size_t limit = size_t(-1)) const;
 
     template <Action action, typename T, typename R, class ColClass>

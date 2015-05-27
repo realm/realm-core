@@ -575,7 +575,7 @@ template <Action action, typename T, typename R, class ColType>
         end = m_view ? m_view->size() : m_table->size();
 
     const ColType& column =
-        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
+        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T, ColType::nullable>::id)>(column_ndx);
 
     if ((first.size() == 0 || first[0] == 0) && !m_view) {
 
@@ -598,7 +598,7 @@ template <Action action, typename T, typename R, class ColType>
         SequentialGetter<ColType> source_column(*m_table, column_ndx);
 
         if (!m_view) {
-            aggregate_internal(action, ColumnTypeTraits<T>::id, ColType::nullable, first[0], &st, start, end, &source_column);
+            aggregate_internal(action, ColumnTypeTraits<T, ColType::nullable>::id, ColType::nullable, first[0], &st, start, end, &source_column);
         }
         else {
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
@@ -742,7 +742,7 @@ DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t 
 
 // Average
 
-template <typename T>
+template <typename T, bool Nullable>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if(limit == 0 || m_table->is_degenerate()) {
@@ -752,8 +752,8 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     }
 
     size_t resultcount2 = 0;
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    typedef typename ColumnTypeTraits<T>::sum_type SumType;
+    typedef typename ColumnTypeTraits<T, Nullable>::column_type ColType;
+    typedef typename ColumnTypeTraits<T, Nullable>::sum_type SumType;
     const SumType sum1 = aggregate<act_Sum, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
     double avg1 = 0;
     if (resultcount2 != 0)
@@ -765,15 +765,24 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
 
 double Query::average_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return average<int64_t>(column_ndx, resultcount, start, end, limit);
+    if (m_table->is_nullable(column_ndx)) {
+        return average<int64_t, true>(column_ndx, resultcount, start, end, limit);
+    }
+    return average<int64_t, false>(column_ndx, resultcount, start, end, limit);
 }
 double Query::average_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return average<float>(column_ndx, resultcount, start, end, limit);
+    if (m_table->is_nullable(column_ndx)) {
+        return average<float, true>(column_ndx, resultcount, start, end, limit);
+    }
+    return average<float, false>(column_ndx, resultcount, start, end, limit);
 }
 double Query::average_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return average<double>(column_ndx, resultcount, start, end, limit);
+    if (m_table->is_nullable(column_ndx)) {
+        return average<double, true>(column_ndx, resultcount, start, end, limit);
+    }
+    return average<double, false>(column_ndx, resultcount, start, end, limit);
 }
 
 
@@ -979,7 +988,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
     else {
         QueryState<int64_t> st;
         st.init(act_FindAll, &ret.m_row_indexes, limit);
-        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, first[0], &st, start, end, NULL);
+        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t, false>::id, false, first[0], &st, start, end, NULL);
     }
 }
 
@@ -1017,7 +1026,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     else {
         QueryState<int64_t> st;
         st.init(act_Count, nullptr, limit);
-        aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, first[0], &st, start, end, NULL);
+        aggregate_internal(act_Count, ColumnTypeTraits<int64_t, false>::id, false, first[0], &st, start, end, NULL);
         cnt = size_t(st.m_state);
     }
 
