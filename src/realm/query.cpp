@@ -676,6 +676,9 @@ template <Action action, typename T, typename R, class ColType>
 
 int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if (m_table->is_nullable(column_ndx)) {
+        return aggregate<act_Sum, int64_t>(&ColumnIntNull::sum, column_ndx, resultcount, start, end, limit);
+    }
     return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
@@ -692,12 +695,18 @@ double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, s
 int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
                            size_t* return_ndx) const
 {
+    if (m_table->is_nullable(column_ndx)) {
+        return aggregate<act_Max, int64_t>(&ColumnIntNull::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    }
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
                                  size_t limit, size_t* return_ndx) const
 {
+    if (m_table->is_nullable(column_ndx)) {
+        return aggregate<act_Max, int64_t>(&ColumnIntNull::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    }
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
@@ -719,6 +728,9 @@ double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t star
 int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
                            size_t limit, size_t* return_ndx) const
 {
+    if (m_table->is_nullable(column_ndx)) {
+        return aggregate<act_Min, int64_t>(&ColumnIntNull::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    }
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
@@ -736,6 +748,9 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
 DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                                  size_t* return_ndx) const
 {
+    if (m_table->is_nullable(column_ndx)) {
+        return aggregate<act_Min, int64_t>(&ColumnIntNull::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    }
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
