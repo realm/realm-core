@@ -57,6 +57,40 @@
                                       "DefaultSuite", #name, __FILE__, __LINE__); \
     void Realm_UnitTest__##name::test_run()
 
+#define TEST_TYPES(name, ...) \
+    TEST_TYPES_IF(name, true, __VA_ARGS__)
+
+#define TEST_TYPES_IF(name, enabled, ...) \
+    TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, __VA_ARGS__)
+
+#define TEST_TYPES_EX(name, list, enabled, ...) \
+    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
+        bool test_enabled() const { return bool(enabled); } \
+        template <class T> void test_one(); \
+        template <class...> struct TestEach; \
+        void test_run(); \
+    }; \
+    template <class T, class... Rest> struct Realm_UnitTest__##name::TestEach<T, Rest...> { \
+        static void test_each(Realm_UnitTest__##name& self) \
+        { \
+            self.test_one<T>(); \
+            TestEach<Rest...>::test_each(self); \
+        } \
+    }; \
+    template <> struct Realm_UnitTest__##name::TestEach<> { \
+        static void test_each(Realm_UnitTest__##name&) {} \
+    }; \
+    Realm_UnitTest__##name realm_unit_test__##name; \
+    realm::test_util::unit_test::RegisterTest \
+        realm_unit_test_reg__##name((list), realm_unit_test__##name, \
+                                    "DefaultSuite", #name, __FILE__, __LINE__); \
+    inline void Realm_UnitTest__##name::test_run() \
+    { \
+        TestEach<__VA_ARGS__>::test_each(*this); \
+    } \
+    template <class TEST_TYPE> \
+    void Realm_UnitTest__##name::test_one()
+
 
 #define CHECK(cond) \
     test_results.check(bool(cond), __FILE__, __LINE__, #cond)
