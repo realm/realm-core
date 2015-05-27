@@ -1104,7 +1104,7 @@ ref_type Column::write(size_t slice_offset, size_t slice_size,
 }
 
 
-void Column::refresh_accessor_tree(size_t, const Spec&)
+void Column::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
     // With this type of column (Column), `m_array` is always an instance of
     // Array. This is true because all leafs are instances of Array, and when
@@ -1112,6 +1112,12 @@ void Column::refresh_accessor_tree(size_t, const Spec&)
     // is cached. This means that we never have to change the type of the cached
     // root array.
     m_array->init_from_parent();
+
+    if (m_search_index) {
+        size_t ndx_in_parent = m_array->get_ndx_in_parent();
+        m_search_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+        m_search_index->refresh_accessor_tree(new_col_ndx, spec);
+    }
 }
 
 
