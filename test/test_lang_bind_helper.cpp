@@ -6293,6 +6293,36 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     }
 }
 
+TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear) {
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "int");
+    origin->add_column_link(type_LinkList, "linklist", *target);
+    origin->add_column_link(type_Link, "link", *target);
+
+    target->add_empty_row();
+    origin->add_empty_row();
+    origin->set_link(1, 0, 0);
+    LinkViewRef linklist = origin->get_linklist(0, 0);
+    linklist->add(0);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    LangBindHelper::promote_to_write(sg);
+    CHECK_EQUAL(1, linklist->size());
+    target->clear();
+    CHECK_EQUAL(0, linklist->size());
+
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(1, linklist->size());
+}
+
 #ifndef _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
