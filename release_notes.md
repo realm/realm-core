@@ -26,6 +26,8 @@
 
 * Fixed LinkViews containing incorrect data after a write transaction
   containing a table clear is rolled back.
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back.
 
 ### API breaking changes:
 
