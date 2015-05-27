@@ -145,43 +145,45 @@ const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
 
-template<class T> struct ColumnTypeTraits;
+template <class T, bool Nullable> struct ColumnTypeTraits;
 
-template<> struct ColumnTypeTraits<int64_t> {
-    typedef Column column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+template <bool Nullable> struct ColumnTypeTraits<int64_t, Nullable> {
+    using column_type = TColumn<int64_t, Nullable>;
+    using leaf_type = typename column_type::LeafType;
+    using sum_type = int64_t;
     static const DataType id = type_Int;
 };
-template<> struct ColumnTypeTraits<bool> {
-    typedef Column column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+
+template <bool Nullable> struct ColumnTypeTraits<bool, Nullable>:
+    ColumnTypeTraits<int64_t, Nullable>
+{
     static const DataType id = type_Bool;
 };
-template<> struct ColumnTypeTraits<float> {
-    typedef ColumnFloat column_type;
-    typedef ArrayFloat array_type;
-    typedef double sum_type;
+
+template <bool N> struct ColumnTypeTraits<float, N> {
+    using column_type = ColumnFloat;
+    using leaf_type = ArrayFloat;
+    using sum_type = double;
     static const DataType id = type_Float;
 };
-template<> struct ColumnTypeTraits<double> {
-    typedef ColumnDouble column_type;
-    typedef ArrayDouble array_type;
-    typedef double sum_type;
+
+template <bool N> struct ColumnTypeTraits<double, N> {
+    using column_type = ColumnDouble;
+    using leaf_type = ArrayDouble;
+    using sum_type = double;
     static const DataType id = type_Double;
 };
-template<> struct ColumnTypeTraits<DateTime> {
-    typedef Column column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+
+template <bool N> struct ColumnTypeTraits<DateTime, N>:
+    ColumnTypeTraits<int64_t, N>
+{
     static const DataType id = type_DateTime;
 };
 
-template<> struct ColumnTypeTraits<StringData> {
-    typedef Column column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+template <bool N> struct ColumnTypeTraits<StringData, N> {
+    using column_type = ColumnStringEnum;
+    using leaf_type = ColumnStringEnum::LeafType;
+    using sum_type = int64_t;
     static const DataType id = type_String;
 };
 
