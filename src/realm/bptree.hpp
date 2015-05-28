@@ -117,7 +117,7 @@ public:
     BpTree(BpTree<T, Nullable>&&) = default;
     BpTree<T, Nullable>& operator=(BpTree<T, Nullable>&&) = default;
     void init_from_ref(Allocator& alloc, ref_type ref);
-	void init_from_parent();
+    void init_from_parent();
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -131,7 +131,7 @@ public:
     void insert(std::size_t ndx, null, std::size_t num_rows = 1);
     void erase(std::size_t ndx, bool is_last = false);
     void move_last_over(std::size_t ndx, std::size_t last_row_ndx);
-	void clear();
+    void clear();
     T front() const REALM_NOEXCEPT;
     T back() const REALM_NOEXCEPT;
 
@@ -304,13 +304,13 @@ template <class T, bool N>
 void BpTree<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
 {
     auto new_root = create_root_from_ref(alloc, ref);
-	replace_root(std::move(new_root));
+    replace_root(std::move(new_root));
 }
 
 template <class T, bool N>
 void BpTree<T,N>::init_from_parent()
 {
-	ref_type ref = root().get_ref_from_parent();
+    ref_type ref = root().get_ref_from_parent();
     auto new_root = create_root_from_ref(get_alloc(), ref);
     new_root->set_parent(m_root->get_parent(), m_root->get_ndx_in_parent());
     m_root = std::move(new_root);
@@ -633,26 +633,26 @@ void BpTree<T, N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 template <class T, bool N>
 void BpTree<T,N>::clear()
 {
-	if (root_is_leaf()) {
-		if (std::is_same<T, int64_t>::value && !N && root().get_type() == Array::type_HasRefs) {
-			// FIXME: This is because some column types rely on integer columns
-			// to contain refs.
-			root().clear_and_destroy_children();
-		}
-		else {
-			root_as_leaf().clear();
-		}
-	}
-	else {
-		root().clear_and_destroy_children();
-		
-		// Reinitialize the root's memory as a leaf.
-		Allocator& alloc = get_alloc();
-		std::unique_ptr<LeafType> new_root(new LeafType(alloc));
-		new_root->init_from_mem(MemRef{root().get_ref(), alloc});
-		new_root->set_type(Array::type_Normal);
-		replace_root(std::move(new_root));
-	}
+    if (root_is_leaf()) {
+        if (std::is_same<T, int64_t>::value && !N && root().get_type() == Array::type_HasRefs) {
+            // FIXME: This is because some column types rely on integer columns
+            // to contain refs.
+            root().clear_and_destroy_children();
+        }
+        else {
+            root_as_leaf().clear();
+        }
+    }
+    else {
+        root().clear_and_destroy_children();
+        
+        // Reinitialize the root's memory as a leaf.
+        Allocator& alloc = get_alloc();
+        std::unique_ptr<LeafType> new_root(new LeafType(alloc));
+        new_root->init_from_mem(MemRef{root().get_ref(), alloc});
+        new_root->set_type(Array::type_Normal);
+        replace_root(std::move(new_root));
+    }
 }
 
 
