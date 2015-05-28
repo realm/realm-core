@@ -587,7 +587,7 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, Action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 }
 
 
@@ -598,7 +598,7 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, Action, bitwidth>(value, start, end, baseindex, state);
+    return Array::find<cond, action, bitwidth>(value, start, end, baseindex, state);
 }
 
 
@@ -609,7 +609,7 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, Action, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action, Callback>(value, start, end, baseindex, state, callback);
 }
 
 
@@ -617,7 +617,7 @@ template<Action action, class Callback>
 bool ArrayIntNull::find_action(std::size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
 {
     ++index;
-    return Array::find_action<Action, Callback>(index, value, state, callback);
+    return Array::find_action<action, Callback>(index, value, state, callback);
 }
 
 
@@ -625,7 +625,7 @@ template<Action action, class Callback>
 bool ArrayIntNull::find_action_pattern(std::size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
     ++index;
-    return Array::find_action_pattern<Action, Callback>(index, pattern, state, callback);
+    return Array::find_action_pattern<action, Callback>(index, pattern, state, callback);
 }
 
 
