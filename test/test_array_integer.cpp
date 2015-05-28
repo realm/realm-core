@@ -121,12 +121,12 @@ TEST(ArrayIntNull_InitFromTruncatedRef)
     inner_node.add(456);
 
     inner_node.clear();
-
     CHECK_EQUAL(0, inner_node.size());
+
     ArrayIntNull new_leaf(Allocator::get_default());
-    new_leaf.init_from_ref(inner_node.get_ref());
+    new_leaf.init_from_ref(inner_node.get_ref()); // ownership transferred
     CHECK_EQUAL(0, new_leaf.size());
-    inner_node.destroy();
+    new_leaf.destroy();
 }
 
 TEST(ArrayIntNull_InitFromParent)
@@ -146,6 +146,8 @@ TEST(ArrayIntNull_InitFromParent)
     leaf2.set_parent(&inner_node, 0);
     leaf2.init_from_parent();
     CHECK_EQUAL(123, leaf2.get(0));
+    inner_node.clear_and_destroy_children();
+    inner_node.destroy();
 }
 
 TEST(ArrayIntNull_SetNull) {
