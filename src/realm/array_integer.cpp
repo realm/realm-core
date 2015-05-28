@@ -148,7 +148,7 @@ void ArrayIntNull::replace_nulls_with(int64_t new_null)
 }
 
 
-void ArrayIntNull::ensure_not_null(int64_t value)
+void ArrayIntNull::avoid_null_collision(int64_t value)
 {
     if (m_width == 64) {
         if (value == null_value()) {

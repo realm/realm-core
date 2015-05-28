@@ -183,7 +183,7 @@ public:
     MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
                                     Allocator& target_alloc) const;
 protected:
-    void ensure_not_null(int64_t value);
+    void avoid_null_collision(int64_t value);
 private:
     template<bool find_max>
     bool minmax_helper(int64_t& result, std::size_t start = 0, std::size_t end = npos,
@@ -324,7 +324,7 @@ bool ArrayIntNull::is_empty() const REALM_NOEXCEPT
 inline
 void ArrayIntNull::insert(std::size_t ndx, int_fast64_t value)
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::insert(ndx + 1, value);
 }
 
@@ -337,7 +337,7 @@ void ArrayIntNull::insert(std::size_t ndx, null)
 inline
 void ArrayIntNull::add(int64_t value)
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::add(value);
 }
 
@@ -350,7 +350,7 @@ void ArrayIntNull::add(null)
 inline
 void ArrayIntNull::set(std::size_t ndx, int64_t value) REALM_NOEXCEPT
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
@@ -369,7 +369,7 @@ void ArrayIntNull::set_null(std::size_t ndx) REALM_NOEXCEPT
 inline
 void ArrayIntNull::set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
