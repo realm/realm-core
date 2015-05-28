@@ -352,6 +352,11 @@ T BpTree<T, N>::back() const REALM_NOEXCEPT
 
 namespace _impl {
 
+// NullableOrNothing encapsulates the behavior of nullable and
+// non-nullable leaf types, so that non-nullable leaf types
+// don't have to implement is_null/set_null but BpTree can still
+// support the interface (and return false / assert when null
+// is not supported).
 template <class Leaf, bool Nullable> struct NullableOrNothing;
 template <class Leaf>
 struct NullableOrNothing<Leaf, true> {
