@@ -225,7 +225,7 @@ struct ArrayIntNullLeafInserter {
             state.m_split_offset = ndx;
         }
         else {
-            for (size_t i = ndx; i != leaf_size; ++i) {
+            for (size_t i = ndx; i < leaf_size; ++i) {
                 if (self.is_null(i)) {
                     new_leaf.add(null{}); // Throws
                 }
