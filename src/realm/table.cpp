@@ -2571,6 +2571,8 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
         throw LogicError(LogicError::binary_too_big);
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
+    if(!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
     bump_version();
 
     ColumnBinary& column = get_column_binary(col_ndx);
