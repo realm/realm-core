@@ -185,12 +185,20 @@ void ArrayIntNull::ensure_not_null(int64_t value)
 
 void ArrayIntNull::find_all(Column* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
 {
-    ++begin;
-    if (end != npos) {
-        ++end;
+    // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
+    // in the result column. Since find_all may be invoked many times for different leaves in the
+    // B+tree with the same result column, we also can't simply adjust indices after finding them
+    // (because then the first indices would be adjusted multiple times for each subsequent leaf)
+    
+    if (end == npos) {
+        end = size();
     }
-    Array::find_all(result, value, col_offset, begin, end);
-    result->adjust(-1);
+    
+    for (size_t i = begin; i < end; ++i) {
+        if (get(i) == value) {
+            result->add(col_offset + i);
+        }
+    }
 }
 
 namespace {
