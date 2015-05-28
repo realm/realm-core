@@ -5891,6 +5891,43 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+
+    TableRef target = g.add_table("target");
+    target->add_column(type_Int, "pk");
+    target->add_search_index(0);
+
+    target->add_empty_row(REALM_MAX_BPNODE_SIZE+1);
+
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    // open a second copy that'll be advanced over the write
+    std::unique_ptr<Replication> repl_r(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_r(*repl_r, SharedGroup::durability_Full, crypt_key());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    TableRef t_r = g_r.get_table("target");
+
+    LangBindHelper::promote_to_write(sg);
+    // Ensure that the index has a different bptree layout so that failing to
+    // refresh it will do bad things
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
+        target->set_int(0, i, i);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    LangBindHelper::promote_to_write(sg_r);
+    // Crashes if index has an invalid parent ref
+    t_r->clear();
+}
+
+
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -6321,6 +6358,36 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear) {
 
     LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(1, linklist->size());
+}
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+
+    TableRef target = g.add_table("target");
+    target->add_column(type_Int, "pk");
+    target->add_search_index(0);
+
+    target->add_empty_row(REALM_MAX_BPNODE_SIZE+1);
+
+    LangBindHelper::commit_and_continue_as_read(sg);
+    LangBindHelper::promote_to_write(sg);
+
+    // Ensure that the index has a different bptree layout so that failing to
+    // refresh it will do bad things
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
+        target->set_int(0, i, i);
+
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    LangBindHelper::promote_to_write(sg);
+
+    // Crashes if index has an invalid parent ref
+    target->clear();
 }
 
 #ifndef _WIN32
