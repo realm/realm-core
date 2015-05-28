@@ -79,6 +79,7 @@ public:
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
     bool is_null(std::size_t ndx) const REALM_NOEXCEPT final;
     void set(std::size_t ndx, StringData value);
+    void set_null(std::size_t ndx) override;
     void add();
     void add(StringData value);
     void insert(std::size_t ndx);
@@ -270,6 +271,11 @@ inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const 
 inline void ColumnStringEnum::set_string(std::size_t row_ndx, StringData value)
 {
     set(row_ndx, value); // Throws
+}
+
+inline void ColumnStringEnum::set_null(std::size_t row_ndx)
+{
+    set(row_ndx, realm::null{});
 }
 
 inline AdaptiveStringColumn& ColumnStringEnum::get_keys()
