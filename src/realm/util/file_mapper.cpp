@@ -27,6 +27,10 @@
 
 #include <realm/util/errno.hpp>
 
+#ifdef __APPLE__
+#   include <fcntl.h>
+#endif
+
 #ifdef REALM_ENABLE_ENCRYPTION
 
 #include "encrypted_file_mapping.hpp"
@@ -51,10 +55,6 @@
 #ifdef REALM_ANDROID
 #include <linux/unistd.h>
 #include <sys/syscall.h>
-#endif
-
-#ifdef __APPLE__
-#   include <fcntl.h>
 #endif
 
 using namespace realm;
