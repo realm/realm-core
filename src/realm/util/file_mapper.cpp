@@ -46,12 +46,15 @@
 #ifdef __APPLE__
 #   include <mach/mach.h>
 #   include <mach/exc.h>
-#   include <fcntl.h>
 #endif
 
 #ifdef REALM_ANDROID
 #include <linux/unistd.h>
 #include <sys/syscall.h>
+#endif
+
+#ifdef __APPLE__
+#   include <fcntl.h>
 #endif
 
 using namespace realm;
