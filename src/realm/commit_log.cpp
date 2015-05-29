@@ -183,6 +183,7 @@ protected:
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
     util::File::Map<CommitLogHeader> m_header;
+    util::File* m_header_file = 0;
     bool m_is_persisting;
 
     // last seen version and associated offset - 0 for invalid
@@ -293,19 +294,23 @@ inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble_for
 inline void WriteLogCollector::sync_header()
 {
     CommitLogHeader* header = m_header.get_addr();
-    if (m_is_persisting)
-        m_header.sync();
+    if (m_is_persisting) {
+        REALM_ASSERT(m_header_file);
+        m_header.sync(*m_header_file);
+    }
     header->use_preamble_a = ! header->use_preamble_a;
     if (m_is_persisting)
-        m_header.sync();
+        m_header.sync(*m_header_file);
 }
 
 
 inline void WriteLogCollector::map_header_if_needed()
 {
     if (m_header.is_attached() == false) {
-        File header_file(m_header_name, File::mode_Update);
-        m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+        if (m_header_file == 0) {
+            m_header_file = new File(m_header_name, File::mode_Update);
+        }
+        m_header.map(*m_header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
     }
 }
 
@@ -373,10 +378,11 @@ void WriteLogCollector::reset_header()
 {
     m_header.unmap();
     File::try_remove(m_header_name);
-
-    File header_file(m_header_name, File::mode_Write);
-    header_file.resize(sizeof (CommitLogHeader));
-    m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+    if (m_header_file != 0)
+        delete m_header_file;
+    m_header_file = new File(m_header_name, File::mode_Write);
+    m_header_file->resize(sizeof (CommitLogHeader));
+    m_header.map(*m_header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
 }
 
 
@@ -445,7 +451,7 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast6
     *reinterpret_cast<uint64_t*>(write_ptr) = size;
     write_ptr += sizeof (uint64_t);
     std::copy(data, data+size, write_ptr);
-    active_log->map.sync();
+    active_log->map.sync(active_log->file);
 
     // update metadata to reflect the added commit log
     preamble->write_offset += aligned_to(sizeof (uint64_t), size + sizeof (uint64_t));
@@ -462,6 +468,9 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast6
 
 WriteLogCollector::~WriteLogCollector() REALM_NOEXCEPT
 {
+    if (m_header_file) {
+        delete m_header_file;
+    }
 }
 
 void WriteLogCollector::stop_logging()
@@ -534,7 +543,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
     // us against deadlock when we restart after crash on a platform without support
     // for robust mutexes.
     new (& m_header.get_addr()->lock) RobustMutex;
-    m_header.sync();
+    m_header.sync(*m_header_file);
 }
 
 

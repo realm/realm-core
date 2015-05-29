@@ -707,7 +707,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
                     db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
                     File::UnmapGuard db_ug(db_map);
                     alloc.prepare_for_update(db_map.get_addr(), db_map);
-                    db_map.sync();
+                    db_map.sync(alloc.m_file);
                 }
 
                 // determine version

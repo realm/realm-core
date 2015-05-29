@@ -810,17 +810,18 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
 }
 
 
-void File::sync_map(void* addr, size_t size)
+void File::sync_map(int fd, void* addr, size_t size)
 {
 #ifdef _WIN32 // Windows version
 
     if (FlushViewOfFile(addr, size))
         return;
     throw std::runtime_error("FlushViewOfFile() failed");
+    static_cast<void>(fd);
 
 #else // POSIX version
 
-    realm::util::msync(addr, size);
+    realm::util::msync(fd, addr, size);
 
 #endif
 }

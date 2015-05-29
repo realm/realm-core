@@ -477,7 +477,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     top_refs[new_valid_ref] = new_top_ref;
 
     // Make sure that all data and the top pointer is written to stable storage
-    m_file_map.sync(); // Throws
+    m_file_map.sync(m_alloc.m_file); // Throws
 
     // update selector - must happen after write of all data and top pointer
     file_header[16+7] = char(select_field); // swap
@@ -487,7 +487,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
-    m_file_map.sync(); // Throws
+    m_file_map.sync(m_alloc.m_file); // Throws
 }
 
 

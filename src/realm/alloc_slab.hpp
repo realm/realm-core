@@ -352,7 +352,7 @@ private:
 
     bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
 
-    void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
+    void do_prepare_for_update(char* mutable_data, const util::File& file, util::File::Map<char>& mapping);
 
     class ChunkRefEq;
     class ChunkRefEndEq;
@@ -425,7 +425,7 @@ inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<ch
     REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     if (REALM_LIKELY(!m_file_on_streaming_form))
         return;
-    do_prepare_for_update(mutable_data, mapping);
+    do_prepare_for_update(mutable_data, m_file, mapping);
 }
 
 inline void SlabAlloc::reserve(std::size_t size)

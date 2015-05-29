@@ -341,7 +341,7 @@ public:
     /// the synchronization operation is complete. The specified
     /// address range must be one that was previously returned by
     /// map().
-    static void sync_map(void* addr, std::size_t size);
+    static void sync_map(int fd, void* addr, std::size_t size);
 
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
@@ -456,7 +456,7 @@ private:
         void map(const File&, AccessMode, std::size_t size, int map_flags);
         void remap(const File&, AccessMode, std::size_t size, int map_flags);
         void unmap() REALM_NOEXCEPT;
-        void sync();
+        void sync(const File&);
     };
 };
 
@@ -534,7 +534,7 @@ public:
     ///
     /// Calling this function on an instance that is not currently
     /// attached to a memory mapped file, has undefined behavior.
-    void sync();
+    void sync(const File&);
 
     /// Check whether this Map instance is currently attached to a
     /// memory mapped file.
@@ -744,11 +744,11 @@ inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, 
     m_size = size;
 }
 
-inline void File::MapBase::sync()
+inline void File::MapBase::sync(const File& f)
 {
     REALM_ASSERT(m_addr);
 
-    File::sync_map(m_addr, m_size);
+    File::sync_map(f.m_fd, m_addr, m_size);
 }
 
 template<class T>
@@ -780,9 +780,9 @@ inline T* File::Map<T>::remap(const File& f, AccessMode a, std::size_t size, int
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::sync()
+template<class T> inline void File::Map<T>::sync(const File& f)
 {
-    MapBase::sync();
+    MapBase::sync(f);
 }
 
 template<class T> inline bool File::Map<T>::is_attached() const REALM_NOEXCEPT
