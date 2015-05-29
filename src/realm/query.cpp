@@ -6,6 +6,7 @@
 #include <realm/column_fwd.hpp>
 #include <realm/query.hpp>
 #include <realm/query_engine.hpp>
+#include <realm/descriptor.hpp>
 
 using namespace realm;
 
@@ -150,40 +151,140 @@ Query& Query::expression(Expression* compare, bool auto_delete)
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BinaryNode<Equal>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<Equal>(column_ndx, b);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BinaryNode<NotEqual>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<NotEqual>(column_ndx, b);
     return *this;
 }
 Query& Query::begins_with(size_t column_ndx, BinaryData b)
 {
-    ParentNode* p = new BinaryNode<BeginsWith>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<BeginsWith>(column_ndx, b);
     return *this;
 }
 Query& Query::ends_with(size_t column_ndx, BinaryData b)
 {
-    ParentNode* p = new BinaryNode<EndsWith>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<EndsWith>(column_ndx, b);
     return *this;
 }
 Query& Query::contains(size_t column_ndx, BinaryData b)
 {
-    ParentNode* p = new BinaryNode<Contains>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<Contains>(column_ndx, b);
     return *this;
 }
 
-// Generic 'simple type' condition
-template <typename T, class N>
+
+namespace {
+
+template <class Node> struct MakeConditionNode {
+    // make() for Node creates a Node* with either a value type
+    // or null, and supports both nodes for values that are implicitly
+    // nullable (like StringData and BinaryData) and others.
+    // Regardless of nullability, it throws a LogicError if trying
+    // to query for a value of type T on a column of a different type.
+
+    template <class N = Node>
+    static typename std::enable_if<N::implicit_nullable, ParentNode*>::type
+    make(size_t col_ndx, typename N::TConditionValue value)
+    {
+        return new Node(std::move(value), col_ndx);
+    }
+    template <class T>
+    static typename std::enable_if<
+        Node::implicit_nullable
+        && !std::is_same<T, typename Node::TConditionValue>::value
+        && !std::is_same<T, null>::value
+        , ParentNode*>::type
+    make(size_t, T)
+    {
+        throw LogicError{LogicError::type_mismatch};
+    }
+
+    template <class T>
+    static typename std::enable_if<
+        !Node::implicit_nullable
+        && std::is_same<T, null>::value
+        , ParentNode*>::type
+    make(size_t col_ndx, T value)
+    {
+        // value is null
+        return new Node(value, col_ndx);
+    }
+
+    template <class T>
+    static typename std::enable_if<
+        !Node::implicit_nullable
+        && std::is_same<T, typename Node::TConditionValue>::value
+        , ParentNode*>::type
+    make(size_t col_ndx, T value)
+    {
+        return new Node(value, col_ndx);
+    }
+
+    template <class T>
+    static typename std::enable_if<
+        !Node::implicit_nullable
+        && !std::is_same<T, null>::value
+        && !std::is_same<T, typename Node::TConditionValue>::value
+        , ParentNode*>::type
+    make(size_t, T)
+    {
+        throw LogicError{LogicError::type_mismatch};
+    }
+};
+
+template <class Cond, class T>
+ParentNode* make_condition_node(const Descriptor& descriptor, size_t column_ndx, T value)
+{
+    DataType type = descriptor.get_column_type(column_ndx);
+    bool is_nullable = descriptor.is_nullable(column_ndx);
+    switch (type) {
+        case type_Int:
+        case type_Bool:
+        case type_DateTime: {
+            if (is_nullable) {
+                return MakeConditionNode<ValueNode<ColumnIntNull, Cond>>::make(column_ndx, value);
+            }
+            else {
+                return MakeConditionNode<ValueNode<Column, Cond>>::make(column_ndx, value);
+            }
+        }
+        case type_Float: {
+            return MakeConditionNode<FloatDoubleNode<ColumnFloat, Cond>>::make(column_ndx, value);
+        }
+        case type_Double: {
+            return MakeConditionNode<FloatDoubleNode<ColumnDouble, Cond>>::make(column_ndx, value);
+        }
+        case type_String: {
+            return MakeConditionNode<StringNode<Cond>>::make(column_ndx, value);
+        }
+        case type_Binary: {
+            return MakeConditionNode<BinaryNode<Cond>>::make(column_ndx, value);
+        }
+        default: {
+            throw LogicError{LogicError::type_mismatch};
+        }
+    }
+}
+
+} // anonymous namespace
+
+ConstDescriptorRef Query::current_descriptor() const
+{
+    ConstDescriptorRef desc = m_table->get_descriptor();
+    for (size_t i = 0; i < m_subtable_path.size(); ++i) {
+        desc = desc->get_subdescriptor(m_subtable_path[i]);
+    }
+    return desc;
+}
+
+
+template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
-    ParentNode* const parent = new N(value, column_ndx);
+    ParentNode* const parent = make_condition_node<TConditionFunction>(*current_descriptor(), column_ndx, value);
     UpdatePointers(parent, &parent->m_child);
     return *this;
 }
@@ -361,27 +462,23 @@ Query& Query::links_to(size_t origin_column, size_t target_row)
 // int64 constant vs column
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<Equal>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<Equal>(column_ndx, value);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<NotEqual>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<NotEqual>(column_ndx, value);
     return *this;
 }
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<Greater>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<Greater>(column_ndx, value);
     return *this;
 }
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if (value > LLONG_MIN) {
-        ParentNode* const p = new IntegerNode<Greater>(value - 1, column_ndx);
-        UpdatePointers(p, &p->m_child);
+        add_condition<Greater>(column_ndx, value - 1);
     }
     // field >= LLONG_MIN has no effect
     return *this;
@@ -389,16 +486,14 @@ Query& Query::greater_equal(size_t column_ndx, int64_t value)
 Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if (value < LLONG_MAX) {
-        ParentNode* const p = new IntegerNode<Less>(value + 1, column_ndx);
-        UpdatePointers(p, &p->m_child);
+        add_condition<Less>(column_ndx, value + 1);
     }
     // field <= LLONG_MAX has no effect
     return *this;
 }
 Query& Query::less(size_t column_ndx, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<Less>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<Less>(column_ndx, value);
     return *this;
 }
 Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
@@ -411,35 +506,34 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new IntegerNode<Equal>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    add_condition<Equal>(column_ndx, int64_t(value));
     return *this;
 }
 
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Equal>>(column_ndx, value);
+    return add_condition<Equal>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, NotEqual>>(column_ndx, value);
+    return add_condition<NotEqual>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Greater>>(column_ndx, value);
+    return add_condition<Greater>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, GreaterEqual>>(column_ndx, value);
+    return add_condition<GreaterEqual>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, LessEqual>>(column_ndx, value);
+    return add_condition<LessEqual>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Less>>(column_ndx, value);
+    return add_condition<Less>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -454,27 +548,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Equal>>(column_ndx, value);
+    return add_condition<Equal>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, NotEqual>>(column_ndx, value);
+    return add_condition<NotEqual>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Greater>>(column_ndx, value);
+    return add_condition<Greater>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, GreaterEqual>>(column_ndx, value);
+    return add_condition<GreaterEqual>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, LessEqual>>(column_ndx, value);
+    return add_condition<LessEqual>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Less>>(column_ndx, value);
+    return add_condition<Less>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -490,52 +584,42 @@ Query& Query::between(size_t column_ndx, double from, double to)
 
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
-    ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<Equal>(value, column_ndx);
+        add_condition<Equal>(column_ndx, value);
     else
-        p = new StringNode<EqualIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+        add_condition<EqualIns>(column_ndx, value);
     return *this;
 }
 Query& Query::begins_with(size_t column_ndx, StringData value, bool case_sensitive)
 {
-    ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<BeginsWith>(value, column_ndx);
+        add_condition<BeginsWith>(column_ndx, value);
     else
-        p = new StringNode<BeginsWithIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+        add_condition<BeginsWithIns>(column_ndx, value);
     return *this;
 }
 Query& Query::ends_with(size_t column_ndx, StringData value, bool case_sensitive)
 {
-    ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<EndsWith>(value, column_ndx);
+        add_condition<EndsWith>(column_ndx, value);
     else
-        p = new StringNode<EndsWithIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+        add_condition<EndsWithIns>(column_ndx, value);
     return *this;
 }
 Query& Query::contains(size_t column_ndx, StringData value, bool case_sensitive)
 {
-    ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<Contains>(value, column_ndx);
+        add_condition<Contains>(column_ndx, value);
     else
-        p = new StringNode<ContainsIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+        add_condition<ContainsIns>(column_ndx, value);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
-    ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<NotEqual>(value, column_ndx);
+        add_condition<NotEqual>(column_ndx, value);
     else
-        p = new StringNode<NotEqualIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+        add_condition<NotEqualIns>(column_ndx, value);
     return *this;
 }
 
@@ -911,6 +995,7 @@ Query& Query::subtable(size_t column)
     UpdatePointers(p, &p->m_child);
     // once subtable conditions have been evaluated, resume evaluation from m_child2
     subtables.push_back(&p->m_child2);
+    m_subtable_path.push_back(column);
     group();
     return *this;
 }
@@ -928,6 +1013,7 @@ Query& Query::end_subtable()
         update[update.size()-1] = subtables[subtables.size()-1];
 
     subtables.pop_back();
+    m_subtable_path.pop_back();
     return *this;
 }
 
