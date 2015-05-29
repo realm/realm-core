@@ -85,6 +85,10 @@ public:
     static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
                                Allocator&);
     void create(Type, bool context_flag = false);
+    
+    void init_from_ref(ref_type) REALM_NOEXCEPT;
+    void init_from_mem(MemRef) REALM_NOEXCEPT;
+    void init_from_parent() REALM_NOEXCEPT;
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT;
@@ -179,7 +183,7 @@ public:
     MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
                                     Allocator& target_alloc) const;
 protected:
-    void ensure_not_null(int64_t value);
+    void avoid_null_collision(int64_t value);
 private:
     template<bool find_max>
     bool minmax_helper(int64_t& result, std::size_t start = 0, std::size_t end = npos,
@@ -320,7 +324,7 @@ bool ArrayIntNull::is_empty() const REALM_NOEXCEPT
 inline
 void ArrayIntNull::insert(std::size_t ndx, int_fast64_t value)
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::insert(ndx + 1, value);
 }
 
@@ -333,7 +337,7 @@ void ArrayIntNull::insert(std::size_t ndx, null)
 inline
 void ArrayIntNull::add(int64_t value)
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::add(value);
 }
 
@@ -346,7 +350,7 @@ void ArrayIntNull::add(null)
 inline
 void ArrayIntNull::set(std::size_t ndx, int64_t value) REALM_NOEXCEPT
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
@@ -365,7 +369,7 @@ void ArrayIntNull::set_null(std::size_t ndx) REALM_NOEXCEPT
 inline
 void ArrayIntNull::set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
@@ -583,7 +587,7 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, Action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 }
 
 
@@ -594,7 +598,7 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, Action, bitwidth>(value, start, end, baseindex, state);
+    return Array::find<cond, action, bitwidth>(value, start, end, baseindex, state);
 }
 
 
@@ -605,7 +609,7 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, Action, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action, Callback>(value, start, end, baseindex, state, callback);
 }
 
 
@@ -613,7 +617,7 @@ template<Action action, class Callback>
 bool ArrayIntNull::find_action(std::size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
 {
     ++index;
-    return Array::find_action<Action, Callback>(index, value, state, callback);
+    return Array::find_action<action, Callback>(index, value, state, callback);
 }
 
 
@@ -621,7 +625,7 @@ template<Action action, class Callback>
 bool ArrayIntNull::find_action_pattern(std::size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
     ++index;
-    return Array::find_action_pattern<Action, Callback>(index, pattern, state, callback);
+    return Array::find_action_pattern<action, Callback>(index, pattern, state, callback);
 }
 
 

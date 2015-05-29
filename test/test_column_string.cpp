@@ -712,6 +712,16 @@ TEST(ColumnString_Null)
         CHECK_EQUAL(a.is_null(2), true);
         CHECK(a.get(0) == "foo");
 
+        size_t keys, values;
+        bool res = a.auto_enumerate(keys, values, true);
+        CHECK(res);
+        ColumnStringEnum e{Allocator::get_default(), values, keys, true};
+        CHECK_EQUAL(e.is_null(0), false);
+        CHECK_EQUAL(e.is_null(1), false);
+        CHECK_EQUAL(e.is_null(2), true);
+        CHECK(e.get(0) == "foo");
+        e.destroy();
+
         // Test set
         a.set_null(0);
         a.set_null(1);
@@ -719,6 +729,7 @@ TEST(ColumnString_Null)
         CHECK_EQUAL(a.is_null(1), true);
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(2), true);
+
 
         a.destroy();
     }
@@ -841,6 +852,23 @@ TEST(ColumnString_Null)
         a.destroy();
     }
 
+}
+
+TEST(ColumnString_SetNullThrowsUnlessNullable)
+{
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn c(Allocator::get_default(), ref, false);
+    c.add("Hello, World!");
+    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
+
+    size_t keys, values;
+    bool res = c.auto_enumerate(keys, values, true);
+    CHECK(res);
+    ColumnStringEnum e{Allocator::get_default(), values, keys, false};
+    CHECK_LOGIC_ERROR(e.set_null(0), LogicError::column_not_nullable);
+
+    c.destroy();
+    e.destroy();
 }
 
 

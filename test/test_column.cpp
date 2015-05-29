@@ -434,6 +434,23 @@ TEST(Column_Basic)
     c.destroy();
 }
 
+TEST(Column_IsNullAlwaysFalse)
+{
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
+    c.add(123);
+    CHECK(!c.is_null(0));
+    c.destroy();
+}
+
+TEST(Column_SetNullThrows)
+{
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
+    c.add(123);
+    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
+    c.destroy();
+}
 
 TEST(Column_FindLeafs)
 {

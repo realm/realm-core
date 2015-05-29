@@ -58,7 +58,7 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
 {
     MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, value, alloc);
     ArrayIntNull arr(alloc);
-    arr.init_from_mem(r);
+    arr.Array::init_from_mem(r);
     if (arr.m_width == 64) {
         int_fast64_t null_value = value ^ 1; // Just anything different from value.
         arr.Array::set(0, null_value);
@@ -67,6 +67,34 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
         arr.Array::set(0, arr.m_ubound);
     }
     return r;
+}
+
+void ArrayIntNull::init_from_ref(ref_type ref) REALM_NOEXCEPT
+{
+    REALM_ASSERT_DEBUG(ref);
+    char* header = m_alloc.translate(ref);
+    init_from_mem(MemRef{header, ref});
+}
+
+void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
+{
+    Array::init_from_mem(mem);
+    
+    if (m_size == 0) {
+        // This can only happen when mem is being reused from another
+        // array (which happens when shrinking the B+tree), so we need
+        // to add the "magic" null value to the beginning.
+        
+        // Since init_* functions are noexcept, but insert() isn't, we
+        // need to ensure that insert() will not allocate.
+        REALM_ASSERT(m_capacity != 0);
+        Array::insert(0, m_ubound);
+    }
+}
+
+void ArrayIntNull::init_from_parent() REALM_NOEXCEPT
+{
+    init_from_ref(get_ref_from_parent());
 }
 
 namespace {
@@ -120,7 +148,7 @@ void ArrayIntNull::replace_nulls_with(int64_t new_null)
 }
 
 
-void ArrayIntNull::ensure_not_null(int64_t value)
+void ArrayIntNull::avoid_null_collision(int64_t value)
 {
     if (m_width == 64) {
         if (value == null_value()) {
@@ -157,12 +185,20 @@ void ArrayIntNull::ensure_not_null(int64_t value)
 
 void ArrayIntNull::find_all(Column* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
 {
-    ++begin;
-    if (end != npos) {
-        ++end;
+    // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
+    // in the result column. Since find_all may be invoked many times for different leaves in the
+    // B+tree with the same result column, we also can't simply adjust indices after finding them
+    // (because then the first indices would be adjusted multiple times for each subsequent leaf)
+    
+    if (end == npos) {
+        end = size();
     }
-    Array::find_all(result, value, col_offset, begin, end);
-    result->adjust(-1);
+    
+    for (size_t i = begin; i < end; ++i) {
+        if (get(i) == value) {
+            result->add(col_offset + i);
+        }
+    }
 }
 
 namespace {
@@ -189,7 +225,7 @@ struct ArrayIntNullLeafInserter {
             state.m_split_offset = ndx;
         }
         else {
-            for (size_t i = ndx; i != leaf_size; ++i) {
+            for (size_t i = ndx; i < leaf_size; ++i) {
                 if (self.is_null(i)) {
                     new_leaf.add(null{}); // Throws
                 }
