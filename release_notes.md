@@ -1,3 +1,12 @@
+# 0.89.5 Release notes
+
+### Bugfixes:
+
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back or advanced over.
+
+----------------------------------------------
+
 # 0.89.4 Release notes
 
 ### Enhancements:
@@ -6,6 +15,7 @@
   safely from any thread.
 * Improved performance of Query::find_all() with assertions enabled.
 
+----------------------------------------------
 
 # 0.89.3 Release notes
 
