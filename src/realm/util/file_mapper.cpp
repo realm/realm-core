@@ -35,6 +35,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <string.h>
 #include <atomic>
 
 #include <realm/util/errno.hpp>
@@ -45,6 +46,7 @@
 #ifdef __APPLE__
 #   include <mach/mach.h>
 #   include <mach/exc.h>
+#   include <fcntl.h>
 #endif
 
 #ifdef REALM_ANDROID
@@ -725,8 +727,8 @@ void msync(int fd, void* addr, size_t size)
 
     // not an encrypted mapping
 
-    // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
-    // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
+    // On iOS/OSX fsync may not be enough to ensure crash safety.
+    // So we're adding fcntl(F_FULLFSYNC). Same for msync.
     //
     // See description of fsync on iOS here:
     // https://developer.apple.com/library/ios/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html
