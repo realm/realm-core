@@ -837,6 +837,10 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
 
 bool SharedGroup::compact()
 {
+    // Verify that the database file is attached
+    if (is_attached() == false) {
+        throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
+    }
     // Verify that preconditions for compacting is met:
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
@@ -887,7 +891,7 @@ bool SharedGroup::compact()
     // update the versioning info to match
     SharedInfo* r_info = m_reader_map.get_addr();
     Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
-    REALM_ASSERT(rc.version == info->latest_version_number);
+    REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
     rc.filesize = file_size;
     rc.current_top = top_ref;
     return true;

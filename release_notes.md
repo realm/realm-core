@@ -58,10 +58,11 @@
 ### Enhancements:
 
 * Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
+* SharedGroup::compact() will now throw a runtime_error if called in detached state.
 
 ### Internals:
 
-* Lorem ipsum.
+* Can now be built with encryption enabled on Linux.
 
 ----------------------------------------------
 

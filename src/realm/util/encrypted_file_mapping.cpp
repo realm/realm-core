@@ -73,10 +73,17 @@ AESCryptor::AESCryptor(const uint8_t* key) {
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #else
-#ifdef REALM_ANDROID
+
+#if defined(__linux__)
     // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
     // into every process with every version of Android, so we can get to it
     // with dlsym
+    // FIXME: Don't know where to write the following info:
+    // on linux, we add -ldl to the linking step to get dlsym to work,
+    // and set LD_PRELOAD to the location of libcrypto when running the executable.
+    // (on linux mint this is currently: "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libcrypto.so")
+    // To be able to debug with gdb, use the command "handle SIGSEGV noprint"
+    // before running the program.
     dlsym_cast(AES_set_encrypt_key, "AES_set_encrypt_key");
     dlsym_cast(AES_set_decrypt_key, "AES_set_decrypt_key");
     dlsym_cast(AES_cbc_encrypt, "AES_cbc_encrypt");
@@ -85,7 +92,6 @@ AESCryptor::AESCryptor(const uint8_t* key) {
     dlsym_cast(SHA256_Update, "SHA256_Update");
     dlsym_cast(SHA256_Final, "SHA256_Final");
 #endif
-
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
 #endif
