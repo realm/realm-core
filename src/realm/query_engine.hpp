@@ -674,7 +674,6 @@ class ValueNodeBase : public ColumnNodeBase
 public:
     using TConditionValue = typename ColType::value_type;
     static const bool nullable = ColType::nullable;
-    static const bool implicit_nullable = false;
 
     template <class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
     bool find_callback_specialization(size_t s, size_t end2)
@@ -839,20 +838,21 @@ class ValueNode : public ValueNodeBase<ColType> {
     using BaseType = ValueNodeBase<ColType>;
     using ThisType = ValueNode<ColType, TConditionFunction>;
 public:
+    static const bool implicit_nullable = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
-    ValueNode(TConditionValue v, size_t column):
-        BaseType(v, column)
+    ValueNode(TConditionValue value, size_t column_ndx)
+    : ValueNodeBase<ColType>{value, column_ndx}
     {
     }
 
-    template <typename U = ColType>
-    ValueNode(null n, size_t column, typename std::enable_if<U::Nullable>::type* = 0):
-        BaseType(n, column)
+    ValueNode(null n, size_t column_ndx)
+    : ValueNodeBase<ColType>{n, column_ndx}
     {
     }
 
-    ValueNode(const ThisType& from): BaseType(from)
+    ValueNode(const ThisType& other)
+    : ValueNodeBase<ColType>(other)
     {
     }
 
@@ -976,6 +976,10 @@ public:
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
+    FloatDoubleNode(null, size_t)
+    {
+        REALM_ASSERT(false); // null is not supported on float columns yet.
+    }
     ~FloatDoubleNode() REALM_NOEXCEPT override {}
 
     void init(const Table& table) override
@@ -1023,7 +1027,7 @@ protected:
 template <class TConditionFunction> class BinaryNode: public ParentNode {
 public:
     using TConditionValue = BinaryData;
-    static const bool implicit_nullable = true;
+    static const bool implicit_nullable = false;
 
     template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
@@ -1036,6 +1040,11 @@ public:
         char* data = v.is_null() ? nullptr : new char[v.size()];
         memcpy(data, v.data(), v.size());
         m_value = BinaryData(data, v.size());
+    }
+
+    BinaryNode(null, size_t column)
+    : BinaryNode(BinaryData{nullptr, 0}, column)
+    {
     }
 
     ~BinaryNode() REALM_NOEXCEPT override

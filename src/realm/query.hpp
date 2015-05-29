@@ -74,6 +74,10 @@ public:
     // Find links that point to a specific target row 
     Query& links_to(size_t column_ndx, size_t target_row);
 
+    // Conditions: null
+    Query& equal(size_t column_ndx, null);
+    Query& not_equal(size_t column_ndx, null);
+
     // Conditions: int64_t
     Query& equal(size_t column_ndx, int64_t value);
     Query& not_equal(size_t column_ndx, int64_t value);

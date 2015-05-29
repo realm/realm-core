@@ -421,6 +421,18 @@ Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
     return not_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
 }
 
+// null vs column
+Query& Query::equal(size_t column_ndx, null n)
+{
+    add_condition<Equal>(column_ndx, n);
+    return *this;
+}
+
+Query& Query::not_equal(size_t column_ndx, null n)
+{
+    add_condition<NotEqual>(column_ndx, n);
+    return *this;
+}
 
 // int constant vs column (we need those because '1234' is ambiguous, can convert to float/double/int64_t)
 Query& Query::equal(size_t column_ndx, int value)
