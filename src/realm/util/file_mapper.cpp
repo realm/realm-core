@@ -35,6 +35,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <string.h>
 #include <atomic>
 
 #include <realm/util/errno.hpp>
