@@ -862,6 +862,9 @@ template <class T, bool N>
 StringData TColumn<T, N>::get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT
 {
     static_assert(sizeof(T) == 8, "not filling buffer");
+    if (N && is_null(ndx)) {
+        return StringData{nullptr, 0};
+    }
     T x = get(ndx);
     *reinterpret_cast<T*>(buffer) = x;
 	  return StringData(buffer, sizeof(T));
@@ -874,10 +877,14 @@ void TColumn<T,N>::populate_search_index()
     // Populate the index
     std::size_t num_rows = size();
     for (std::size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        T value = get(row_ndx);
-        size_t num_rows = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        if (N && is_null(row_ndx)) {
+            m_search_index->insert(row_ndx, null{}, 1, is_append); // Throws
+        }
+        else {
+            T value = get(row_ndx);
+            m_search_index->insert(row_ndx, value, 1, is_append); // Throws
+        }
     }
 }
 
