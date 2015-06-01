@@ -245,10 +245,10 @@ ParentNode* make_condition_node(const Descriptor& descriptor, size_t column_ndx,
         case type_Bool:
         case type_DateTime: {
             if (is_nullable) {
-                return MakeConditionNode<ValueNode<ColumnIntNull, Cond>>::make(column_ndx, value);
+                return MakeConditionNode<IntegerNode<ColumnIntNull, Cond>>::make(column_ndx, value);
             }
             else {
-                return MakeConditionNode<ValueNode<Column, Cond>>::make(column_ndx, value);
+                return MakeConditionNode<IntegerNode<Column, Cond>>::make(column_ndx, value);
             }
         }
         case type_Float: {

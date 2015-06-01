@@ -668,9 +668,9 @@ protected:
 };
 
 template <class ColType>
-class ValueNodeBase : public ColumnNodeBase
+class IntegerNodeBase : public ColumnNodeBase
 {
-    using ThisType = ValueNodeBase<ColType>;
+    using ThisType = IntegerNodeBase<ColType>;
 public:
     using TConditionValue = typename ColType::value_type;
     static const bool nullable = ColType::nullable;
@@ -701,34 +701,26 @@ protected:
         // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
         // the same as the column used for the aggregate action, then the entire query can run within scope of that
         // column only, with no references to other columns:
-        bool fastmode = (m_conds == 1 &&
-                         (source_column == nullptr ||
-                          (!m_fastmode_disabled
-                           && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));
+        bool fastmode = should_run_in_fastmode(source_column);
         for (size_t s = start; s < end; ) {
-            // Cache internal leaves
-            if (s >= m_leaf_end || s < m_leaf_start) {
-                get_leaf(*m_condition_column, s);
-                size_t w = m_leaf_ptr->get_width();
-                m_dT = (w == 0 ? 1.0 / REALM_MAX_BPNODE_SIZE : w / float(bitwidth_time_unit));
-            }
+            cache_leaf(s);
 
-            size_t end2;
+            size_t end_in_leaf;
             if (end > m_leaf_end)
-                end2 = m_leaf_end - m_leaf_start;
+                end_in_leaf = m_leaf_end - m_leaf_start;
             else
-                end2 = end - m_leaf_start;
+                end_in_leaf = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_leaf_ptr->find(c, m_action, m_value, m_null, s - m_leaf_start, end2, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                bool cont = m_leaf_ptr->find(c, m_action, m_value, m_null, s - m_leaf_start, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 if (!cont)
                     return not_found;
             }
-            // Else, for each match in this node, call our ValueNodeBase::match_callback to test remaining nodes and/or extract
+            // Else, for each match in this node, call our IntegerNodeBase::match_callback to test remaining nodes and/or extract
             // aggregate payload from aggregate column:
             else {
                 m_source_column = source_column;
-                bool cont = (this->*m_find_callback_specialized)(s, end2);
+                bool cont = (this->*m_find_callback_specialized)(s, end_in_leaf);
                 if (!cont)
                     return not_found;
             }
@@ -736,7 +728,7 @@ protected:
             if (m_local_matches == m_local_limit)
                 break;
 
-            s = end2 + m_leaf_start;
+            s = end_in_leaf + m_leaf_start;
         }
 
         if (m_local_matches == m_local_limit) {
@@ -749,19 +741,19 @@ protected:
         }
     }
 
-    ValueNodeBase(TConditionValue v, size_t column_idx)
-        : ValueNodeBase(column_idx)
+    IntegerNodeBase(TConditionValue v, size_t column_idx)
+        : IntegerNodeBase(column_idx)
     {
         m_value = v;
     }
 
-    ValueNodeBase(null, size_t column_idx)
-        : ValueNodeBase(column_idx)
+    IntegerNodeBase(null, size_t column_idx)
+        : IntegerNodeBase(column_idx)
     {
         m_null = true;
     }
 
-    ValueNodeBase(const ThisType& from) : ColumnNodeBase(from),
+    IntegerNodeBase(const ThisType& from) : ColumnNodeBase(from),
         m_value(from.m_value), m_null(from.m_null)
     {
         // state is transient/only valid during search, no need to copy
@@ -802,6 +794,23 @@ protected:
         m_leaf_end = m_leaf_start + m_leaf_ptr->size();
     }
 
+    void cache_leaf(size_t s)
+    {
+        if (s >= m_leaf_end || s < m_leaf_start) {
+            get_leaf(*m_condition_column, s);
+            size_t w = m_leaf_ptr->get_width();
+            m_dT = (w == 0 ? 1.0 / REALM_MAX_BPNODE_SIZE : w / float(bitwidth_time_unit));
+        }
+    }
+
+    bool should_run_in_fastmode(SequentialGetterBase* source_column) const
+    {
+        return (m_conds == 1 &&
+                (source_column == nullptr ||
+                 (!m_fastmode_disabled
+                  && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));
+    }
+
     // Search value:
     // FIXME: Consider using Optional.
     TConditionValue m_value;
@@ -824,7 +833,7 @@ protected:
     TFind_callback_specialized m_find_callback_specialized = nullptr;
 
 private:
-    explicit ValueNodeBase(size_t column_idx) : ColumnNodeBase(column_idx)
+    explicit IntegerNodeBase(size_t column_idx) : ColumnNodeBase(column_idx)
     {
         m_dT = _impl::CostHeuristic<ColType>::dT;
         m_dD = _impl::CostHeuristic<ColType>::dD;
@@ -833,25 +842,25 @@ private:
 
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
 template <class ColType, class TConditionFunction>
-class ValueNode : public ValueNodeBase<ColType> {
-    using BaseType = ValueNodeBase<ColType>;
-    using ThisType = ValueNode<ColType, TConditionFunction>;
+class IntegerNode : public IntegerNodeBase<ColType> {
+    using BaseType = IntegerNodeBase<ColType>;
+    using ThisType = IntegerNode<ColType, TConditionFunction>;
 public:
     static const bool implicit_nullable = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
-    ValueNode(TConditionValue value, size_t column_ndx)
-    : ValueNodeBase<ColType>{value, column_ndx}
+    IntegerNode(TConditionValue value, size_t column_ndx)
+    : IntegerNodeBase<ColType>{value, column_ndx}
     {
     }
 
-    ValueNode(null n, size_t column_ndx)
-    : ValueNodeBase<ColType>{n, column_ndx}
+    IntegerNode(null n, size_t column_ndx)
+    : IntegerNodeBase<ColType>{n, column_ndx}
     {
     }
 
-    ValueNode(const ThisType& other)
-    : ValueNodeBase<ColType>(other)
+    IntegerNode(const ThisType& other)
+    : IntegerNodeBase<ColType>(other)
     {
     }
 
@@ -911,7 +920,7 @@ public:
 
     ParentNode* clone() override
     {
-        return new ValueNode<ColType, TConditionFunction>(*this);
+        return new IntegerNode<ColType, TConditionFunction>(*this);
     }
 
 protected:
