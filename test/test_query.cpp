@@ -6091,6 +6091,26 @@ TEST(Query_IntegerNull)
     CHECK_EQUAL(2, t.size());
 }
 
+TEST(Query_IntegerNonNull)
+{
+    Table table;
+    table.add_column(type_Int, "first", false);
+    table.add_empty_row(3);
+    table.set_int(0, 1, 123);
+    table.set_int(0, 2, 456);
+
+    TableView t;
+
+    t = table.where().equal(0, null{}).find_all();
+    CHECK_EQUAL(0, t.size());
+
+    t = table.where().not_equal(0, null{}).find_all();
+    CHECK_EQUAL(3, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.get_source_ndx(2));
+}
+
 #endif
 
 #endif // TEST_QUERY
