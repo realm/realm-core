@@ -33,6 +33,8 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/bind_ptr.hpp>
 
+#include "demangle.hpp"
+
 
 #define TEST(name) TEST_IF(name, true)
 
@@ -64,32 +66,15 @@
     TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, __VA_ARGS__)
 
 #define TEST_TYPES_EX(name, list, enabled, ...) \
-    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
+    template<class> struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
         bool test_enabled() const { return bool(enabled); } \
-        template <class T> void test_one(); \
-        template <class...> struct TestEach; \
-        void test_run(); \
+        void test_run();                                    \
     }; \
-    template <class T, class... Rest> struct Realm_UnitTest__##name::TestEach<T, Rest...> { \
-        static void test_each(Realm_UnitTest__##name& self) \
-        { \
-            self.test_one<T>(); \
-            TestEach<Rest...>::test_each(self); \
-        } \
-    }; \
-    template <> struct Realm_UnitTest__##name::TestEach<> { \
-        static void test_each(Realm_UnitTest__##name&) {} \
-    }; \
-    Realm_UnitTest__##name realm_unit_test__##name; \
-    realm::test_util::unit_test::RegisterTest \
+    realm::test_util::unit_test::TestCons<Realm_UnitTest__##name, __VA_ARGS__> realm_unit_test__##name; \
+    realm::test_util::unit_test::RegisterTest                        \
         realm_unit_test_reg__##name((list), realm_unit_test__##name, \
-                                    "DefaultSuite", #name, __FILE__, __LINE__); \
-    inline void Realm_UnitTest__##name::test_run() \
-    { \
-        TestEach<__VA_ARGS__>::test_each(*this); \
-    } \
-    template <class TEST_TYPE> \
-    void Realm_UnitTest__##name::test_one()
+                                      "DefaultSuite", #name, __FILE__, __LINE__); \
+    template<class TEST_TYPE> void Realm_UnitTest__##name<TEST_TYPE>::test_run()
 
 
 #define CHECK(cond) \
@@ -202,6 +187,18 @@ namespace realm {
 namespace test_util {
 namespace unit_test {
 
+
+template<template<class> class Test, class...> class TestCons;
+
+template<template<class> class Test, class Type, class... Types>
+class TestCons<Test, Type, Types...> {
+public:
+    Test<Type> head;
+    TestCons<Test, Types...> tail;
+};
+template<template<class> class Test> class TestCons<Test> {};
+
+
 class Test;
 class TestResults;
 
@@ -209,7 +206,7 @@ class TestResults;
 struct TestDetails {
     long test_index;
     const char* suite_name;
-    const char* test_name;
+    std::string test_name;
     const char* file_name;
     long line_number;
 };
@@ -270,7 +267,7 @@ public:
 
     /// Called automatically when you use the `TEST` macro (or one of
     /// its friends).
-    void add(Test&, const char* suite, const char* name, const char* file, long line);
+    void add(Test&, const char* suite, const std::string& name, const char* file, long line);
 
 private:
     class ExecContext;
@@ -469,7 +466,34 @@ struct RegisterTest {
     RegisterTest(TestList& list, Test& test, const char* suite,
                  const char* name, const char* file, long line)
     {
+        register_test(list, test, suite, name, file, line);
+    }
+    template<template<class> class Test, class... Types>
+    RegisterTest(TestList& list, TestCons<Test, Types...>& tests, const char* suite,
+                 const char* name, const char* file, long line)
+    {
+        register_tests(list, tests, suite, name, file, line);
+    }
+    static void register_test(TestList& list, Test& test, const char* suite,
+                              const std::string& name, const char* file, long line)
+    {
         list.add(test, suite, name, file, line);
+    }
+    template<template<class> class Test, class Type, class... Types>
+    static void register_tests(TestList& list, TestCons<Test, Type, Types...>& tests,
+                               const char* suite, const char* name, const char* file, long line)
+    {
+        std::string name_2 = name;
+        name_2 += '<';
+        name_2 += get_type_name<Type>();
+        name_2 += '>';
+        register_test(list, tests.head, suite, name_2, file, line);
+        register_tests(list, tests.tail, suite, name, file, line);
+    }
+    template<template<class> class Test>
+    static void register_tests(TestList&, TestCons<Test>&,
+                               const char*, const char*, const char*, long)
+    {
     }
 };
 

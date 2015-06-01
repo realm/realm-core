@@ -199,14 +199,15 @@ public:
 
     bool include(const TestDetails& details) override
     {
-        const char* name = details.test_name;
+        const char* name_begin = details.test_name.data();
+        const char* name_end   = name_begin + details.test_name.size();
         typedef patterns::const_iterator iter;
 
         // Say "no" if it matches an exclude pattern
         {
             iter end = m_exclude.end();
             for (iter i = m_exclude.begin(); i != end; ++i) {
-                if (i->match(name))
+                if (i->match(name_begin, name_end))
                     return false;
             }
         }
@@ -215,7 +216,7 @@ public:
         {
             iter end = m_include.end();
             for (iter i = m_include.begin(); i != end; ++i) {
-                if (i->match(name))
+                if (i->match(name_begin, name_end))
                     return true;
             }
         }
@@ -260,7 +261,8 @@ public:
 };
 
 
-void TestList::add(Test& test, const char* suite, const char* name, const char* file, long line)
+void TestList::add(Test& test, const char* suite, const std::string& name,
+                   const char* file, long line)
 {
     test.test_results.m_test = &test;
     test.test_results.m_list = this;
