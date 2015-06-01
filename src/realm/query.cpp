@@ -47,6 +47,8 @@ void Query::Create()
     first.push_back(0);
     pending_not.push_back(false);
     do_delete = true;
+    if (m_table)
+        update_current_descriptor();
 }
 
 // FIXME: Try to remove this
@@ -63,6 +65,7 @@ Query::Query(const Query& copy)
     m_source_link_view = copy.m_source_link_view;
     copy.do_delete = false;
     do_delete = true;
+    m_current_descriptor = copy.m_current_descriptor;
 }
 
 
@@ -90,6 +93,10 @@ Query& Query::operator = (const Query& source)
         update_override.clear();
         subtables.clear();
 
+        m_table = source.m_table;
+        m_view = source.m_view;
+        m_source_link_view = source.m_source_link_view;
+
         Create();
         first = source.first;
         std::map<ParentNode*, ParentNode*> node_mapping;
@@ -106,9 +113,8 @@ Query& Query::operator = (const Query& source)
         for (size_t t = 0; t < first.size(); t++) {
             first[t] = node_mapping[first[t]];
         }
-        m_table = source.m_table;
-        m_view = source.m_view;
-        m_source_link_view = source.m_source_link_view;
+
+
 
         if (first[0]) {
             ParentNode* node_to_update = first[0];
@@ -271,20 +277,20 @@ ParentNode* make_condition_node(const Descriptor& descriptor, size_t column_ndx,
 
 } // anonymous namespace
 
-ConstDescriptorRef Query::current_descriptor() const
+void Query::update_current_descriptor()
 {
     ConstDescriptorRef desc = m_table->get_descriptor();
     for (size_t i = 0; i < m_subtable_path.size(); ++i) {
         desc = desc->get_subdescriptor(m_subtable_path[i]);
     }
-    return desc;
+    m_current_descriptor = desc;
 }
 
 
 template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
-    ParentNode* const parent = make_condition_node<TConditionFunction>(*current_descriptor(), column_ndx, value);
+    ParentNode* const parent = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
     UpdatePointers(parent, &parent->m_child);
     return *this;
 }
@@ -1008,6 +1014,7 @@ Query& Query::subtable(size_t column)
     // once subtable conditions have been evaluated, resume evaluation from m_child2
     subtables.push_back(&p->m_child2);
     m_subtable_path.push_back(column);
+    update_current_descriptor();
     group();
     return *this;
 }
@@ -1026,6 +1033,7 @@ Query& Query::end_subtable()
 
     subtables.pop_back();
     m_subtable_path.pop_back();
+    update_current_descriptor();
     return *this;
 }
 

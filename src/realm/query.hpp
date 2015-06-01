@@ -280,7 +280,8 @@ public:
 
     // Used to access schema while building query:
     std::vector<size_t> m_subtable_path;
-    ConstDescriptorRef current_descriptor() const;
+    ConstDescriptorRef m_current_descriptor;
+    void update_current_descriptor();
 
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
