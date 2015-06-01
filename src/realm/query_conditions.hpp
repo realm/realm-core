@@ -82,12 +82,24 @@ struct NotEqual {
 struct ContainsIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
+        if (v2.is_null() && !v1.is_null())
+            return false;
+
+        if (v1.size() == 0 && !v2.is_null())
+            return true;
+
         return search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
     bool operator()(StringData v1, StringData v2) const
     {
+        if (v2.is_null() && !v1.is_null())
+            return false;
+
+        if (v1.size() == 0 && !v2.is_null())
+            return true;
+
         std::string v1_upper = case_map(v1, true);
         std::string v1_lower = case_map(v1, false);
         return search_case_fold(v2, v1_upper.c_str(), v1_lower.c_str(), v1.size()) != v2.size();
@@ -100,12 +112,17 @@ struct ContainsIns {
 struct BeginsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
+        if (v2.is_null() && !v1.is_null())
+            return false;
         return v1.size() <= v2.size() && equal_case_fold(v2.prefix(v1.size()), v1_upper, v1_lower);
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
     bool operator()(StringData v1, StringData v2) const
     {
+        if (v2.is_null() && !v1.is_null())
+            return false;
+
         if (v1.size() > v2.size())
             return false;
         std::string v1_upper = case_map(v1, true);
@@ -120,12 +137,18 @@ struct BeginsWithIns {
 struct EndsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
+        if (v2.is_null() && !v1.is_null())
+            return false;
+
         return v1.size() <= v2.size() && equal_case_fold(v2.suffix(v1.size()), v1_upper, v1_lower);
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
     bool operator()(StringData v1, StringData v2) const
     {
+        if (v2.is_null() && !v1.is_null())
+            return false;
+
         if (v1.size() > v2.size())
             return false;
         std::string v1_upper = case_map(v1, true);
@@ -139,12 +162,18 @@ struct EndsWithIns {
 struct EqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
+        if (v1.is_null() != v2.is_null())
+            return false;
+
         return v1.size() == v2.size() && equal_case_fold(v2, v1_upper, v1_lower);
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
     bool operator()(StringData v1, StringData v2) const
     {
+        if (v1.is_null() != v2.is_null())
+            return false;
+
         if (v1.size() != v2.size())
             return false;
         std::string v1_upper = case_map(v1, true);
@@ -158,12 +187,17 @@ struct EqualIns {
 struct NotEqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
+        if (v1.is_null() != v2.is_null())
+            return true;
         return v1.size() != v2.size() || !equal_case_fold(v2, v1_upper, v1_lower);
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
     bool operator()(StringData v1, StringData v2) const
     {
+        if (v1.is_null() != v2.is_null())
+            return true;
+
         if (v1.size() != v2.size())
             return true;        
         std::string v1_upper = case_map(v1, true);

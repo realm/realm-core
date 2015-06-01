@@ -3,7 +3,6 @@
 #include <realm.hpp>
 
 using namespace realm;
-using namespace std;
 
 int main()
 {

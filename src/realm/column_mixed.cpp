@@ -4,7 +4,6 @@
 #include <memory>
 #include <realm/column_mixed.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -16,7 +15,7 @@ ColumnMixed::~ColumnMixed() REALM_NOEXCEPT
 
 void ColumnMixed::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    if (!m_array->update_from_parent(old_baseline))
+    if (!get_root_array()->update_from_parent(old_baseline))
         return;
 
     m_types->update_from_parent(old_baseline);
@@ -426,14 +425,14 @@ void ColumnMixed::do_verify(const Table* table, size_t col_ndx) const
     REALM_ASSERT_3(types_len, ==, refs_len);
 }
 
-void ColumnMixed::to_dot(ostream& out, StringData title) const
+void ColumnMixed::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
-    out << "subgraph cluster_mixed_column" << ref << " {" << endl;
+    out << "subgraph cluster_mixed_column" << ref << " {" << std::endl;
     out << " label = \"Mixed column";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
-    out << "\";" << endl;
+    out << "\";" << std::endl;
 
     m_array->to_dot(out, "mixed_top");
     m_types->to_dot(out, "types");
@@ -451,10 +450,10 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
         subtable->to_dot(out);
     }
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
-void ColumnMixed::do_dump_node_structure(ostream& out, int level) const
+void ColumnMixed::do_dump_node_structure(std::ostream& out, int level) const
 {
     m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
 }

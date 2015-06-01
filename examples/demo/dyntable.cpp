@@ -3,7 +3,6 @@
 #include <sstream>
 
 using namespace realm;
-using namespace std;
 
 int main(int, char*[]) {
     Table t;
@@ -23,8 +22,8 @@ int main(int, char*[]) {
     t.set_int(age_ndx, 0, 32);
     t.set_int(age_ndx, 1, 18);
 
-    cout << "Total: " << t.sum_int(age_ndx) << endl;
-    stringstream ss;
+    std::cout << "Total: " << t.sum_int(age_ndx) << std::endl;
+    std::stringstream ss;
     t.to_json(ss);
-    cout << "JSON:  " << ss.str() << endl;
+    std::cout << "JSON:  " << ss.str() << std::endl;
 }

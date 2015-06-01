@@ -37,7 +37,7 @@ class WriteLogCollector;
 // Thrown by SharedGroup::open if the lock file is already open in another
 // process which can't share mutexes with this process
 struct IncompatibleLockFile : std::runtime_error {
-    IncompatibleLockFile() : runtime_error("Incompatible lock file") { }
+    IncompatibleLockFile() : std::runtime_error("Incompatible lock file") { }
 };
 
 /// A SharedGroup facilitates transactions.
@@ -323,8 +323,9 @@ public:
 
     /// Compact the database file.
     /// - The method will throw if called inside a transaction.
+    /// - The method will throw if called in unattached state.
     /// - The method will return false if other SharedGroups are accessing the database
-    ///   in which case compaction is not done.
+    ///   in which case compaction is not done. This is not necessarily an error.
     /// It will return true following succesful compaction.
     /// While compaction is in progress, attempts by other
     /// threads or processes to open the database will wait.
@@ -422,6 +423,8 @@ private:
     void low_level_commit(uint_fast64_t new_version);
 
     void do_async_commits();
+
+    void upgrade_file_format();
 
 #ifdef REALM_ENABLE_REPLICATION
 
@@ -600,6 +603,8 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
     m_group(Group::shared_tag())
 {
     open(file, no_create, dlevel, false, key);
+
+    upgrade_file_format();
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
@@ -607,18 +612,37 @@ inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
 {
 }
 
+#ifdef REALM_ENABLE_REPLICATION
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
+m_group(Group::shared_tag())
+{
+    open(repl, dlevel, key);
+
+    upgrade_file_format();
+}
+#endif
+
 inline bool SharedGroup::is_attached() const REALM_NOEXCEPT
 {
     return m_file_map.is_attached();
 }
 
-#ifdef REALM_ENABLE_REPLICATION
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
-    m_group(Group::shared_tag())
-{
-    open(repl, dlevel, key);
+inline void SharedGroup::upgrade_file_format() {
+    // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set
+    // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
+    // call returns immediately if it finds that the upgrade is already complete.
+    begin_read();
+    bool upgrade = m_group.get_file_format() < default_file_format_version;
+    end_read();
+
+    // Only create write transaction if needed; that's why we test whether to upgrade or not in a separate read
+    // transaction. Else unit tests would fail.
+    if (upgrade) {
+        begin_write();
+        m_group.upgrade_file_format();
+        commit();
+    }
 }
-#endif
 
 } // namespace realm
 

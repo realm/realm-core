@@ -1,7 +1,6 @@
 #include <realm.hpp>
 
 using namespace realm;
-using namespace std;
 
 REALM_TABLE_3(People,
                 name, String,
@@ -22,7 +21,7 @@ int main(int, char*[]) {
 
     // Get a view
     People::View v1 = t.where().hired.equal(true).find_all();
-    cout << "Hired: " << v1.size() << endl;
+    std::cout << "Hired: " << v1.size() << std::endl;
 
     // Retire seniors
     People::View v2 = t.where().age.greater(65).find_all();
@@ -34,5 +33,5 @@ int main(int, char*[]) {
     People::View v3 = t.where().age.between(13, 19).find_all();
     v3.clear();
 
-    cout << "Rows: " << t.size() << endl;
+    std::cout << "Rows: " << t.size() << std::endl;
 }

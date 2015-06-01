@@ -30,8 +30,8 @@ class ArrayStringLong: public Array {
 public:
     typedef StringData value_type;
 
-    explicit ArrayStringLong(Allocator&) REALM_NOEXCEPT;
-    ~ArrayStringLong() REALM_NOEXCEPT override {}
+    explicit ArrayStringLong(Allocator&, bool nullable) REALM_NOEXCEPT;
+    ~ArrayStringLong() REALM_NOEXCEPT override{}
 
     /// Create a new empty long string array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -53,6 +53,7 @@ public:
 
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
 
+
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
@@ -60,6 +61,9 @@ public:
     void truncate(std::size_t size);
     void clear();
     void destroy();
+
+    bool is_null(size_t ndx) const;
+    void set_null(size_t ndx);
 
     std::size_t count(StringData value, std::size_t begin = 0,
                       std::size_t end = npos) const REALM_NOEXCEPT;
@@ -72,7 +76,7 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static StringData get(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
+    static StringData get(const char* header, std::size_t ndx, Allocator&, bool nullable) REALM_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
 
@@ -81,7 +85,7 @@ public:
     /// Construct a long string array of the specified size and return
     /// just the reference to the underlying memory. All elements will
     /// be initialized to zero size blobs.
-    static MemRef create_array(std::size_t size, Allocator&);
+    static MemRef create_array(std::size_t size, Allocator&, bool nullable);
 
     /// Construct a copy of the specified slice of this long string
     /// array using the specified target allocator.
@@ -95,24 +99,27 @@ public:
 private:
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
+    Array m_nulls;
+    bool m_nullable;
 };
 
 
 
 
 // Implementation:
-
-inline ArrayStringLong::ArrayStringLong(Allocator& alloc) REALM_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc)
+inline ArrayStringLong::ArrayStringLong(Allocator& alloc, bool nullable) REALM_NOEXCEPT:
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(nullable ? alloc : Allocator::get_default()), m_nullable(nullable)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
+    if (nullable)
+        m_nulls.set_parent(this, 2);
 }
 
 inline void ArrayStringLong::create()
 {
     std::size_t size = 0;
-    MemRef mem = create_array(size, get_alloc()); // Throws
+    MemRef mem = create_array(size, get_alloc(), m_nullable); // Throws
     init_from_mem(mem);
 }
 
@@ -121,6 +128,7 @@ inline void ArrayStringLong::init_from_ref(ref_type ref) REALM_NOEXCEPT
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
     init_from_mem(MemRef(header, ref));
+    m_nullable = (Array::size() == 3);
 }
 
 inline void ArrayStringLong::init_from_parent() REALM_NOEXCEPT
@@ -142,6 +150,10 @@ inline std::size_t ArrayStringLong::size() const REALM_NOEXCEPT
 inline StringData ArrayStringLong::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
+
+    if (m_nullable && m_nulls.get(ndx) == 0)
+        return realm::null();
+
     std::size_t begin, end;
     if (0 < ndx) {
         // FIXME: Consider how much of a performance problem it is,
@@ -155,6 +167,7 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const REALM_NOEXCEPT
         end   = to_size_t(m_offsets.get(0));
     }
     --end; // Discount the terminating zero
+
     return StringData(m_blob.get(begin), end-begin);
 }
 
@@ -166,18 +179,24 @@ inline void ArrayStringLong::truncate(std::size_t size)
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
+    if (m_nullable)
+        m_nulls.truncate(size);
 }
 
 inline void ArrayStringLong::clear()
 {
     m_blob.clear();
     m_offsets.clear();
+    if (m_nullable)
+        m_nulls.clear();
 }
 
 inline void ArrayStringLong::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
+    if (m_nullable)
+        m_nulls.destroy();
     Array::destroy();
 }
 
@@ -187,6 +206,8 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) REALM_NOEXC
     if (res) {
         m_blob.update_from_parent(old_baseline);
         m_offsets.update_from_parent(old_baseline);
+        if (m_nullable)
+            m_nulls.update_from_parent(old_baseline);
     }
     return res;
 }

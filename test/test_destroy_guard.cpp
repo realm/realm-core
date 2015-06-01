@@ -5,7 +5,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::_impl;
 
@@ -82,7 +81,7 @@ public:
 
     void do_free(ref_type ref, const char* addr) REALM_NOEXCEPT override
     {
-        typedef map<ref_type, char*>::iterator iter;
+        typedef std::map<ref_type, char*>::iterator iter;
         iter i = m_map.find(ref);
         REALM_ASSERT(i != m_map.end());
         char* addr_2 = i->second;
@@ -94,7 +93,7 @@ public:
 
     char* do_translate(ref_type ref) const REALM_NOEXCEPT override
     {
-        typedef map<ref_type, char*>::const_iterator iter;
+        typedef std::map<ref_type, char*>::const_iterator iter;
         iter i = m_map.find(ref);
         REALM_ASSERT(i != m_map.end());
         char* addr = i->second;
@@ -108,7 +107,7 @@ public:
 
     void clear()
     {
-        typedef map<ref_type, char*>::const_iterator iter;
+        typedef std::map<ref_type, char*>::const_iterator iter;
         iter end = m_map.end();
         for (iter i = m_map.begin(); i != end; ++i) {
             char* addr = i->second;
@@ -125,7 +124,7 @@ public:
 
 private:
     ref_type m_offset;
-    map<ref_type, char*> m_map;
+    std::map<ref_type, char*> m_map;
 };
 
 } // anonymous namespace

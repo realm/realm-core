@@ -243,7 +243,6 @@
 /// since the latter it an invariant.
 
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -276,13 +275,18 @@ template<> struct ColumnTypeTraits3<DateTime> {
     const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
 };
+template<> struct ColumnTypeTraits3<BinaryData> {
+    const static ColumnType ct_id = col_type_Binary;
+    const static ColumnType ct_id_real = col_type_Binary;
+    typedef ColumnBinary column_type;
+};
 
 // -- Table ---------------------------------------------------------------------------------
 
-size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
+size_t Table::add_column(DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
 {
     REALM_ASSERT(!has_shared_type());
-    return get_descriptor()->add_column(type, name, subdesc); // Throws
+    return get_descriptor()->add_column(type, name, subdesc, nullable); // Throws
 }
 
 size_t Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
@@ -391,11 +395,10 @@ void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
 }
 
 
-void Table::insert_column(size_t col_ndx, DataType type, StringData name,
-                          DescriptorRef* subdesc)
+void Table::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
 {
     REALM_ASSERT(!has_shared_type());
-    get_descriptor()->insert_column(col_ndx, type, name, subdesc); // Throws
+    get_descriptor()->insert_column(col_ndx, type, name, subdesc, nullable); // Throws
 }
 
 
@@ -627,7 +630,7 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
 
 
 void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
-                             StringData name, Table* link_target_table)
+                             StringData name, Table* link_target_table, bool nullable)
 {
     REALM_ASSERT(desc.is_attached());
 
@@ -640,7 +643,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
     if (desc.is_root()) {
         root_table.bump_version();
-        root_table.insert_root_column(col_ndx, type, name, link_target_table); // Throws
+        root_table.insert_root_column(col_ndx, type, name, link_target_table, nullable); // Throws
     }
     else {
         Spec& spec = df::get_spec(desc);
@@ -654,7 +657,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, col_ndx, type, name, link_target_table); // Throws
+        repl->insert_column(desc, col_ndx, type, name, link_target_table, nullable); // Throws
 #endif
 }
 
@@ -737,11 +740,11 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 
 
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
-                               Table* link_target_table)
+                               Table* link_target_table, bool nullable)
 {
     REALM_ASSERT_3(col_ndx, <=, m_spec.get_public_column_count());
 
-    do_insert_root_column(col_ndx, ColumnType(type), name); // Throws
+    do_insert_root_column(col_ndx, ColumnType(type), name, nullable); // Throws
     adj_insert_column(col_ndx); // Throws
     update_link_target_tables(col_ndx, col_ndx + 1); // Throws
 
@@ -790,12 +793,11 @@ void Table::erase_root_column(size_t col_ndx)
 }
 
 
-void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name)
+void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable)
 {
-    m_spec.insert_column(ndx, type, name); // Throws
+    m_spec.insert_column(ndx, type, name, nullable ? col_attr_Nullable : col_attr_None); // Throws
 
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(ndx, info);
+    Spec::ColumnInfo info = m_spec.get_column_info(ndx);
     size_t ndx_in_parent = info.m_column_ref_ndx;
     ref_type col_ref = create_column(type, m_size, m_columns.get_alloc()); // Throws
     m_columns.insert(ndx_in_parent, col_ref); // Throws
@@ -804,8 +806,7 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name)
 
 void Table::do_erase_root_column(size_t ndx)
 {
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(ndx, info);
+    Spec::ColumnInfo info = m_spec.get_column_info(ndx);
     m_spec.erase_column(ndx); // Throws
 
     // Remove ref from m_columns, and destroy node structure
@@ -954,7 +955,7 @@ void Table::update_subtables(Descriptor& desc, SubtableUpdater* updater)
             return;
         }
         if (int_multiply_with_overflow_detect(size, 2))
-            throw runtime_error("Too many subdescriptor nesting levels");
+            throw std::runtime_error("Too many subdescriptor nesting levels");
         begin = new size_t[size]; // Throws
         end = begin + size;
         dyn_buf.reset(begin);
@@ -1200,6 +1201,13 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
     ColumnBase* col = 0;
     ref_type ref = m_columns.get_as_ref(ndx_in_parent);
     Allocator& alloc = m_columns.get_alloc();
+
+    bool nullable = is_nullable(col_ndx);
+
+    REALM_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
+                                  col_type != col_type_StringEnum &&
+                                  col_type != col_type_Binary)));
+
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
@@ -1213,17 +1221,17 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = new ColumnDouble(alloc, ref); // Throws
             break;
         case col_type_String:
-            col = new AdaptiveStringColumn(alloc, ref); // Throws
+            col = new AdaptiveStringColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Binary:
-            col = new ColumnBinary(alloc, ref); // Throws
+            col = new ColumnBinary(alloc, ref, nullable); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
                 m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
-            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref, nullable); // Throws
             col_2->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             col = col_2;
             break;
@@ -1348,6 +1356,31 @@ bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
 }
 
 
+void Table::upgrade_file_format()
+{
+    for (size_t c = 0; c < get_column_count(); c++) {
+        if (has_search_index(c)) {
+            if (get_column_type(c) == type_String) {
+                AdaptiveStringColumn& asc = get_column_string(c);
+                asc.get_search_index()->clear();
+                asc.populate_search_index();
+            }
+            else if (get_real_column_type(c) == col_type_Int) {
+                ColumnBase& col = get_column_base(c);
+                Column& c = static_cast<Column&>(col);
+                c.get_search_index()->clear();
+                c.populate_search_index();
+            }
+            else {
+                // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
+                // so this is fine for now.
+                REALM_ASSERT(false);
+            }
+
+        }
+    }
+}
+
 void Table::add_search_index(size_t col_ndx)
 {
     if (REALM_UNLIKELY(!is_attached()))
@@ -1364,28 +1397,25 @@ void Table::add_search_index(size_t col_ndx)
 
     REALM_ASSERT(!m_primary_key);
 
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(col_ndx, info);
-    size_t column_pos = info.m_column_ref_ndx;
-    ref_type index_ref = 0;
-
     // Create the index
     ColumnBase& col = get_column_base(col_ndx);
     StringIndex* index = col.create_search_index(); // Throws
-    if (index) {
-        index->set_parent(&m_columns, column_pos + 1);
-        index_ref = index->get_ref();
-    } else {
+    if (!index) {
         throw LogicError(LogicError::illegal_combination);
     }
 
-    // Insert ref into list of column refs after the owning column
-    m_columns.insert(column_pos+1, index_ref); // Throws
+    // The index goes in the list of column refs immediate after the owning column
+    size_t index_pos = m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
+    index->set_parent(&m_columns, index_pos);
+    m_columns.insert(index_pos, index->get_ref()); // Throws
 
+    // Mark the column as having an index
     int attr = m_spec.get_column_attr(col_ndx);
     attr |= col_attr_Indexed;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
+    // Update column accessors for all columns after the one we just added an
+    // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx+1); // Throws
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -1412,20 +1442,22 @@ void Table::remove_search_index(size_t col_ndx)
     if (!has_search_index(col_ndx))
         return;
 
-    // Remove the index column
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(col_ndx, info);
-    size_t column_pos = info.m_column_ref_ndx;
-
+    // Destroy and remove the index column
     ColumnBase& col = get_column_base(col_ndx);
     col.get_search_index()->destroy();
     col.destroy_search_index();
 
+    // The index is always immediately after the column in m_columns
+    size_t index_pos = m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
+    m_columns.erase(index_pos);
+
+    // Mark the column as no longer having an index
     int attr = m_spec.get_column_attr(col_ndx);
     attr &= ~col_attr_Indexed;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-    m_columns.erase(column_pos + 1);
+    // Update column accessors for all columns after the one we just removed the
+    // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx + 1); // Throws
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -1593,6 +1625,12 @@ void Table::remove_primary_key()
 //
 // Note: get_subtable_ptr() has now been collapsed to one version, but
 // the suggested change will still be a significant improvement.
+
+bool Table::is_nullable(size_t col_ndx) const
+{
+    REALM_ASSERT_DEBUG(col_ndx < m_spec.get_column_count());
+    return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
+}
 
 const ColumnBase& Table::get_column_base(size_t ndx) const REALM_NOEXCEPT
 {
@@ -1841,22 +1879,8 @@ ref_type Table::clone_columns(Allocator& alloc) const
     for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ref_type new_col_ref;
         const ColumnBase* col = &get_column_base(col_ndx);
-        if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
-            ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
-            AdaptiveStringColumn new_col(alloc, ref); // Throws
-            // FIXME: Should be optimized with something like
-            // new_col.add(seq_tree_accessor.begin(),
-            // seq_tree_accessor.end())
-            size_t n = enum_col->size();
-            for (size_t i = 0; i < n; ++i)
-                new_col.add(enum_col->get(i)); // Throws
-            new_col_ref = new_col.get_ref();
-        }
-        else {
-            const Array& root = *col->get_root_array();
-            MemRef mem = root.clone_deep(alloc); // Throws
-            new_col_ref = mem.m_ref;
-        }
+        MemRef mem = col->clone_deep(alloc);
+        new_col_ref = mem.m_ref;
         new_columns.add(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();
@@ -1897,7 +1921,7 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_DEBUG(row_ndx <= m_size);
-    REALM_ASSERT_DEBUG(num_rows <= numeric_limits<size_t>::max() - row_ndx);
+    REALM_ASSERT_DEBUG(num_rows <= std::numeric_limits<size_t>::max() - row_ndx);
     bump_version();
 
     size_t num_cols = m_spec.get_column_count();
@@ -2473,16 +2497,19 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
-
+    StringData sd;
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = get_column_string(col_ndx);
-        return column.get(ndx);
+        sd = column.get(ndx);
     }
-
-    REALM_ASSERT_3(type, ==, col_type_StringEnum);
-    const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-    return column.get(ndx);
+    else {
+        REALM_ASSERT(type == col_type_StringEnum);
+        const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+        sd = column.get(ndx);
+    }
+    REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
+    return sd;
 }
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
@@ -2500,8 +2527,10 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    bump_version();
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
 
+    bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
 
@@ -2517,6 +2546,9 @@ void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::string_too_big);
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <=, m_size);
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
@@ -2551,6 +2583,8 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
         throw LogicError(LogicError::binary_too_big);
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
     bump_version();
 
     ColumnBinary& column = get_column_binary(col_ndx);
@@ -3204,10 +3238,9 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
     return column.find_first(value);
 }
 
-size_t Table::find_first_binary(size_t, BinaryData) const
+size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    // FIXME: Implement this!
-    throw runtime_error("Not implemented");
+    return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
 }
 
 
@@ -3292,13 +3325,13 @@ ConstTableView Table::find_all_string(size_t col_ndx, StringData value) const
 TableView Table::find_all_binary(size_t, BinaryData)
 {
     // FIXME: Implement this!
-    throw runtime_error("Not implemented");
+    throw std::runtime_error("Not implemented");
 }
 
 ConstTableView Table::find_all_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
-    throw runtime_error("Not implemented");
+    throw std::runtime_error("Not implemented");
 }
 
 TableView Table::get_distinct_view(size_t col_ndx)
@@ -3343,15 +3376,16 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
 namespace {
 
 struct AggrState {
-    AggrState() : block(Array::no_prealloc_tag()), added_row(false) {}
+    AggrState(const Table& table) : table(table), cache(table.get_alloc()), added_row(false) {}
 
-    const Table* table;
+    const Table& table;
     const StringIndex* dst_index;
     size_t group_by_column;
 
     const ColumnStringEnum* enums;
-    vector<size_t> keys;
-    Array block;
+    std::vector<size_t> keys;
+    const ArrayInteger* block = nullptr;
+    ArrayInteger cache;
     size_t offset;
     size_t block_end;
 
@@ -3362,7 +3396,7 @@ typedef size_t (*get_group_fnc)(size_t, AggrState&, Table&);
 
 size_t get_group_ndx(size_t i, AggrState& state, Table& result)
 {
-    StringData str = state.table->get_string(state.group_by_column, i);
+    StringData str = state.table.get_string(state.group_by_column, i);
     size_t ndx = state.dst_index->find_first(str);
     if (ndx == not_found) {
         ndx = result.add_empty_row();
@@ -3376,13 +3410,16 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 {
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
-        state.enums->Column::GetBlock(i, state.block, state.offset);
-        state.block_end = state.offset + state.block.size();
+        std::size_t ndx_in_leaf;
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        state.enums->Column::get_leaf(i, ndx_in_leaf, leaf);
+        state.offset = i - ndx_in_leaf;
+        state.block_end = state.offset + state.block->size();
     }
 
     // Since we know the exact number of distinct keys,
     // we can use that to avoid index lookups
-    int64_t key = state.block.get(i - state.offset);
+    int64_t key = state.block->get(i - state.offset);
     size_t ndx = state.keys[key];
 
     // Stored position is offset by one, so zero can indicate
@@ -3423,7 +3460,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     const Column& src_column = get_column(aggr_column);
     Column& dst_column = result.get_column(1);
 
-    AggrState state;
+    AggrState state(*this);
     get_group_fnc get_group_ndx_fnc = NULL;
 
     // When doing grouped aggregates, the column to group on is likely
@@ -3437,8 +3474,11 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.enums = &enums;
         state.keys.assign(key_count, 0);
 
-        enums.Column::GetBlock(0, state.block, state.offset);
-        state.block_end = state.offset + state.block.size();
+        std::size_t ndx_in_leaf;
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        enums.Column::get_leaf(0, ndx_in_leaf, leaf);
+        state.offset = 0 - ndx_in_leaf;
+        state.block_end = state.offset + state.block->size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
     }
     else {
@@ -3447,7 +3487,6 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         result.add_search_index(0);
         const StringIndex& dst_index = *result.get_column_string(0).get_search_index();
 
-        state.table = this;
         state.dst_index = &dst_index;
         state.group_by_column = group_by_column;
         get_group_ndx_fnc = &get_group_ndx;
@@ -3741,7 +3780,7 @@ size_t Table::upper_bound_string(size_t col_ndx, StringData value) const REALM_N
 }
 
 
-void Table::optimize()
+void Table::optimize(bool enforce)
 {
     // At the present time there is only one kind of optimization that
     // we can do, and that is to replace a string column with a string
@@ -3760,12 +3799,11 @@ void Table::optimize()
             AdaptiveStringColumn* column = &get_column_string(i);
 
             ref_type ref, keys_ref;
-            bool res = column->auto_enumerate(keys_ref, ref);
+            bool res = column->auto_enumerate(keys_ref, ref, enforce);
             if (!res)
                 continue;
 
-            Spec::ColumnInfo info;
-            m_spec.get_column_info(i, info);
+            Spec::ColumnInfo info = m_spec.get_column_info(i);
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             m_spec.upgrade_string_to_enum(i, keys_ref, keys_parent, keys_ndx_in_parent);
@@ -3785,7 +3823,7 @@ void Table::optimize()
             size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
-            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref, is_nullable(i)); // Throws
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
@@ -3906,11 +3944,11 @@ private:
 };
 
 
-void Table::write(ostream& out, size_t offset, size_t size, StringData override_table_name) const
+void Table::write(std::ostream& out, size_t offset, size_t size, StringData override_table_name) const
 {
     size_t table_size = this->size();
     if (offset > table_size)
-        throw out_of_range("Offset is out of range");
+        throw std::out_of_range("Offset is out of range");
     size_t remaining_size = table_size - offset;
     size_t size_2 = size;
     if (size_2 > remaining_size)
@@ -3957,14 +3995,14 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
     std::map<std::string, std::string> renames2;
     renames = renames ? renames : &renames2;
 
-    vector<ref_type> followed;
+    std::vector<ref_type> followed;
     to_json_row(row_ndx, out, link_depth, *renames, followed);
 }
 
 
 namespace {
 
-inline void out_datetime(ostream& out, DateTime value)
+inline void out_datetime(std::ostream& out, DateTime value)
 {
     time_t rawtime = value.get_datetime();
     struct tm* t = gmtime(&rawtime);
@@ -3978,32 +4016,19 @@ inline void out_datetime(ostream& out, DateTime value)
     }
 }
 
-inline void out_binary(ostream& out, const BinaryData bin)
+inline void out_binary(std::ostream& out, const BinaryData bin)
 {
     const char* p = bin.data();
     for (size_t i = 0; i < bin.size(); ++i)
-        out << setw(2) << setfill('0') << hex << static_cast<unsigned int>(p[i]) << dec;
+        out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
 }
 
-template<class T> void out_floats(ostream& out, T value)
+template<class T> void out_floats(std::ostream& out, T value)
 {
-    // fixme, windows prints exponent as 3 digits while *nix prints 2. We use _set_output_format()
-    // and restore it again with _set_output_format() because we're a library which must not permanently
-    // set modes that effect the application. However, this method of set/get is not thread safe! Must
-    // be fixed before releasing Windows versions of core.
-#if _MSC_VER
-    int oldformat = _get_output_format();
-    _set_output_format(_TWO_DIGIT_EXPONENT);
-#endif
-    streamsize old = out.precision();
-    out.precision(numeric_limits<T>::digits10 + 1);
-    out << scientific << value;
+    std::streamsize old = out.precision();
+    out.precision(std::numeric_limits<T>::digits10 + 1);
+    out << std::scientific << value;
     out.precision(old);
-
-#if _MSC_VER
-    _set_output_format(oldformat);
-#endif
-
 }
 
 } // anonymous namespace
@@ -4184,10 +4209,10 @@ size_t chars_in_int(int64_t v)
 } // anonymous namespace
 
 
-void Table::to_string(ostream& out, size_t limit) const
+void Table::to_string(std::ostream& out, size_t limit) const
 {
     // Print header (will also calculate widths)
-    vector<size_t> widths;
+    std::vector<size_t> widths;
     to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
@@ -4205,19 +4230,19 @@ void Table::to_string(ostream& out, size_t limit) const
     }
 }
 
-void Table::row_to_string(size_t row_ndx, ostream& out) const
+void Table::row_to_string(size_t row_ndx, std::ostream& out) const
 {
     REALM_ASSERT_3(row_ndx, <, size());
 
     // Print header (will also calculate widths)
-    vector<size_t> widths;
+    std::vector<size_t> widths;
     to_string_header(out, widths);
 
     // Print row contents
     to_string_row(row_ndx, out, widths);
 }
 
-void Table::to_string_header(ostream& out, vector<size_t>& widths) const
+void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) const
 {
     size_t column_count = get_column_count();
     size_t row_count = size();
@@ -4253,14 +4278,14 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
             case type_Table:
                 for (size_t row = 0; row < row_count; ++row) {
                     size_t len = chars_in_int(get_subtable_size(col, row));
-                    width = max(width, len+2);
+                    width = std::max(width, len+2);
                 }
                 width += 2; // space for "[]"
                 break;
             case type_Binary:
                 for (size_t row = 0; row < row_count; ++row) {
                     size_t len = chars_in_int(get_binary(col, row).size()) + 2;
-                    width = max(width, len);
+                    width = std::max(width, len);
                 }
                 width += 6; // space for " bytes"
                 break;
@@ -4268,7 +4293,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                 // Find max length of the strings
                 for (size_t row = 0; row < row_count; ++row) {
                     size_t len = get_string(col, row).size();
-                    width = max(width, len);
+                    width = std::max(width, len);
                 }
                 if (width > 20)
                     width = 23; // cut strings longer than 20 chars
@@ -4281,34 +4306,34 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                     DataType mtype = get_mixed_type(col, row);
                     if (mtype == type_Table) {
                         size_t len = chars_in_int( get_subtable_size(col, row) ) + 2;
-                        width = max(width, len);
+                        width = std::max(width, len);
                         continue;
                     }
                     Mixed m = get_mixed(col, row);
                     switch (mtype) {
                         case type_Bool:
-                            width = max(width, size_t(5));
+                            width = std::max(width, size_t(5));
                             break;
                         case type_DateTime:
-                            width = max(width, size_t(19));
+                            width = std::max(width, size_t(19));
                             break;
                         case type_Int:
-                            width = max(width, chars_in_int(m.get_int()));
+                            width = std::max(width, chars_in_int(m.get_int()));
                             break;
                         case type_Float:
-                            width = max(width, size_t(14));
+                            width = std::max(width, size_t(14));
                             break;
                         case type_Double:
-                            width = max(width, size_t(14));
+                            width = std::max(width, size_t(14));
                             break;
                         case type_Binary:
-                            width = max(width, chars_in_int(m.get_binary().size()) + 6);
+                            width = std::max(width, chars_in_int(m.get_binary().size()) + 6);
                             break;
                         case type_String: {
                             size_t len = m.get_string().size();
                             if (len > 20)
                                 len = 23;
-                            width = max(width, len);
+                            width = std::max(width, len);
                             break;
                         }
                         case type_Table:
@@ -4334,7 +4359,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
         out << "  "; // spacing
 
         out.width(width);
-        out << string(name);
+        out << std::string(name);
     }
     out << "\n";
 }
@@ -4342,19 +4367,19 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
 
 namespace {
 
-inline void out_string(ostream& out, const string text, const size_t max_len)
+inline void out_string(std::ostream& out, const std::string text, const size_t max_len)
 {
-    out.setf(ostream::left, ostream::adjustfield);
+    out.setf(std::ostream::left, std::ostream::adjustfield);
     if (text.size() > max_len)
         out << text.substr(0, max_len) + "...";
     else
         out << text;
-    out.unsetf(ostream::adjustfield);
+    out.unsetf(std::ostream::adjustfield);
 }
 
-inline void out_table(ostream& out, const size_t len)
+inline void out_table(std::ostream& out, const size_t len)
 {
-    streamsize width = out.width() - chars_in_int(len) - 1;
+    std::streamsize width = out.width() - chars_in_int(len) - 1;
     out.width(width);
     out << "[" << len << "]";
 }
@@ -4362,23 +4387,14 @@ inline void out_table(ostream& out, const size_t len)
 } // anonymous namespace
 
 
-void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& widths) const
+void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const
 {
     size_t column_count  = get_column_count();
     size_t row_ndx_width = widths[0];
 
-    out << scientific;          // for float/double
+    out << std::scientific;          // for float/double
     out.width(row_ndx_width);
     out << row_ndx << ":";
-
-    // fixme, windows prints exponents as 3 digits while *nix prints 2. We use _set_output_format()
-    // and restore it again with _set_output_format() because we're a library which must not permanently
-    // set modes that effect the application. However, this method of set/get is not thread safe! Must
-    // be fixed before releasing Windows versions of core.
-#if _MSC_VER
-    int oldformat = _get_output_format();
-    _set_output_format(_TWO_DIGIT_EXPONENT);
-#endif
 
     for (size_t col = 0; col < column_count; ++col) {
         out << "  "; // spacing
@@ -4406,7 +4422,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
-                break; 
+                break;
             case type_Binary:
                 out.width(widths[col+1]-6); // adjust for " bytes" text
                 out << get_binary(col, row_ndx).size() << " bytes";
@@ -4461,10 +4477,6 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 break;
         }
     }
-
-#if _MSC_VER
-    _set_output_format(oldformat);
-#endif
 
     out << "\n";
 }
@@ -4591,37 +4603,9 @@ bool Table::compare_rows(const Table& t) const
 }
 
 
-const Array* Table::get_column_root(size_t col_ndx) const REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    return m_cols[col_ndx]->get_root_array();
-}
-
-
-pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
-    REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-
-    const ColumnBase* col = m_cols[col_ndx];
-
-    const Array* root = col->get_root_array();
-    const Array* enum_root = 0;
-
-    if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
-        enum_root = c->get_keys().get_root_array();
-    }
-    else {
-        REALM_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));
-    }
-
-    return make_pair(root, enum_root);
-}
-
-
 StringData Table::Parent::get_child_name(size_t) const REALM_NOEXCEPT
 {
-    return StringData();
+    return StringData("");
 }
 
 
@@ -4928,7 +4912,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 
         if (col) {
             // Refresh the column accessor
-            col->get_root_array()->set_ndx_in_parent(ndx_in_parent);
+            col->set_ndx_in_parent(ndx_in_parent);
             col->refresh_accessor_tree(col_ndx, m_spec); // Throws
         }
         else {
@@ -4975,6 +4959,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
         bool has_search_index = (attr & col_attr_Indexed)    != 0;
         bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
+
         REALM_ASSERT(has_search_index || !is_primary_key);
         if (has_search_index) {
             bool allow_duplicate_values = !is_primary_key;
@@ -5051,7 +5036,7 @@ void Table::Verify() const
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
             std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
-            REALM_ASSERT_3(ndx_in_parent, ==, column.get_root_array()->get_ndx_in_parent());
+            REALM_ASSERT_3(ndx_in_parent, ==, column.get_ndx_in_parent());
             column.Verify(*this, i);
             REALM_ASSERT_3(column.size(), ==, m_size);
         }
@@ -5059,32 +5044,32 @@ void Table::Verify() const
 }
 
 
-void Table::to_dot(ostream& out, StringData title) const
+void Table::to_dot(std::ostream& out, StringData title) const
 {
     if (m_top.is_attached()) {
-        out << "subgraph cluster_table_with_spec" << m_top.get_ref() << " {" << endl;
+        out << "subgraph cluster_table_with_spec" << m_top.get_ref() << " {" << std::endl;
         out << " label = \"Table";
         if (0 < title.size())
             out << "\\n'" << title << "'";
-        out << "\";" << endl;
+        out << "\";" << std::endl;
         m_top.to_dot(out, "table_top");
         m_spec.to_dot(out);
     }
     else {
-        out << "subgraph cluster_table_"  << m_columns.get_ref() <<  " {" << endl;
+        out << "subgraph cluster_table_"  << m_columns.get_ref() <<  " {" << std::endl;
         out << " label = \"Table";
         if (0 < title.size())
             out << " " << title;
-        out << "\";" << endl;
+        out << "\";" << std::endl;
     }
 
     to_dot_internal(out);
 
-    out << "}" << endl;
+    out << "}" << std::endl;
 }
 
 
-void Table::to_dot_internal(ostream& out) const
+void Table::to_dot_internal(std::ostream& out) const
 {
     m_columns.to_dot(out, "columns");
 
@@ -5101,79 +5086,79 @@ void Table::to_dot_internal(ostream& out) const
 void Table::print() const
 {
     // Table header
-    cout << "Table: len(" << m_size << ")\n    ";
+    std::cout << "Table: len(" << m_size << ")\n    ";
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         StringData name = m_spec.get_column_name(i);
-        cout << left << setw(10) << name << right << " ";
+        std::cout << std::left << std::setw(10) << name << std::right << " ";
     }
 
     // Types
-    cout << "\n    ";
+    std::cout << "\n    ";
     for (size_t i = 0; i < column_count; ++i) {
         ColumnType type = get_real_column_type(i);
         switch (type) {
             case type_Int:
-                cout << "Int        "; break;
+                std::cout << "Int        "; break;
             case type_Float:
-                cout << "Float      "; break;
+                std::cout << "Float      "; break;
             case type_Double:
-                cout << "Double     "; break;
+                std::cout << "Double     "; break;
             case type_Bool:
-                cout << "Bool       "; break;
+                std::cout << "Bool       "; break;
             case type_String:
-                cout << "String     "; break;
+                std::cout << "String     "; break;
             case col_type_StringEnum:
-                cout << "String     "; break;
+                std::cout << "String     "; break;
             default:
                 REALM_ASSERT(false);
         }
     }
-    cout << "\n";
+    std::cout << "\n";
 
     // Columns
     for (size_t i = 0; i < m_size; ++i) {
-        cout << setw(3) << i;
+        std::cout << std::setw(3) << i;
         for (size_t n = 0; n < column_count; ++n) {
             ColumnType type = get_real_column_type(n);
             switch (type) {
                 case type_Int: {
                     const Column& column = get_column(n);
-                    cout << setw(10) << column.get(i) << " ";
+                    std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
                 case type_Float: {
                     const ColumnFloat& column = get_column_float(n);
-                    cout << setw(10) << column.get(i) << " ";
+                    std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
                 case type_Double: {
                     const ColumnDouble& column = get_column_double(n);
-                    cout << setw(10) << column.get(i) << " ";
+                    std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
                 case type_Bool: {
                     const Column& column = get_column(n);
-                    cout << (column.get(i) == 0 ? "     false " : "      true ");
+                    std::cout << (column.get(i) == 0 ? "     false " : "      true ");
                     break;
                 }
                 case type_String: {
                     const AdaptiveStringColumn& column = get_column_string(n);
-                    cout << setw(10) << column.get(i) << " ";
+                    std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
                 case col_type_StringEnum: {
                     const ColumnStringEnum& column = get_column_string_enum(n);
-                    cout << setw(10) << column.get(i) << " ";
+                    std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
                 default:
                     REALM_ASSERT(false);
             }
         }
-        cout << "\n";
+        std::cout << "\n";
     }
-    cout << "\n";
+    std::cout << "\n";
 }
 
 
@@ -5187,16 +5172,16 @@ MemStats Table::stats() const
 
 void Table::dump_node_structure() const
 {
-    dump_node_structure(cerr, 0);
+    dump_node_structure(std::cerr, 0);
 }
 
-void Table::dump_node_structure(ostream& out, int level) const
+void Table::dump_node_structure(std::ostream& out, int level) const
 {
     int indent = level * 2;
-    out << setw(indent) << "" << "Table (top_ref: "<<m_top.get_ref()<<")\n";
+    out << std::setw(indent) << "" << "Table (top_ref: "<<m_top.get_ref()<<")\n";
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
-        out << setw(indent) << "" << "  Column "<<(i+1)<<"\n";
+        out << std::setw(indent) << "" << "  Column "<<(i+1)<<"\n";
         const ColumnBase& column = get_column_base(i);
         column.do_dump_node_structure(out, level+2);
     }

@@ -21,40 +21,62 @@
 #define REALM_INDEX_STRING_HPP
 
 #include <iostream>
+#include <cstring>
+#include <memory>
 
-#include <realm/column.hpp>
-#include <realm/column_string.hpp>
+#include <realm/array.hpp>
+#include <realm/column_fwd.hpp>
 
 namespace realm {
 
+class Spec;
+
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
 // by making Column convert its integers to strings by calling to_str().
-template <class T> inline StringData to_str(T& value)
+template <class T> inline StringData to_str(const T& value)
 {
     REALM_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
     const char* c = reinterpret_cast<const char*>(&value);
     return StringData(c, sizeof(T));
 }
 
-inline StringData to_str(StringData& input)
+inline StringData to_str(const StringData& input)
 {
     return input;
 }
 
+inline StringData to_str(null& input)
+{
+    return input;
+}
+
+// todo, should be removed
 inline StringData to_str(const char* value)
 {
     return StringData(value);
 }
 
-typedef StringData (*StringGetter)(void*, std::size_t, char*);
-
-class StringIndex: public Column {
+class StringIndex {
 public:
-    StringIndex(void* target_column, StringGetter get_func, Allocator&);
-    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
-                StringGetter get_func, bool allow_duplicate_values, Allocator&);
-    ~StringIndex() REALM_NOEXCEPT override {}
-    void set_target(void* target_column, StringGetter get_func) REALM_NOEXCEPT;
+    StringIndex(ColumnBase* target_column, Allocator&);
+    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, ColumnBase* target_column,
+                bool allow_duplicate_values, Allocator&);
+    ~StringIndex() REALM_NOEXCEPT {}
+    void set_target(ColumnBase* target_column) REALM_NOEXCEPT;
+
+    // Accessor concept:
+    Allocator& get_alloc() const REALM_NOEXCEPT;
+    void destroy() REALM_NOEXCEPT;
+    void detach();
+    bool is_attached() const REALM_NOEXCEPT;
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT;
+    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT;
+    void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT;
+    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
+    void refresh_accessor_tree(std::size_t, const Spec&);
+    ref_type get_ref() const REALM_NOEXCEPT;
+
+    // StringIndex interface:
 
     bool is_empty() const;
 
@@ -65,25 +87,25 @@ public:
     template <class T> size_t find_first(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindFirst(to_str(value), m_target_column, m_get_func);
+        return m_array->IndexStringFindFirst(to_str(value), m_target_column);
     }
 
     template <class T> void find_all(Column& result, T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, to_str(value), m_target_column, m_get_func);
+        return m_array->IndexStringFindAll(result, to_str(value), m_target_column);
     }
 
-    template <class T> FindRes find_all(T value, size_t& ref) const
+    template <class T> FindRes find_all(T value, ref_type& ref) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column, m_get_func);
+        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column);
     }
 
     template <class T> size_t count(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringCount(to_str(value), m_target_column, m_get_func);
+        return m_array->IndexStringCount(to_str(value), m_target_column);
     }
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
@@ -92,7 +114,6 @@ public:
     }
 
     void clear();
-    using Column::clear;
 
     void distinct(Column& result) const;
     bool has_duplicate_values() const REALM_NOEXCEPT;
@@ -101,9 +122,9 @@ public:
     void set_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
-    void Verify() const override;
+    void Verify() const;
     void verify_entries(const AdaptiveStringColumn& column) const;
-    void do_dump_node_structure(std::ostream&, int) const override;
+    void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const { to_dot(std::cerr); }
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -111,19 +132,17 @@ public:
     typedef int32_t key_type;
 
     static key_type create_key(StringData) REALM_NOEXCEPT;
+    static key_type create_key(StringData, size_t) REALM_NOEXCEPT;
 
 private:
-    void* m_target_column;
-    StringGetter m_get_func;
+    std::unique_ptr<Array> m_array;
+    ColumnBase* m_target_column;
     bool m_deny_duplicate_values;
-
-    using Column::insert;
-    using Column::erase;
 
     struct inner_node_tag {};
     StringIndex(inner_node_tag, Allocator&);
 
-    static ArrayInteger* create_node(Allocator&, bool is_leaf);
+    static Array* create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void InsertRowList(size_t ref, size_t offset, StringData value);
@@ -154,7 +173,7 @@ private:
     void DoDelete(size_t ndx, StringData, size_t offset);
     void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
-    StringData get(size_t ndx, char* buffer) {return (*m_get_func)(m_target_column, ndx, buffer);}
+    StringData get(size_t ndx, char* buffer) const;
 
     void NodeAddKey(ref_type ref);
 
@@ -171,30 +190,28 @@ private:
 
 // Implementation:
 
-inline StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
-    Column(create_node(alloc, true)), // Throws
+inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
+    m_array(create_node(alloc, true)), // Throws
     m_target_column(target_column),
-    m_get_func(get_func),
     m_deny_duplicate_values(false)
 {
 }
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                void* target_column, StringGetter get_func,
+                                ColumnBase* target_column,
                                 bool deny_duplicate_values, Allocator& alloc):
-    Column(alloc, ref),
+    m_array(new Array(alloc)),
     m_target_column(target_column),
-    m_get_func(get_func),
     m_deny_duplicate_values(deny_duplicate_values)
 {
     REALM_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
+    m_array->init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
 }
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
-    Column(create_node(alloc, false)), // Throws
+    m_array(create_node(alloc, false)), // Throws
     m_target_column(0),
-    m_get_func(0),
     m_deny_duplicate_values(false)
 {
 }
@@ -236,8 +253,37 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) REALM_NOEXC
     return key;
 }
 
+// Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So 
+// "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored as empty strings.
+inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) REALM_NOEXCEPT
+{
+#if REALM_NULL_STRINGS == 1
+    if (str.is_null())
+    return 0;
+
+    if (offset > str.size())
+        return 0;
+    else {
+        size_t tail = str.size() - offset;
+        if (tail <= sizeof(key_type)-1) {
+            char buf[sizeof(key_type)];
+            memset(buf, 0, sizeof(key_type));
+            buf[tail] = 'X';
+            memcpy(buf, str.data() + offset, tail);
+            return create_key(StringData(buf, tail + 1));
+        }
+        else {
+            return create_key(str.substr(offset));
+        }
+    }
+#else
+    return create_key(str.substr(offset));
+#endif
+}
+
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
+    REALM_ASSERT_3(row_ndx, !=, npos);
     validate_value(value); // Throws
 
     // If the new row is inserted after the last row in the table, we don't need
@@ -283,21 +329,69 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
     DoDelete(row_ndx, value, 0);
 
     // Collapse top nodes with single item
-    while (!root_is_leaf()) {
-        REALM_ASSERT(array()->size() > 1); // node cannot be empty
-        if (array()->size() > 2)
+    while (m_array->is_inner_bptree_node()) {
+        REALM_ASSERT(m_array->size() > 1); // node cannot be empty
+        if (m_array->size() > 2)
             break;
 
-        ref_type ref = array()->get_as_ref(1);
-        array()->set(1, 1); // avoid destruction of the extracted ref
-        array()->destroy_deep();
-        array()->init_from_ref(ref);
-        array()->update_parent();
+        ref_type ref = m_array->get_as_ref(1);
+        m_array->set(1, 1); // avoid destruction of the extracted ref
+        m_array->destroy_deep();
+        m_array->init_from_ref(ref);
+        m_array->update_parent();
     }
 
     // If it is last item in column, we don't have to update refs
     if (!is_last)
         adjust_row_indexes(row_ndx, -1);
+}
+
+inline
+void StringIndex::destroy() REALM_NOEXCEPT
+{
+    return m_array->destroy_deep();
+}
+
+inline
+bool StringIndex::is_attached() const REALM_NOEXCEPT
+{
+    return m_array->is_attached();
+}
+
+inline
+void StringIndex::refresh_accessor_tree(std::size_t, const Spec&)
+{
+    m_array->init_from_parent();
+}
+
+inline
+ref_type StringIndex::get_ref() const REALM_NOEXCEPT
+{
+    return m_array->get_ref();
+}
+
+inline
+void StringIndex::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
+{
+    m_array->set_parent(parent, ndx_in_parent);
+}
+
+inline
+std::size_t StringIndex::get_ndx_in_parent() const REALM_NOEXCEPT
+{
+    return m_array->get_ndx_in_parent();
+}
+
+inline
+void StringIndex::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
+{
+    m_array->set_ndx_in_parent(ndx_in_parent);
+}
+
+inline
+void StringIndex::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
+{
+    m_array->update_from_parent(old_baseline);
 }
 
 } //namespace realm

@@ -531,20 +531,17 @@ inline bool less(const char* a, const char* b)
 // Arithmetic", definitions (21)-(24).
 inline bool approximately_equal(long double a, long double b, long double epsilon)
 {
-    using namespace std;
-    return abs(a - b) <= max(abs(a), abs(b)) * epsilon;
+    return std::abs(a - b) <= std::max(std::abs(a), std::abs(b)) * epsilon;
 }
 
 inline bool essentially_equal(long double a, long double b, long double epsilon)
 {
-    using namespace std;
-    return abs(a - b) <= min(abs(a), abs(b)) * epsilon;
+    return std::abs(a - b) <= std::min(std::abs(a), std::abs(b)) * epsilon;
 }
 
 inline bool definitely_less(long double a, long double b, long double epsilon)
 {
-    using namespace std;
-    return b - a > max(abs(a), abs(b)) * epsilon;
+    return b - a > std::max(std::abs(a), std::abs(b)) * epsilon;
 }
 
 

@@ -25,7 +25,6 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #include "test.hpp"
 #include "crypt_key.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -112,7 +111,7 @@ TEST(Group_OpenFile)
 TEST(Group_Permissions)
 {
     if(getuid() == 0) {
-        cout << "Group_Permissions test skipped because you are running it as root\n\n";
+        std::cout << "Group_Permissions test skipped because you are running it as root\n\n";
         return;
     }
 
@@ -288,7 +287,7 @@ TEST(Group_TableIndex)
     TableRef mbili = group.add_table("mbili");
     TableRef tatu  = group.add_table("tatu");
     CHECK_EQUAL(3, group.size());
-    vector<size_t> indexes;
+    std::vector<size_t> indexes;
     indexes.push_back(moja->get_index_in_group());
     indexes.push_back(mbili->get_index_in_group());
     indexes.push_back(tatu->get_index_in_group());
@@ -690,7 +689,7 @@ TEST(Group_Invalid2)
     const char* const str = "invalid data";
     const size_t size = strlen(str);
     char* const data = new char[strlen(str)];
-    copy(str, str+size, data);
+    std::copy(str, str+size, data);
     CHECK_THROW(Group(BinaryData(data, size)), InvalidDatabase);
     delete[] data;
 }
@@ -1568,9 +1567,9 @@ TEST(Group_ToJSON)
 
     table->add("jeff", 1, true, Wed);
     table->add("jim",  1, true, Wed);
-    ostringstream out;
+    std::ostringstream out;
     g.to_json(out);
-    string str = out.str();
+    std::string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
 }
@@ -1583,9 +1582,9 @@ TEST(Group_ToString)
 
     table->add("jeff", 1, true, Wed);
     table->add("jim",  1, true, Wed);
-    ostringstream out;
+    std::ostringstream out;
     g.to_string(out);
-    string str = out.str();
+    std::string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
@@ -1636,6 +1635,8 @@ TEST(Group_IndexString)
 
     size_t m1 = t->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, m1);
+
+    from_mem.upgrade_file_format();
 
     size_t m2 = t->column().first.find_first("jeff");
     size_t m3 = t->column().first.find_first("jim");
@@ -1757,7 +1758,7 @@ TEST(Group_ToDot)
         table->insert_bool(1, i, (i % 2 ? true : false));
         table->insert_datetime(2, i, 12345);
 
-        stringstream ss;
+        std::stringstream ss;
         ss << "string" << i;
         table->insert_string(3, i, ss.str().c_str());
 
@@ -1820,16 +1821,16 @@ TEST(Group_ToDot)
     table->optimize();
 
 #if 1
-    // Write array graph to cout
-    stringstream ss;
+    // Write array graph to std::cout
+    std::stringstream ss;
     mygroup.ToDot(ss);
-    cout << ss.str() << endl;
+    std::cout << ss.str() << std::endl;
 #endif
 
     // Write array graph to file in dot format
-    ofstream fs("realm_graph.dot", ios::out | ios::binary);
+    std::ofstream fs("realm_graph.dot", ios::out | ios::binary);
     if (!fs.is_open())
-        cout << "file open error " << strerror << endl;
+        std::cout << "file open error " << strerror << std::endl;
     mygroup.to_dot(fs);
     fs.close();
 }
