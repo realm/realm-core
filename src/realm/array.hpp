@@ -598,6 +598,10 @@ public:
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
 
+    // FIXME: Remove this once ArrayIntNull can use optionals.
+    bool find(int cond, Action action, int64_t value, bool null, size_t start, size_t end, size_t baseindex,
+              QueryState<int64_t>* state) const;
+
     template<class cond, Action action, size_t bitwidth, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
@@ -608,7 +612,11 @@ public:
               QueryState<int64_t>* state) const;
 
     template<class cond, Action action, class Callback>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex,
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+                 Callback callback) const;
+
+    template<class cond, Action action, class Callback>
+    bool find(int64_t value, bool null, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
     // Optimized implementation for release mode
@@ -2792,6 +2800,17 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
                  Callback callback) const
 {
     REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
+}
+
+template<class cond, Action action, class Callback>
+bool Array::find(int64_t value, bool null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+                 Callback callback) const
+{
+    if (null) {
+        // search for a value that we are sure does not exist:
+        value = m_ubound + 1;
+    }
+    return find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback));
 }
 
 template<class cond, Action action, size_t bitwidth, class Callback>

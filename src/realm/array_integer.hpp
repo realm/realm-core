@@ -132,9 +132,16 @@ public:
 
     bool find(int cond, Action action, int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state) const;
+    // FIXME: Use Optional instead of the null bool.
+    bool find(int cond, Action action, int64_t value, bool null, std::size_t start, std::size_t end, std::size_t baseindex,
+              QueryState<int64_t>* state) const;
 
     template<class cond, Action action, std::size_t bitwidth, class Callback>
     bool find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
+              QueryState<int64_t>* state, Callback callback) const;
+    // FIXME: Use Optional instead of the null bool.
+    template<class cond, Action action, std::size_t bitwidth, class Callback>
+    bool find(int64_t value, bool null, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
     // This is the one installed into the m_finder slots.
@@ -144,6 +151,10 @@ public:
 
     template<class cond, Action action, class Callback>
     bool find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
+              QueryState<int64_t>* state, Callback callback) const;
+    // FIXME: Use Optional instead of the null bool.
+    template<class cond, Action action, class Callback>
+    bool find(int64_t value, bool null, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
     // Optimized implementation for release mode
@@ -576,7 +587,20 @@ bool ArrayIntNull::find(int cond, Action action, int64_t value, std::size_t star
     if (end != npos) {
         ++end;
     }
-    return Array::find(cond, action, value, start, end, baseindex, state);
+    return Array::find(cond, action, value, start, end, baseindex - 1, state);
+}
+
+inline
+bool ArrayIntNull::find(int cond, Action action, int64_t value, bool null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
+{
+    if (null) {
+        value = null_value();
+    } 
+    ++start;
+    if (end != npos) {
+        ++end;
+    }
+    return Array::find(cond, action, value, start, end, baseindex - 1, state);
 }
 
 
@@ -587,7 +611,20 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action, bitwidth, Callback>(value, start, end, baseindex - 1, state, callback);
+}
+
+template<class cond, Action action, std::size_t bitwidth, class Callback>
+bool ArrayIntNull::find(int64_t value, bool null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
+    if (null) {
+        value = null_value();
+    }
+    ++start;
+    if (end != npos) {
+        ++end;
+    }
+    return Array::find<cond, action, bitwidth, Callback>(value, start, end, baseindex - 1, state, callback);
 }
 
 
@@ -598,7 +635,7 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, action, bitwidth>(value, start, end, baseindex, state);
+    return Array::find<cond, action, bitwidth>(value, start, end, baseindex - 1, state);
 }
 
 
@@ -609,7 +646,16 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
     if (end != npos) {
         ++end;
     }
-    return Array::find<cond, action, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action>(value, start, end, baseindex - 1, state, std::forward<Callback>(callback));
+}
+
+template<class cond, Action action, class Callback>
+bool ArrayIntNull::find(int64_t value, bool null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
+    if (null) {
+        value = null_value();
+    }
+    return find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback));
 }
 
 
