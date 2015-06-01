@@ -2908,7 +2908,9 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 void Table::set_null(size_t col_ndx, size_t row_ndx)
 {
     auto& col = get_column_base(col_ndx);
-    REALM_ASSERT(col.is_nullable());
+    if (!col.is_nullable()) {
+        throw LogicError{LogicError::column_not_nullable};
+    }
     col.set_null(row_ndx);
 
 #ifdef REALM_ENABLE_REPLICATION
