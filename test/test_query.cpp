@@ -6058,6 +6058,39 @@ TEST(Query_BinaryNull)
     CHECK_EQUAL(2, t.get_source_ndx(0));
 }
 
+TEST(Query_IntegerNull)
+{
+    Table table;
+    table.add_column(type_Int, "first", true);
+    table.add_empty_row(3);
+    table.set_int(0, 1, 0);
+    table.set_int(0, 2, 123);
+
+    TableView t;
+
+    t = table.where().equal(0, null{}).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+
+    t = table.where().equal(0, 0).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+
+    t = table.where().equal(0, 123).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+
+    t = table.where().not_equal(0, null{}).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+
+    t = table.where().not_equal(0, 0).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+}
+
 #endif
 
 #endif // TEST_QUERY

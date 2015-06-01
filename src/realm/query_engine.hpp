@@ -679,9 +679,8 @@ public:
     bool find_callback_specialization(size_t s, size_t end2)
     {
         using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
-        // FIXME: Support searching for NULLs here.
         bool cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
-            (this->m_value, s - this->m_leaf_start, end2, this->m_leaf_start, nullptr,
+            (this->m_value, this->m_null, s - this->m_leaf_start, end2, this->m_leaf_start, nullptr,
              std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
         return cont;
     }
@@ -721,7 +720,7 @@ protected:
                 end2 = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_leaf_ptr->find(c, m_action, m_value, s - m_leaf_start, end2, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                bool cont = m_leaf_ptr->find(c, m_action, m_value, m_null, s - m_leaf_start, end2, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 if (!cont)
                     return not_found;
             }
