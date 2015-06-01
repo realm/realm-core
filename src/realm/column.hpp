@@ -56,7 +56,7 @@ struct ColumnTemplateBase
 
 template <class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
-				std::size_t limit, std::size_t* return_ndx);
+                std::size_t limit, std::size_t* return_ndx);
 
 template <class T> struct ColumnTemplate : public ColumnTemplateBase
 {
@@ -417,7 +417,7 @@ class TColumn : public ColumnBaseWithIndex, public ColumnTemplate<T> {
 public:
     using value_type = T;
     using LeafInfo = typename BpTree<T, Nullable>::LeafInfo;
-	using LeafType = typename BpTree<T, Nullable>::LeafType;
+    using LeafType = typename BpTree<T, Nullable>::LeafType;
 
     struct unattached_root_tag {};
 
@@ -427,8 +427,8 @@ public:
     TColumn(unattached_root_tag, Allocator&);
     TColumn(TColumn<T, Nullable>&&) REALM_NOEXCEPT = default;
     ~TColumn() REALM_NOEXCEPT override;
-	
-	void init_from_parent();
+    
+    void init_from_parent();
 
     // Accessor concept:
     void destroy() REALM_NOEXCEPT override;
@@ -863,7 +863,7 @@ StringData TColumn<T, N>::get_index_data(std::size_t ndx, char* buffer) const RE
     static_assert(sizeof(T) == 8, "not filling buffer");
     T x = get(ndx);
     *reinterpret_cast<T*>(buffer) = x;
-	  return StringData(buffer, sizeof(T));
+      return StringData(buffer, sizeof(T));
 }
 
 template <class T, bool N>
@@ -993,7 +993,7 @@ TColumn<T,N>::~TColumn() REALM_NOEXCEPT
 template <class T, bool N>
 void TColumn<T,N>::init_from_parent()
 {
-	m_tree.init_from_parent();
+    m_tree.init_from_parent();
 }
 
 template <class T, bool N>
@@ -1267,7 +1267,7 @@ void TColumn<T,N>::clear(std::size_t, bool)
 template <class T, bool N>
 std::size_t TColumn<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
 {
-	static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->lower_bound_int(value);
     }
@@ -1277,7 +1277,7 @@ std::size_t TColumn<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
 template <class T, bool N>
 std::size_t TColumn<T,N>::upper_bound_int(T value) const REALM_NOEXCEPT
 {
-	static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->upper_bound_int(value);
     }
