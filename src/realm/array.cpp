@@ -426,7 +426,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     if (m_width < 8) {
         // FIXME: Should be optimized
         for (size_t i = begin; i != end; ++i) {
-            int_fast64_t v = (this->*(m_vtable->getter))(i);
+            int_fast64_t v = (this->*m_getter)(i);
             (this->*(m_vtable->setter))(dest_begin++, v);
         }
         return;
@@ -453,7 +453,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     if (m_width < 8) {
         // FIXME: Should be optimized
         for (size_t i = end; i != begin; --i) {
-            int_fast64_t v = (this->*(m_vtable->getter))(i-1);
+            int_fast64_t v = (this->*m_getter)(i-1);
             (this->*(m_vtable->setter))(--dest_end, v);
         }
         return;
@@ -482,7 +482,7 @@ void Array::set(size_t ndx, int64_t value)
     if (do_expand) {
         size_t width = bit_width(value);
         REALM_ASSERT_DEBUG(width > m_width);
-        Getter old_getter = m_vtable->getter;    // Save old getter before width expansion
+        Getter old_getter = m_getter;    // Save old getter before width expansion
         alloc(m_size, width); // Throws
         set_width(width);
 
@@ -532,7 +532,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    Getter old_getter = m_vtable->getter; // Save old getter before potential width expansion
+    Getter old_getter = m_getter; // Save old getter before potential width expansion
 
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
@@ -660,7 +660,7 @@ void Array::ensure_minimum_width(int64_t value)
     size_t width = bit_width(value);
     REALM_ASSERT_3(width, >, m_width);
 
-    Getter old_getter = m_vtable->getter; // Save old getter before width expansion
+    Getter old_getter = m_getter; // Save old getter before width expansion
     alloc(m_size, width); // Throws
     set_width(width);
 
@@ -1778,6 +1778,7 @@ template<size_t width> void Array::set_width() REALM_NOEXCEPT
     m_width = width;
 
     m_vtable = &VTableForWidth<width>::vtable;
+    m_getter = m_vtable->getter;
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
