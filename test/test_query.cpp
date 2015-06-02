@@ -6111,6 +6111,34 @@ TEST(Query_IntegerNonNull)
     CHECK_EQUAL(2, t.get_source_ndx(2));
 }
 
+// Test nullable integer columns with queries using query_expression.hpp
+TEST(Query_IntegerNull_ExpressionSyntax)
+{
+    size_t match;
+    Table untyped;
+
+    // Test works fine for nullable = false, but asserts for nullable = true.
+    untyped.add_column(type_Int, "firs1", true);
+    untyped.add_column(type_Int, "firs2", true);
+    untyped.add_column(type_Float, "second", true);
+
+    untyped.add_empty_row(2);
+
+    untyped.set_int(0, 0, 44);
+    untyped.set_int(1, 0, 55);
+    untyped.set_float(2, 0, 66.0f);
+
+    untyped.set_int(0, 1, 77);
+    untyped.set_int(1, 1, 88);
+    untyped.set_float(2, 1, 99.0f);
+
+    // Enforce use of query_expression.hpp by specifying an advanced query that is not supported by query_engine.hpp.
+    // Search for the REALM_OLDQUERY_FALLBACK flag (in the query_expression.hpp file) to find an explanation of when 
+    // a query will use query_expression.hpp.
+    match = (untyped.column<Int>(0) + untyped.column<Int>(1) == 77 + 88).find();
+    CHECK_EQUAL(match, 1);
+}
+
 #endif
 
 #endif // TEST_QUERY
