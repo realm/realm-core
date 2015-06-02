@@ -293,7 +293,7 @@ class TableView: public TableViewBase {
 public:
     TableView();
     TableView(const TableView&) = default;
-    TableView(TableView&) = default;
+    TableView(TableView&&) = default;
     ~TableView() REALM_NOEXCEPT;
     TableView& operator=(const TableView&) = default;
     TableView& operator=(TableView&&) = default;
