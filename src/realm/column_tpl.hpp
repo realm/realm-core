@@ -25,8 +25,6 @@
 #include <realm/util/features.h>
 #include <realm/array.hpp>
 #include <realm/array_basic.hpp>
-#include <realm/column.hpp>
-#include <realm/column_fwd.hpp>
 
 namespace realm {
 
@@ -79,11 +77,11 @@ template <class T, class R, Action action, class condition>
         size_t end2 = sg.local_end(end);
 
         if(util::SameType<T, int64_t>::value) {
-            cont = (static_cast<const Array*>(sg.m_array_ptr))->find(c, action, int64_t(target), s - sg.m_leaf_start, end2, sg.m_leaf_start, reinterpret_cast<QueryState<int64_t>*>(&state));
+            cont = (static_cast<const Array*>(sg.m_leaf_ptr))->find(c, action, int64_t(target), s - sg.m_leaf_start, end2, sg.m_leaf_start, reinterpret_cast<QueryState<int64_t>*>(&state));
         }
         else {
             for(size_t local_index = s - sg.m_leaf_start; cont && local_index < end2; local_index++) {
-                T v = (static_cast<const ArrType*>(sg.m_array_ptr))->get(local_index);
+                T v = static_cast<const ArrType*>(sg.m_leaf_ptr)->get(local_index);
                 if(cond(v, target)) {
                     cont = (static_cast<QueryState<R>*>(&state))->template match<action, false>(s + local_index , 0, static_cast<R>(v));
                 }

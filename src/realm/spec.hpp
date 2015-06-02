@@ -161,12 +161,11 @@ private:
     static MemRef create_empty_spec(Allocator&);
 
     struct ColumnInfo {
-        std::size_t m_column_ref_ndx; ///< Index within Table::m_columns
-        bool m_has_search_index;
-        ColumnInfo(): m_column_ref_ndx(0), m_has_search_index(false) {}
+        std::size_t m_column_ref_ndx = 0; ///< Index within Table::m_columns
+        bool m_has_search_index = false;
     };
 
-    void get_column_info(std::size_t column_ndx, ColumnInfo&) const REALM_NOEXCEPT;
+    ColumnInfo get_column_info(std::size_t column_ndx) const REALM_NOEXCEPT;
 
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.

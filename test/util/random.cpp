@@ -9,7 +9,6 @@
 
 #include "random.hpp"
 
-using namespace std;
 
 namespace realm {
 namespace test_util {

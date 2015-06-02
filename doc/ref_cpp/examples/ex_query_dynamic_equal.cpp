@@ -4,7 +4,6 @@
 #include <assert.h>
 
 using namespace realm;
-using namespace std;
 
 int main()
 {

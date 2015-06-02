@@ -1,7 +1,6 @@
 #include <realm/row.hpp>
 #include <realm/table.hpp>
 
-using namespace std;
 using namespace realm;
 
 

@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <cstring>
 
 #include <realm/utilities.hpp>
 #include <realm/array_string.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column.hpp>
 
-using namespace std;
 using namespace realm;
 
 
@@ -17,14 +17,16 @@ namespace {
 
 const int max_width = 64;
 
-// When size = 0 returns 0
-// When size = 1 returns 4
-// When 2 <= size < 256, returns 2**ceil(log2(size+1)).
-// Thus, 0 < size < 256 implies that size < round_up(size).
+// Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
+// strings in as little space as possible, because 0 can only store nulls.
 size_t round_up(size_t size)
 {
-    if (size < 2)
-        return size << 2;
+    REALM_ASSERT(size <= 256);
+
+    if (size <= 1)
+        return size;
+
+    size--;
     size |= size >> 1;
     size |= size >> 2;
     size |= size >> 4;
@@ -34,6 +36,19 @@ size_t round_up(size_t size)
 
 } // anonymous namespace
 
+bool ArrayString::is_null(size_t ndx) const
+{
+    REALM_ASSERT_3(ndx, <, m_size);
+    StringData sd = get(ndx);
+    return sd.is_null();
+}
+
+void ArrayString::set_null(size_t ndx)
+{
+    REALM_ASSERT_3(ndx, <, m_size);
+    StringData sd = realm::null();
+    set(ndx, sd);
+}
 
 void ArrayString::set(size_t ndx, StringData value)
 {
@@ -45,15 +60,18 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        if (value.size() == 0 && m_width == 0)
-            return;
-
-        REALM_ASSERT_3(0, <, value.size());
+        // if m_width == 0 and m_nullable == true, then entire array contains only null entries
+        // if m_width == 0 and m_nullable == false, then entire array contains only "" entries
+        if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
+            return; // existing element in array already equals the value we want to set it to
+        }
 
         // Calc min column width
-        size_t new_width = ::round_up(value.size());
-
-        REALM_ASSERT_3(value.size(), <, new_width);
+        size_t new_width;
+        if (m_width == 0 && value.size() == 0)
+            new_width = ::round_up(1); // Entire Array is nulls; expand to m_width > 0
+        else
+            new_width = ::round_up(value.size() + 1);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -65,25 +83,30 @@ void ArrayString::set(size_t ndx, StringData value)
         if (0 < m_width) {
             const char* old_end = base + m_size*m_width;
             while (new_end != base) {
-                *--new_end = char(*--old_end + (new_width-m_width));
+                *--new_end = char(*--old_end + (new_width - m_width));
                 {
-                    char* new_begin = new_end - (new_width-m_width);
-                    fill(new_begin, new_end, 0); // Extend zero padding
+                    // extend 0-padding
+                    char* new_begin = new_end - (new_width - m_width);
+                    std::fill(new_begin, new_end, 0);
                     new_end = new_begin;
                 }
                 {
-                    const char* old_begin = old_end - (m_width-1);
-                    new_end = copy_backward(old_begin, old_end, new_end);
+                    // copy string payload
+                    const char* old_begin = old_end - (m_width - 1);
+                    if (static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
+                        new_end = std::copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
             }
         }
         else {
+            // m_width == 0. Expand to new width.
             while (new_end != base) {
-                *--new_end = char(new_width-1);
+                REALM_ASSERT_3(new_width, <= , max_width);
+                *--new_end = static_cast<char>(new_width); 
                 {
-                    char* new_begin = new_end - (new_width-1);
-                    fill(new_begin, new_end, 0); // Fill with zero bytes
+                    char* new_begin = new_end - (new_width - 1);
+                    std::fill(new_begin, new_end, 0); // Fill with zero bytes
                     new_end = new_begin;
                 }
             }
@@ -96,121 +119,45 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
-    char* end   = begin + (m_width-1);
-    begin = copy(value.data(), value.data()+value.size(), begin);
-    fill(begin, end, 0); // Pad with zero bytes
-    REALM_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-    REALM_ASSERT(end - begin < max_width);
-    int pad_size = int(end - begin);
-    *end = char(pad_size);
+    char* end = begin + (m_width - 1);
+    begin = std::copy(value.data(), value.data() + value.size(), begin);
+    std::fill(begin, end, 0); // Pad with zero bytes
+    REALM_STATIC_ASSERT(max_width <= max_width, "Padding size must fit in 7-bits");
+
+    if (value.is_null()) {
+        REALM_ASSERT_3(m_width, <= , 128);
+        *end = static_cast<char>(m_width);
+    }
+    else {
+        int pad_size = int(end - begin);
+        *end = char(pad_size);
+    }
 }
 
 
 void ArrayString::insert(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <=, m_size);
-    REALM_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    REALM_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    // Calc min column width (incl trailing zero-byte)
-    size_t new_width = max(m_width, ::round_up(value.size()));
+    // Todo: Below code will perform up to 3 memcpy() operations in worst case. Todo, if we improve the
+    // allocator to make a gap for the new value for us, we can have just 1. We can also have 2 by merging
+    // memmove() and set(), but it's a bit complex. May be done after support of realm::null() is completed.
 
-    // Make room for the new value
-    alloc(m_size+1, new_width); // Throws
+    // Allocate room for the new value
+    alloc(m_size + 1, m_width); // Throws
 
-    if (0 < value.size() || 0 < m_width) {
-        char* base = m_data;
-        const char* old_end = base + m_size*m_width;
-        char*       new_end = base + m_size*new_width + new_width;
+    // Make gap for new value
+    memmove(m_data + m_width * (ndx + 1), m_data + m_width * ndx, m_width * (m_size - ndx));
 
-        // Move values after insertion point (may expand)
-        if (ndx != m_size) {
-            if (REALM_UNLIKELY(m_width < new_width)) {
-                char* const new_begin = base + ndx*new_width + new_width;
-                if (0 < m_width) {
-                    // Expand the old values
-                    do {
-                        *--new_end = char(*--old_end + (new_width-m_width));
-                        {
-                            char* new_begin2 = new_end - (new_width-m_width);
-                            fill(new_begin2, new_end, 0); // Extend zero padding
-                            new_end = new_begin2;
-                        }
-                        {
-                            const char* old_begin = old_end - (m_width-1);
-                            new_end = copy_backward(old_begin, old_end, new_end);
-                            old_end = old_begin;
-                        }
-                    }
-                    while (new_end != new_begin);
-                }
-                else {
-                    do {
-                        *--new_end = char(new_width-1);
-                        {
-                            char* new_begin2 = new_end - (new_width-1);
-                            fill(new_begin2, new_end, 0); // Fill with zero bytes
-                            new_end = new_begin2;
-                        }
-                    }
-                    while (new_end != new_begin);
-                }
-            }
-            else {
-                // when no expansion just move the following entries forward
-                const char* old_begin = base + ndx*m_width;
-                new_end = copy_backward(old_begin, old_end, new_end);
-                old_end = old_begin;
-            }
-        }
+    m_size++;
 
-        // Set the value
-        {
-            char* new_begin = new_end - new_width;
-            char* pad_begin = copy(value.data(), value.data()+value.size(), new_begin);
-            --new_end;
-            fill(pad_begin, new_end, 0); // Pad with zero bytes
-            REALM_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-            REALM_ASSERT(new_end - pad_begin < max_width);
-            int pad_size = int(new_end - pad_begin);
-            *new_end = char(pad_size);
-            new_end = new_begin;
-        }
-
-        // Expand values before insertion point
-        if (REALM_UNLIKELY(m_width < new_width)) {
-            if (0 < m_width) {
-                while (new_end != base) {
-                    *--new_end = char(*--old_end + (new_width-m_width));
-                    {
-                        char* new_begin = new_end - (new_width-m_width);
-                        fill(new_begin, new_end, 0); // Extend zero padding
-                        new_end = new_begin;
-                    }
-                    {
-                        const char* old_begin = old_end - (m_width-1);
-                        new_end = copy_backward(old_begin, old_end, new_end);
-                        old_end = old_begin;
-                    }
-                }
-            }
-            else {
-                while (new_end != base) {
-                    *--new_end = char(new_width-1);
-                    {
-                        char* new_begin = new_end - (new_width-1);
-                        fill(new_begin, new_end, 0); // Fill with zero bytes
-                        new_end = new_begin;
-                    }
-                }
-            }
-            m_width = new_width;
-        }
-    }
-
-    ++m_size;
+    // Set new value
+    set(ndx, value);
+    return;
 }
 
 void ArrayString::erase(size_t ndx)
@@ -221,11 +168,11 @@ void ArrayString::erase(size_t ndx)
     copy_on_write(); // Throws
 
     // move data backwards after deletion
-    if (ndx < m_size-1) {
+    if (ndx < m_size - 1) {
         char* new_begin = m_data + ndx*m_width;
         char* old_begin = new_begin + m_width;
-        char* old_end   = m_data + m_size*m_width;
-        copy(old_begin, old_end, new_begin);
+        char* old_end = m_data + m_size*m_width;
+        std::copy(old_begin, old_end, new_begin);
     }
 
     --m_size;
@@ -271,17 +218,29 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         end = m_size;
     REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
-    if (m_width == 0)
-        return value.size() == 0 && begin < end ? begin : size_t(-1);
+    if (m_width == 0) {
+        if (m_nullable)
+            // m_width == 0 implies that all elements in the array are NULL
+            return value.is_null() && begin < m_size ? begin : npos;
+        else
+            return value.size() == 0 && begin < m_size ? begin : npos;
+    }
 
     // A string can never be wider than the column width
     if (m_width <= value.size())
         return size_t(-1);
 
-    if (value.size() == 0) {
-        const char* data = m_data + (m_width-1);
+    if (m_nullable ? value.is_null() : value.size() == 0) {
         for (size_t i = begin; i != end; ++i) {
-            size_t size = (m_width-1) - data[i * m_width];
+            if (m_nullable ? is_null(i) : get(i).size() == 0)
+                return i;
+        }
+    }
+    else if (value.size() == 0) {
+        const char* data = m_data + (m_width - 1);
+        for (size_t i = begin; i != end; ++i) {
+            size_t size = (m_width - 1) - data[i * m_width];
+            // left-hand-side tests if array element is NULL
             if (REALM_UNLIKELY(size == 0))
                 return i;
         }
@@ -295,7 +254,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
                     break;
                 ++j;
                 if (REALM_UNLIKELY(j == value.size())) {
-                    size_t size = (m_width-1) - data[m_width-1];
+                    size_t size = (m_width - 1) - data[m_width - 1];
                     if (REALM_LIKELY(size == value.size()))
                         return i;
                     break;
@@ -308,7 +267,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 }
 
 void ArrayString::find_all(Column& result, StringData value, size_t add_offset,
-                           size_t begin, size_t end)
+    size_t begin, size_t end)
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -344,7 +303,7 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     }
 
     // Split leaf node
-    ArrayString new_leaf(m_alloc);
+    ArrayString new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value); // Throws
@@ -368,11 +327,11 @@ MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) c
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
-    ArrayString slice(target_alloc);
+    ArrayString slice(target_alloc, m_nullable);
     _impl::ShallowArrayDestroyGuard dg(&slice);
     slice.create(); // Throws
     size_t begin = offset;
-    size_t end   = offset + size;
+    size_t end = offset + size;
     for (size_t i = begin; i != end; ++i) {
         StringData value = get(i);
         slice.add(value); // Throws
@@ -400,41 +359,41 @@ void ArrayString::string_stats() const
     size_t zeroes = size - total;
     size_t zavg = zeroes / (m_size ? m_size : 1); // avoid possible div by zero
 
-    cout << "Size: " << m_size << "\n";
-    cout << "Width: " << m_width << "\n";
-    cout << "Total: " << size << "\n";
-    cout << "Capacity: " << m_capacity << "\n\n";
-    cout << "Bytes string: " << total << "\n";
-    cout << "     longest: " << longest << "\n";
-    cout << "Bytes zeroes: " << zeroes << "\n";
-    cout << "         avg: " << zavg << "\n";
+    std::cout << "Size: " << m_size << "\n";
+    std::cout << "Width: " << m_width << "\n";
+    std::cout << "Total: " << size << "\n";
+    std::cout << "Capacity: " << m_capacity << "\n\n";
+    std::cout << "Bytes string: " << total << "\n";
+    std::cout << "     longest: " << longest << "\n";
+    std::cout << "Bytes zeroes: " << zeroes << "\n";
+    std::cout << "         avg: " << zavg << "\n";
 }
 
 
-void ArrayString::to_dot(ostream& out, StringData title) const
+void ArrayString::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
     if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << endl;
-        out << " label = \"" << title << "\";" << endl;
-        out << " color = white;" << endl;
+        out << "subgraph cluster_" << ref << " {" << std::endl;
+        out << " label = \"" << title << "\";" << std::endl;
+        out << " color = white;" << std::endl;
     }
 
-    out << "n" << hex << ref << dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
+    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
-    out << "0x" << hex << ref << dec << "</FONT></TD>" << endl;
+    out << "0x" << std::hex << ref << std::dec << "</FONT></TD>" << std::endl;
 
     for (size_t i = 0; i < m_size; ++i)
-        out << "<TD>\"" << get(i) << "\"</TD>" << endl;
+        out << "<TD>\"" << get(i) << "\"</TD>" << std::endl;
 
-    out << "</TR></TABLE>>];" << endl;
+    out << "</TR></TABLE>>];" << std::endl;
 
     if (title.size() != 0)
-        out << "}" << endl;
+        out << "}" << std::endl;
 
     to_dot_parent_edge(out);
 }

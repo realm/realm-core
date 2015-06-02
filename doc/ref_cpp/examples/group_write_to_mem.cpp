@@ -4,7 +4,6 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
-using namespace std;
 using namespace realm;
 
 // @@EndFold@@
@@ -24,6 +23,6 @@ int main()
     BinaryData buffer = g.write_to_mem();
     Group g2(buffer);
     PeopleTable::Ref table2 = g2.get_table<PeopleTable>("people");
-    cout << table2[2].age << endl;
+    std::cout << table2[2].age << std::endl;
 }
 // @@EndExample@@

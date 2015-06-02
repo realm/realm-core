@@ -86,7 +86,7 @@ private:
     AES_KEY m_dctx;
 #endif
 
-#ifdef REALM_ANDROID
+#if defined(__linux__)
     // Loaded at runtime with dysym
     int (*AES_set_encrypt_key)(const unsigned char *, const int, AES_KEY *);
     int (*AES_set_decrypt_key)(const unsigned char *, const int, AES_KEY *);

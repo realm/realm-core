@@ -22,7 +22,6 @@
 
 #include "column_link.hpp"
 
-using namespace std;
 using namespace realm;
 
 
@@ -55,7 +54,7 @@ void ColumnLink::move_last_over(size_t row_ndx, size_t last_row_ndx,
         }
     }
 
-    do_move_last_over(row_ndx, last_row_ndx);
+    Column::move_last_over(row_ndx, last_row_ndx);
 }
 
 
@@ -66,7 +65,7 @@ void ColumnLink::clear(size_t, bool broken_reciprocal_backlinks)
         m_backlink_column->remove_all_backlinks(num_target_rows); // Throws
     }
 
-    do_clear(); // Throws
+    clear_without_updating_index(); // Throws
 }
 
 
@@ -121,7 +120,7 @@ void ColumnLink::Verify(const Table& table, size_t col_ndx) const
 {
     ColumnLinkBase::Verify(table, col_ndx);
 
-    vector<ColumnBackLink::VerifyPair> pairs;
+    std::vector<ColumnBackLink::VerifyPair> pairs;
     m_backlink_column->get_backlinks(pairs);
 
     // Check correspondence between forward nad backward links.
@@ -131,10 +130,10 @@ void ColumnLink::Verify(const Table& table, size_t col_ndx) const
         if (is_null_link(i))
             continue;
         size_t target_row_ndx = get_link(i);
-        typedef vector<ColumnBackLink::VerifyPair>::const_iterator iter;
+        typedef std::vector<ColumnBackLink::VerifyPair>::const_iterator iter;
         ColumnBackLink::VerifyPair search_value;
         search_value.origin_row_ndx = i;
-        pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         // Exactly one corresponding backlink must exist
         REALM_ASSERT(range.second - range.first == 1);
         REALM_ASSERT_3(range.first->target_row_ndx, ==, target_row_ndx);

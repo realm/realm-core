@@ -9,7 +9,6 @@ util/terminate.hpp \
 util/type_list.hpp \
 util/tuple.hpp \
 util/type_traits.hpp \
-util/bind.hpp \
 util/safe_int_ops.hpp \
 util/bind_ptr.hpp \
 util/buffer.hpp \
@@ -27,6 +26,7 @@ alloc_slab.hpp \
 array.hpp \
 array_integer.hpp \
 array_string.hpp \
+bptree.hpp \
 data_type.hpp \
 column_type.hpp \
 column_fwd.hpp \
@@ -122,6 +122,7 @@ array_blobs_big.cpp \
 array_integer.cpp \
 array_string.cpp \
 array_string_long.cpp \
+bptree.cpp \
 column.cpp \
 column_backlink.cpp \
 column_binary.cpp \

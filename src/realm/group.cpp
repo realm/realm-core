@@ -19,7 +19,6 @@
 #  include <realm/replication.hpp>
 #endif
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::_impl;
@@ -37,16 +36,40 @@ public:
 Initialization initialization;
 } // anonymous namespace
 
-void Group::open(const string& file_path, const char* encryption_key, OpenMode mode)
+void Group::upgrade_file_format()
+{
+#if REALM_NULL_STRINGS == 1
+    REALM_ASSERT(is_attached());
+    if (m_alloc.get_file_format() >= default_file_format_version)
+        return;
+
+    for (size_t t = 0; t < m_tables.size(); t++) {
+        TableRef table = get_table(t);
+        table->upgrade_file_format();
+    }
+
+    m_alloc.m_file_format_version = default_file_format_version;
+#endif
+}
+
+unsigned char Group::get_file_format() const
+{
+    return m_alloc.get_file_format();
+}
+
+
+void Group::open(const std::string& file_path, const char* encryption_key, OpenMode mode)
 {
     REALM_ASSERT(!is_attached());
     bool is_shared = false;
+
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
     bool server_sync_mode = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
                                            skip_validate, encryption_key, server_sync_mode); // Throws
+
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     if (top_ref == 0) {
@@ -463,7 +486,7 @@ void Group::remove_table(size_t table_ndx)
         TableRef last_table = get_table(last_ndx);
         const Spec& last_spec = tf::get_spec(*last_table);
         size_t last_num_cols = last_spec.get_column_count();
-        set<Table*> opposite_tables;
+        std::set<Table*> opposite_tables;
         for (size_t i = 0; i < last_num_cols; ++i) {
             Table* opposite_table;
             ColumnType type = last_spec.get_column_type(i);
@@ -484,7 +507,7 @@ void Group::remove_table(size_t table_ndx)
             }
             opposite_tables.insert(opposite_table); // Throws
         }
-        typedef set<Table*>::const_iterator iter;
+        typedef std::set<Table*>::const_iterator iter;
         iter end = opposite_tables.end();
         for (iter i = opposite_tables.begin(); i != end; ++i) {
             Table* table_2 = *i;
@@ -565,31 +588,31 @@ private:
     const Group& m_group;
 };
 
-void Group::write(ostream& out, bool pad) const
+void Group::write(std::ostream& out, bool pad) const
 {
     write(out, pad, 0);
 }
 
-void Group::write(ostream& out, bool pad, uint_fast64_t version_number) const
+void Group::write(std::ostream& out, bool pad, uint_fast64_t version_number) const
 {
     REALM_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
     write(out, table_writer, pad, version_number); // Throws
 }
 
-void Group::write(const string& path, const char* encryption_key) const
+void Group::write(const std::string& path, const char* encryption_key) const
 {
     write(path, encryption_key, 0);
 }
 
-void Group::write(const string& path, const char* encryption_key, uint_fast64_t version_number) const
+void Group::write(const std::string& path, const char* encryption_key, uint_fast64_t version_number) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
     file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
-    ostream out(&streambuf);
+    std::ostream out(&streambuf);
     write(out, encryption_key != 0, version_number);
 }
 
@@ -606,7 +629,7 @@ BinaryData Group::write_to_mem() const
 
     char* buffer = static_cast<char*>(malloc(max_size)); // Throws
     if (!buffer)
-        throw bad_alloc();
+        throw std::bad_alloc();
     try {
         MemoryOutputStream out; // Throws
         out.set_buffer(buffer, buffer + max_size);
@@ -621,7 +644,7 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(ostream& out, TableWriter& table_writer,
+void Group::write(std::ostream& out, TableWriter& table_writer,
                   bool pad_for_encryption, uint_fast64_t version_number)
 {
     _impl::OutputStream out_2(out);
@@ -719,6 +742,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
 void Group::commit()
 {
     REALM_ASSERT(is_attached());
+   // REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     // GroupWriter::write_group() needs free-space tracking
     // information, so if the attached database does not contain it,
@@ -873,7 +897,7 @@ bool Group::operator==(const Group& g) const
 }
 
 
-void Group::to_string(ostream& out) const
+void Group::to_string(std::ostream& out) const
 {
     // Calculate widths
     size_t index_width = 4;
@@ -894,9 +918,9 @@ void Group::to_string(ostream& out) const
 
 
     // Print header
-    out << setw(int(index_width+1)) << left << " ";
-    out << setw(int(name_width+1))  << left << "tables";
-    out << setw(int(rows_width))    << left << "rows"    << endl;
+    out << std::setw(int(index_width+1)) << std::left << " ";
+    out << std::setw(int(name_width+1))  << std::left << "tables";
+    out << std::setw(int(rows_width))    << std::left << "rows"    << std::endl;
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
@@ -904,9 +928,9 @@ void Group::to_string(ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << setw(int(index_width)) << right << i           << " ";
-        out << setw(int(name_width))  << left  << name.data() << " ";
-        out << setw(int(rows_width))  << left  << row_count   << endl;
+        out << std::setw(int(index_width)) << std::right << i           << " ";
+        out << std::setw(int(name_width))  << std::left  << name.data() << " ";
+        out << std::setw(int(rows_width))  << std::left  << row_count   << std::endl;
     }
 }
 
@@ -948,13 +972,13 @@ public:
             if (m_curr_buf_remaining_size > 0) {
                 size_t offset = m_logs_begin->size() - m_curr_buf_remaining_size;
                 const char* data = m_logs_begin->data() + offset;
-                size_t size_2 = min(m_curr_buf_remaining_size, size);
+                size_t size_2 = std::min(m_curr_buf_remaining_size, size);
                 m_curr_buf_remaining_size -= size_2;
                 // FIXME: Eliminate the need for copying by changing the API of
                 // Replication::InputStream such that blocks can be handed over
                 // without copying. This is a straight forward change, but the
                 // result is going to be more complicated and less conventional.
-                copy(data, data + size_2, buffer);
+                std::copy(data, data + size_2, buffer);
                 return size_2;
             }
 
@@ -965,7 +989,7 @@ public:
         }
     }
 
-    virtual size_t next_block(const char*& begin, const char*& end) override
+    size_t next_block(const char*& begin, const char*& end) override
     {
         while (m_logs_begin < m_logs_end) {
             size_t result = m_logs_begin->size();
@@ -1161,6 +1185,8 @@ public:
         typedef _impl::TableFriend tf;
         if (unordered) {
             if (m_table) {
+                if (num_rows == 0)
+                    tf::mark_opposite_link_tables(*m_table);
                 while (num_rows--) {
                     tf::adj_acc_move_over(*m_table, row_ndx + num_rows, last_row_ndx - num_rows);
                 }
@@ -1403,8 +1429,9 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData)
+    bool insert_column(size_t col_ndx, DataType, StringData, bool nullable)
     {
+        static_cast<void>(nullable);
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
@@ -1631,14 +1658,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 class Group::TransactReverser  {
 public:
 
-    TransactReverser() :
-        m_encoder(m_buffer), current_instr_start(0),
-        m_pending_table_select(false), m_pending_descriptor_select(false)
-    {
-    }
-
-    // override only the instructions which need to be reversed. (NullHandler class provides
-    // default implementatins for the rest)
     bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
     {
         sync_table();
@@ -1827,7 +1846,9 @@ public:
 
     bool clear_table()
     {
-        return true; // No-op
+        m_encoder.insert_empty_rows(0, 0, 0, true);
+        append_instruction();
+        return true;
     }
 
     bool add_search_index(size_t)
@@ -1871,7 +1892,7 @@ public:
         return true;
     }
 
-    bool insert_column(std::size_t col_idx, DataType, StringData)
+    bool insert_column(std::size_t col_idx, DataType, StringData, bool)
     {
         m_encoder.erase_column(col_idx);
         append_instruction();
@@ -1926,12 +1947,12 @@ public:
 
 private:
     _impl::TransactLogBufferStream m_buffer;
-    _impl::TransactLogEncoder m_encoder;
+    _impl::TransactLogEncoder m_encoder{m_buffer};
     struct Instr { size_t begin; size_t end; };
     std::vector<Instr> m_instructions;
-    size_t current_instr_start;
-    bool m_pending_table_select;
-    bool m_pending_descriptor_select;
+    size_t current_instr_start = 0;
+    bool m_pending_table_select = false;
+    bool m_pending_descriptor_select = false;
     Instr m_pending_ts_instr;
     Instr m_pending_ds_instr;
 
@@ -2096,7 +2117,7 @@ public:
     {
         // Sort the chunks in order of increasing ref, then merge adjacent
         // chunks while checking that there is no overlap
-        typedef vector<Chunk>::iterator iter;
+        typedef std::vector<Chunk>::iterator iter;
         iter i_1 = m_chunks.begin(), end = m_chunks.end();
         iter i_2 = i_1;
         sort(i_1, end);
@@ -2133,7 +2154,7 @@ private:
             return ref < c.ref;
         }
     };
-    vector<Chunk> m_chunks;
+    std::vector<Chunk> m_chunks;
     ref_type m_ref_begin, m_immutable_ref_end, m_mutable_ref_end, m_baseline;
 };
 
@@ -2247,7 +2268,7 @@ void Group::print() const
 void Group::print_free() const
 {
     if (!m_free_positions.is_attached()) {
-        cout << "none\n";
+        std::cout << "none\n";
         return;
     }
     bool has_versions = m_free_versions.is_attached();
@@ -2256,24 +2277,24 @@ void Group::print_free() const
     for (size_t i = 0; i != n; ++i) {
         size_t pos  = to_size_t(m_free_positions[i]);
         size_t size = to_size_t(m_free_lengths[i]);
-        cout << i << ": " << pos << " " << size;
+        std::cout << i << ": " << pos << " " << size;
 
         if (has_versions) {
             size_t version = to_size_t(m_free_versions[i]);
-            cout << " " << version;
+            std::cout << " " << version;
         }
-        cout << "\n";
+        std::cout << "\n";
     }
-    cout << "\n";
+    std::cout << "\n";
 }
 
 
-void Group::to_dot(ostream& out) const
+void Group::to_dot(std::ostream& out) const
 {
-    out << "digraph G {" << endl;
+    out << "digraph G {" << std::endl;
 
-    out << "subgraph cluster_group {" << endl;
-    out << " label = \"Group\";" << endl;
+    out << "subgraph cluster_group {" << std::endl;
+    out << " label = \"Group\";" << std::endl;
 
     m_top.to_dot(out, "group_top");
     m_table_names.to_dot(out, "table_names");
@@ -2286,26 +2307,26 @@ void Group::to_dot(ostream& out) const
         table->to_dot(out, name);
     }
 
-    out << "}" << endl;
-    out << "}" << endl;
+    out << "}" << std::endl;
+    out << "}" << std::endl;
 }
 
 
 void Group::to_dot() const
 {
-    to_dot(cerr);
+    to_dot(std::cerr);
 }
 
 
 void Group::to_dot(const char* file_path) const
 {
-    ofstream out(file_path);
+    std::ofstream out(file_path);
     to_dot(out);
 }
 
-pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    return make_pair(m_tables.get_ref(), ndx_in_parent);
+    return std::make_pair(m_tables.get_ref(), ndx_in_parent);
 }
 
 
@@ -2329,7 +2350,7 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
         size_t len = to_size_t(m_free_lengths.get(i));
 
         char* p = map.get_addr() + pos;
-        fill(p, p+len, 0);
+        std::fill(p, p+len, 0);
     }
 }
 */

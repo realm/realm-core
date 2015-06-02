@@ -13,7 +13,6 @@
 
 #include "test.hpp"
 
-using namespace std;
 using namespace realm;
 using namespace realm::test_util;
 using unit_test::TestResults;
@@ -495,7 +494,7 @@ TEST(Array_UpperLowerBound)
     // This test is independent of REALM_MAX_BPNODE_SIZE
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
-    vector<int> v;
+    std::vector<int> v;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     // we use 4 as constant in order to make border case sequences of

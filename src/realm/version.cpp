@@ -2,12 +2,11 @@
 #include <realm/version.hpp>
 
 using namespace realm;
-using namespace std;
 
 
-string Version::get_version()
+std::string Version::get_version()
 {
-    stringstream ss;
+    std::stringstream ss;
     ss << get_major() << "." << get_minor() << "." << get_patch();
     return ss.str();
 }

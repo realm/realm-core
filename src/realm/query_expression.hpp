@@ -143,6 +143,7 @@ typedef realm::DateTime   DateTime;
 typedef float               Float;
 typedef double              Double;
 typedef realm::StringData String;
+typedef realm::BinaryData Binary;
 
 
 // Return StringData if either T or U is StringData, else return T. See description of usage in export2().
@@ -193,6 +194,9 @@ template<class T> char* in_place_deep_clone(T* in)
 
 char* in_place_deep_clone(StringData* in)
 {
+    if (in->is_null())
+        return nullptr;
+
     char* payload = new char[in->size()];
     memcpy(payload, in->data(), in->size());
     *in = StringData(payload, in->size());
@@ -348,6 +352,8 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
             q.less_equal(column->m_column, only_numeric<R>(left));
         else if (util::SameType<Cond, EqualIns>::value)
             q.equal(column->m_column, only_string(left), false);
+        else if (util::SameType<Cond, NotEqualIns>::value)
+            q.not_equal(column->m_column, only_string(left), false);
         else if (util::SameType<Cond, BeginsWith>::value)
             q.begins_with(column->m_column, only_string(left));
         else if (util::SameType<Cond, BeginsWithIns>::value)
@@ -961,7 +967,7 @@ If all link columns are type_Link, then LinkMapFunction is only invoked for a si
 columns are type_LinkList, then it may result in multiple row indexes.
 
 The reason we use this map pattern is that we can exit the link-tree-traversal as early as possible, e.g. when we've
-found the first link that points to row '5'. Other solutions could be a vector<size_t> harvest_all_links(), or an
+found the first link that points to row '5'. Other solutions could be a std::vector<size_t> harvest_all_links(), or an
 iterator pattern. First solution can't exit, second solution requires internal state.
 */
 class LinkMap
@@ -1413,7 +1419,7 @@ public:
                 Value<T> v;
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
                 // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-                sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+                sg->m_leaf_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
                 destination.import(v);
             }
             else {

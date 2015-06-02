@@ -24,11 +24,10 @@
 
 
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
-string PlatformSpecificCondVar::internal_naming_prefix = "/RealmsBigFriendlySemaphore";
+std::string PlatformSpecificCondVar::internal_naming_prefix = "/RealmsBigFriendlySemaphore";
 
 void PlatformSpecificCondVar::set_resource_naming_prefix(std::string prefix)
 {

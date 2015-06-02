@@ -9,7 +9,6 @@
 #include <realm/group_shared.hpp>
 #include <realm/replication.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -39,11 +38,11 @@ public:
     {
     }
 
-    void set_apply_log(ostream* log) REALM_NOEXCEPT
+    void set_apply_log(std::ostream* log) REALM_NOEXCEPT
     {
         m_log = log;
         if (m_log)
-            *m_log << boolalpha;
+            *m_log << std::boolalpha;
     }
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
@@ -538,7 +537,7 @@ public:
         return false;
     }
 
-    bool insert_column(size_t col_ndx, DataType type, StringData name)
+    bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
     {
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
@@ -546,11 +545,11 @@ public:
 #ifdef REALM_DEBUG
                 if (m_log) {
                     *m_log << "desc->insert_column("<<col_ndx<<", "<<data_type_to_str(type)<<", "
-                        "\""<<name<<"\")\n";
+                        "\""<<name<< ", " << nullable << ")\")\n";
                 }
 #endif
                 Table* link_target_table = 0;
-                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
+                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
                 return true;
             }
         }
@@ -800,7 +799,7 @@ private:
     TableRef m_table;
     DescriptorRef m_desc;
     LinkViewRef m_link_list;
-    ostream* m_log;
+    std::ostream* m_log;
 
     bool check_set_cell(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
     {
@@ -868,7 +867,7 @@ private:
 };
 
 
-void Replication::apply_transact_log(InputStream& transact_log, Group& group, ostream* log)
+void Replication::apply_transact_log(InputStream& transact_log, Group& group, std::ostream* log)
 {
     TransactLogParser parser(transact_log);
     TransactLogApplier applier(group);
@@ -903,7 +902,7 @@ public:
 } // anonymous namespace
 
 void TrivialReplication::apply_transact_log(const char* data, size_t size, SharedGroup& target,
-                                            ostream* log)
+                                            std::ostream* log)
 {
     InputStreamImpl in(data, size);
     WriteTransaction wt(target); // Throws
@@ -911,7 +910,7 @@ void TrivialReplication::apply_transact_log(const char* data, size_t size, Share
     wt.commit(); // Throws
 }
 
-string TrivialReplication::do_get_database_path()
+std::string TrivialReplication::do_get_database_path()
 {
     return m_database_file;
 }
@@ -953,5 +952,5 @@ void TrivialReplication::do_clear_interrupt() REALM_NOEXCEPT
 void TrivialReplication::transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(size, new_begin, new_end);
-    *new_begin = copy(data, data + size, *new_begin);
+    *new_begin = std::copy(data, data + size, *new_begin);
 }

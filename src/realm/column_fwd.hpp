@@ -24,7 +24,10 @@ namespace realm {
 
 
 class ColumnBase;
-class Column;
+template <class T, bool Nullable = false> class TColumn;
+/// FIXME: Rename Column to IntegerColumn.
+using Column = TColumn<int64_t>;
+using ColumnIntNull = TColumn<int64_t, true>;
 template<class T> class BasicColumn;
 typedef BasicColumn<double> ColumnDouble;
 typedef BasicColumn<float> ColumnFloat;
