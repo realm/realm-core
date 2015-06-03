@@ -714,7 +714,7 @@ public:
             source.export_float(*this);
         else if (util::SameType<T, double>::value)
             source.export_double(*this);
-        else if (util::SameType<T, int64_t>::value)
+        else if (util::SameType<T, int64_t>::value || util::SameType<T, DateTime>::value)
             source.export_int64_t(*this);
         else if (util::SameType<T, StringData>::value)
             source.export_StringData(*this);
