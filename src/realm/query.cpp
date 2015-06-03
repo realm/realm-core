@@ -184,20 +184,21 @@ Query& Query::contains(size_t column_ndx, BinaryData b)
 
 namespace {
 
-template <class Node> struct MakeConditionNode {
+struct MakeConditionNode {
     // make() for Node creates a Node* with either a value type
     // or null, and supports both nodes for values that are implicitly
     // nullable (like StringData and BinaryData) and others.
     // Regardless of nullability, it throws a LogicError if trying
     // to query for a value of type T on a column of a different type.
 
-    template <class N = Node>
-    static typename std::enable_if<N::implicit_nullable, ParentNode*>::type
-    make(size_t col_ndx, typename N::TConditionValue value)
+    template <class Node>
+    static typename std::enable_if<Node::implicit_nullable, ParentNode*>::type
+    make(size_t col_ndx, typename Node::TConditionValue value)
     {
         return new Node(std::move(value), col_ndx);
     }
-    template <class T>
+
+    template <class Node, class T>
     static typename std::enable_if<
         Node::implicit_nullable
         && !std::is_same<T, typename Node::TConditionValue>::value
@@ -208,7 +209,7 @@ template <class Node> struct MakeConditionNode {
         throw LogicError{LogicError::type_mismatch};
     }
 
-    template <class T>
+    template <class Node, class T>
     static typename std::enable_if<
         !Node::implicit_nullable
         && std::is_same<T, null>::value
@@ -219,7 +220,7 @@ template <class Node> struct MakeConditionNode {
         return new Node(value, col_ndx);
     }
 
-    template <class T>
+    template <class Node, class T>
     static typename std::enable_if<
         !Node::implicit_nullable
         && std::is_same<T, typename Node::TConditionValue>::value
@@ -229,7 +230,7 @@ template <class Node> struct MakeConditionNode {
         return new Node(value, col_ndx);
     }
 
-    template <class T>
+    template <class Node, class T>
     static typename std::enable_if<
         !Node::implicit_nullable
         && !std::is_same<T, null>::value
@@ -251,23 +252,23 @@ ParentNode* make_condition_node(const Descriptor& descriptor, size_t column_ndx,
         case type_Bool:
         case type_DateTime: {
             if (is_nullable) {
-                return MakeConditionNode<IntegerNode<ColumnIntNull, Cond>>::make(column_ndx, value);
+                return MakeConditionNode::make<IntegerNode<ColumnIntNull, Cond>>(column_ndx, value);
             }
             else {
-                return MakeConditionNode<IntegerNode<Column, Cond>>::make(column_ndx, value);
+                return MakeConditionNode::make<IntegerNode<Column, Cond>>(column_ndx, value);
             }
         }
         case type_Float: {
-            return MakeConditionNode<FloatDoubleNode<ColumnFloat, Cond>>::make(column_ndx, value);
+            return MakeConditionNode::make<FloatDoubleNode<ColumnFloat, Cond>>(column_ndx, value);
         }
         case type_Double: {
-            return MakeConditionNode<FloatDoubleNode<ColumnDouble, Cond>>::make(column_ndx, value);
+            return MakeConditionNode::make<FloatDoubleNode<ColumnDouble, Cond>>(column_ndx, value);
         }
         case type_String: {
-            return MakeConditionNode<StringNode<Cond>>::make(column_ndx, value);
+            return MakeConditionNode::make<StringNode<Cond>>(column_ndx, value);
         }
         case type_Binary: {
-            return MakeConditionNode<BinaryNode<Cond>>::make(column_ndx, value);
+            return MakeConditionNode::make<BinaryNode<Cond>>(column_ndx, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};

@@ -676,12 +676,20 @@ public:
     static const bool nullable = ColType::nullable;
 
     template <class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
-    bool find_callback_specialization(size_t s, size_t end2)
+    bool find_callback_specialization(size_t s, size_t end_in_leaf)
     {
         using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
-        bool cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
-            (this->m_value, this->m_null, s - this->m_leaf_start, end2, this->m_leaf_start, nullptr,
-             std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
+        bool cont;
+        size_t start_in_leaf = s - this->m_leaf_start;
+        if (this->m_null) {
+            cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
+                (null{}, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
+                 std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
+        } else {
+            cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
+                (m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
+                 std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
+        }
         return cont;
     }
 
@@ -712,7 +720,14 @@ protected:
                 end_in_leaf = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_leaf_ptr->find(c, m_action, m_value, m_null, s - m_leaf_start, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                bool cont;
+                size_t start_in_leaf = s - m_leaf_start;
+                if (m_null) {
+                    cont = m_leaf_ptr->find(c, m_action, null{}, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                }
+                else {
+                    cont = m_leaf_ptr->find(c, m_action, m_value, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                }
                 if (!cont)
                     return not_found;
             }
