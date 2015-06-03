@@ -177,7 +177,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         size_t refs_ndx = node_ndx+1; // first entry in refs points to offsets
         ref_type ref = m_array->get_as_ref(refs_ndx);
         StringIndex target(ref, m_array.get(), refs_ndx, m_target_column,
-                           m_deny_duplicate_values, alloc);
+                           m_deny_duplicate_values, m_store_complete_string, alloc);
 
         // Insert item
         NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
@@ -253,7 +253,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
             return NodeChange::none;
 
         // Create new list for item (a leaf)
-        StringIndex new_list(m_target_column, m_array->get_alloc());
+        StringIndex new_list(m_target_column, m_array->get_alloc(), m_deny_duplicate_values, m_store_complete_string);
 
         new_list.LeafInsert(row_ndx, key, offset, value);
 
@@ -306,9 +306,9 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     size_t refs_ndx = ndx+1; // first entry in refs points to offsets
     ref_type orig_ref = m_array->get_as_ref(refs_ndx);
     StringIndex orig_col(orig_ref, m_array.get(), refs_ndx, m_target_column,
-                         m_deny_duplicate_values, alloc);
+                         m_deny_duplicate_values, m_store_complete_string, alloc);
     StringIndex new_col(new_ref, 0, 0, m_target_column,
-                        m_deny_duplicate_values, alloc);
+                        m_deny_duplicate_values, m_store_complete_string, alloc);
 
     // Update original key
     key_type last_key = orig_col.GetLastKey();
@@ -335,11 +335,30 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE);
 
     StringIndex col(ref, 0, 0, m_target_column,
-                    m_deny_duplicate_values, alloc);
+                    m_deny_duplicate_values, m_store_complete_string, alloc);
     key_type last_key = col.GetLastKey();
 
     offsets.insert(ndx, last_key);
     m_array->insert(ndx+1, ref);
+}
+
+// This method reconstructs the string inserted in the search index based on a string
+// that matches so far and the last key (only works if complete strings are stored in the index) 
+StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
+{
+    if (key == 0)
+        return StringData();
+
+    size_t rest_len = 4;
+    char* k = reinterpret_cast<char*>(&key);
+    if (k[0] == 'X') rest_len = 3;
+    else if (k[1] == 'X') rest_len = 2;
+    else if (k[2] == 'X') rest_len = 1;
+    else if (k[3] == 'X') rest_len = 0;
+
+    REALM_ASSERT(offset + rest_len <= new_string.size());
+
+    return StringData(new_string.data(), offset + rest_len);
 }
 
 
@@ -353,19 +372,32 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     get_child(*m_array, 0, values);
     REALM_ASSERT(m_array->size() == values.size()+1);
 
+    // If we are keeping the complete string in the index
+    // we want to know if this is the last part
+    bool is_at_string_end = offset + 4 >= value.size();
+
     size_t ins_pos = values.lower_bound_int(key);
+    size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
+
     if (ins_pos == values.size()) {
         if (noextend)
             return false;
 
         // When key is outside current range, we can just add it
         values.add(key);
-        int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
-        m_array->add(shifted);
+        if (!m_store_complete_string || is_at_string_end) {
+            int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
+            m_array->add(shifted);
+        }
+        else {
+            // create subindex for rest of string
+            StringIndex subindex(m_target_column, m_array->get_alloc(), m_deny_duplicate_values, m_store_complete_string);
+            subindex.insert_with_offset(row_ndx, value, offset+4);
+            m_array->add(subindex.get_ref());
+        }
         return true;
     }
 
-    size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
     key_type k = key_type(values.get(ins_pos));
 
     // If key is not present we add it at the correct location
@@ -374,12 +406,20 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             return false;
 
         values.insert(ins_pos, key);
-        int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
-        m_array->insert(ins_pos_refs, shifted);
+        if (!m_store_complete_string || is_at_string_end) {
+            int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
+            m_array->insert(ins_pos_refs, shifted);
+        }
+        else {
+            // create subindex
+            StringIndex subindex(m_target_column, m_array->get_alloc(), m_deny_duplicate_values, m_store_complete_string);
+            subindex.insert_with_offset(row_ndx, value, offset+4);
+            m_array->insert(ins_pos_refs, subindex.get_ref());
+        }
         return true;
     }
 
-    // This leaf already has a slot for for the key
+    // This leaf already has a slot for the key
 
     int_fast64_t slot_value = m_array->get(ins_pos+1);
     size_t suboffset = offset + 4;
@@ -387,10 +427,12 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     // Single match (lowest bit set indicates literal row_ndx)
     if (slot_value % 2 != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
-        // for integer index, get_func fills out 'buffer' and makes str point at it
-        char buffer[8];
-        StringData v2 = get(row_ndx2, buffer);
-        if (v2 == value) {
+        
+        // If we know that current key completes the existing value we can reconstruct it from the incoming.
+        char buffer[8]; // for integer index, get_func fills out 'buffer' and makes str point at it
+        StringData v2 = m_store_complete_string ? reconstruct_string(offset, key, value) : get(row_ndx2, buffer);
+        
+        if (v2 == value) { // || (m_store_complete_string && is_at_string_end)) {
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
             // convert to list (in sorted order)
@@ -402,7 +444,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         }
         else {
             // convert to subindex
-            StringIndex subindex(m_target_column, m_array->get_alloc());
+            StringIndex subindex(m_target_column, m_array->get_alloc(), m_deny_duplicate_values, m_store_complete_string);
             subindex.insert_with_offset(row_ndx2, v2, suboffset);
             subindex.insert_with_offset(row_ndx, value, suboffset);
             m_array->set(ins_pos_refs, subindex.get_ref());
@@ -418,10 +460,12 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         sub.set_parent(m_array.get(), ins_pos_refs);
 
         size_t r1 = to_size_t(sub.get(0));
-        // for integer index, get_func fills out 'buffer' and makes str point at it
-        char buffer[8];
-        StringData v2 = get(r1, buffer);
-        if (v2 == value) {
+        
+        // If we know that current key completes the existing value we can reconstruct it from the incoming.
+        char buffer[8]; // for integer index, get_func fills out 'buffer' and makes str point at it
+        StringData v2 = m_store_complete_string ? reconstruct_string(offset, key, value) :  get(r1, buffer);
+        
+        if (v2 == value ) { // || (m_store_complete_string && is_at_string_end)) {
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
             // find insert position (the list has to be kept in sorted order)
@@ -442,7 +486,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             }
         }
         else {
-            StringIndex subindex(m_target_column, m_array->get_alloc());
+            StringIndex subindex(m_target_column, m_array->get_alloc(), m_deny_duplicate_values, m_store_complete_string);
             subindex.InsertRowList(sub.get_ref(), suboffset, v2);
             subindex.insert_with_offset(row_ndx, value, suboffset);
             m_array->set(ins_pos_refs, subindex.get_ref());
@@ -452,7 +496,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
 
     // subindex
     StringIndex subindex(ref, m_array.get(), ins_pos_refs, m_target_column,
-                         m_deny_duplicate_values, alloc);
+                         m_deny_duplicate_values, m_store_complete_string, alloc);
     subindex.insert_with_offset(row_ndx, value, suboffset);
 
     return true;
@@ -468,7 +512,7 @@ void StringIndex::distinct(Column& result) const
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, 0, 0, m_target_column,
-                            m_deny_duplicate_values, alloc);
+                            m_deny_duplicate_values, m_store_complete_string, alloc);
             ndx.distinct(result);
         }
     }
@@ -485,7 +529,7 @@ void StringIndex::distinct(Column& result) const
                 // A real ref either points to a list or a subindex
                 if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                     StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
-                                    m_deny_duplicate_values, alloc);
+                                    m_deny_duplicate_values, m_store_complete_string, alloc);
                     ndx.distinct(result);
                 }
                 else {
@@ -514,7 +558,7 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, m_array.get(), i, m_target_column,
-                            m_deny_duplicate_values, alloc);
+                            m_deny_duplicate_values, m_store_complete_string, alloc);
             ndx.adjust_row_indexes(min_row_ndx, diff);
         }
     }
@@ -534,7 +578,7 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
                 // A real ref either points to a list or a subindex
                 if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                     StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
-                                    m_deny_duplicate_values, alloc);
+                                    m_deny_duplicate_values, m_store_complete_string, alloc);
                     ndx.adjust_row_indexes(min_row_ndx, diff);
                 }
                 else {
@@ -581,7 +625,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     if (m_array->is_inner_bptree_node()) {
         ref_type ref = m_array->get_as_ref(pos_refs);
         StringIndex node(ref, m_array.get(), pos_refs, m_target_column,
-                         m_deny_duplicate_values, alloc);
+                         m_deny_duplicate_values, m_store_complete_string, alloc);
         node.DoDelete(row_ndx, value, offset);
 
         // Update the ref
@@ -607,7 +651,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
             // A real ref either points to a list or a subindex
             if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
-                                     m_deny_duplicate_values, alloc);
+                                     m_deny_duplicate_values, m_store_complete_string, alloc);
                 subindex.DoDelete(row_ndx, value, offset+4);
 
                 if (subindex.is_empty()) {
@@ -652,7 +696,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     if (m_array->is_inner_bptree_node()) {
         ref_type ref = m_array->get_as_ref(pos_refs);
         StringIndex node(ref, m_array.get(), pos_refs, m_target_column,
-                         m_deny_duplicate_values, alloc);
+                         m_deny_duplicate_values, m_store_complete_string, alloc);
         node.do_update_ref(value, row_ndx, new_row_ndx, offset);
     }
     else {
@@ -666,7 +710,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
             // A real ref either points to a list or a subindex
             if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
-                                     m_deny_duplicate_values, alloc);
+                                     m_deny_duplicate_values, m_store_complete_string, alloc);
                 subindex.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
             }
             else {
@@ -789,6 +833,68 @@ void StringIndex::Verify() const
     // FIXME: Extend verification along the lines of Column::Verify().
 }
 
+void StringIndex::dump(const AdaptiveStringColumn& column) const
+{
+    to_dot();
+    
+    size_t count = column.size();
+    for (size_t i = 0; i < count; ++i) {
+        StringData value = column.get(i);
+        
+        if (value.data() == NULL)
+            std::cout << i << ": NULL\n";
+        else
+            std::cout << i << ": str(" << value.size() << '\n';
+    }
+}
+
+void StringIndex::verify_entry(size_t row_ndx, StringData value, size_t offset) const
+{
+    Allocator& alloc = m_array->get_alloc();
+    Array values(alloc);
+    get_child(*m_array, 0, values);
+    REALM_ASSERT(m_array->size() == values.size()+1);
+    
+    // Create 4 byte index key
+    key_type key = create_key(value, offset);
+    
+    const size_t pos = values.lower_bound_int(key);
+    const size_t pos_refs = pos + 1; // first entry in refs points to offsets
+    REALM_ASSERT(pos != values.size());
+    
+    if (m_array->is_inner_bptree_node()) {
+        ref_type ref = m_array->get_as_ref(pos_refs);
+        StringIndex node(ref, m_array.get(), pos_refs, m_target_column,
+                         m_deny_duplicate_values, m_store_complete_string, alloc);
+        node.verify_entry(row_ndx, value, offset);
+    }
+    else {
+        int64_t ref = m_array->get(pos_refs);
+        if (ref & 1) {
+            REALM_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
+            
+            if (m_store_complete_string)
+                REALM_ASSERT(offset + 4 >= value.size());
+        }
+        else {
+            // A real ref either points to a list or a subindex
+            if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+                StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
+                                     m_deny_duplicate_values, m_store_complete_string, alloc);
+                subindex.verify_entry(row_ndx, value, offset+4);
+            }
+            else {
+                Column sub(alloc, to_ref(ref)); // Throws
+                sub.set_parent(m_array.get(), pos_refs);
+                size_t r = sub.find_first(row_ndx);
+                REALM_ASSERT(r != not_found);
+                
+                if (m_store_complete_string)
+                    REALM_ASSERT(offset + 4 >= value.size());
+            }
+        }
+    }
+}
 
 void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 {
@@ -799,8 +905,11 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
     size_t count = column.size();
     for (size_t i = 0; i < count; ++i) {
         StringData value = column.get(i);
+        
+        verify_entry(i, value);
 
         find_all(results, value);
+        REALM_ASSERT(!results.is_empty());
 
         size_t ndx = results.find_first(i);
         REALM_ASSERT(ndx != not_found);

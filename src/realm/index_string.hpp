@@ -58,9 +58,9 @@ inline StringData to_str(const char* value)
 
 class StringIndex {
 public:
-    StringIndex(ColumnBase* target_column, Allocator&);
+    StringIndex(ColumnBase* target_column, Allocator&, bool allow_duplicate_values, bool store_complete_string);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, ColumnBase* target_column,
-                bool allow_duplicate_values, Allocator&);
+                bool allow_duplicate_values, bool store_complete_string, Allocator&);
     ~StringIndex() REALM_NOEXCEPT {}
     void set_target(ColumnBase* target_column) REALM_NOEXCEPT;
 
@@ -120,10 +120,16 @@ public:
 
     /// By default, duplicate values are allowed.
     void set_allow_duplicate_values(bool) REALM_NOEXCEPT;
+    
+    // By default only common prefixes of strings are stored in index
+    // this allows you to force it to store the complete string
+    void set_store_complete_string(bool) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
+    void dump(const AdaptiveStringColumn& column) const;
     void Verify() const;
     void verify_entries(const AdaptiveStringColumn& column) const;
+    void verify_entry(size_t row_ndx, StringData value, size_t offset=0) const;
     void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const { to_dot(std::cerr); }
     void to_dot(std::ostream&, StringData title = StringData()) const;
@@ -138,6 +144,7 @@ private:
     std::unique_ptr<Array> m_array;
     ColumnBase* m_target_column;
     bool m_deny_duplicate_values;
+    bool m_store_complete_string;
 
     struct inner_node_tag {};
     StringIndex(inner_node_tag, Allocator&);
@@ -190,19 +197,21 @@ private:
 
 // Implementation:
 
-inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
+inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc, bool allow_duplicate_values, bool store_complete_string):
     m_array(create_node(alloc, true)), // Throws
     m_target_column(target_column),
-    m_deny_duplicate_values(false)
+    m_deny_duplicate_values(allow_duplicate_values),
+    m_store_complete_string(store_complete_string)
 {
 }
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                 ColumnBase* target_column,
-                                bool deny_duplicate_values, Allocator& alloc):
+                                bool deny_duplicate_values, bool store_complete_string, Allocator& alloc):
     m_array(new Array(alloc)),
     m_target_column(target_column),
-    m_deny_duplicate_values(deny_duplicate_values)
+    m_deny_duplicate_values(deny_duplicate_values),
+    m_store_complete_string(store_complete_string)
 {
     REALM_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
     m_array->init_from_ref(ref);
@@ -219,6 +228,11 @@ inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
 inline void StringIndex::set_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 {
     m_deny_duplicate_values = !allow;
+}
+    
+inline void StringIndex::set_store_complete_string(bool store_complete) REALM_NOEXCEPT
+{
+    m_store_complete_string = store_complete;
 }
 
 // Byte order of the key is *reversed*, so that for the integer index, the least significant

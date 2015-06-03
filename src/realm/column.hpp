@@ -842,7 +842,7 @@ template <class T, bool N>
 StringIndex* TColumn<T, N>::create_search_index()
 {
     REALM_ASSERT(!has_search_index());
-    m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
+    m_search_index.reset(new StringIndex(this, get_alloc(), false, false)); // Throws
     populate_search_index();
     return m_search_index.get();
 }

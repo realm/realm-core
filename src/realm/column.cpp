@@ -531,7 +531,7 @@ void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent
 {
     REALM_ASSERT(!m_search_index);
     m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-        !allow_duplicate_valaues, get_alloc())); // Throws
+        !allow_duplicate_valaues, false, get_alloc())); // Throws
 }
 
 

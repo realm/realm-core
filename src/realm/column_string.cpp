@@ -202,7 +202,7 @@ StringIndex* AdaptiveStringColumn::create_search_index()
     REALM_ASSERT(!m_search_index);
 
     std::unique_ptr<StringIndex> index;
-    index.reset(new StringIndex(this, m_array->get_alloc())); // Throws
+    index.reset(new StringIndex(this, m_array->get_alloc(), false, false)); // Throws
 
     // Populate the index
     m_search_index = std::move(index);
@@ -228,7 +228,7 @@ void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* paren
 {
     REALM_ASSERT(!m_search_index);
     m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-                                         !allow_duplicate_valaues, m_array->get_alloc())); // Throws
+                                         !allow_duplicate_valaues, false, m_array->get_alloc())); // Throws
 }
 
 

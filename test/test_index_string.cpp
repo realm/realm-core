@@ -943,6 +943,84 @@ TEST(StringIndex_Zero_Crash2)
         }
     }
 }
+
+TEST(StringIndex_Zero_Crash_CompleteString)
+{
+    Random random(random_int<unsigned long>());
+    
+    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100 ; iter++) {
+        // Create a column with string values
+        ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+        AdaptiveStringColumn col(Allocator::get_default(), ref, true);
+        
+        // Create index and make sure it stores complete strings
+        // so we can verify that it stores them correctly (even with nulls)
+        StringIndex& ndx = *col.create_search_index();
+        ndx.set_store_complete_string(true);
+        
+        for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
+            unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
+            
+            if (action > 48 && col.size() < 10) {
+                // Generate string with equal probability of being empty, null, short, medium and long, and with
+                // their contents having equal proability of being either random or a duplicate of a previous
+                // string. When it's random, each char must have equal probability of being 0 or non-0e
+                char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
+                memcpy(buf1, buf, sizeof(buf));
+                char buf2[] = "                                                                                         ";
+                StringData sd;
+                
+                size_t len = random.draw_int_max<size_t>(3);
+                if (len == 0)
+                    len = 0;
+                else if (len == 1)
+                    len = 7;
+                else if (len == 2)
+                    len = 27;
+                else
+                    len = random.draw_int_max<size_t>(90);
+                
+                if (random.draw_int_max<int>(1) == 0) {
+                    // duplicate string
+                    sd = StringData(buf1, len);
+                }
+                else {
+                    // random string
+                    for (size_t t = 0; t < len; t++) {
+                        if (random.draw_int_max<int>(100) > 20)
+                            buf2[t] = 0;                        // zero byte
+                        else
+                            buf2[t] = static_cast<char>(random.draw_int<int>());  // random byte
+                    }
+                    // no generated string can equal "null" (our vector magic value for null) because
+                    // len == 4 is not possible
+                    sd = StringData(buf2, len);
+                }
+                
+                size_t pos = random.draw_int_max<size_t>(col.size());
+                col.insert(pos);
+                col.set_string(pos, sd);
+                free(buf1);
+            }
+            else if (col.size() > 0) {
+                // delete
+                size_t row = random.draw_int_max<size_t>(col.size() - 1);
+                col.erase(row);
+            }
+            
+            action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
+            if (col.size() > 0) {
+                // Search for value that exists
+                size_t row = random.draw_int_max<size_t>(col.size() - 1);
+                StringData sd = col.get(row);
+                size_t t = col.find_first(sd);
+                StringData sd2 = col.get(t);
+                CHECK_EQUAL(sd, sd2);
+            }
+        }
+    }
+}
 #endif
 
 TEST(StringIndex_Integer_Increasing)
