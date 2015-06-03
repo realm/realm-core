@@ -428,9 +428,9 @@ Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
 }
 
 // null vs column
-Query& Query::equal(size_t column_ndx, null n)
+Query& Query::equal(size_t column_ndx, null)
 {
-    add_condition<Equal>(column_ndx, n);
+    add_condition<Equal>(column_ndx, null{});
     return *this;
 }
 
