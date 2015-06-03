@@ -9,7 +9,7 @@
 * Merged lr_nulls into master (support for null in String column and bugfix in
 String index with 0 bytes). If you want to disable all this again, then #define
 REALM_NULL_STRINGS to 0 in features.h. Else API is as follows: Call add_column()
-with nullable = true. You can then use tightdb::null() in place of any
+with nullable = true. You can then use realm::null() in place of any
 StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
