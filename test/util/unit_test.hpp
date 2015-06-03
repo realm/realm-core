@@ -57,40 +57,6 @@
                                       "DefaultSuite", #name, __FILE__, __LINE__); \
     void Realm_UnitTest__##name::test_run()
 
-#define TEST_TYPES(name, ...) \
-    TEST_TYPES_IF(name, true, __VA_ARGS__)
-
-#define TEST_TYPES_IF(name, enabled, ...) \
-    TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, __VA_ARGS__)
-
-#define TEST_TYPES_EX(name, list, enabled, ...) \
-    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
-        bool test_enabled() const { return bool(enabled); } \
-        template <class T> void test_one(); \
-        template <class...> struct TestEach; \
-        void test_run(); \
-    }; \
-    template <class T, class... Rest> struct Realm_UnitTest__##name::TestEach<T, Rest...> { \
-        static void test_each(Realm_UnitTest__##name& self) \
-        { \
-            self.test_one<T>(); \
-            TestEach<Rest...>::test_each(self); \
-        } \
-    }; \
-    template <> struct Realm_UnitTest__##name::TestEach<> { \
-        static void test_each(Realm_UnitTest__##name&) {} \
-    }; \
-    Realm_UnitTest__##name realm_unit_test__##name; \
-    realm::test_util::unit_test::RegisterTest \
-        realm_unit_test_reg__##name((list), realm_unit_test__##name, \
-                                    "DefaultSuite", #name, __FILE__, __LINE__); \
-    inline void Realm_UnitTest__##name::test_run() \
-    { \
-        TestEach<__VA_ARGS__>::test_each(*this); \
-    } \
-    template <class TEST_TYPE> \
-    void Realm_UnitTest__##name::test_one()
-
 
 #define CHECK(cond) \
     test_results.check(bool(cond), __FILE__, __LINE__, #cond)
@@ -202,6 +168,7 @@ namespace realm {
 namespace test_util {
 namespace unit_test {
 
+
 class Test;
 class TestResults;
 
@@ -209,7 +176,7 @@ class TestResults;
 struct TestDetails {
     long test_index;
     const char* suite_name;
-    const char* test_name;
+    std::string test_name;
     const char* file_name;
     long line_number;
 };
@@ -270,7 +237,7 @@ public:
 
     /// Called automatically when you use the `TEST` macro (or one of
     /// its friends).
-    void add(Test&, const char* suite, const char* name, const char* file, long line);
+    void add(Test&, const char* suite, const std::string& name, const char* file, long line);
 
 private:
     class ExecContext;
@@ -468,6 +435,11 @@ private:
 struct RegisterTest {
     RegisterTest(TestList& list, Test& test, const char* suite,
                  const char* name, const char* file, long line)
+    {
+        register_test(list, test, suite, name, file, line);
+    }
+    static void register_test(TestList& list, Test& test, const char* suite,
+                              const std::string& name, const char* file, long line)
     {
         list.add(test, suite, name, file, line);
     }
