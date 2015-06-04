@@ -37,12 +37,6 @@
 namespace realm {
 namespace util {
 
-template<class T> struct IsConst          { static const bool value = false; };
-template<class T> struct IsConst<const T> { static const bool value = true;  };
-
-template<class T> struct IsVolatile             { static const bool value = false; };
-template<class T> struct IsVolatile<volatile T> { static const bool value = true;  };
-
 template<class T> struct RemoveConst          { typedef T type; };
 template<class T> struct RemoveConst<const T> { typedef T type; };
 
@@ -57,7 +51,7 @@ template<class From, class To> struct CopyConst {
 private:
     typedef typename RemoveConst<To>::type type_1;
 public:
-    typedef typename std::conditional<IsConst<From>::value, const type_1, type_1>::type type;
+    typedef typename std::conditional<std::is_const<From>::value, const type_1, type_1>::type type;
 };
 
 template<class T> struct RemovePointer                    { typedef T type; };

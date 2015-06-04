@@ -85,7 +85,7 @@ public:
 private:
     template<int col_idx> struct Field {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
-        typedef _impl::FieldAccessor<View, col_idx, value_type, util::IsConst<Tab>::value> type;
+        typedef _impl::FieldAccessor<View, col_idx, value_type, std::is_const<Tab>::value> type;
     };
     typedef std::pair<View*, std::size_t> FieldInit;
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
