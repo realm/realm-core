@@ -45,11 +45,6 @@ public:
 };
 
 
-/// Member `value` is true if, and only if the specified type is a
-/// floating point type. Same as `std::is_floating_point` in C++11.
-template<class T> struct IsFloatingPoint;
-
-
 /// Member `type` is the type resulting from integral or
 /// floating-point promotion of a value of type `T`.
 ///
@@ -89,36 +84,7 @@ template<int bits> struct LeastUnsigned;
 template<int bits> struct FastestUnsigned;
 
 
-
-
-
 // Implementation
-
-} // namespace util
-
-namespace _impl {
-
-#ifndef REALM_HAVE_CXX11_TYPE_TRAITS
-
-template<class T> struct is_float { static const bool value = false; };
-template<> struct is_float<float>       { static const bool value = true; };
-template<> struct is_float<double>      { static const bool value = true; };
-template<> struct is_float<long double> { static const bool value = true; };
-
-#endif // !REALM_HAVE_CXX11_TYPE_TRAITS
-
-} // namespace _impl
-
-
-namespace util {
-
-template<class T> struct IsFloatingPoint {
-#ifdef REALM_HAVE_CXX11_TYPE_TRAITS
-    static const bool value = std::is_floating_point<T>::value;
-#else
-    static const bool value = _impl::is_float<typename std::remove_cv<T>::type>::value;
-#endif
-};
 
 
 #ifdef REALM_HAVE_CXX11_DECLTYPE

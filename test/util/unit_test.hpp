@@ -560,7 +560,7 @@ template<class T> void to_string(const T& value, std::string& str)
 {
     // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
     std::ostringstream out;
-    SetPrecision<T, util::IsFloatingPoint<T>::value>::exec(out);
+    SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
     out << value;
     str = out.str();
 }
