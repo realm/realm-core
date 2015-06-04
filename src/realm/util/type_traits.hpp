@@ -37,14 +37,6 @@
 namespace realm {
 namespace util {
 
-template<class T, class F, bool b> struct EitherType;
-template<class T, class F> struct EitherType<T, F, true> {
-    typedef T type;
-};
-template<class T, class F> struct EitherType<T, F, false> {
-    typedef F type;
-};
-
 template<class T> struct IsConst          { static const bool value = false; };
 template<class T> struct IsConst<const T> { static const bool value = true;  };
 
@@ -65,7 +57,7 @@ template<class From, class To> struct CopyConst {
 private:
     typedef typename RemoveConst<To>::type type_1;
 public:
-    typedef typename CondType<IsConst<From>::value, const type_1, type_1>::type type;
+    typedef typename std::conditional<IsConst<From>::value, const type_1, type_1>::type type;
 };
 
 template<class T> struct RemovePointer                    { typedef T type; };
@@ -196,7 +188,7 @@ private:
     static const bool cond =
         int(INT_MIN) <= int(CHAR_MIN) && unsigned(CHAR_MAX) <= unsigned(INT_MAX);
 public:
-    typedef CondType<cond, int, unsigned>::type type;
+    typedef std::conditional<cond, int, unsigned>::type type;
 };
 template<> struct Promote<signed char> {
     typedef int type;
@@ -205,7 +197,7 @@ template<> struct Promote<unsigned char> {
 private:
     static const bool cond = unsigned(UCHAR_MAX) <= unsigned(INT_MAX);
 public:
-    typedef CondType<cond, int, unsigned>::type type;
+    typedef std::conditional<cond, int, unsigned>::type type;
 };
 template<> struct Promote<wchar_t> {
 private:
@@ -223,12 +215,12 @@ private:
         (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= unsigned(UINT_MAX));
     static const bool cond_5 =
         (int(INT_MIN) <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= unsigned(INT_MAX));
-    typedef CondType<cond_0, unsigned long long, void>::type type_0;
-    typedef CondType<cond_1, long long,        type_0>::type type_1;
-    typedef CondType<cond_2, unsigned long,    type_1>::type type_2;
-    typedef CondType<cond_3, long,             type_2>::type type_3;
-    typedef CondType<cond_4, unsigned,         type_3>::type type_4;
-    typedef CondType<cond_5, int,              type_4>::type type_5;
+    typedef std::conditional<cond_0, unsigned long long, void>::type type_0;
+    typedef std::conditional<cond_1, long long,        type_0>::type type_1;
+    typedef std::conditional<cond_2, unsigned long,    type_1>::type type_2;
+    typedef std::conditional<cond_3, long,             type_2>::type type_3;
+    typedef std::conditional<cond_4, unsigned,         type_3>::type type_4;
+    typedef std::conditional<cond_5, int,              type_4>::type type_5;
     REALM_STATIC_ASSERT(!(std::is_same<type_5, void>::value), "Failed to promote `wchar_t`");
 public:
     typedef type_5 type;
@@ -240,7 +232,7 @@ template<> struct Promote<unsigned short> {
 private:
     static const bool cond = unsigned(USHRT_MAX) <= unsigned(INT_MAX);
 public:
-    typedef CondType<cond, int, unsigned>::type type;
+    typedef std::conditional<cond, int, unsigned>::type type;
 };
 template<> struct Promote<int> { typedef int type; };
 template<> struct Promote<unsigned> { typedef unsigned type; };
@@ -265,24 +257,24 @@ private:
     typedef typename Promote<B>::type B2;
 
     typedef unsigned long long ullong;
-    typedef typename CondType<ullong(UINT_MAX) <= ullong(LONG_MAX), long, unsigned long>::type type_l_u;
-    typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, type_l_u, long>::type type_l;
+    typedef typename std::conditional<ullong(UINT_MAX) <= ullong(LONG_MAX), long, unsigned long>::type type_l_u;
+    typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, type_l_u, long>::type type_l;
 
-    typedef typename CondType<ullong(UINT_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_u;
-    typedef typename CondType<ullong(ULONG_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_ul;
-    typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, type_ll_u, long long>::type type_ll_1;
-    typedef typename CondType<EitherTypeIs<unsigned long, A2, B2>::value, type_ll_ul, type_ll_1>::type type_ll;
+    typedef typename std::conditional<ullong(UINT_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_u;
+    typedef typename std::conditional<ullong(ULONG_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_ul;
+    typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, type_ll_u, long long>::type type_ll_1;
+    typedef typename std::conditional<EitherTypeIs<unsigned long, A2, B2>::value, type_ll_ul, type_ll_1>::type type_ll;
 
-    typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, unsigned, int>::type type_1;
-    typedef typename CondType<EitherTypeIs<long, A2, B2>::value, type_l, type_1>::type type_2;
-    typedef typename CondType<EitherTypeIs<unsigned long, A2, B2>::value, unsigned long, type_2>::type type_3;
-    typedef typename CondType<EitherTypeIs<long long, A2, B2>::value, type_ll, type_3>::type type_4;
-    typedef typename CondType<EitherTypeIs<unsigned long long, A2, B2>::value, unsigned long long, type_4>::type type_5;
-    typedef typename CondType<EitherTypeIs<float, A, B>::value, float, type_5>::type type_6;
-    typedef typename CondType<EitherTypeIs<double, A, B>::value, double, type_6>::type type_7;
+    typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, unsigned, int>::type type_1;
+    typedef typename std::conditional<EitherTypeIs<long, A2, B2>::value, type_l, type_1>::type type_2;
+    typedef typename std::conditional<EitherTypeIs<unsigned long, A2, B2>::value, unsigned long, type_2>::type type_3;
+    typedef typename std::conditional<EitherTypeIs<long long, A2, B2>::value, type_ll, type_3>::type type_4;
+    typedef typename std::conditional<EitherTypeIs<unsigned long long, A2, B2>::value, unsigned long long, type_4>::type type_5;
+    typedef typename std::conditional<EitherTypeIs<float, A, B>::value, float, type_5>::type type_6;
+    typedef typename std::conditional<EitherTypeIs<double, A, B>::value, double, type_6>::type type_7;
 
 public:
-    typedef typename CondType<EitherTypeIs<long double, A, B>::value, long double, type_7>::type type;
+    typedef typename std::conditional<EitherTypeIs<long double, A, B>::value, long double, type_7>::type type;
 };
 #endif // !REALM_HAVE_CXX11_DECLTYPE
 
@@ -296,7 +288,7 @@ private:
     REALM_STATIC_ASSERT(lim_a::is_integer && lim_b::is_integer,
                           "Both types must be integers");
 public:
-    typedef typename CondType<(lim_a::digits >= lim_b::digits), A, B>::type type;
+    typedef typename std::conditional<(lim_a::digits >= lim_b::digits), A, B>::type type;
 };
 
 
