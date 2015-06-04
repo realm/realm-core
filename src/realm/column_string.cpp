@@ -1010,12 +1010,74 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
 void AdaptiveStringColumn::find_all_fulltext(Column& result, StringData value) const
 {
     REALM_ASSERT(m_search_index && m_fulltext_index);
+    REALM_ASSERT(result.is_empty());
     
     // Convert search string to lowercase
-    std::string word = case_map(value, false); // convert to lowercase
-    StringData w(word);
+    std::set<std::string> words = tokenize(value);
     
-    m_search_index->find_all(result, w, true); // Throws
+    for (const std::string& w: words) {
+        size_t ref = not_found;
+        FindRes res1 = m_search_index->find_all(StringData(w), ref, true);
+        if (res1 == FindRes_not_found) {
+            result.clear();
+            return;
+        }
+        else if (res1 == FindRes_column) {
+            const Column matches(get_alloc(), ref_type(ref));
+            
+            if (result.is_empty()) {
+                size_t count = matches.size();
+                for (size_t i = 0; i < count; ++i) {
+                    result.add(matches.get(i));
+                }
+            }
+            else {
+                size_t rc = result.size();
+                size_t mc = matches.size();
+                
+                size_t r = 0;
+                size_t m = 0;
+                
+                // only keep intersection
+                while (r < rc && m < mc) {
+                    if (result.get(r) < matches.get(m)) {
+                        result.erase(r); // remove if match is not in new set
+                        --rc;
+                    }
+                    else if (result.get(r) > matches.get(m)) {
+                        ++m; // ignore new matches
+                    }
+                    else {
+                        ++r; ++m;
+                    }
+                }
+                while (r < rc) {
+                    result.erase(r);
+                    ++r;
+                }
+            }
+            
+            if (result.is_empty())
+                return;
+        }
+        else if (res1 == FindRes_single) {
+            // merge in single res
+            if (result.is_empty()) {
+                result.add(ref);
+            }
+            else {
+                size_t pos = result.lower_bound_int(ref);
+                if (pos != not_found && static_cast<int64_t>(ref) == result.get(pos)) {
+                    result.clear();
+                    result.add(ref);
+                }
+                else {
+                    result.clear();
+                    return;
+                }
+            }
+        }
+    }
 }
 
 

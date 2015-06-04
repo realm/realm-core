@@ -1140,14 +1140,40 @@ TEST(StringIndex_FullText)
     col.move_last_over(1);
     
     result.clear();
-    col.find_all_fulltext(result, "ælbler");
+    col.find_all_fulltext(result, "æbler");
     CHECK_EQUAL(0, result.size());
     
     result.clear();
     col.find_all_fulltext(result, "texas");
     CHECK_EQUAL(1, result.size());
     CHECK_EQUAL(1, result.get(0));
+    
+    col.clear();
+    
+    col.add("An object database (also object-oriented database management system) is a database management system in which information is represented in the form of objects as used in object-oriented programming. Object databases are different from relational databases which are table-oriented. Object-relational databases are a hybrid of both approaches.");
+    col.add("Object database management systems grew out of research during the early to mid-1970s into having intrinsic database management support for graph-structured objects. The term 'object-oriented database system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION (Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC compiled the best of those papers in a book published by The MIT Press.");
+    col.add("Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase (Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter the market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer Associates), Matisse (Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress Software, acquired from eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name changed from Ontologic), O2[6] (O2 Technology, merged with several companies, acquired by Informix, which was in turn acquired by IBM), POET (now FastObjects from Versant which acquired Poet Software), Versant Object Database (Versant Corporation), VOSS (Logic Arts) and JADE (Jade Software Corporation). Some of these products remain on the market and have been joined by new open source and commercial products such as InterSystems Caché.");
+    col.add("As the usage of web-based technology increases with the implementation of Intranets and extranets, companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been specifically designed to store data as objects gives an advantage to those companies that are geared towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]");
+    col.add("Object database management systems added the concept of persistence to object programming languages. The early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase (LISP), Vbase (COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
 
+
+    // search with multiple terms
+    result.clear();
+    col.find_all_fulltext(result, "object gemstone");
+    CHECK_EQUAL(2, result.size());
+    CHECK_EQUAL(2, result.get(0));
+    CHECK_EQUAL(4, result.get(1));
+    
+    // search for combination that is not present
+    result.clear();
+    col.find_all_fulltext(result, "object data");
+    CHECK_EQUAL(0, result.size());
+    
+    // many terms
+    result.clear();
+    col.find_all_fulltext(result, "object database management brown");
+    CHECK_EQUAL(1, result.size());
+    CHECK_EQUAL(1, result.get(0));
 
     
     result.destroy();
