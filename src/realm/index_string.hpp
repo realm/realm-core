@@ -84,28 +84,28 @@ public:
     template <class T> void set(size_t row_ndx, T new_value);
     template <class T> void erase(size_t row_ndx, bool is_last);
 
-    template <class T> size_t find_first(T value) const
+    template <class T> size_t find_first(T value, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringFindFirst(to_str(value), m_target_column);
+        return m_array->IndexStringFindFirst(to_str(value), m_target_column, isFullText);
     }
 
-    template <class T> void find_all(Column& result, T value) const
+    template <class T> void find_all(Column& result, T value, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, to_str(value), m_target_column);
+        return m_array->IndexStringFindAll(result, to_str(value), m_target_column, isFullText);
     }
 
-    template <class T> FindRes find_all(T value, ref_type& ref) const
+    template <class T> FindRes find_all(T value, ref_type& ref, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column);
+        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column, isFullText);
     }
 
-    template <class T> size_t count(T value) const
+    template <class T> size_t count(T value, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringCount(to_str(value), m_target_column);
+        return m_array->IndexStringCount(to_str(value), m_target_column, isFullText);
     }
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
@@ -139,6 +139,17 @@ public:
 
     static key_type create_key(StringData) REALM_NOEXCEPT;
     static key_type create_key(StringData, size_t) REALM_NOEXCEPT;
+    
+protected:
+    friend class AdaptiveStringColumn;
+    
+    // Erase without getting string from parent column (useful when string stored
+    // does not directly match string in parent, like with full-text indexing)
+    void erase_string(size_t row_ndx, StringData value);
+    
+    /// Add small signed \a diff to all elements that are greater than, or equal
+    /// to \a min_row_ndx.
+    void adjust_row_indexes(size_t min_row_ndx, int diff);
 
 private:
     std::unique_ptr<Array> m_array;
@@ -154,10 +165,6 @@ private:
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void InsertRowList(size_t ref, size_t offset, StringData value);
     key_type GetLastKey() const;
-
-    /// Add small signed \a diff to all elements that are greater than, or equal
-    /// to \a min_row_ndx.
-    void adjust_row_indexes(size_t min_row_ndx, int diff);
 
     void validate_value(StringData data) const;
     void validate_value(int64_t value) const REALM_NOEXCEPT;
@@ -339,25 +346,31 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 {
     char buffer[sizeof(T)];
     StringData value = get(row_ndx, buffer);
+    
+    erase_string(row_ndx, value);
+    
+    // If it is last item in column, we don't have to update refs
+    if (!is_last)
+        adjust_row_indexes(row_ndx, -1);
+}
 
+inline
+void StringIndex::erase_string(size_t row_ndx, StringData value)
+{
     DoDelete(row_ndx, value, 0);
-
+    
     // Collapse top nodes with single item
     while (m_array->is_inner_bptree_node()) {
         REALM_ASSERT(m_array->size() > 1); // node cannot be empty
         if (m_array->size() > 2)
             break;
-
+        
         ref_type ref = m_array->get_as_ref(1);
         m_array->set(1, 1); // avoid destruction of the extracted ref
         m_array->destroy_deep();
         m_array->init_from_ref(ref);
         m_array->update_parent();
     }
-
-    // If it is last item in column, we don't have to update refs
-    if (!is_last)
-        adjust_row_indexes(row_ndx, -1);
 }
 
 inline

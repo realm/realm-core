@@ -456,10 +456,10 @@ public:
     void ensure_minimum_width(int64_t value);
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(StringData value, ColumnBase* column) const;
-    void   IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const;
-    size_t IndexStringCount(StringData value, ColumnBase* column) const;
-    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, ColumnBase* column) const;
+    size_t IndexStringFindFirst(StringData value, ColumnBase* column, bool isFullText) const;
+    void   IndexStringFindAll(Column& result, StringData value, ColumnBase* column, bool isFullText) const;
+    size_t IndexStringCount(StringData value, ColumnBase* column, bool isFullText) const;
+    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, ColumnBase* column, bool isFullText) const;
 
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().
@@ -931,7 +931,7 @@ protected:
 
     template <IndexMethod method, class T>
     std::size_t index_string(StringData value, Column& result, ref_type& result_ref,
-                             ColumnBase* column) const;
+                             ColumnBase* column, bool isFullText) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
 

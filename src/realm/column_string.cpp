@@ -9,6 +9,8 @@
 #endif
 
 #include <memory>
+#include <set>
+#include <string>
 
 #include <realm/query_conditions.hpp>
 #include <realm/column_string.hpp>
@@ -55,7 +57,7 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 
 
 AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref, bool nullable):
-    m_nullable(nullable)
+    m_fulltext_index(false), m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -210,6 +212,77 @@ StringIndex* AdaptiveStringColumn::create_search_index()
     return m_search_index.get();
 }
 
+std::set<std::string> tokenize(const StringData text)
+{
+    std::set<std::string> words;
+    std::string word;
+    
+    const char*  str = text.data();
+    const size_t len = text.size();
+    size_t start = 0;
+    
+    for (size_t i = 0; i < len; ++i) {
+        char c = str[i];
+        
+        // Words are alnum + unicode chars above 128 (special unicode whitespace
+        // chars are not used as word separators)
+        bool is_alnum = (c >= '0' && c <= '9') ||
+                        (c >= 'A' && c <= 'Z') ||
+                        (c >= 'a' && c <= 'z') ||
+                         c < 0; // sign bit is set = unicode above 128
+        
+        if (is_alnum)
+            continue;
+        
+        if (i > start) {
+            StringData w(str + start, i - start);
+            
+            // All words are converted to lowercase (not very unicode aware)
+            // This is also where we could do stemming.
+            std::string word = case_map(w, false);
+            
+            words.insert(word);
+        }
+        start = i+1;
+    }
+    if (start < len) {
+        StringData w(str + start, len - start);
+        std::string word = case_map(w, false); // convert to lowercase
+        words.insert(word);
+    }
+    
+    return words;
+}
+
+
+StringIndex* AdaptiveStringColumn::create_fulltext_index()
+{
+    REALM_ASSERT(!m_search_index);
+    
+    // Create search index (set to store entire strings)
+    std::unique_ptr<StringIndex> index;
+    bool store_complete_strings = true;
+    index.reset(new StringIndex(this, m_array->get_alloc(), false, store_complete_strings)); // Throws
+    m_search_index = std::move(index);
+    m_fulltext_index = true;
+    
+    // Populate the index
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+        StringData value = get(row_ndx);
+        
+        std::set<std::string> words = tokenize(value);
+        
+        for (const std::string& word: words) {
+            bool is_append = true;
+            StringData value(word.data(), word.size());
+            m_search_index->insert(row_ndx, value, 1, is_append); // Throws
+        }
+    }
+    
+    return m_search_index.get();
+}
+
 
 void AdaptiveStringColumn::destroy_search_index() REALM_NOEXCEPT
 {
@@ -355,7 +428,42 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        m_search_index->set(ndx, value); // Throws
+        if (m_fulltext_index) {
+            StringData old_value = get(ndx);
+            
+            std::set<std::string> old_words = tokenize(old_value);
+            std::set<std::string> new_words = tokenize(value);
+            
+            auto w1 = old_words.begin();
+            auto w2 = new_words.begin();
+            
+            // Do a diff, deleting words no longer present and
+            // inserting new words
+            while (w1 != old_words.end() && w2 != new_words.end()) {
+                if (*w1 < *w2) {
+                    m_search_index->erase_string(ndx, *w1);
+                    ++w1;
+                }
+                else if (*w2 < *w1) {
+                    m_search_index->insert(ndx, StringData(*w2), 1, true);
+                    ++w2;
+                }
+                else {
+                    ++w1; ++w2;
+                }
+            }
+            while (w1 != old_words.end()) {
+                m_search_index->erase_string(ndx, *w1);
+                ++w1;
+            }
+            while (w2 != new_words.end()) {
+                m_search_index->insert(ndx, StringData(*w2), 1, true);
+                ++w2;
+            }
+        }
+        else {
+            m_search_index->set(ndx, value); // Throws
+        }
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -494,7 +602,21 @@ void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        m_search_index->erase<StringData>(ndx, is_last);
+        if (m_fulltext_index) {
+            StringData value = get(ndx);
+            std::set<std::string> words = tokenize(value);
+            
+            for (const std::string& word: words) {
+                StringData value(word.data(), word.size());
+                m_search_index->erase_string(ndx, value); // Throws
+            }
+            
+            if (!is_last)
+                m_search_index->adjust_row_indexes(ndx, -1);
+        }
+        else {
+            m_search_index->erase<StringData>(ndx, is_last);
+        }
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -552,13 +674,33 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
 
     if (m_search_index) {
-        // remove the value to be overwritten from index
-        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
+        if (m_fulltext_index) {;
+            StringData deleted_string = get(row_ndx);
+            std::set<std::string> deleted_words = tokenize(deleted_string);
+            
+            // remove the value to be overwritten from index
+            for (const std::string& word: deleted_words) {
+                m_search_index->erase_string(row_ndx, StringData(word)); // Throws
+            }
+            
+            if (row_ndx != last_row_ndx) {
+                std::set<std::string> moved_words = tokenize(value);
+            
+                // update index to point to new location
+                for (const std::string& word: moved_words) {
+                    m_search_index->update_ref(StringData(word), last_row_ndx, row_ndx); // Throws
+                }
+            }
+        }
+        else {
+            // remove the value to be overwritten from index
+            bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
+            m_search_index->erase<StringData>(row_ndx, is_last); // Throws
 
-        // update index to point to new location
-        if (row_ndx != last_row_ndx)
-            m_search_index->update_ref(copy_of_value, last_row_ndx, row_ndx); // Throws
+            // update index to point to new location
+            if (row_ndx != last_row_ndx)
+                m_search_index->update_ref(copy_of_value, last_row_ndx, row_ndx); // Throws
+        }
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -708,7 +850,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_search_index && begin == 0 && end == npos)
+    if (m_search_index && begin == 0 && end == npos && !m_fulltext_index)
         return m_search_index->find_first(value); // Throws
 
     if (root_is_leaf()) {
@@ -790,7 +932,7 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_search_index && begin == 0 && end == npos) {
+    if (m_search_index && begin == 0 && end == npos && !m_fulltext_index) {
         m_search_index->find_all(result, value); // Throws
         return;
     }
@@ -863,6 +1005,17 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
         }
         ndx_in_tree = leaf_offset + end_in_leaf;
     }
+}
+
+void AdaptiveStringColumn::find_all_fulltext(Column& result, StringData value) const
+{
+    REALM_ASSERT(m_search_index && m_fulltext_index);
+    
+    // Convert search string to lowercase
+    std::string word = case_map(value, false); // convert to lowercase
+    StringData w(word);
+    
+    m_search_index->find_all(result, w, true); // Throws
 }
 
 
@@ -1006,7 +1159,23 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
     if (m_search_index) {
         bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        
+        if (m_fulltext_index) {
+            REALM_ASSERT(num_rows == 1); // only single row insertions are supported right now
+            
+            std::set<std::string> words = tokenize(value);
+            
+            bool is_append2 = is_append;
+            for (const std::string& word: words) {
+                StringData value(word.data(), word.size());
+                m_search_index->insert(row_ndx_2, value, 1, is_append2); // Throws
+                if (!is_append2) // only adjust rowrefs on first insert
+                    is_append2 = true;
+            }
+        }
+        else {
+            m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        }
     }
 }
 
@@ -1016,8 +1185,24 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     bptree_insert(row_ndx_2, value, num_rows); // Throws
 
-    if (m_search_index)
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    if (m_search_index) {
+        if (m_fulltext_index) {
+            REALM_ASSERT(num_rows == 1); // only single row insertions are supported right now
+            
+            std::set<std::string> words = tokenize(value);
+            
+            bool is_append2 = is_append;
+            for (const std::string& word: words) {
+                StringData value(word.data(), word.size());
+                m_search_index->insert(row_ndx, value, 1, is_append2); // Throws
+                if (!is_append2) // only adjust rowrefs on first insert
+                    is_append2 = true;
+            }
+        }
+        else {
+            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        }
+    }
 }
 
 

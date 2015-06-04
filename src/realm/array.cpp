@@ -2740,7 +2740,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, ref_type& result_ref, ColumnBase* column) const
+template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, ref_type& result_ref, ColumnBase* column, bool isFullText) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);
@@ -2795,18 +2795,27 @@ top:
         // Literal row index
         if (ref & 1) {
             size_t row_ref = size_t(uint64_t(ref) >> 1);
-
-            // for integer index, get_index_data fills out 'buffer' and makes str point at it
-            char buffer[8];
-            StringData str = column->get_index_data(row_ref, buffer);
-            if (str == value) {
+            
+            if (isFullText) {
                 result_ref = row_ref;
                 if (all)
                     result.add(row_ref);
-
-                return first ? row_ref : count ? 1 : FindRes_single;
+                
+                return first ? row_ref : (count ? 1 : FindRes_single);
             }
-            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+            else {
+                // for integer index, get_index_data fills out 'buffer' and makes str point at it
+                char buffer[8];
+                StringData str = column->get_index_data(row_ref, buffer);
+                if (str == value) {
+                    result_ref = row_ref;
+                    if (all)
+                        result.add(row_ref);
+
+                    return first ? row_ref : count ? 1 : FindRes_single;
+                }
+                return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+            }
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
@@ -2826,13 +2835,16 @@ top:
                 const char* sub_data = get_data_from_header(sub_header);
                 const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
 
-                // for integer index, get_index_data fills out 'buffer' and makes str point at it
-                char buffer[8];
-                StringData str = column->get_index_data(first_row_ref, buffer);
-                if (str.is_null() != value.is_null() || str != value) {
-                    if (count)
-                        return 0;
-                    return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+                
+                if (!isFullText) {
+                    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+                    char buffer[8];
+                    StringData str = column->get_index_data(first_row_ref, buffer);
+                    if (str.is_null() != value.is_null() || str != value) {
+                        if (count)
+                            return 0;
+                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+                    }
                 }
 
                 result_ref = to_ref(ref);
@@ -2858,11 +2870,13 @@ top:
                 if (count)
                     sub_count = sub.size();
 
-                // for integer index, get_index_data fills out 'buffer' and makes str point at it
-                char buffer[8];
-                StringData str = column->get_index_data(first_row_ref, buffer);
-                if (str != value)
-                    return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+                if (!isFullText) {
+                    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+                    char buffer[8];
+                    StringData str = column->get_index_data(first_row_ref, buffer);
+                    if (str != value)
+                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+                }
 
                 result_ref = to_ref(ref);
                 if (all) {
@@ -2894,34 +2908,34 @@ top:
     }
 }
 
-size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column) const
+size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column, bool isFullText) const
 {
     size_t dummy;
     Column dummycol;
-    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
+    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column, isFullText);
 }
 
 
-void Array::IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const
+void Array::IndexStringFindAll(Column& result, StringData value, ColumnBase* column, bool isFullText) const
 {
     size_t dummy;
 
-    index_string<index_FindAll, StringData>(value, result, dummy, column);
+    index_string<index_FindAll, StringData>(value, result, dummy, column, isFullText);
 }
 
 
-FindRes Array::IndexStringFindAllNoCopy(StringData value, ref_type& res_ref, ColumnBase* column) const
+FindRes Array::IndexStringFindAllNoCopy(StringData value, ref_type& res_ref, ColumnBase* column, bool isFullText) const
 {
     Column dummy;
-    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, isFullText));
 }
 
 
-size_t Array::IndexStringCount(StringData value, ColumnBase* column) const
+size_t Array::IndexStringCount(StringData value, ColumnBase* column, bool isFullText) const
 {
     Column dummy;
     size_t dummysizet;
-    return index_string<index_Count, StringData>(value, dummy, dummysizet, column);
+    return index_string<index_Count, StringData>(value, dummy, dummysizet, column, isFullText);
 }
 
 
