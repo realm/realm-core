@@ -6109,6 +6109,16 @@ TEST(Query_IntegerNonNull)
     CHECK_EQUAL(0, t.get_source_ndx(0));
     CHECK_EQUAL(1, t.get_source_ndx(1));
     CHECK_EQUAL(2, t.get_source_ndx(2));
+
+    // Should any non-null value compare greater than null?
+    t = table.where().greater(0, null{}).find_all();
+    CHECK_EQUAL(3, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.get_source_ndx(2));
+
+    t = table.where().greater(null{}, 0).find_all();
+    CHECK_EQUAL(0, t.size());
 }
 
 // Test nullable integer columns with queries using query_expression.hpp
@@ -6137,6 +6147,16 @@ TEST(Query_IntegerNull_ExpressionSyntax)
     // a query will use query_expression.hpp.
     match = (untyped.column<Int>(0) + untyped.column<Int>(1) == 77 + 88).find();
     CHECK_EQUAL(match, 1);
+
+    // Should any non-null value compare greater than null?
+    match = (untyped.column<Int>(0) + untyped.column<Int>(1) > null{}).find();
+    CHECK_EQUAL(match, 2);
+
+    TableView tv = (untyped.column<Int>(0) + untyped.column<Int>(1) != null{}).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    match = (untyped.column<Int>(0) + untyped.column<Int>(1) < null{}).find();
+    CHECK_EQUAL(match, not_found);
 }
 
 #endif
