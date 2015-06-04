@@ -24,10 +24,7 @@
 #include <climits>
 #include <cwchar>
 #include <limits>
-
-#ifdef REALM_HAVE_CXX11_TYPE_TRAITS
-#  include <type_traits>
-#endif
+#include <type_traits>
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
