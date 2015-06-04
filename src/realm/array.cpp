@@ -2610,13 +2610,13 @@ void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t be
     return;
 }
 
-bool Array::find(int cond, Action action, int64_t value, bool null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
+bool Array::find(int cond, Action action, null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
-    if (null) {
-        // search for a value that we are sure does not exist:
-        value = m_ubound + 1;
+    if (cond == cond_Equal) {
+        if (action == act_ReturnFirst) {
+            
+        }
     }
-    return find(cond, action, value, start, end, baseindex, state);
 }
 
 
