@@ -81,7 +81,7 @@ namespace {
 template<class T_1, class T_2>
 void test_two_args(TestResults& test_results, const std::set<super_int>& values)
 {
-//    if (!(SameType<T_1, bool>::value && SameType<T_2, char>::value))
+//    if (!(std::is_same<T_1, bool>::value && std::is_same<T_2, char>::value))
 //        return;
 
 //    std::cerr << get_type_name<T_1>() << ", " << get_type_name<T_2>() << "\n";

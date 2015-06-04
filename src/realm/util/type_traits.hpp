@@ -229,7 +229,7 @@ private:
     typedef CondType<cond_3, long,             type_2>::type type_3;
     typedef CondType<cond_4, unsigned,         type_3>::type type_4;
     typedef CondType<cond_5, int,              type_4>::type type_5;
-    REALM_STATIC_ASSERT(!(SameType<type_5, void>::value), "Failed to promote `wchar_t`");
+    REALM_STATIC_ASSERT(!(std::is_same<type_5, void>::value), "Failed to promote `wchar_t`");
 public:
     typedef type_5 type;
 };
@@ -322,7 +322,7 @@ private:
     };
 public:
     typedef typename FindType<types, dummy<bits>::template pred>::type type;
-    REALM_STATIC_ASSERT(!(SameType<type, void>::value), "No unsigned type is that wide");
+    REALM_STATIC_ASSERT(!(std::is_same<type, void>::value), "No unsigned type is that wide");
 };
 
 
