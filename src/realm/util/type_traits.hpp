@@ -44,12 +44,6 @@ public:
     typedef typename std::conditional<std::is_const<From>::value, const type_1, type_1>::type type;
 };
 
-template<class T> struct RemovePointer                    { typedef T type; };
-template<class T> struct RemovePointer<T*>                { typedef T type; };
-template<class T> struct RemovePointer<T* const>          { typedef T type; };
-template<class T> struct RemovePointer<T* volatile>       { typedef T type; };
-template<class T> struct RemovePointer<T* const volatile> { typedef T type; };
-
 
 /// Member `value` is true if, and only if the specified type is an
 /// integral type. Same as `std::is_integral` in C++11, however,
