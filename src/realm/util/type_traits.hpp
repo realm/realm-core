@@ -37,19 +37,9 @@
 namespace realm {
 namespace util {
 
-template<class T> struct RemoveConst          { typedef T type; };
-template<class T> struct RemoveConst<const T> { typedef T type; };
-
-template<class T> struct RemoveVolatile             { typedef T type; };
-template<class T> struct RemoveVolatile<volatile T> { typedef T type; };
-
-template<class T> struct RemoveCV {
-    typedef typename RemoveVolatile<typename RemoveConst<T>::type>::type type;
-};
-
 template<class From, class To> struct CopyConst {
 private:
-    typedef typename RemoveConst<To>::type type_1;
+    typedef typename std::remove_const<To>::type type_1;
 public:
     typedef typename std::conditional<std::is_const<From>::value, const type_1, type_1>::type type;
 };
@@ -155,7 +145,7 @@ template<class T> struct IsIntegral {
 #ifdef REALM_HAVE_CXX11_TYPE_TRAITS
     static const bool value = std::is_integral<T>::value;
 #else
-    static const bool value = _impl::is_int<typename RemoveCV<T>::type>::value;
+    static const bool value = _impl::is_int<typename std::remove_cv<T>::type>::value;
 #endif
 };
 
@@ -164,7 +154,7 @@ template<class T> struct IsFloatingPoint {
 #ifdef REALM_HAVE_CXX11_TYPE_TRAITS
     static const bool value = std::is_floating_point<T>::value;
 #else
-    static const bool value = _impl::is_float<typename RemoveCV<T>::type>::value;
+    static const bool value = _impl::is_float<typename std::remove_cv<T>::type>::value;
 #endif
 };
 
