@@ -45,13 +45,6 @@ public:
 };
 
 
-/// Member `value` is true if, and only if the specified type is an
-/// integral type. Same as `std::is_integral` in C++11, however,
-/// implementation-defined extended integer types are recognized only
-/// when REALM_HAVE_CXX11_TYPE_TRAITS is defined.
-template<class T> struct IsIntegral;
-
-
 /// Member `value` is true if, and only if the specified type is a
 /// floating point type. Same as `std::is_floating_point` in C++11.
 template<class T> struct IsFloatingPoint;
@@ -107,21 +100,6 @@ namespace _impl {
 
 #ifndef REALM_HAVE_CXX11_TYPE_TRAITS
 
-template<class T> struct is_int { static const bool value = false; };
-template<> struct is_int<bool>               { static const bool value = true; };
-template<> struct is_int<char>               { static const bool value = true; };
-template<> struct is_int<signed char>        { static const bool value = true; };
-template<> struct is_int<unsigned char>      { static const bool value = true; };
-template<> struct is_int<wchar_t>            { static const bool value = true; };
-template<> struct is_int<short>              { static const bool value = true; };
-template<> struct is_int<unsigned short>     { static const bool value = true; };
-template<> struct is_int<int>                { static const bool value = true; };
-template<> struct is_int<unsigned>           { static const bool value = true; };
-template<> struct is_int<long>               { static const bool value = true; };
-template<> struct is_int<unsigned long>      { static const bool value = true; };
-template<> struct is_int<long long>          { static const bool value = true; };
-template<> struct is_int<unsigned long long> { static const bool value = true; };
-
 template<class T> struct is_float { static const bool value = false; };
 template<> struct is_float<float>       { static const bool value = true; };
 template<> struct is_float<double>      { static const bool value = true; };
@@ -133,16 +111,6 @@ template<> struct is_float<long double> { static const bool value = true; };
 
 
 namespace util {
-
-
-template<class T> struct IsIntegral {
-#ifdef REALM_HAVE_CXX11_TYPE_TRAITS
-    static const bool value = std::is_integral<T>::value;
-#else
-    static const bool value = _impl::is_int<typename std::remove_cv<T>::type>::value;
-#endif
-};
-
 
 template<class T> struct IsFloatingPoint {
 #ifdef REALM_HAVE_CXX11_TYPE_TRAITS

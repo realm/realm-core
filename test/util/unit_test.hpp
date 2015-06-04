@@ -501,13 +501,13 @@ template<class A, class B> struct Compare<A, B, true> {
 
 template<class A, class B> inline bool equal(const A& a, const B& b)
 {
-    const bool both_are_integral = util::IsIntegral<A>::value && util::IsIntegral<B>::value;
+    const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
     return Compare<A, B, both_are_integral>::equal(a,b);
 }
 
 template<class A, class B> inline bool less(const A& a, const B& b)
 {
-    const bool both_are_integral = util::IsIntegral<A>::value && util::IsIntegral<B>::value;
+    const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
     return Compare<A, B, both_are_integral>::less(a,b);
 }
 
