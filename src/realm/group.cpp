@@ -149,14 +149,18 @@ void Group::create(bool add_free_versions)
 }
 
 
-void Group::init_from_ref(ref_type top_ref) REALM_NOEXCEPT
+void Group::init_from_ref(ref_type top_ref)
 {
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
-    REALM_ASSERT_3(top_size, >=, 3);
+    if (top_size < 3) {
+        throw InvalidDatabase();
+    }
 
     // Logical file size must not exceed actual file size
-    REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
+    if (size_t(m_top.get(2) / 2) > m_alloc.get_baseline()) {
+        throw InvalidDatabase();
+    }
 
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
@@ -168,12 +172,16 @@ void Group::init_from_ref(ref_type top_ref) REALM_NOEXCEPT
     // tracking, and files that are accessed via a stan-along Group do
     // not need version information for free-space tracking.
     if (top_size > 3) {
-        REALM_ASSERT_3(top_size, >=, 5);
+        if (top_size < 5) {
+            throw InvalidDatabase();
+        }
         m_free_positions.init_from_parent();
         m_free_lengths.init_from_parent();
 
         if (m_is_shared && top_size > 5) {
-            REALM_ASSERT_3(top_size, >= , 7);
+            if (top_size < 7) {
+                throw InvalidDatabase();
+            }
             m_free_versions.init_from_parent();
             // Note that the seventh slot is the database version
             // (a.k.a. transaction count,) which is not yet used for
