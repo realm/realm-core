@@ -910,7 +910,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
 
     if (end == size_t(-1))
         end = m_size;
-    REALM_ASSERT(start < m_size && end <= m_size && start < end);
+    REALM_ASSERT_11(start, <, m_size, &&, end, <=, m_size, &&, start, <, end);
 
     if (m_size == 0)
         return false;
@@ -1005,7 +1005,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
-    REALM_ASSERT(start < m_size && end <= m_size && start < end);
+    REALM_ASSERT_11(start, <, m_size, &&, end, <=, m_size, &&, start, <, end);
 
     if (w == 0)
         return 0;
@@ -1578,8 +1578,8 @@ void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) REALM
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size,
                      int_fast64_t value, Allocator& alloc)
 {
-    REALM_ASSERT(value == 0 || width_type == wtype_Bits);
-    REALM_ASSERT(size  == 0 || width_type != wtype_Ignore);
+    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
+    REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
@@ -3304,7 +3304,7 @@ private:
 bool Array::visit_bptree_leaves(size_t elem_ndx_offset, size_t elems_in_tree,
                                 VisitHandler& handler)
 {
-    REALM_ASSERT(elem_ndx_offset < elems_in_tree);
+    REALM_ASSERT_3(elem_ndx_offset, <, elems_in_tree);
     size_t root_offset = 0, root_size = elems_in_tree;
     VisitAdapter adapter(handler);
     size_t start_offset = elem_ndx_offset;
