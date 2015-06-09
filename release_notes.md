@@ -1,44 +1,5 @@
 # NEXT RELEASE
 
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
-
-----------------------------------------------
-
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Fixed LinkViews containing incorrect data after a write transaction
-  containing a table clear is rolled back.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
-
-### Internals:
-
-* Lorem ipsum.
-
 ----------------------------------------------
 
 # 0.90.0 Release notes
@@ -48,11 +9,56 @@
 * Merged lr_nulls into master (support for null in String column and bugfix in
 String index with 0 bytes). If you want to disable all this again, then #define
 REALM_NULL_STRINGS to 0 in features.h. Else API is as follows: Call add_column()
-with nullable = true. You can then use tightdb::null() in place of any
+with nullable = true. You can then use realm::null() in place of any
 StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
 is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.5 Release notes
+
+### Bugfixes:
+
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back or advanced over.
+
+----------------------------------------------
+
+# 0.89.4 Release notes
+
+### Enhancements:
+
+* Detaching (and thus destroying) row acessors and TableViews can now be done
+  safely from any thread.
+* Improved performance of Query::find_all() with assertions enabled.
+
+----------------------------------------------
+
+# 0.89.3 Release notes
+
+### Bugfixes:
+
+* Fixed LinkViews containing incorrect data after a write transaction
+  containing a table clear is rolled back.
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
+* SharedGroup::compact() will now throw a runtime_error if called in detached state.
+* Make the start index of `ListView::find()` overrideable for finding multiple
+  occurances of a given row in a LinkList.
+
+### Internals:
+
+* Can now be built with encryption enabled on Linux.
 
 ----------------------------------------------
 

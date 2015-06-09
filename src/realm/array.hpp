@@ -1789,8 +1789,8 @@ inline std::size_t Array::get_byte_size() const REALM_NOEXCEPT
 
     num_bytes += header_size;
 
-    REALM_ASSERT(m_alloc.is_read_only(m_ref) ||
-                   num_bytes <= get_capacity_from_header(header));
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||,
+                   num_bytes, <=, get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1860,7 +1860,7 @@ inline MemRef Array::clone_deep(Allocator& target_alloc) const
 
 inline void Array::move_assign(Array& a) REALM_NOEXCEPT
 {
-    REALM_ASSERT(&get_alloc() == &a.get_alloc());
+    REALM_ASSERT_3(&get_alloc(), ==, &a.get_alloc());
     // FIXME: Be carefull with the old parent info here. Should it be
     // copied?
 

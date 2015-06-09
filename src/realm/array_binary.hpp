@@ -173,6 +173,7 @@ inline bool ArrayBinary::legacy_array_type() const REALM_NOEXCEPT
         return true;                // Old database file
     else
         REALM_ASSERT(false);        // Should never happen
+    return false;
 }
 
 inline std::size_t ArrayBinary::size() const REALM_NOEXCEPT

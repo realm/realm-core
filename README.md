@@ -28,18 +28,21 @@ each of our major platforms:
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
     sudo apt-get install libproc-dev
+    sudo apt-get install libssl-dev
 
 ### Linux Mint 15, 16, Ubuntu 13.04, 13.10
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
     sudo apt-get install libprocps0-dev
+    sudo apt-get install libssl-dev
 
 ### Linux Mint 17, 17.1, Ubuntu 14.04
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
     sudo apt-get install libprocps3-dev
+    sudo apt-get install libssl-dev
 
 ### Fedora 17, 18, 19, 20, Amazon Linux 2012.09
 

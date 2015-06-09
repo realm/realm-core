@@ -6003,7 +6003,7 @@ TEST(Query_Nulls_Fuzzy)
 TEST(Query_BinaryNull)
 {
     Table table;
-    table.add_column(type_Binary, "first");
+    table.add_column(type_Binary, "first", true);
     table.add_empty_row(3);
     table.set_binary(0, 0, BinaryData());
     table.set_binary(0, 1, BinaryData("", 0)); // NOTE: Specify size = 0, else size turns into 1!

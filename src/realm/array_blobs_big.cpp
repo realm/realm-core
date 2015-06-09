@@ -13,7 +13,7 @@ using namespace realm;
 
 void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
     if (value.is_null()) {
         Array::add(0); // Throws
@@ -30,7 +30,7 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, size());
-    REALM_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
     ArrayBlob blob(m_alloc);
     ref_type ref = get_as_ref(ndx);
@@ -65,7 +65,7 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <=, size());
-    REALM_ASSERT(value.size() == 0 || value.data());
+    REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
     if (value.is_null()) {
         Array::insert(ndx, 0); // Throws
@@ -103,7 +103,7 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
 {
     if (end == npos)
         end = m_size;
-    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    REALM_ASSERT_11(begin, <=, m_size, &&, end, <=, m_size, &&, begin, <=, end);
 
     // When strings are stored as blobs, they are always zero-terminated
     // but the value we get as input might not be.
