@@ -427,7 +427,7 @@ public:
     void move_assign(TColumn<T, Nullable>&);
     bool IsIntColumn() const REALM_NOEXCEPT override;
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     /// Provides access to the leaf that contains the element at the
