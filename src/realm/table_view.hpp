@@ -773,7 +773,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) REALM_NOEXCEPT:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(move(tv.m_table)),
-    m_distinct_column_source(tv.m_distinct_column_source)
+    m_distinct_column_source(tv.m_distinct_column_source),
+    m_num_detached_refs(tv.m_num_detached_refs)
 {
 #ifdef REALM_ENABLE_REPLICATION
     // if we are created from a table view which is outdated, take care to use the outdated
@@ -809,6 +810,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) REALM_NOEXCEP
 
     m_row_indexes.move_assign(tv.m_row_indexes);
     m_query = tv.m_query;
+    m_num_detached_refs = tv.m_num_detached_refs;
 #ifdef REALM_ENABLE_REPLICATION
     m_last_seen_version = tv.m_last_seen_version;
     m_auto_sort = tv.m_auto_sort;
