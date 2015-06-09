@@ -233,8 +233,9 @@ public:
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
+            typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
             std::size_t ndx_in_leaf;
-            m_leaf_ptr = &m_column->get_leaf(index, ndx_in_leaf, *m_array_ptr);
+            m_column->get_leaf(index, ndx_in_leaf, leaf);
             m_leaf_start = index - ndx_in_leaf;
             const size_t leaf_size = m_leaf_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -287,8 +288,8 @@ class ParentNode {
     typedef ParentNode ThisType;
 public:
 
-    ParentNode(): m_table(0) 
-    { 
+    ParentNode(): m_table(0)
+    {
     }
 
     void gather_children(std::vector<ParentNode*>& v)
@@ -357,10 +358,10 @@ public:
         TSourceColumn av = static_cast<TSourceColumn>(0);
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
-            REALM_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
+            REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
         }
-        REALM_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
+        REALM_ASSERT_DEBUG(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
         bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
         return cont;
     }
@@ -567,7 +568,7 @@ public:
         m_child2 = mapping.find(m_child2)->second;
     }
 
-    SubtableNode(const SubtableNode& from) 
+    SubtableNode(const SubtableNode& from)
         : ParentNode(from)
     {
         m_child2 = from.m_child2;
@@ -659,7 +660,8 @@ public:
     void get_leaf(const Column& col, std::size_t ndx)
     {
         std::size_t ndx_in_leaf;
-        m_leaf_ptr = &col.get_leaf(ndx, ndx_in_leaf, *m_array_ptr);
+        Column::LeafInfo leaf_info{&m_leaf_ptr, m_array_ptr.get()};
+        col.get_leaf(ndx, ndx_in_leaf, leaf_info);
         m_leaf_start = ndx - ndx_in_leaf;
         m_leaf_end = m_leaf_start + m_leaf_ptr->size();
     }
@@ -940,7 +942,7 @@ public:
         m_child = 0;
 
         // FIXME: Store this in std::string instead.
-        char* data = new char[v.size()];
+        char* data = v.is_null() ? nullptr : new char[v.size()];
         memcpy(data, v.data(), v.size());
         m_value = BinaryData(data, v.size());
     }
@@ -1044,7 +1046,7 @@ public:
         m_leaf.reset(nullptr);
     }
 
-    StringNodeBase(const StringNodeBase& from) 
+    StringNodeBase(const StringNodeBase& from)
         : ParentNode(from)
     {
         char* data = from.m_value.data() ? new char[from.m_value.size()] : nullptr;
@@ -1210,8 +1212,6 @@ public:
         m_dD = 10.0;
         StringNodeBase::init(table);
 
-        m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
-
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
             m_key_ndx = static_cast<const ColumnStringEnum*>(m_condition_column)->GetKeyNdx(m_value);
@@ -1268,9 +1268,8 @@ public:
 
         }
         else if (m_column_type != col_type_String) {
-            m_cse.m_column = static_cast<const ColumnStringEnum*>(m_condition_column);
-            m_cse.m_leaf_end = 0;
-            m_cse.m_leaf_start = 0;
+            REALM_ASSERT_DEBUG(dynamic_cast<const ColumnStringEnum*>(m_condition_column));
+            m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
         }
 
         if (m_child)
@@ -1422,6 +1421,9 @@ public:
 
         std::vector<ParentNode*> v;
 
+        m_start.clear();
+        m_start.resize(m_cond.size(), 0);
+
         m_last.clear();
         m_last.resize(m_cond.size(), 0);
 
@@ -1448,20 +1450,28 @@ public:
         size_t index = not_found;
 
         for (size_t c = 0; c < m_cond.size(); ++c) {
-            if (m_last[c] >= end)
+            // out of order search; have to discard cached results
+            if (start < m_start[c]) {
+                m_last[c] = 0;
+                m_was_match[c] = false;
+            }
+            // already searched this range and didn't match
+            else if (m_last[c] >= end)
                 continue;
-            else if (m_was_match[c] && m_last[c] >= start) {
+            // already search this range and *did* match
+           else if (m_was_match[c] && m_last[c] >= start) {
                 if (index > m_last[c])
                     index = m_last[c];
+               continue;
             }
-            else {
-                size_t fmax = m_last[c] > start ? m_last[c] : start;
-                size_t f = m_cond[c]->find_first(fmax, end);
-                m_was_match[c] = f != not_found;
-                m_last[c] = f == not_found ? end : f;
-                if (f != not_found && index > m_last[c])
-                    index = m_last[c];
-            }
+
+            m_start[c] = start;
+            size_t fmax = std::max(m_last[c], start);
+            size_t f = m_cond[c]->find_first(fmax, end);
+            m_was_match[c] = f != not_found;
+            m_last[c] = f == not_found ? end : f;
+            if (f != not_found && index > m_last[c])
+                index = m_last[c];
         }
 
         return index;
@@ -1502,6 +1512,10 @@ public:
 
     std::vector<ParentNode*> m_cond;
 private:
+    // start index of the last find for each cond
+    std::vector<size_t> m_start;
+    // last looked at index of the lasft find for each cond
+    // is a matching index if m_was_match is true
     std::vector<size_t> m_last;
     std::vector<bool> m_was_match;
 };
@@ -1570,7 +1584,7 @@ public:
         m_cond = mapping.find(m_cond)->second;
     }
 
-    NotNode(const NotNode& from) 
+    NotNode(const NotNode& from)
         : ParentNode(from)
     {
         // here we are just copying the pointers - they'll be remapped by "translate_pointers"
@@ -1623,7 +1637,9 @@ public:
         m_dD = 100.0;
         m_table = &table;
 
-        const ColType* c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx1));
+        const ColumnBase* cb = &get_column_base(table, m_condition_column_idx1);
+        REALM_ASSERT_DEBUG(dynamic_cast<const ColType*>(cb));
+        const ColType* c = static_cast<const ColType*>(cb);
         m_getter1.init(c);
 
         c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx2));
@@ -1747,7 +1763,7 @@ public:
         return new ExpressionNode(*this);
     }
 
-    ExpressionNode(ExpressionNode& from) 
+    ExpressionNode(ExpressionNode& from)
         : ParentNode(from)
     {
         m_compare = from.m_compare;

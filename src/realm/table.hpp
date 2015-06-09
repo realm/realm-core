@@ -26,6 +26,7 @@
 #include <typeinfo>
 
 #include <realm/util/features.h>
+#include <realm/util/thread.hpp>
 #include <realm/util/tuple.hpp>
 #include <memory>
 #include <realm/column_fwd.hpp>
@@ -155,7 +156,7 @@ public:
     /// string.
     StringData get_name() const REALM_NOEXCEPT;
 
-    // Whether or not elements can be null. 
+    // Whether or not elements can be null.
     bool is_nullable(size_t col_ndx) const;
 
     //@{
@@ -195,7 +196,7 @@ public:
     void insert_column(std::size_t column_ndx, DataType type, StringData name, bool nullable = false,
                        DescriptorRef* subdesc = 0);
 
-    // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error 
+    // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error
     // prone (optional arguments and implicit bool to null-ptr conversion)
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc)
     {
@@ -701,7 +702,7 @@ public:
 
     Table& link(size_t link_column);
 
-    // Optimizing. enforce == true will enforce enumeration of all string columns; 
+    // Optimizing. enforce == true will enforce enumeration of all string columns;
     // enforce == false will auto-evaluate if they should be enumerated or not
     void optimize(bool enforce = false);
 
@@ -868,7 +869,10 @@ private:
     mutable views m_views;
 
     // Points to first bound row accessor, or is null if there are none.
-    mutable RowBase* m_row_accessors;
+    mutable RowBase* m_row_accessors = nullptr;
+
+    // Mutex which must be locked any time the row accessor chain or m_views is used
+    mutable util::Mutex m_accessor_mutex;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
@@ -1039,6 +1043,7 @@ private:
 
     void register_row_accessor(RowBase*) const REALM_NOEXCEPT;
     void unregister_row_accessor(RowBase*) const REALM_NOEXCEPT;
+    void do_unregister_row_accessor(RowBase*) const REALM_NOEXCEPT;
 
     class UnbindGuard;
 
@@ -1047,10 +1052,6 @@ private:
     /// If this table is a group-level table, the parent group is returned,
     /// otherwise null is returned.
     Group* get_parent_group() const REALM_NOEXCEPT;
-
-    const Array* get_column_root(std::size_t col_ndx) const REALM_NOEXCEPT;
-    std::pair<const Array*, const Array*> get_string_column_roots(std::size_t col_ndx) const
-        REALM_NOEXCEPT;
 
     const ColumnBase& get_column_base(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnBase& get_column_base(std::size_t column_ndx);
@@ -1573,7 +1574,6 @@ inline Table::Table(Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
-    m_row_accessors = 0;
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = 0;
@@ -1588,7 +1588,6 @@ inline Table::Table(const Table& t, Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
-    m_row_accessors = 0;
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = 0;
@@ -1603,7 +1602,6 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
 {
     m_ref_count = 0; // Lifetime managed by reference counting
     m_descriptor = 0;
-    m_row_accessors = 0;
 }
 
 inline Allocator& Table::get_alloc() const

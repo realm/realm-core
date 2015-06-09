@@ -4,6 +4,7 @@
 #include <realm/column.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/handover_defs.hpp>
+#include <realm/index_string.hpp>
 
 using namespace realm;
 

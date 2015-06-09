@@ -1,4 +1,25 @@
-librealm (0.90.0~@CODENAME@-1) UNRELEASED; urgency=low
+librealm (0.89.5~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Fri, 29 May 2015 15:36:54 +0200
+
+
+librealm (0.89.4~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Fri, 22 May 2015 12:42:01 +0200
+
+
+librealm (0.89.3~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Tue, 12 May 2015 16:59:21 +0200
+
+
+librealm (0.89.2~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
 

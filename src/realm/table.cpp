@@ -275,6 +275,11 @@ template<> struct ColumnTypeTraits3<DateTime> {
     const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
 };
+template<> struct ColumnTypeTraits3<BinaryData> {
+    const static ColumnType ct_id = col_type_Binary;
+    const static ColumnType ct_id_real = col_type_Binary;
+    typedef ColumnBinary column_type;
+};
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -896,6 +901,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 
 void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     row->m_prev = 0;
     row->m_next = m_row_accessors;
     if (m_row_accessors)
@@ -905,6 +911,13 @@ void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 
 void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
+{
+    LockGuard lock(m_accessor_mutex);
+    do_unregister_row_accessor(row);
+}
+
+
+void Table::do_unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
     if (row->m_prev) {
         row->m_prev->m_next = row->m_next;
@@ -919,6 +932,7 @@ void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 void Table::discard_row_accessors() REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
     m_row_accessors = 0;
@@ -1104,6 +1118,7 @@ void Table::detach() REALM_NOEXCEPT
 
 void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
     typedef views::iterator iter;
@@ -1121,6 +1136,7 @@ void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 void Table::move_registered_view(const TableViewBase* old_addr,
                                  const TableViewBase* new_addr) REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     typedef views::iterator iter;
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i) {
@@ -1137,6 +1153,7 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 
 void Table::discard_views() REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     typedef views::const_iterator iter;
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i)
@@ -1190,7 +1207,8 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
     bool nullable = is_nullable(col_ndx);
 
     REALM_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
-                                  col_type != col_type_StringEnum)));
+                                  col_type != col_type_StringEnum &&
+                                  col_type != col_type_Binary)));
 
     switch (col_type) {
         case col_type_Int:
@@ -1208,7 +1226,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = new AdaptiveStringColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Binary:
-            col = new ColumnBinary(alloc, ref); // Throws
+            col = new ColumnBinary(alloc, ref, nullable); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
@@ -1358,7 +1376,7 @@ void Table::upgrade_file_format()
             else {
                 // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
                 // so this is fine for now.
-                REALM_ASSERT(false); 
+                REALM_ASSERT(false);
             }
 
         }
@@ -1863,23 +1881,8 @@ ref_type Table::clone_columns(Allocator& alloc) const
     for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ref_type new_col_ref;
         const ColumnBase* col = &get_column_base(col_ndx);
-        if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
-            ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
-            bool nullable = is_nullable(col_ndx);
-            AdaptiveStringColumn new_col(alloc, ref, nullable); // Throws
-            // FIXME: Should be optimized with something like
-            // new_col.add(seq_tree_accessor.begin(),
-            // seq_tree_accessor.end())
-            size_t n = enum_col->size();
-            for (size_t i = 0; i < n; ++i)
-                new_col.add(enum_col->get(i)); // Throws
-            new_col_ref = new_col.get_ref();
-        }
-        else {
-            const Array& root = *col->get_root_array();
-            MemRef mem = root.clone_deep(alloc); // Throws
-            new_col_ref = mem.m_ref;
-        }
+        MemRef mem = col->clone_deep(alloc);
+        new_col_ref = mem.m_ref;
         new_columns.add(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();
@@ -2526,7 +2529,7 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if(!is_nullable(col_ndx) && value.is_null())
+    if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
 
     bump_version();
@@ -2582,6 +2585,8 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
         throw LogicError(LogicError::binary_too_big);
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
     bump_version();
 
     ColumnBinary& column = get_column_binary(col_ndx);
@@ -3235,10 +3240,9 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
     return column.find_first(value);
 }
 
-size_t Table::find_first_binary(size_t, BinaryData) const
+size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    // FIXME: Implement this!
-    throw std::runtime_error("Not implemented");
+    return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
 }
 
 
@@ -3374,7 +3378,7 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
 namespace {
 
 struct AggrState {
-    AggrState(const Table& table) : table(table), block(table.get_alloc()), added_row(false) {}
+    AggrState(const Table& table) : table(table), cache(table.get_alloc()), added_row(false) {}
 
     const Table& table;
     const StringIndex* dst_index;
@@ -3382,7 +3386,8 @@ struct AggrState {
 
     const ColumnStringEnum* enums;
     std::vector<size_t> keys;
-    ArrayInteger block;
+    const ArrayInteger* block = nullptr;
+    ArrayInteger cache;
     size_t offset;
     size_t block_end;
 
@@ -3408,14 +3413,15 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
         std::size_t ndx_in_leaf;
-        state.enums->Column::get_leaf(i, ndx_in_leaf, state.block);
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        state.enums->Column::get_leaf(i, ndx_in_leaf, leaf);
         state.offset = i - ndx_in_leaf;
-        state.block_end = state.offset + state.block.size();
+        state.block_end = state.offset + state.block->size();
     }
 
     // Since we know the exact number of distinct keys,
     // we can use that to avoid index lookups
-    int64_t key = state.block.get(i - state.offset);
+    int64_t key = state.block->get(i - state.offset);
     size_t ndx = state.keys[key];
 
     // Stored position is offset by one, so zero can indicate
@@ -3471,9 +3477,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.keys.assign(key_count, 0);
 
         std::size_t ndx_in_leaf;
-        enums.Column::get_leaf(0, ndx_in_leaf, state.block);
+        Column::LeafInfo leaf { &state.block, &state.cache };
+        enums.Column::get_leaf(0, ndx_in_leaf, leaf);
         state.offset = 0 - ndx_in_leaf;
-        state.block_end = state.offset + state.block.size();
+        state.block_end = state.offset + state.block->size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
     }
     else {
@@ -4417,7 +4424,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
-                break; 
+                break;
             case type_Binary:
                 out.width(widths[col+1]-6); // adjust for " bytes" text
                 out << get_binary(col, row_ndx).size() << " bytes";
@@ -4598,34 +4605,6 @@ bool Table::compare_rows(const Table& t) const
 }
 
 
-const Array* Table::get_column_root(size_t col_ndx) const REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    return m_cols[col_ndx]->get_root_array();
-}
-
-
-std::pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
-    REALM_NOEXCEPT
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-
-    const ColumnBase* col = m_cols[col_ndx];
-
-    const Array* root = col->get_root_array();
-    const Array* enum_root = 0;
-
-    if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
-        enum_root = c->get_keys().get_root_array();
-    }
-    else {
-        REALM_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));
-    }
-
-    return std::make_pair(root, enum_root);
-}
-
-
 StringData Table::Parent::get_child_name(size_t) const REALM_NOEXCEPT
 {
     return StringData("");
@@ -4730,6 +4709,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXC
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after insertion of new rows
+    LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next) {
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
@@ -4749,12 +4729,13 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after removal of a row
+    LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx > row_ndx) {
             --row->m_row_ndx;
@@ -4775,12 +4756,13 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
+    LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == to_row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx == from_row_ndx) {
             row->m_row_ndx = to_row_ndx;
@@ -4947,7 +4929,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 
         if (col) {
             // Refresh the column accessor
-            col->get_root_array()->set_ndx_in_parent(ndx_in_parent);
+            col->set_ndx_in_parent(ndx_in_parent);
             col->refresh_accessor_tree(col_ndx, m_spec); // Throws
         }
         else {
@@ -5055,6 +5037,7 @@ void Table::Verify() const
 
     // Verify row accessors
     {
+        LockGuard lock(m_accessor_mutex);
         for (RowBase* row = m_row_accessors; row; row = row->m_next) {
             // Check that it is attached to this table
             REALM_ASSERT_3(row->m_table.get(), ==, this);
@@ -5070,7 +5053,7 @@ void Table::Verify() const
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
             std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
-            REALM_ASSERT_3(ndx_in_parent, ==, column.get_root_array()->get_ndx_in_parent());
+            REALM_ASSERT_3(ndx_in_parent, ==, column.get_ndx_in_parent());
             column.Verify(*this, i);
             REALM_ASSERT_3(column.size(), ==, m_size);
         }

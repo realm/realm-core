@@ -35,16 +35,23 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <string.h>
 #include <atomic>
 
 #include <realm/util/errno.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
+#include <string.h> // for memset
 
 #ifdef __APPLE__
 #   include <mach/mach.h>
 #   include <mach/exc.h>
+#endif
+
+#ifdef REALM_ANDROID
+#include <linux/unistd.h>
+#include <sys/syscall.h>
 #endif
 
 using namespace realm;
@@ -364,6 +371,27 @@ void install_handler()
 
 #else // __APPLE__
 
+#if defined(REALM_ANDROID) && defined(__LP64__)
+// bionic's sigaction() is broken on arm64, so use the syscall directly
+int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sigaction* old_action) {
+    __kernel_sigaction kernel_new_action;
+    kernel_new_action.sa_flags = new_action->sa_flags;
+    kernel_new_action.sa_handler = new_action->sa_handler;
+    kernel_new_action.sa_mask = new_action->sa_mask;
+
+    __kernel_sigaction kernel_old_action;
+    int result = syscall(__NR_rt_sigaction, signal, &kernel_new_action,
+                         &kernel_old_action, sizeof(sigset_t));
+    old_action->sa_flags = kernel_old_action.sa_flags;
+    old_action->sa_handler = kernel_old_action.sa_handler;
+    old_action->sa_mask = kernel_old_action.sa_mask;
+
+    return result;
+}
+#else
+#define sigaction_wrapper sigaction
+#endif
+
 // The signal handlers which our handlers replaced, if any, for forwarding
 // signals for segfaults outside of our encrypted pages
 struct sigaction old_segv;
@@ -406,9 +434,9 @@ void install_handler()
         action.sa_sigaction = signal_handler;
         action.sa_flags = SA_SIGINFO;
 
-        if (sigaction(SIGSEGV, &action, &old_segv) != 0)
+        if (sigaction_wrapper(SIGSEGV, &action, &old_segv) != 0)
             REALM_TERMINATE("sigaction SEGV failed");
-        if (sigaction(SIGBUS, &action, &old_bus) != 0)
+        if (sigaction_wrapper(SIGBUS, &action, &old_bus) != 0)
             REALM_TERMINATE("sigaction SIGBUS");
     }
 }

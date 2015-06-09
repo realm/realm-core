@@ -85,6 +85,9 @@ struct ContainsIns {
         if (v2.is_null() && !v1.is_null())
             return false;
 
+        if (v1.size() == 0 && !v2.is_null())
+            return true;
+
         return search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
     }
 
@@ -93,6 +96,9 @@ struct ContainsIns {
     {
         if (v2.is_null() && !v1.is_null())
             return false;
+
+        if (v1.size() == 0 && !v2.is_null())
+            return true;
 
         std::string v1_upper = case_map(v1, true);
         std::string v1_lower = case_map(v1, false);

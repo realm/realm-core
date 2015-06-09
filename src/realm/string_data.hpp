@@ -301,6 +301,11 @@ inline StringData::operator unspecified_bool_type() const REALM_NOEXCEPT
 }
 #endif
 
+// Represents null in Query, find(), get(), set(), etc.
+struct null {
+    operator StringData() { return StringData(0, 0); }
+};
+
 } // namespace realm
 
 #endif // REALM_STRING_HPP

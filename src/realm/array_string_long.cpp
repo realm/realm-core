@@ -126,7 +126,8 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin,
     size_t n = size();
     if (end == npos)
         end = n;
-    REALM_ASSERT(begin <= n && end <= n && begin <= end);
+    REALM_ASSERT_7(begin, <= , n, &&, end, <= , n);
+    REALM_ASSERT_3(begin, <=, end);
 
     for (size_t i = begin; i < end; ++i) {
         StringData value_2 = get(i);

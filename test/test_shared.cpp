@@ -220,7 +220,7 @@ TEST(Shared_CompactingOnTheFly)
     std::string tmp_path = std::string(path)+".tmp";
     Thread writer_thread;
     {
-        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         // Create table entries
         {
             WriteTransaction wt(sg);
@@ -258,7 +258,7 @@ TEST(Shared_CompactingOnTheFly)
     }
     writer_thread.join();
     {
-        SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        SharedGroup sg2(path, true, SharedGroup::durability_Full, crypt_key());
         {
             sg2.begin_write();
             sg2.commit();

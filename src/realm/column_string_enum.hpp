@@ -56,6 +56,7 @@ public:
     ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref, bool nullable);
     ~ColumnStringEnum() REALM_NOEXCEPT override;
     void destroy() REALM_NOEXCEPT override;
+    MemRef clone_deep(Allocator& alloc) const override;
 
     int compare_values(size_t row1, size_t row2) const override
     {
@@ -109,11 +110,8 @@ public:
     void adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT;
 
     // Search index
-    bool has_search_index() const REALM_NOEXCEPT override;
-    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
+    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT final;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
-    StringIndex* get_search_index() REALM_NOEXCEPT override;
-    const StringIndex* get_search_index() const REALM_NOEXCEPT override;
     StringIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) REALM_NOEXCEPT;
     void destroy_search_index() REALM_NOEXCEPT override;
@@ -145,7 +143,6 @@ public:
 private:
     // Member variables
     AdaptiveStringColumn m_keys;
-    std::unique_ptr<StringIndex> m_search_index;
     bool m_nullable;
 
     /// If you are appending and have the size of the column readily available,
@@ -267,21 +264,6 @@ inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const 
 inline void ColumnStringEnum::set_string(std::size_t row_ndx, StringData value)
 {
     set(row_ndx, value); // Throws
-}
-
-inline bool ColumnStringEnum::has_search_index() const REALM_NOEXCEPT
-{
-    return m_search_index != 0;
-}
-
-inline StringIndex* ColumnStringEnum::get_search_index() REALM_NOEXCEPT
-{
-    return m_search_index.get();
-}
-
-inline const StringIndex* ColumnStringEnum::get_search_index() const REALM_NOEXCEPT
-{
-    return m_search_index.get();
 }
 
 inline AdaptiveStringColumn& ColumnStringEnum::get_keys()
