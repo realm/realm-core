@@ -323,8 +323,9 @@ public:
 
     /// Compact the database file.
     /// - The method will throw if called inside a transaction.
+    /// - The method will throw if called in unattached state.
     /// - The method will return false if other SharedGroups are accessing the database
-    ///   in which case compaction is not done.
+    ///   in which case compaction is not done. This is not necessarily an error.
     /// It will return true following succesful compaction.
     /// While compaction is in progress, attempts by other
     /// threads or processes to open the database will wait.

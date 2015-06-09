@@ -32,8 +32,8 @@ using namespace realm;
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() || link_ndx == 0);
-    REALM_ASSERT(!m_row_indexes.is_attached() || link_ndx <= m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, ||, link_ndx, ==, 0);
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, false, ||, link_ndx, <=, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
@@ -61,7 +61,7 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 void LinkView::set(size_t link_ndx, size_t target_row_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -132,7 +132,7 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 void LinkView::remove(size_t link_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -293,7 +293,7 @@ TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
 void LinkView::remove_target_row(size_t link_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
     size_t target_row_ndx = m_row_indexes.get(link_ndx);
     Table& target_table = get_target_table();
