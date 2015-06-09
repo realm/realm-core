@@ -85,6 +85,10 @@ public:
     static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
                                Allocator&);
     void create(Type, bool context_flag = false);
+    
+    void init_from_ref(ref_type) REALM_NOEXCEPT;
+    void init_from_mem(MemRef) REALM_NOEXCEPT;
+    void init_from_parent() REALM_NOEXCEPT;
 
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT;
