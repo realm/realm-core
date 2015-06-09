@@ -468,6 +468,24 @@ public:
         }
         return false;
     }
+    
+    bool add_fulltext_index(size_t col_ndx)
+    {
+        if (REALM_LIKELY(m_table)) {
+            if (REALM_LIKELY(!m_table->has_shared_type())) {
+                if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
+#ifdef REALM_DEBUG
+                    if (m_log)
+                        *m_log << "table->add_fulltext_index("<<col_ndx<<")\n";
+#endif
+                    m_table->add_fulltext_index(col_ndx); // Throws
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 
     bool remove_search_index(size_t col_ndx)
     {

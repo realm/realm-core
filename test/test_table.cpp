@@ -1267,6 +1267,26 @@ TEST(Table_IndexString)
     CHECK_EQUAL(2, c1);
 }
 
+TEST(Table_IndexStringFindAll)
+{
+    TestTableEnum table;
+    
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); //duplicate
+    
+    table.column().second.add_search_index();
+    CHECK(table.column().second.has_search_index());
+    
+    TestTableEnum::View result = table.where().second.equal("jennifer").find_all();
+    CHECK_EQUAL(2, result.size());
+}
+
 
 TEST(Table_IndexStringTwice)
 {
@@ -5824,6 +5844,24 @@ TEST(Table_IndexStringDelete)
         out << i;
         t.set_string(0, i, out.str());
     }
+}
+
+TEST(Table_FullTextIndex)
+{
+    Table t;
+    t.add_column(type_String, "str");
+    t.add_fulltext_index(0);
+    
+    t.add_empty_row();
+    t.add_empty_row();
+    t.add_empty_row();
+    
+    t.set_string(0, 0, "This is a test, with  spaces!");
+    t.set_string(0, 1, "More testing, with normal spaces");
+    t.set_string(0, 2, "ål, ø og æbler");
+    
+    TableView res = t.find_all_fulltext(0, "spaces with");
+    CHECK_EQUAL(2, res.size());
 }
 
 #if REALM_NULL_STRINGS == 1

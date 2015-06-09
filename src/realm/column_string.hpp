@@ -99,6 +99,7 @@ public:
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
+    void set_search_index_is_fulltext(bool) REALM_NOEXCEPT override;
     StringIndex* get_search_index() REALM_NOEXCEPT override;
     const StringIndex* get_search_index() const REALM_NOEXCEPT override;
     std::unique_ptr<StringIndex> release_search_index() REALM_NOEXCEPT;
@@ -110,6 +111,7 @@ public:
     
     // Full-text index
     StringIndex* create_fulltext_index();
+    bool has_fulltext_index() const;
 
     // Optimizing data layout
     // Optimizing data layout. enforce == true will enforce enumeration;

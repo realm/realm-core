@@ -1412,6 +1412,53 @@ void Table::add_search_index(size_t col_ndx)
 #endif
 }
 
+void Table::add_fulltext_index(size_t col_ndx)
+{
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    
+    if (REALM_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
+    
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    
+    if (REALM_UNLIKELY(m_primary_key))
+        throw LogicError(LogicError::is_primary_key);
+    
+    if (REALM_UNLIKELY(has_search_index(col_ndx)))
+        throw LogicError(LogicError::illegal_combination);
+    
+    if (REALM_UNLIKELY(get_real_column_type(col_ndx) != col_type_String))
+        throw LogicError(LogicError::illegal_combination);
+    
+    // Create the index
+    AdaptiveStringColumn& col = get_column_string(col_ndx);
+    StringIndex* index = col.create_fulltext_index(); // Throws
+    if (!index) {
+        throw LogicError(LogicError::illegal_combination);
+    }
+    
+    // The index goes in the list of column refs immediate after the owning column
+    size_t index_pos = m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
+    index->set_parent(&m_columns, index_pos);
+    m_columns.insert(index_pos, index->get_ref()); // Throws
+    
+    // Mark the column as having an index
+    int attr = m_spec.get_column_attr(col_ndx);
+    attr |= col_attr_FullText;
+    m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+    
+    // Update column accessors for all columns after the one we just added an
+    // index for, as their position in `m_columns` has changed
+    refresh_column_accessors(col_ndx+1); // Throws
+    
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->add_fulltext_index(this, col_ndx); // Throws
+#endif
+}
+
 
 void Table::remove_search_index(size_t col_ndx)
 {
@@ -1441,7 +1488,7 @@ void Table::remove_search_index(size_t col_ndx)
 
     // Mark the column as no longer having an index
     int attr = m_spec.get_column_attr(col_ndx);
-    attr &= ~col_attr_Indexed;
+    attr &= ~(col_attr_Indexed | col_attr_FullText);
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
     // Update column accessors for all columns after the one we just removed the
@@ -3320,6 +3367,19 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
     throw std::runtime_error("Not implemented");
 }
 
+TableView Table::find_all_fulltext(size_t col_ndx, StringData terms)
+{
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT(get_real_column_type(col_ndx) == col_type_String);
+    REALM_ASSERT(get_column_string(col_ndx).has_fulltext_index());
+    
+    const AdaptiveStringColumn& col = get_column_string(col_ndx);
+    
+    TableView tv(*this);
+    col.find_all_fulltext(tv.m_row_indexes, terms);
+    return tv;
+}
+
 TableView Table::get_distinct_view(size_t col_ndx)
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
@@ -3871,7 +3931,7 @@ public:
             for (size_t i = 0; i != n; ++i) {
                 int attr = spec.get_column_attr(i);
                 // Remove any index specifying attributes
-                attr &= ~(col_attr_Indexed | col_attr_Unique | col_attr_PrimaryKey);
+                attr &= ~(col_attr_Indexed | col_attr_FullText | col_attr_Unique | col_attr_PrimaryKey);
                 spec.set_column_attr(i, ColumnAttr(attr)); // Throws
             }
             size_t pos = spec.m_top.write(out); // Throws
@@ -4940,11 +5000,12 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // If there is no search index accessor, but the column has been
         // equipped with a search index, create the accessor now.
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-        bool has_search_index = (attr & col_attr_Indexed)    != 0;
-        bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
+        bool has_search_index   = (attr & col_attr_Indexed)    != 0;
+        bool is_primary_key     = (attr & col_attr_PrimaryKey) != 0;
+        bool has_fulltext_index = (attr & col_attr_FullText) != 0;
 
         REALM_ASSERT(has_search_index || !is_primary_key);
-        if (has_search_index) {
+        if (has_search_index || has_fulltext_index) {
             bool allow_duplicate_values = !is_primary_key;
             if (col->has_search_index()) {
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
@@ -4954,11 +5015,12 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 col->set_search_index_ref(ref, &m_columns, ndx_in_parent+1,
                                           allow_duplicate_values); // Throws
             }
+            col->set_search_index_is_fulltext(has_fulltext_index);
         }
         else {
             col->destroy_search_index();
         }
-        ndx_in_parent += (has_search_index ? 2 : 1);
+        ndx_in_parent += ((has_search_index || has_fulltext_index) ? 2 : 1);
     }
 
     // Set table size

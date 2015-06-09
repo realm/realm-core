@@ -251,6 +251,7 @@ public:
     bool has_search_index(std::size_t column_ndx) const REALM_NOEXCEPT;
 //    void remove_search_index(size_t col_ndx);
     void add_search_index(std::size_t column_ndx);
+    void add_fulltext_index(std::size_t column_ndx);
     void remove_search_index(std::size_t column_ndx);
     bool has_primary_key() const REALM_NOEXCEPT;
     bool try_add_primary_key(std::size_t column_ndx);
@@ -596,6 +597,8 @@ public:
     ConstTableView find_all_string(std::size_t column_ndx, StringData value) const;
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
+    
+    TableView      find_all_fulltext(size_t col_ndx, StringData terms);
 
     /// The following column types are supported: String, Integer, DateTime, Bool
     TableView      get_distinct_view(std::size_t column_ndx);

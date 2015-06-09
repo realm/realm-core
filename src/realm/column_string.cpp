@@ -283,6 +283,11 @@ StringIndex* AdaptiveStringColumn::create_fulltext_index()
     return m_search_index.get();
 }
 
+bool AdaptiveStringColumn::has_fulltext_index() const
+{
+    return m_fulltext_index;
+}
+
 
 void AdaptiveStringColumn::destroy_search_index() REALM_NOEXCEPT
 {
@@ -307,7 +312,14 @@ void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* paren
 
 void AdaptiveStringColumn::set_search_index_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 {
+    REALM_ASSERT(m_search_index);
     m_search_index->set_allow_duplicate_values(allow);
+}
+
+void AdaptiveStringColumn::set_search_index_is_fulltext(bool is_fulltext) REALM_NOEXCEPT
+{
+    REALM_ASSERT(m_search_index);
+    m_fulltext_index = is_fulltext;
 }
 
 
