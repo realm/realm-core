@@ -87,12 +87,12 @@ public:
     void stop_logging() override;
     void reset_log_management(version_type last_version) override;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
-        REALM_NOEXCEPT;
-    virtual void set_last_version_synced(version_type last_seen_version_number) REALM_NOEXCEPT;
+        REALM_NOEXCEPT override;
+    virtual void set_last_version_synced(version_type last_seen_version_number) REALM_NOEXCEPT override;
     virtual version_type get_last_version_synced(version_type* newest_version_number)
-        REALM_NOEXCEPT;
+        REALM_NOEXCEPT override;
     virtual void get_commit_entries(version_type from_version, version_type to_version,
-                                    BinaryData* logs_buffer) REALM_NOEXCEPT;
+                                    BinaryData* logs_buffer) REALM_NOEXCEPT override;
 
 protected:
     // file and memory mappings are always multiples of this size
