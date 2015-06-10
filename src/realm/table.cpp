@@ -837,13 +837,13 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
     }
 
     ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-    ColumnAttr attr_2 = attr;
-    attr_2 = ColumnAttr(attr_2 & ~col_attr_StrongLinks);
+    ColumnAttr new_attr = attr;
+    new_attr = ColumnAttr(new_attr & ~col_attr_StrongLinks);
     if (!weak_links)
-        attr_2 = ColumnAttr(attr_2 | col_attr_StrongLinks);
-    if (attr_2 == attr)
+        new_attr = ColumnAttr(new_attr | col_attr_StrongLinks);
+    if (new_attr == attr)
         return;
-    m_spec.set_column_attr(col_ndx, attr);
+    m_spec.set_column_attr(col_ndx, new_attr);
 
     ColumnLinkBase& col = get_column_link_base(col_ndx);
     col.set_weak_links(weak_links);
