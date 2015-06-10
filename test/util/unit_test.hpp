@@ -168,6 +168,7 @@ namespace realm {
 namespace test_util {
 namespace unit_test {
 
+
 class Test;
 class TestResults;
 
@@ -175,7 +176,7 @@ class TestResults;
 struct TestDetails {
     long test_index;
     const char* suite_name;
-    const char* test_name;
+    std::string test_name;
     const char* file_name;
     long line_number;
 };
@@ -236,7 +237,7 @@ public:
 
     /// Called automatically when you use the `TEST` macro (or one of
     /// its friends).
-    void add(Test&, const char* suite, const char* name, const char* file, long line);
+    void add(Test&, const char* suite, const std::string& name, const char* file, long line);
 
 private:
     class ExecContext;
@@ -434,6 +435,11 @@ private:
 struct RegisterTest {
     RegisterTest(TestList& list, Test& test, const char* suite,
                  const char* name, const char* file, long line)
+    {
+        register_test(list, test, suite, name, file, line);
+    }
+    static void register_test(TestList& list, Test& test, const char* suite,
+                              const std::string& name, const char* file, long line)
     {
         list.add(test, suite, name, file, line);
     }
