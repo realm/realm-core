@@ -1,5 +1,11 @@
 # NEXT RELEASE
 
+### Enhancements
+
+* Checks in init_from_ref() which check for a well formed top array,
+  are changed from asserting into throwing exceptions (InvalidDatabase).
+
+
 ----------------------------------------------
 
 # 0.90.0 Release notes

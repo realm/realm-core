@@ -489,7 +489,7 @@ private:
 
     /// Attach this accessor instance to a preexisting underlying node
     /// structure.
-    void init_from_ref(ref_type top_ref) REALM_NOEXCEPT;
+    void init_from_ref(ref_type top_ref);
 
     typedef void (*DescSetter)(Table&);
     typedef bool (*DescMatcher)(const Spec&);
