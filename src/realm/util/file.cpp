@@ -501,6 +501,13 @@ void File::resize(SizeType size)
         return;
     throw runtime_error("ftruncate() failed");
 
+#ifdef __APPLE__
+    if (::fcntl(m_fd, F_FULLFSYNC) != 0) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("fcntl(F_FULLFSYNC) failed: ", err));
+    }
+#endif
+
 #endif
 }
 
