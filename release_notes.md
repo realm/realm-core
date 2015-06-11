@@ -1,3 +1,11 @@
+# 0.89.6 Release notes
+
+### Bugfixes:
+
+* Fixed durability issue in case of power / system failures on Apple platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to stable storage when the file is extended.
+
+----------------------------------------------
+
 # 0.89.5 Release notes
 
 ### Bugfixes:
