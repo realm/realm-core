@@ -3485,7 +3485,7 @@ TEST(Table_Pivot)
 
         Table result_avg;
         table.aggregate(0, 1, Table::aggr_avg, result_avg);
-        if (false) {
+        if ((false)) {
             std::ostringstream ss;
             result_avg.to_string(ss);
             std::cerr << "\nMax:\n" << ss.str();
