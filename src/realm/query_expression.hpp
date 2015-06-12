@@ -1071,7 +1071,7 @@ public:
     {
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table;
-        REALM_ASSERT(m_link_map.m_table->get_column_type(column) == type_String);
+        REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), ==, type_String);
     }
 
     Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), m_column(column)
@@ -1417,7 +1417,7 @@ public:
 
             if (util::SameType<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
                 Value<T> v;
-                REALM_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
+                REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
                 // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
                 sg->m_leaf_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
                 destination.import(v);

@@ -1185,6 +1185,8 @@ public:
         typedef _impl::TableFriend tf;
         if (unordered) {
             if (m_table) {
+                if (num_rows == 0)
+                    tf::mark_opposite_link_tables(*m_table);
                 while (num_rows--) {
                     tf::adj_acc_move_over(*m_table, row_ndx + num_rows, last_row_ndx - num_rows);
                 }
@@ -1661,14 +1663,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 class Group::TransactReverser  {
 public:
 
-    TransactReverser() :
-        m_encoder(m_buffer), current_instr_start(0),
-        m_pending_table_select(false), m_pending_descriptor_select(false)
-    {
-    }
-
-    // override only the instructions which need to be reversed. (NullHandler class provides
-    // default implementatins for the rest)
     bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
     {
         sync_table();
@@ -1862,7 +1856,9 @@ public:
 
     bool clear_table()
     {
-        return true; // No-op
+        m_encoder.insert_empty_rows(0, 0, 0, true);
+        append_instruction();
+        return true;
     }
 
     bool add_search_index(size_t)
@@ -1961,12 +1957,12 @@ public:
 
 private:
     _impl::TransactLogBufferStream m_buffer;
-    _impl::TransactLogEncoder m_encoder;
+    _impl::TransactLogEncoder m_encoder{m_buffer};
     struct Instr { size_t begin; size_t end; };
     std::vector<Instr> m_instructions;
-    size_t current_instr_start;
-    bool m_pending_table_select;
-    bool m_pending_descriptor_select;
+    size_t current_instr_start = 0;
+    bool m_pending_table_select = false;
+    bool m_pending_descriptor_select = false;
     Instr m_pending_ts_instr;
     Instr m_pending_ds_instr;
 

@@ -10,9 +10,9 @@
 using namespace realm;
 using namespace realm::test_util;
 
-TEST(ArrayInteger_Sum0)
+TEST_TYPES(ArrayInteger_Sum0, ArrayInteger, ArrayIntNull)
 {
-    ArrayInteger a(Allocator::get_default());
+    TEST_TYPE a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     for (int i = 0; i < 64 + 7; ++i) {
@@ -22,9 +22,9 @@ TEST(ArrayInteger_Sum0)
     a.destroy();
 }
 
-TEST(ArrayInteger_Sum1)
+TEST_TYPES(ArrayInteger_Sum1, ArrayInteger, ArrayIntNull)
 {
-    ArrayInteger a(Allocator::get_default());
+    TEST_TYPE a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     int64_t s1 = 0;
@@ -44,9 +44,9 @@ TEST(ArrayInteger_Sum1)
     a.destroy();
 }
 
-TEST(ArrayInteger_Sum2)
+TEST_TYPES(ArrayInteger_Sum2, ArrayInteger, ArrayIntNull)
 {
-    ArrayInteger a(Allocator::get_default());
+    TEST_TYPE a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     int64_t s1 = 0;
@@ -67,9 +67,9 @@ TEST(ArrayInteger_Sum2)
 }
 
 
-TEST(ArrayInteger_Sum4)
+TEST_TYPES(ArrayInteger_Sum4, ArrayInteger, ArrayIntNull)
 {
-    ArrayInteger a(Allocator::get_default());
+    TEST_TYPE a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     int64_t s1 = 0;
@@ -89,9 +89,9 @@ TEST(ArrayInteger_Sum4)
     a.destroy();
 }
 
-TEST(ArrayInteger_Sum16)
+TEST_TYPES(ArrayInteger_Sum16, ArrayInteger, ArrayIntNull)
 {
-    ArrayInteger a(Allocator::get_default());
+    TEST_TYPE a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     int64_t s1 = 0;

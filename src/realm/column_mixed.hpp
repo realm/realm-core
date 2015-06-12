@@ -73,7 +73,7 @@ public:
     double get_double(std::size_t ndx) const REALM_NOEXCEPT;
     StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
     BinaryData get_binary(std::size_t ndx) const REALM_NOEXCEPT;
-    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT;
+    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT override;
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.

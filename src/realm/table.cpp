@@ -838,13 +838,13 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
     }
 
     ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-    ColumnAttr attr_2 = attr;
-    attr_2 = ColumnAttr(attr_2 & ~col_attr_StrongLinks);
+    ColumnAttr new_attr = attr;
+    new_attr = ColumnAttr(new_attr & ~col_attr_StrongLinks);
     if (!weak_links)
-        attr_2 = ColumnAttr(attr_2 | col_attr_StrongLinks);
-    if (attr_2 == attr)
+        new_attr = ColumnAttr(new_attr | col_attr_StrongLinks);
+    if (new_attr == attr)
         return;
-    m_spec.set_column_attr(col_ndx, attr);
+    m_spec.set_column_attr(col_ndx, new_attr);
 
     ColumnLinkBase& col = get_column_link_base(col_ndx);
     col.set_weak_links(weak_links);
@@ -902,6 +902,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 
 void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     row->m_prev = 0;
     row->m_next = m_row_accessors;
     if (m_row_accessors)
@@ -911,6 +912,13 @@ void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 
 void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
+{
+    LockGuard lock(m_accessor_mutex);
+    do_unregister_row_accessor(row);
+}
+
+
+void Table::do_unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
     if (row->m_prev) {
         row->m_prev->m_next = row->m_next;
@@ -925,6 +933,7 @@ void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 void Table::discard_row_accessors() REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
     m_row_accessors = 0;
@@ -1111,6 +1120,7 @@ void Table::detach() REALM_NOEXCEPT
 
 void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
     typedef views::iterator iter;
@@ -1128,6 +1138,7 @@ void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 void Table::move_registered_view(const TableViewBase* old_addr,
                                  const TableViewBase* new_addr) REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     typedef views::iterator iter;
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i) {
@@ -1142,6 +1153,7 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 
 void Table::discard_views() REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     typedef views::const_iterator iter;
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i)
@@ -2553,7 +2565,7 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if(!is_nullable(col_ndx) && value.is_null())
+    if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
 
     bump_version();
@@ -2609,6 +2621,8 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
         throw LogicError(LogicError::binary_too_big);
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
     bump_version();
 
     ColumnBinary& column = get_column_binary(col_ndx);
@@ -4786,6 +4800,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXC
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after insertion of new rows
+    LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next) {
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
@@ -4800,12 +4815,13 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after removal of a row
+    LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx > row_ndx) {
             --row->m_row_ndx;
@@ -4821,12 +4837,13 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
+    LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == to_row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx == from_row_ndx) {
             row->m_row_ndx = to_row_ndx;
@@ -5096,6 +5113,7 @@ void Table::Verify() const
 
     // Verify row accessors
     {
+        LockGuard lock(m_accessor_mutex);
         for (RowBase* row = m_row_accessors; row; row = row->m_next) {
             // Check that it is attached to this table
             REALM_ASSERT_3(row->m_table.get(), ==, this);

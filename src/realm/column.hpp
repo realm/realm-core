@@ -347,7 +347,9 @@ protected:
 class ColumnBaseWithIndex : public ColumnBase {
 public:
     ~ColumnBaseWithIndex() REALM_NOEXCEPT override {}
+    void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT override;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
     void move_assign(ColumnBaseWithIndex& col) REALM_NOEXCEPT;
     void destroy() REALM_NOEXCEPT override;
 
@@ -446,7 +448,7 @@ public:
     void move_assign(TColumn<T, Nullable>&);
     bool IsIntColumn() const REALM_NOEXCEPT override;
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
     bool is_nullable() const REALM_NOEXCEPT override;
 
@@ -1037,6 +1039,7 @@ std::size_t TColumn<T,N>::get_ndx_in_parent() const REALM_NOEXCEPT
 template <class T, bool N>
 void TColumn<T,N>::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
 {
+    ColumnBaseWithIndex::set_ndx_in_parent(ndx_in_parent);
     m_tree.set_ndx_in_parent(ndx_in_parent);
 }
 
@@ -1348,9 +1351,10 @@ ref_type TColumn<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
 }
 
 template <class T, bool N>
-void TColumn<T,N>::refresh_accessor_tree(size_t, const Spec&)
+void TColumn<T,N>::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
     m_tree.init_from_parent();
+    ColumnBaseWithIndex::refresh_accessor_tree(new_col_ndx, spec);
 }
 
 #if defined(REALM_DEBUG)

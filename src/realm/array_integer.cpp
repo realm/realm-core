@@ -157,7 +157,7 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
         }
     }
     else {
-        if (value <= m_lbound || value >= m_ubound) {
+        if (value < m_lbound || value >= m_ubound) {
             size_t new_width = bit_width(value);
             int64_t new_upper_bound = Array::ubound_for_width(new_width);
 
