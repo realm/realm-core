@@ -926,6 +926,11 @@ ifneq ($(COMPILER_IS_GCC_LIKE),)
   CFLAGS_AUTODEP = -MMD -MP
 endif
 
+ifeq ($(COMPILER_IS),clang)
+  # While -Wunreachable-code is accepted by GCC, it is ignored and will be removed in the future.
+  CFLAGS_GENERAL += -Wunreachable-code
+endif
+
 # Linker
 X := $(EMPTY)
 LD_SPECIFIED = $(filter-out undefined default,$(origin LD))
