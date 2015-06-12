@@ -83,9 +83,9 @@ TEST(Optional_References)
 {
     int n = 0;
     Optional<int&> x { n };
-    fmap(x, [&](int& y) {
-        y = 123;
-    });
+    if (x) {
+        x.value() = 123;
+    }
     CHECK(x);
     CHECK_EQUAL(x.value(), 123);
     x = realm::none;
@@ -167,67 +167,13 @@ TEST(Optional_ReferenceBinding)
     ttt2 = iref;
 }
 
-TEST(Optional_VoidIsEquivalentToBool)
-{
-    auto a = some<void>();
-    CHECK_EQUAL(sizeof(a), sizeof(bool));
-    CHECK(a);
-    Optional<void> b = none;
-    CHECK_EQUAL(sizeof(b), sizeof(bool));
-    CHECK(!b);
-}
-
-TEST(Optional_fmap)
-{
-    Optional<int> a { 123 };
-    bool a_called = false;
-    auto ar = fmap(a, [&](int) {
-        a_called = true;
-    });
-    CHECK(a_called);
-    CHECK(ar);
-
-    Optional<int> b { 123 };
-    auto bs = fmap(b, [](int foo) {
-        std::stringstream ss;
-        ss << foo;
-        return ss.str();
-    });
-    CHECK(bs);
-    CHECK_EQUAL(*bs, "123");
-
-    Optional<int> c;
-    Optional<int> cx = fmap(c, [](int) { return 0; });
-    CHECK(!cx);
-}
-
-TEST(Optional_StreamingMap)
-{
-    Optional<int> a { 123 };
-
-    auto result = a
-        >> [](int b) { return b + 200; }
-        >> [](int c) {
-            std::ostringstream os;
-            os << c;
-            return os.str();
-        };
-    CHECK(result);
-    CHECK_EQUAL(result.value(), "323");
-
-    Optional<int> b { 500 };
-    Optional<int> result2 = b
-        >> [](int x) { return x > 300 ? some<int>(x + 300) : none; };
-    CHECK(result2);
-}
-
-TEST(Optional_Chaining)
-{
-    struct Foo {
-        int bar() { return 123; }
-    };
-    Optional<Foo> foo { Foo{} };
-    auto r = foo >> std::mem_fn(&Foo::bar);
-    CHECK(r);
-    CHECK_EQUAL(r.value(), 123);
-}
+// Disabled for compliance with std::optional
+// TEST(Optional_VoidIsEquivalentToBool)
+// {
+//     auto a = some<void>();
+//     CHECK_EQUAL(sizeof(a), sizeof(bool));
+//     CHECK(a);
+//     Optional<void> b = none;
+//     CHECK_EQUAL(sizeof(b), sizeof(bool));
+//     CHECK(!b);
+// }
