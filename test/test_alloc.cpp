@@ -108,18 +108,18 @@ TEST(Alloc_AttachFile)
         bool read_only     = false;
         bool no_create     = false;
         bool skip_validate = false;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false, false);
         CHECK(alloc.is_attached());
         CHECK(alloc.nonempty_attachment());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false, false);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
         read_only = true;
         no_create = true;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false, false);
         CHECK(alloc.is_attached());
     }
 }
@@ -142,22 +142,22 @@ TEST(Alloc_BadFile)
         bool no_create     = true;
         bool skip_validate = false;
         CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+                                      skip_validate, 0, false, false), InvalidDatabase);
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+                                      skip_validate, 0, false, false), InvalidDatabase);
         CHECK(!alloc.is_attached());
         read_only = false;
         no_create = false;
         CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+                                      skip_validate, 0, false, false), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        alloc.attach_file(path_2, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path_2, is_shared, read_only, no_create, skip_validate, 0, false, false);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+                                      skip_validate, 0, false, false), InvalidDatabase);
     }
 }
 
@@ -177,7 +177,7 @@ TEST(Alloc_AttachBuffer)
             bool read_only     = false;
             bool no_create     = false;
             bool skip_validate = false;
-            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false, false);
         }
         {
             File file(path);
@@ -204,7 +204,7 @@ TEST(Alloc_AttachBuffer)
         bool read_only     = false;
         bool no_create     = false;
         bool skip_validate = false;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false, false);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
@@ -237,7 +237,7 @@ TEST(Alloc_BadBuffer)
         bool read_only     = false;
         bool no_create     = false;
         bool skip_validate = false;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false, false);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());

@@ -13,6 +13,8 @@
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
+#include <sys/mman.h>
+
 using namespace realm;
 using namespace realm::util;
 
@@ -377,9 +379,11 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
 
 ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool read_only,
                                 bool no_create, bool skip_validate,
-                                const char* encryption_key, bool server_sync_mode)
+                                const char* encryption_key, bool server_sync_mode,
+                                bool session_initiator, std::size_t chunk_size)
 {
     REALM_ASSERT(!is_attached());
+    m_chunk_size = chunk_size;
 
     // When 'read_only' is true, this function will throw InvalidDatabase if the
     // file exists already but is empty. This can happen if another process is
@@ -433,6 +437,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         size = initial_size;
     }
 
+    // TODO: Make sure the filesize matches a page boundary...
+
+
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
@@ -477,6 +484,36 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
 
     // make sure that any call to begin_read cause any slab to be placed in free lists correctly
     m_free_space_state = free_space_Invalid;
+
+    if (m_file_on_streaming_form && read_only && is_shared)
+        goto invalid_database;
+
+    // make sure the database is not on streaming format. This has to be done at
+    // session initialization, even if it means writing the database during open.
+    if (session_initiator && m_file_on_streaming_form) {
+
+        Header* header = reinterpret_cast<Header*>(m_data);
+
+        // Don't compare file format version fields as they are allowed to differ. 
+        // Also don't compare reserved fields (todo, is it correct to ignore?)
+        REALM_ASSERT_3(header->m_flags, == , streaming_header.m_flags);
+        REALM_ASSERT_3(header->m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
+        REALM_ASSERT_3(header->m_mnemonic[1], == , streaming_header.m_mnemonic[1]);
+        REALM_ASSERT_3(header->m_mnemonic[2], == , streaming_header.m_mnemonic[2]);
+        REALM_ASSERT_3(header->m_mnemonic[3], == , streaming_header.m_mnemonic[3]);
+        REALM_ASSERT_3(header->m_top_ref[0], == , streaming_header.m_top_ref[0]);
+        REALM_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
+
+        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+m_baseline) - 1;
+        REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
+        ::mprotect(header, sizeof(Header), PROT_READ | PROT_WRITE);
+        header->m_top_ref[1] = footer->m_top_ref;
+        ::msync(header, sizeof(Header), MS_SYNC);
+        header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
+        m_file_on_streaming_form = false;
+        ::msync(header, sizeof(Header), MS_SYNC);
+        ::mprotect(header, sizeof(Header), PROT_READ);
+    }
 
     fcg.release(); // Do not close
     return top_ref;

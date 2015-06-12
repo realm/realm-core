@@ -67,8 +67,10 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
     bool server_sync_mode = false;
+    bool is_session_initiator = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
-                                           skip_validate, encryption_key, server_sync_mode); // Throws
+                                           skip_validate, encryption_key, server_sync_mode,
+                                           is_session_initiator); // Throws
 
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws

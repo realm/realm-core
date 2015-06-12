@@ -696,12 +696,12 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
                 server_sync_mode = repl->is_in_server_synchronization_mode();
 #endif
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
-                                                 no_create, skip_validate, key, server_sync_mode); // Throws
+                                                 no_create, skip_validate, key, 
+                                                 server_sync_mode, begin_new_session); // Throws
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
-                // make sure the database is not on streaming format. This has to be done at
-                // session initialization, even if it means writing the database during open.
+                /*
                 if (alloc.m_file_on_streaming_form) {
                     util::File::Map<char> db_map;
                     db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
@@ -709,6 +709,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
                     alloc.prepare_for_update(db_map.get_addr(), db_map);
                     db_map.sync();
                 }
+                */
 
                 // determine version
                 uint_fast64_t version;
@@ -884,8 +885,10 @@ bool SharedGroup::compact()
     bool read_only = false;
     bool is_shared = true;
     bool server_sync_mode = false;
+    bool is_session_initiator = true;
     ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create, 
-                                         skip_validate, m_key, server_sync_mode); // Throws
+                                         skip_validate, m_key, server_sync_mode,
+                                         is_session_initiator); // Throws
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match

@@ -102,11 +102,38 @@ public:
     /// that the database was created with the same setting. In case of conflict
     /// a runtime_error is thrown.
     ///
+    /// \param session_initiator if set, the caller is the session initiator and
+    /// guarantees exclusive access to the file. If attaching in read/write mode,
+    /// the file is modified: files on streaming form is changed to non-streaming
+    /// form, and if a non-zero chunk_size is set, the file size is aligned to the
+    /// nearest chunk boundary. 
+    ///
+    /// \param chunk_size if non-zero, any growth of the file will be done in
+    /// chunks which are mmapped separately. This may give a non-contiguous virtual
+    /// address space range for the file. This allows us to expand the file without
+    /// having to change any existing memory mapping - only adding new ones.
+    /// If a file is mapped with a non-zero chunksize, references to mapped memory
+    /// needs to be translated seperately for every chunk. This effectively limits
+    /// use, so that datastructures cannot cross a chunk boundary. The chunk_size
+    /// must be a power of 2 and at least equal to the page size, if not 0.
+    ///
+    /// If the file is opened for read/write with a non-zero chunk size, the
+    /// file must be extended to a chunk boundary. open() will do this for the session
+    /// initiator and validate it for all non-initiators.
+    ///
+    /// If the file is shared, all allocators *must* attach to the file using the
+    /// same chunk_size (specifically, they must all respect the chunk boundaries set by
+    /// the one that has the smallest chunk_size, so it's most likely smarter to
+    /// ensure that all just use the same setting).
+    ///
+    /// If the file is opened in read-only mode, chunk_size must be 0.
+    ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate, const char* encryption_key, bool server_sync_mode);
+                         bool skip_validate, const char* encryption_key, bool server_sync_mode, 
+                         bool session_initiator, std::size_t chunk_size = 0);
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -176,6 +203,7 @@ public:
     /// The specified address must be a writable memory mapping of the
     /// attached file, and the mapped region must be at least as big
     /// as what is returned by get_baseline().
+    /// TODO: Fix this for chunked memory mappings!!!
     void prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
     /// Reserve disk space now to avoid allocation errors at a later
@@ -229,7 +257,8 @@ public:
     /// will result in undefined behavior.
     ///
     /// \return True if, and only if the memory address of the first
-    /// mapped byte has changed.
+    /// mapped byte has changed. If chunked memory mapping is enabled,
+    /// addresses never change and remap() will always return false.
     bool remap(std::size_t file_size);
 
 #ifdef REALM_DEBUG
@@ -307,7 +336,14 @@ private:
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
     util::File m_file;
-    char* m_data;
+    // the initial mapping is determined by m_data and m_initial_mapping_size,
+    // we don't us a util::File::Map for that to stay compatible with the uses
+    // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
+    char* m_data = 0;
+    std::size_t m_initial_mapping_size = 0;
+    std::size_t m_num_additional_mappings = 0;
+    std::size_t m_chunk_size = 0;
+    util::File::Map<char>* m_additional_mappings = 0;
     AttachMode m_attach_mode;
 
     /// If a file or buffer is currently attached and validation was
@@ -366,7 +402,6 @@ private:
 
     friend class Group;
     friend class GroupWriter;
-    friend class SharedGroup;
 };
 
 
