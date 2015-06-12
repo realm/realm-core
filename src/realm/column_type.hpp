@@ -63,7 +63,10 @@ enum ColumnAttr {
     col_attr_StrongLinks = 8,
 
     /// Specifies that elements in the column can be null.
-    col_attr_Nullable = 16
+    col_attr_Nullable = 16,
+    
+    /// Specifies that elements in the column are full-text indexed
+    col_attr_FullText = 32
 };
 
 

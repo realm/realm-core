@@ -262,7 +262,7 @@ StringIndex* ColumnStringEnum::create_search_index()
     REALM_ASSERT(!m_search_index);
 
     std::unique_ptr<StringIndex> index;
-    index.reset(new StringIndex(this, get_alloc())); // Throws
+    index.reset(new StringIndex(this, get_alloc(), false, false)); // Throws
 
     // Populate the index
     size_t num_rows = size();

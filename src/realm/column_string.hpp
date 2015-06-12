@@ -75,6 +75,8 @@ public:
                            std::size_t end = npos) const;
     void find_all(Column& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
+    
+    void find_all_fulltext(Column& result, StringData value) const;
 
     int compare_values(std::size_t, std::size_t) const override;
 
@@ -97,6 +99,7 @@ public:
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
+    void set_search_index_is_fulltext(bool) REALM_NOEXCEPT override;
     StringIndex* get_search_index() REALM_NOEXCEPT override;
     const StringIndex* get_search_index() const REALM_NOEXCEPT override;
     std::unique_ptr<StringIndex> release_search_index() REALM_NOEXCEPT;
@@ -105,6 +108,10 @@ public:
     // Simply inserts all column values in the index in a loop
     void populate_search_index();
     void destroy_search_index() REALM_NOEXCEPT override;
+    
+    // Full-text index
+    StringIndex* create_fulltext_index();
+    bool has_fulltext_index() const;
 
     // Optimizing data layout
     // Optimizing data layout. enforce == true will enforce enumeration;
@@ -152,6 +159,7 @@ protected:
 
 private:
     std::unique_ptr<StringIndex> m_search_index;
+    bool m_fulltext_index;
     bool m_nullable;
 
     LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,

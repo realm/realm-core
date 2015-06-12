@@ -58,9 +58,9 @@ inline StringData to_str(const char* value)
 
 class StringIndex {
 public:
-    StringIndex(ColumnBase* target_column, Allocator&);
+    StringIndex(ColumnBase* target_column, Allocator&, bool allow_duplicate_values, bool store_complete_string);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, ColumnBase* target_column,
-                bool allow_duplicate_values, Allocator&);
+                bool allow_duplicate_values, bool store_complete_string, Allocator&);
     ~StringIndex() REALM_NOEXCEPT {}
     void set_target(ColumnBase* target_column) REALM_NOEXCEPT;
 
@@ -84,28 +84,28 @@ public:
     template <class T> void set(size_t row_ndx, T new_value);
     template <class T> void erase(size_t row_ndx, bool is_last);
 
-    template <class T> size_t find_first(T value) const
+    template <class T> size_t find_first(T value, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringFindFirst(to_str(value), m_target_column);
+        return m_array->IndexStringFindFirst(to_str(value), m_target_column, isFullText);
     }
 
-    template <class T> void find_all(Column& result, T value) const
+    template <class T> void find_all(Column& result, T value, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, to_str(value), m_target_column);
+        return m_array->IndexStringFindAll(result, to_str(value), m_target_column, isFullText);
     }
 
-    template <class T> FindRes find_all(T value, ref_type& ref) const
+    template <class T> FindRes find_all(T value, ref_type& ref, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column);
+        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column, isFullText);
     }
 
-    template <class T> size_t count(T value) const
+    template <class T> size_t count(T value, bool isFullText=false) const
     {
         // Use direct access method
-        return m_array->IndexStringCount(to_str(value), m_target_column);
+        return m_array->IndexStringCount(to_str(value), m_target_column, isFullText);
     }
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
@@ -120,10 +120,16 @@ public:
 
     /// By default, duplicate values are allowed.
     void set_allow_duplicate_values(bool) REALM_NOEXCEPT;
+    
+    // By default only common prefixes of strings are stored in index
+    // this allows you to force it to store the complete string
+    void set_store_complete_string(bool) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
+    void dump(const AdaptiveStringColumn& column) const;
     void Verify() const;
     void verify_entries(const AdaptiveStringColumn& column) const;
+    void verify_entry(size_t row_ndx, StringData value, size_t offset=0) const;
     void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const { to_dot(std::cerr); }
     void to_dot(std::ostream&, StringData title = StringData()) const;
@@ -133,11 +139,23 @@ public:
 
     static key_type create_key(StringData) REALM_NOEXCEPT;
     static key_type create_key(StringData, size_t) REALM_NOEXCEPT;
+    
+protected:
+    friend class AdaptiveStringColumn;
+    
+    // Erase without getting string from parent column (useful when string stored
+    // does not directly match string in parent, like with full-text indexing)
+    void erase_string(size_t row_ndx, StringData value);
+    
+    /// Add small signed \a diff to all elements that are greater than, or equal
+    /// to \a min_row_ndx.
+    void adjust_row_indexes(size_t min_row_ndx, int diff);
 
 private:
     std::unique_ptr<Array> m_array;
     ColumnBase* m_target_column;
     bool m_deny_duplicate_values;
+    bool m_store_complete_string;
 
     struct inner_node_tag {};
     StringIndex(inner_node_tag, Allocator&);
@@ -147,10 +165,6 @@ private:
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void InsertRowList(size_t ref, size_t offset, StringData value);
     key_type GetLastKey() const;
-
-    /// Add small signed \a diff to all elements that are greater than, or equal
-    /// to \a min_row_ndx.
-    void adjust_row_indexes(size_t min_row_ndx, int diff);
 
     void validate_value(StringData data) const;
     void validate_value(int64_t value) const REALM_NOEXCEPT;
@@ -190,19 +204,21 @@ private:
 
 // Implementation:
 
-inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
+inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc, bool allow_duplicate_values, bool store_complete_string):
     m_array(create_node(alloc, true)), // Throws
     m_target_column(target_column),
-    m_deny_duplicate_values(false)
+    m_deny_duplicate_values(allow_duplicate_values),
+    m_store_complete_string(store_complete_string)
 {
 }
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                 ColumnBase* target_column,
-                                bool deny_duplicate_values, Allocator& alloc):
+                                bool deny_duplicate_values, bool store_complete_string, Allocator& alloc):
     m_array(new Array(alloc)),
     m_target_column(target_column),
-    m_deny_duplicate_values(deny_duplicate_values)
+    m_deny_duplicate_values(deny_duplicate_values),
+    m_store_complete_string(store_complete_string)
 {
     REALM_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
     m_array->init_from_ref(ref);
@@ -219,6 +235,11 @@ inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
 inline void StringIndex::set_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 {
     m_deny_duplicate_values = !allow;
+}
+    
+inline void StringIndex::set_store_complete_string(bool store_complete) REALM_NOEXCEPT
+{
+    m_store_complete_string = store_complete;
 }
 
 // Byte order of the key is *reversed*, so that for the integer index, the least significant
@@ -325,25 +346,31 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 {
     char buffer[sizeof(T)];
     StringData value = get(row_ndx, buffer);
+    
+    erase_string(row_ndx, value);
+    
+    // If it is last item in column, we don't have to update refs
+    if (!is_last)
+        adjust_row_indexes(row_ndx, -1);
+}
 
+inline
+void StringIndex::erase_string(size_t row_ndx, StringData value)
+{
     DoDelete(row_ndx, value, 0);
-
+    
     // Collapse top nodes with single item
     while (m_array->is_inner_bptree_node()) {
         REALM_ASSERT(m_array->size() > 1); // node cannot be empty
         if (m_array->size() > 2)
             break;
-
+        
         ref_type ref = m_array->get_as_ref(1);
         m_array->set(1, 1); // avoid destruction of the extracted ref
         m_array->destroy_deep();
         m_array->init_from_ref(ref);
         m_array->update_parent();
     }
-
-    // If it is last item in column, we don't have to update refs
-    if (!is_last)
-        adjust_row_indexes(row_ndx, -1);
 }
 
 inline

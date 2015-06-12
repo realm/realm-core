@@ -125,6 +125,7 @@ public:
     virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                                       bool allow_duplicate_values);
     virtual void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT;
+    virtual void set_search_index_is_fulltext(bool) REALM_NOEXCEPT {}
 
     virtual Allocator& get_alloc() const REALM_NOEXCEPT = 0;
 
@@ -844,7 +845,7 @@ template <class T, bool N>
 StringIndex* TColumn<T, N>::create_search_index()
 {
     REALM_ASSERT(!has_search_index());
-    m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
+    m_search_index.reset(new StringIndex(this, get_alloc(), false, false)); // Throws
     populate_search_index();
     return m_search_index.get();
 }

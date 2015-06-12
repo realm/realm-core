@@ -1505,6 +1505,11 @@ public:
     {
         return true; // No-op
     }
+    
+    bool add_fulltext_index(size_t) REALM_NOEXCEPT
+    {
+        return true; // No-op
+    }
 
     bool remove_search_index(size_t) REALM_NOEXCEPT
     {
@@ -1852,6 +1857,11 @@ public:
     }
 
     bool add_search_index(size_t)
+    {
+        return true; // No-op
+    }
+    
+    bool add_fulltext_index(size_t)
     {
         return true; // No-op
     }

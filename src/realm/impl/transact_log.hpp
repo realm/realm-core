@@ -90,7 +90,8 @@ enum Instruction {
     instr_LinkListErase         = 47, // Remove an entry from a link list
     instr_LinkListClear         = 48, // Ramove all entries from a link list
     instr_LinkListSetAll        = 49, // Assign to link list entry
-    instr_InsertNullableColumn = 50   // Insert nullable column  
+    instr_InsertNullableColumn  = 50, // Insert nullable column
+    instr_AddFullTextIndex      = 51  // Add a full-text index to a column
 };
 
 
@@ -177,6 +178,7 @@ public:
     bool erase_column(std::size_t col_ndx);
     bool rename_column(std::size_t col_ndx, StringData new_name);
     bool add_search_index(std::size_t col_ndx);
+    bool add_fulltext_index(std::size_t col_ndx);
     bool remove_search_index(std::size_t col_ndx);
     bool add_primary_key(std::size_t col_ndx);
     bool remove_primary_key();
@@ -284,6 +286,7 @@ public:
     void erase_row(const Table*, std::size_t row_ndx, bool move_last_over);
     void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
+    void add_fulltext_index(const Table*, std::size_t col_ndx);
     void remove_search_index(const Table*, std::size_t col_ndx);
     void add_primary_key(const Table*, std::size_t col_ndx);
     void remove_primary_key(const Table*);
@@ -1173,6 +1176,18 @@ inline void TransactLogConvenientEncoder::add_search_index(const Table* t, std::
     m_encoder.add_search_index(col_ndx); // Throws
 }
 
+inline bool TransactLogEncoder::add_fulltext_index(std::size_t col_ndx)
+{
+    simple_cmd(instr_AddFullTextIndex, util::tuple(col_ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::add_fulltext_index(const Table* t, std::size_t col_ndx)
+{
+    select_table(t); // Throws
+    m_encoder.add_fulltext_index(col_ndx); // Throws
+}
+
 
 inline bool TransactLogEncoder::remove_search_index(std::size_t col_ndx)
 {
@@ -1682,6 +1697,12 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_AddSearchIndex: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.add_search_index(col_ndx)) // Throws
+                    parser_error();
+                continue;
+            }
+            case instr_AddFullTextIndex: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.add_fulltext_index(col_ndx)) // Throws
                     parser_error();
                 continue;
             }
