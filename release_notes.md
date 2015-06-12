@@ -1,5 +1,27 @@
 # NEXT RELEASE
 
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# NEXT RELEASE
+
 ----------------------------------------------
 
 # 0.90.0 Release notes
