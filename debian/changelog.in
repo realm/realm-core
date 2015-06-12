@@ -1,3 +1,10 @@
+librealm (0.89.6~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Daniel Povlsen <daniel.povlsen@gmail.com>  Fri, 12 Jun 2015 11:19:17 +0200
+
+
 librealm (0.89.5~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
