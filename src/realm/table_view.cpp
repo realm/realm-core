@@ -390,9 +390,9 @@ void TableView::clear()
     }
 
     if (is_ordered)
-        m_table->remove(m_row_indexes);
+        m_table->batch_remove(m_row_indexes);
     else
-        m_table->move_last_over(m_row_indexes);
+        m_table->batch_move_last_over(m_row_indexes);
 
     m_row_indexes.clear();
 

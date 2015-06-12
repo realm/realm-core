@@ -391,11 +391,15 @@ public:
     std::size_t add_empty_row(std::size_t num_rows = 1);
     void insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
     void remove(std::size_t row_ndx);
-    void remove(const Column& rows);
     void remove_last();
     void move_last_over(std::size_t row_ndx);
-    void move_last_over(const Column& rows);
     void clear();
+
+private:
+    // batch versions used by TableView and LinkView
+    void batch_remove(const Column& rows);
+    void batch_move_last_over(const Column& rows);
+public:
 
     //@}
 

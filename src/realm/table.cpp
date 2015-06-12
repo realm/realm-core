@@ -2026,7 +2026,7 @@ CascadeState cascade_state_from_column(const Column& rows, std::size_t table_ndx
 }
 }
 
-void Table::move_last_over(const Column& rows)
+void Table::batch_move_last_over(const Column& rows)
 {
     REALM_ASSERT(is_attached());
 
@@ -2045,7 +2045,7 @@ void Table::move_last_over(const Column& rows)
     remove_backlink_broken_rows(state); // Throws
 }
 
-void Table::remove(const Column& rows)
+void Table::batch_remove(const Column& rows)
 {
     REALM_ASSERT(is_attached());
 

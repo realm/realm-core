@@ -309,7 +309,7 @@ void LinkView::remove_all_target_rows()
 
     if (m_row_indexes.is_attached()) {
         Table& target_table = get_target_table();
-        target_table.move_last_over(m_row_indexes);
+        target_table.batch_move_last_over(m_row_indexes);
     }
 }
 
