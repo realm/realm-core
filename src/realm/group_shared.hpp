@@ -653,7 +653,7 @@ void SharedGroup::advance_read(History& history, Handler&& handler, VersionID sp
 
     std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, specific_version);
     if (changesets) {
-        size_t num_changesets = m_readlock.m_version - old_readlock.m_version;
+        size_t num_changesets = size_t(m_readlock.m_version - old_readlock.m_version);
         _impl::MultiLogNoCopyInputStream in(changesets.get(),
                                             changesets.get() + num_changesets); // Throws
         _impl::TransactLogParser parser;
