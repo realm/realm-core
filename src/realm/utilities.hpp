@@ -123,6 +123,9 @@ void checksum_init(checksum_t* t);
 int fast_popcount32(int32_t x);
 int fast_popcount64(int64_t x);
 uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
+    
+// timestamp
+uint_fast64_t get_current_timestamp();
 
 // Implementation:
 

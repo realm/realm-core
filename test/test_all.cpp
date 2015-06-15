@@ -50,6 +50,7 @@ const char* file_order[] = {
     "test_basic_utils.cpp",
     "test_file*.cpp",
     "test_thread.cpp",
+    "test_util_network.cpp",
     "test_utf8.cpp",
 
     // /realm/ (helpers)
@@ -71,10 +72,12 @@ const char* file_order[] = {
     "test_shared*.cpp",
     "test_transactions*.cpp",
     "test_query*.cpp",
-    "test_replication*.cpp",
     "test_links.cpp",
     "test_link_query_view.cpp",
     "test_json.cpp",
+    "test_replication*.cpp",
+    "test_transform.cpp",
+    "test_sync.cpp",
 
     "test_lang_bind_helper.cpp",
 

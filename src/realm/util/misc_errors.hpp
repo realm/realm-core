@@ -17,24 +17,33 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef REALM_UTIL_ERRNO_HPP
-#define REALM_UTIL_ERRNO_HPP
+#ifndef REALM_UTIL_MISC_ERRORS_HPP
+#define REALM_UTIL_MISC_ERRORS_HPP
 
-#include <string>
-
-#include <realm/util/basic_system_errors.hpp>
+#include <system_error>
 
 
 namespace realm {
 namespace util {
+namespace error {
 
-// Get the error message for a given error code, and append it to `prefix`
-inline std::string get_errno_msg(const char* prefix, int err)
-{
-    return prefix + make_basic_system_error_code(err).message();
-}
+enum misc_errors {
+    unknown = 1
+};
 
+std::error_code make_error_code(misc_errors);
+
+} // namespace error
 } // namespace util
 } // namespace realm
 
-#endif
+namespace std {
+
+template<> class is_error_code_enum<realm::util::error::misc_errors> {
+public:
+    static const bool value = true;
+};
+
+} // namespace std
+
+#endif // REALM_UTIL_MISC_ERRORS_HPP
