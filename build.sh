@@ -53,7 +53,8 @@ IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
 IPHONE_DIR="iphone-lib"
 
 ANDROID_DIR="android-lib"
-ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86"
+ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
+
 
 usage()
 {
@@ -669,7 +670,7 @@ EOF
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot $sdk_root -mstrict-align" || exit 1
+            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root' -mstrict-align" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
             cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
@@ -721,7 +722,7 @@ EOF
             temp_dir="$(mktemp -d /tmp/realm.build-android.XXXX)" || exit 1
             if [ "$target" = "arm" ]; then
                 platform="8"
-            elif [ "$target" = "arm64" ]; then
+            elif [ "$target" = "arm64" -o "$target" = "x86_64" ]; then
                 platform="21"
             else
                 platform="9"
@@ -743,6 +744,10 @@ EOF
                 arch="x86"
                 android_prefix="i686"
                 android_toolchain="x86-4.8"
+            elif [ "$target" = "x86_64" ]; then
+                arch="x86_64"
+                android_prefix="x86_64"
+                android_toolchain="x86_64-4.9"
             fi
             # Note that `make-standalone-toolchain.sh` is written for
             # `bash` and must therefore be executed by `bash`.

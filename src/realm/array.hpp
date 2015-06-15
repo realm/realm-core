@@ -604,7 +604,7 @@ public:
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
-    // This is the one installed into the m_finder slots.
+    // This is the one installed into the m_vtable->finder slots.
     template<class cond, Action action, size_t bitwidth>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
@@ -853,10 +853,6 @@ public:
     /// array is used.
     std::size_t get_width() const REALM_NOEXCEPT { return m_width; }
 
-    // FIXME: Should not be mutable
-    // FIXME: Should not be public
-    mutable char* m_data; // Points to first byte after header
-
     static char* get_data_from_header(char*) REALM_NOEXCEPT;
     static char* get_header_from_data(char*) REALM_NOEXCEPT;
     static const char* get_data_from_header(const char*) REALM_NOEXCEPT;
@@ -996,27 +992,12 @@ protected:
     void copy_on_write();
 
 private:
-    std::size_t m_ref;
 
     template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
-protected:
-    std::size_t m_size;     // Number of elements currently stored.
-    std::size_t m_capacity; // Number of elements that fit inside the allocated memory.
-// FIXME: m_width Should be an 'int'
-    std::size_t m_width;    // Size of an element (meaning depend on type of array).
-    bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
-    bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
-    bool m_context_flag;    // Meaning depends on context.
-
-private:
-    ArrayParent* m_parent;
-    std::size_t m_ndx_in_parent; // Ignored if m_parent is null.
 
 protected:
-    Allocator& m_alloc;
-
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
@@ -1058,15 +1039,15 @@ protected:
     typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
     typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
-private:
-    Getter m_getter;
-    ChunkGetter m_chunk_getter;
-    Setter m_setter;
-    Finder m_finder[cond_Count]; // one for each COND_XXX enum
+    struct VTable {
+        Getter getter;
+        ChunkGetter chunk_getter;
+        Setter setter;
+        Finder finder[cond_Count]; // one for each COND_XXX enum
+    };
+    template <size_t w> struct VTableForWidth;
 
 protected:
-    int64_t m_lbound;       // min number that can be stored with current m_width
-    int64_t m_ubound;       // max number that can be stored with current m_width
 
     /// Takes a 64-bit value and returns the minimum number of bits needed
     /// to fit the value. For alignment this is rounded up to nearest
@@ -1076,6 +1057,33 @@ protected:
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif
+
+private:
+    Getter m_getter = nullptr; // cached to avoid indirection
+    const VTable* m_vtable = nullptr;
+
+public:
+    // FIXME: Should not be mutable
+    // FIXME: Should not be public
+    mutable char* m_data = nullptr; // Points to first byte after header
+
+protected:
+    int64_t m_lbound;       // min number that can be stored with current m_width
+    int64_t m_ubound;       // max number that can be stored with current m_width
+
+    std::size_t m_size = 0;     // Number of elements currently stored.
+    std::size_t m_capacity = 0; // Number of elements that fit inside the allocated memory.
+
+    Allocator& m_alloc;
+private:
+    std::size_t m_ref;
+    ArrayParent* m_parent = nullptr;
+    std::size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
+protected:
+    unsigned char m_width = 0;  // Size of an element (meaning depend on type of array).
+    bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
+    bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
+    bool m_context_flag;    // Meaning depends on context.
 
     friend class SlabAlloc;
     friend class GroupWriter;
@@ -1306,9 +1314,6 @@ public:
 
 
 inline Array::Array(Allocator& alloc) REALM_NOEXCEPT:
-    m_data(0),
-    m_parent(0),
-    m_ndx_in_parent(0),
     m_alloc(alloc)
 {
 }
@@ -1359,7 +1364,7 @@ inline Array::Type Array::get_type() const REALM_NOEXCEPT
 inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ndx < m_size);
-    (this->*m_chunk_getter)(ndx, res);
+    (this->*(m_vtable->chunk_getter))(ndx, res);
 }
 
 
@@ -1382,7 +1387,7 @@ inline int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
     if (m_width >= 8 && m_size > ndx + 7)
         return get<64>(ndx >> m_shift) & m_widthmask;
     else
-        return (this->*m_getter)(ndx);
+        return (this->*(m_vtable->getter))(ndx);
 */
 }
 
@@ -1795,8 +1800,8 @@ inline std::size_t Array::get_byte_size() const REALM_NOEXCEPT
 
     num_bytes += header_size;
 
-    REALM_ASSERT(m_alloc.is_read_only(m_ref) ||
-                   num_bytes <= get_capacity_from_header(header));
+    REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||,
+                   num_bytes, <=, get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1866,7 +1871,7 @@ inline MemRef Array::clone_deep(Allocator& target_alloc) const
 
 inline void Array::move_assign(Array& a) REALM_NOEXCEPT
 {
-    REALM_ASSERT(&get_alloc() == &a.get_alloc());
+    REALM_ASSERT_3(&get_alloc(), ==, &a.get_alloc());
     // FIXME: Be carefull with the old parent info here. Should it be
     // copied?
 
@@ -2786,7 +2791,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 // There exists a couple of find() functions that take more or less template arguments. Always call the one that
 // takes as most as possible to get best performance.
 
-// This is the one installed into the m_finder slots.
+// This is the one installed into the m_vtable->finder slots.
 template<class cond, Action action, size_t bitwidth>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
@@ -3242,7 +3247,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
     REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, nullptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
-    Finder finder = m_finder[cond::condition];
+    Finder finder = m_vtable->finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 
     return static_cast<size_t>(state.m_state);

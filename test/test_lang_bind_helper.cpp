@@ -5890,6 +5890,248 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg(tlm, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg_w);
+        Table& origin = *wt.add_table("origin");
+        Table& target = *wt.add_table("target");
+        origin.add_column_link(type_Link, "o_1", target, link_Strong);
+        target.add_column(type_Int, "t_1");
+        wt.commit();
+    }
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    const Table& target = *group.get_table("target");
+
+    ConstRow target_row_0, target_row_1;
+
+    auto perform_change = [&](std::function<void (Table&)> func) {
+        // Ensure there are two rows in each table, with each row in `origin`
+        // pointing to the corresponding row in `target`
+        {
+            WriteTransaction wt(sg_w);
+            Table& origin_w = *wt.get_table("origin");
+            Table& target_w = *wt.get_table("target");
+
+            origin_w.clear();
+            target_w.clear();
+            origin_w.add_empty_row(2);
+            target_w.add_empty_row(2);
+            origin_w[0].set_link(0, 0);
+            origin_w[1].set_link(0, 1);
+
+            wt.commit();
+        }
+
+        // Grab the row accessors before applying the modification being tested
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        target_row_0 = target.get(0);
+        target_row_1 = target.get(1);
+
+        // Perform the modification
+        {
+            WriteTransaction wt(sg_w);
+            func(*wt.get_table("origin"));
+            wt.commit();
+        }
+
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        // Leave `group` and the target accessors in a state which can be tested
+        // with the changes applied
+    };
+
+    // Break link by nullifying
+    perform_change([](Table& origin) {
+        origin[1].nullify_link(0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by reassign
+    perform_change([](Table& origin) {
+        origin[1].set_link(0, 0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Avoid breaking link by reassigning self
+    perform_change([](Table& origin) {
+        origin[1].set_link(0, 1);
+    });
+    // Should not delete anything
+    CHECK(target_row_0 && target_row_1);
+    CHECK_EQUAL(target.size(), 2);
+
+    // Break link by explicit row removal
+    perform_change([](Table& origin) {
+        origin[1].move_last_over();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by clearing table
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 0);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg(tlm, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg_w);
+        Table& origin = *wt.add_table("origin");
+        Table& target = *wt.add_table("target");
+        origin.add_column_link(type_LinkList, "o_1", target, link_Strong);
+        target.add_column(type_Int, "t_1");
+        wt.commit();
+    }
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    const Table& target = *group.get_table("target");
+
+    ConstRow target_row_0, target_row_1;
+
+    auto perform_change = [&](std::function<void (Table&)> func) {
+        // Ensure there are two rows in each table, with the first row in `origin`
+        // linking to the first row in `target`, and the second row in `origin`
+        // linking to both rows in `target`
+        {
+            WriteTransaction wt(sg_w);
+            Table& origin_w = *wt.get_table("origin");
+            Table& target_w = *wt.get_table("target");
+
+            origin_w.clear();
+            target_w.clear();
+            origin_w.add_empty_row(2);
+            target_w.add_empty_row(2);
+            origin_w[0].get_linklist(0)->add(0);
+            origin_w[1].get_linklist(0)->add(0);
+            origin_w[1].get_linklist(0)->add(1);
+
+
+            wt.commit();
+        }
+
+        // Grab the row accessors before applying the modification being tested
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        target_row_0 = target.get(0);
+        target_row_1 = target.get(1);
+
+        // Perform the modification
+        {
+            WriteTransaction wt(sg_w);
+            func(*wt.get_table("origin"));
+            wt.commit();
+        }
+
+        LangBindHelper::advance_read(sg);
+        group.Verify();
+        // Leave `group` and the target accessors in a state which can be tested
+        // with the changes applied
+    };
+
+    // Break link by clearing list
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->clear();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by removal from list
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->remove(1);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by reassign
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->set(1, 0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Avoid breaking link by reassigning self
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->set(1, 1);
+    });
+    // Should not delete anything
+    CHECK(target_row_0 && target_row_1);
+    CHECK_EQUAL(target.size(), 2);
+
+    // Break link by explicit row removal
+    perform_change([](Table& origin) {
+        origin[1].move_last_over();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 1);
+
+    // Break link by clearing table
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK_EQUAL(target.size(), 0);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+
+    TableRef target = g.add_table("target");
+    target->add_column(type_Int, "pk");
+    target->add_search_index(0);
+
+    target->add_empty_row(REALM_MAX_BPNODE_SIZE+1);
+
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    // open a second copy that'll be advanced over the write
+    std::unique_ptr<Replication> repl_r(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_r(*repl_r, SharedGroup::durability_Full, crypt_key());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    TableRef t_r = g_r.get_table("target");
+
+    LangBindHelper::promote_to_write(sg);
+    // Ensure that the index has a different bptree layout so that failing to
+    // refresh it will do bad things
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
+        target->set_int(0, i, i);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    LangBindHelper::promote_to_write(sg_r);
+    // Crashes if index has an invalid parent ref
+    t_r->clear();
+}
+
 
 TEST(LangBindHelper_ImplicitTransactions)
 {
@@ -6291,6 +6533,66 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
         CHECK_EQUAL(21, mixed_1->get_int(0,0));
         CHECK_EQUAL(24, mixed_4->get_int(0,0));
     }
+}
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear) {
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "int");
+    origin->add_column_link(type_LinkList, "linklist", *target);
+    origin->add_column_link(type_Link, "link", *target);
+
+    target->add_empty_row();
+    origin->add_empty_row();
+    origin->set_link(1, 0, 0);
+    LinkViewRef linklist = origin->get_linklist(0, 0);
+    linklist->add(0);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    LangBindHelper::promote_to_write(sg);
+    CHECK_EQUAL(1, linklist->size());
+    target->clear();
+    CHECK_EQUAL(0, linklist->size());
+
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(1, linklist->size());
+}
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+
+    TableRef target = g.add_table("target");
+    target->add_column(type_Int, "pk");
+    target->add_search_index(0);
+
+    target->add_empty_row(REALM_MAX_BPNODE_SIZE+1);
+
+    LangBindHelper::commit_and_continue_as_read(sg);
+    LangBindHelper::promote_to_write(sg);
+
+    // Ensure that the index has a different bptree layout so that failing to
+    // refresh it will do bad things
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
+        target->set_int(0, i, i);
+
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    LangBindHelper::promote_to_write(sg);
+
+    // Crashes if index has an invalid parent ref
+    target->clear();
 }
 
 #ifndef _WIN32

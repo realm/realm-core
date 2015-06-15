@@ -162,6 +162,31 @@ TEST(Table_Null)
         CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
     }
 
+    {
+        // Check that add_empty_row() adds NULL binary as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_Binary, "name", true);
+        table->add_empty_row();
+
+        CHECK(table->get_binary(0, 0).is_null());
+    }
+
+    {
+        // Check that add_empty_row() adds empty binary as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_Binary, "name");
+        table->add_empty_row();
+
+        CHECK(!table->get_binary(0, 0).is_null());
+
+        // Test that inserting null in non-nullable column will throw
+        CHECK_THROW_ANY(table->set_binary(0, 0, BinaryData()));
+    }
+
 }
 
 TEST(Table_DeleteCrash)

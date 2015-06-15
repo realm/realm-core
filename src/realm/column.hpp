@@ -40,6 +40,7 @@ namespace realm {
 
 
 // Pre-definitions
+struct CascadeState;
 class StringIndex;
 
 template <> struct GetLeafType<int64_t, false> {
@@ -56,7 +57,7 @@ struct ColumnTemplateBase
 
 template <class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
-				std::size_t limit, std::size_t* return_ndx);
+                std::size_t limit, std::size_t* return_ndx);
 
 template <class T> struct ColumnTemplate : public ColumnTemplateBase
 {
@@ -104,8 +105,8 @@ public:
     /// \param num_rows The total number of rows in this column.
     ///
     /// \param broken_reciprocal_backlinks If true, link columns must assume
-    /// that reciprocal backlinks have already been removed. Non-link columns,
-    /// and backlink columns should ignore this argument.
+    /// that reciprocal backlinks have already been removed. Non-link columns
+    /// should ignore this argument.
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
     /// Remove the specified entry from this column. Set \a is_last to
@@ -119,8 +120,8 @@ public:
     /// one less than the number of rows in the column.
     ///
     /// \param broken_reciprocal_backlinks If true, link columns must assume
-    /// that reciprocal backlinks have already been removed for the specified
-    /// row. Non-link columns, and backlink columns should ignore this argument.
+    /// that reciprocal backlinks have already been removed. Non-link columns
+    /// should ignore this argument.
     virtual void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
                                 bool broken_reciprocal_backlinks) = 0;
 
@@ -190,7 +191,6 @@ public:
     /// Table::cascade_break_backlinks_to_all_rows() to pass the number of rows
     /// in the table as \a num_rows.
 
-    struct CascadeState;
     virtual void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState&);
     virtual void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&);
 
@@ -347,7 +347,9 @@ protected:
 class ColumnBaseWithIndex : public ColumnBase {
 public:
     ~ColumnBaseWithIndex() REALM_NOEXCEPT override {}
+    void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT override;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
+    void refresh_accessor_tree(std::size_t, const Spec&) override;
     void move_assign(ColumnBaseWithIndex& col) REALM_NOEXCEPT;
     void destroy() REALM_NOEXCEPT override;
 
@@ -362,49 +364,6 @@ protected:
     ColumnBaseWithIndex() {}
     ColumnBaseWithIndex(ColumnBaseWithIndex&&) = default;
     std::unique_ptr<StringIndex> m_search_index;
-};
-
-
-struct ColumnBase::CascadeState {
-    struct row {
-        std::size_t table_ndx; ///< Index within group of a group-level table.
-        std::size_t row_ndx;
-
-        bool operator==(const row&) const REALM_NOEXCEPT;
-        bool operator!=(const row&) const REALM_NOEXCEPT;
-
-        /// Trivial lexicographic order
-        bool operator<(const row&) const REALM_NOEXCEPT;
-    };
-
-    typedef std::vector<row> row_set;
-
-    /// A sorted list of rows. The order is defined by row::operator<(), and
-    /// insertions must respect this order.
-    row_set rows;
-
-    /// If non-null, then no recursion will be performed for rows of that
-    /// table. The effect is then exactly as if all the rows of that table were
-    /// added to \a state.rows initially, and then removed again after the
-    /// explicit invocations of Table::cascade_break_backlinks_to() (one for
-    /// each initiating row). This is used by Table::clear() to avoid
-    /// reentrance.
-    ///
-    /// Must never be set concurrently with stop_on_link_list_column.
-    Table* stop_on_table;
-
-    /// If non-null, then Table::cascade_break_backlinks_to() will skip the
-    /// removal of reciprocal backlinks for the link list at
-    /// stop_on_link_list_row_ndx in this column, and no recursion will happen
-    /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
-    ///
-    /// Must never be set concurrently with stop_on_table.
-    ColumnLinkList* stop_on_link_list_column;
-
-    /// Is ignored if stop_on_link_list_column is null.
-    std::size_t stop_on_link_list_row_ndx;
-
-    CascadeState();
 };
 
 
@@ -428,8 +387,8 @@ public:
     TColumn(unattached_root_tag, Allocator&);
     TColumn(TColumn<T, Nullable>&&) REALM_NOEXCEPT = default;
     ~TColumn() REALM_NOEXCEPT override;
-	
-	void init_from_parent();
+    
+    void init_from_parent();
 
     // Accessor concept:
     void destroy() REALM_NOEXCEPT override;
@@ -447,7 +406,7 @@ public:
     void move_assign(TColumn<T, Nullable>&);
     bool IsIntColumn() const REALM_NOEXCEPT override;
 
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
     bool is_nullable() const REALM_NOEXCEPT override;
 
@@ -642,28 +601,6 @@ inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t
 }
 
 inline void ColumnBase::set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT
-{
-}
-
-inline bool ColumnBase::CascadeState::row::operator==(const row& r) const REALM_NOEXCEPT
-{
-    return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
-}
-
-inline bool ColumnBase::CascadeState::row::operator!=(const row& r) const REALM_NOEXCEPT
-{
-    return !(*this == r);
-}
-
-inline bool ColumnBase::CascadeState::row::operator<(const row& r) const REALM_NOEXCEPT
-{
-    return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
-}
-
-inline ColumnBase::CascadeState::CascadeState():
-    stop_on_table(0),
-    stop_on_link_list_column(0),
-    stop_on_link_list_row_ndx(0)
 {
 }
 
@@ -867,7 +804,7 @@ StringData TColumn<T, N>::get_index_data(std::size_t ndx, char* buffer) const RE
     }
     T x = get(ndx);
     *reinterpret_cast<T*>(buffer) = x;
-	  return StringData(buffer, sizeof(T));
+      return StringData(buffer, sizeof(T));
 }
 
 template <class T, bool N>
@@ -1001,7 +938,7 @@ TColumn<T,N>::~TColumn() REALM_NOEXCEPT
 template <class T, bool N>
 void TColumn<T,N>::init_from_parent()
 {
-	m_tree.init_from_parent();
+    m_tree.init_from_parent();
 }
 
 template <class T, bool N>
@@ -1045,6 +982,7 @@ std::size_t TColumn<T,N>::get_ndx_in_parent() const REALM_NOEXCEPT
 template <class T, bool N>
 void TColumn<T,N>::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
 {
+    ColumnBaseWithIndex::set_ndx_in_parent(ndx_in_parent);
     m_tree.set_ndx_in_parent(ndx_in_parent);
 }
 
@@ -1275,7 +1213,7 @@ void TColumn<T,N>::clear(std::size_t, bool)
 template <class T, bool N>
 std::size_t TColumn<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
 {
-	static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->lower_bound_int(value);
     }
@@ -1285,7 +1223,7 @@ std::size_t TColumn<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
 template <class T, bool N>
 std::size_t TColumn<T,N>::upper_bound_int(T value) const REALM_NOEXCEPT
 {
-	static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->upper_bound_int(value);
     }
@@ -1356,9 +1294,10 @@ ref_type TColumn<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
 }
 
 template <class T, bool N>
-void TColumn<T,N>::refresh_accessor_tree(size_t, const Spec&)
+void TColumn<T,N>::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
     m_tree.init_from_parent();
+    ColumnBaseWithIndex::refresh_accessor_tree(new_col_ndx, spec);
 }
 
 #if defined(REALM_DEBUG)

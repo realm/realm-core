@@ -50,10 +50,24 @@ void ColumnBase::set_string(size_t, StringData)
     throw LogicError(LogicError::type_mismatch);
 }
 
+void ColumnBaseWithIndex::set_ndx_in_parent(size_t ndx) REALM_NOEXCEPT
+{
+    if (m_search_index) {
+        m_search_index->set_ndx_in_parent(ndx + 1);
+    }
+}
+
 void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     if (m_search_index) {
         m_search_index->update_from_parent(old_baseline);
+    }
+}
+
+void ColumnBaseWithIndex::refresh_accessor_tree(std::size_t new_col_ndx, const realm::Spec& spec)
+{
+    if (m_search_index) {
+        m_search_index->refresh_accessor_tree(new_col_ndx, spec);
     }
 }
 

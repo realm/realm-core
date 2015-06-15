@@ -22,6 +22,8 @@
 
 #include "column_link.hpp"
 
+#include <realm/group.hpp>
+
 using namespace realm;
 
 
