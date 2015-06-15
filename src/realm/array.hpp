@@ -2822,7 +2822,10 @@ bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64
     else if (width == 32)
         search = _mm_set1_epi32(static_cast<int>(value));
     else if (width == 64) {
-        search = _mm_set_epi64x(value, value);
+        if (cond2::condition == cond_Less)
+            search = _mm_set_epi64x(value - 1, value - 1);
+        else
+            search = _mm_set_epi64x(value, value);
     }
 
     return FindSSE_intern<cond2, action, width, Callback>(data, &search, items, state, baseindex, callback);
@@ -2873,9 +2876,9 @@ REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data
                 compare = _mm_cmplt_epi16(action_data[i], *data);
             if (width == 32)
                 compare = _mm_cmplt_epi32(action_data[i], *data);
-            if (width == 64){
+            if (width == 64) {
                 // There exists no _mm_cmplt_epi64 instruction, so emulate it. _mm_set1_epi8(0xff) is pre-calculated by compiler.
-                compare = _mm_cmpeq_epi64(action_data[i], *data);
+                compare = _mm_cmpgt_epi64(action_data[i], *data);
                 compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffff));
             }
         }
