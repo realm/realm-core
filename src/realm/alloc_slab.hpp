@@ -256,6 +256,9 @@ public:
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
+    /// If chunked memory mapping is enabled, the file_size argument
+    /// must be a multipla of the chunk_size.
+    ///
     /// \return True if, and only if the memory address of the first
     /// mapped byte has changed. If chunked memory mapping is enabled,
     /// addresses never change and remap() will always return false.
@@ -342,6 +345,7 @@ private:
     char* m_data = 0;
     std::size_t m_initial_mapping_size = 0;
     std::size_t m_num_additional_mappings = 0;
+    std::size_t m_capacity_additional_mappings = 0;
     std::size_t m_chunk_size = 0;
     util::File::Map<char>* m_additional_mappings = 0;
     AttachMode m_attach_mode;

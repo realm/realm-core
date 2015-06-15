@@ -732,7 +732,7 @@ void File::unlock() REALM_NOEXCEPT
 }
 
 
-void* File::map(AccessMode a, size_t size, int map_flags) const
+void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) const
 {
 #ifdef _WIN32 // Windows version
 
@@ -774,7 +774,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
-    return realm::util::mmap(m_fd, size, a, m_encryption_key.get());
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
 
 #endif
 }

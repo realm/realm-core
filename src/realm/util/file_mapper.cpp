@@ -624,7 +624,7 @@ size_t round_up_to_page_size(size_t size) REALM_NOEXCEPT
 }
 #endif
 
-void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_key)
+void* mmap(int fd, size_t size, File::AccessMode access, std::size_t offset, const char* encryption_key)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
@@ -648,7 +648,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_
                 break;
         }
 
-        void* addr = ::mmap(0, size, prot, MAP_SHARED, fd, 0);
+        void* addr = ::mmap(0, size, prot, MAP_SHARED, fd, offset);
         if (addr != MAP_FAILED)
             return addr;
     }

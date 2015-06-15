@@ -316,7 +316,7 @@ public:
     ///
     /// Calling this function with a size that is greater than the
     /// size of the file has undefined behavior.
-    void* map(AccessMode, std::size_t size, int map_flags = 0) const;
+    void* map(AccessMode, std::size_t size, int map_flags = 0, std::size_t offset = 0) const;
 
     /// The same as unmap(old_addr, old_size) followed by map(a,
     /// new_size, map_flags), but more efficient on some systems.
@@ -453,7 +453,7 @@ private:
         MapBase() REALM_NOEXCEPT;
         ~MapBase() REALM_NOEXCEPT;
 
-        void map(const File&, AccessMode, std::size_t size, int map_flags);
+        void map(const File&, AccessMode, std::size_t size, int map_flags, std::size_t offset = 0);
         void remap(const File&, AccessMode, std::size_t size, int map_flags);
         void unmap() REALM_NOEXCEPT;
         void sync();
@@ -501,11 +501,22 @@ public:
     explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
                  int map_flags = 0);
 
+    explicit Map(const File&, std::size_t offset, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+                 int map_flags = 0);
+
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
     Map() REALM_NOEXCEPT;
 
     ~Map() REALM_NOEXCEPT;
+
+    /// Move the mapping from another Map object to this Map object
+    void move(File::Map<T>& other) {
+        if (m_addr) unmap();
+        m_addr = other.m_addr;
+        m_size = other.m_size;
+        other.m_addr = 0;
+    }
 
     /// See File::map().
     ///
@@ -514,7 +525,7 @@ public:
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
     T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
-           int map_flags = 0);
+           int map_flags = 0, std::size_t offset = 0);
 
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
@@ -721,11 +732,11 @@ inline File::MapBase::~MapBase() REALM_NOEXCEPT
     unmap();
 }
 
-inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
 {
     REALM_ASSERT(!m_addr);
 
-    m_addr = f.map(a, size, map_flags);
+    m_addr = f.map(a, size, map_flags, offset);
     m_size = size;
 }
 
@@ -757,14 +768,20 @@ inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size, int map_
     map(f, a, size, map_flags);
 }
 
+template<class T>
+inline File::Map<T>::Map(const File& f, std::size_t offset, AccessMode a, std::size_t size, int map_flags)
+{
+    map(f, a, size, map_flags, offset);
+}
+
 template<class T> inline File::Map<T>::Map() REALM_NOEXCEPT {}
 
 template<class T> inline File::Map<T>::~Map() REALM_NOEXCEPT {}
 
 template<class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
 {
-    MapBase::map(f, a, size, map_flags);
+    MapBase::map(f, a, size, map_flags, offset);
     return static_cast<T*>(m_addr);
 }
 
