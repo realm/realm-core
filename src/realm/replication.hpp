@@ -115,6 +115,8 @@ public:
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) REALM_NOEXCEPT;
 
+    virtual BinaryData get_pending_entries() REALM_NOEXCEPT;
+
     /// Set the latest version that is known to be received and accepted by the
     /// server. All later versions are guaranteed to be available to the caller
     /// of get_commit_entries(). This function is guaranteed to have no effect,
@@ -224,14 +226,12 @@ protected:
     /// the end of payload data in the transaction log.
     virtual version_type do_commit_write_transact(SharedGroup&, version_type orig_version) = 0;
 
-    virtual void do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT = 0;
-
     virtual void do_interrupt() REALM_NOEXCEPT = 0;
 
     virtual void do_clear_interrupt() REALM_NOEXCEPT = 0;
 
     /// Must be called only from do_begin_write_transact(),
-    /// do_commit_write_transact(), or do_rollback_write_transact().
+    /// do_commit_write_transact().
     static Group& get_group(SharedGroup&) REALM_NOEXCEPT;
 
     // Part of a temporary ugly hack to avoid generating new
@@ -242,10 +242,10 @@ protected:
     static void set_replication(Group&, Replication*) REALM_NOEXCEPT;
 
     /// Must be called only from do_begin_write_transact(),
-    /// do_commit_write_transact(), or do_rollback_write_transact().
+    /// do_commit_write_transact().
     static version_type get_current_version(SharedGroup&);
 
-    friend class Group::TransactReverser;
+    friend class _impl::TransactReverser;
 };
 
 
@@ -281,7 +281,6 @@ private:
     std::string do_get_database_path() override;
     void do_begin_write_transact(SharedGroup&) override;
     version_type do_commit_write_transact(SharedGroup&, version_type orig_version) override;
-    void do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT override;
     void do_interrupt() REALM_NOEXCEPT override;
     void do_clear_interrupt() REALM_NOEXCEPT override;
     void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) override;
@@ -289,8 +288,6 @@ private:
     void internal_transact_log_reserve(std::size_t, char** new_begin, char** new_end);
 
     std::size_t transact_log_size();
-
-    friend class Group::TransactReverser;
 };
 
 
@@ -345,6 +342,11 @@ inline void Replication::get_commit_entries(version_type, version_type, BinaryDa
     REALM_ASSERT(false);
 }
 
+inline BinaryData Replication::get_pending_entries() REALM_NOEXCEPT
+{
+    return BinaryData(0, 0);
+}
+
 inline void Replication::begin_write_transact(SharedGroup& sg)
 {
     do_begin_write_transact(sg);
@@ -357,9 +359,8 @@ Replication::commit_write_transact(SharedGroup& sg, version_type orig_version)
     return do_commit_write_transact(sg, orig_version);
 }
 
-inline void Replication::rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT
+inline void Replication::rollback_write_transact(SharedGroup&) REALM_NOEXCEPT
 {
-    do_rollback_write_transact(sg);
 }
 
 inline void Replication::interrupt() REALM_NOEXCEPT

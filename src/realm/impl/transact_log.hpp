@@ -328,7 +328,7 @@ private:
     void do_select_desc(const Descriptor&);
     void do_select_link_list(const LinkView&);
 
-    friend class Group::TransactReverser;
+    friend class TransactReverser;
 };
 
 
@@ -2048,7 +2048,414 @@ inline bool TransactLogParser::is_valid_link_type(int type)
     return false;
 }
 
+class TransactReverser {
+public:
+    bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
+    {
+        sync_table();
+        m_encoder.select_table(group_level_ndx, levels, path);
+        m_pending_ts_instr = get_inst();
+        return true;
+    }
 
+    bool select_descriptor(size_t levels, const size_t* path)
+    {
+        sync_descriptor();
+        m_encoder.select_descriptor(levels, path);
+        m_pending_ds_instr = get_inst();
+        return true;
+    }
+
+    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData)
+    {
+        m_encoder.erase_group_level_table(table_ndx, num_tables + 1);
+        append_instruction();
+        return true;
+    }
+
+    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+    {
+        m_encoder.insert_group_level_table(table_ndx, num_tables - 1, "");
+        append_instruction();
+        return true;
+    }
+
+    bool rename_group_level_table(std::size_t, StringData)
+    {
+        return true; // No-op
+    }
+
+    bool optimize_table()
+    {
+        return true; // No-op
+    }
+
+    bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
+        m_encoder.erase_rows(idx, num_rows, tbl_sz, unordered);
+        append_instruction();
+        return true;
+    }
+
+    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
+        m_encoder.insert_empty_rows(idx, num_rows, tbl_sz, unordered);
+        append_instruction();
+        return true;
+    }
+
+    bool add_int_to_column(size_t col_ndx, int_fast64_t value)
+    {
+        m_encoder.add_int_to_column(col_ndx, -value);
+        append_instruction();
+        return true;
+    }
+
+    // helper function, shared by insert_xxx
+    bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
+        if (col_idx == 0) {
+            m_encoder.erase_rows(row_idx, 1, tbl_sz, false);
+            append_instruction();
+        }
+        return true;
+    }
+    bool insert_int(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, int_fast64_t)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_bool(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_float(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, float)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_double(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, double)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_string(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, StringData)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_binary(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, BinaryData)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, DateTime)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_table(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, const Mixed&)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, std::size_t)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_link_list(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool row_insert_complete()
+    {
+        return true; // No-op
+    }
+
+    bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
+    {
+        m_encoder.set_int(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool value)
+    {
+        m_encoder.set_bool(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_float(std::size_t col_ndx, std::size_t row_ndx, float value)
+    {
+        m_encoder.set_float(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_double(std::size_t col_ndx, std::size_t row_ndx, double value)
+    {
+        m_encoder.set_double(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData value)
+    {
+        m_encoder.set_string(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData value)
+    {
+        m_encoder.set_binary(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime value)
+    {
+        m_encoder.set_date_time(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_table(size_t col_ndx, size_t row_ndx)
+    {
+        m_encoder.set_table(col_ndx, row_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
+    {
+        m_encoder.set_mixed(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_null(size_t col_ndx, size_t row_ndx)
+    {
+        m_encoder.set_null(col_ndx, row_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t value)
+    {
+        m_encoder.set_link(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool clear_table()
+    {
+        m_encoder.insert_empty_rows(0, 0, 0, true);
+        append_instruction();
+        return true;
+    }
+
+    bool add_search_index(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool remove_search_index(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool add_primary_key(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool remove_primary_key()
+    {
+        return true; // No-op
+    }
+
+    bool set_link_type(size_t, LinkType)
+    {
+        return true; // No-op
+    }
+
+    bool insert_link_column(std::size_t col_idx, DataType, StringData,
+                            std::size_t target_table_idx, std::size_t backlink_col_ndx)
+    {
+        m_encoder.erase_link_column(col_idx, target_table_idx, backlink_col_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx,
+                           std::size_t backlink_col_idx)
+    {
+        m_encoder.insert_link_column(col_idx, DataType(), "", target_table_idx, backlink_col_idx);
+        append_instruction();
+        return true;
+    }
+
+    bool insert_column(std::size_t col_idx, DataType, StringData, bool)
+    {
+        m_encoder.erase_column(col_idx);
+        append_instruction();
+        return true;
+    }
+
+    bool erase_column(std::size_t col_idx)
+    {
+        m_encoder.insert_column(col_idx, DataType(), "");
+        append_instruction();
+        return true;
+    }
+
+    bool rename_column(size_t, StringData)
+    {
+        return true; // No-op
+    }
+
+    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    {
+        sync_linkview();
+        m_encoder.select_link_list(col_ndx, row_ndx);
+        m_pending_lv_instr = get_inst();
+        return true;
+    }
+
+    bool link_list_set(size_t row, size_t value)
+    {
+        m_encoder.link_list_set(row, value);
+        append_instruction();
+        return true;
+    }
+
+    bool link_list_insert(size_t link_ndx, size_t)
+    {
+        m_encoder.link_list_erase(link_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool link_list_move(size_t old_link_ndx, size_t new_link_ndx)
+    {
+        m_encoder.link_list_move(new_link_ndx, old_link_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool link_list_erase(size_t link_ndx)
+    {
+        m_encoder.link_list_insert(link_ndx, 0);
+        append_instruction();
+        return true;
+    }
+
+    bool link_list_clear()
+    {
+        return true; // No-op
+    }
+
+    template<typename Handler>
+    void execute(Handler&& handler)
+    {
+        // push any pending select_table or select_descriptor into the buffer:
+        sync_table();
+
+        // then execute the instructions in the transformed order
+        ReversedInputStream reversed_log(m_buffer.transact_log_data(), m_instructions);
+        TransactLogParser parser(reversed_log);
+        parser.parse(std::forward<Handler&&>(handler));
+    }
+
+private:
+    _impl::TransactLogBufferStream m_buffer;
+    _impl::TransactLogEncoder m_encoder{m_buffer};
+    struct Instr { size_t begin; size_t end; };
+    std::vector<Instr> m_instructions;
+    size_t current_instr_start = 0;
+    Instr m_pending_ts_instr{0, 0};
+    Instr m_pending_ds_instr{0, 0};
+    Instr m_pending_lv_instr{0, 0};
+
+    Instr get_inst() {
+        Instr instr;
+        instr.begin = current_instr_start;
+        current_instr_start = transact_log_size();
+        instr.end = current_instr_start;
+        return instr;
+    }
+
+    size_t transact_log_size() const
+    {
+        REALM_ASSERT_3(m_encoder.write_position(), >=, m_buffer.transact_log_data());
+        return m_encoder.write_position() - m_buffer.transact_log_data();
+    }
+
+    void append_instruction() {
+        m_instructions.push_back(get_inst());
+    }
+
+    void append_instruction(Instr instr) {
+        m_instructions.push_back(instr);
+    }
+
+    void sync_select(Instr& pending_instr) {
+        if (pending_instr.begin != pending_instr.end) {
+            append_instruction(pending_instr);
+            pending_instr = {0, 0};
+        }
+    }
+
+    void sync_linkview() {
+        sync_select(m_pending_lv_instr);
+    }
+
+    void sync_descriptor() {
+        sync_linkview();
+        sync_select(m_pending_ds_instr);
+    }
+
+    void sync_table() {
+        sync_descriptor();
+        sync_select(m_pending_ts_instr);
+    }
+
+    class ReversedInputStream : public InputStream {
+    public:
+        ReversedInputStream(const char* buffer, std::vector<Instr>& instr_order)
+            : m_buffer(buffer), m_instr_order(instr_order)
+        {
+            m_current = m_instr_order.size();
+        }
+
+        size_t next_block(const char*& begin, const char*& end) override
+        {
+            if (m_current != 0) {
+                m_current--;
+                begin = m_buffer + m_instr_order[m_current].begin;
+                end   = m_buffer + m_instr_order[m_current].end;
+                return end-begin;
+            }
+            else
+                return 0;
+        }
+
+    private:
+        const char* m_buffer;
+        std::vector<Instr>& m_instr_order;
+        size_t m_current;
+    };
+};
 
 }
 }

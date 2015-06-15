@@ -950,10 +950,6 @@ TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_ver
     return new_version;
 }
 
-void TrivialReplication::do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT
-{
-}
-
 void TrivialReplication::do_interrupt() REALM_NOEXCEPT
 {
 }

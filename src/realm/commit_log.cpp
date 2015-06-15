@@ -77,7 +77,7 @@ public:
     void do_begin_write_transact(SharedGroup& sg) override;
     version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version)
         override;
-    void do_rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT override;
+    BinaryData get_pending_entries() REALM_NOEXCEPT override;
     void do_interrupt() REALM_NOEXCEPT override {};
     void do_clear_interrupt() REALM_NOEXCEPT override {};
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
@@ -679,12 +679,10 @@ void WriteLogCollector::do_begin_write_transact(SharedGroup&)
 }
 
 
-void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) REALM_NOEXCEPT
+BinaryData WriteLogCollector::get_pending_entries() REALM_NOEXCEPT
 {
-    // forward transaction log buffer
-    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), write_position());
+    return BinaryData(m_transact_log_buffer.data(), write_position() - m_transact_log_buffer.data());
 }
-
 
 
 void WriteLogCollector::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
