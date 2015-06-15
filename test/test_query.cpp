@@ -6111,14 +6111,14 @@ TEST(Query_IntegerNonNull)
     CHECK_EQUAL(2, t.get_source_ndx(2));
 
     // Should any non-null value compare greater than null?
-    t = table.where().greater(0, null{}).find_all();
-    CHECK_EQUAL(3, t.size());
-    CHECK_EQUAL(0, t.get_source_ndx(0));
-    CHECK_EQUAL(1, t.get_source_ndx(1));
-    CHECK_EQUAL(2, t.get_source_ndx(2));
+    // t = table.where().greater(0, null{}).find_all();
+    // CHECK_EQUAL(3, t.size());
+    // CHECK_EQUAL(0, t.get_source_ndx(0));
+    // CHECK_EQUAL(1, t.get_source_ndx(1));
+    // CHECK_EQUAL(2, t.get_source_ndx(2));
 
-    t = table.where().greater(null{}, 0).find_all();
-    CHECK_EQUAL(0, t.size());
+    // t = table.where().greater(null{}, 0).find_all();
+    // CHECK_EQUAL(0, t.size());
 }
 
 // Test nullable integer columns with queries using query_expression.hpp
