@@ -12,15 +12,9 @@
 
 * Lorem ipsum.
 
------------
-
 ### Internals:
 
 * Lorem ipsum.
-
-----------------------------------------------
-
-# NEXT RELEASE
 
 ----------------------------------------------
 
@@ -74,10 +68,6 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
   containing a table clear is rolled back.
 * Fixed errors when a changes to a table with an indexed int column are rolled
   back.
-
-### API breaking changes:
-
-* Lorem ipsum.
 
 ### Enhancements:
 
