@@ -32,8 +32,8 @@ using namespace realm;
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() || link_ndx == 0);
-    REALM_ASSERT(!m_row_indexes.is_attached() || link_ndx <= m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, ||, link_ndx, ==, 0);
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, false, ||, link_ndx, <=, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
@@ -61,7 +61,7 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 void LinkView::set(size_t link_ndx, size_t target_row_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -78,15 +78,15 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     if (num_remaining > 0)
         return;
 
-    ColumnBase::CascadeState::row target_row;
+    CascadeState::row target_row;
     target_row.table_ndx = target_table.get_index_in_group();
     target_row.row_ndx   = old_target_row_ndx;
-    ColumnBase::CascadeState state;
+    CascadeState state;
     state.rows.push_back(target_row);
 
     typedef _impl::TableFriend tf;
     tf::cascade_break_backlinks_to(target_table, old_target_row_ndx, state); // Throws
-    tf::remove_backlink_broken_rows(target_table, state.rows); // Throws
+    tf::remove_backlink_broken_rows(target_table, state); // Throws
 }
 
 
@@ -132,7 +132,7 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 void LinkView::remove(size_t link_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -148,15 +148,15 @@ void LinkView::remove(size_t link_ndx)
     if (num_remaining > 0)
         return;
 
-    ColumnBase::CascadeState::row target_row;
+    CascadeState::row target_row;
     target_row.table_ndx = target_table.get_index_in_group();
     target_row.row_ndx   = target_row_ndx;
-    ColumnBase::CascadeState state;
+    CascadeState state;
     state.rows.push_back(target_row);
 
     typedef _impl::TableFriend tf;
     tf::cascade_break_backlinks_to(target_table, target_row_ndx, state); // Throws
-    tf::remove_backlink_broken_rows(target_table, state.rows); // Throws
+    tf::remove_backlink_broken_rows(target_table, state); // Throws
 }
 
 
@@ -193,7 +193,7 @@ void LinkView::clear()
     }
 
     size_t origin_row_ndx = get_origin_row_index();
-    ColumnBase::CascadeState state;
+    CascadeState state;
     state.stop_on_link_list_column  = &m_origin_column;
     state.stop_on_link_list_row_ndx = origin_row_ndx;
 
@@ -206,11 +206,10 @@ void LinkView::clear()
         size_t num_remaining = target_table.get_num_strong_backlinks(target_row_ndx);
         if (num_remaining > 0)
             continue;
-        ColumnBase::CascadeState::row target_row;
+        CascadeState::row target_row;
         target_row.table_ndx = target_table.get_index_in_group();
         target_row.row_ndx   = target_row_ndx;
-        typedef ColumnBase::CascadeState::row_set::iterator iter;
-        iter i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
+        auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
         // This target row cannot already be in state.rows
         REALM_ASSERT(i == state.rows.begin() || i[-1] != target_row);
         state.rows.insert(i, target_row);
@@ -220,7 +219,7 @@ void LinkView::clear()
     bool broken_reciprocal_backlinks = true;
     do_clear(broken_reciprocal_backlinks); // Throws
 
-    tf::remove_backlink_broken_rows(*m_origin_table, state.rows); // Throws
+    tf::remove_backlink_broken_rows(*m_origin_table, state); // Throws
 }
 
 
@@ -293,7 +292,7 @@ TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
 void LinkView::remove_target_row(size_t link_ndx)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
+    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
     size_t target_row_ndx = m_row_indexes.get(link_ndx);
     Table& target_table = get_target_table();
@@ -308,18 +307,9 @@ void LinkView::remove_all_target_rows()
 {
     REALM_ASSERT(is_attached());
 
-    Table& target_table = get_target_table();
-
-    // Delete all rows targeted by links. We have to keep checking the
-    // size as the list may contain multiple links to the same row, so
-    // one delete could remove multiple entries.
-    while (size_t count = size()) {
-        size_t last_link_ndx = count-1;
-        size_t target_row_ndx = m_row_indexes.get(last_link_ndx);
-
-        // Deleting the target row will automatically remove all links
-        // to it. So we do not have to manually remove the deleted link
-        target_table.move_last_over(target_row_ndx);
+    if (m_row_indexes.is_attached()) {
+        Table& target_table = get_target_table();
+        target_table.batch_move_last_over(m_row_indexes);
     }
 }
 

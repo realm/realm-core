@@ -26,6 +26,7 @@
 #include <typeinfo>
 
 #include <realm/util/features.h>
+#include <realm/util/thread.hpp>
 #include <realm/util/tuple.hpp>
 #include <memory>
 #include <realm/column_fwd.hpp>
@@ -393,6 +394,12 @@ public:
     void remove_last();
     void move_last_over(std::size_t row_ndx);
     void clear();
+
+private:
+    // batch versions used by TableView and LinkView
+    void batch_remove(const Column& rows);
+    void batch_move_last_over(const Column& rows);
+public:
 
     //@}
 
@@ -868,7 +875,10 @@ private:
     mutable views m_views;
 
     // Points to first bound row accessor, or is null if there are none.
-    mutable RowBase* m_row_accessors;
+    mutable RowBase* m_row_accessors = nullptr;
+
+    // Mutex which must be locked any time the row accessor chain or m_views is used
+    mutable util::Mutex m_accessor_mutex;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
@@ -1039,6 +1049,7 @@ private:
 
     void register_row_accessor(RowBase*) const REALM_NOEXCEPT;
     void unregister_row_accessor(RowBase*) const REALM_NOEXCEPT;
+    void do_unregister_row_accessor(RowBase*) const REALM_NOEXCEPT;
 
     class UnbindGuard;
 
@@ -1190,10 +1201,9 @@ private:
     /// It is immaterial which table remove_backlink_broken_rows() is called on,
     /// as long it that table is in the same group as the specified rows.
 
-    typedef ColumnBase::CascadeState CascadeState;
     void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState& state);
     void cascade_break_backlinks_to_all_rows(CascadeState& state);
-    void remove_backlink_broken_rows(const CascadeState::row_set&);
+    void remove_backlink_broken_rows(const CascadeState&);
 
     //@}
 
@@ -1566,7 +1576,6 @@ inline Table::Table(Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
-    m_row_accessors = 0;
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = 0;
@@ -1581,7 +1590,6 @@ inline Table::Table(const Table& t, Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
-    m_row_accessors = 0;
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = 0;
@@ -1596,7 +1604,6 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
 {
     m_ref_count = 0; // Lifetime managed by reference counting
     m_descriptor = 0;
-    m_row_accessors = 0;
 }
 
 inline Allocator& Table::get_alloc() const
@@ -1628,7 +1635,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
-    if (util::SameType<T, Link>::value || util::SameType<T, LinkList>::value) {
+    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
         tmp.push_back(column);
     }
     m_link_chain.clear();
@@ -2075,12 +2082,12 @@ public:
     }
 
     static void cascade_break_backlinks_to(Table& table, std::size_t row_ndx,
-                                           Table::CascadeState& state)
+                                           CascadeState& state)
     {
         table.cascade_break_backlinks_to(row_ndx, state); // Throws
     }
 
-    static void remove_backlink_broken_rows(Table& table, const Table::CascadeState::row_set& rows)
+    static void remove_backlink_broken_rows(Table& table, const CascadeState& rows)
     {
         table.remove_backlink_broken_rows(rows); // Throws
     }

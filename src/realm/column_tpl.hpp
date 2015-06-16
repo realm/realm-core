@@ -76,7 +76,7 @@ template <class T, class R, Action action, class condition>
         sg.cache_next(s);
         size_t end2 = sg.local_end(end);
 
-        if(util::SameType<T, int64_t>::value) {
+        if(std::is_same<T, int64_t>::value) {
             cont = (static_cast<const Array*>(sg.m_leaf_ptr))->find(c, action, int64_t(target), s - sg.m_leaf_start, end2, sg.m_leaf_start, reinterpret_cast<QueryState<int64_t>*>(&state));
         }
         else {

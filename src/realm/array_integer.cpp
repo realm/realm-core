@@ -58,7 +58,7 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
 {
     MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, value, alloc);
     ArrayIntNull arr(alloc);
-    arr.init_from_mem(r);
+    arr.Array::init_from_mem(r);
     if (arr.m_width == 64) {
         int_fast64_t null_value = value ^ 1; // Just anything different from value.
         arr.Array::set(0, null_value);
@@ -67,6 +67,34 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
         arr.Array::set(0, arr.m_ubound);
     }
     return r;
+}
+
+void ArrayIntNull::init_from_ref(ref_type ref) REALM_NOEXCEPT
+{
+    REALM_ASSERT_DEBUG(ref);
+    char* header = m_alloc.translate(ref);
+    init_from_mem(MemRef{header, ref});
+}
+
+void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
+{
+    Array::init_from_mem(mem);
+    
+    if (m_size == 0) {
+        // This can only happen when mem is being reused from another
+        // array (which happens when shrinking the B+tree), so we need
+        // to add the "magic" null value to the beginning.
+        
+        // Since init_* functions are noexcept, but insert() isn't, we
+        // need to ensure that insert() will not allocate.
+        REALM_ASSERT(m_capacity != 0);
+        Array::insert(0, m_ubound);
+    }
+}
+
+void ArrayIntNull::init_from_parent() REALM_NOEXCEPT
+{
+    init_from_ref(get_ref_from_parent());
 }
 
 namespace {
@@ -129,7 +157,7 @@ void ArrayIntNull::ensure_not_null(int64_t value)
         }
     }
     else {
-        if (value <= m_lbound || value >= m_ubound) {
+        if (value < m_lbound || value >= m_ubound) {
             size_t new_width = bit_width(value);
             int64_t new_upper_bound = Array::ubound_for_width(new_width);
 

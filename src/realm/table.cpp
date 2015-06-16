@@ -330,7 +330,7 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_target_table(target_table);
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
-    backlink_col.set_origin_column(link_col);
+    backlink_col.set_origin_column(link_col, link_col_ndx);
 }
 
 
@@ -352,7 +352,7 @@ size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT
 
 void Table::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 {
-    size_t num_cols = m_spec.get_public_column_count();
+    size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         column.cascade_break_backlinks_to(row_ndx, state); // Throws
@@ -362,7 +362,7 @@ void Table::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 
 void Table::cascade_break_backlinks_to_all_rows(CascadeState& state)
 {
-    size_t num_cols = m_spec.get_public_column_count();
+    size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         column.cascade_break_backlinks_to_all_rows(m_size, state); // Throws
@@ -370,16 +370,15 @@ void Table::cascade_break_backlinks_to_all_rows(CascadeState& state)
 }
 
 
-void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
+void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
 {
     Group& group = *get_parent_group();
 
     // Rows are ordered by ascending row index, but we need to remove the rows
     // by descending index to avoid changing the indexes of rows that are not
     // removed yet.
-    typedef CascadeState::row_set::const_reverse_iterator iter;
-    iter end = rows.rend();
-    for (iter i = rows.rbegin(); i != end; ++i) {
+    auto end = cascade_state.rows.rend();
+    for (auto i = cascade_state.rows.rbegin(); i != end; ++i) {
         typedef _impl::GroupFriend gf;
         Table& table = gf::get_table(group, i->table_ndx);
 
@@ -837,13 +836,13 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
     }
 
     ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-    ColumnAttr attr_2 = attr;
-    attr_2 = ColumnAttr(attr_2 & ~col_attr_StrongLinks);
+    ColumnAttr new_attr = attr;
+    new_attr = ColumnAttr(new_attr & ~col_attr_StrongLinks);
     if (!weak_links)
-        attr_2 = ColumnAttr(attr_2 | col_attr_StrongLinks);
-    if (attr_2 == attr)
+        new_attr = ColumnAttr(new_attr | col_attr_StrongLinks);
+    if (new_attr == attr)
         return;
-    m_spec.set_column_attr(col_ndx, attr);
+    m_spec.set_column_attr(col_ndx, new_attr);
 
     ColumnLinkBase& col = get_column_link_base(col_ndx);
     col.set_weak_links(weak_links);
@@ -901,6 +900,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 
 void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     row->m_prev = 0;
     row->m_next = m_row_accessors;
     if (m_row_accessors)
@@ -910,6 +910,13 @@ void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 
 void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
+{
+    LockGuard lock(m_accessor_mutex);
+    do_unregister_row_accessor(row);
+}
+
+
+void Table::do_unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
     if (row->m_prev) {
         row->m_prev->m_next = row->m_next;
@@ -924,6 +931,7 @@ void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 
 void Table::discard_row_accessors() REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
     m_row_accessors = 0;
@@ -1109,6 +1117,7 @@ void Table::detach() REALM_NOEXCEPT
 
 void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
     typedef views::iterator iter;
@@ -1126,6 +1135,7 @@ void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 void Table::move_registered_view(const TableViewBase* old_addr,
                                  const TableViewBase* new_addr) REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     typedef views::iterator iter;
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i) {
@@ -1140,6 +1150,7 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 
 void Table::discard_views() REALM_NOEXCEPT
 {
+    LockGuard lock(m_accessor_mutex);
     typedef views::const_iterator iter;
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i)
@@ -1988,9 +1999,76 @@ void Table::move_last_over(size_t row_ndx)
     CascadeState state;
     state.rows.push_back(row);
 
+    if (Group* g = get_parent_group())
+        state.track_link_nullifications = g->has_cascade_notification_handler();
+
     cascade_break_backlinks_to(row_ndx, state); // Throws
 
-    remove_backlink_broken_rows(state.rows); // Throws
+    if (Group* g = get_parent_group())
+        _impl::GroupFriend::send_cascade_notification(*g, state);
+
+    remove_backlink_broken_rows(state); // Throws
+}
+
+namespace {
+CascadeState cascade_state_from_column(const Column& rows, std::size_t table_ndx)
+{
+    size_t size = rows.size();
+
+    CascadeState state;
+    state.rows.reserve(size);
+    for (size_t i = 0; i < size; ++i)
+        state.rows.push_back({table_ndx, to_size_t(rows.get(i))});
+    sort(begin(state.rows), end(state.rows));
+    state.rows.erase(unique(begin(state.rows), end(state.rows)), end(state.rows));
+
+    return state;
+}
+}
+
+void Table::batch_move_last_over(const Column& rows)
+{
+    REALM_ASSERT(is_attached());
+
+    CascadeState state = cascade_state_from_column(rows, get_index_in_group());
+    if (Group* g = get_parent_group())
+        state.track_link_nullifications = g->has_cascade_notification_handler();
+
+    // Iterate over a copy of `rows` since cascading deletes mutate it
+    auto copy = state.rows;
+    for (auto const& row : copy)
+        cascade_break_backlinks_to(row.row_ndx, state); // Throws
+
+    if (Group* g = get_parent_group())
+        _impl::GroupFriend::send_cascade_notification(*g, state);
+
+    remove_backlink_broken_rows(state); // Throws
+}
+
+void Table::batch_remove(const Column& rows)
+{
+    REALM_ASSERT(is_attached());
+
+    CascadeState state = cascade_state_from_column(rows, get_index_in_group());
+    if (Group* g = get_parent_group())
+        _impl::GroupFriend::send_cascade_notification(*g, state);
+
+#ifdef REALM_ENABLE_REPLICATION
+    Replication* repl = get_repl();
+#endif
+
+    // Remove in reverse order to avoid having to update row indexes
+    auto end = state.rows.rend();
+    for (auto i = state.rows.rbegin(); i != end; ++i) {
+#ifdef REALM_ENABLE_REPLICATION
+        if (repl) {
+            bool move_last_over = false;
+            repl->erase_row(this, i->row_ndx, move_last_over); // Throws
+        }
+#endif
+
+        do_remove(i->row_ndx);
+    }
 }
 
 
@@ -2030,12 +2108,17 @@ void Table::clear()
     // all the rows that need to be cascade-removed.
     CascadeState state;
     state.stop_on_table = this;
+    if (Group* g = get_parent_group())
+        state.track_link_nullifications = g->has_cascade_notification_handler();
     cascade_break_backlinks_to_all_rows(state); // Throws
+
+    if (Group* g = get_parent_group())
+        _impl::GroupFriend::send_cascade_notification(*g, state);
 
     bool broken_reciprocal_backlinks = true;
     do_clear(broken_reciprocal_backlinks);
 
-    remove_backlink_broken_rows(state.rows); // Throws
+    remove_backlink_broken_rows(state); // Throws
 }
 
 
@@ -2787,9 +2870,16 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     target_row.row_ndx   = old_target_row_ndx;
     CascadeState state;
     state.rows.push_back(target_row);
+
+    if (Group* g = get_parent_group())
+        state.track_link_nullifications = g->has_cascade_notification_handler();
+
     target_table.cascade_break_backlinks_to(old_target_row_ndx, state); // Throws
 
-    remove_backlink_broken_rows(state.rows); // Throws
+    if (Group* g = get_parent_group())
+        _impl::GroupFriend::send_cascade_notification(*g, state);
+
+    remove_backlink_broken_rows(state); // Throws
 }
 
 
@@ -4695,6 +4785,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXC
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after insertion of new rows
+    LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next) {
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
@@ -4709,12 +4800,13 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after removal of a row
+    LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx > row_ndx) {
             --row->m_row_ndx;
@@ -4730,12 +4822,13 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
+    LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
         if (row->m_row_ndx == to_row_ndx) {
             row->m_table.reset();
-            unregister_row_accessor(row);
+            do_unregister_row_accessor(row);
         }
         else if (row->m_row_ndx == from_row_ndx) {
             row->m_row_ndx = to_row_ndx;
@@ -5005,6 +5098,7 @@ void Table::Verify() const
 
     // Verify row accessors
     {
+        LockGuard lock(m_accessor_mutex);
         for (RowBase* row = m_row_accessors; row; row = row->m_next) {
             // Check that it is attached to this table
             REALM_ASSERT_3(row->m_table.get(), ==, this);

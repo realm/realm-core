@@ -35,7 +35,7 @@ class Spec;
 // by making Column convert its integers to strings by calling to_str().
 template <class T> inline StringData to_str(const T& value)
 {
-    REALM_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
+    REALM_STATIC_ASSERT((std::is_same<T, int64_t>::value), "");
     const char* c = reinterpret_cast<const char*>(&value);
     return StringData(c, sizeof(T));
 }

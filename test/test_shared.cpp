@@ -167,8 +167,18 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 #if !defined(__APPLE__) && !defined(_WIN32)&& !defined REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
-TEST(Shared_PipelinedWritesWithKills)
+TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
+    // FIXME: This test was disabled because it has a strong tendency to leave
+    // rogue child processes behind after the root test process aborts. If these
+    // orphanned child processes are not manually searched for and killed, they
+    // will run indefinitely. Additionally, these child processes will typically
+    // grow a Realm file to gigantic sizes over time (100 gigabytes per 20
+    // minutes).
+    //
+    // Idea for solution: Install a custom signal handler for SIGABRT and
+    // friends, and kill all spawned child processes from it. See `man abort`.
+
     CHECK(RobustMutex::is_robust_on_this_platform());
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);

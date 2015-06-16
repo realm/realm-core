@@ -496,9 +496,17 @@ void File::resize(SizeType size)
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
-    if (::ftruncate(m_fd, size2) == 0)
-        return;
-    throw std::runtime_error("ftruncate() failed");
+    if (::ftruncate(m_fd, size2) != 0) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("ftruncate() failed: ", err));
+    }
+
+#ifdef __APPLE__
+    if (::fcntl(m_fd, F_FULLFSYNC) != 0) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("fcntl(F_FULLFSYNC) failed: ", err));
+    }
+#endif
 
 #endif
 }

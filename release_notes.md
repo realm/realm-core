@@ -2,10 +2,6 @@
 
 ### Bugfixes:
 
-* Fixed LinkViews containing incorrect data after a write transaction
-  containing a table clear is rolled back.
-* Fixed errors when a changes to a table with an indexed int column are rolled
-  back.
 * Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
 
 ### API breaking changes:
@@ -14,14 +10,17 @@
 
 ### Enhancements:
 
-* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
-* SharedGroup::compact() will now throw a runtime_error if called in detached state.
-* Make the start index of `ListView::find()` overrideable for finding multiple
-  occurances of a given row in a LinkList.
+* Lorem ipsum.
+
+-----------
 
 ### Internals:
 
-* Can now be built with encryption enabled on Linux.
+* Lorem ipsum.
+
+----------------------------------------------
+
+# NEXT RELEASE
 
 ----------------------------------------------
 
@@ -37,6 +36,61 @@ StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
 is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.6 Release notes
+
+### Bugfixes:
+
+* Fixed durability issue in case of power / system failures on Apple platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to stable storage when the file is extended.
+
+----------------------------------------------
+
+# 0.89.5 Release notes
+
+### Bugfixes:
+
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back or advanced over.
+
+----------------------------------------------
+
+# 0.89.4 Release notes
+
+### Enhancements:
+
+* Detaching (and thus destroying) row acessors and TableViews can now be done
+  safely from any thread.
+* Improved performance of Query::find_all() with assertions enabled.
+
+----------------------------------------------
+
+# 0.89.3 Release notes
+
+### Bugfixes:
+
+* Fixed LinkViews containing incorrect data after a write transaction
+  containing a table clear is rolled back.
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
+* SharedGroup::compact() will now throw a runtime_error if called in detached state.
+* Make the start index of `ListView::find()` overrideable for finding multiple
+  occurances of a given row in a LinkList.
+* Add `Group::set_cascade_notification_handler()` to simplify tracking changes
+  due to link nullification and cascading deletes.
+
+### Internals:
+
+* Can now be built with encryption enabled on Linux.
 
 ----------------------------------------------
 

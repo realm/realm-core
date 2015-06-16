@@ -168,6 +168,7 @@ namespace realm {
 namespace test_util {
 namespace unit_test {
 
+
 class Test;
 class TestResults;
 
@@ -175,7 +176,7 @@ class TestResults;
 struct TestDetails {
     long test_index;
     const char* suite_name;
-    const char* test_name;
+    std::string test_name;
     const char* file_name;
     long line_number;
 };
@@ -236,7 +237,7 @@ public:
 
     /// Called automatically when you use the `TEST` macro (or one of
     /// its friends).
-    void add(Test&, const char* suite, const char* name, const char* file, long line);
+    void add(Test&, const char* suite, const std::string& name, const char* file, long line);
 
 private:
     class ExecContext;
@@ -435,6 +436,11 @@ struct RegisterTest {
     RegisterTest(TestList& list, Test& test, const char* suite,
                  const char* name, const char* file, long line)
     {
+        register_test(list, test, suite, name, file, line);
+    }
+    static void register_test(TestList& list, Test& test, const char* suite,
+                              const std::string& name, const char* file, long line)
+    {
         list.add(test, suite, name, file, line);
     }
 };
@@ -501,13 +507,13 @@ template<class A, class B> struct Compare<A, B, true> {
 
 template<class A, class B> inline bool equal(const A& a, const B& b)
 {
-    const bool both_are_integral = util::IsIntegral<A>::value && util::IsIntegral<B>::value;
+    const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
     return Compare<A, B, both_are_integral>::equal(a,b);
 }
 
 template<class A, class B> inline bool less(const A& a, const B& b)
 {
-    const bool both_are_integral = util::IsIntegral<A>::value && util::IsIntegral<B>::value;
+    const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
     return Compare<A, B, both_are_integral>::less(a,b);
 }
 
@@ -560,7 +566,7 @@ template<class T> void to_string(const T& value, std::string& str)
 {
     // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
     std::ostringstream out;
-    SetPrecision<T, util::IsFloatingPoint<T>::value>::exec(out);
+    SetPrecision<T, std::is_floating_point<T>::value>::exec(out);
     out << value;
     str = out.str();
 }

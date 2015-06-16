@@ -22,6 +22,7 @@
 #include <set>
 
 #include <realm/column_linklist.hpp>
+#include <realm/group.hpp>
 #include <realm/link_view.hpp>
 
 using namespace realm;
