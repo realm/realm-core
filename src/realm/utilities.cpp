@@ -3,7 +3,6 @@
 #include <iostream>
 #include <stdint.h>
 #include <atomic>
-#include <sys/time.h> // gettimeofday -- FIXME!! Not portable
 
 #include <realm/utilities.hpp>
 #include <realm/unicode.hpp>
@@ -289,14 +288,6 @@ uint64_t fastrand(uint64_t max)
     x ^= x >> 27; // c
     state.store(x, std::memory_order_release);
     return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 0xffffffffffffffffULL : max + 1);
-}
-
-uint_fast64_t get_current_timestamp()
-{
-    // FIXME: Make sure return value is in UTC.
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 } // namespace realm
