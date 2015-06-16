@@ -27,6 +27,10 @@
 
 #include <realm/util/errno.hpp>
 
+#ifdef __APPLE__
+#   include <fcntl.h>
+#endif
+
 #ifdef REALM_ENABLE_ENCRYPTION
 
 #include "encrypted_file_mapping.hpp"
@@ -711,7 +715,7 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 #endif
 }
 
-void msync(void* addr, size_t size)
+void msync(int fd, void* addr, size_t size)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
@@ -719,6 +723,7 @@ void msync(void* addr, size_t size)
         if (mapping_and_addr* m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {
             m->mapping->flush();
             m->mapping->sync();
+            // TODO: tighter sync when encryption is enabled
             return;
         }
     }
@@ -726,8 +731,8 @@ void msync(void* addr, size_t size)
 
     // not an encrypted mapping
 
-    // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
-    // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
+    // On iOS/OSX fsync may not be enough to ensure crash safety.
+    // So we're adding fcntl(F_FULLFSYNC). Same for msync.
     //
     // See description of fsync on iOS here:
     // https://developer.apple.com/library/ios/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html
@@ -739,6 +744,14 @@ void msync(void* addr, size_t size)
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));
     }
+#ifdef __APPLE__
+    if (::fcntl(fd, F_FULLFSYNC) != 0) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("fcntl(F_FULLFSYNC) failed: ", err));
+    }
+#else
+    static_cast<void>(fd);
+#endif
 }
 
 }
