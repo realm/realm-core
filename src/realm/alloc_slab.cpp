@@ -414,7 +414,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     File::CloseGuard fcg(m_file);
 
     size_t initial_size = 4 * 1024; // 4 KiB
+    if (m_chunk_size)
+        initial_size = m_chunk_size;
 
+    std::size_t size_of_streaming_file;
     ref_type top_ref = 0;
 
     // The size of a database file must not exceed what can be encoded in
@@ -449,8 +452,21 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         size = initial_size;
     }
 
-    // TODO: Make sure the filesize matches a page boundary...
+    // We must now make sure the filesize matches a page boundary...
+    // first, save the original filesize for use later when converting from streaming format
+    size_of_streaming_file = size;
 
+    // next extend the file to a multiple of chunk_size (unless already there)
+    // The file must be extended prior to being mmapped, as extending it after mmap has
+    // undefined behavior.
+    if (m_chunk_size && ((size % m_chunk_size) != 0)) {
+        size += m_chunk_size - (size % m_chunk_size); // realign on chunk boundary
+        m_file.resize(size);
+        // resizing the file (as we do here) without actually changing any internal
+        // datastructures to reflect the additional free space will work, because the
+        // free space management relies on the logical filesize and disregards the
+        // actual size of the file.
+    }
 
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
@@ -458,7 +474,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            if (!validate_buffer(map.get_addr(), size, top_ref))
+            if (!validate_buffer(map.get_addr(), size_of_streaming_file, top_ref))
                 goto invalid_database;
         }
         m_data        = map.release();
@@ -517,7 +533,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         REALM_ASSERT_3(header->m_top_ref[0], == , streaming_header.m_top_ref[0]);
         REALM_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
 
-        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+m_baseline) - 1;
+        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+size_of_streaming_file) - 1;
         REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
         ::mprotect(header, sizeof(Header), PROT_READ | PROT_WRITE);
         header->m_top_ref[1] = footer->m_top_ref;

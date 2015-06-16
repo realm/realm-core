@@ -300,6 +300,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     ArrayInteger& lengths   = m_group.m_free_lengths;
     ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
+    std::size_t alloc_chunk_size = m_alloc.m_chunk_size;
 
     // We need to consider the "logical" size of the file here, and
     // not the real size. The real size may have changed without the
@@ -334,41 +335,50 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         }
     }
 
-    size_t min_file_size = logical_file_size;
-    if (int_add_with_overflow_detect(min_file_size, extend_size))
-        throw std::runtime_error("File size overflow");
-
-    // We double the size until we reach 'stop_doubling_size'. From
-    // then on we increment the size in steps of
-    // 'stop_doubling_size'. This is to achieve a reasonable
-    // compromise between minimizing fragmentation (maximizing
-    // performance) and minimizing over-allocation.
-#ifdef REALM_MOBILE
-    size_t stop_doubling_size = 16 * (1024*1024L); // = 16 MiB
-#else
-    size_t stop_doubling_size = 128 * (1024*1024L); // = 128 MiB
-#endif
-    REALM_ASSERT_3(stop_doubling_size % 8, ==, 0);
-
     size_t new_file_size = logical_file_size;
-    while (new_file_size < min_file_size) {
-        if (new_file_size < stop_doubling_size) {
-            // The file contains at least a header, so the size can never
-            // be zero. We need this to ensure that the number of
-            // iterations will be finite.
-            REALM_ASSERT_3(new_file_size, !=, 0);
-            // Be sure that the doubling does not overflow
-            REALM_ASSERT_3(stop_doubling_size, <=, std::numeric_limits<size_t>::max() / 2);
-            new_file_size *= 2;
-        }
-        else {
-            if (int_add_with_overflow_detect(new_file_size, stop_doubling_size)) {
-                new_file_size = std::numeric_limits<size_t>::max();
-                new_file_size &= ~size_t(7); // 8-byte alignment
+
+    if (alloc_chunk_size) {
+        REALM_ASSERT_3(requested_size, <=, alloc_chunk_size);
+        new_file_size = logical_file_size + extend_size;
+        if ((new_file_size % alloc_chunk_size) != 0)
+            new_file_size += alloc_chunk_size - (new_file_size % alloc_chunk_size);
+    }
+    else {
+
+        size_t min_file_size = logical_file_size;
+        if (int_add_with_overflow_detect(min_file_size, extend_size))
+            throw std::runtime_error("File size overflow");
+
+        // We double the size until we reach 'stop_doubling_size'. From
+        // then on we increment the size in steps of
+        // 'stop_doubling_size'. This is to achieve a reasonable
+        // compromise between minimizing fragmentation (maximizing
+        // performance) and minimizing over-allocation.
+#ifdef REALM_MOBILE
+        size_t stop_doubling_size = 16 * (1024*1024L); // = 16 MiB
+#else
+        size_t stop_doubling_size = 128 * (1024*1024L); // = 128 MiB
+#endif
+        REALM_ASSERT_3(stop_doubling_size % 8, ==, 0);
+
+        while (new_file_size < min_file_size) {
+            if (new_file_size < stop_doubling_size) {
+                // The file contains at least a header, so the size can never
+                // be zero. We need this to ensure that the number of
+                // iterations will be finite.
+                REALM_ASSERT_3(new_file_size, !=, 0);
+                // Be sure that the doubling does not overflow
+                REALM_ASSERT_3(stop_doubling_size, <=, std::numeric_limits<size_t>::max() / 2);
+                new_file_size *= 2;
+            }
+            else {
+                if (int_add_with_overflow_detect(new_file_size, stop_doubling_size)) {
+                    new_file_size = std::numeric_limits<size_t>::max();
+                    new_file_size &= ~size_t(7); // 8-byte alignment
+                }
             }
         }
     }
-
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
