@@ -714,7 +714,7 @@ public:
             source.export_float(*this);
         else if (std::is_same<T, double>::value)
             source.export_double(*this);
-        else if (std::is_same<T, int64_t>::value)
+        else if (std::is_same<T, int64_t>::value || std::is_same<T, DateTime>::value)
             source.export_int64_t(*this);
         else if (std::is_same<T, StringData>::value)
             source.export_StringData(*this);

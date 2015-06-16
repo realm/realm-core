@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
 
 ### API breaking changes:
 
