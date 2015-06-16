@@ -1242,39 +1242,35 @@ void SharedGroup::promote_to_write()
     REALM_ASSERT(m_transact_stage == transact_Reading);
 
 #ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
+    Replication* repl = m_group.get_replication();
+    if (repl)
         repl->begin_write_transact(*this); // Throws
-        try {
-            do_begin_write();
-            advance_read();
-        }
-        catch (...) {
-            repl->rollback_write_transact(*this);
-            throw;
-        }
-        m_transact_stage = transact_Writing;
-        return;
-    }
 #endif
 
-    do_begin_write();
+    try {
+        do_begin_write();
+        advance_read();
+    }
+    catch (...) {
+#ifdef REALM_ENABLE_REPLICATION
+        if (repl)
+            repl->rollback_write_transact(*this);
+#endif
+        throw;
+    }
 
-    // Advance to latest state (accessor update)
-    advance_read();
     m_transact_stage = transact_Writing;
 }
 
 
-void SharedGroup::advance_read(VersionID specific_version)
+std::unique_ptr<BinaryData[]> SharedGroup::advance_readlock(VersionID specific_version)
 {
-    REALM_ASSERT(m_transact_stage == transact_Reading);
-
-    ReadLockInfo old_readlock = m_readlock;
     bool same_as_before;
     Replication* repl = _impl::GroupFriend::get_replication(m_group);
+    ReadLockInfo old_readlock = m_readlock;
 
     // we cannot move backward in time (yet)
-    if (specific_version.version && specific_version.version < old_readlock.m_version) {
+    if (specific_version.version && specific_version.version < m_readlock.m_version) {
         throw UnreachableVersion();
     }
 
@@ -1292,8 +1288,7 @@ void SharedGroup::advance_read(VersionID specific_version)
         grab_latest_readlock(m_readlock, same_as_before); // Throws
     }
     if (same_as_before) {
-        release_readlock(old_readlock);
-        return;
+        return nullptr;
     }
 
     // If the new top-ref is zero, then the previous top-ref must have
@@ -1304,8 +1299,7 @@ void SharedGroup::advance_read(VersionID specific_version)
     // Group::init_for_transact() to put the group accessor into a
     // valid state.
     if (m_readlock.m_top_ref == 0) {
-        release_readlock(old_readlock);
-        return;
+        return nullptr;
     }
 
     // We know that the log_registry already knows about the new_version,
@@ -1316,13 +1310,27 @@ void SharedGroup::advance_read(VersionID specific_version)
         logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
 
     repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs.get());
+    return logs;
+}
 
+void SharedGroup::do_advance_read(ReadLockInfo old_readlock, std::unique_ptr<BinaryData []> logs)
+{
     m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size,
                              logs.get(),
                              logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
-
-    // OK to release the readlock here:
     release_readlock(old_readlock);
+}
+
+void SharedGroup::advance_read(VersionID specific_version)
+{
+    REALM_ASSERT(m_transact_stage == transact_Reading);
+
+    ReadLockInfo old_readlock = m_readlock;
+    auto logs = advance_readlock(specific_version);
+    if (logs)
+        do_advance_read(old_readlock, std::move(logs));
+    else
+        release_readlock(old_readlock);
 }
 
 #endif // REALM_ENABLE_REPLICATION
@@ -1424,8 +1432,9 @@ void SharedGroup::rollback_and_continue_as_read()
 
     // get the commit log and use it to rollback all accessors:
     if (Replication* repl = m_group.get_replication()) {
+        BinaryData buffer = repl->get_pending_entries();
+        m_group.reverse_transact(m_readlock.m_top_ref, buffer);
 
-        // this call is vectored through to do_rollback_and....
         repl->rollback_write_transact(*this);
     }
 
@@ -1433,14 +1442,6 @@ void SharedGroup::rollback_and_continue_as_read()
     SharedInfo* info = m_file_map.get_addr();
     info->writemutex.unlock();
 }
-
-void SharedGroup::do_rollback_and_continue_as_read(const char* begin, const char* end)
-{
-    BinaryData buffer(begin, end-begin);
-    m_group.reverse_transact(m_readlock.m_top_ref, buffer);
-}
-
-
 
 #endif // REALM_ENABLE_REPLICATION
 

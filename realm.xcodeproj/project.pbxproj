@@ -122,6 +122,7 @@
 		3F1967AD1A9530AA0072FE29 /* config.h in Headers */ = {isa = PBXBuildFile; fileRef = 3F1967AA1A9530AA0072FE29 /* config.h */; };
 		3F1967AE1A9530AA0072FE29 /* platform_specific_condvar.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3F1967AB1A9530AA0072FE29 /* platform_specific_condvar.hpp */; };
 		3F1967AF1A9530AA0072FE29 /* platform_specific_condvar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F1967AC1A9530AA0072FE29 /* platform_specific_condvar.cpp */; };
+		3F240CC21B26455300D3EB96 /* array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A61AA75E3400F27CBD /* array_integer.cpp */; };
 		3F5ED51019D08A11001FCFF4 /* file_mapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED50E19D08A11001FCFF4 /* file_mapper.cpp */; };
 		3F5ED51119D08A11001FCFF4 /* file_mapper.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3F5ED50F19D08A11001FCFF4 /* file_mapper.hpp */; };
 		3F5ED51419D9D4D1001FCFF4 /* test_basic_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51219D9D4D1001FCFF4 /* test_basic_utils.cpp */; };
@@ -277,7 +278,6 @@
 		65BB23001AD80EA30097170F /* test_upgrade_database.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */; };
 		65D3F7A51AA7549600F27CBD /* test_array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A41AA7549100F27CBD /* test_array_integer.cpp */; };
 		65D3F7A71AA75E3A00F27CBD /* array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A61AA75E3400F27CBD /* array_integer.cpp */; };
-		65D3F7A81AA75E3B00F27CBD /* array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A61AA75E3400F27CBD /* array_integer.cpp */; };
 		65D3F7A91AA75E7200F27CBD /* array_integer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 65D3F7A01AA74E2900F27CBD /* array_integer.hpp */; };
 		65D3F7AA1AA75E7200F27CBD /* array_integer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 65D3F7A01AA74E2900F27CBD /* array_integer.hpp */; };
 		80ADCCE918A23DD00049D472 /* version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80ADCCE718A23DD00049D472 /* version.cpp */; };
@@ -301,7 +301,6 @@
 		F43098B31B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
 		F43098B41B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
 		F43098B51B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
-		F45013AA1B01016C00CD4A7E /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F4D0FC2A1B00F4010040956A /* Info.plist */; };
 		F45013B41B01022800CD4A7E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = F45013B31B01022800CD4A7E /* main.m */; };
 		F45013BA1B01022800CD4A7E /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F45013B91B01022800CD4A7E /* ViewController.mm */; };
 		F45013BD1B01022800CD4A7E /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F45013BB1B01022800CD4A7E /* Main.storyboard */; };
@@ -898,7 +897,6 @@
 			children = (
 				F43098B01B021C04000A2333 /* bptree.cpp */,
 				F43098B11B021C04000A2333 /* bptree.hpp */,
-				F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */,
 				3620DF0318B6CA7B003AD498 /* impl */,
 				52D7C4661852A01700633748 /* util */,
 				52F6359316B43C79006117C4 /* alloc.cpp */,
@@ -1643,7 +1641,7 @@
 		3611F2FC14209B7000017263 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0620;
+				LastUpgradeCheck = 0700;
 				ORGANIZATIONNAME = Realm;
 				TargetAttributes = {
 					F45013AE1B01022800CD4A7E = {
@@ -1703,7 +1701,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				F4D0FC371B00F4010040956A /* Images.xcassets in Resources */,
-				F45013AA1B01016C00CD4A7E /* Info.plist in Resources */,
 				F4D0FC3A1B00F4010040956A /* LaunchScreen.xib in Resources */,
 				F4D0FC351B00F4010040956A /* Main.storyboard in Resources */,
 			);
@@ -1867,7 +1864,7 @@
 				4142C93C1623478700B3B902 /* array_binary.cpp in Sources */,
 				4142C93D1623478700B3B902 /* array_blob.cpp in Sources */,
 				36FDACE117D67DED0084E8BB /* array_blobs_big.cpp in Sources */,
-				65D3F7A81AA75E3B00F27CBD /* array_integer.cpp in Sources */,
+				3F240CC21B26455300D3EB96 /* array_integer.cpp in Sources */,
 				4142C93F1623478700B3B902 /* array_string.cpp in Sources */,
 				4142C93E1623478700B3B902 /* array_string_long.cpp in Sources */,
 				4142C9471623478700B3B902 /* column.cpp in Sources */,
@@ -1890,7 +1887,6 @@
 				4142C9491623478700B3B902 /* group.cpp in Sources */,
 				4142C9511623478700B3B902 /* group_shared.cpp in Sources */,
 				F43098B31B021C04000A2333 /* bptree.cpp in Sources */,
-				65D3F7A81AA75E3B00F27CBD /* array_integer.cpp in Sources */,
 				4142C9481623478700B3B902 /* group_writer.cpp in Sources */,
 				4142C9521623478700B3B902 /* index_string.cpp in Sources */,
 				52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */,
@@ -2112,6 +2108,7 @@
 				CLANG_WARN__EXIT_TIME_DESTRUCTORS = NO;
 				CLANG_X86_VECTOR_INSTRUCTIONS = sse4.2;
 				COPY_PHASE_STRIP = NO;
+				ENABLE_TESTABILITY = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"REALM_DEBUG=1",
@@ -2418,6 +2415,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MTL_ENABLE_DEBUG_INFO = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.realm.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2454,6 +2452,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.realm.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2560,6 +2559,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MTL_ENABLE_DEBUG_INFO = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.realm.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";
 				SDKROOT = iphoneos;
@@ -2598,6 +2598,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.realm.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";
 				SDKROOT = iphoneos;

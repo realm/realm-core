@@ -101,7 +101,7 @@ private:
     typedef typename List::head                                type_1;
     typedef typename FindType<typename List::tail, Pred>::type type_2;
 public:
-    typedef typename CondType<Pred<type_1>::value, type_1, type_2>::type type;
+    typedef typename std::conditional<Pred<type_1>::value, type_1, type_2>::type type;
 };
 /// Base case for empty type list.
 template<template<class> class Pred> struct FindType<void, Pred> {

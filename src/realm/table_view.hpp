@@ -811,28 +811,28 @@ inline size_t TableViewBase::find_first_datetime(size_t column_ndx, DateTime val
 template <class R, class V>
 R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
 {
-    typedef typename util::RemoveConst<V>::type TNonConst;
+    typedef typename std::remove_const<V>::type TNonConst;
     return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_ndx, value).find_all();
 }
 
 template <class R, class V>
 R TableViewBase::find_all_float(V* view, size_t column_ndx, float value)
 {
-    typedef typename util::RemoveConst<V>::type TNonConst;
+    typedef typename std::remove_const<V>::type TNonConst;
     return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_ndx, value).find_all();
 }
 
 template <class R, class V>
 R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
 {
-    typedef typename util::RemoveConst<V>::type TNonConst;
+    typedef typename std::remove_const<V>::type TNonConst;
     return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_ndx, value).find_all();
 }
 
 template <class R, class V>
 R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
 {
-    typedef typename util::RemoveConst<V>::type TNonConst;
+    typedef typename std::remove_const<V>::type TNonConst;
     return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_ndx, value).find_all();
 }
 

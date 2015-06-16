@@ -70,9 +70,9 @@ struct RegisterTests {
                                const char* suite, const char* name, const char* file, long line)
     {
         std::string name_2 = name;
-        name_2 += '<';
+        name_2 += '[';
         name_2 += get_type_name<Type>();
-        name_2 += '>';
+        name_2 += ']';
         RegisterTest::register_test(list, tests.head, suite, name_2, file, line);
         register_tests(list, tests.tail, suite, name, file, line);
     }

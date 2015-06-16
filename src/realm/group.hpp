@@ -21,6 +21,7 @@
 #ifndef REALM_GROUP_HPP
 #define REALM_GROUP_HPP
 
+#include <functional>
 #include <string>
 #include <vector>
 #include <map>
@@ -385,6 +386,60 @@ public:
     /// this is not the case when working with proper transactions.
     void commit();
 
+    //@{
+    /// Some operations on Tables in a Group can cause indirect changes to other
+    /// fields, including in other Tables in the same Group. Specifically,
+    /// removing a row will set any links to that row to null, and if it had the
+    /// last strong links to other rows, will remove those rows. When this
+    /// happens, The cascade notification handler will be called with a
+    /// CascadeNotification containing information about what indirect changes
+    /// will occur, before any changes are made.
+    ///
+    /// has_cascade_notification_handler() returns true if and only if there is
+    /// currently a non-null notification handler registered.
+    ///
+    /// set_cascade_notification_handler() replaces the current handler (if any)
+    /// with the passed in handler. Pass in nullptr to remove the current handler
+    /// without registering a new one.
+    ///
+    /// CascadeNotification contains a vector of rows which will be removed and
+    /// a vector of links which will be set to null (or removed, for entries in
+    /// LinkLists).
+    struct CascadeNotification {
+        struct row {
+            std::size_t table_ndx; ///< Index within group of a group-level table.
+            std::size_t row_ndx; ///< Row index which will be removed.
+
+            bool operator==(const row&) const REALM_NOEXCEPT;
+            bool operator!=(const row&) const REALM_NOEXCEPT;
+
+            /// Trivial lexicographic order
+            bool operator<(const row&) const REALM_NOEXCEPT;
+        };
+
+        struct link {
+            const Table* origin_table; ///< A group-level table.
+            std::size_t origin_col_ndx; ///< Link column being nullified.
+            std::size_t origin_row_ndx; ///< Row in column being nullified.
+            /// The target row index which is being removed. Mostly relevant for
+            /// LinkList (to know which entries are being removed), but also
+            /// valid for Link.
+            std::size_t old_target_row_ndx;
+        };
+
+        /// A sorted list of rows which will be removed by the current operation.
+        std::vector<row> rows;
+
+        /// An unordered list of links which will be nullified by the current
+        /// operation.
+        std::vector<link> links;
+    };
+
+    bool has_cascade_notification_handler() const REALM_NOEXCEPT;
+    void set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) REALM_NOEXCEPT;
+
+    //@}
+
     // Conversion
     template<class S> void to_json(S& out, size_t link_depth = 0,
         std::map<std::string, std::string>* renames = nullptr) const;
@@ -431,6 +486,8 @@ private:
     
     const bool m_is_shared;
     bool m_is_attached;
+
+    std::function<void (const CascadeNotification&)> m_notify_handler;
 
     struct shared_tag {};
     Group(shared_tag) REALM_NOEXCEPT;
@@ -518,7 +575,6 @@ private:
     Replication* get_replication() const REALM_NOEXCEPT;
     void set_replication(Replication*) REALM_NOEXCEPT;
     class TransactAdvancer;
-    class TransactReverser;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           const BinaryData* logs_begin, const BinaryData* logs_end);
     void reverse_transact(ref_type new_top_ref, const BinaryData& log);
@@ -529,6 +585,8 @@ private:
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const override;
 #endif
+
+    void send_cascade_notification(const CascadeNotification& notification) const;
 
     friend class Table;
     friend class GroupWriter;
@@ -815,6 +873,22 @@ inline void Group::child_accessor_destroyed(Table*) REALM_NOEXCEPT
     // Ignore
 }
 
+inline bool Group::has_cascade_notification_handler() const REALM_NOEXCEPT
+{
+    return !!m_notify_handler;
+}
+
+inline void Group::set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) REALM_NOEXCEPT
+{
+    m_notify_handler = std::move(new_handler);
+}
+
+inline void Group::send_cascade_notification(const CascadeNotification& notification) const
+{
+    if (m_notify_handler)
+        m_notify_handler(notification);
+}
+
 class Group::TableWriter {
 public:
     virtual std::size_t write_names(_impl::OutputStream&) = 0;
@@ -894,6 +968,11 @@ public:
         return *table;
     }
 
+    static void send_cascade_notification(const Group& group, const Group::CascadeNotification& notification)
+    {
+        group.send_cascade_notification(notification);
+    }
+
 #ifdef REALM_ENABLE_REPLICATION
     static Replication* get_replication(const Group& group) REALM_NOEXCEPT
     {
@@ -907,6 +986,48 @@ public:
 #endif // REALM_ENABLE_REPLICATION
 };
 
+
+struct CascadeState : Group::CascadeNotification {
+    /// If non-null, then no recursion will be performed for rows of that
+    /// table. The effect is then exactly as if all the rows of that table were
+    /// added to \a state.rows initially, and then removed again after the
+    /// explicit invocations of Table::cascade_break_backlinks_to() (one for
+    /// each initiating row). This is used by Table::clear() to avoid
+    /// reentrance.
+    ///
+    /// Must never be set concurrently with stop_on_link_list_column.
+    Table* stop_on_table = nullptr;
+
+    /// If non-null, then Table::cascade_break_backlinks_to() will skip the
+    /// removal of reciprocal backlinks for the link list at
+    /// stop_on_link_list_row_ndx in this column, and no recursion will happen
+    /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
+    ///
+    /// Must never be set concurrently with stop_on_table.
+    ColumnLinkList* stop_on_link_list_column = nullptr;
+
+    /// Is ignored if stop_on_link_list_column is null.
+    std::size_t stop_on_link_list_row_ndx = 0;
+
+    /// If false, the links field is not needed, so any work done just for that
+    /// can be skipped.
+    bool track_link_nullifications = false;
+};
+
+inline bool Group::CascadeNotification::row::operator==(const row& r) const REALM_NOEXCEPT
+{
+    return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
+}
+
+inline bool Group::CascadeNotification::row::operator!=(const row& r) const REALM_NOEXCEPT
+{
+    return !(*this == r);
+}
+
+inline bool Group::CascadeNotification::row::operator<(const row& r) const REALM_NOEXCEPT
+{
+    return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
+}
 
 } // namespace realm
 

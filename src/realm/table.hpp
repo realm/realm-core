@@ -395,6 +395,12 @@ public:
     void move_last_over(std::size_t row_ndx);
     void clear();
 
+private:
+    // batch versions used by TableView and LinkView
+    void batch_remove(const Column& rows);
+    void batch_move_last_over(const Column& rows);
+public:
+
     //@}
 
 
@@ -1195,10 +1201,9 @@ private:
     /// It is immaterial which table remove_backlink_broken_rows() is called on,
     /// as long it that table is in the same group as the specified rows.
 
-    typedef ColumnBase::CascadeState CascadeState;
     void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState& state);
     void cascade_break_backlinks_to_all_rows(CascadeState& state);
-    void remove_backlink_broken_rows(const CascadeState::row_set&);
+    void remove_backlink_broken_rows(const CascadeState&);
 
     //@}
 
@@ -1630,7 +1635,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
-    if (util::SameType<T, Link>::value || util::SameType<T, LinkList>::value) {
+    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
         tmp.push_back(column);
     }
     m_link_chain.clear();
@@ -2077,12 +2082,12 @@ public:
     }
 
     static void cascade_break_backlinks_to(Table& table, std::size_t row_ndx,
-                                           Table::CascadeState& state)
+                                           CascadeState& state)
     {
         table.cascade_break_backlinks_to(row_ndx, state); // Throws
     }
 
-    static void remove_backlink_broken_rows(Table& table, const Table::CascadeState::row_set& rows)
+    static void remove_backlink_broken_rows(Table& table, const CascadeState& rows)
     {
         table.remove_backlink_broken_rows(rows); // Throws
     }

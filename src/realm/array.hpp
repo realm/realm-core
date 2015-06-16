@@ -1258,8 +1258,8 @@ public:
 
     void init(Action action, Array*, size_t limit)
     {
-        REALM_STATIC_ASSERT((util::SameType<R, float>::value ||
-                               util::SameType<R, double>::value), "");
+        REALM_STATIC_ASSERT((std::is_same<R, float>::value ||
+                               std::is_same<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
         m_minmax_index = not_found;
@@ -2410,7 +2410,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
 #if defined(REALM_COMPILER_SSE)
     if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
-    ||  (sseavx<30>() && (util::SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
+    ||  (sseavx<30>() && (std::is_same<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
 
         // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));

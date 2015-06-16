@@ -39,6 +39,7 @@ namespace realm {
 
 
 // Pre-definitions
+struct CascadeState;
 class StringIndex;
 
 struct ColumnTemplateBase
@@ -81,8 +82,8 @@ public:
     /// \param num_rows The total number of rows in this column.
     ///
     /// \param broken_reciprocal_backlinks If true, link columns must assume
-    /// that reciprocal backlinks have already been removed. Non-link columns,
-    /// and backlink columns should ignore this argument.
+    /// that reciprocal backlinks have already been removed. Non-link columns
+    /// should ignore this argument.
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
     /// Remove the specified entry from this column. Set \a is_last to
@@ -96,8 +97,8 @@ public:
     /// one less than the number of rows in the column.
     ///
     /// \param broken_reciprocal_backlinks If true, link columns must assume
-    /// that reciprocal backlinks have already been removed for the specified
-    /// row. Non-link columns, and backlink columns should ignore this argument.
+    /// that reciprocal backlinks have already been removed. Non-link columns
+    /// should ignore this argument.
     virtual void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
                                 bool broken_reciprocal_backlinks) = 0;
 
@@ -167,7 +168,6 @@ public:
     /// Table::cascade_break_backlinks_to_all_rows() to pass the number of rows
     /// in the table as \a num_rows.
 
-    struct CascadeState;
     virtual void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState&);
     virtual void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&);
 
@@ -344,49 +344,6 @@ protected:
     ColumnBaseWithIndex() {}
     ColumnBaseWithIndex(ColumnBaseWithIndex&&) = default;
     std::unique_ptr<StringIndex> m_search_index;
-};
-
-
-struct ColumnBase::CascadeState {
-    struct row {
-        std::size_t table_ndx; ///< Index within group of a group-level table.
-        std::size_t row_ndx;
-
-        bool operator==(const row&) const REALM_NOEXCEPT;
-        bool operator!=(const row&) const REALM_NOEXCEPT;
-
-        /// Trivial lexicographic order
-        bool operator<(const row&) const REALM_NOEXCEPT;
-    };
-
-    typedef std::vector<row> row_set;
-
-    /// A sorted list of rows. The order is defined by row::operator<(), and
-    /// insertions must respect this order.
-    row_set rows;
-
-    /// If non-null, then no recursion will be performed for rows of that
-    /// table. The effect is then exactly as if all the rows of that table were
-    /// added to \a state.rows initially, and then removed again after the
-    /// explicit invocations of Table::cascade_break_backlinks_to() (one for
-    /// each initiating row). This is used by Table::clear() to avoid
-    /// reentrance.
-    ///
-    /// Must never be set concurrently with stop_on_link_list_column.
-    Table* stop_on_table;
-
-    /// If non-null, then Table::cascade_break_backlinks_to() will skip the
-    /// removal of reciprocal backlinks for the link list at
-    /// stop_on_link_list_row_ndx in this column, and no recursion will happen
-    /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
-    ///
-    /// Must never be set concurrently with stop_on_table.
-    ColumnLinkList* stop_on_link_list_column;
-
-    /// Is ignored if stop_on_link_list_column is null.
-    std::size_t stop_on_link_list_row_ndx;
-
-    CascadeState();
 };
 
 
@@ -620,28 +577,6 @@ inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t
 }
 
 inline void ColumnBase::set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT
-{
-}
-
-inline bool ColumnBase::CascadeState::row::operator==(const row& r) const REALM_NOEXCEPT
-{
-    return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
-}
-
-inline bool ColumnBase::CascadeState::row::operator!=(const row& r) const REALM_NOEXCEPT
-{
-    return !(*this == r);
-}
-
-inline bool ColumnBase::CascadeState::row::operator<(const row& r) const REALM_NOEXCEPT
-{
-    return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
-}
-
-inline ColumnBase::CascadeState::CascadeState():
-    stop_on_table(0),
-    stop_on_link_list_column(0),
-    stop_on_link_list_row_ndx(0)
 {
 }
 
