@@ -669,13 +669,10 @@ EOF
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
-            case "$sdk" in
-              iPhoneOS*)
+            if [ "$platform" = 'iPhoneOS' ]; then
                 word_list_append "cflags_arch" "-mstrict-align" || exit 1
                 word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
-                ;;
-              *) ;;
-            esac
+            fi
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
             $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
