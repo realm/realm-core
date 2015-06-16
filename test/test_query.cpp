@@ -6065,10 +6065,10 @@ TEST(Query_LongLongLessThan)
     TableRef table = g.add_table("table");
     table->insert_column(0, type_Int, "key");
 
-    const long long start = 4485019129LL;
-    const long long count = 20; // First 16 SSE-searched, four fallback
+    const int64_t start = 4485019129LL;
+    const int64_t count = 20; // First 16 SSE-searched, four fallback
     table->add_empty_row(count);
-    for (long long i = 0; i < count; ++i)
+    for (int64_t i = 0; i < count; ++i)
         table->set_int(0, i, start + i);
 
     CHECK_EQUAL(0, table->where().less(0, start).count());
