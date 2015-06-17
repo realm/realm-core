@@ -1702,7 +1702,7 @@ SharedGroup::Handover<LinkView>* SharedGroup::export_linkview_for_handover(const
 LinkViewRef SharedGroup::import_linkview_from_handover(Handover<LinkView>* handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
-        throw std::runtime_error("Handover failed due to version mismatch");
+        throw UnreachableVersion();
     }
     // move data
     LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);

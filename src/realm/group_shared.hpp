@@ -452,13 +452,15 @@ public:
     /// Import an accessor wrapped in a handover object. The import will fail if the
     /// importing SharedGroup is viewing a version of the database that is different
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
-    /// The handover object is "consumed", it cannot be imported again.
+    /// If the import is succesfull, The handover object is "consumed", it cannot be 
+    /// imported again. If the import fails with a version mismatch, an UnreachableVersion
+    /// is thrown and the handover object is *not* "consumed".
     template<typename T>
     T* import_from_handover(Handover<T>* handover)
     {
         if (handover->version != get_version_of_current_transaction()) {
             // TODO: Clean up both patch data and cloned data
-            throw std::runtime_error("Handover failed due to version mismatch");
+            throw UnreachableVersion();
         }
         T* result = handover->clone;
         handover->clone = 0;

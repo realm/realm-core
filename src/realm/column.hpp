@@ -410,7 +410,7 @@ public:
     ~TColumn() REALM_NOEXCEPT override;
 	
 	void init_from_parent();
-
+    void init_from_ref(Allocator&, ref_type);
     // Accessor concept:
     void destroy() REALM_NOEXCEPT override;
     Allocator& get_alloc() const REALM_NOEXCEPT final;
@@ -954,6 +954,12 @@ template <class T, bool N>
 void TColumn<T,N>::init_from_parent()
 {
 	m_tree.init_from_parent();
+}
+
+template <class T, bool N>
+void TColumn<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
+{
+    m_tree.init_from_ref(alloc, ref);
 }
 
 template <class T, bool N>
