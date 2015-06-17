@@ -5,6 +5,7 @@
 #include <ostream>
 
 #include <realm/util/file.hpp>
+#include "realm/util/file_mapper.hpp" // for data_size_to_encrypted_size, encrypted_size_to_data_size
 
 #include "test.hpp"
 #include "crypt_key.hpp"
@@ -241,7 +242,7 @@ TEST(File_Resize)
     f.set_encryption_key(crypt_key(true));
 
     f.resize(8192);
-    CHECK_EQUAL(8192, f.get_size());
+    CHECK_EQUAL(encrypted_size_to_data_size(data_size_to_encrypted_size(8192)), f.get_size());
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
         for (int i = 0; i < 8192; ++i)
@@ -257,7 +258,7 @@ TEST(File_Resize)
     }
 
     f.resize(4096);
-    CHECK_EQUAL(4096, f.get_size());
+    CHECK_EQUAL(encrypted_size_to_data_size(data_size_to_encrypted_size(4096)), f.get_size());
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, 4096);
         for (int i = 0; i < 4096; ++i) {
@@ -268,7 +269,7 @@ TEST(File_Resize)
     }
 
     f.resize(8192);
-    CHECK_EQUAL(8192, f.get_size());
+    CHECK_EQUAL(encrypted_size_to_data_size(data_size_to_encrypted_size(8192)), f.get_size());
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
         for (int i = 0; i < 8192; ++i)
