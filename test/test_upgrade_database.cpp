@@ -52,7 +52,7 @@ using namespace realm::util;
 
 TEST(Upgrade_Database_2_3)
 {
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
     CHECK_OR_RETURN(File::exists(path));
 
     // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
@@ -263,7 +263,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     CHECK_OR_RETURN(File::exists(path));
 
 #if 1
@@ -407,7 +407,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
     CHECK_OR_RETURN(File::exists(path));
 
 #if 1
@@ -550,7 +550,7 @@ TEST(Upgrade_Database_Binary)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
     CHECK_OR_RETURN(File::exists(path));
 
 #if 1
