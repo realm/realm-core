@@ -350,8 +350,8 @@ public:
     {
         // Sum of float column must accumulate in double
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
-        REALM_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceColumn, float>::value &&
-                                                        !util::SameType<TResult, double>::value)), "");
+        REALM_STATIC_ASSERT( !(TAction == act_Sum && (std::is_same<TSourceColumn, float>::value &&
+                                                        !std::is_same<TResult, double>::value)), "");
 
         // TResult: type of query result
         // TSourceColumn: type of aggregate source
@@ -1654,7 +1654,7 @@ public:
         size_t s = start;
 
         while (s < end) {
-            if (util::SameType<TConditionValue, int64_t>::value) {
+            if (std::is_same<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 m_getter1.cache_next(s);
