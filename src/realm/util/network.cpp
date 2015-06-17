@@ -681,7 +681,7 @@ endpoint socket_base::local_endpoint(std::error_code& ec) const
 
 
 void socket_base::get_option(opt_enum opt, void* value_data, size_t& value_size,
-                             std::error_code& ec)
+                             std::error_code& ec) const
 {
     int level = 0;
     int option_name = 0;
@@ -714,7 +714,7 @@ void socket_base::set_option(opt_enum opt, const void* value_data, size_t value_
 }
 
 
-void socket_base::map_option(opt_enum opt, int& level, int& option_name)
+void socket_base::map_option(opt_enum opt, int& level, int& option_name) const
 {
     switch (opt) {
         case opt_ReuseAddr:

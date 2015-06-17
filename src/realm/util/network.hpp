@@ -279,18 +279,10 @@ public:
     std::error_code close(std::error_code&);
 
     template<class O> void get_option(O& option) const;
-    template<class O> std::error_code get_option(O& option, std::error_code& ec) const
-    {
-        option.get(*this, ec);
-        return ec;
-    }
+    template<class O> std::error_code get_option(O& option, std::error_code&) const;
 
     template<class O> void set_option(const O& option);
-    template<class O> std::error_code set_option(const O& option, std::error_code& ec)
-    {
-        option.set(*this, ec);
-        return ec;
-    }
+    template<class O> std::error_code set_option(const O& option, std::error_code&);
 
     void bind(const endpoint&);
     std::error_code bind(const endpoint&, std::error_code&);
@@ -315,9 +307,9 @@ protected:
 
     socket_base(io_service&);
 
-    void get_option(opt_enum, void* value_data, std::size_t& value_size, std::error_code&);
+    void get_option(opt_enum, void* value_data, std::size_t& value_size, std::error_code&) const;
     void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code&);
-    void map_option(opt_enum, int& level, int& option_name);
+    void map_option(opt_enum, int& level, int& option_name) const;
 
     friend class acceptor;
     friend class buffered_input_stream;
@@ -738,6 +730,34 @@ inline void socket_base::close()
     std::error_code ec;
     if (close(ec))
         throw std::system_error(ec);
+}
+
+template<class O> inline void socket_base::get_option(O& option) const
+{
+    std::error_code ec;
+    if (get_option(option, ec))
+        throw std::system_error(ec);
+}
+
+template<class O>
+inline std::error_code socket_base::get_option(O& option, std::error_code& ec) const
+{
+    option.get(*this, ec);
+    return ec;
+}
+
+template<class O> inline void socket_base::set_option(const O& option)
+{
+    std::error_code ec;
+    if (set_option(option, ec))
+        throw std::system_error(ec);
+}
+
+template<class O>
+inline std::error_code socket_base::set_option(const O& option, std::error_code& ec)
+{
+    option.set(*this, ec);
+    return ec;
 }
 
 inline void socket_base::bind(const endpoint& ep)

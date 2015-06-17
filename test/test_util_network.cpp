@@ -56,47 +56,171 @@ TEST(Network_Hostname)
 }
 
 
-namespace {
-
-void post_handler(int* var, int value)
-{
-    *var = value;
-}
-
-} // anonymous namespace
-
 TEST(Network_Post)
 {
-    int var = 381;
     network::io_service service;
-    service.post([&]{ post_handler(&var, 824); });
+    int var = 381;
+    service.post([&] { var = 824; });
     CHECK_EQUAL(var, 381);
     service.run();
     CHECK_EQUAL(var, 824);
 }
 
 
+TEST(Network_GetSetSocketOption)
+{
+    network::io_service service;
+    network::socket socket(service);
+    socket.open(network::protocol::ip_v4());
+    network::socket::reuse_address opt_reuse_addr;
+    socket.get_option(opt_reuse_addr);
+    CHECK_NOT(opt_reuse_addr.value());
+    socket.set_option(network::socket::reuse_address(true));
+    socket.get_option(opt_reuse_addr);
+    CHECK(opt_reuse_addr.value());
+}
+
+
 namespace {
 
-void handle_accept_1(std::error_code ec, bool* was_canceled)
+network::endpoint bind_acceptor(network::acceptor& acceptor)
 {
-    if (ec == error::operation_aborted)
-        *was_canceled = true;
+    network::io_service& service = acceptor.service();
+    network::resolver resolver(service);
+    network::resolver::query query("localhost", "",
+                                   network::resolver::query::passive |
+                                   network::resolver::query::address_configured);
+    network::endpoint::list endpoints;
+    resolver.resolve(query, endpoints);
+    {
+        auto i = endpoints.begin();
+        auto end = endpoints.end();
+        for (;;) {
+            std::error_code ec;
+            acceptor.bind(*i, ec);
+            if (!ec)
+                break;
+            acceptor.close();
+            if (++i == end)
+                throw std::runtime_error("Failed to bind to localhost:*");
+        }
+    }
+    return acceptor.local_endpoint();
 }
 
-void handle_accept_2(std::error_code ec, bool* was_accepted)
+void connect_socket(network::socket& socket, std::string port)
 {
-    if (!ec)
-        *was_accepted = true;
-}
+    network::io_service& service = socket.service();
+    network::resolver resolver(service);
+    network::resolver::query query("localhost", port);
+    network::endpoint::list endpoints;
+    resolver.resolve(query, endpoints);
 
-void handle_read_write(std::error_code ec, bool* was_canceled)
-{
-    if (ec == error::operation_aborted)
-        *was_canceled = true;
+    auto i = endpoints.begin();
+    auto end = endpoints.end();
+    for (;;) {
+        std::error_code ec;
+        socket.connect(*i, ec);
+        if (!ec)
+            break;
+        socket.close();
+        if (++i == end)
+            throw std::runtime_error("Failed to connect to localhost:"+port);
+    }
 }
 
 } // anonymous namespace
+
+TEST(Network_ReadWrite)
+{
+    network::io_service service_1;
+    network::acceptor acceptor(service_1);
+    network::endpoint listening_endpoint = bind_acceptor(acceptor);
+    acceptor.listen();
+
+    char data[] = { 'X', 'F', 'M' };
+
+    auto reader = [&] {
+        network::socket socket_1(service_1);
+        acceptor.accept(socket_1);
+        network::buffered_input_stream input(socket_1);
+        char buffer[sizeof data];
+        size_t n = input.read(buffer, sizeof data);
+        if (CHECK_EQUAL(sizeof data, n))
+            CHECK(std::equal(buffer, buffer+n, data));
+        std::error_code ec;
+        n = input.read(buffer, 1, ec);
+        CHECK_EQUAL(0, n);
+        CHECK(ec == network::end_of_input);
+    };
+    ThreadWrapper thread;
+    thread.start(reader);
+
+    network::io_service service_2;
+    network::socket socket_2(service_2);
+    socket_2.connect(listening_endpoint);
+    write(socket_2, data, sizeof data);
+    socket_2.close();
+
+    thread.join();
+}
+
+
+TEST(Network_SocketAndAcceptorOpen)
+{
+    network::io_service service_1;
+    network::acceptor acceptor(service_1);
+    network::resolver resolver(service_1);
+    network::resolver::query query("localhost", "",
+                                   network::resolver::query::passive |
+                                   network::resolver::query::address_configured);
+    network::endpoint::list endpoints;
+    resolver.resolve(query, endpoints);
+    {
+        auto i = endpoints.begin();
+        auto end = endpoints.end();
+        for (;;) {
+            std::error_code ec;
+            acceptor.open(i->protocol(), ec);
+            if (!ec) {
+                acceptor.bind(*i, ec);
+                if (!ec)
+                    break;
+                acceptor.close();
+            }
+            if (++i == end)
+                throw std::runtime_error("Failed to bind to localhost:*");
+        }
+    }
+    network::endpoint listening_endpoint = acceptor.local_endpoint();
+    acceptor.listen();
+    network::socket socket_1(service_1);
+    ThreadWrapper thread;
+    thread.start([&] { acceptor.accept(socket_1); });
+
+    network::io_service service_2;
+    network::socket socket_2(service_2);
+    socket_2.open(listening_endpoint.protocol());
+    socket_2.connect(listening_endpoint);
+
+    thread.join();
+}
+
+
+TEST(Network_PrestopAndResetService)
+{
+    network::io_service service;
+    int var = 381;
+    service.post([&]{ var = 824; });
+    service.stop();
+    service.run();
+    CHECK_EQUAL(var, 381);
+    service.post([&]{ var = 824; });
+    service.reset();
+    service.run();
+    CHECK_EQUAL(var, 824);
+}
+
 
 TEST(Network_CancelAsyncAccept)
 {
@@ -106,7 +230,8 @@ TEST(Network_CancelAsyncAccept)
     network::socket socket(service);
     bool accept_was_canceled = false;
     auto handler = [&](std::error_code ec) {
-        handle_accept_1(ec, &accept_was_canceled);
+        if (ec == error::operation_aborted)
+            accept_was_canceled = true;
     };
     acceptor.async_accept(socket, handler);
     acceptor.close();
@@ -124,7 +249,8 @@ TEST(Network_CancelAsyncReadWrite)
     network::socket socket_1(service);
     bool was_accepted = false;
     auto accept_handler = [&](std::error_code ec) {
-        handle_accept_2(ec, &was_accepted);
+        if (!ec)
+            was_accepted = true;
     };
     acceptor.async_accept(socket_1, accept_handler);
     network::socket socket_2(service);
@@ -135,20 +261,82 @@ TEST(Network_CancelAsyncReadWrite)
     char data[size] = { 'a' };
     bool write_was_canceled = false;
     auto write_handler = [&](std::error_code ec, size_t) {
-        handle_read_write(ec, &write_was_canceled);
+        if (ec == error::operation_aborted)
+            write_was_canceled = true;
     };
     async_write(socket_2, data, size, write_handler);
     network::buffered_input_stream input(socket_2);
     char buffer[size];
     bool read_was_canceled = false;
     auto read_handler = [&](std::error_code ec, size_t) {
-        handle_read_write(ec, &read_was_canceled);
+        if (ec == error::operation_aborted)
+            read_was_canceled = true;
     };
     input.async_read(buffer, size, read_handler);
     socket_2.close();
     service.run();
     CHECK(read_was_canceled);
     CHECK(write_was_canceled);
+}
+
+
+TEST(Network_HandlerDealloc)
+{
+    // Check that dynamically allocated handlers are properly freed when the
+    // service object is destroyed.
+    {
+        // m_post_handlers
+        network::io_service service;
+        service.post([] {});
+    }
+    {
+        // m_imm_handlers
+        network::io_service service;
+        // By adding two post handlers that throw, one is going to be left
+        // behind in `m_imm_handlers`
+        service.post([&]{ throw std::runtime_error(""); });
+        service.post([&]{ throw std::runtime_error(""); });
+        CHECK_THROW(service.run(), std::runtime_error);
+    }
+    {
+        // m_poll_handlers
+        network::io_service service;
+        network::acceptor acceptor(service);
+        acceptor.open(network::protocol::ip_v4());
+        network::socket socket(service);
+        // This leaves behind a read handler in m_poll_handlers
+        acceptor.async_accept(socket, [&](std::error_code) {});
+    }
+    {
+        // m_cancel_handlers
+        network::io_service service;
+        network::acceptor acceptor(service);
+        acceptor.open(network::protocol::ip_v4());
+        network::socket socket(service);
+        acceptor.async_accept(socket, [&](std::error_code) {});
+        // This leaves behind a read handler in m_cancel_handlers
+        acceptor.close();
+    }
+    {
+        // m_poll_handlers
+        network::io_service service_1;
+        network::acceptor acceptor(service_1);
+        network::endpoint listening_endpoint = bind_acceptor(acceptor);
+        acceptor.listen();
+        network::socket socket_1(service_1);
+        ThreadWrapper thread;
+        thread.start([&] { acceptor.accept(socket_1); });
+        network::io_service service_2;
+        network::socket socket_2(service_2);
+        socket_2.connect(listening_endpoint);
+        thread.join();
+        network::buffered_input_stream input(socket_1);
+        char buffer[1];
+        char data[] = { 'X', 'F', 'M' };
+        // This leaves behind both a read and a write handler in m_poll_handlers
+        input.async_read(buffer, sizeof buffer, [](std::error_code, size_t) {});
+        async_write(socket_1, data, sizeof data, [](std::error_code, size_t) {});
+    }
 }
 
 
@@ -218,25 +406,7 @@ void sync_client(unsigned short listen_port, unit_test::TestResults* test_result
         ostringstream out;
         out << listen_port;
         string listen_port_2 = out.str();
-        network::resolver resolver(service);
-        network::resolver::query query("localhost", listen_port_2);
-        network::endpoint::list endpoints;
-        resolver.resolve(query, endpoints);
-        typedef network::endpoint::list::iterator iter;
-        iter i = endpoints.begin();
-        iter end = endpoints.end();
-        for (;;) {
-            std::error_code ec;
-            socket.open(i->protocol(), ec);
-            if (!ec) {
-                socket.connect(*i, ec);
-                if (!ec)
-                    break;
-                socket.close();
-            }
-            if (++i == end)
-                throw std::runtime_error("Could not connect to server: All endpoints failed");
-        }
+        connect_socket(socket, listen_port_2);
     }
 
     const size_t max_header_size = 32;
@@ -282,34 +452,9 @@ void sync_client(unsigned short listen_port, unit_test::TestResults* test_result
 TEST(Network_Sync)
 {
     network::io_service service;
-    network::resolver resolver(service);
     network::acceptor acceptor(service);
-
-    network::resolver::query query("localhost", "",
-                                   network::resolver::query::passive |
-                                   network::resolver::query::address_configured);
-    network::endpoint::list endpoints;
-    resolver.resolve(query, endpoints);
-
-    typedef network::endpoint::list::iterator iter;
-    iter i = endpoints.begin();
-    iter end = endpoints.end();
-    for (;;) {
-        std::error_code ec;
-        acceptor.open(i->protocol(), ec);
-        if (!ec) {
-            acceptor.bind(*i, ec);
-            if (!ec)
-                break;
-            acceptor.close();
-        }
-        if (++i == end)
-            throw std::runtime_error("Could not create a listening socket: All endpoints failed");
-    }
-
-    network::endpoint listen_endpoint = acceptor.local_endpoint();
-    unsigned short listen_port = listen_endpoint.port();
-
+    network::endpoint listen_endpoint = bind_acceptor(acceptor);
+    network::endpoint::port_type listen_port = listen_endpoint.port();
     acceptor.listen();
 
     ThreadWrapper server_thread, client_thread;
@@ -334,36 +479,9 @@ public:
 
     unsigned short init()
     {
-        network::resolver resolver(m_service);
-
-        network::resolver::query query("localhost", "",
-                                       network::resolver::query::passive |
-                                       network::resolver::query::address_configured);
-        network::endpoint::list endpoints;
-        resolver.resolve(query, endpoints);
-
-        typedef network::endpoint::list::iterator iter;
-        iter i = endpoints.begin();
-        iter end = endpoints.end();
-        for (;;) {
-            std::error_code ec;
-            m_acceptor.open(i->protocol(), ec);
-            if (!ec) {
-                m_acceptor.bind(*i, ec);
-                if (!ec)
-                    break;
-                m_acceptor.close();
-            }
-            if (++i == end)
-                throw std::runtime_error("Could not create a listening socket: "
-                                         "All endpoints failed");
-        }
-
-        network::endpoint listen_endpoint = m_acceptor.local_endpoint();
-        unsigned short listen_port = listen_endpoint.port();
-
+        network::endpoint listen_endpoint = bind_acceptor(m_acceptor);
+        network::endpoint::port_type listen_port = listen_endpoint.port();
         m_acceptor.listen();
-
         return listen_port;
     }
 
@@ -491,27 +609,7 @@ public:
             out << m_listen_port;
             service = out.str();
         }
-
-        network::resolver resolver(m_service);
-        network::resolver::query query("localhost", service);
-        network::endpoint::list endpoints;
-        resolver.resolve(query, endpoints);
-
-        typedef network::endpoint::list::iterator iter;
-        iter i = endpoints.begin();
-        iter end = endpoints.end();
-        for (;;) {
-            std::error_code ec;
-            m_socket.open(i->protocol(), ec);
-            if (!ec) {
-                m_socket.connect(*i, ec);
-                if (!ec)
-                    break;
-                m_socket.close();
-            }
-            if (++i == end)
-                throw std::runtime_error("Could not connect to server: All endpoints failed");
-        }
+        connect_socket(m_socket, service);
 
         MemoryOutputStream out;
         out.set_buffer(m_header_buffer, m_header_buffer+s_max_header_size);
