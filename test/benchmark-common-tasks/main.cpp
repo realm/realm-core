@@ -1,16 +1,19 @@
 #include <iostream>
 #include <sstream>
 
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
+#include "../util/test_path.hpp"
 
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
+
+namespace {
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -26,10 +29,9 @@ using namespace tightdb::test_util;
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
 */
 
-static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
-static const size_t min_repetitions = 10;
-static const size_t max_repetitions = 100;
-static const double min_duration_s = 0.05;
+const size_t min_repetitions = 10;
+const size_t max_repetitions = 100;
+const double min_duration_s = 0.05;
 
 struct Benchmark
 {
@@ -83,11 +85,59 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         BenchmarkWithStringsTable::setup(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(1000);
-        for (size_t i = 0; i < 1000; ++i) {
+        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
+        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
             t->set_string(0, i, ss.str());
+        }
+        tr.commit();
+    }
+};
+
+struct BenchmarkWithLongStrings : BenchmarkWithStrings {
+    void setup(SharedGroup& group)
+    {
+        BenchmarkWithStrings::setup(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->insert_empty_row(0);
+        // This should be enough to upgrade the entire array:
+        t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, REALM_MAX_BPNODE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, REALM_MAX_BPNODE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, REALM_MAX_BPNODE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
+        tr.commit();
+    }
+};
+
+struct BenchmarkWithIntsTable : Benchmark {
+    void setup(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef t = tr.add_table("IntOnly");
+        t->add_column(type_Int, "ints");
+        tr.commit();
+    }
+
+    void teardown(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table("IntOnly");
+        group.commit();
+    }
+};
+
+struct BenchmarkWithInts : BenchmarkWithIntsTable {
+    void setup(SharedGroup& group)
+    {
+        BenchmarkWithIntsTable::setup(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+            t->set_int(0, i, r.draw_int<int64_t>());
         }
         tr.commit();
     }
@@ -123,6 +173,17 @@ struct BenchmarkSort : BenchmarkWithStrings {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->get_sorted_view(0);
+    }
+};
+
+struct BenchmarkSortInt : BenchmarkWithInts {
+    const char* name() const { return "SortInt"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
         ConstTableView view = table->get_sorted_view(0);
     }
 };
@@ -173,6 +234,48 @@ struct BenchmarkSetString : BenchmarkWithStrings {
     }
 };
 
+struct BenchmarkCreateIndex : BenchmarkWithStrings {
+    const char* name() const { return "CreateIndex"; }
+    void operator()(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef table = tr.get_table("StringOnly");
+        table->add_search_index(0);
+        tr.commit();
+    }
+};
+
+struct BenchmarkGetLongString : BenchmarkWithLongStrings {
+    const char* name() const { return "GetLongString"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        size_t len = table->size();
+        volatile int dummy = 0;
+        for (size_t i = 0; i < len; ++i) {
+            StringData str = table->get_string(0, i);
+            dummy += str[0]; // to avoid over-optimization
+        }
+    }
+};
+
+struct BenchmarkSetLongString : BenchmarkWithLongStrings {
+    const char* name() const { return "SetLongString"; }
+
+    void operator()(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef table = tr.get_table("StringOnly");
+        size_t len = table->size();
+        for (size_t i = 0; i < len; ++i) {
+            table->set_string(0, i, "c");
+        }
+        tr.commit();
+    }
+};
+
 struct BenchmarkQueryNot : Benchmark {
     const char* name() const { return "QueryNot"; }
 
@@ -209,7 +312,7 @@ struct BenchmarkQueryNot : Benchmark {
 
 
 
-static const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
+const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 {
     switch (level) {
         case SharedGroup::durability_Full: return "Full";
@@ -244,26 +347,39 @@ void run_benchmark(BenchmarkResults& results)
 #else
     const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
 #endif
+    
+    static long test_counter = 0;
 
     Timer timer(Timer::type_UserTime);
     for (size_t i = 0; i < num_durabilities; ++i) {
-        // Open a SharedGroup:
-        File::try_remove(realm_path);
-        UniquePtr<SharedGroup> group;
         SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
-        group.reset(new SharedGroup(realm_path, false, level));
-
         B benchmark;
-
+        
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
         lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ")";
         ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level);
         std::string ident = ident_ss.str();
+        
+        realm::test_util::unit_test::TestDetails test_details;
+        test_details.test_index = test_counter++;
+        test_details.suite_name = "BenchmarkCommonTasks";
+        test_details.test_name = ident.c_str();
+        test_details.file_name = __FILE__;
+        test_details.line_number = __LINE__;
+        
+        // Open a SharedGroup:
+        SHARED_GROUP_TEST_PATH(realm_path);
+        std::unique_ptr<SharedGroup> group;
+        group.reset(new SharedGroup(realm_path, false, level));
 
         // Warm-up and initial measuring:
         Timer t_unused(Timer::type_UserTime);
+        run_benchmark_once(benchmark, *group, t_unused);
+        run_benchmark_once(benchmark, *group, t_unused);
+        run_benchmark_once(benchmark, *group, t_unused);
+        run_benchmark_once(benchmark, *group, t_unused);
         run_benchmark_once(benchmark, *group, t_unused);
 
         size_t rep;
@@ -280,19 +396,34 @@ void run_benchmark(BenchmarkResults& results)
     }
 }
 
+} // anonymous namespace
 
-int main(int, const char**)
+extern "C" int benchmark_common_tasks_main();
+
+int benchmark_common_tasks_main()
 {
-    BenchmarkResults results(40);
+    std::string results_file_stem = test_util::get_test_path_prefix() + "results";
+    BenchmarkResults results(40, results_file_stem.c_str());
 
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);
     run_benchmark<BenchmarkQueryNot>(results);
     run_benchmark<BenchmarkSize>(results);
     run_benchmark<BenchmarkSort>(results);
+    run_benchmark<BenchmarkSortInt>(results);
     run_benchmark<BenchmarkInsert>(results);
     run_benchmark<BenchmarkGetString>(results);
     run_benchmark<BenchmarkSetString>(results);
+    run_benchmark<BenchmarkCreateIndex>(results);
+    run_benchmark<BenchmarkGetLongString>(results);
+    run_benchmark<BenchmarkSetLongString>(results);
 
     return 0;
 }
+
+#if !defined(REALM_IOS)
+int main(int, const char**)
+{
+    return benchmark_common_tasks_main();
+}
+#endif

@@ -1,14 +1,13 @@
 // @@Example: ex_cpp_group_write_to_mem @@
 // @@Fold@@
 #include <iostream>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@EndFold@@
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
@@ -24,6 +23,6 @@ int main()
     BinaryData buffer = g.write_to_mem();
     Group g2(buffer);
     PeopleTable::Ref table2 = g2.get_table<PeopleTable>("people");
-    cout << table2[2].age << endl;
+    std::cout << table2[2].age << std::endl;
 }
 // @@EndExample@@

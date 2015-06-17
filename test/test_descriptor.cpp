@@ -1,9 +1,8 @@
-#include <tightdb/descriptor.hpp>
+#include <realm/descriptor.hpp>
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

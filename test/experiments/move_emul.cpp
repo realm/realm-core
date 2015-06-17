@@ -1,12 +1,11 @@
 #include <iostream>
-using namespace std;
 
 
-namespace tightdb {
+namespace realm {
 
     struct Data {
-        Data() { cout << "Data()\n"; }
-        ~Data() { cout << "~Data()\n"; }
+        Data() { std::cout << "Data()\n"; }
+        ~Data() { std::cout << "~Data()\n"; }
         Data* clone() const { return new Data(); }
     };
 
@@ -15,10 +14,10 @@ namespace tightdb {
         CopyAndMove(): m_data(new Data()) {}
         ~CopyAndMove() { delete m_data; }
 
-        CopyAndMove(const CopyAndMove& a): m_data(a.m_data->clone()) { cout << "Copy CopyAndMove (constructor)\n"; }
-        CopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; cout << "Move CopyAndMove (assign)\n"; return *this; }
+        CopyAndMove(const CopyAndMove& a): m_data(a.m_data->clone()) { std::cout << "Copy CopyAndMove (constructor)\n"; }
+        CopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove (assign)\n"; return *this; }
 
-        friend CopyAndMove move(CopyAndMove& a) { Data* d = a.m_data; a.m_data = 0; cout << "Move CopyAndMove (move)\n"; return CopyAndMove(d); }
+        friend CopyAndMove move(CopyAndMove& a) { Data* d = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove (move)\n"; return CopyAndMove(d); }
 
     private:
         friend class ConstCopyAndMove;
@@ -33,13 +32,13 @@ namespace tightdb {
         ConstCopyAndMove(): m_data(new Data()) {}
         ~ConstCopyAndMove() { delete m_data; }
 
-        ConstCopyAndMove(const ConstCopyAndMove& a): m_data(a.m_data->clone()) { cout << "Copy ConstCopyAndMove (constructor)\n"; }
-        ConstCopyAndMove& operator=(ConstCopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; cout << "Move ConstCopyAndMove (assign)\n"; return *this; }
+        ConstCopyAndMove(const ConstCopyAndMove& a): m_data(a.m_data->clone()) { std::cout << "Copy ConstCopyAndMove (constructor)\n"; }
+        ConstCopyAndMove& operator=(ConstCopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move ConstCopyAndMove (assign)\n"; return *this; }
 
-        ConstCopyAndMove(CopyAndMove a): m_data(a.m_data) { a.m_data = 0; cout << "Move CopyAndMove to ConstCopyAndMove (constructor)\n"; }
-        ConstCopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; cout << "Move CopyAndMove to ConstCopyAndMove (assign)\n"; return *this; }
+        ConstCopyAndMove(CopyAndMove a): m_data(a.m_data) { a.m_data = 0; std::cout << "Move CopyAndMove to ConstCopyAndMove (constructor)\n"; }
+        ConstCopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove to ConstCopyAndMove (assign)\n"; return *this; }
 
-        friend ConstCopyAndMove move(ConstCopyAndMove& a) { const Data* d = a.m_data; a.m_data = 0; cout << "Move ConstCopyAndMove (move)\n"; return ConstCopyAndMove(d); }
+        friend ConstCopyAndMove move(ConstCopyAndMove& a) { const Data* d = a.m_data; a.m_data = 0; std::cout << "Move ConstCopyAndMove (move)\n"; return ConstCopyAndMove(d); }
 
     private:
         const Data* m_data;
@@ -47,42 +46,42 @@ namespace tightdb {
         ConstCopyAndMove(const Data* d): m_data(d) {}
     };
 
-} // namespace tightdb
+} // namespace realm
 
 
 
-tightdb::CopyAndMove func(tightdb::CopyAndMove a) { return move(a); }
+realm::CopyAndMove func(realm::CopyAndMove a) { return move(a); }
 
 int main()
 {
-    tightdb::CopyAndMove x1, x2;
-    cout << "---A---\n";
+    realm::CopyAndMove x1, x2;
+    std::cout << "---A---\n";
     x2 = x1;
-    cout << "---B---\n";
+    std::cout << "---B---\n";
     x2 = move(x1);
 
-    cout << "---0---\n";
-    tightdb::CopyAndMove a1;
-    cout << "---1---\n";
-    tightdb::CopyAndMove a2 = func(func(func(func(a1)))); // One genuine copy, and 'a1' is left untouched
-    cout << "---2---\n";
-    tightdb::CopyAndMove a3 = func(func(func(func(move(a2))))); // Zero genuine copies, and 'a2' is left truncated
-    cout << "---3---\n";
-    const tightdb::CopyAndMove a4(a3); // Copy
-    cout << "---4---\n";
-    tightdb::CopyAndMove a5(a4); // Copy from const
-    cout << "---5---\n";
+    std::cout << "---0---\n";
+    realm::CopyAndMove a1;
+    std::cout << "---1---\n";
+    realm::CopyAndMove a2 = func(func(func(func(a1)))); // One genuine copy, and 'a1' is left untouched
+    std::cout << "---2---\n";
+    realm::CopyAndMove a3 = func(func(func(func(move(a2))))); // Zero genuine copies, and 'a2' is left truncated
+    std::cout << "---3---\n";
+    const realm::CopyAndMove a4(a3); // Copy
+    std::cout << "---4---\n";
+    realm::CopyAndMove a5(a4); // Copy from const
+    std::cout << "---5---\n";
     static_cast<void>(a5);
 
-    tightdb::ConstCopyAndMove b1(a1); // One genuine copy
-    cout << "---6---\n";
-    tightdb::ConstCopyAndMove b2(move(a1)); // Zero genuine copies, and 'a1' is left truncated
-    cout << "---7---\n";
-    tightdb::ConstCopyAndMove b3(a4); // One genuine copy from const
-    cout << "---8---\n";
-    tightdb::ConstCopyAndMove b4(func(func(func(func(a3))))); // One genuine copy, and 'a3' is left untouched
-    cout << "---9---\n";
-    tightdb::ConstCopyAndMove b5(func(func(func(func(move(a3)))))); // Zero genuine copies, and 'a3' is left truncated
+    realm::ConstCopyAndMove b1(a1); // One genuine copy
+    std::cout << "---6---\n";
+    realm::ConstCopyAndMove b2(move(a1)); // Zero genuine copies, and 'a1' is left truncated
+    std::cout << "---7---\n";
+    realm::ConstCopyAndMove b3(a4); // One genuine copy from const
+    std::cout << "---8---\n";
+    realm::ConstCopyAndMove b4(func(func(func(func(a3))))); // One genuine copy, and 'a3' is left untouched
+    std::cout << "---9---\n";
+    realm::ConstCopyAndMove b5(func(func(func(func(move(a3)))))); // Zero genuine copies, and 'a3' is left truncated
     static_cast<void>(b1);
     static_cast<void>(b2);
     static_cast<void>(b3);

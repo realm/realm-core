@@ -1,0 +1,10 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/test-realm
+/test-realm-dbg
+/test-realm-cov

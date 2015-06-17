@@ -2,13 +2,12 @@
 
 #include <unistd.h>
 
-#include <tightdb.hpp>
+#include <realm.hpp>
 
 #include "../util/timer.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 namespace {
@@ -19,7 +18,7 @@ enum Mode {
     mode_UseTable
 };
 
-TIGHTDB_TABLE_5(TestTable,
+REALM_TABLE_5(TestTable,
                 x,  Int,
                 s1, String,
                 b,  Bool,
@@ -29,15 +28,15 @@ TIGHTDB_TABLE_5(TestTable,
 
 void usage()
 {
-    cout << "Usage: add_insert [-h] [-s mem|full|async] [-a]" << endl;
-    cout << "  -h : this text" << endl;
-    cout << "  -s : use shared group (default: no)" << endl;
-    cout << "  -i : insert at front (defalut: no - append)" << endl;
-    cout << "  -N : number of rows to add" << endl;
-    cout << "  -n : rows between print outs" << endl;
-    cout << "  -g : use group (default: no)" << endl;
-    cout << "  -r : rows/commit (default: 1)" << endl;
-    cout << "  -R : insert at random position (only useful with -i)" << endl;
+    std::cout << "Usage: add_insert [-h] [-s mem|full|async] [-a]" << std::endl;
+    std::cout << "  -h : this text" << std::endl;
+    std::cout << "  -s : use shared group (default: no)" << std::endl;
+    std::cout << "  -i : insert at front (defalut: no - append)" << std::endl;
+    std::cout << "  -N : number of rows to add" << std::endl;
+    std::cout << "  -n : rows between print outs" << std::endl;
+    std::cout << "  -g : use group (default: no)" << std::endl;
+    std::cout << "  -r : rows/commit (default: 1)" << std::endl;
+    std::cout << "  -R : insert at random position (only useful with -i)" << std::endl;
 }
 
 } // anonymous namespace
@@ -61,7 +60,7 @@ int main(int argc, char *argv[])
 
     // FIXME: 'getopt' is POSIX/Linux specific. We should replace with
     // code similar to what appears in main() in
-    // "tightdb_tools/src/tightdb/tools/prompt/prompt.cpp".
+    // "realm_tools/src/realm/tools/prompt/prompt.cpp".
     while ((c = getopt(argc, argv, "hs:iN:n:r:gR")) != EOF) {
         switch (c) {
             case 'h':
@@ -84,7 +83,7 @@ int main(int argc, char *argv[])
                             dlevel = SharedGroup::durability_Async;
                         }
                         else {
-                            cout << "durability must be either mem or full" << endl;
+                            std::cout << "durability must be either mem or full" << std::endl;
                             return 1;
                         }
                     }
@@ -106,14 +105,14 @@ int main(int argc, char *argv[])
                 rows_per_commit = size_t(atol(optarg));
                 break;
             default:
-                cout << "Unknown option" << endl;
+                std::cout << "Unknown option" << std::endl;
                 usage();
                 return 1;
         }
     }
 
     if (use_group && use_shared) {
-        cout << "You cannot specify -g and -s at the same time." << endl;
+        std::cout << "You cannot specify -g and -s at the same time." << std::endl;
         usage();
         return 1;
     }
@@ -131,28 +130,28 @@ int main(int argc, char *argv[])
         }
     }
 
-    cout << "# Parameters: " << endl;
-    cout << "#  number of rows    : " << N << endl;
-    cout << "#  rows per commit   : " << rows_per_commit << endl;
-    cout << "#  output frequency  : " << n << endl;
-    cout << "#  mode              : " << m << endl;
+    std::cout << "# Parameters: " << std::endl;
+    std::cout << "#  number of rows    : " << N << std::endl;
+    std::cout << "#  rows per commit   : " << rows_per_commit << std::endl;
+    std::cout << "#  output frequency  : " << n << std::endl;
+    std::cout << "#  mode              : " << m << std::endl;
     if (do_insert) {
-        cout << "#  do inserts" << endl;
-        cout << "#  random insert     : " << random_insert << endl;
+        std::cout << "#  do inserts" << std::endl;
+        std::cout << "#  random insert     : " << random_insert << std::endl;
     }
 
     if (random_insert) {  // initialize RNG
         srandom(0);
     }
 
-    while (File::exists("test.tightdb.lock")) {
+    while (File::exists("test.realm.lock")) {
         usleep(10000);
     }
-    File::try_remove("test.tightdb");
-    File::try_remove("gtest.tightdb");
+    File::try_remove("test.realm");
+    File::try_remove("gtest.realm");
 
-    SharedGroup sg = SharedGroup("test.tightdb", false, dlevel);
-    Group g("gtest.tightdb", Group::mode_ReadWrite);
+    SharedGroup sg = SharedGroup("test.realm", false, dlevel);
+    Group g("gtest.realm", Group::mode_ReadWrite);
 
     switch(m) {
         case mode_UseShared: {
@@ -167,7 +166,7 @@ int main(int argc, char *argv[])
                 g.commit();
             }
             catch (std::runtime_error& e) {
-                cerr << "Cannot create table: " << e.what() << endl;
+                std::cerr << "Cannot create table: " << e.what() << std::endl;
                 return 1;
             }
             break;
@@ -217,11 +216,11 @@ int main(int argc, char *argv[])
                     g.commit();
                 }
                 catch (File::PermissionDenied& e) {
-                    cerr << "commit (permission denied): " << e.what() << endl;
+                    std::cerr << "commit (permission denied): " << e.what() << std::endl;
                     return 1;
                 }
                 catch (std::runtime_error& e) {
-                    cerr << "commit (runtime error): " << e.what() << endl;
+                    std::cerr << "commit (runtime error): " << e.what() << std::endl;
                     return 1;
                 }
                 break;
@@ -244,7 +243,7 @@ int main(int argc, char *argv[])
 
         if (((i*rows_per_commit) % n) == 0 && i > 0) {
             double dt = timer.get_elapsed_time();
-            cout << i*rows_per_commit << ";" << dt << ";" << double(i*rows_per_commit)/dt << ";" << dt/double(i*rows_per_commit) << endl;
+            std::cout << i*rows_per_commit << ";" << dt << ";" << double(i*rows_per_commit)/dt << ";" << dt/double(i*rows_per_commit) << std::endl;
         }
     }
     return 0;

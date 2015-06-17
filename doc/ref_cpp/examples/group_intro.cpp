@@ -1,20 +1,19 @@
 // @@Example: ex_cpp_group_intro @@
 // @@Fold@@
 #include <iostream>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@EndFold@@
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
 void func()
 {
-    Group g("people.tightdb", 0, Group::mode_ReadWrite);
+    Group g("people.realm", 0, Group::mode_ReadWrite);
 
     PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 
@@ -29,7 +28,7 @@ void func()
 int main()
 {
     func();
-    util::File::remove("people.tightdb");
+    util::File::remove("people.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -2,26 +2,25 @@
 #include <algorithm>
 #include <iostream>
 
-#include <tightdb.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <realm.hpp>
+#include <memory>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 
 namespace {
 
-TIGHTDB_TABLE_1(IntTable,
+REALM_TABLE_1(IntTable,
                 i, Int)
 
 
-inline int_fast64_t read(IntTable& table, const vector<size_t> order)
+inline int_fast64_t read(IntTable& table, const std::vector<size_t> order)
 {
     int_fast64_t dummy = 0;
     size_t n = order.size();
@@ -30,21 +29,21 @@ inline int_fast64_t read(IntTable& table, const vector<size_t> order)
     return dummy;
 }
 
-inline void write(IntTable& table, const vector<size_t> order)
+inline void write(IntTable& table, const std::vector<size_t> order)
 {
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i)
         table[order[i]].i = 125;
 }
 
-inline void insert(IntTable& table, const vector<size_t> order)
+inline void insert(IntTable& table, const std::vector<size_t> order)
 {
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i)
         table.insert(order[i], 127);
 }
 
-inline void erase(IntTable& table, const vector<size_t> order)
+inline void erase(IntTable& table, const std::vector<size_t> order)
 {
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i)
@@ -58,14 +57,14 @@ int main()
 {
     const size_t target_size = 1100*1000L;
     const int num_tables = 50;
-    cout << "Number of tables: " << num_tables << endl;
-    cout << "Elements per table: " << target_size << endl;
+    std::cout << "Number of tables: " << num_tables << std::endl;
+    std::cout << "Elements per table: " << target_size << std::endl;
 
-    vector<size_t> rising_order;
-    vector<size_t> falling_order;
-    vector<size_t> random_order;
-    vector<size_t> random_insert_order;
-    vector<size_t> random_erase_order;
+    std::vector<size_t> rising_order;
+    std::vector<size_t> falling_order;
+    std::vector<size_t> random_order;
+    std::vector<size_t> random_insert_order;
+    std::vector<size_t> random_erase_order;
     for (size_t i = 0; i != target_size; ++i) {
         rising_order.push_back(i);
         falling_order.push_back(target_size-1-i);
@@ -76,7 +75,7 @@ int main()
     Random random;
     random.shuffle(random_order.begin(), random_order.end());
 
-    UniquePtr<Group> group;
+    std::unique_ptr<Group> group;
     IntTable::Ref tables_1[num_tables], tables_2[num_tables];
 
     bool from_group = true;
@@ -157,5 +156,5 @@ int main()
 
     results.submit_single("total_time", "Total time", timer_total);
 
-    cout << "dummy = "<<dummy<<" (to avoid over-optimization)"<<endl;
+    std::cout << "dummy = "<<dummy<<" (to avoid over-optimization)"<<endl;
 }

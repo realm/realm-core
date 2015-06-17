@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
-TIGHTDB_TABLE_7(IndexTable,
+REALM_TABLE_7(IndexTable,
                 s1, String,
                 n1, Int,
                 n2, Int,
@@ -42,5 +41,5 @@ int main(int argc, char *argv[]) {
     printf("Creating index\n");
     t->column().s1.set_index();
     printf("Writing to disk\n");
-    g->write("test.tdb");
+    g->write("test.realm");
 }

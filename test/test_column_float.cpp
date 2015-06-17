@@ -3,11 +3,11 @@
 
 #include <iostream>
 
-#include <tightdb/column_basic.hpp>
+#include <realm/column_basic.hpp>
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using test_util::unit_test::TestResults;
 
 
@@ -364,7 +364,7 @@ TEST(ColumnString_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_String, "works");
-    t.add_column(type_String, "works also");
+    t.add_column(type_String, "works also", false);
     t.add_empty_row();
     t.set_string(0,0, "yellow");
     t.set_string(1,0, "very bright");

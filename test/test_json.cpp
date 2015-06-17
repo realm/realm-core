@@ -7,18 +7,17 @@
 #include <fstream>
 #include <ostream>
 
-#include <tightdb.hpp>
-#include <tightdb/lang_bind_helper.hpp>
+#include <realm.hpp>
+#include <realm/lang_bind_helper.hpp>
 
 #include "util/misc.hpp"
 #include "util/jsmn.hpp"
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -104,9 +103,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         int64_t sign = (i % 2 == 0) ? 1 : -1;
         table.set_double(4, i, 9876.54321*sign);
     }
-    vector<string> strings;
+    std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
-        stringstream out;
+        std::stringstream out;
         out << "string" << i;
         strings.push_back(out.str());
     }
@@ -117,7 +116,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     for (size_t i = 0; i < rows; ++i) {
         switch (i % 2) {
         case 0: {
-                    string s = strings[i];
+                    std::string s = strings[i];
                     s += " very long string.........";
                     for (int j = 0; j != 4; ++j)
                         s += " big blobs big blobs big blobs"; // +30
@@ -203,9 +202,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     table.optimize();
 }
 
-bool json_test(string json, string expected_file, bool generate)
+bool json_test(std::string json, std::string expected_file, bool generate)
 {
-    string file_name = get_test_resource_path();
+    std::string file_name = get_test_resource_path();
     file_name += expected_file + ".json";
 
     jsmn_parser p;
@@ -220,16 +219,16 @@ bool json_test(string json, string expected_file, bool generate)
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
-        ofstream test_file(file_name.c_str(), ios::out | ios::binary);
+        std::ofstream test_file(file_name.c_str(), std::ios::out | std::ios::binary);
         test_file << json;
-        cerr << "\n----------------------------------------\n";
-        cerr << "Generated " << expected_file << ":\n";
-        cerr << json << "\n----------------------------------------\n";
+        std::cerr << "\n----------------------------------------\n";
+        std::cerr << "Generated " << expected_file << ":\n";
+        std::cerr << json << "\n----------------------------------------\n";
         return true;
     }
     else {
-        string expected;
-        ifstream test_file(file_name.c_str(), ios::in | ios::binary);
+        std::string expected;
+        std::ifstream test_file(file_name.c_str(), std::ios::in | std::ios::binary);
 
         // fixme, find a way to use CHECK from a function
         if(!test_file.good())
@@ -238,10 +237,10 @@ bool json_test(string json, string expected_file, bool generate)
             return false;
         getline(test_file, expected);
         if (json != expected) {
-            string path = "bad_" + file_name;
+            std::string path = "bad_" + file_name;
             File out(path, File::mode_Write);
             out.write(json);
-            cerr << "\n error result in '" << string(path) << "'\n";
+            std::cerr << "\n error result in '" << std::string(path) << "'\n";
             return false;
         }
         return true;
@@ -254,7 +253,7 @@ TEST(Json_NoLinks)
     Table table;
     setup_multi_table(table, 15, 2);
 
-    stringstream ss;
+    std::stringstream ss;
     table.to_json(ss);
     CHECK(json_test(ss.str(), "expect_json", false));
 
@@ -337,7 +336,7 @@ TEST(Json_LinkList1)
     links1->add(0);
     links1->add(2);
 
-    stringstream ss;
+    std::stringstream ss;
 
     // Now try different link_depth arguments
     table1->to_json(ss);
@@ -360,7 +359,7 @@ TEST(Json_LinkList1)
     CHECK(json_test(ss.str(), "expected_json_linklist1_5", generate_all));
 
     // Column and table renaming
-    map<string, string> m;
+    std::map<std::string, std::string> m;
     m["str1"] = "STR1";
     m["linkA"] = "LINKA";
     m["table1"] = "TABLE1";
@@ -403,7 +402,7 @@ TEST(Json_LinkListCycle)
 
     // create json
 
-    stringstream ss;
+    std::stringstream ss;
 
     // Now try different link_depth arguments
     table1->to_json(ss);
@@ -457,7 +456,7 @@ TEST(Json_LinkCycles)
     table1->set_link(col_link1, 0, 0);
     table2->set_link(col_link2, 0, 0);
 
-    stringstream ss;
+    std::stringstream ss;
 
     // Now try different link_depth arguments
     table1->to_json(ss);

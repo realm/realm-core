@@ -3,7 +3,7 @@
 //  iOSTemp
 //
 //  Created by Oleks on 28/03/14.
-//  Copyright (c) 2014 Tightdb. All rights reserved.
+//  Copyright (c) 2014 Realm. All rights reserved.
 //
 
 #import "AppDelegate.h"
@@ -13,8 +13,7 @@
 #include <fstream>
 #include <string>
 
-using namespace std;
-using namespace tightdb::test_util;
+using namespace realm::test_util;
 
 @implementation AppDelegate
 
@@ -37,11 +36,11 @@ using namespace tightdb::test_util;
     test_all(0, NULL);
     
     // Report to stdout.
-    cout << "====================" << endl;
-    ifstream if_xml(path_prefix + "unit-test-report.xml", ios_base::binary);
-    cout << if_xml.rdbuf();
+    std::cout << "====================" << std::endl;
+    std::ifstream if_xml(path_prefix + "unit-test-report.xml", std::ios_base::binary);
+    std::cout << if_xml.rdbuf();
     if_xml.close();
-    cout << "====================" << endl;
+    std::cout << "====================" << std::endl;
 
     [[NSThread mainThread] cancel];
     return YES;

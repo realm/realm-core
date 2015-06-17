@@ -1,22 +1,21 @@
 #include <stdexcept>
 
-#include <tightdb/util/assert.hpp>
+#include <realm/util/assert.hpp>
 
 #include "resource_limits.hpp"
 
 #ifndef _WIN32
-#  define TIGHTDB_HAVE_POSIX_RLIMIT 1
+#  define REALM_HAVE_POSIX_RLIMIT 1
 #endif
 
-#if TIGHTDB_HAVE_POSIX_RLIMIT
+#if REALM_HAVE_POSIX_RLIMIT
 #  include <sys/resource.h>
 #endif
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
-#if TIGHTDB_HAVE_POSIX_RLIMIT
+#if REALM_HAVE_POSIX_RLIMIT
 
 namespace {
 
@@ -28,11 +27,11 @@ long get_rlimit(Resource resource, bool hard)
             resource_2 = RLIMIT_NOFILE;
             break;
     }
-    TIGHTDB_ASSERT(resource_2 != -1);
+    REALM_ASSERT(resource_2 != -1);
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw runtime_error("getrlimit() failed");
+        throw std::runtime_error("getrlimit() failed");
     rlim_t value = hard ? rlimit.rlim_max : rlimit.rlim_cur;
     return value == RLIM_INFINITY ? -1 : long(value);
 }
@@ -45,29 +44,29 @@ void set_rlimit(Resource resource, long value, bool hard)
             resource_2 = RLIMIT_NOFILE;
             break;
     }
-    TIGHTDB_ASSERT(resource_2 != -1);
+    REALM_ASSERT(resource_2 != -1);
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw runtime_error("getrlimit() failed");
+        throw std::runtime_error("getrlimit() failed");
     rlim_t value_2 = value < 0 ? RLIM_INFINITY : rlim_t(value);
     (hard ? rlimit.rlim_max : rlimit.rlim_cur) = value_2;
     status = setrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw runtime_error("setrlimit() failed");
+        throw std::runtime_error("setrlimit() failed");
 }
 
 } // anonymous namespace
 
-#endif // TIGHTDB_HAVE_POSIX_RLIMIT
+#endif // REALM_HAVE_POSIX_RLIMIT
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
-#if TIGHTDB_HAVE_POSIX_RLIMIT
+#if REALM_HAVE_POSIX_RLIMIT
 
-bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT
+bool system_has_rlimit(Resource) REALM_NOEXCEPT
 {
     return true;
 }
@@ -90,31 +89,31 @@ void set_soft_rlimit(Resource resource, long value)
     set_rlimit(resource, value, hard);
 }
 
-#else // ! TIGHTDB_HAVE_POSIX_RLIMIT
+#else // ! REALM_HAVE_POSIX_RLIMIT
 
-bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT
+bool system_has_rlimit(Resource) REALM_NOEXCEPT
 {
     return false;
 }
 
 long get_hard_rlimit(Resource)
 {
-    throw runtime_error("Not supported");
+    throw std::runtime_error("Not supported");
 }
 
 long get_soft_rlimit(Resource)
 {
-    throw runtime_error("Not supported");
+    throw std::runtime_error("Not supported");
 }
 
 void set_soft_rlimit(Resource, long)
 {
-    throw runtime_error("Not supported");
+    throw std::runtime_error("Not supported");
 }
 
-#endif // ! TIGHTDB_HAVE_POSIX_RLIMIT
+#endif // ! REALM_HAVE_POSIX_RLIMIT
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 

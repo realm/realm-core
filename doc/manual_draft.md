@@ -1,7 +1,7 @@
 String and binary data sizes
 ----------------------------
 
-TightDB currently has the following limitations:
+Realm currently has the following limitations:
 
 - The maximum size of a table and column mames is 63 bytes. Note that this
   applies to the UTF-8 encoding of the name, so the maximum number of characters
@@ -19,10 +19,10 @@ TightDB currently has the following limitations:
 Strings and Unicode
 -------------------
 
-TightDB has full support for Unicode. Internally it stores all strings using the
+Realm has full support for Unicode. Internally it stores all strings using the
 UTF-8 character encoding.
 
-Although it is not fully implemented yet, it is the intention that when TightDB
+Although it is not fully implemented yet, it is the intention that when Realm
 performs case insensitive string comparisons, it uses the locale indenpendant
 case folding mechanism as described in “Caseless Matching,” in Section 5.18,
 Case Mappings of the the Unicode Standard.
@@ -32,7 +32,7 @@ Case Mappings of the the Unicode Standard.
 Date/time
 ---------
 
-TightDB supports only one date/time data type called 'DateTime'. A DateTime
+Realm supports only one date/time data type called 'DateTime'. A DateTime
 value represents an absolute point it time, and is represented as an integral
 non-negative number of seconds since midnight (UTC), 1 January 1970, not
 counting leap seconds.

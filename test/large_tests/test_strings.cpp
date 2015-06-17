@@ -1,4 +1,4 @@
-#include <tightdb/column.hpp>
+#include <realm/column.hpp>
 
 #include "../util/number_names.hpp"
 #include "../util/verified_string.hpp"
@@ -6,9 +6,8 @@
 #include "../testsettings.hpp"
 #include "../test.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
@@ -43,14 +42,14 @@ using namespace tightdb::test_util;
 
 namespace {
 
-string randstring(Random& random)
+std::string randstring(Random& random)
 {
-    // If there are in the order of TIGHTDB_MAX_BPNODE_SIZE different strings, then we'll get a good
+    // If there are in the order of REALM_MAX_BPNODE_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
     int64_t t = random.draw_int_mod(100) * 100;
     size_t len = random.draw_int_mod(10) * 100 + 1;
-    string s;
+    std::string s;
     while (s.length() < len)
         s += number_name(t);
 
@@ -76,7 +75,7 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
     for (size_t iter = 0; iter < ITER; iter++) {
 
 //        if (random.chance(1, 10))
-//            cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
+//            std::cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
 
         if (random.draw_int_mod(ITER / 100) == 0) {
             trend = random.draw_int_mod(10);

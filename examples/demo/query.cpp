@@ -1,9 +1,8 @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
-TIGHTDB_TABLE_3(People,
+REALM_TABLE_3(People,
                 name, String,
                 age,  Int,
                 hired, Bool)
@@ -23,11 +22,11 @@ int main(int, char*[]) {
     // Create query
     // -> hired teenagers
     People::Query q1 = t.where().age.between(13, 19).hired.equal(true);
-    cout << "No. teenagers: " << q1.count() << endl;
+    std::cout << "No. teenagers: " << q1.count() << std::endl;
 
     // Another query
     // -> names with i or a
     People::Query q2 = t.where().name.contains("i").Or().name.contains("a");
-    cout << "Min: " << q2.age.minimum() << endl;
-    cout << "Max: " << q2.age.maximum() << endl;
+    std::cout << "Min: " << q2.age.minimum() << std::endl;
+    std::cout << "Max: " << q2.age.maximum() << std::endl;
 }

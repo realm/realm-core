@@ -14,7 +14,7 @@
 
 // Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by
 // #including pthread_test.h. Works both in debug and release mode.
-//#define TIGHTDB_PTHREADS_TEST
+//#define REALM_PTHREADS_TEST
 
 #define TEST_BASIC_UTILS
 #define TEST_COLUMN_MIXED
@@ -53,6 +53,9 @@
 #define TEST_JSON
 #define TEST_LINKS
 #define TEST_ENCRYPTED_FILE_MAPPING
+#ifndef _WIN32
+#  define TEST_UTIL_NETWORK
+#endif
 
 // Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this
 // test could perhaps be modified to trigger it (unless it's a language binding problem).

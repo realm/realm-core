@@ -1,9 +1,8 @@
 // @@Example: ex_cpp_dyn_query_startsWith @@
 #include <cassert>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
 int main()
 {

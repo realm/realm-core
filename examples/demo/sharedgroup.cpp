@@ -1,11 +1,10 @@
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
 #include <pthread.h>
 
 #include <unistd.h>
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
 struct thread_info {
     pthread_t thread_id;
@@ -13,37 +12,37 @@ struct thread_info {
 };
 
 
-TIGHTDB_TABLE_3(People,
+REALM_TABLE_3(People,
                 name, String,
                 age,  Int,
                 hired, Bool)
 
-TIGHTDB_TABLE_2(Books,
+REALM_TABLE_2(Books,
                 title, String,
                 author, String)
 
 
 void* reader(void*)
 {
-    SharedGroup sg("test.tdb");
+    SharedGroup sg("test.realm");
 
     // Read transaction
     {
         const Group& g = sg.begin_read();
         Books::ConstRef t = g.get_table<Books>("books");
-        cout << "Books: " << t->size() << endl;
+        std::cout << "Books: " << t->size() << std::endl;
         sg.end_read();
     }
 
     while (!sg.has_changed()) { // wait for an update
         sleep(2);
-        cout << "No updates" << endl;
+        std::cout << "No updates" << std::endl;
     }
 
     {
         const Group& g = sg.begin_read();
         Books::ConstRef t = g.get_table<Books>("books");
-        cout << "Books: " << t->size() << endl;
+        std::cout << "Books: " << t->size() << std::endl;
         sg.end_read();
     }
 
@@ -52,13 +51,13 @@ void* reader(void*)
 
 void* writer(void*)
 {
-    SharedGroup sg("test.tdb");
+    SharedGroup sg("test.realm");
 
     sleep(5);
 
     // Write transaction
     {
-        cout << "Adding book" << endl;
+        std::cout << "Adding book" << std::endl;
         Group& g = sg.begin_write();
         Books::Ref t = g.get_table<Books>("books");
         t->add("Solaris", "Stanislaw Lem");

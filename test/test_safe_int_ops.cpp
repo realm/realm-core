@@ -8,17 +8,16 @@
 
 #include <stdint.h>
 
-#include <tightdb/util/type_list.hpp>
-#include <tightdb/util/safe_int_ops.hpp>
+#include <realm/util/type_list.hpp>
+#include <realm/util/safe_int_ops.hpp>
 
 #include "util/demangle.hpp"
 #include "util/super_int.hpp"
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -53,11 +52,11 @@ using unit_test::TestResults;
 
 
 
-// FIXME: Test T -> tightdb::test_util::super_int -> T using min/max
+// FIXME: Test T -> realm::test_util::super_int -> T using min/max
 // values for each fundamental standard type, and also using 0 and -1
 // for signed types.
 
-// FIXME: Test tightdb::util::from_twos_compl(). For each type pair
+// FIXME: Test realm::util::from_twos_compl(). For each type pair
 // (S,U), and for each super_int `i` in special set, if i.get_as<S>(s)
 // && two's compl of `s` can be stored in U without loss of
 // information, then CHECK_EQUAL(s, from_twos_compl(U(s))). Two's
@@ -65,9 +64,9 @@ using unit_test::TestResults;
 // only if make_unsigned<S>::type(s < 0 ?  -1-s : s) <
 // (U(1)<<(lim_u::digits-1)).
 
-// FIXME: Test tightdb::util::int_shift_left_with_overflow_detect().
+// FIXME: Test realm::util::int_shift_left_with_overflow_detect().
 
-// FIXME: Test tightdb::util::int_cast_with_overflow_detect().
+// FIXME: Test realm::util::int_cast_with_overflow_detect().
 
 
 TEST(SafeIntOps_AddWithOverflowDetect)
@@ -80,16 +79,16 @@ TEST(SafeIntOps_AddWithOverflowDetect)
 namespace {
 
 template<class T_1, class T_2>
-void test_two_args(TestResults& test_results, const set<super_int>& values)
+void test_two_args(TestResults& test_results, const std::set<super_int>& values)
 {
-//    if (!(SameType<T_1, bool>::value && SameType<T_2, char>::value))
+//    if (!(std::is_same<T_1, bool>::value && std::is_same<T_2, char>::value))
 //        return;
 
-//    cerr << get_type_name<T_1>() << ", " << get_type_name<T_2>() << "\n";
-    vector<T_1> values_1;
-    vector<T_2> values_2;
+//    std::cerr << get_type_name<T_1>() << ", " << get_type_name<T_2>() << "\n";
+    std::vector<T_1> values_1;
+    std::vector<T_2> values_2;
     {
-        typedef set<super_int>::const_iterator iter;
+        typedef std::set<super_int>::const_iterator iter;
         iter end = values.end();
         for (iter i = values.begin(); i != end; ++i) {
             T_1 v_1;
@@ -101,13 +100,13 @@ void test_two_args(TestResults& test_results, const set<super_int>& values)
         }
     }
 
-    typedef typename vector<T_1>::const_iterator iter_1;
-    typedef typename vector<T_2>::const_iterator iter_2;
+    typedef typename std::vector<T_1>::const_iterator iter_1;
+    typedef typename std::vector<T_2>::const_iterator iter_2;
     iter_1 end_1 = values_1.end();
     iter_2 end_2 = values_2.end();
     for (iter_1 i_1 = values_1.begin(); i_1 != end_1; ++i_1) {
         for (iter_2 i_2 = values_2.begin(); i_2 != end_2; ++i_2) {
-//            cout << "--> " << promote(*i_1) << " vs " << promote(*i_2) << "\n";
+//            std::cout << "--> " << promote(*i_1) << " vs " << promote(*i_2) << "\n";
             // Comparisons
             {
                 T_1 v_1 = *i_1;
@@ -195,9 +194,9 @@ typedef types_13 types;
 
 
 template<class T, int> struct add_min_max {
-    static void exec(set<super_int>* values)
+    static void exec(std::set<super_int>* values)
     {
-        typedef numeric_limits<T> lim;
+        typedef std::numeric_limits<T> lim;
         values->insert(super_int(lim::min()));
         values->insert(super_int(lim::max()));
     }
@@ -205,12 +204,12 @@ template<class T, int> struct add_min_max {
 
 template<class T_1, int> struct test_two_args_1 {
     template<class T_2, int> struct test_two_args_2 {
-        static void exec(TestResults* test_results, const set<super_int>* values)
+        static void exec(TestResults* test_results, const std::set<super_int>* values)
         {
             test_two_args<T_1, T_2>(*test_results, *values);
         }
     };
-    static void exec(TestResults* test_results, const set<super_int>* values)
+    static void exec(TestResults* test_results, const std::set<super_int>* values)
     {
         ForEachType<types, test_two_args_2>::exec(test_results, values);
     }
@@ -223,7 +222,7 @@ template<class T_1, int> struct test_two_args_1 {
 TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
 {
     // Generate a set of interesting values in three steps
-    set<super_int> values;
+    std::set<super_int> values;
 
     // Add 0 to the set (worst case 1)
     values.insert(super_int(0));
@@ -233,10 +232,10 @@ TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
 
     // Add x-1 and x+1 to the set for all x in set (worst case 81)
     {
-        super_int min_val(numeric_limits<intmax_t>::min());
-        super_int max_val(numeric_limits<uintmax_t>::max());
-        set<super_int> values_2 = values;
-        typedef set<super_int>::const_iterator iter;
+        super_int min_val(std::numeric_limits<intmax_t>::min());
+        super_int max_val(std::numeric_limits<uintmax_t>::max());
+        std::set<super_int> values_2 = values;
+        typedef std::set<super_int>::const_iterator iter;
         iter end = values_2.end();
         for (iter i = values_2.begin(); i != end; ++i) {
             if (*i > min_val)
@@ -249,10 +248,10 @@ TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
     // Add x+y and x-y to the set for all x and y in set (worst case
     // 13203)
     {
-        super_int min_val(numeric_limits<intmax_t>::min());
-        super_int max_val(numeric_limits<uintmax_t>::max());
-        set<super_int> values_2 = values;
-        typedef set<super_int>::const_iterator iter;
+        super_int min_val(std::numeric_limits<intmax_t>::min());
+        super_int max_val(std::numeric_limits<uintmax_t>::max());
+        std::set<super_int> values_2 = values;
+        typedef std::set<super_int>::const_iterator iter;
         iter end = values_2.end();
         for (iter i_1 = values_2.begin(); i_1 != end; ++i_1) {
             for (iter i_2 = values_2.begin(); i_2 != end; ++i_2) {
@@ -272,10 +271,10 @@ TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
 
 /*
     {
-        typedef set<super_int>::const_iterator iter;
+        typedef std::set<super_int>::const_iterator iter;
         iter end = values.end();
         for (iter i = values.begin(); i != end; ++i)
-            cout << *i << "\n";
+            std::cout << *i << "\n";
     }
 */
 

@@ -21,8 +21,8 @@ build: clean
 	sh build.sh build
 
 
-libtightdb: build
-	DESTDIR=$$(pwd)/debian/libtightdb sh build.sh install-prod
+librealm: build
+	DESTDIR=$$(pwd)/debian/librealm sh build.sh install-prod
 	dh_testdir -a
 	dh_testroot -a
 	dh_installdocs -a
@@ -38,8 +38,8 @@ libtightdb: build
 	dh_installdirs
 
 
-libtightdb-dev: build
-	DESTDIR=$$(pwd)/debian/libtightdb-dev sh build.sh install-devel
+librealm-dev: build
+	DESTDIR=$$(pwd)/debian/librealm-dev sh build.sh install-devel
 	dh_testdir -a
 	dh_testroot -a
 	dh_installdocs -a
@@ -55,9 +55,9 @@ libtightdb-dev: build
 
 binary: build binary-indep binary-arch
 
-binary-indep: libtightdb-dev
+binary-indep: librealm-dev
 
-binary: libtightdb
+binary: librealm
 
 
 .PHONY: binary binary-arch binary-indep clean checkroot install

@@ -1,14 +1,13 @@
-#include <tightdb.hpp>
+#include <realm.hpp>
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
-TIGHTDB_TABLE_3(People,
+REALM_TABLE_3(People,
                 name, String,
                 age,  Int,
                 hired, Bool)
 
-TIGHTDB_TABLE_2(Books,
+REALM_TABLE_2(Books,
                 title, String,
                 author, String)
 
@@ -33,13 +32,13 @@ int main()
     t2->add("Childhood's End", "Arthur C. Clarke");
 
     // and save to disk
-    g1.write("test.tdb");
+    g1.write("test.realm");
 
     // Read a group from disk
-    Group g2("test.tdb");
+    Group g2("test.realm");
     Books::Ref t3 = g2.get_table<Books>("books");
-    cout << "Table Books" << endl;
+    std::cout << "Table Books" << std::endl;
     for(size_t i=0; i<t3->size(); ++i) {
-        cout << "'" << t3[i].title << "' by " << t3[i].author << endl;
+        std::cout << "'" << t3[i].title << "' by " << t3[i].author << std::endl;
     }
 }

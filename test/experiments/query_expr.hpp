@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <ostream>
 
-#include <tightdb/util/assert.hpp>
-#include <tightdb/util/meta.hpp>
-#include <tightdb/util/tuple.hpp>
+#include <realm/util/assert.hpp>
+#include <realm/util/meta.hpp>
+#include <realm/util/tuple.hpp>
 
 
 // Check that Inlining is still perfect when referring to context variables whose value are not known to be constant (e.g. a function argument)
@@ -41,7 +41,7 @@ Then reconsider AND changes for improved optimization
 // Optional dynamic column names in table spec
 
 
-namespace tightdb {
+namespace realm {
 
 
 
@@ -53,7 +53,7 @@ namespace query
     struct EmptyType {};
 
     template<class T> struct IsSubtable { static const bool value = false; };
-    template<class T> struct IsSubtable<SpecBase::Subtable<T> > {
+    template<class T> struct IsSubtable<SpecBase::Subtable<T>> {
         static const bool value = true;
     };
 
@@ -92,7 +92,7 @@ namespace query
 
     /// We need to specialize Expr for ColRef because it has to have a
     /// constructor that takes EmptyType as argument.
-    template<class Tab, int col_idx, class Type> struct Expr<ColRef<Tab, col_idx, Type> > {
+    template<class Tab, int col_idx, class Type> struct Expr<ColRef<Tab, col_idx, Type>> {
         ColRef<Tab, col_idx, Type> value;
         explicit Expr(EmptyType) {}
     };
@@ -316,391 +316,391 @@ namespace query
     template<class Op, class Col, class Query>
     inline Subquery<Op, Col, Query> subquery(const Col& c, const Query& q)
     {
-        TIGHTDB_STATIC_ASSERT(IsSubtable<typename Col::column_type>::value,
+        REALM_STATIC_ASSERT(IsSubtable<typename Col::column_type>::value,
                               "A subtable column is required at this point");
         return Subquery<Op, Col, Query>(c,q);
     }
 
 
 
-    template<class Q> inline Expr<UnOp<Not, Q> > operator!(const Expr<Q>& q)
+    template<class Q> inline Expr<UnOp<Not, Q>> operator!(const Expr<Q>& q)
     {
         return expr(unop<Not>(q.value));
     }
 
-    template<class Q> inline Expr<UnOp<Compl, Q> > operator~(const Expr<Q>& q)
+    template<class Q> inline Expr<UnOp<Compl, Q>> operator~(const Expr<Q>& q)
     {
         return expr(unop<Compl>(q.value));
     }
 
-    template<class Q> inline Expr<UnOp<Pos, Q> > operator+(const Expr<Q>& q)
+    template<class Q> inline Expr<UnOp<Pos, Q>> operator+(const Expr<Q>& q)
     {
         return expr(unop<Pos>(q.value));
     }
 
-    template<class Q> inline Expr<UnOp<Neg, Q> > operator-(const Expr<Q>& q)
+    template<class Q> inline Expr<UnOp<Neg, Q>> operator-(const Expr<Q>& q)
     {
         return expr(unop<Neg>(q.value));
     }
 
-    template<class Q> inline Expr<UnOp<Deref, Q> > operator*(const Expr<Q>& q)
+    template<class Q> inline Expr<UnOp<Deref, Q>> operator*(const Expr<Q>& q)
     {
         return expr(unop<Deref>(q.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Mul, A, B> > operator*(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Mul, A, B>> operator*(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Mul>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Mul, A, B> > operator*(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Mul, A, B>> operator*(const Expr<A>& a, const B& b)
     {
         return expr(binop<Mul>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Mul, A, B> > operator*(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Mul, A, B>> operator*(const A& a, const Expr<B>& b)
     {
         return expr(binop<Mul>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Div, A, B> > operator/(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Div, A, B>> operator/(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Div>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Div, A, B> > operator/(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Div, A, B>> operator/(const Expr<A>& a, const B& b)
     {
         return expr(binop<Div>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Div, A, B> > operator/(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Div, A, B>> operator/(const A& a, const Expr<B>& b)
     {
         return expr(binop<Div>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Mod, A, B> > operator%(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Mod, A, B>> operator%(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Mod>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Mod, A, B> > operator%(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Mod, A, B>> operator%(const Expr<A>& a, const B& b)
     {
         return expr(binop<Mod>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Mod, A, B> > operator%(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Mod, A, B>> operator%(const A& a, const Expr<B>& b)
     {
         return expr(binop<Mod>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Add, A, B> > operator+(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Add, A, B>> operator+(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Add>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Add, A, B> > operator+(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Add, A, B>> operator+(const Expr<A>& a, const B& b)
     {
         return expr(binop<Add>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Add, A, B> > operator+(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Add, A, B>> operator+(const A& a, const Expr<B>& b)
     {
         return expr(binop<Add>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Sub, A, B> > operator-(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Sub, A, B>> operator-(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Sub>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Sub, A, B> > operator-(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Sub, A, B>> operator-(const Expr<A>& a, const B& b)
     {
         return expr(binop<Sub>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Sub, A, B> > operator-(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Sub, A, B>> operator-(const A& a, const Expr<B>& b)
     {
         return expr(binop<Sub>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Shl, A, B> > operator<<(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Shl, A, B>> operator<<(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Shl>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Shl, A, B> > operator<<(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Shl, A, B>> operator<<(const Expr<A>& a, const B& b)
     {
         return expr(binop<Shl>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Shl, A, B> > operator<<(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Shl, A, B>> operator<<(const A& a, const Expr<B>& b)
     {
         return expr(binop<Shl>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Shr, A, B> > operator>>(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Shr, A, B>> operator>>(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Shr>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Shr, A, B> > operator>>(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Shr, A, B>> operator>>(const Expr<A>& a, const B& b)
     {
         return expr(binop<Shr>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Shr, A, B> > operator>>(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Shr, A, B>> operator>>(const A& a, const Expr<B>& b)
     {
         return expr(binop<Shr>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Eq, A, B> > operator==(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Eq, A, B>> operator==(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Eq>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Eq, A, B> > operator==(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Eq, A, B>> operator==(const Expr<A>& a, const B& b)
     {
         return expr(binop<Eq>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Eq, A, B> > operator==(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Eq, A, B>> operator==(const A& a, const Expr<B>& b)
     {
         return expr(binop<Eq>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Ne, A, B> > operator!=(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Ne, A, B>> operator!=(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Ne>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Ne, A, B> > operator!=(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Ne, A, B>> operator!=(const Expr<A>& a, const B& b)
     {
         return expr(binop<Ne>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Ne, A, B> > operator!=(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Ne, A, B>> operator!=(const A& a, const Expr<B>& b)
     {
         return expr(binop<Ne>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Lt, A, B> > operator<(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Lt, A, B>> operator<(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Lt>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Lt, A, B> > operator<(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Lt, A, B>> operator<(const Expr<A>& a, const B& b)
     {
         return expr(binop<Lt>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Lt, A, B> > operator<(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Lt, A, B>> operator<(const A& a, const Expr<B>& b)
     {
         return expr(binop<Lt>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Gt, A, B> > operator>(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Gt, A, B>> operator>(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Gt>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Gt, A, B> > operator>(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Gt, A, B>> operator>(const Expr<A>& a, const B& b)
     {
         return expr(binop<Gt>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Gt, A, B> > operator>(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Gt, A, B>> operator>(const A& a, const Expr<B>& b)
     {
         return expr(binop<Gt>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Le, A, B> > operator<=(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Le, A, B>> operator<=(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Le>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Le, A, B> > operator<=(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Le, A, B>> operator<=(const Expr<A>& a, const B& b)
     {
         return expr(binop<Le>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Le, A, B> > operator<=(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Le, A, B>> operator<=(const A& a, const Expr<B>& b)
     {
         return expr(binop<Le>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Ge, A, B> > operator>=(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Ge, A, B>> operator>=(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Ge>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Ge, A, B> > operator>=(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Ge, A, B>> operator>=(const Expr<A>& a, const B& b)
     {
         return expr(binop<Ge>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Ge, A, B> > operator>=(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Ge, A, B>> operator>=(const A& a, const Expr<B>& b)
     {
         return expr(binop<Ge>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<And, A, B> > operator&(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<And, A, B>> operator&(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<And>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<And, A, B> > operator&(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<And, A, B>> operator&(const Expr<A>& a, const B& b)
     {
         return expr(binop<And>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<And, A, B> > operator&(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<And, A, B>> operator&(const A& a, const Expr<B>& b)
     {
         return expr(binop<And>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Xor, A, B> > operator^(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Xor, A, B>> operator^(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Xor>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Xor, A, B> > operator^(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Xor, A, B>> operator^(const Expr<A>& a, const B& b)
     {
         return expr(binop<Xor>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Xor, A, B> > operator^(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Xor, A, B>> operator^(const A& a, const Expr<B>& b)
     {
         return expr(binop<Xor>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Or, A, B> > operator|(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Or, A, B>> operator|(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Or>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Or, A, B> > operator|(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Or, A, B>> operator|(const Expr<A>& a, const B& b)
     {
         return expr(binop<Or>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Or, A, B> > operator|(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Or, A, B>> operator|(const A& a, const Expr<B>& b)
     {
         return expr(binop<Or>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Conj, A, B> > operator&&(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Conj, A, B>> operator&&(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Conj>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Conj, A, B> > operator&&(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Conj, A, B>> operator&&(const Expr<A>& a, const B& b)
     {
         return expr(binop<Conj>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Conj, A, B> > operator&&(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Conj, A, B>> operator&&(const A& a, const Expr<B>& b)
     {
         return expr(binop<Conj>(a, b.value));
     }
 
 
     template<class A, class B>
-    inline Expr<BinOp<Disj, A, B> > operator||(const Expr<A>& a, const Expr<B>& b)
+    inline Expr<BinOp<Disj, A, B>> operator||(const Expr<A>& a, const Expr<B>& b)
     {
         return expr(binop<Disj>(a.value, b.value));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Disj, A, B> > operator||(const Expr<A>& a, const B& b)
+    inline Expr<BinOp<Disj, A, B>> operator||(const Expr<A>& a, const B& b)
     {
         return expr(binop<Disj>(a.value, b));
     }
 
     template<class A, class B>
-    inline Expr<BinOp<Disj, A, B> > operator||(const A& a, const Expr<B>& b)
+    inline Expr<BinOp<Disj, A, B>> operator||(const A& a, const Expr<B>& b)
     {
         return expr(binop<Disj>(a, b.value));
     }
 
 
     template<class Tab, int col_idx, class Type, class Query>
-    inline Expr<Subquery<Exists, ColRef<Tab, col_idx, Type>, Query> >
-    exists(const Expr<ColRef<Tab, col_idx, Type> >& col, const Query& query)
+    inline Expr<Subquery<Exists, ColRef<Tab, col_idx, Type>, Query>>
+    exists(const Expr<ColRef<Tab, col_idx, Type>>& col, const Query& query)
     {
         return expr(subquery<Exists>(col.value, query));
     }
 
     template<class Tab, int col_idx, class Type, class Query>
-    inline Expr<Subquery<Count, ColRef<Tab, col_idx, Type>, Query> >
-    count(const Expr<ColRef<Tab, col_idx, Type> >& col, const Query& query)
+    inline Expr<Subquery<Count, ColRef<Tab, col_idx, Type>, Query>>
+    count(const Expr<ColRef<Tab, col_idx, Type>>& col, const Query& query)
     {
         return expr(subquery<Count>(col.value, query));
     }
@@ -714,16 +714,16 @@ namespace query
     template<class> struct HasCol {
         static const bool value = false;
     };
-    template<class Tab, int col_idx, class Type> struct HasCol<ColRef<Tab, col_idx, Type> > {
+    template<class Tab, int col_idx, class Type> struct HasCol<ColRef<Tab, col_idx, Type>> {
         static const bool value = true;
     };
-    template<class Op, class A> struct HasCol<UnOp<Op, A> > {
+    template<class Op, class A> struct HasCol<UnOp<Op, A>> {
         static const bool value = HasCol<A>::value;
     };
-    template<class Op, class A, class B> struct HasCol<BinOp<Op, A, B> > {
+    template<class Op, class A, class B> struct HasCol<BinOp<Op, A, B>> {
         static const bool value = HasCol<A>::value || HasCol<B>::value;
     };
-    template<class Op, class Col, class Query> struct HasCol<Subquery<Op, Col, Query> > {
+    template<class Op, class Col, class Query> struct HasCol<Subquery<Op, Col, Query>> {
         static const bool value = true;
     };
 
@@ -736,19 +736,19 @@ namespace query
      * specified query expression.
      */
     template<class> struct GetCol {};
-    template<class Tab, int i, class T> struct GetCol<ColRef<Tab, i, T> > {
+    template<class Tab, int i, class T> struct GetCol<ColRef<Tab, i, T>> {
         typedef T type;
         static const int col_idx = i;
     };
-    template<class Op, class A> struct GetCol<UnOp<Op, A> > {
+    template<class Op, class A> struct GetCol<UnOp<Op, A>> {
         typedef typename GetCol<A>::type type;
         static const int col_idx = GetCol<A>::col_idx;
     };
-    template<class Op, class A, class B> struct GetCol<BinOp<Op, A, B> > {
+    template<class Op, class A, class B> struct GetCol<BinOp<Op, A, B>> {
         typedef typename GetColBinOp<HasCol<A>::value, A, B>::type type;
         static const int col_idx = GetColBinOp<HasCol<A>::value, A, B>::col_idx;
     };
-    template<class Op, class Col, class Query> struct GetCol<Subquery<Op, Col, Query> > {
+    template<class Op, class Col, class Query> struct GetCol<Subquery<Op, Col, Query>> {
         typedef typename GetCol<Col>::type type;
         static const int col_idx = GetCol<Col>::col_idx;
     };
@@ -775,16 +775,16 @@ namespace query
      * query expression.
      */
     template<class T> struct ExprResult { typedef T type; };
-    template<class Tab, int col_idx, class Type> struct ExprResult<ColRef<Tab, col_idx, Type> > {
+    template<class Tab, int col_idx, class Type> struct ExprResult<ColRef<Tab, col_idx, Type>> {
         typedef Type type;
     };
-    template<class Op, class A> struct ExprResult<UnOp<Op, A> > {
+    template<class Op, class A> struct ExprResult<UnOp<Op, A>> {
         typedef typename UnOpResult<Op, A>::type type;
     };
-    template<class Op, class A, class B> struct ExprResult<BinOp<Op, A, B> > {
+    template<class Op, class A, class B> struct ExprResult<BinOp<Op, A, B>> {
         typedef typename BinOpResult<Op, A, B>::type type;
     };
-    template<class Op, class Col, class Query> struct ExprResult<Subquery<Op, Col, Query> > {
+    template<class Op, class Col, class Query> struct ExprResult<Subquery<Op, Col, Query>> {
         typedef typename Op::ResultType type;
     };
 
@@ -816,35 +816,35 @@ namespace query
         static Result exec(const Query& q) { return q; }
     };
     // Get rid of the Expr<Q> wrapper
-    template<class Q> struct Canonicalize<Expr<Q> > {
+    template<class Q> struct Canonicalize<Expr<Q>> {
         typedef typename Canonicalize<Q>::Result Result;
         static Result exec(const Expr<Q>& q) { return canon(q.value); }
     };
     // Reduce (!!q) to (q)
-    template<class Q> struct Canonicalize<UnOp<Not, UnOp<Not, Q> > > {
+    template<class Q> struct Canonicalize<UnOp<Not, UnOp<Not, Q>>> {
         typedef typename Canonicalize<Q>::Result Result;
-        static Result exec(const UnOp<Not, UnOp<Not, Q> >& q) { return canon(q.arg.arg); }
+        static Result exec(const UnOp<Not, UnOp<Not, Q>>& q) { return canon(q.arg.arg); }
     };
     // Rewrite (!(a || b)) to (!a && !b) (De Morgan's law)
-    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<Disj, A, B> > > {
+    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<Disj, A, B>>> {
     private:
-        typedef typename Canonicalize<UnOp<Not, A> >::Result A2;
-        typedef typename Canonicalize<UnOp<Not, B> >::Result B2;
+        typedef typename Canonicalize<UnOp<Not, A>>::Result A2;
+        typedef typename Canonicalize<UnOp<Not, B>>::Result B2;
     public:
         typedef BinOp<Conj, A2, B2> Result;
-        static Result exec(const UnOp<Not, BinOp<Disj, A, B> >& q)
+        static Result exec(const UnOp<Not, BinOp<Disj, A, B>>& q)
         {
             return binop<Conj>(canon(unop<Not>(q.arg.left)), canon(unop<Not>(q.arg.right)));
         }
     };
     // Rewrite (!(a && b)) to (!a || !b) (De Morgan's law)
-    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<Conj, A, B> > > {
+    template<class A, class B> struct Canonicalize<UnOp<Not, BinOp<Conj, A, B>>> {
     private:
-        typedef typename Canonicalize<UnOp<Not, A> >::Result A2;
-        typedef typename Canonicalize<UnOp<Not, B> >::Result B2;
+        typedef typename Canonicalize<UnOp<Not, A>>::Result A2;
+        typedef typename Canonicalize<UnOp<Not, B>>::Result B2;
     public:
         typedef BinOp<Disj, A2, B2> Result;
-        static Result exec(const UnOp<Not, BinOp<Conj, A, B> >& q)
+        static Result exec(const UnOp<Not, BinOp<Conj, A, B>>& q)
         {
             return binop<Disj>(canon(unop<Not>(q.arg.left)), canon(unop<Not>(q.arg.right)));
         }
@@ -867,7 +867,7 @@ namespace query
 
         Type operator()(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type>::value,
+            REALM_STATIC_ASSERT(!IsSubtable<Type>::value,
                                   "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
             return static_cast<const Type*>(m_column)[i];
         }
@@ -875,7 +875,7 @@ namespace query
         template<int col_idx2, class Type2>
         Type2 operator()(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
         {
-            TIGHTDB_STATIC_ASSERT(!IsSubtable<Type2>::value,
+            REALM_STATIC_ASSERT(!IsSubtable<Type2>::value,
                                   "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
             return m_table->template get<col_idx2, Type2>(i);
         }
@@ -1152,4 +1152,4 @@ private:
 */
 };
 
-} // namespace tightdb
+} // namespace realm

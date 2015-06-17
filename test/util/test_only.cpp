@@ -18,7 +18,7 @@ TestOnly& access_test_only()
 
 } // anonymous namespace
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 SetTestOnly::SetTestOnly(const char* test_name)
@@ -34,4 +34,4 @@ const char* get_test_only()
 }
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

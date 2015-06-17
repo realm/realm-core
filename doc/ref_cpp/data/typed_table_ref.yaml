@@ -11,7 +11,7 @@ DESCR      : &g_typed_table_descr
              NOTE: The current documentation of Typed Table is under construction,
              and not completely correct yet.
 
-             The Table class is the core class of the TightDB framework. It allows you
+             The Table class is the core class of the Realm framework. It allows you
              to efficiently work with data in terms of rows and columns. The value of
              a cell (specific column, specific row) is compacted in order to keep the
              overall memory consumption as little as possible. The internal data structure
@@ -23,15 +23,15 @@ DESCR      : &g_typed_table_descr
              a typed table and enforce type checking of the methods parameters at compile time.
 
              The table supports the most common types including integers, timestamps and strings.
-             It is possible to use a TightDB table class as column type. This means that you can
+             It is possible to use a Realm table class as column type. This means that you can
              have tables of tables structure.
 
-             Moreover, TightDB introduces a column type called {@link class_mixed}. A value of the
-             Mixed type can be any supported value of TightDB. This implies - as the name
+             Moreover, Realm introduces a column type called {@link class_mixed}. A value of the
+             Mixed type can be any supported value of Realm. This implies - as the name
              indicates - that you can mix the type of values in the the column. In one row the
              value could be an integer, in another row the value could be a string or even a table.
 
-             The aim of the TightDB table class is that it feels as close to the native data
+             The aim of the Realm table class is that it feels as close to the native data
              structures (in particular arrays) as possible.
 SEE        :
 EXAMPLES:
@@ -43,12 +43,12 @@ CATEGORIES:
 - Schema:
   METHODS:
   - g_typed_table_macros:
-      NAME     : TIGHTDB_TABLE_*
+      NAME     : REALM_TABLE_*
       DESCR    : >
                  This set of predefined macros is used to declare type safe table classes.
                  It is possible to declare table classes with 1 to 15 columns.
       SIGNATURE: |
-                 TIGHTDB_TABLE_*(ClassName,
+                 REALM_TABLE_*(ClassName,
                                  ColumnName, ColumnType
                                  ...)
       SUMMARY  : Declare type safe table classes.
@@ -412,7 +412,7 @@ CATEGORIES:
                  The value to search for.
       RETURN:
         TYPES  : size_t
-        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+        DESCR  : "The row index or <code>realm::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_lookup
         DESCR  :
@@ -444,7 +444,7 @@ CATEGORIES:
                  The value.
       RETURN:
         TYPES  : size_t
-        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+        DESCR  : "The row index or <code>realm::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_find_first_xxx
         DESCR  :

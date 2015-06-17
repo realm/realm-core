@@ -16,23 +16,21 @@
 #  include <windows.h>
 #endif
 
-#include <tightdb.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/terminate.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/util/thread.hpp>
+#include <realm.hpp>
+#include <realm/util/features.h>
+#include <realm/util/safe_int_ops.hpp>
+#include <memory>
+#include <realm/util/terminate.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
 #include "crypt_key.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -77,7 +75,7 @@ namespace {
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !defined(__APPLE__)
-#  if TIGHTDB_ANDROID || defined DISABLE_ASYNC || defined TIGHTDB_ENABLE_ENCRYPTION
+#  if REALM_ANDROID || defined DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
 bool allow_async = true;
@@ -85,7 +83,7 @@ bool allow_async = true;
 #endif
 
 
-TIGHTDB_TABLE_4(TestTableShared,
+REALM_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
                 third,  Bool,
@@ -93,15 +91,15 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 
 
-void writer(string path, int id)
+void writer(std::string path, int id)
 {
-    // cerr << "Started writer " << endl;
+    // std::cerr << "Started writer " << std::endl;
     try {
         bool done = false;
         SharedGroup sg(path, true, SharedGroup::durability_Full);
-        // cerr << "Opened sg " << endl;
+        // std::cerr << "Opened sg " << std::endl;
         for (int i=0; !done; ++i) {
-            // cerr << "       - " << getpid() << endl;
+            // std::cerr << "       - " << getpid() << std::endl;
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             done = t1[id].third;
@@ -111,16 +109,16 @@ void writer(string path, int id)
             sched_yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
-        // cerr << "Ended pid " << getpid() << endl;
+        // std::cerr << "Ended pid " << getpid() << std::endl;
     } catch (...) {
-        // cerr << "Exception from " << getpid() << endl;
+        // std::cerr << "Exception from " << getpid() << std::endl;
     }
 }
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined REALM_ENABLE_ENCRYPTION
 
-void killer(TestResults& test_results, int pid, string path, int id)
+void killer(TestResults& test_results, int pid, std::string path, int id)
 {
     {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
@@ -143,12 +141,12 @@ void killer(TestResults& test_results, int pid, string path, int id)
     int ret_pid = waitpid(pid, &stat_loc, options);
     if (ret_pid == pid_t(-1)) {
         if (errno == EINTR)
-            cerr << "waitpid was interrupted" << endl;
+            std::cerr << "waitpid was interrupted" << std::endl;
         if (errno == EINVAL)
-            cerr << "waitpid got bad arguments" << endl;
+            std::cerr << "waitpid got bad arguments" << std::endl;
         if (errno == ECHILD)
-            cerr << "waitpid tried to wait for the wrong child: " << pid << endl;
-        TIGHTDB_TERMINATE("waitpid failed");
+            std::cerr << "waitpid tried to wait for the wrong child: " << pid << std::endl;
+        REALM_TERMINATE("waitpid failed");
     }
     bool child_exited_from_signal = WIFSIGNALED(stat_loc);
     CHECK(child_exited_from_signal);
@@ -167,10 +165,20 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION && !defined(TIGHTDB_ANDROID)
+#if !defined(__APPLE__) && !defined(_WIN32)&& !defined REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
-TEST(Shared_PipelinedWritesWithKills)
+TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
+    // FIXME: This test was disabled because it has a strong tendency to leave
+    // rogue child processes behind after the root test process aborts. If these
+    // orphanned child processes are not manually searched for and killed, they
+    // will run indefinitely. Additionally, these child processes will typically
+    // grow a Realm file to gigantic sizes over time (100 gigabytes per 20
+    // minutes).
+    //
+    // Idea for solution: Install a custom signal handler for SIGABRT and
+    // friends, and kill all spawned child processes from it. See `man abort`.
+
     CHECK(RobustMutex::is_robust_on_this_platform());
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
@@ -187,7 +195,7 @@ TEST(Shared_PipelinedWritesWithKills)
     }
     int pid = fork();
     if (pid == -1)
-        TIGHTDB_TERMINATE("fork() failed");
+        REALM_TERMINATE("fork() failed");
     if (pid == 0) {
         // first writer!
         writer(path, 0);
@@ -198,32 +206,31 @@ TEST(Shared_PipelinedWritesWithKills)
             int pid2 = pid;
             pid = fork();
             if (pid == pid_t(-1))
-                TIGHTDB_TERMINATE("fork() failed");
+                REALM_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
                 _exit(0);
             }
             else {
-                // cerr << "New process " << pid << " killing old " << pid2 << endl;
+                // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
                 killer(test_results, pid2, path, k-1);
             }
         }
-        // cerr << "Killing last one: " << pid << endl;
+        // std::cerr << "Killing last one: " << pid << std::endl;
         killer(test_results, pid, path, num_processes-1);
     }
 }
 #endif
 
 
-#ifndef _WIN32
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
-    string old_path = path;
-    string tmp_path = string(path)+".tmp";
+    std::string old_path = path;
+    std::string tmp_path = std::string(path)+".tmp";
     Thread writer_thread;
     {
-        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         // Create table entries
         {
             WriteTransaction wt(sg);
@@ -235,7 +242,7 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            writer_thread.start(bind(&writer, old_path, 41));
+            writer_thread.start(std::bind(&writer, old_path, 41));
 
             // make sure writer has started:
             bool waiting = true;
@@ -244,7 +251,7 @@ TEST(Shared_CompactingOnTheFly)
                 ReadTransaction rt(sg);
                 TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
                 waiting = t1[41].first == 0;
-                // cerr << t1[41].first << endl;
+                // std::cerr << t1[41].first << std::endl;
             }
 
             // since the writer is running, we cannot compact:
@@ -261,13 +268,17 @@ TEST(Shared_CompactingOnTheFly)
     }
     writer_thread.join();
     {
-        SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        SharedGroup sg2(path, true, SharedGroup::durability_Full, crypt_key());
+        {
+            sg2.begin_write();
+            sg2.commit();
+        }
         CHECK_EQUAL(true, sg2.compact());
         ReadTransaction rt2(sg2);
         rt2.get_group().Verify();
     }
 }
-#endif // _WIN32
+
 
 
 #ifdef LOCKFILE_CLEANUP
@@ -359,8 +370,8 @@ TEST(Shared_StaleLockFileFaked)
 TEST(Shared_StaleLockFileRenamed)
 {
     SHARED_GROUP_TEST_PATH(path);
-    string lock_path   = path.get_lock_path();
-    string lock_path_2 = path.get_lock_path() + ".backup";
+    std::string lock_path   = path.get_lock_path();
+    std::string lock_path_2 = path.get_lock_path() + ".backup";
     File::try_remove(lock_path_2);
     bool no_create = false;
     {
@@ -369,12 +380,12 @@ TEST(Shared_StaleLockFileRenamed)
 #ifdef _WIN32
         // Requires ntfs to work
         if (!CreateHardLinkA(lock_path_2.c_str(), lock_path.c_str(), 0)) {
-            cerr << "Creating a hard link failed, test abandoned" << endl;
+            std::cerr << "Creating a hard link failed, test abandoned" << std::endl;
             return;
         }
 #else
         if (link(lock_path.c_str(), lock_path_2.c_str())) {
-            cerr << "Creating a hard link failed, test abandoned" << endl;
+            std::cerr << "Creating a hard link failed, test abandoned" << std::endl;
             return;
         }
 #endif
@@ -857,8 +868,8 @@ TEST(Shared_ManyReaders)
 
     const int max_N = 64;
     CHECK(max_N >= rounds[num_rounds-1]);
-    UniquePtr<SharedGroup> shared_groups[8 * max_N];
-    UniquePtr<ReadTransaction> read_transactions[8 * max_N];
+    std::unique_ptr<SharedGroup> shared_groups[8 * max_N];
+    std::unique_ptr<ReadTransaction> read_transactions[8 * max_N];
 
     for (int round = 0; round < num_rounds; ++round) {
         int N = rounds[round];
@@ -1089,7 +1100,7 @@ TEST(Shared_ManyReaders)
 
 namespace {
 
-TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
+REALM_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 } // anonymous namespace
 
@@ -1098,7 +1109,7 @@ TEST(Shared_WritesSpecialOrder)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_BPNODE_SIZE, but that takes a loooooong time!
+    const int num_rows = 5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
 
     {
@@ -1136,7 +1147,7 @@ TEST(Shared_WritesSpecialOrder)
 
 namespace  {
 
-void writer_threads_thread(TestResults* test_results_ptr, string path, size_t row_ndx)
+void writer_threads_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
 {
     TestResults& test_results = *test_results_ptr;
 
@@ -1197,7 +1208,7 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i)
-            threads[i].start(bind(&writer_threads_thread, &test_results, string(path), i));
+            threads[i].start(std::bind(&writer_threads_thread, &test_results, std::string(path), i));
 
         // Wait for all threads to complete
         for (size_t i = 0; i < thread_count; ++i)
@@ -1223,8 +1234,8 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
-#if !defined TIGHTDB_ANDROID && !defined TIGHTDB_IOS
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
+#if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
@@ -1242,7 +1253,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     for (int i = 0; i < 10; ++i) {
         pid_t pid = fork();
         if (pid == pid_t(-1))
-            TIGHTDB_TERMINATE("fork() failed");
+            REALM_TERMINATE("fork() failed");
         if (pid == 0) {
             // Child
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
@@ -1257,7 +1268,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             int options = 0;
             pid = waitpid(pid, &stat_loc, options);
             if (pid == pid_t(-1))
-                TIGHTDB_TERMINATE("waitpid() failed");
+                REALM_TERMINATE("waitpid() failed");
             bool child_exited_normaly = WIFEXITED(stat_loc);
             CHECK(child_exited_normaly);
             int child_exit_status = WEXITSTATUS(stat_loc);
@@ -1292,7 +1303,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 }
 
 #endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
@@ -1437,10 +1448,10 @@ TEST(Shared_FormerErrorCase1)
 
 namespace {
 
-TIGHTDB_TABLE_1(FormerErrorCase2_Subtable,
+REALM_TABLE_1(FormerErrorCase2_Subtable,
                 value,  Int)
 
-TIGHTDB_TABLE_1(FormerErrorCase2_Table,
+REALM_TABLE_1(FormerErrorCase2_Table,
                 bar, Subtable<FormerErrorCase2_Subtable>)
 
 } // namespace
@@ -1467,7 +1478,7 @@ TEST(Shared_FormerErrorCase2)
 
 namespace {
 
-TIGHTDB_TABLE_1(OverAllocTable,
+REALM_TABLE_1(OverAllocTable,
                 text, String)
 
 } // namespace
@@ -1604,9 +1615,9 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
         TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
         table->add_search_index(0);
-        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
             table->add_empty_row();
-        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
             table->remove(0);
         db.commit();
     }
@@ -1679,7 +1690,7 @@ TEST(Shared_StringIndexBug3)
             TableRef table = group.get_table("users");
             if (table->size() > 0) {
                 size_t del = random.draw_int_mod(table->size());
-                //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
+                //cerr << "-" << del << ": " << table->get_string(0, del) << std::endl;
                 table->remove(del);
                 table->Verify();
             }
@@ -1693,7 +1704,7 @@ TEST(Shared_StringIndexBug3)
             char txt[100];
             rand_str(random, txt, 8);
             txt[8] = 0;
-            //cerr << "+" << txt << endl;
+            //cerr << "+" << txt << std::endl;
             table->set_string(0, table->size() - 1, txt);
             table->Verify();
             db.commit();
@@ -1737,7 +1748,7 @@ TEST_IF(Shared_Async, allow_async)
         SharedGroup db(path, no_create, SharedGroup::durability_Async);
 
         for (size_t i = 0; i < 100; ++i) {
-//            cout << "t "<<n<<"\n";
+//            std::cout << "t "<<n<<"\n";
             WriteTransaction wt(db);
             wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
@@ -1766,7 +1777,7 @@ namespace  {
 
 #define multiprocess_increments 100
 
-void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_ndx)
+void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
 {
     TestResults& test_results = *test_results_ptr;
 
@@ -1805,7 +1816,7 @@ void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_
 }
 
 
-void multiprocess_make_table(string path, string lock_path, string alone_path, size_t rows)
+void multiprocess_make_table(std::string path, std::string lock_path, std::string alone_path, size_t rows)
 {
     static_cast<void>(lock_path);
     // Create first table in group
@@ -1875,22 +1886,22 @@ void multiprocess_make_table(string path, string lock_path, string alone_path, s
 #endif
 }
 
-void multiprocess_threaded(TestResults& test_results, string path, size_t num_threads, size_t base)
+void multiprocess_threaded(TestResults& test_results, std::string path, size_t num_threads, size_t base)
 {
     // Do some changes in a async db
-    UniquePtr<test_util::ThreadWrapper[]> threads;
+    std::unique_ptr<test_util::ThreadWrapper[]> threads;
     threads.reset(new test_util::ThreadWrapper[num_threads]);
 
     // Start threads
     for (size_t i = 0; i != num_threads; ++i)
-        threads[i].start(bind(&multiprocess_thread, &test_results, path, base+i));
+        threads[i].start(std::bind(&multiprocess_thread, &test_results, path, base+i));
 
     // Wait for threads to finish
     for (size_t i = 0; i != num_threads; ++i) {
         bool thread_has_thrown = false;
-        string except_msg;
+        std::string except_msg;
         if (threads[i].join(except_msg)) {
-            cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+            std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
             thread_has_thrown = true;
         }
         CHECK(!thread_has_thrown);
@@ -1911,7 +1922,7 @@ void multiprocess_threaded(TestResults& test_results, string path, size_t num_th
     }
 }
 
-void multiprocess_validate_and_clear(TestResults& test_results, string path, string lock_path,
+void multiprocess_validate_and_clear(TestResults& test_results, std::string path, std::string lock_path,
                                      size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
@@ -1935,7 +1946,7 @@ void multiprocess_validate_and_clear(TestResults& test_results, string path, str
     }
 }
 
-void multiprocess(TestResults& test_results, string path, int num_procs, size_t num_threads)
+void multiprocess(TestResults& test_results, std::string path, int num_procs, size_t num_threads)
 {
     int* pids = new int[num_procs];
     for (int i = 0; i != num_procs; ++i) {
@@ -1988,36 +1999,40 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
+#endif // !defined(_WIN32) && !defined(__APPLE__)
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+
 namespace {
 
-static const int num_threads = 3;
-static int shared_state[num_threads];
-static SharedGroup* sgs[num_threads];
-static Mutex muu;
+const int num_threads = 3;
+int shared_state[num_threads];
+SharedGroup* sgs[num_threads];
+Mutex* muu;
 
-void waiter(string path, int i)
+void waiter(std::string path, int i)
 {
     SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 1;
         sgs[i] = sg;
     }
     sg->wait_for_change();
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 2; // this state should not be observed by the writer
     }
     sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 3;
     }
     sg->begin_read();
     sg->end_read();
     sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 4;
     }
     // works within a read transaction as well
@@ -2025,14 +2040,14 @@ void waiter(string path, int i)
     sg->wait_for_change();
     sg->end_read();
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 5;
     }
     sg->begin_read();
     sg->end_read();
     sg->wait_for_change(); // wait until wait_for_change is released
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 6;
     }
 }
@@ -2041,18 +2056,19 @@ void waiter(string path, int i)
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
+    muu = new Mutex;
     SHARED_GROUP_TEST_PATH(path);
     for (int j=0; j < num_threads; j++)
         shared_state[j] = 0;
     SharedGroup sg(path, false, SharedGroup::durability_Full);
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
-        threads[j].start(bind(&waiter, string(path), j));
+        threads[j].start(std::bind(&waiter, std::string(path), j));
     bool try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (shared_state[j] != 1) try_again = true;
         }
     }
@@ -2063,7 +2079,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (3 != shared_state[j]) try_again = true;
         }
     }
@@ -2074,7 +2090,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (4 != shared_state[j]) try_again = true;
         }
     }
@@ -2084,7 +2100,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (5 != shared_state[j]) try_again = true;
         }
     }
@@ -2092,24 +2108,26 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (sgs[j]) {
                 sgs[j]->wait_for_change_release();
             }
             if (6 != shared_state[j]) {
                 try_again = true;
             }
-            else { 
-                delete sgs[j];
-                sgs[j] = 0;
-            }
         }
     }
     for (int j=0; j < num_threads; j++)
         threads[j].join();
+    for (int j=0; j < num_threads; j++) {
+        delete sgs[j];
+        sgs[j] = 0;
+    }
+    delete muu;
 }
 
-#endif // endif not on windows
+#endif // endif not on windows (or apple)
+
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
 {
@@ -2247,7 +2265,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-#ifndef TIGHTDB_ENABLE_ENCRYPTION // encrpted buffers aren't supported
+#ifndef REALM_ENABLE_ENCRYPTION // encrpted buffers aren't supported
     // The empty group created initially by a shared group accessor is special
     // in that it contains no nodes, and the root-ref is therefore zero. The
     // following block checks that the contents of such a file is still
@@ -2257,8 +2275,8 @@ TEST(Shared_MixedWithNonShared)
         {
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key()); // Create the very empty group
         }
-        ifstream in(path.c_str());
-        string buffer((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+        std::ifstream in(path.c_str());
+        std::string buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         bool take_ownership = false;
         Group group(BinaryData(buffer), take_ownership);
         group.Verify();
@@ -2435,7 +2453,7 @@ TEST(Shared_MovingEnumStringColumn)
         CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
         for (int i = 0; i < 64; ++i) {
-            string value = table->get_string(0, i);
+            std::string value = table->get_string(0, i);
             if (i%2 == 0) {
                 CHECK_EQUAL("a", value);
             }
@@ -2475,7 +2493,7 @@ TEST(Shared_MovingEnumStringColumn)
         ConstTableRef table = rt.get_table("foo");
         CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
         for (int i = 0; i < 64; ++i) {
-            string value = table->get_string(0, i);
+            std::string value = table->get_string(0, i);
             if (i == 0) {
                 CHECK_EQUAL("bar0", value);
             }
@@ -2510,7 +2528,7 @@ TEST(Shared_MovingSearchIndex)
         table->add_column(type_String, "enum");
         table->add_empty_row(64);
         for (int i = 0; i < 64; ++i) {
-            ostringstream out;
+            std::ostringstream out;
             out << "foo" << i;
             table->set_string(0, i, out.str());
             table->set_string(1, i, "bar");
@@ -2545,8 +2563,8 @@ TEST(Shared_MovingSearchIndex)
         wt.get_group().Verify();
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
@@ -2564,8 +2582,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(1) && table->has_search_index(2));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
@@ -2579,8 +2597,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
@@ -2595,8 +2613,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
         CHECK_EQUAL(1,  table->find_first_string(0, "foo_Y"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
@@ -2609,6 +2627,64 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         wt.commit();
     }
+    // Insert a column after the string columns and remove the indexes
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+
+        table->insert_column(2, type_Int, "i");
+        for (size_t i = 0; i < table->size(); ++i)
+            table->set_int(2, i, i);
+        wt.get_group().Verify();
+        table->remove_search_index(0);
+        wt.get_group().Verify();
+        table->remove_search_index(1);
+        wt.get_group().Verify();
+
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        CHECK_EQUAL(60, table->find_first_int(2, 60));
+        wt.commit();
+    }
+    // add and remove the indexes in reverse order
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+
+        wt.get_group().Verify();
+        table->add_search_index(1);
+        wt.get_group().Verify();
+        table->add_search_index(0);
+        wt.get_group().Verify();
+
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        CHECK_EQUAL(60, table->find_first_int(2, 60));
+
+        wt.get_group().Verify();
+        table->remove_search_index(1);
+        wt.get_group().Verify();
+        table->remove_search_index(0);
+        wt.get_group().Verify();
+
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        CHECK_EQUAL(60, table->find_first_int(2, 60));
+        wt.commit();
+    }
 }
 
 
@@ -2616,7 +2692,7 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 {
     // This test only makes sense when we can insert a number of rows
     // equal to the square of the maximum B+-tree node size.
-    size_t max_node_size = TIGHTDB_MAX_BPNODE_SIZE;
+    size_t max_node_size = REALM_MAX_BPNODE_SIZE;
     size_t max_node_size_squared = max_node_size;
     if (int_multiply_with_overflow_detect(max_node_size_squared, max_node_size))
         return;
@@ -2638,20 +2714,6 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
         table->insert_empty_row(row_ndx);
         wt.commit();
     }
-}
-
-
-TEST(Shared_ScopedRollback)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
-    WriteTransaction wt(sg);
-    wt.add_table("foo");
-    wt.rollback();
-    // If wt.rollback() did nothing, then the next statement would cause a
-    // dead-lock. Know that this is part of the test.
-    WriteTransaction wt_2(sg);
-    CHECK_NOT(wt_2.has_table("foo"));
 }
 
 #endif // TEST_SHARED

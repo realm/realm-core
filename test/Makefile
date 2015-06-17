@@ -1,35 +1,43 @@
 SUBDIRS = util
-PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
-benchmark-insert-add benchmark-crud benchmark-prealloc \
-benchmark-index benchmark-transaction benchmark-row-accessor \
+PASSIVE_SUBDIRS = \
+test-realm \
+test-sqlite3 \
+test-stl \
+performance \
+benchmark-insert-add \
+benchmark-crud \
+benchmark-prealloc \
+benchmark-index \
+benchmark-transaction \
+benchmark-row-accessor \
 experiments
 
 RESOURCES=expect_json.json expect_string.txt
 
 DIR_DEPS          = util
-test_tightdb_DEPS = util
+test_realm_DEPS = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
 
-check_PROGRAMS = tightdb-tests
+check_PROGRAMS = realm-tests
 
 TESTS := $(wildcard test_*.cpp large_tests/*.cpp)
 
-tightdb_tests_SOURCES = $(TESTS) main.cpp
-tightdb_tests_LIBS    = util/test-util.a
+realm_tests_SOURCES = $(TESTS) main.cpp
+realm_tests_LIBS    = util/test-util.a
 
 # Run test suite inside `gdb`
 .PHONY: gdb gdb-debug
 gdb: check-norun
-	gdb tightdb-tests
+	gdb realm-tests
 gdb-debug: check-debug-norun
-	gdb tightdb-tests-dbg
+	gdb realm-tests-dbg
 
 .PHONY: benchmark
-benchmark: check-norun/subdir/test-tightdb check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
+benchmark: check-norun/subdir/test-realm check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
 	@echo ""
-	@echo ".:: TightDB ::."
-	test-tightdb/test-tightdb
+	@echo ".:: Realm ::."
+	test-realm/test-realm
 	@echo ""
 	@echo ".:: SQLite 3 ::."
 	test-sqlite3/test-sqlite3

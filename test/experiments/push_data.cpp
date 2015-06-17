@@ -3,16 +3,15 @@
 #include <sstream>
 #include <iostream>
 
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 namespace {
 
-TIGHTDB_TABLE_2(MyTable,
+REALM_TABLE_2(MyTable,
                 number, Int,
                 text, String)
 
@@ -21,11 +20,11 @@ TIGHTDB_TABLE_2(MyTable,
 
 int main(int argc, const char* const argv[])
 {
-    string database_file  = "/tmp/push_data.tdb";
+    string database_file  = "/tmp/push_data.realm";
 
     deque<string> positional_args;
     for (int i=1; i<argc; ++i) {
-        const string arg = argv[i];
+        const std::string arg = argv[i];
         if (arg.size() < 2 || arg.substr(0,2) != "--") {
             positional_args.push_back(arg);
             continue;
@@ -42,7 +41,7 @@ int main(int argc, const char* const argv[])
 
     if (positional_args.size() < 2) {
     bad_command_line:
-        cerr <<
+        std::cerr <<
             "ERROR: Bad command line.\n\n"
             "Synopsis: "<<argv[0]<<"  NUM-REPS  TEXT...\n\n"
             "Options:\n"

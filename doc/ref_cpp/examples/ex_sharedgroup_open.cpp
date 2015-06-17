@@ -1,13 +1,13 @@
 // @@Example: ex_cpp_shared_group_open @@
 // @@Fold@@
 #include <cassert>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 // Define schema for main table
-TIGHTDB_TABLE_3(PeopleTable,
+REALM_TABLE_3(PeopleTable,
                   name,   String,
                   age,    Int,
                   hired,  Bool)
@@ -18,7 +18,7 @@ void func()
     // Create a new shared group in unattached state
     SharedGroup::unattached_tag tag;
     SharedGroup db(tag);
-    db.open("shared_db.tightdb");
+    db.open("shared_db.realm");
 
     // @@Fold@@
 
@@ -57,7 +57,7 @@ void func()
 int main()
 {
     func();
-    util::File::remove("shared_db.tightdb");
+    util::File::remove("shared_db.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

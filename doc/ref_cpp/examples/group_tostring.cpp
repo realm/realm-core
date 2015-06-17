@@ -2,13 +2,12 @@
 // @@Fold@@
 #include <iostream>
 #include <sstream>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
@@ -22,13 +21,13 @@ int main()
     table->add("Jack", 22);
 // @@EndFold@@
 
-    ostringstream ss;
+    std::ostringstream ss;
     group.to_string(ss);
-    cout << ss.str() << endl;
+    std::cout << ss.str() << std::endl;
 
     // or using less memory:
-    group.to_string(cout);
-    cout << endl;
+    group.to_string(std::cout);
+    std::cout << std::endl;
 
 // @@Fold@@
 }

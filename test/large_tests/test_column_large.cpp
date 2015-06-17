@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <vector>
 
-#include <tightdb/column.hpp>
-#include <tightdb/query_conditions.hpp>
+#include <realm/column.hpp>
+#include <realm/query_conditions.hpp>
 
 #include "../util/verified_integer.hpp"
 
@@ -14,9 +14,8 @@
 #define LL_MAX (9223372036854775807LL)
 #define LL_MIN (-LL_MAX - 1)
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
@@ -50,7 +49,7 @@ using namespace tightdb::test_util;
 
 
 // These tests take ~5 min in release mode with
-// TIGHTDB_MAX_BPNODE_SIZE=1000
+// REALM_MAX_BPNODE_SIZE=1000
 
 
 TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
@@ -67,7 +66,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                      -2147483647LL, -2147483646LL, -2147483649LL, -4294967296LL, -4294967295LL,
                      4294967297LL, -4294967294LL, -9223372036854775807LL, (-9223372036854775807LL - 1), -9223372036854775806LL,
                      /* (-9223372036854775807LL - 1) because -9223372036854775808LL is buggy; it's seen as a minus token and then a right-hand-side
-                     exceeding long long's range. Furthermore, numeric_limits<int64_t>::min is typedef'ed to 'long long' which cannot be used in
+                     exceeding long long's range. Furthermore, std::numeric_limits<int64_t>::min is typedef'ed to 'long long' which cannot be used in
                      initializer list for int64_t */
     };
 
@@ -75,7 +74,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
 
     for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
         const size_t LEN = 64 * 20 + 1000;
-        Array a(Allocator::get_default());
+        ArrayInteger a(Allocator::get_default());
         a.create(Array::type_Normal);
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
@@ -279,7 +278,7 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
         for (size_t iter = 0; iter < ITER_PER_BITWIDTH; ++iter) {
 
 //            if (random.chance(1, 10))
-//                cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
+//                std::cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
 
             if (random.draw_int_mod(ITER_PER_BITWIDTH / 100) == 0) {
                 trend = random.draw_int_mod(10);

@@ -2,13 +2,12 @@
 // @@Fold@@
 #include <cstddef>
 #include <cstdlib>
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
@@ -26,7 +25,7 @@ void func(BinaryData buffer)
     table->add("Joe",  17);
     table->add("Jack", 22);
 
-    g.write("people.tightdb");
+    g.write("people.realm");
 }
 
 int main()
@@ -41,7 +40,7 @@ int main()
         throw;
     }
     free(const_cast<char*>(buffer.data()));
-    util::File::remove("people.tightdb");
+    util::File::remove("people.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -8,18 +8,16 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/group_shared.hpp>
-#include <tightdb/table_macros.hpp>
+#include <realm/util/file.hpp>
+#include <realm/group_shared.hpp>
+#include <realm/table_macros.hpp>
 
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 using test_util::unit_test::TestResults;
 
 
@@ -58,15 +56,15 @@ namespace {
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
               kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
-TIGHTDB_TABLE_2(MySubsubtable,
+REALM_TABLE_2(MySubsubtable,
                 value,  Int,
                 binary, Binary)
 
-TIGHTDB_TABLE_2(MySubtable,
+REALM_TABLE_2(MySubtable,
                 foo, Int,
                 bar, Subtable<MySubsubtable>)
 
-TIGHTDB_TABLE_8(MyTable,
+REALM_TABLE_8(MyTable,
                 alpha,   Int,
                 beta,    Bool,
                 gamma,   Enum<MyEnum>,
@@ -82,6 +80,8 @@ const int num_rounds  = 2;
 
 const size_t max_blob_size   = 32*1024; // 32 KiB
 
+const BinaryData EmptyNonNul = BinaryData("", 0);
+
 void round(TestResults& test_results, SharedGroup& db, int index)
 {
     // Testing all value types
@@ -90,7 +90,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         MyTable::Ref table = wt.get_or_add_table<MyTable>("my_table");
         if (table->is_empty()) {
             table->add();
-            table->add(0, false, moja, time_t(), "", BinaryData(0,0), 0, Mixed(int64_t()));
+            table->add(0, false, moja, time_t(), "", EmptyNonNul, 0, Mixed(int64_t()));
             char binary_data[] = { 7, 6, 5, 7, 6, 5, 4, 3, 113 };
             table->add(749321, true, kumi_na_tatu, time_t(99992), "click",
                        BinaryData(binary_data), 0, Mixed("fido"));
@@ -203,7 +203,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
         size_t size = ((512 + index%1024) * 1024) % max_blob_size;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index) * 677 % 256);
         subsubtable[index].binary = BinaryData(data.get(), size);
@@ -222,7 +222,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #11
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[index%2].zeta = BinaryData(data.get(), size);
@@ -246,7 +246,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #13
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         size_t size = (512 + (333 + 677*index) % 1024) * 327;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[(index+1)%2].zeta = BinaryData(data.get(), size);
@@ -268,7 +268,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         }
         int n = 1 + 13 / (1+index);
         for (int i=0; i<n; ++i) {
-            BinaryData bin;
+            BinaryData bin("", 0);
             Mixed mix = int64_t(i);
             subtable->add(0, false, moja,  time_t(), "alpha",   bin, 0, mix);
             subtable->add(1, false, mbili, time_t(), "beta",    bin, 0, mix);
@@ -305,7 +305,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
             subsubtable = subtable[0].theta.set_subtable<MyTable>();
         }
         size_t size = (17 + 233*index) % 523;
-        UniquePtr<char[]> data(new char[size]);
+        std::unique_ptr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+79) * 677 % 256);
         BinaryData bin(data.get(), size);
@@ -332,12 +332,12 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         int num = 8;
         for (int i=0; i<num; ++i)
             subsubtable->add(i, 0);
-        vector<MySubsubtable::Ref> subsubsubtables;
+        std::vector<MySubsubtable::Ref> subsubsubtables;
         for (int i=0; i<num; ++i)
             subsubsubtables.push_back(subsubtable[i].bar);
         for (int i=0; i<3; ++i) {
             for (int j=0; j<num; j+=2) {
-                BinaryData bin;
+                BinaryData bin("", 0);
                 subsubsubtables[j]->add((i-j)*index-19, bin);
             }
         }
@@ -367,7 +367,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         }
         int num = 9;
         for (int i=0; i<num; ++i)
-            subsubtable->add(i, BinaryData());
+            subsubtable->add(i, BinaryData("", 0));
         subsubtable->column().value += 31;
         wt.commit();
     }
@@ -388,13 +388,13 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         }
         int num = 9;
         for (int i=0; i<num; ++i)
-            subsubtable->add(i, BinaryData());
+            subsubtable->add(i, BinaryData("", 0));
         wt.commit();
     }
 }
 
 
-void thread(TestResults* test_results, int index, string path)
+void thread(TestResults* test_results, int index, std::string path)
 {
     for (int i=0; i<num_rounds; ++i) {
         SharedGroup db(path);
@@ -415,14 +415,14 @@ TEST(Transactions_General)
 
         // Start threads
         for (int i = 0; i != num_threads; ++i)
-            threads[i].start(bind(&thread, &test_results, i, string(path)));
+            threads[i].start(std::bind(&thread, &test_results, i, std::string(path)));
 
         // Wait for threads to finish
         for (int i = 0; i != num_threads; ++i) {
             bool thread_has_thrown = false;
-            string except_msg;
+            std::string except_msg;
             if (threads[i].join(except_msg)) {
-                cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+                std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
                 thread_has_thrown = true;
             }
             CHECK(!thread_has_thrown);
@@ -470,7 +470,7 @@ TEST(Transactions_General)
         for (int i = 0; i != num_threads; ++i) {
             CHECK_EQUAL(1000+i, subsubtable[i].value);
             size_t size = ((512 + i%1024) * 1024) % max_blob_size;
-            UniquePtr<char[]> data(new char[size]);
+            std::unique_ptr<char[]> data(new char[size]);
             for (size_t j = 0; j != size; ++j)
                 data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
             CHECK_EQUAL(BinaryData(data.get(), size), subsubtable[i].binary);
@@ -482,7 +482,7 @@ TEST(Transactions_General)
         for (size_t i=0; i<table1_theta_size; ++i) {
             CHECK_EQUAL(false,        subtable[i].beta);
             CHECK_EQUAL(0,            subtable[i].delta);
-            CHECK_EQUAL(BinaryData(), subtable[i].zeta);
+            CHECK_EQUAL(BinaryData("", 0), subtable[i].zeta);
             CHECK_EQUAL(0u,           subtable[i].eta->size());
             if (4 <= i)
                 CHECK_EQUAL(type_Int, subtable[i].theta.get_type());

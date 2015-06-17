@@ -1,17 +1,18 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX_STRING
 
-#include <tightdb/index_string.hpp>
+#include <realm.hpp>
+#include <realm/index_string.hpp>
+#include <realm/column_string.hpp>
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using namespace util;
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -147,7 +148,7 @@ TEST(StringIndex_DeleteAll)
     col.erase(2, 2 == col.size()-1);
     col.erase(1, 1 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -171,7 +172,7 @@ TEST(StringIndex_DeleteAll)
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -223,11 +224,81 @@ TEST(StringIndex_Delete)
     // Delete all items
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #endif
 
     // Clean up
+    col.destroy();
+}
+
+TEST(StringIndex_MoveLastOver)
+{
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+    col.add(s1);
+    col.add(s2);
+    col.add(s3);
+    col.add(s4);
+    col.add(s1); // duplicate value
+    col.add(s1); // duplicate value
+
+    col.create_search_index();
+
+    {
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
+            return;
+
+        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
+
+        CHECK_EQUAL(3, matches.size());
+        CHECK_EQUAL(0, matches.get(0));
+        CHECK_EQUAL(4, matches.get(1));
+        CHECK_EQUAL(5, matches.get(2));
+    }
+
+    // Remove a non-s1 row and change the order of the s1 rows
+    col.move_last_over(1);
+
+    {
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
+            return;
+
+        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
+
+        CHECK_EQUAL(3, matches.size());
+        CHECK_EQUAL(0, matches.get(0));
+        CHECK_EQUAL(1, matches.get(1));
+        CHECK_EQUAL(4, matches.get(2));
+    }
+
+    // Move a s1 row over a s1 row
+    col.move_last_over(1);
+
+    {
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
+            return;
+
+        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
+
+        CHECK_EQUAL(2, matches.size());
+        CHECK_EQUAL(0, matches.get(0));
+        CHECK_EQUAL(1, matches.get(1));
+    }
+
     col.destroy();
 }
 
@@ -242,7 +313,7 @@ TEST(StringIndex_ClearEmpty)
 
     // Clear to remove all entries
     col.clear();
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -271,7 +342,7 @@ TEST(StringIndex_Clear)
 
     // Clear to remove all entries
     col.clear();
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
     static_cast<void>(ndx);
@@ -580,7 +651,7 @@ TEST(StringIndex_Count_Int)
             if (ints[t] == ints[y])
                 real++;
         }
-        
+
         CHECK_EQUAL(real, count);
     }
     // Clean up
@@ -600,21 +671,21 @@ TEST(StringIndex_Distinct_Int)
     // Create a new index on column
     col.create_search_index();
 
-    
+
     StringIndex& ndx = *col.get_search_index();
-    
+
     ref_type results_ref = Column::create(Allocator::get_default());
     Column results(Allocator::get_default(), results_ref);
 
     ndx.distinct(results);
-    
-    std::set<int64_t> s;    
+
+    std::set<int64_t> s;
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         s.insert(ints[t]);
     }
 
     CHECK_EQUAL(s.size(), results.size());
-    
+
     // Clean up
     col.destroy();
     results.destroy();
@@ -649,12 +720,15 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
     CHECK_EQUAL(2, f);
 
     col.insert(1, 5);
+    CHECK_EQUAL(col.get(1), 5);
 
     f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(3, f);
 
     col.add(7);
+    CHECK_EQUAL(col.get(4), 7);
     col.set(4, 10);
+    CHECK_EQUAL(col.get(4), 10);
 
     f = ndx.find_first(int64_t(10));
     CHECK_EQUAL(col.size() - 1, f);
@@ -676,7 +750,7 @@ TEST(StringIndex_FuzzyTest_Int)
     ref_type ref = Column::create(Allocator::get_default());
     Column col(Allocator::get_default(), ref);
     Random random(random_int<unsigned long>());
-    const size_t n = 1.2 * TIGHTDB_MAX_BPNODE_SIZE;
+    const size_t n = static_cast<size_t>(1.2 * REALM_MAX_BPNODE_SIZE);
 
     col.create_search_index();
 
@@ -694,7 +768,7 @@ TEST(StringIndex_FuzzyTest_Int)
         size_t m = col.find_first(r);
         for (size_t t_2 = 0; t_2 < n; ++t_2) {
             if (col.get(t_2) == r) {
-                CHECK_EQUAL(t_2, m); // 238, -1
+                CHECK_EQUAL(t_2, m);
                 break;
             }
         }
@@ -704,16 +778,32 @@ TEST(StringIndex_FuzzyTest_Int)
 
 
 // Tests for a bug with strings containing zeroes
-TEST(StringIndex_Bug1)
+TEST(StringIndex_EmbeddedZeroes)
 {
     // String index
     ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col2(Allocator::get_default(), ref2);
     const StringIndex& ndx2 = *col2.create_search_index();
+
+#if REALM_NULL_STRINGS == 1
+    // FIXME: re-enable once embedded nuls work
+    col2.add(StringData("\0", 1));
+    col2.add(StringData("\1", 1));
+    col2.add(StringData("\0\0", 2));
+    col2.add(StringData("\0\1", 2));
+    col2.add(StringData("\1\0", 2));
+
+    CHECK_EQUAL(ndx2.find_first(StringData("\0", 1)), 0);
+    CHECK_EQUAL(ndx2.find_first(StringData("\1", 1)), 1);
+    CHECK_EQUAL(ndx2.find_first(StringData("\2", 1)), not_found);
+    CHECK_EQUAL(ndx2.find_first(StringData("\0\0", 2)), 2);
+    CHECK_EQUAL(ndx2.find_first(StringData("\0\1", 2)), 3);
+    CHECK_EQUAL(ndx2.find_first(StringData("\1\0", 2)), 4);
+    CHECK_EQUAL(ndx2.find_first(StringData("\1\0\0", 3)), not_found);
+#else
     static_cast<void>(ndx2);
-    col2.add(StringData("\0\0\0\0\0\x001\0\0", 8));
-    size_t t = ndx2.find_first(StringData("\0\0\0\0\0\x002\0\0"));
-    CHECK_EQUAL(t, not_found);
+    CHECK_THROW_ANY(col2.add(StringData("\0", 1)));
+#endif
 
     // Integer index (uses String index internally)
     int64_t v = 1ULL << 41;
@@ -727,6 +817,170 @@ TEST(StringIndex_Bug1)
 
     col.destroy();
     col2.destroy();
+}
+
+#if REALM_NULL_STRINGS == 1
+TEST(StringIndex_Null)
+{
+    // Create a column with string values
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref, true);
+
+    col.add("");
+    col.add(realm::null());
+
+    const StringIndex& ndx = *col.create_search_index();
+
+    const size_t r1 = ndx.find_first(realm::null());
+    CHECK_EQUAL(r1, 1);
+
+    col.destroy();
+}
+#endif
+
+#if REALM_NULL_STRINGS == 1
+TEST(StringIndex_Zero_Crash)
+{
+    // StringIndex could crash if strings ended with one or more 0-bytes
+    Table table;
+    table.add_column(type_String, "");
+    table.add_empty_row(3);
+
+    table.set_string(0, 0, StringData(""));
+    table.set_string(0, 1, StringData("\0", 1));
+    table.set_string(0, 2, StringData("\0\0", 2));
+    table.add_search_index(0);
+
+    size_t t;
+
+    t = table.find_first_string(0, StringData(""));
+    CHECK_EQUAL(0, t);
+
+    t = table.find_first_string(0, StringData("\0", 1));
+    CHECK_EQUAL(1, t);
+
+    t = table.find_first_string(0, StringData("\0\0", 2));
+    CHECK_EQUAL(2, t);
+}
+#endif
+
+#if REALM_NULL_STRINGS == 1
+TEST(StringIndex_Zero_Crash2)
+{
+    Random random(random_int<unsigned long>());
+
+    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100 ; iter++) {
+        // StringIndex could crash if strings ended with one or more 0-bytes
+        Table table;
+        table.add_column(type_String, "", true);
+
+        table.add_search_index(0);
+
+        for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
+            unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
+            if (action == 0) {
+//                table.remove_search_index(0);
+                table.add_search_index(0);
+            }
+            else if (action > 48 && table.size() < 10) {
+                // Generate string with equal probability of being empty, null, short, medium and long, and with 
+                // their contents having equal proability of being either random or a duplicate of a previous 
+                // string. When it's random, each char must have equal probability of being 0 or non-0e
+                char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
+                memcpy(buf1, buf, sizeof(buf));
+                char buf2[] = "                                                                                         ";
+                StringData sd;
+
+                size_t len = random.draw_int_max<size_t>(3);
+                if (len == 0)
+                    len = 0;
+                else if (len == 1)
+                    len = 7;
+                else if (len == 2)
+                    len = 27;
+                else
+                    len = random.draw_int_max<size_t>(90);
+
+                if (random.draw_int_max<int>(1) == 0) {
+                    // duplicate string
+                    sd = StringData(buf1, len);
+                }
+                else {
+                    // random string
+                    for (size_t t = 0; t < len; t++) {
+                        if (random.draw_int_max<int>(100) > 20)
+                            buf2[t] = 0;                        // zero byte
+                        else
+                            buf2[t] = static_cast<char>(random.draw_int<int>());  // random byte
+                    }
+                    // no generated string can equal "null" (our vector magic value for null) because 
+                    // len == 4 is not possible
+                    sd = StringData(buf2, len);
+                }
+
+                size_t pos = random.draw_int_max<size_t>(table.size());
+                table.insert_empty_row(pos);
+                table.set_string(0, pos, sd);
+                free(buf1);
+            }
+            else if (table.size() > 0) {
+                // delete
+                size_t row = random.draw_int_max<size_t>(table.size() - 1);
+                table.remove(row);
+            }
+
+            action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
+            if (table.size() > 0) {
+                // Search for value that exists
+                size_t row = random.draw_int_max<size_t>(table.size() - 1);
+                StringData sd = table.get_string(0, row);
+                size_t t = table.find_first_string(0, sd);
+                StringData sd2 = table.get_string(0, t);
+                CHECK_EQUAL(sd, sd2);
+            }
+
+        }
+    }
+}
+#endif
+
+TEST(StringIndex_Integer_Increasing)
+{
+    const size_t rows = 2000 + 1000000 * TEST_DURATION;
+
+    // StringIndex could crash if strings ended with one or more 0-bytes
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_search_index(0);
+
+    std::vector<int64_t> reference;
+
+    for (size_t row = 0; row < rows; row++) {
+        int64_t r = fastrand(0x100000);
+        table.add_empty_row();
+        table.set_int(0, row, r);
+        reference.push_back(r);
+    }
+
+    std::sort(reference.begin(), reference.end());
+
+    for (size_t row = 0; row < rows; row++) {
+        int64_t v = table.get_int(0, row);
+        size_t c = table.count_int(0, v);
+        
+        size_t start = std::lower_bound(reference.begin(), reference.end(), v) - reference.begin();
+        size_t ref_count = 0;
+        for (size_t t = start; t < reference.size(); t++) {
+            if (reference[t] == v)
+                ref_count++;
+        }
+
+        CHECK_EQUAL(c, ref_count);
+
+    }
+
+
 }
 
 #endif // TEST_INDEX_STRING

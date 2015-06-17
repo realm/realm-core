@@ -30,12 +30,12 @@
 # a file named conf/distributions. The contents of this file consists
 # of sections like:
 #
-# Origin: www.tightdb.com
-# Label: tightdb ubuntu repository
+# Origin: www.realm.com
+# Label: realm ubuntu repository
 # Codename: lucid
 # Components: main
 # Architectures: i386 amd64
-# Description: TightDB for Ubuntu
+# Description: Realm for Ubuntu
 # SignWith: 6C518649
 #
 # Each ubuntu (and mint) version have a codename. For each supported
@@ -65,7 +65,7 @@
 # </IfModule>
 #
 # Moreover, in order to help customers for easy installation you
-# should create a small script at the web server named apt-tightdb.sh
+# should create a small script at the web server named apt-realm.sh
 # with the contents (add your OpenGPP key!!!):
 #
 # #!/bin/bash
@@ -80,7 +80,7 @@
 #         codename="precise"
 #         ;;
 # esac
-# echo "deb http://www.tightdb.com/u/ $codename main" > /etc/apt/sources.list.d/tightdb.list
+# echo "deb http://www.realm.com/u/ $codename main" > /etc/apt/sources.list.d/realm.list
 #
 # apt-key add - <<EOF
 #   YOUR OpenGPG KEY
@@ -120,20 +120,20 @@ tar xzf $release || exit 1
 cd $(find . -mindepth 1 -maxdepth 1 -type d)
 
 # build core
-cd tightdb
+cd realm
 DISABLE_CHEETAH_CODE_GEN=1 sh build.sh dist-deb
 cd ..
 sudo dpkg -i *deb
 
 # build extensions
 for i in python java php ruby node gui; do
-    cd tightdb_$i
+    cd realm_$i
     sh build.sh dist-deb
     cd ..
 done
 
-# remove installed tightdb packages
-sudo dpkg -P $(dpkg-query -l '*tightdb*' | grep ^ii | awk '{print $2}')
+# remove installed realm packages
+sudo dpkg -P $(dpkg-query -l '*realm*' | grep ^ii | awk '{print $2}')
 
 # save a copy
 cp -a *deb "$dest"

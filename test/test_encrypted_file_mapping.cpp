@@ -1,11 +1,12 @@
 #include "testsettings.hpp"
 #ifdef TEST_ENCRYPTED_FILE_MAPPING
 
-#include <tightdb/util/encrypted_file_mapping.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 
 #include "test.hpp"
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // Test independence and thread-safety
@@ -37,9 +38,9 @@
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
+#ifdef REALM_ENABLE_ENCRYPTION
 
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(EncryptedFile_CryptorBasic)
 {
@@ -50,9 +51,9 @@ TEST(EncryptedFile_CryptorBasic)
     const char data[4096] = "test data";
     char buffer[4096];
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR);
-    cryptor.write(fd, 0, data);
-    cryptor.read(fd, 0, buffer);
+    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    cryptor.write(fd, 0, data, sizeof(data));
+    cryptor.read(fd, 0, buffer, sizeof(buffer));
     CHECK(memcmp(buffer, data, strlen(data)) == 0);
     close(fd);
 }
@@ -65,13 +66,13 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
 
     const char data[4096] = "test data";
     char raw_buffer_1[8192] = {0}, raw_buffer_2[9192] = {0};
-    int fd = open(path.c_str(), O_CREAT|O_RDWR);
+    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 
-    cryptor.write(fd, 0, data);
+    cryptor.write(fd, 0, data, sizeof(data));
     lseek(fd, 0, SEEK_SET);
     read(fd, raw_buffer_1, sizeof(raw_buffer_1));
 
-    cryptor.write(fd, 0, data);
+    cryptor.write(fd, 0, data, sizeof(data));
     lseek(fd, 0, SEEK_SET);
     read(fd, raw_buffer_2, sizeof(raw_buffer_2));
 
@@ -87,16 +88,16 @@ TEST(EncryptedFile_SeparateCryptors)
     const char data[4096] = "test data";
     char buffer[4096];
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR);
+    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.write(fd, 0, data);
+        cryptor.write(fd, 0, data, sizeof(data));
     }
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.read(fd, 0, buffer);
+        cryptor.read(fd, 0, buffer, sizeof(buffer));
     }
 
     CHECK(memcmp(buffer, data, strlen(data)) == 0);
@@ -107,13 +108,13 @@ TEST(EncryptedFile_InterruptedWrite)
 {
     TEST_PATH(path);
 
-    const char data[] = "test data";
+    const char data[4096] = "test data";
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR);
+    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.write(fd, 0, data);
+        cryptor.write(fd, 0, data, sizeof(data));
     }
 
     // Fake an interrupted write which updates the IV table but not the data
@@ -126,12 +127,31 @@ TEST(EncryptedFile_InterruptedWrite)
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.read(fd, 0, buffer);
+        cryptor.read(fd, 0, buffer, sizeof(buffer));
         CHECK(memcmp(buffer, data, strlen(data)) == 0);
     }
 
     close(fd);
 }
 
-#endif // TIGHTDB_ENABLE_ENCRYPTION
+TEST(EncryptedFile_LargePages)
+{
+    TEST_PATH(path);
+
+    char data[4096*4];
+    for (size_t i = 0; i < sizeof(data); ++i)
+        data[i] = static_cast<char>(i);
+
+    AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+    cryptor.set_file_size(sizeof(data));
+    char buffer[sizeof(data)];
+
+    int fd = open(path.c_str(), O_CREAT|O_RDWR);
+    cryptor.write(fd, 0, data, sizeof(data));
+    cryptor.read(fd, 0, buffer, sizeof(buffer));
+    CHECK(memcmp(buffer, data, sizeof(data)) == 0);
+    close(fd);
+}
+
+#endif // REALM_ENABLE_ENCRYPTION
 #endif // TEST_ENCRYPTED_FILE_MAPPING

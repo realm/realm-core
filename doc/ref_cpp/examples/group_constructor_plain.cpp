@@ -1,11 +1,11 @@
 // @@Example: ex_cpp_group_constructor_plain @@
 // @@Fold@@
-#include <tightdb.hpp>
-#include <tightdb/util/file.hpp>
+#include <realm.hpp>
+#include <realm/util/file.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
-TIGHTDB_TABLE_2(PeopleTable,
+REALM_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
@@ -23,13 +23,13 @@ void func()
     table->add("Joe", 17);
     table->add("Jack", 22);
 
-    g.write("people.tightdb");
+    g.write("people.realm");
 }
 
 int main()
 {
     func();
-    util::File::remove("people.tightdb");
+    util::File::remove("people.realm");
 }
 // @@EndFold@@
 // @@EndExample@@

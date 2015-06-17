@@ -14,12 +14,12 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb.hpp>
-#include <tightdb/utilities.hpp>
-#include <tightdb/version.hpp>
+#include <realm/util/features.h>
+#include <memory>
+#include <realm/util/features.h>
+#include <realm.hpp>
+#include <realm/utilities.hpp>
+#include <realm/version.hpp>
 
 #include "test_all.hpp"
 #include "util/timer.hpp"
@@ -27,11 +27,10 @@
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
+using namespace realm::test_util::unit_test;
 
 
 namespace {
@@ -46,25 +45,26 @@ const char* file_order[] = {
     //
     "test_self.cpp",
 
-    // tightdb/util/
+    // realm/util/
     "test_safe_int_ops.cpp",
     "test_basic_utils.cpp",
     "test_file*.cpp",
     "test_thread.cpp",
+    "test_util_network.cpp",
     "test_utf8.cpp",
 
-    // /tightdb/ (helpers)
+    // /realm/ (helpers)
     "test_string_data.cpp",
     "test_binary_data.cpp",
 
-    // /tightdb/impl/ (detail)
+    // /realm/impl/ (detail)
     "test_alloc*.cpp",
     "test_array*.cpp",
     "test_column*.cpp",
     "test_index*.cpp",
     "test_destroy_guard.cpp",
 
-    // /tightdb/ (main API)
+    // /realm/ (main API)
     "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
@@ -72,10 +72,12 @@ const char* file_order[] = {
     "test_shared*.cpp",
     "test_transactions*.cpp",
     "test_query*.cpp",
-    "test_replication*.cpp",
     "test_links.cpp",
     "test_link_query_view.cpp",
     "test_json.cpp",
+    "test_replication*.cpp",
+    "test_transform.cpp",
+    "test_sync.cpp",
 
     "test_lang_bind_helper.cpp",
 
@@ -93,7 +95,7 @@ void fix_max_open_files()
             if (new_soft_limit > soft_limit) {
                 set_soft_rlimit(resource_NumOpenFiles, new_soft_limit);
 /*
-                cout << "\n"
+                std::cout << "\n"
                     "MaxOpenFiles: "<<soft_limit<<" --> "<<new_soft_limit<<"\n";
 */
             }
@@ -112,24 +114,24 @@ void fix_async_daemon_path()
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
-#  ifdef TIGHTDB_DEBUG
-        async_daemon = "tightdbd-dbg-noinst";
+#  ifdef REALM_DEBUG
+        async_daemon = "realmd-dbg-noinst";
 #  else
-        async_daemon = "tightdbd-noinst";
+        async_daemon = "realmd-noinst";
 #  endif
     }
     else {
-#  ifdef TIGHTDB_COVER
-        async_daemon = "../src/tightdb/tightdbd-cov-noinst";
+#  ifdef REALM_COVER
+        async_daemon = "../src/realm/realmd-cov-noinst";
 #  else
-#    ifdef TIGHTDB_DEBUG
-        async_daemon = "../src/tightdb/tightdbd-dbg-noinst";
+#    ifdef REALM_DEBUG
+        async_daemon = "../src/realm/realmd-dbg-noinst";
 #    else
-        async_daemon = "../src/tightdb/tightdbd-noinst";
+        async_daemon = "../src/realm/realmd-noinst";
 #    endif
 #  endif
     }
-    setenv("TIGHTDB_ASYNC_DAEMON", async_daemon, 0);
+    setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
 #endif // _WIN32
 }
 
@@ -141,30 +143,30 @@ void display_build_config()
     const char* with_replication =
         Version::has_feature(feature_Replication) ? "Enabled" : "Disabled";
 
-#ifdef TIGHTDB_COMPILER_SSE
+#ifdef REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
 #else
     const char* compiler_sse = "No";
 #endif
 
-#ifdef TIGHTDB_COMPILER_AVX
+#ifdef REALM_COMPILER_AVX
     const char* compiler_avx = "Yes";
 #else
     const char* compiler_avx = "No";
 #endif
 
-    const char* cpu_sse = tightdb::sseavx<42>() ? "4.2" :
-        (tightdb::sseavx<30>() ? "3.0" : "None");
+    const char* cpu_sse = realm::sseavx<42>() ? "4.2" :
+        (realm::sseavx<30>() ? "3.0" : "None");
 
-    const char* cpu_avx = tightdb::sseavx<1>() ? "Yes" : "No";
+    const char* cpu_avx = realm::sseavx<1>() ? "Yes" : "No";
 
-    cout <<
+    std::cout <<
         "\n"
-        "TightDB version: "<<Version::get_version()<<"\n"
+        "Realm version: "<<Version::get_version()<<"\n"
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"
-        "TIGHTDB_MAX_BPNODE_SIZE = "<<TIGHTDB_MAX_BPNODE_SIZE<<"\n"
+        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -186,11 +188,11 @@ public:
     {
     }
 
-    ~CustomReporter() TIGHTDB_NOEXCEPT
+    ~CustomReporter() REALM_NOEXCEPT
     {
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) TIGHTDB_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) override
     {
         result r;
         r.m_test_name = details.test_name;
@@ -199,12 +201,12 @@ public:
         SimpleReporter::end(details, elapsed_seconds);
     }
 
-    void summary(const Summary& summary) TIGHTDB_OVERRIDE
+    void summary(const Summary& summary) override
     {
         SimpleReporter::summary(summary);
 
         size_t max_n = 5;
-        size_t n = min<size_t>(max_n, m_results.size());
+        size_t n = std::min<size_t>(max_n, m_results.size());
         if (n < 2)
             return;
 
@@ -221,20 +223,20 @@ public:
         }
         name_col_width += 2;
         size_t full_width = name_col_width + time_col_width;
-        cout.fill('-');
-        cout << "\nTop "<<n<<" time usage:\n"<<setw(int(full_width)) << "" << "\n";
-        cout.fill(' ');
+        std::cout.fill('-');
+        std::cout << "\nTop " << n << " time usage:\n" << std::setw(int(full_width)) << "" << "\n";
+        std::cout.fill(' ');
         for(size_t i = 0; i != n; ++i) {
             const result& r = m_results[i];
-            cout <<
-                left  << setw(int(name_col_width)) << r.m_test_name <<
-                right << setw(int(time_col_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
+            std::cout <<
+                std::left  << std::setw(int(name_col_width)) << r.m_test_name <<
+                std::right << std::setw(int(time_col_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
         }
     }
 
 private:
     struct result {
-        string m_test_name;
+        std::string m_test_name;
         double m_elapsed_seconds;
         bool operator<(const result& r) const
         {
@@ -242,7 +244,7 @@ private:
         }
     };
 
-    vector<result> m_results;
+    std::vector<result> m_results;
 };
 
 
@@ -256,15 +258,15 @@ bool run_tests()
                 seed = produce_nondeterministic_random_seed();
             }
             else {
-                istringstream in(str);
-                in.imbue(locale::classic());
-                in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
+                std::istringstream in(str);
+                in.imbue(std::locale::classic());
+                in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
                 in >> seed;
-                bool bad = !in || in.get() != char_traits<char>::eof();
+                bool bad = !in || in.get() != std::char_traits<char>::eof();
                 if (bad)
-                    throw runtime_error("Bad random seed");
+                    throw std::runtime_error("Bad random seed");
             }
-            cout << "Random seed: "<<seed<<"\n\n";
+            std::cout << "Random seed: "<<seed<<"\n\n";
             random_seed(seed);
         }
     }
@@ -275,21 +277,21 @@ bool run_tests()
             keep_test_files();
     }
 
-    UniquePtr<Reporter> reporter;
-    UniquePtr<Filter> filter;
+    std::unique_ptr<Reporter> reporter;
+    std::unique_ptr<Filter> filter;
 
     // Set up reporter
-    ofstream xml_file;
+    std::ofstream xml_file;
     bool xml;
-#ifdef TIGHTDB_MOBILE
+#ifdef REALM_MOBILE
     xml = true;
 #else
     const char* xml_str = getenv("UNITTEST_XML");
     xml = (xml_str && strlen(xml_str) != 0);
 #endif
     if (xml) {
-        string path = get_test_path_prefix();
-        string xml_path = path + "unit-test-report.xml";
+        std::string path = get_test_path_prefix();
+        std::string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
         reporter.reset(create_xml_reporter(xml_file));
     }
@@ -311,16 +313,16 @@ bool run_tests()
     {
         const char* str = getenv("UNITTEST_THREADS");
         if (str && strlen(str) != 0) {
-            istringstream in(str);
-            in.imbue(locale::classic());
-            in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
             in >> num_threads;
-            bool bad = !in || in.get() != char_traits<char>::eof() ||
+            bool bad = !in || in.get() != std::char_traits<char>::eof() ||
                 num_threads < 1 || num_threads > 1024;
             if (bad)
-                throw runtime_error("Bad number of threads");
+                throw std::runtime_error("Bad number of threads");
             if (num_threads > 1)
-                cout << "Number of test threads: "<<num_threads<<"\n\n";
+                std::cout << "Number of test threads: "<<num_threads<<"\n\n";
         }
     }
 
@@ -337,10 +339,10 @@ bool run_tests()
     bool success = list.run(reporter.get(), filter.get(), num_threads, shuffle);
 
     if (test_only)
-        cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
+        std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
     if (!xml)
-        cout << "\n";
+        std::cout << "\n";
 
     return success;
 }
@@ -350,9 +352,9 @@ bool run_tests()
 
 int test_all(int argc, char* argv[])
 {
-    // Disable buffering on cout so that progress messages can be related to
+    // Disable buffering on std::cout so that progress messages can be related to
     // error messages.
-    cout.setf(ios::unitbuf);
+    std::cout.setf(std::ios::unitbuf);
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 

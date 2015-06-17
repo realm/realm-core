@@ -4,23 +4,22 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#include <tightdb/column.hpp>
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
-#include <tightdb/column_basic.hpp>
-#include <tightdb/column_string.hpp>
-#include <tightdb/column_string_enum.hpp>
-#include <tightdb/column_mixed.hpp>
-#include <tightdb/array_binary.hpp>
-#include <tightdb/array_string_long.hpp>
+#include <realm/column.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
+#include <realm/column_basic.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_string_enum.hpp>
+#include <realm/column_mixed.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_string_long.hpp>
 
 #include "../util/thread_wrapper.hpp"
 
 #include "../util/timer.hpp"
 #include "unit_test.hpp"
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
 
 TEST(bounds)
@@ -125,7 +124,7 @@ sum: 8.876
         test_util::Timer t;
         double best;
 
-        tightdb::Array a;
+        realm::Array a;
         int64_t val = 0;
         volatile size_t tt = 40;
 
@@ -149,7 +148,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, random indexing:     \t" << best << "\n";
+        std::cerr << "byte array, random indexing:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -163,7 +162,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, average direction:  \t" << best << "\n";
+        std::cerr << "byte array, average direction:  \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -177,7 +176,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, always go left:     \t" << best << "\n";
+        std::cerr << "byte array, always go left:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -191,7 +190,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "byte array, always go right:    \t" << best << "\n";
+        std::cerr << "byte array, always go right:    \t" << best << "\n";
         score += best;
     }
 
@@ -201,7 +200,7 @@ sum: 8.876
         test_util::Timer t;
         double best;
 
-        tightdb::Array a;
+        realm::Array a;
         int64_t val = 0;
 
         for(int i = 0; i < 1000; i++) {
@@ -224,7 +223,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, random indexing:     \t" << best << "\n";
+        std::cerr << "32-bit array, random indexing:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -238,7 +237,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, average direction:\t" << best << "\n";
+        std::cerr << "32-bit array, average direction:\t" << best << "\n";
 
         best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
@@ -251,7 +250,7 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, always go left:   \t" << best << "\n";
+        std::cerr << "32-bit array, always go left:   \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -265,12 +264,12 @@ sum: 8.876
             if(t < best)
                 best = t;
         }
-        cerr << "32-bit array, always go right:  \t" << best << "\n";
+        std::cerr << "32-bit array, always go right:  \t" << best << "\n";
         score += best;
     }
 
 
 
 
-    cerr << "sum: " << score;
+    std::cerr << "sum: " << score;
 }

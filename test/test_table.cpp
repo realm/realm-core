@@ -7,18 +7,17 @@
 #include <fstream>
 #include <ostream>
 
-#include <tightdb.hpp>
-#include <tightdb/lang_bind_helper.hpp>
-#include <tightdb/util/buffer.hpp>
+#include <realm.hpp>
+#include <realm/lang_bind_helper.hpp>
+#include <realm/util/buffer.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -54,7 +53,7 @@ using unit_test::TestResults;
 
 namespace {
 
-TIGHTDB_TABLE_2(TupleTableType,
+REALM_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
 
@@ -63,12 +62,12 @@ TIGHTDB_TABLE_2(TupleTableType,
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
-TIGHTDB_TABLE_3(SubtableType,
+REALM_TABLE_3(SubtableType,
                 year,  Int,
                 daysSinceLastVisit, Int,
                 conceptId, String)
 
-TIGHTDB_TABLE_7(MainTableType,
+REALM_TABLE_7(MainTableType,
                 patientId, String,
                 gender, Int,
                 ethnicity, Int,
@@ -93,26 +92,80 @@ TEST(Table_ManyColumnsCrash2)
 #if 0
             // Add row to subtable through typed interface
             SubtableType::Ref subtable = mainTable[0].events->get_table_ref();
-            TIGHTDB_ASSERT(subtable->is_attached());
+            REALM_ASSERT(subtable->is_attached());
             subtable->add(0, 0, "");
-            TIGHTDB_ASSERT(subtable->is_attached());
+            REALM_ASSERT(subtable->is_attached());
 
 #else
             // Add row to subtable through dynamic interface. This mimics Java closest
             TableRef subtable2 = dynPatientTable->get_subtable(6, 0);
-            TIGHTDB_ASSERT(subtable2->is_attached());
+            REALM_ASSERT(subtable2->is_attached());
             size_t subrow = subtable2->add_empty_row();
-            TIGHTDB_ASSERT(subtable2->is_attached());
+            REALM_ASSERT(subtable2->is_attached());
 
 #endif
             if((counter % 1000) == 0){
-           //     cerr << counter << "\n";
+           //     std::cerr << counter << "\n";
             }
         }
     }
 }
 
 #endif // JAVA_MANY_COLUMNS_CRASH
+
+TEST(Table_Null)
+{
+    {
+        // Check that add_empty_row() adds NULL string as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_String, "name", true);
+        table->add_empty_row();
+
+        CHECK(table->get_string(0, 0).is_null());
+    }
+
+    {
+        // Check that add_empty_row() adds empty string as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_String, "name");
+        table->add_empty_row();
+
+        CHECK(!table->get_string(0, 0).is_null());
+
+        // Test that inserting null in non-nullable column will throw
+        CHECK_THROW_ANY(table->set_string(0, 0, realm::null()));
+    }
+
+    {
+        // Check that add_empty_row() adds NULL binary as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_Binary, "name", true);
+        table->add_empty_row();
+
+        CHECK(table->get_binary(0, 0).is_null());
+    }
+
+    {
+        // Check that add_empty_row() adds empty binary as default
+        Group group;
+        TableRef table = group.add_table("test");
+
+        table->add_column(type_Binary, "name");
+        table->add_empty_row();
+
+        CHECK(!table->get_binary(0, 0).is_null());
+
+        // Test that inserting null in non-nullable column will throw
+        CHECK_THROW_ANY(table->set_binary(0, 0, BinaryData()));
+    }
+
+}
 
 TEST(Table_DeleteCrash)
 {
@@ -183,7 +236,7 @@ TEST(Table_1)
         CHECK_EQUAL(v2, table.get_int(1, i));
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -194,7 +247,7 @@ TEST(Table_ColumnNameTooLong)
     Group group;
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
-    UniquePtr<char[]> buf(new char[buf_size]);
+    std::unique_ptr<char[]> buf(new char[buf_size]);
     CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
@@ -228,7 +281,7 @@ TEST(Table_StringOrBinaryTooBig)
 
     size_t large_bin_size = 0xFFFFF1;
     size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
-    UniquePtr<char[]> large_buf(new char[large_bin_size]);
+    std::unique_ptr<char[]> large_buf(new char[large_bin_size]);
     CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
                       LogicError::string_too_big);
     CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size)),
@@ -292,7 +345,7 @@ TEST(Table_Floats)
         CHECK_EQUAL(v2, table.get_double(1, i));
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -301,7 +354,7 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-TIGHTDB_TABLE_4(TestTable,
+REALM_TABLE_4(TestTable,
                 first,  Int,
                 second, Int,
                 third,  Bool,
@@ -321,7 +374,7 @@ TEST(Table_2)
     CHECK_EQUAL(true, r.third);
     CHECK_EQUAL(Wed, r.fourth);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -349,14 +402,14 @@ TEST(Table_3)
     CHECK_EQUAL(3, table[0].first);
     CHECK_EQUAL(3, table[99].first);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
 
 namespace {
 
-TIGHTDB_TABLE_2(TestTableEnum,
+REALM_TABLE_2(TestTableEnum,
                 first,      Enum<Days>,
                 second,     String)
 
@@ -377,14 +430,14 @@ TEST(Table_4)
     CHECK_EQUAL(size_t(1),  table.column().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
     CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
 
 namespace {
 
-TIGHTDB_TABLE_2(TestTableFloats,
+REALM_TABLE_2(TestTableFloats,
                 first,      Float,
                 second,     Double)
 
@@ -401,7 +454,7 @@ TEST(Table_Float2)
     CHECK_EQUAL(1.1f, r.first);
     CHECK_EQUAL(2.2, r.second);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -427,7 +480,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(7, table[5].second);
     CHECK_EQUAL(8, table[6].second);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
@@ -439,7 +492,7 @@ TEST(Table_Delete)
     CHECK(table.is_empty());
     CHECK_EQUAL(0, table.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -538,9 +591,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_double(4, i, 9876.54321*sign);
     }
-    vector<string> strings;
+    std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
-        stringstream out;
+        std::stringstream out;
         out << "string" << i;
         strings.push_back(out.str());
     }
@@ -551,7 +604,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i) {
         switch (i % 2) {
             case 0: {
-                string s = strings[i];
+                std::string s = strings[i];
                 s += " very long string.........";
                 for (int j = 0; j != 4; ++j)
                     s += " big blobs big blobs big blobs"; // +30
@@ -645,13 +698,13 @@ TEST(Table_LowLevelCopy)
     Table table;
     setup_multi_table(table, 15, 2);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
     Table table2 = table;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table2.Verify();
 #endif
 
@@ -659,7 +712,7 @@ TEST(Table_LowLevelCopy)
 
     TableRef table3 = table.copy();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table3->Verify();
 #endif
 
@@ -673,13 +726,13 @@ TEST(Table_HighLevelCopy)
     table.add(10, 120, false, Mon);
     table.add(12, 100, true,  Tue);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
     TestTable table2 = table;
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table2.Verify();
 #endif
 
@@ -687,7 +740,7 @@ TEST(Table_HighLevelCopy)
 
     TestTable::Ref table3 = table.copy();
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table3->Verify();
 #endif
 
@@ -707,7 +760,7 @@ TEST(Table_DeleteAllTypes)
 
     CHECK_EQUAL(12, table.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 
@@ -715,7 +768,7 @@ TEST(Table_DeleteAllTypes)
     table.clear();
     CHECK_EQUAL(0, table.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -798,7 +851,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->find_first_float(2, 0));
     CHECK_EQUAL(not_found, degen_child->find_first_double(3, 0));
     CHECK_EQUAL(not_found, degen_child->find_first_datetime(4, DateTime()));
-    CHECK_EQUAL(not_found, degen_child->find_first_string(5, StringData()));
+    CHECK_EQUAL(not_found, degen_child->find_first_string(5, StringData("")));
 //    CHECK_EQUAL(not_found, degen_child->find_first_binary(6, BinaryData())); // Exists but not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->find_first_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->find_first_mixed(8, Mixed())); // Not yet implemented
@@ -808,7 +861,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->find_all_float(2, 0).size());
     CHECK_EQUAL(0, degen_child->find_all_double(3, 0).size());
     CHECK_EQUAL(0, degen_child->find_all_datetime(4, DateTime()).size());
-    CHECK_EQUAL(0, degen_child->find_all_string(5, StringData()).size());
+    CHECK_EQUAL(0, degen_child->find_all_string(5, StringData("")).size());
 //    CHECK_EQUAL(0, degen_child->find_all_binary(6, BinaryData()).size()); // Exists but not yet implemented
 //    CHECK_EQUAL(0, degen_child->find_all_subtable(7, subtab).size()); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->find_all_mixed(8, Mixed()).size()); // Not yet implemented
@@ -818,7 +871,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->lower_bound_float(2, 0));
     CHECK_EQUAL(0, degen_child->lower_bound_double(3, 0));
 //    CHECK_EQUAL(0, degen_child->lower_bound_date(4, Date())); // Not yet implemented
-    CHECK_EQUAL(0, degen_child->lower_bound_string(5, StringData()));
+    CHECK_EQUAL(0, degen_child->lower_bound_string(5, StringData("")));
 //    CHECK_EQUAL(0, degen_child->lower_bound_binary(6, BinaryData())); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->lower_bound_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->lower_bound_mixed(8, Mixed())); // Not yet implemented
@@ -828,7 +881,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->upper_bound_float(2, 0));
     CHECK_EQUAL(0, degen_child->upper_bound_double(3, 0));
 //    CHECK_EQUAL(0, degen_child->upper_bound_date(4, Date())); // Not yet implemented
-    CHECK_EQUAL(0, degen_child->upper_bound_string(5, StringData()));
+    CHECK_EQUAL(0, degen_child->upper_bound_string(5, StringData("")));
 //    CHECK_EQUAL(0, degen_child->upper_bound_binary(6, BinaryData())); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->upper_bound_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->upper_bound_mixed(8, Mixed())); // Not yet implemented
@@ -841,7 +894,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->count_float(2, 0));
     CHECK_EQUAL(0, degen_child->count_double(3, 0));
 //    CHECK_EQUAL(0, degen_child->count_date(4, Date())); // Not yet implemented
-    CHECK_EQUAL(0, degen_child->count_string(5, StringData()));
+    CHECK_EQUAL(0, degen_child->count_string(5, StringData("")));
 //    CHECK_EQUAL(0, degen_child->count_binary(6, BinaryData())); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->count_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->count_mixed(8, Mixed())); // Not yet implemented
@@ -871,7 +924,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal_datetime(4, DateTime()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData()).find());
+    CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData("")).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find()); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->where().equal(8, Mixed()).find()); // Not yet implemented
@@ -880,7 +933,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().not_equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal_datetime(4, DateTime()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData()).find());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData("")).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find()); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(8, Mixed()).find()); // Not yet implemented
@@ -941,28 +994,28 @@ TEST(Table_ToString)
     Table table;
     setup_multi_table(table, 15, 6);
 
-    stringstream ss;
+    std::stringstream ss;
     table.to_string(ss);
-    const string result = ss.str();
-    string file_name = get_test_resource_path();
+    const std::string result = ss.str();
+    std::string file_name = get_test_resource_path();
     file_name += "expect_string.txt";
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream test_file(file_name.c_str(), ios::out);
+    std::ofstream test_file(file_name.c_str(), ios::out);
     test_file << result;
-    cerr << "to_string() test:\n" << result << endl;
+    std::cerr << "to_string() test:\n" << result << std::endl;
 #else
-    ifstream test_file(file_name.c_str(), ios::in);
+    std::ifstream test_file(file_name.c_str(), std::ios::in);
     CHECK(!test_file.fail());
-    string expected;
-    expected.assign( istreambuf_iterator<char>(test_file),
-                     istreambuf_iterator<char>() );
+    std::string expected;
+    expected.assign( std::istreambuf_iterator<char>(test_file),
+                     std::istreambuf_iterator<char>() );
     bool test_ok = test_util::equal_without_cr(result, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
         TEST_PATH(path);
         File out(path, File::mode_Write);
         out.write(result);
-        cerr << "\n error result in '"<<string(path)<<"'\n";
+        std::cerr << "\n error result in '" << std::string(path) << "'\n";
     }
 #endif
 }
@@ -974,22 +1027,22 @@ TEST(Table_RowToString)
     Table table;
     setup_multi_table(table, 2, 2);
 
-    stringstream ss;
+    std::stringstream ss;
     table.row_to_string(1, ss);
-    const string row_str = ss.str();
+    const std::string row_str = ss.str();
 #if 0
-    ofstream test_file("row_to_string.txt", ios::out);
+    std::ofstream test_file("row_to_string.txt", ios::out);
     test_file << row_str;
 #endif
 
-    string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
+    std::string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
                       "1:   -1   true  1970-01-01 03:25:45  -1.234560e+002  -9.876543e+003  string1  string1 very long st...  enum2          7 bytes     -1     [3]\n";
     bool test_ok = test_util::equal_without_cr(row_str, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        cerr << "row_to_string() failed\n"
+        std::cerr << "row_to_string() failed\n"
              << "Expected: " << expected << "\n"
-             << "Got     : " << row_str << endl;
+             << "Got     : " << row_str << std::endl;
     }
 }
 
@@ -1006,7 +1059,7 @@ TEST(Table_FindInt)
     CHECK_EQUAL(size_t(1000), table.column().second.find_first(0));
     CHECK_EQUAL(size_t(-1),   table.column().second.find_first(1001));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1018,12 +1071,12 @@ TEST(Table_6)
 {
     TestTableEnum table;
 
-    TDB_QUERY(TestQuery, TestTableEnum) {
+    RLM_QUERY(TestQuery, TestTableEnum) {
     //  first.between(Mon, Thu);
         second == "Hello" || (second == "Hey" && first == Mon);
     }};
 
-    TDB_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
+    RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
         (void)b;
         (void)a;
         //first.between(a, b);
@@ -1034,7 +1087,7 @@ TEST(Table_6)
     //size_t result2 = table.Range(10, 200).find_first(TestQuery());
     //CHECK_EQUAL((size_t)-1, result2);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1070,7 +1123,7 @@ TEST(Table_FindAllInt)
     CHECK_EQUAL(7, v.get_source_ndx(3));
     CHECK_EQUAL(9, v.get_source_ndx(4));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1105,7 +1158,7 @@ TEST(Table_SortedInt)
     CHECK_EQUAL(3, v.get_source_ndx(8));
     CHECK_EQUAL(8, v.get_source_ndx(9));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1142,7 +1195,7 @@ TEST(Table_Sorted_Query_where)
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1175,11 +1228,11 @@ TEST(Table_Multi_Sort)
     table.set_int(0, 4, 1);
     table.set_int(1, 4, 14);
 
-    vector<size_t> col_ndx1;
+    std::vector<size_t> col_ndx1;
     col_ndx1.push_back(0);
     col_ndx1.push_back(1);
 
-    vector<bool> asc;
+    std::vector<bool> asc;
     asc.push_back(true);
     asc.push_back(true);
 
@@ -1192,7 +1245,7 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
     CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
 
-    vector<size_t> col_ndx2;
+    std::vector<size_t> col_ndx2;
     col_ndx2.push_back(1);
     col_ndx2.push_back(0);
 
@@ -1756,7 +1809,7 @@ TEST(Table_IndexInt)
     CHECK_EQUAL(6, table.column().second.find_first(30));
     CHECK_EQUAL(7, table.column().second.find_first(100));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -1765,7 +1818,7 @@ TEST(Table_IndexInt)
 
 namespace {
 
-TIGHTDB_TABLE_4(TestTableAE,
+REALM_TABLE_4(TestTableAE,
                 first,  Int,
                 second, String,
                 third,  Bool,
@@ -1856,7 +1909,7 @@ TEST(Table_AutoEnumerationFindFindAll)
 
 namespace {
 
-TIGHTDB_TABLE_4(TestTableEnum4,
+REALM_TABLE_4(TestTableEnum4,
                 col1, String,
                 col2, String,
                 col3, String,
@@ -1869,7 +1922,7 @@ TEST(Table_AutoEnumerationOptimize)
     TestTableEnum4 t;
 
     // Insert non-optimzable strings
-    string s;
+    std::string s;
     for (size_t i = 0; i < 10; ++i) {
         t.add(s.c_str(), s.c_str(), s.c_str(), s.c_str());
         s += "x";
@@ -1901,16 +1954,16 @@ TEST(Table_AutoEnumerationOptimize)
         CHECK_EQUAL("test", t[i].col4);
     }
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     t.Verify();
 #endif
 }
 
 namespace {
 
-TIGHTDB_TABLE_1(TestSubtabEnum2,
+REALM_TABLE_1(TestSubtabEnum2,
                 str, String)
-TIGHTDB_TABLE_1(TestSubtabEnum1,
+REALM_TABLE_1(TestSubtabEnum1,
                 subtab, Subtable<TestSubtabEnum2>)
 
 } // anonymous namespace
@@ -1924,7 +1977,7 @@ TEST(Table_OptimizeSubtable)
     {
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[0].subtab;
-        string s;
+        std::string s;
         for (int i=0; i<100; ++i) {
             r->add(s.c_str());
             s += 'x';
@@ -1944,7 +1997,7 @@ TEST(Table_OptimizeSubtable)
     {
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[0].subtab;
-        string s;
+        std::string s;
         for (size_t i = 0; i < r->size(); ++i) {
             CHECK_EQUAL(s.c_str(), r[i].str);
             s += 'x';
@@ -2006,7 +2059,7 @@ TEST(Table_SlabAlloc)
     table.remove(2);
     table.remove(4);
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
@@ -2085,7 +2138,7 @@ TEST(Table_SpecColumnPath)
     TableRef table = group.add_table("test");
 
     // Create path to sub-table column (starting with root)
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
 
     // Create specification with sub-table
     table->add_subcolumn(column_path, type_Int,    "first");
@@ -2128,7 +2181,7 @@ TEST(Table_SpecRenameColumns)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -2179,7 +2232,7 @@ TEST(Table_SpecDeleteColumns)
     table->add_column(type_String, "fourth"); // will be auto-enumerated
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -2279,11 +2332,59 @@ TEST(Table_SpecDeleteColumns)
     CHECK_EQUAL(0, table->get_column_count());
     CHECK(table->is_empty());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table->Verify();
 #endif
 }
 
+TEST(Table_NullInEnum)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    table->add_column(type_String, "second", true);
+
+    for (size_t c = 0; c < 100; c++) {
+        table->insert_string(0, c, "hello");
+        table->insert_done();
+    }
+
+    size_t r;
+
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(100, r);
+
+    table->set_string(0, 50, realm::null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    table->optimize();
+
+    table->set_string(0, 50, realm::null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    table->set_string(0, 50, "hello");
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(100, r);
+
+    table->set_string(0, 50, realm::null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    r = table->where().equal(0, realm::null()).count();
+    CHECK_EQUAL(1, r);
+
+    table->set_string(0, 55, realm::null());
+    r = table->where().equal(0, realm::null()).count();
+    CHECK_EQUAL(2, r);
+
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(98, r);
+
+    table->remove(55);
+    r = table->where().equal(0, realm::null()).count();
+    CHECK_EQUAL(1, r);
+}
 
 TEST(Table_SpecAddColumns)
 {
@@ -2296,7 +2397,7 @@ TEST(Table_SpecAddColumns)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -2412,7 +2513,7 @@ TEST(Table_SpecAddColumns)
     stab->insert_done();
     CHECK_EQUAL(2, table->get_subtable_size(7, 0));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table->Verify();
 #endif
 }
@@ -2430,7 +2531,7 @@ TEST(Table_SpecDeleteColumnsBug)
     table->add_column(type_Table,  "phones");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(3); // phones
 
     table->add_subcolumn(column_path, type_String, "type");
@@ -2483,7 +2584,7 @@ TEST(Table_SpecDeleteColumnsBug)
     table->remove_column(1); // age
     table->remove_column(3); // extra
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table->Verify();
 #endif
 }
@@ -2637,14 +2738,14 @@ TEST(Table_Mixed)
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
     CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     table.Verify();
 #endif
 }
 
 
 namespace {
-TIGHTDB_TABLE_1(TestTableMX,
+REALM_TABLE_1(TestTableMX,
                 first, Mixed)
 } // anonymous namespace
 
@@ -2727,7 +2828,7 @@ TEST(Table_SubtableSizeAndClear)
 TEST(Table_LowLevelSubtables)
 {
     Table table;
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     table.add_column(type_Table, "subtab");
     table.add_column(type_Mixed, "mixed");
     column_path.push_back(0);
@@ -2778,7 +2879,7 @@ TEST(Table_LowLevelSubtables)
 
         table.clear_subtable(1, i_1); // Mixed
         TableRef subtab_mix = table.get_subtable(1, i_1);
-        vector<size_t> subcol_path;
+        std::vector<size_t> subcol_path;
         subtab_mix->add_column(type_Table, "subtab");
         subtab_mix->add_column(type_Mixed, "mixed");
         subcol_path.push_back(0);
@@ -2828,18 +2929,18 @@ TEST(Table_LowLevelSubtables)
 
 
 namespace {
-TIGHTDB_TABLE_2(MyTable1,
+REALM_TABLE_2(MyTable1,
                 val, Int,
                 val2, Int)
 
-TIGHTDB_TABLE_2(MyTable2,
+REALM_TABLE_2(MyTable2,
                 val, Int,
                 subtab, Subtable<MyTable1>)
 
-TIGHTDB_TABLE_1(MyTable3,
+REALM_TABLE_1(MyTable3,
                 subtab, Subtable<MyTable2>)
 
-TIGHTDB_TABLE_1(MyTable4,
+REALM_TABLE_1(MyTable4,
                 mix, Mixed)
 } // anonymous namespace
 
@@ -3004,7 +3105,7 @@ TEST(Table_SetMethod)
 
 
 namespace {
-TIGHTDB_TABLE_2(TableDateAndBinary,
+REALM_TABLE_2(TableDateAndBinary,
                 date, DateTime,
                 bin, Binary)
 } // anonymous namespace
@@ -3019,7 +3120,7 @@ TEST(Table_DateAndBinary)
     t.add(8, BinaryData(data, size));
     CHECK_EQUAL(t[0].date, 8);
     CHECK_EQUAL(t[0].bin.size(), size);
-    CHECK(equal(t[0].bin.data(), t[0].bin.data()+size, data));
+    CHECK(std::equal(t[0].bin.data(), t[0].bin.data()+size, data));
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
@@ -3073,7 +3174,7 @@ TEST(Table_SetSubTableByExample1)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -3127,7 +3228,7 @@ TEST(Table_SetSubTableByExample2)
     table->add_column(type_Table,  "third");
 
     // Create path to sub-table column
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     column_path.push_back(2); // third
 
     table->add_subcolumn(column_path, type_Int,    "sub_first");
@@ -3209,7 +3310,7 @@ TEST(Table_HasSharedSpec)
 
 
 namespace {
-TIGHTDB_TABLE_3(TableAgg,
+REALM_TABLE_3(TableAgg,
                 c_int,   Int,
                 c_float, Float,
                 c_double, Double)
@@ -3218,7 +3319,7 @@ TIGHTDB_TABLE_3(TableAgg,
 } // anonymous namespace
 
 #if TEST_DURATION > 0
-#define TBL_SIZE TIGHTDB_MAX_BPNODE_SIZE*10
+#define TBL_SIZE REALM_MAX_BPNODE_SIZE*10
 #else
 #define TBL_SIZE 10
 #endif
@@ -3244,7 +3345,7 @@ TEST(Table_Aggregates)
     d_sum += 1.2 + 12.0 + 3.0;
     double size = TBL_SIZE + 3;
 
-    double epsilon = numeric_limits<double>::epsilon();
+    double epsilon = std::numeric_limits<double>::epsilon();
 
     // minimum
     CHECK_EQUAL(1, table.column().c_int.minimum());
@@ -3265,7 +3366,7 @@ TEST(Table_Aggregates)
 }
 
 namespace {
-TIGHTDB_TABLE_1(TableAgg2,
+REALM_TABLE_1(TableAgg2,
                 c_count, Int)
 } // anonymous namespace
 
@@ -3333,7 +3434,7 @@ TEST(Table_FormerLeakCase)
 
 namespace {
 
-TIGHTDB_TABLE_3(TablePivotAgg,
+REALM_TABLE_3(TablePivotAgg,
                 sex,   String,
                 age,   Int,
                 hired, Bool)
@@ -3385,7 +3486,7 @@ TEST(Table_Pivot)
         Table result_avg;
         table.aggregate(0, 1, Table::aggr_avg, result_avg);
         if (false) {
-            ostringstream ss;
+            std::ostringstream ss;
             result_avg.to_string(ss);
             std::cerr << "\nMax:\n" << ss.str();
         }
@@ -3526,7 +3627,7 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
                             case type_Mixed:
                             case type_Link:
                             case type_LinkList:
-                                TIGHTDB_ASSERT(false);
+                                REALM_ASSERT(false);
                         }
                     }
                 }
@@ -3542,14 +3643,14 @@ void test_write_slice_name(TestResults& test_results, const Table& table,
                            StringData expect_name, bool override_name)
 {
     size_t offset = 0, size = 0;
-    ostringstream out;
+    std::ostringstream out;
     if (override_name) {
         table.write(out, offset, size, expect_name);
     }
     else {
         table.write(out, offset, size);
     }
-    string str = out.str();
+    std::string str = out.str();
     BinaryData buffer(str.data(), str.size());
     bool take_ownership = false;
     Group group(buffer, take_ownership);
@@ -3560,9 +3661,9 @@ void test_write_slice_name(TestResults& test_results, const Table& table,
 void test_write_slice_contents(TestResults& test_results, const Table& table,
                                size_t offset, size_t size)
 {
-    ostringstream out;
+    std::ostringstream out;
     table.write(out, offset, size);
-    string str = out.str();
+    std::string str = out.str();
     BinaryData buffer(str.data(), str.size());
     bool take_ownership = false;
     Group group(buffer, take_ownership);
@@ -3602,7 +3703,7 @@ TEST(Table_WriteSlice)
     // Run through a 3-D matrix of table sizes, slice offsets, and
     // slice sizes. Each test involves a table with columns of each
     // possible type.
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 135 };
 #else
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561 };
@@ -3635,8 +3736,8 @@ TEST(Table_Parent)
 {
     TableRef table = Table::create();
     CHECK_EQUAL(TableRef(), table->get_parent_table());
-    CHECK_EQUAL(tightdb::npos, table->get_parent_row_index()); // Not a subtable
-    CHECK_EQUAL(tightdb::npos, table->get_index_in_group()); // Not a group-level table
+    CHECK_EQUAL(realm::npos, table->get_parent_row_index()); // Not a subtable
+    CHECK_EQUAL(realm::npos, table->get_index_in_group()); // Not a group-level table
 
     DescriptorRef subdesc;
     table->add_column(type_Table, "", &subdesc);
@@ -4514,7 +4615,7 @@ TEST(Table_RowAccessor)
     table.add_column(type_Float,    "");
     table.add_column(type_Double,   "");
     table.add_column(type_String,   "");
-    table.add_column(type_Binary,   "");
+    table.add_column(type_Binary,   "", true);
     table.add_column(type_DateTime, "");
     table.add_column(type_Table,    "", &subdesc);
     table.add_column(type_Mixed,    "");
@@ -4560,7 +4661,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          table[0].get_bool          (1));
         CHECK_EQUAL(float(),         table[0].get_float         (2));
         CHECK_EQUAL(double(),        table[0].get_double        (3));
-        CHECK_EQUAL(StringData(),    table[0].get_string        (4));
+        CHECK_EQUAL(StringData(""),    table[0].get_string        (4));
         CHECK_EQUAL(BinaryData(),    table[0].get_binary        (5));
         CHECK_EQUAL(DateTime(),      table[0].get_datetime      (6));
         CHECK_EQUAL(0,               table[0].get_subtable_size (7));
@@ -4601,8 +4702,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          const_table[0].get_bool          (1));
         CHECK_EQUAL(float(),         const_table[0].get_float         (2));
         CHECK_EQUAL(double(),        const_table[0].get_double        (3));
-        CHECK_EQUAL(StringData(),    const_table[0].get_string        (4));
-        CHECK_EQUAL(BinaryData(),    const_table[0].get_binary        (5));
+        CHECK_EQUAL(StringData(""),  const_table[0].get_string        (4));
+        CHECK_EQUAL(BinaryData(),  const_table[0].get_binary        (5));
         CHECK_EQUAL(DateTime(),      const_table[0].get_datetime      (6));
         CHECK_EQUAL(0,               const_table[0].get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  const_table[0].get_mixed         (8));
@@ -4643,8 +4744,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4677,8 +4778,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4711,8 +4812,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4745,8 +4846,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
-        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4789,7 +4890,7 @@ TEST(Table_RowAccessor)
         row_1.set_bool     (1, bool());
         row_1.set_float    (2, float());
         row_1.set_double   (3, double());
-        row_1.set_string   (4, StringData());
+        row_1.set_string   (4, StringData(""));
         row_1.set_binary   (5, BinaryData());
         row_1.set_datetime (6, DateTime());
         row_1.set_subtable (7, 0);
@@ -4810,8 +4911,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          table.get_bool     (1,1));
         CHECK_EQUAL(float(),         table.get_float    (2,1));
         CHECK_EQUAL(double(),        table.get_double   (3,1));
-        CHECK_EQUAL(StringData(),    table.get_string   (4,1));
-        CHECK_EQUAL(BinaryData(),    table.get_binary   (5,1));
+        CHECK_EQUAL(StringData(""),  table.get_string   (4,1));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,1));
         CHECK_EQUAL(DateTime(),      table.get_datetime (6,1));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,1));
 
@@ -4840,7 +4941,7 @@ TEST(Table_RowAccessor)
         table[0].set_bool     (1, bool());
         table[0].set_float    (2, float());
         table[0].set_double   (3, double());
-        table[0].set_string   (4, StringData());
+        table[0].set_string   (4, StringData(""));
         table[0].set_binary   (5, BinaryData());
         table[0].set_datetime (6, DateTime());
         table[0].set_subtable (7, 0);
@@ -4862,8 +4963,8 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(bool(),          table.get_bool     (1,0));
         CHECK_EQUAL(float(),         table.get_float    (2,0));
         CHECK_EQUAL(double(),        table.get_double   (3,0));
-        CHECK_EQUAL(StringData(),    table.get_string   (4,0));
-        CHECK_EQUAL(BinaryData(),    table.get_binary   (5,0));
+        CHECK_EQUAL(StringData(""),  table.get_string   (4,0));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,0));
         CHECK_EQUAL(DateTime(),      table.get_datetime (6,0));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,0));
 
@@ -5709,7 +5810,7 @@ TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
     table.add_column(type_Int, "");
-    table.add_empty_row(TIGHTDB_MAX_BPNODE_SIZE*TIGHTDB_MAX_BPNODE_SIZE+1);
+    table.add_empty_row(REALM_MAX_BPNODE_SIZE*REALM_MAX_BPNODE_SIZE+1);
     table.add_column(type_Int, "");
     table.Verify();
 }
@@ -5719,7 +5820,7 @@ TEST(Table_ClearWithTwoLevelBptree)
 {
     Table table;
     table.add_column(type_Mixed, "");
-    table.add_empty_row(TIGHTDB_MAX_BPNODE_SIZE+1);
+    table.add_empty_row(REALM_MAX_BPNODE_SIZE+1);
     table.clear();
     table.Verify();
 }
@@ -5731,11 +5832,11 @@ TEST(Table_IndexStringDelete)
     t.add_column(type_String, "str");
     t.add_search_index(0);
 
-    ostringstream out;
+    std::ostringstream out;
 
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.str(string());
+        out.str(std::string());
         out << i;
         t.set_string(0, i, out.str());
     }
@@ -5744,10 +5845,102 @@ TEST(Table_IndexStringDelete)
 
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.str(string());
+        out.str(std::string());
         out << i;
         t.set_string(0, i, out.str());
     }
 }
+
+#if REALM_NULL_STRINGS == 1
+TEST(Table_Nulls)
+{
+    // 'round' lets us run this entire test both with and without index and with/without optimize/enum
+    for (size_t round = 0; round < 5; round++) {
+        Table t;
+        TableView tv;
+        t.add_column(type_String, "str", true);
+        
+        if (round == 1)
+            t.add_search_index(0);
+        else if (round == 2)
+            t.optimize(true);
+        else if (round == 3) {
+            t.add_search_index(0);
+            t.optimize(true);
+        }
+        else if (round == 4) {
+            t.optimize(true);
+            t.add_search_index(0);
+        }
+
+        t.add_empty_row(3);
+        t.set_string(0, 0, "foo"); // short strings
+        t.set_string(0, 1, "");
+        t.set_string(0, 2, realm::null());
+
+        CHECK_EQUAL(1, t.count_string(0, "foo"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0, "foo"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+
+        tv = t.find_all_string(0, "foo");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+
+        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYY"); // medium strings (< 64)
+
+        CHECK_EQUAL(1, t.count_string(0, "xxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0, "xxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+
+        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYY");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+
+
+        // long strings (>= 64)
+        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
+
+        CHECK_EQUAL(1, t.count_string(0,
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0,
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+
+        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+    }
+}
+#endif 
 
 #endif // TEST_TABLE

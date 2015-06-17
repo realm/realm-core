@@ -7,15 +7,14 @@
 #include <vector>
 #include <map>
 
-#include <tightdb/array.hpp>
-#include <tightdb/column.hpp>
-#include <tightdb/query_conditions.hpp>
+#include <realm/array.hpp>
+#include <realm/column.hpp>
+#include <realm/query_conditions.hpp>
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -492,10 +491,10 @@ TEST(Array_AddNeg1_1)
 TEST(Array_UpperLowerBound)
 {
     // Tests Array::upper_bound() and Array::lower_bound()
-    // This test is independent of TIGHTDB_MAX_BPNODE_SIZE
+    // This test is independent of REALM_MAX_BPNODE_SIZE
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
-    vector<int> v;
+    std::vector<int> v;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     // we use 4 as constant in order to make border case sequences of
@@ -581,39 +580,7 @@ TEST(Array_LowerUpperBound)
 }
 
 
-TEST(Array_Sort)
-{
-    // Create Array with random values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
 
-    a.add(25);
-    a.add(12);
-    a.add(50);
-    a.add(3);
-    a.add(34);
-    a.add(0);
-    a.add(17);
-    a.add(51);
-    a.add(2);
-    a.add(40);
-
-    a.sort();
-
-    CHECK_EQUAL(0, a.get(0));
-    CHECK_EQUAL(2, a.get(1));
-    CHECK_EQUAL(3, a.get(2));
-    CHECK_EQUAL(12, a.get(3));
-    CHECK_EQUAL(17, a.get(4));
-    CHECK_EQUAL(25, a.get(5));
-    CHECK_EQUAL(34, a.get(6));
-    CHECK_EQUAL(40, a.get(7));
-    CHECK_EQUAL(50, a.get(8));
-    CHECK_EQUAL(51, a.get(9));
-
-    // Cleanup
-    a.destroy();
-}
 
 /** find_all() int tests spread out over bitwidth
  *
@@ -920,7 +887,7 @@ TEST(Array_FindSSE)
     for (size_t i = 0; i < 100; ++i) {
         a.set(i, 123);
         size_t t = a.find_first(123);
-        TIGHTDB_ASSERT(t == i);
+        REALM_ASSERT(t == i);
         a.set(i, 10000);
         static_cast<void>(t);
     }
@@ -928,106 +895,6 @@ TEST(Array_FindSSE)
 }
 
 
-TEST(Array_Sum0)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    for (int i = 0; i < 64 + 7; ++i) {
-        a.add(0);
-    }
-    CHECK_EQUAL(0, a.sum(0, a.size()));
-    a.destroy();
-}
-
-TEST(Array_Sum1)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 2);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
-
-TEST(Array_Sum2)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 4);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
-
-
-TEST(Array_Sum4)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 16);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
-
-TEST(Array_Sum16)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 30000);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
 
 TEST(Array_Greater)
 {
@@ -1055,7 +922,7 @@ TEST(Array_Greater)
             a.set(i, 1);
 
             size_t t = a.find_first<Greater>(0, 0, size_t(-1));
-            TIGHTDB_ASSERT(i == t);
+            REALM_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);
             a.set(i, 0);
@@ -1413,90 +1280,7 @@ TEST(Array_NotEqual)
 
 
 
-TEST(Array_Sort1)
-{
-    // negative values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
 
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 400; ++t)
-        a.add(random.draw_int(-100, 199));
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) >= a.get(t - 1));
-
-    a.destroy();
-}
-
-
-TEST(Array_Sort2)
-{
-    // 64 bit values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 400; ++t) {
-        int_fast64_t v = 1;
-        for (int i = 0; i != 8; ++i)
-            v *= int64_t(random.draw_int_max(RAND_MAX));
-        a.add(v);
-    }
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) >= a.get(t - 1));
-
-    a.destroy();
-}
-
-TEST(Array_Sort3)
-{
-    // many values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 1000; ++t)
-        a.add(random.draw_int_max(200)); // 200 will make some duplicate values which is good
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) >= a.get(t - 1));
-
-    a.destroy();
-}
-
-
-TEST(Array_Sort4)
-{
-    // same values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    for (size_t t = 0; t < 1000; ++t)
-        a.add(0);
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) == 0);
-
-    a.destroy();
-}
 
 TEST(Array_Copy)
 {
@@ -1512,7 +1296,7 @@ TEST(Array_Copy)
     Array b(Allocator::get_default());
     b.init_from_mem(a.clone_deep(Allocator::get_default()));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     b.Verify();
 #endif
 
@@ -1531,7 +1315,7 @@ TEST(Array_Copy)
     Array d(Allocator::get_default());
     d.init_from_mem(c.clone_deep(Allocator::get_default()));
 
-#ifdef TIGHTDB_DEBUG
+#ifdef REALM_DEBUG
     d.Verify();
 #endif
 

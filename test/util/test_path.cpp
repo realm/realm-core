@@ -1,21 +1,20 @@
-#include <tightdb/util/file.hpp>
+#include <realm/util/file.hpp>
 
 #include "test_path.hpp"
 
-using namespace std;
-using namespace tightdb::util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm::util;
+using namespace realm::test_util::unit_test;
 
 namespace {
 
 bool keep_files = false;
 
-string path_prefix;
-string resource_path;
+std::string path_prefix;
+std::string resource_path;
 
 } // anonymous namespace
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -24,41 +23,41 @@ void keep_test_files()
     keep_files = true;
 }
 
-string get_test_path(const TestDetails& test_details, const char* suffix)
+std::string get_test_path(const TestDetails& test_details, const std::string& suffix)
 {
-    string path = path_prefix;
+    std::string path = path_prefix;
     path += test_details.test_name;
     path += suffix;
     return path;
 }
 
-void set_test_path_prefix(const string& prefix)
+void set_test_path_prefix(const std::string& prefix)
 {
     path_prefix = prefix;
 }
 
-string get_test_path_prefix()
+std::string get_test_path_prefix()
 {
     return path_prefix;
 }
 
-string get_test_resource_path()
+std::string get_test_resource_path()
 {
     return resource_path;
 }
 
-void set_test_resource_path(const string& path)
+void set_test_resource_path(const std::string& path)
 {
     resource_path = path;
 }
 
-TestPathGuard::TestPathGuard(const string& path):
+TestPathGuard::TestPathGuard(const std::string& path):
     m_path(path)
 {
     File::try_remove(m_path);
 }
 
-TestPathGuard::~TestPathGuard() TIGHTDB_NOEXCEPT
+TestPathGuard::~TestPathGuard() REALM_NOEXCEPT
 {
     if (keep_files)
         return;
@@ -71,7 +70,7 @@ TestPathGuard::~TestPathGuard() TIGHTDB_NOEXCEPT
 }
 
 
-SharedGroupTestPathGuard::SharedGroupTestPathGuard(const string& path):
+SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
     TestPathGuard(path)
 {
     File::try_remove(get_lock_path());
@@ -88,4 +87,4 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard()
 }
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

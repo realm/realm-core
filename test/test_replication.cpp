@@ -3,22 +3,21 @@
 
 #include <algorithm>
 
-#include <tightdb.hpp>
-#include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/util/file.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#  include <tightdb/replication.hpp>
+#include <realm.hpp>
+#include <realm/util/features.h>
+#include <memory>
+#include <realm/util/file.hpp>
+#ifdef REALM_ENABLE_REPLICATION
+#  include <realm/replication.hpp>
 #endif
 
 #include "test.hpp"
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef REALM_ENABLE_REPLICATION
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -56,9 +55,9 @@ namespace {
 
 class MyTrivialReplication: public TrivialReplication {
 public:
-    MyTrivialReplication(string path): TrivialReplication(path) {}
+    MyTrivialReplication(std::string path): TrivialReplication(path) {}
 
-    ~MyTrivialReplication() TIGHTDB_NOEXCEPT
+    ~MyTrivialReplication() REALM_NOEXCEPT
     {
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
@@ -66,42 +65,42 @@ public:
             delete[] i->data();
     }
 
-    void replay_transacts(SharedGroup& target, ostream* replay_log = 0)
+    void replay_transacts(SharedGroup& target, std::ostream* replay_log = 0)
     {
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
         for (iter i = m_transact_logs.begin(); i != end; ++i)
-            apply_transact_log(i->data(), i->size(), target, replay_log);
+            apply_changeset(i->data(), i->size(), target, replay_log);
         for (iter i = m_transact_logs.begin(); i != end; ++i)
             delete[] i->data();
         m_transact_logs.clear();
     }
 
 private:
-    void handle_transact_log(const char* data, size_t size, version_type) TIGHTDB_OVERRIDE
+    void handle_transact_log(const char* data, size_t size, version_type) override
     {
-        UniquePtr<char[]> log(new char[size]); // Throws
-        copy(data, data+size, log.get());
+        std::unique_ptr<char[]> log(new char[size]); // Throws
+        std::copy(data, data+size, log.get());
         m_transact_logs.push_back(BinaryData(log.get(), size)); // Throws
         log.release();
     }
 
-    typedef vector<BinaryData> TransactLogs;
+    typedef std::vector<BinaryData> TransactLogs;
     TransactLogs m_transact_logs;
 };
 
-TIGHTDB_TABLE_1(MySubsubsubtable,
+REALM_TABLE_1(MySubsubsubtable,
                 i, Int)
 
-TIGHTDB_TABLE_3(MySubsubtable,
+REALM_TABLE_3(MySubsubtable,
                 a, Int,
                 b, Subtable<MySubsubsubtable>,
                 c, Int)
 
-TIGHTDB_TABLE_1(MySubtable,
+REALM_TABLE_1(MySubtable,
                 t, Subtable<MySubsubtable>)
 
-TIGHTDB_TABLE_9(MyTable,
+REALM_TABLE_9(MyTable,
                 my_int,       Int,
                 my_bool,      Bool,
                 my_float,     Float,
@@ -136,6 +135,9 @@ TEST(Replication_General)
         table->set    (0, 2, true, 2.0f, 2.0, "xx",  bin, 728, 0, mix);
         table->add       (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
         table->insert (0, 1, true, 1.0f, 1.0, "x",   bin, 727, 0, mix);
+
+        table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix);     // empty string
+        table->add(3, true, 3.0f, 1.0, "", bin, 729, 0, mix);     // empty string
         wt.commit();
     }
     {
@@ -169,7 +171,7 @@ TEST(Replication_General)
         wt.commit();
     }
 
-    ostream* replay_log = 0;
+    std::ostream* replay_log = 0;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -181,11 +183,15 @@ TEST(Replication_General)
         rt_2.get_group().Verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
         MyTable::ConstRef table = rt_2.get_table<MyTable>("my_table");
-        CHECK_EQUAL(4, table->size());
+        CHECK_EQUAL(6, table->size());
         CHECK_EQUAL(10, table[0].my_int);
         CHECK_EQUAL(3,  table[1].my_int);
         CHECK_EQUAL(2,  table[2].my_int);
         CHECK_EQUAL(8,  table[3].my_int);
+
+        StringData sd1 = table[4].my_string.get();
+
+        CHECK(!sd1.is_null());
     }
 }
 
@@ -206,7 +212,7 @@ TEST(Replication_Links)
         wt.commit();
     }
 
-    ostream* replay_log = 0;
+    std::ostream* replay_log = 0;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -290,7 +296,7 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    ostream* replay_log = 0;
+    std::ostream* replay_log = 0;
 //    replay_log = &cout;
 
     MyTrivialReplication repl(path_1);
@@ -489,7 +495,274 @@ TEST(Replication_Links)
     // LangBindHelper_AdvanceReadTransact_Links.
 }
 
+
+TEST(Replication_CascadeRemove_ColumnLink)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::ostream* replay_log = 0;
+//    replay_log = &cout;
+
+    SharedGroup sg(path_1);
+    MyTrivialReplication repl(path_2);
+    SharedGroup sg_w(repl);
+
+    {
+        WriteTransaction wt(sg_w);
+        Table& origin = *wt.add_table("origin");
+        Table& target = *wt.add_table("target");
+        origin.add_column_link(type_Link, "o_1", target, link_Strong);
+        target.add_column(type_Int, "t_1");
+        wt.commit();
+    }
+
+    // perform_change expects sg to be in a read transaction
+    sg.begin_read();
+
+    ConstTableRef target;
+    ConstRow target_row_0, target_row_1;
+
+    auto perform_change = [&](std::function<void (Table&)> func) {
+        // Ensure there are two rows in each table, with each row in `origin`
+        // pointing to the corresponding row in `target`
+        {
+            WriteTransaction wt(sg_w);
+            Table& origin_w = *wt.get_table("origin");
+            Table& target_w = *wt.get_table("target");
+
+            origin_w.clear();
+            target_w.clear();
+            origin_w.add_empty_row(2);
+            target_w.add_empty_row(2);
+            origin_w[0].set_link(0, 0);
+            origin_w[1].set_link(0, 1);
+
+            wt.commit();
+        }
+
+        // Perform the modification
+        {
+            WriteTransaction wt(sg_w);
+            func(*wt.get_table("origin"));
+            wt.commit();
+        }
+
+        // Apply the changes to sg via replication
+        sg.end_read();
+        repl.replay_transacts(sg, replay_log);
+        const Group& group = sg.begin_read();
+        group.Verify();
+
+        target = group.get_table("target");
+        if (target->size() > 0)
+            target_row_0 = target->get(0);
+        if (target->size() > 1)
+            target_row_1 = target->get(1);
+        // Leave `group` and the target accessors in a state which can be tested
+        // with the changes applied
+    };
+
+    // Break link by nullifying
+    perform_change([](Table& origin) {
+        origin[1].nullify_link(0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 1);
+
+    // Break link by reassign
+    perform_change([](Table& origin) {
+        origin[1].set_link(0, 0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 1);
+
+    // Avoid breaking link by reassigning self
+    perform_change([](Table& origin) {
+        origin[1].set_link(0, 1);
+    });
+    // Should not delete anything
+    CHECK(target_row_0 && target_row_1);
+    CHECK_EQUAL(target->size(), 2);
+
+    // Break link by explicit row removal
+    perform_change([](Table& origin) {
+        origin[1].move_last_over();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 1);
+
+    // Break link by clearing table
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 0);
+}
+
+TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::ostream* replay_log = 0;
+//    replay_log = &cout;
+
+    SharedGroup sg(path_1);
+    MyTrivialReplication repl(path_2);
+    SharedGroup sg_w(repl);
+
+    {
+        WriteTransaction wt(sg_w);
+        Table& origin = *wt.add_table("origin");
+        Table& target = *wt.add_table("target");
+        origin.add_column_link(type_LinkList, "o_1", target, link_Strong);
+        target.add_column(type_Int, "t_1");
+        wt.commit();
+    }
+
+    // perform_change expects sg to be in a read transaction
+    sg.begin_read();
+
+    ConstTableRef target;
+    ConstRow target_row_0, target_row_1;
+
+    auto perform_change = [&](std::function<void (Table&)> func) {
+        // Ensure there are two rows in each table, with each row in `origin`
+        // pointing to the corresponding row in `target`
+        {
+            WriteTransaction wt(sg_w);
+            Table& origin_w = *wt.get_table("origin");
+            Table& target_w = *wt.get_table("target");
+
+            origin_w.clear();
+            target_w.clear();
+            origin_w.add_empty_row(2);
+            target_w.add_empty_row(2);
+            origin_w[0].get_linklist(0)->add(0);
+            origin_w[1].get_linklist(0)->add(0);
+            origin_w[1].get_linklist(0)->add(1);
+
+            wt.commit();
+        }
+
+        // Perform the modification
+        {
+            WriteTransaction wt(sg_w);
+            func(*wt.get_table("origin"));
+            wt.commit();
+        }
+
+        // Apply the changes to sg via replication
+        sg.end_read();
+        repl.replay_transacts(sg, replay_log);
+        const Group& group = sg.begin_read();
+        group.Verify();
+
+        target = group.get_table("target");
+        if (target->size() > 0)
+            target_row_0 = target->get(0);
+        if (target->size() > 1)
+            target_row_1 = target->get(1);
+        // Leave `group` and the target accessors in a state which can be tested
+        // with the changes applied
+    };
+
+    // Break link by clearing list
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->clear();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 1);
+
+    // Break link by removal from list
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->remove(1);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 1);
+
+    // Break link by reassign
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->set(1, 0);
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 1);
+
+    // Avoid breaking link by reassigning self
+    perform_change([](Table& origin) {
+        origin[1].get_linklist(0)->set(1, 1);
+    });
+    // Should not delete anything
+    CHECK(target_row_0 && target_row_1);
+    CHECK_EQUAL(target->size(), 2);
+
+    // Break link by explicit row removal
+    perform_change([](Table& origin) {
+        origin[1].move_last_over();
+    });
+    CHECK(target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 1);
+
+    // Break link by clearing table
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK_EQUAL(target->size(), 0);
+}
+
+
+TEST(Replication_NullStrings)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::ostream* replay_log = 0;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_String, "c1", true);
+        table1->add_column(type_Binary, "b1", true);
+        table1->add_empty_row(3);                   // default value is null
+        
+        table1->set_string(0, 1, StringData(""));   // empty string
+        table1->set_string(0, 2, realm::null());    // null
+
+        table1->set_binary(1, 1, BinaryData(""));   // empty string
+        table1->set_binary(1, 2, BinaryData());    // null
+
+        CHECK(table1->get_string(0, 0).is_null());
+        CHECK(!table1->get_string(0, 1).is_null());
+        CHECK(table1->get_string(0, 2).is_null());
+
+        CHECK(table1->get_binary(1, 0).is_null());
+        CHECK(!table1->get_binary(1, 1).is_null());
+        CHECK(table1->get_binary(1, 2).is_null());
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_log);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK(table2->get_string(0, 0).is_null());
+        CHECK(!table2->get_string(0, 1).is_null());
+        CHECK(table2->get_string(0, 2).is_null());
+
+        CHECK(table2->get_binary(1, 0).is_null());
+        CHECK(!table2->get_binary(1, 1).is_null());
+        CHECK(table2->get_binary(1, 2).is_null());
+    }
+}
+
 } // anonymous namespace
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif // REALM_ENABLE_REPLICATION
 #endif // TEST_REPLICATION

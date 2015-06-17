@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
 
 ### API breaking changes:
 
@@ -10,9 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
-
------------
+* Generic networking API added.
 
 ### Internals:
 
@@ -20,13 +18,196 @@
 
 ----------------------------------------------
 
+# 0.90.0 Release notes
+
+### API breaking changes:
+
+* Merged lr_nulls into master (support for null in String column and bugfix in
+String index with 0 bytes). If you want to disable all this again, then #define
+REALM_NULL_STRINGS to 0 in features.h. Else API is as follows: Call add_column()
+with nullable = true. You can then use realm::null() in place of any
+StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
+also call Table::is_null(), Table::set_null() and StringData::is_null(). This
+upgrades the database file from version 2 to 3 initially the first time a file
+is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.6 Release notes
+
+### Bugfixes:
+
+* Fixed durability issue in case of power / system failures on Apple platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to stable storage when the file is extended.
+
+----------------------------------------------
+
+# 0.89.5 Release notes
+
+### Bugfixes:
+
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back or advanced over.
+
+----------------------------------------------
+
+# 0.89.4 Release notes
+
+### Enhancements:
+
+* Detaching (and thus destroying) row acessors and TableViews can now be done
+  safely from any thread.
+* Improved performance of Query::find_all() with assertions enabled.
+
+----------------------------------------------
+
+# 0.89.3 Release notes
+
+### Bugfixes:
+
+* Fixed LinkViews containing incorrect data after a write transaction
+  containing a table clear is rolled back.
+* Fixed errors when a changes to a table with an indexed int column are rolled
+  back.
+
+### Enhancements:
+
+* Changes the mmap doubling treshold on mobile devices from 128MB to 16MB.
+* SharedGroup::compact() will now throw a runtime_error if called in detached state.
+* Make the start index of `ListView::find()` overrideable for finding multiple
+  occurances of a given row in a LinkList.
+* Add `Group::set_cascade_notification_handler()` to simplify tracking changes
+  due to link nullification and cascading deletes.
+
+### Internals:
+
+* Can now be built with encryption enabled on Linux.
+
+----------------------------------------------
+
+# 0.89.1 Release notes
+
+### Bugfixes:
+
+* Fixed bug in "index rebuilding" (would delete the wrong column, causing crash). See https://github.com/realm/realm-core/pull/798 ;  "Remove the correct column when removing search indexes #798"
+
+----------------------------------------------
+
+# 0.89.0 Release notes
+
+### Bugfixes:
+
+* Added a check for NUL bytes in indexed strings to avoid corrupting data
+  structures.
+* Fixed bug in SharedGroup::compact(). The bug left the freelist outdated in
+  some situations, which could cause crash later, if work continued on the same
+  shared group. The bug did not affect the data written to the compacted
+  database, but later commits working on the outdated freelist might have. The
+  fix forces proper (re)initialization of the free list.
+* Fixed incorrect results in querying on an indexed string column via a
+  LinkView.
+* Fixed corruption of indexes when using move_last_over() on rows with
+  duplicated values for indexed properties.
+
+### API breaking changes:
+
+* Changed the `tightdb` namespace to `realm`.
+* We switched to C++11, and removed functionality that was duplicated from the
+  C++11 standard library, including `null_ptr` and `util::UniquePtr`.
+
+### Enhancements:
+
+* Improved performance of advance_read() over commits with string or binary data
+  insertions.
+* Improved performance sorting TableView and LinkView.
+* Added Table::remove_search_index().
+
+----------------------------------------------
+
+# 0.88.6 Release notes
+
+### Bugfixes:
+
+* Fixed bug in Integer index that could make it crash or return bad results
+  (String index not affected)
+
+----------------------------------------------
+
+# 0.88.5 Release notes
+
+### Bugfixes:
+
+* Fixed crash when `std::exit()` is called with active encrypted mappings.
+* Fixed writing over 4KB of data to an encrypted file with `Group::write()`.
+* Fixed crash after making commits which produced over 4KB of writelog data with
+  encryption enabled.
+
+-----------
+
+### Internals:
+
+* Switched to using mach exceptions rather than signal() for encrypted mappings
+  on Apple platforms.
+
+----------------------------------------------
+
+# 0.88.4 Release notes
+
+### Bugfixes:
+
+* Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
+* Fixed issues with ArrayString that *could* be the cause of all the asserts the
+  past few days
+
+-----------
+
+### Internals:
+
+* Many `REALM_ASSERT` invocations replaced by new `REALM_ASSERT_3` macro
+  that prints variable/argument contents on failure. It's not implemented
+  optimally yet.
+
+----------------------------------------------
+
+# 0.88.3 Release notes
+
+### Enhancements:
+
+* Added emulation of inter-process condition variables for use on platforms which
+  do not properly implement them.
+
+----------------------------------------------
+
+# 0.88.2 Release notes
+
+### Bugfixes:
+
+* Fixed duplicated results when querying on a link column with matches at row
+  1000+.
+
+-----------
+
+### Internals:
+
+* Added support for Android ARM64
+
+----------------------------------------------
+
+# 0.88.1 Release notes
+
+### Bugfixes:
+
+* Fix encryption on platforms with non-4KB pages.
+
+----------------------------------------------
+
 # 0.88.0 Release notes
 
 ### Enhancements:
 
-* SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
-  in order to get the name of its temporary workspace file instead of ".tmp". It also
-  automatically removes the file in case it already exists before compaction.
+* SharedGroup::compact() now appends ".tmp_compaction_space" to the database
+  name in order to get the name of its temporary workspace file instead of
+  ".tmp". It also automatically removes the file in case it already exists
+  before compaction.
 * Add support for comparing string columns to other string columns in queries.
 * `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
   added. Previously, only implicit rollback was possible with
@@ -86,7 +267,8 @@
 
 ### Internals:
 
-* Now uses system OpenSSL on Android rather than a statically-linked copy for encryption.
+* Now uses system OpenSSL on Android rather than a statically-linked copy for
+  encryption.
 
 ----------------------------------------------
 
@@ -114,7 +296,7 @@
 
 ### Internals:
 
-* Extra assertions in `src/tightdb/util.file.cpp`.
+* Extra assertions in `src/realm/util.file.cpp`.
 
 ----------------------------------------------
 
@@ -122,7 +304,8 @@
 
 ### Enhancements:
 
-* Added 'compact' method to SharedGroup for better control of compaction of the database file.
+* Added 'compact' method to SharedGroup for better control of compaction of the
+  database file.
 * The following constants were added: `Group::max_table_name_length`,
   `Table::max_column_name_length`, `Table::max_string_size`, and
   `Table::max_binary_size`.
@@ -135,13 +318,13 @@
 
 ### Internals:
 
-* There is now three kinds of runtime assertions, `TIGHTDB_ASSERT_DEBUG()`,
-  which is retained only in debug-mode builds, `TIGHTDB_ASSERT_RELEASE()`, which
-  is also retained in release-mode builds, and finally, `TIGHTDB_ASSERT()`,
+* There is now three kinds of runtime assertions, `REALM_ASSERT_DEBUG()`,
+  which is retained only in debug-mode builds, `REALM_ASSERT_RELEASE()`, which
+  is also retained in release-mode builds, and finally, `REALM_ASSERT()`,
   which is normally only retained in debug-mode builds, but may occasionally be
   retained in release-mode builds too, depending on the specific build
   configuration.
-* `TIGHTDB_ASSERT()` assertions are now enabled in release-mode builds by
+* `REALM_ASSERT()` assertions are now enabled in release-mode builds by
   default.
 
 ----------------------------------------------
@@ -273,7 +456,7 @@
 ### Internals:
 
 * Introducing `LogicError` as an alternative to expected exceptions. See
-  https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
+  https://github.com/Realm/realm/wiki/Exception-safety-guarantees for more
   on this.
 * Various query related speed improvements.
 * Test suite now passes ASAN (address sanitizer).
@@ -342,9 +525,9 @@
 
 ### Internals:
 
-* `TIGHTDB_MAX_LIST_SIZE` was renamed to `TIGHTDB_MAX_BPNODE_SIZE`. `BPNODE`
+* `REALM_MAX_LIST_SIZE` was renamed to `REALM_MAX_BPNODE_SIZE`. `BPNODE`
   stands for "B+-tree node".
-* `TIGHTDB_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
+* `REALM_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
   mode.
 
 ----------------------------------------------
@@ -360,7 +543,7 @@
   the spaecified name. Addition is now handled by either `Group::add_table()` or
   `Group::get_or_add_table()`.
 * `Group::get_table()` and Group::get_table_name() now throw
-  `tightdb::InvalidArgument` if the specified table index is out of range.
+  `realm::InvalidArgument` if the specified table index is out of range.
 * Template version of `Group::get_table()` now throws `DescriptorMismatch` if
   the dynamic type disagrees with the statically specified custom table type.
 * `LangBindHelper::bind_table_ref()` was renamed to
@@ -452,10 +635,10 @@
 
 * Fixed bug in `Table::add_column()` which would produce a corrupt underlying
   node structure if the table already contains more than N**2 rows, where N is
-  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+  `REALM_MAX_LIST_SIZE` (currently set to 1000).
 * Fixed bugs in `Table::clear()` which would produce a corrupt underlying node
   structure if the table already contains more than N rows, where N is
-  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+  `REALM_MAX_LIST_SIZE` (currently set to 1000).
 
 ### Enhancements:
 
@@ -522,7 +705,7 @@
 
 ### API breaking changes:
 
-* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
+* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/realm/table_view.hpp`.
 * is_attached(), detach(), get_table(), and get_index() moved from BasicRow to RowFuncs. This makes it possible to write `link_list[7].get_index()`, for instance.
 * `LinkView::get_target_row(link_ndx)` was removed as it is now just a shorthand for the equally efficient `LinkView::get(link_ndx).get_index()`.
 * Added missing const versions of `LinkView::get()` and `LinkView::operator[]()`.
@@ -579,7 +762,7 @@ The C++ API has been updated and your code will break!
 ----------------------------------------------
 
 
-TightDB Changelog:
+Realm Changelog:
 ==================
 
 Format:
@@ -630,7 +813,7 @@ Format:
 
 
 2014-02-11 (Kristian Spangsege)
-+ Group::write(std::ostream&) added. This allows general online streaming of TightDB databases in memory for the first time.
++ Group::write(std::ostream&) added. This allows general online streaming of Realm databases in memory for the first time.
 + Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
 
 
@@ -675,7 +858,7 @@ Format:
 
 2013-12-17 (Kristian Spangsege)
 + Implicit termination of active transaction when SharedGroup is destroyed.
-. Class `File` and related exceptions such as `File::AccessError` moved to namespace `tightdb::util`.
+. Class `File` and related exceptions such as `File::AccessError` moved to namespace `realm::util`.
 . Table::add_column() optimized. For integer columns, the speedup is by more than a factor of 1000 for large tables.
 
 
@@ -786,7 +969,7 @@ Format:
 + Support for explicit string lengths added. Most method arguments and
   return values of type 'const char*' have been changed to be of type
   'StringData'. This new type is defined in
-  <tightdb/string_data.hpp>. 'StringData' can be implicitly
+  <realm/string_data.hpp>. 'StringData' can be implicitly
   constructed from 'const char*', so no change is required when
   passing arguments. Source code change is required when dealing with
   returned strings of type 'const char*'. The following is a complete
@@ -893,7 +1076,7 @@ Format:
 + New Group::open(...) methods added. Same for SharedGroup.
 + New Group::is_attached() added. Same for SharedGroup.
 + Classes ReadTransaction and WriteTransaction added for handling safe scoped transaction.
-+ Many methods have now been qualified with TIGHTDB_NOEXCEPT.
++ Many methods have now been qualified with REALM_NOEXCEPT.
 
 
 2013-01-14 (Kristian Spangsege)
@@ -934,7 +1117,7 @@ Format:
 
 2012-12-06 (Kristian Spangsege)
 ----------
-. "C" API moved to its own repository "tightdb_c".
+. "C" API moved to its own repository "realm_c".
 
 
 2012-12-03 (Brian Munkholm)
@@ -969,7 +1152,7 @@ Format:
 
 2012-10-02 (Kristian Spangsege)
 ----------
-+ New program 'tightdb-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
++ New program 'realm-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the Realm core library.
 
 
 2012-10-01 (Brian Munkholm)
@@ -1006,9 +1189,9 @@ Format:
 
 2012-07-27 (Kristian Spangsege)
 ----------
-+ 6 tightdb::is_a<MyTable>(const Table&) added.
-+ 6 tightdb::unchecked_cast<MyTable>(TableRef) added.
-+ 6 tightdb::checked_cast<MyTable>(TableRef) added.
++ 6 realm::is_a<MyTable>(const Table&) added.
++ 6 realm::unchecked_cast<MyTable>(TableRef) added.
++ 6 realm::checked_cast<MyTable>(TableRef) added.
 + 6 my_table[i].mixed.set_subtable() added.
 + 6 my_table[i].mixed.set_subtable<MySubtable>() added.
 + 6 my_table[i].mixed.is_subtable<MyTable>() added (inefficient, do we want it at all?).
@@ -1017,13 +1200,13 @@ Format:
 
 2012-07-24 (Kristian Spangsege)
 ----------
-+  New macro TIGHTDB_DEBUG to control compilation mode.
++  New macro REALM_DEBUG to control compilation mode.
     The library (including all headers) is no longer affected in any way by the definition status of NDEBUG or _DEBUG.
-    When we (TightDB) compile the library in debug mode, we must define this macro.
+    When we (Realm) compile the library in debug mode, we must define this macro.
     We will deliver two versions of the library, one for release mode, and one for debug mode.
     If the customer wishes to use the debugging version of the library, he must do two things:
-    1) Define TIGHTDB_DEBUG in any translation unit that includes a TightDB header.
-    2) Use the version of the library that is compiled for debug mode (libtightdb_d.a).
+    1) Define REALM_DEBUG in any translation unit that includes a Realm header.
+    2) Use the version of the library that is compiled for debug mode (librealm_d.a).
 + 5 Removed obsolete constructor Mixed(ColumnType). Use Mixed(subtable_tag) instead, since this has no runtime overhead.
 
 

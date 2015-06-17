@@ -5,14 +5,13 @@
 #  include <psapi.h>
 #elif defined __APPLE__
 #  include <mach/mach.h>
-#elif defined TIGHTDB_HAVE_LIBPROCPS
+#elif defined REALM_HAVE_LIBPROCPS
 // Requires libprocps (formerly known as libproc)
 #  include <proc/readproc.h>
 #endif
 
 #include "mem.hpp"
 
-using namespace std;
 
 
 #ifdef _WIN32
@@ -39,7 +38,7 @@ DWORD calculate_ws_private(DWORD process_id)
 
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, process_id);
 
-    if (hProcess) throw runtime_error("Failed");
+    if (hProcess) throw std::runtime_error("Failed");
 
     __try {
         if (!QueryWorkingSet(hProcess, dWorkingSetPages, sizeof (dWorkingSetPages)))
@@ -95,7 +94,7 @@ DWORD calculate_ws_private(DWORD process_id)
     __finally {
         CloseHandle(hProcess);
     }
-    throw runtime_error("Failed");
+    throw std::runtime_error("Failed");
 }
 
 } // anonymous namespace
@@ -103,7 +102,7 @@ DWORD calculate_ws_private(DWORD process_id)
 #endif // _WIN32
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -129,7 +128,7 @@ size_t get_mem_usage()
     // either, yet we will yse the resident size for now.
     return t_info.resident_size;
 
-#elif defined TIGHTDB_HAVE_LIBPROCPS
+#elif defined REALM_HAVE_LIBPROCPS
 
     struct proc_t usage;
     look_up_our_self(&usage);
@@ -139,10 +138,10 @@ size_t get_mem_usage()
 
 #else
 
-    throw runtime_error("Not supported");
+    throw std::runtime_error("Not supported");
 
 #endif
 }
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

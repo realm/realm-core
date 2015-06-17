@@ -1,13 +1,12 @@
 #include <iostream>
-#include <tightdb.hpp>
+#include <realm.hpp>
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@Example: create_table @@
 
 // defining a table
-TIGHTDB_TABLE_3(MyTable,
+REALM_TABLE_3(MyTable,
 //              columns: types:
                 name,    String,
                 age,     Int,
@@ -33,8 +32,8 @@ int main()
 
 
     // @@Example: number_of_rows @@
-    cout << table.size() << endl; // => 6
-    cout << (table.is_empty() ? "Empty" : "Not empty") << endl; // => Not Empty
+    std::cout << table.size() << std::endl; // => 6
+    std::cout << (table.is_empty() ? "Empty" : "Not empty") << std::endl; // => Not Empty
     // @@EndExample@@
 
     // @@Example: accessing_rows @@
@@ -52,7 +51,7 @@ int main()
     static_cast<void>(hired);
 
     // @@Example: last_row @@
-    cout << table.back().name << endl;                 // => "Anni"
+    std::cout << table.back().name << std::endl;                 // => "Anni"
     // @@EndExample@@
 
     // @@Example: updating_entire_row @@
@@ -61,15 +60,15 @@ int main()
 
     // @@Example: deleting_row @@
     table.remove(2);
-    cout << table.size(); // => 5
+    std::cout << table.size(); // => 5
     // @@EndExample@@
 
-    cout << endl << endl;
+    std::cout << std::endl << std::endl;
 
     // @@Example: iteration @@
     for (size_t i = 0; i < table.size(); ++i) {
         MyTable::Cursor row = table[i];
-        cout << row.name << " is " << row.age << " years old." << endl;
+        std::cout << row.name << " is " << row.age << " years old." << std::endl;
     }
     // @@EndExample@@
 
@@ -86,7 +85,7 @@ int main()
 
     static_cast<void>(cnt);
 
-    cout << endl << endl;
+    std::cout << std::endl << std::endl;
 
     // @@Example: advanced_search @@
     // Create query (current employees between 20 and 30 years old)
@@ -94,10 +93,10 @@ int main()
                                     .age.between(20, 30);
 
     // Get number of matching entries
-    cout << q.count() << endl;      // => 2
+    std::cout << q.count() << std::endl;      // => 2
 
     // Get the average age
-    cout << q.age.average() << endl; // => 26
+    std::cout << q.age.average() << std::endl; // => 26
 
     // Execute the query and return a table (view)
     MyTable::View res = q.find_all();
@@ -105,11 +104,11 @@ int main()
         StringData name = res[i].name;
         int        age  = res[i].age;
 
-        cout << i << ": " << name << " is " << age << " years old." << endl;
+        std::cout << i << ": " << name << " is " << age << " years old." << std::endl;
     }
     // @@EndExample@@
 
-    cout << endl << endl;
+    std::cout << std::endl << std::endl;
 
     // @@Example: serialisation @@
     // Create Table in Group
@@ -124,16 +123,16 @@ int main()
     t->add("Anni", 54, true);
 
     // Remove database file if already existing
-    remove("employees.tightdb");
+    remove("employees.realm");
 
     // Write to disk
-    group.write("employees.tightdb");
+    group.write("employees.realm");
 
     // Load a group from disk (and print contents)
-    Group fromDisk("employees.tightdb");
+    Group fromDisk("employees.realm");
     MyTable::Ref diskTable = fromDisk.get_table<MyTable>("employees");
     for (size_t i = 0; i < diskTable->size(); ++i)
-        cout << i << ": " << diskTable[i].name << endl;
+        std::cout << i << ": " << diskTable[i].name << std::endl;
 
     // Write same group to memory buffer
     BinaryData buffer = group.write_to_mem();
@@ -142,12 +141,12 @@ int main()
     Group fromMem(buffer);
     MyTable::Ref memTable = fromMem.get_table<MyTable>("employees");
     for (size_t i = 0; i < memTable->size(); i++)
-        cout << i << ": " << memTable[i].name << endl;
+        std::cout << i << ": " << memTable[i].name << std::endl;
     // @@EndExample@@
 
     // @@Example: transaction @@
     // Open a shared group
-    SharedGroup db("employees.tightdb");
+    SharedGroup db("employees.realm");
 
     // Read transaction
     {
@@ -156,7 +155,7 @@ int main()
 
         // Print table contents
         for (size_t i = 0; i < table->size(); ++i)
-            cout << i << ": " << table[i].name << endl;
+            std::cout << i << ": " << table[i].name << std::endl;
     }
 
     // Write transaction (will rollback on error)

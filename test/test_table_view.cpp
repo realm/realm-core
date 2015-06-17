@@ -6,14 +6,13 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
+#include <realm/table_macros.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
 
 
@@ -49,18 +48,18 @@ using namespace test_util;
 
 namespace {
 
-TIGHTDB_TABLE_1(TestTableInt,
+REALM_TABLE_1(TestTableInt,
                 first, Int)
 
-TIGHTDB_TABLE_2(TestTableInt2,
+REALM_TABLE_2(TestTableInt2,
                 first,  Int,
                 second, Int)
 
-TIGHTDB_TABLE_2(TestTableDate,
+REALM_TABLE_2(TestTableDate,
                 first, DateTime,
                 second, Int)
 
-TIGHTDB_TABLE_2(TestTableFloatDouble,
+REALM_TABLE_2(TestTableFloatDouble,
                 first, Float,
                 second, Double)
 
@@ -135,7 +134,7 @@ TEST(TableView_GetSetInteger)
 
 
 namespace {
-TIGHTDB_TABLE_3(TableFloats,
+REALM_TABLE_3(TableFloats,
                 col_float, Float,
                 col_double, Double,
                 col_int, Int)
@@ -214,7 +213,7 @@ TEST(TableView_FloatsFindAndAggregations)
 
     // TODO: add for float as well
 
-    double epsilon = numeric_limits<double>::epsilon();
+    double epsilon = std::numeric_limits<double>::epsilon();
 
     // Test sum
     CHECK_APPROXIMATELY_EQUAL(sum_d,
@@ -564,7 +563,7 @@ TEST(TableView_FindAll)
 
 namespace {
 
-TIGHTDB_TABLE_1(TestTableString,
+REALM_TABLE_1(TestTableString,
                 first, String)
 
 } // anonymous namespace
@@ -619,7 +618,7 @@ TEST(TableView_StringSort)
     CHECK_EQUAL("ZEBRA", v[3].first);
 
     // Should be exactly the same as above because 0 was default already
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
     v.column().first.sort();
     CHECK_EQUAL("alpha", v[0].first);
     CHECK_EQUAL("ALPHA", v[1].first);
@@ -646,7 +645,7 @@ TEST(TableView_StringSort)
     // Try C++11 method which uses current locale of the operating system to give precise sorting. This C++11 feature
     // is currently (mid 2014) only supported by Visual Studio
     got_called = false;
-    bool available = set_string_compare_method(STRING_COMPARE_CPP11, null_ptr);
+    bool available = set_string_compare_method(STRING_COMPARE_CPP11, nullptr);
     if (available) {
         v.column().first.sort();
         CHECK_EQUAL("alpha", v[0].first);
@@ -658,7 +657,7 @@ TEST(TableView_StringSort)
 #endif
 
     // Set back to default for use by other unit tests
-    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
 
 TEST(TableView_FloatDoubleSort)
@@ -720,6 +719,43 @@ TEST(TableView_DoubleSortPrecision)
     CHECK_EQUAL(d2, tv[1].second);
 }
 
+TEST(TableView_SortNullString)
+{
+    Table t;
+    t.add_column(type_String, "s", true);
+    t.add_empty_row(4);
+    t.set_string(0, 0, StringData(""));     // empty string
+    t.set_string(0, 1, realm::null());             // realm::null()
+    t.set_string(0, 2, StringData(""));     // empty string
+    t.set_string(0, 3, realm::null());             // realm::null()
+
+    TableView tv;
+
+    tv = t.where().find_all();
+    tv.sort(0);
+    CHECK(tv.get_string(0, 0).is_null());
+    CHECK(tv.get_string(0, 1).is_null());
+    CHECK(!tv.get_string(0, 2).is_null());
+    CHECK(!tv.get_string(0, 3).is_null());
+
+    t.set_string(0, 0, StringData("medium medium medium medium"));
+
+    tv = t.where().find_all();
+    tv.sort(0);
+    CHECK(tv.get_string(0, 0).is_null());
+    CHECK(tv.get_string(0, 1).is_null());
+    CHECK(!tv.get_string(0, 2).is_null());
+    CHECK(!tv.get_string(0, 3).is_null());
+
+    t.set_string(0, 0, StringData("long long long long long long long long long long long long long long"));
+
+    tv = t.where().find_all();
+    tv.sort(0);
+    CHECK(tv.get_string(0, 0).is_null());
+    CHECK(tv.get_string(0, 1).is_null());
+    CHECK(!tv.get_string(0, 2).is_null());
+    CHECK(!tv.get_string(0, 3).is_null());
+}
 
 TEST(TableView_Delete)
 {
@@ -802,10 +838,6 @@ TEST(TableView_Stacked)
     TableView tv2 = tv.find_all_int(1,2);
     CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
     CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
-
-
-    
-
 }
 
 
@@ -845,7 +877,7 @@ TEST(TableView_FindAllStacked)
 TEST(TableView_LowLevelSubtables)
 {
     Table table;
-    vector<size_t> column_path;
+    std::vector<size_t> column_path;
     table.add_column(type_Bool,  "enable");
     table.add_column(type_Table, "subtab");
     table.add_column(type_Mixed, "mixed");
@@ -912,7 +944,7 @@ TEST(TableView_LowLevelSubtables)
 
         view.clear_subtable(2, i_1); // Mixed
         TableRef subtab_mix = view.get_subtable(2, i_1);
-        vector<size_t> subcol_path;
+        std::vector<size_t> subcol_path;
         subtab_mix->add_column(type_Bool,  "enable");
         subtab_mix->add_column(type_Table, "subtab");
         subtab_mix->add_column(type_Mixed, "mixed");
@@ -1047,14 +1079,14 @@ TEST(TableView_LowLevelSubtables)
 
 namespace {
 
-TIGHTDB_TABLE_1(MyTable1,
+REALM_TABLE_1(MyTable1,
                 val, Int)
 
-TIGHTDB_TABLE_2(MyTable2,
+REALM_TABLE_2(MyTable2,
                 val, Int,
                 subtab, Subtable<MyTable1>)
 
-TIGHTDB_TABLE_2(MyTable3,
+REALM_TABLE_2(MyTable3,
                 val, Int,
                 subtab, Subtable<MyTable2>)
 
@@ -1193,26 +1225,26 @@ TEST(TableView_ToString)
     tbl.add(6, 12345678);
     tbl.add(4, 12345678);
 
-    string s  = "    first    second\n";
-    string s0 = "0:      2    123456\n";
-    string s1 = "1:      4   1234567\n";
-    string s2 = "2:      6  12345678\n";
-    string s3 = "3:      4  12345678\n";
+    std::string s  = "    first    second\n";
+    std::string s0 = "0:      2    123456\n";
+    std::string s1 = "1:      4   1234567\n";
+    std::string s2 = "2:      6  12345678\n";
+    std::string s3 = "3:      4  12345678\n";
 
     // Test full view
-    stringstream ss;
+    std::stringstream ss;
     TestTableInt2::View tv = tbl.where().find_all();
     tv.to_string(ss);
     CHECK_EQUAL(s+s0+s1+s2+s3, ss.str());
 
     // Find partial view: row 1+3
-    stringstream ss2;
+    std::stringstream ss2;
     tv = tbl.where().first.equal(4).find_all();
     tv.to_string(ss2);
     CHECK_EQUAL(s+s1+s3, ss2.str());
 
     // test row_to_string. get row 0 of previous view - i.e. row 1 in tbl
-    stringstream ss3;
+    std::stringstream ss3;
     tv.row_to_string(0,ss3);
     CHECK_EQUAL(s+s1, ss3.str());
 }
@@ -1240,7 +1272,7 @@ TEST(TableView_RefCounting)
     // Now try to access TableView and see that the Table is still alive
     int64_t i = tv.get_int(0, 0);
     CHECK_EQUAL(i, 12);
-    string s = tv2.get_string(0, 0);
+    std::string s = tv2.get_string(0, 0);
     CHECK_EQUAL(s, "just a test string");
 }
 

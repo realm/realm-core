@@ -1,44 +1,44 @@
 /*************************************************************************
  *
- * TIGHTDB CONFIDENTIAL
+ * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TEST_UTIL_TEST_PATH_HPP
-#define TIGHTDB_TEST_UTIL_TEST_PATH_HPP
+#ifndef REALM_TEST_UTIL_TEST_PATH_HPP
+#define REALM_TEST_UTIL_TEST_PATH_HPP
 
 #include <string>
 
-#include <tightdb/util/features.h>
+#include <realm/util/features.h>
 
 #include "unit_test.hpp"
 
 #define TEST_PATH_HELPER(class_name, var_name, suffix) \
-    class_name var_name(tightdb::test_util::get_test_path(test_details, "." #var_name "." suffix))
+    class_name var_name(realm::test_util::get_test_path(test_details, "." #var_name "." suffix))
 
 #define TEST_PATH(var_name) \
-    TEST_PATH_HELPER(tightdb::test_util::TestPathGuard, var_name, "test");
+    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
 
 #define GROUP_TEST_PATH(var_name) \
-    TEST_PATH_HELPER(tightdb::test_util::TestPathGuard, var_name, "tightdb");
+    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "realm");
 
 #define SHARED_GROUP_TEST_PATH(var_name) \
-    TEST_PATH_HELPER(tightdb::test_util::SharedGroupTestPathGuard, var_name, "tightdb");
+    TEST_PATH_HELPER(realm::test_util::SharedGroupTestPathGuard, var_name, "realm");
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 /// Disable removal of test files. If called, the call must complete
@@ -51,7 +51,7 @@ void keep_test_files();
 void set_test_path_prefix(const std::string&);
 std::string get_test_path_prefix();
 
-std::string get_test_path(const unit_test::TestDetails&, const char* suffix);
+std::string get_test_path(const unit_test::TestDetails&, const std::string& suffix);
 
 std::string get_test_resource_path();
 void set_test_resource_path(const std::string&);
@@ -61,7 +61,7 @@ void set_test_resource_path(const std::string&);
 class TestPathGuard {
 public:
     TestPathGuard(const std::string& path);
-    ~TestPathGuard() TIGHTDB_NOEXCEPT;
+    ~TestPathGuard() REALM_NOEXCEPT;
     operator std::string() const
     {
         return m_path;
@@ -85,6 +85,6 @@ public:
 };
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
-#endif // TIGHTDB_TEST_UTIL_TEST_PATH_HPP
+#endif // REALM_TEST_UTIL_TEST_PATH_HPP

@@ -6,18 +6,17 @@
 #include <sstream>
 #include <ostream>
 
-#include <tightdb/table_macros.hpp>
-#include <tightdb/link_view.hpp> // lasse todo remove
-#include <tightdb.hpp>
+#include <realm/table_macros.hpp>
+#include <realm/link_view.hpp> // lasse todo remove
+#include <realm.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(LinkList_Basic1)
 {
@@ -740,7 +739,7 @@ TEST(LinkList_MultiLinkQuery)
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == "none").find_all();
+    tv = (table1->link(col_link2).link(col_linklist3).column<String>(1) == "none").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
@@ -859,14 +858,14 @@ TEST(LinkList_SortLinkView)
     table1->set_string(1, 1, "alfa");
     table1->set_float(2, 1, 100.f);
     table1->set_double(3, 1, 100.);
-    table1->set_string(4, 0, "alfa");
+    table1->set_string(4, 1, "alfa");
 
     table1->add_empty_row();
     table1->set_int(0, 2, 200);
     table1->set_string(1, 2, "beta");
     table1->set_float(2, 2, 200.f);
     table1->set_double(3, 2, 200.);
-    table1->set_string(4, 0, "alfa");
+    table1->set_string(4, 2, "alfa");
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();
@@ -973,12 +972,12 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(2).get_index(), 1);
 
     // Test multi-column sorting
-    vector<size_t> v;
-    vector<bool> a;
+    std::vector<size_t> v;
+    std::vector<bool> a;
     a.push_back(true);
     a.push_back(true);
 
-    vector<bool> a_false;
+    std::vector<bool> a_false;
     a_false.push_back(false);
     a_false.push_back(false);
 
@@ -1119,7 +1118,7 @@ TEST(Link_FindNullLink)
     match = table2->column<LinkList>(col_linklist2).is_null().find(2);
     CHECK_EQUAL(3, match);
 
-    // We have not yet defined behaviour of finding null-links in a linked-to table, so we just throw. Todo.
+    // We have not yet defined behaviour of finding realm::null()-links in a linked-to table, so we just throw. Todo.
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
 
@@ -1202,6 +1201,23 @@ TEST(LinkList_FindNotNullLink)
     q1.Not();
     q1.and_query(q1.get_table()->column<Link>(0).is_null());
     CHECK_EQUAL(6, q1.find_all().size());
+}
+
+TEST(Link_FirstResultPastRow1000)
+{
+    Group g;
+
+    TableRef data_table = g.add_table("data_table");
+    TableRef link_table = g.add_table("link_table");
+    link_table->add_column_link(type_Link, "link", *data_table);
+
+    data_table->add_empty_row();
+    link_table->add_empty_row(1001);
+
+    link_table->set_link(0, 1000, 0);
+
+    TableView tv = link_table->where().links_to(0, 0).find_all();
+    CHECK_EQUAL(1, tv.size());
 }
 
 
@@ -1290,6 +1306,143 @@ TEST(LinkList_QueryOnLinkList)
     }
     query2.find_all();
     query2.find();
+}
+
+TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
+{
+    Group group;
+
+    TableRef data_table = group.add_table("data");
+    data_table->add_column(type_String, "col");
+    data_table->add_search_index(0);
+
+    TableRef link_table = group.add_table("link");
+    link_table->add_column_link(type_LinkList, "col", *data_table);
+
+    data_table->add_empty_row(2);
+    data_table->set_string(0, 0, "a");
+    data_table->set_string(0, 1, "b");
+
+    link_table->add_empty_row();
+    LinkViewRef lvr = link_table->get_linklist(0, 0);
+
+    // Test with LinkList order matching Table order
+    lvr->add(0);
+    lvr->add(1);
+
+    CHECK_EQUAL(0, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(1, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(not_found, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find());
+
+    // Test with LinkList being the reverse of Table order
+    lvr->clear();
+    lvr->add(1);
+    lvr->add(0);
+
+    CHECK_EQUAL(1, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(0, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(not_found, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find());
+}
+
+TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
+{
+    Group group;
+
+    TableRef data_table = group.add_table("data");
+    data_table->add_column(type_String, "col");
+    data_table->add_search_index(0);
+
+    TableRef link_table = group.add_table("link");
+    link_table->add_column_link(type_LinkList, "col", *data_table);
+
+    // Ensure that the results from the index don't fit in a single leaf
+    const size_t count = round_up(std::max(REALM_MAX_BPNODE_SIZE * 8, 100), 4);
+    data_table->add_empty_row(count);
+    for (size_t i = 0; i < count; ++i) {
+        char str[2]{};
+        str[0] = 'a' + (i % 4);
+        data_table->set_string(0, i, StringData(str, 1));
+    }
+
+    link_table->add_empty_row();
+    LinkViewRef lvr = link_table->get_linklist(0, 0);
+
+    // Add every other row to the LinkList in the same order as the table
+    for (size_t i = 0; i < count; i += 2)
+        lvr->add(i);
+
+    // in table and linkview
+    TableView tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(0, tv[0].get_index());
+    CHECK_EQUAL(4, tv[1].get_index());
+
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(2, tv[0].get_index());
+    CHECK_EQUAL(6, tv[1].get_index());
+
+    // in table, not in linkview
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // not in table
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "A").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // Add every other row to the LinkList in the opposite order as the table
+    lvr->clear();
+    for (size_t i = count; i > 1; i -= 2)
+        lvr->add(i - 2);
+
+    // in table and linkview
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(count - 4, tv[0].get_index());
+    CHECK_EQUAL(count - 8, tv[1].get_index());
+
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find_all();
+    CHECK_EQUAL(count / 4, tv.size());
+    CHECK_EQUAL(count - 2, tv[0].get_index());
+    CHECK_EQUAL(count - 6, tv[1].get_index());
+
+    // in table, not in linkview
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // not in table
+    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "A").find_all();
+    CHECK_EQUAL(0, tv.size());
+}
+
+TEST(LinkList_QueryUnsortedListWithOr)
+{
+    Group group;
+
+    TableRef data_table = group.add_table("data");
+    data_table->add_column(type_Int, "col");
+
+    TableRef link_table = group.add_table("link");
+    link_table->add_column_link(type_LinkList, "col", *data_table);
+
+    const size_t count = 5;
+    data_table->add_empty_row(count);
+    link_table->add_empty_row();
+    LinkViewRef lvr = link_table->get_linklist(0, 0);
+
+    // Populate data and add rows to the linkview in the opposite order of the
+    // table's order
+    for (size_t i = 0; i < count; ++i) {
+        data_table->set_int(0, i, i);
+        lvr->add(count - i - 1);
+    }
+
+    // Verify that a query with Or() returns all results
+    TableView tv = data_table->where(lvr).group().equal(0, 1000).Or().between(0, 2, 4).end_group().find_all();
+    CHECK_EQUAL(3, tv.size());
+    CHECK_EQUAL(4, tv[0].get_index());
+    CHECK_EQUAL(3, tv[1].get_index());
+    CHECK_EQUAL(2, tv[2].get_index());
 }
 
 #endif

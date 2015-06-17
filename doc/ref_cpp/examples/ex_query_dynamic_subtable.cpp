@@ -1,10 +1,9 @@
 // @@Example: ex_cpp_dyn_query_subtable @@
 // @@Fold@@
-#include <tightdb.hpp>
+#include <realm.hpp>
 #include <assert.h>
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
 int main()
 {
@@ -36,7 +35,7 @@ int main()
     table->add_column(type_String, "Names");
     table->add_column(type_Table, "Scores");
 
-    vector<size_t> path;
+    std::vector<size_t> path;
     path.push_back(1);
     table->add_subcolumn(path, type_Int, "Score");
 

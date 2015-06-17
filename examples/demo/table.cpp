@@ -1,14 +1,13 @@
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <realm.hpp>
+#include <realm/group_shared.hpp>
 
-using namespace tightdb;
-using namespace std;
+using namespace realm;
 
-TIGHTDB_TABLE_2(Phones,
+REALM_TABLE_2(Phones,
                 desc, String,
                 number, String)
 
-TIGHTDB_TABLE_4(People,
+REALM_TABLE_4(People,
                 name, String,
                 age,  Int,
                 hired, Bool,
@@ -62,9 +61,9 @@ int main(int, char*[]) {
 
     // Iterating
     for(size_t i=0; i<t.size(); ++i) {
-        cout << t[i].name << " has " << t[i].phones->size() << " phones" << endl;
+        std::cout << t[i].name << " has " << t[i].phones->size() << " phones" << std::endl;
         for(size_t j=0; j<t[i].phones->size(); ++j) {
-            cout << " " << t[i].phones[j].desc << ": " << t[i].phones[j].number << endl;
+            std::cout << " " << t[i].phones[j].desc << ": " << t[i].phones[j].number << std::endl;
         }
     }
 
@@ -78,5 +77,5 @@ int main(int, char*[]) {
     t[2].hired = false;
 
     // Number of rows
-    cout << "Rows:    " << t.size() << endl;
+    std::cout << "Rows:    " << t.size() << std::endl;
 }

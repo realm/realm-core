@@ -1,13 +1,12 @@
 #include <map>
 
-#include <tightdb/array.hpp>
-#include <tightdb/impl/destroy_guard.hpp>
+#include <realm/array.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 #include "test.hpp"
 
-using namespace std;
-using namespace tightdb;
-using namespace tightdb::_impl;
+using namespace realm;
+using namespace realm::_impl;
 
 
 // Test independence and thread-safety
@@ -66,37 +65,37 @@ public:
         m_baseline = 8;
     }
 
-    ~FooAlloc() TIGHTDB_NOEXCEPT
+    ~FooAlloc() REALM_NOEXCEPT
     {
     }
 
-    MemRef do_alloc(size_t size) TIGHTDB_OVERRIDE
+    MemRef do_alloc(size_t size) override
     {
         ref_type ref = m_offset;
         char*& addr = m_map[ref]; // Throws
-        TIGHTDB_ASSERT(!addr);
+        REALM_ASSERT(!addr);
         addr = new char[size]; // Throws
         m_offset += size;
         return MemRef(addr, ref);
     }
 
-    void do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void do_free(ref_type ref, const char* addr) REALM_NOEXCEPT override
     {
-        typedef map<ref_type, char*>::iterator iter;
+        typedef std::map<ref_type, char*>::iterator iter;
         iter i = m_map.find(ref);
-        TIGHTDB_ASSERT(i != m_map.end());
+        REALM_ASSERT(i != m_map.end());
         char* addr_2 = i->second;
-        TIGHTDB_ASSERT(addr_2 == addr);
+        REALM_ASSERT(addr_2 == addr);
         static_cast<void>(addr_2);
         m_map.erase(i);
         delete[] addr;
     }
 
-    char* do_translate(ref_type ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    char* do_translate(ref_type ref) const REALM_NOEXCEPT override
     {
-        typedef map<ref_type, char*>::const_iterator iter;
+        typedef std::map<ref_type, char*>::const_iterator iter;
         iter i = m_map.find(ref);
-        TIGHTDB_ASSERT(i != m_map.end());
+        REALM_ASSERT(i != m_map.end());
         char* addr = i->second;
         return addr;
     }
@@ -108,7 +107,7 @@ public:
 
     void clear()
     {
-        typedef map<ref_type, char*>::const_iterator iter;
+        typedef std::map<ref_type, char*>::const_iterator iter;
         iter end = m_map.end();
         for (iter i = m_map.begin(); i != end; ++i) {
             char* addr = i->second;
@@ -117,15 +116,15 @@ public:
         m_map.clear();
     }
 
-#ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE
+#ifdef REALM_DEBUG
+    void Verify() const override
     {
     }
 #endif
 
 private:
     ref_type m_offset;
-    map<ref_type, char*> m_map;
+    std::map<ref_type, char*> m_map;
 };
 
 } // anonymous namespace
