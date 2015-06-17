@@ -987,7 +987,7 @@ public:
 };
 
 
-struct CascadeState : Group::CascadeNotification {
+struct CascadeState: Group::CascadeNotification {
     /// If non-null, then no recursion will be performed for rows of that
     /// table. The effect is then exactly as if all the rows of that table were
     /// added to \a state.rows initially, and then removed again after the

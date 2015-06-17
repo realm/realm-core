@@ -140,6 +140,6 @@ void TransactLogParser::parser_error() const
     throw BadTransactLog();
 }
 
-}
-}
+} // namespace _impl
+} // namespace realm
 

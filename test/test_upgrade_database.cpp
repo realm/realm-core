@@ -209,8 +209,8 @@ TEST(Upgrade_Database_2_3)
     {
       CHECK(File::copy(path, temp_copy));
 
-      auto replication = makeWriteLogCollector(temp_copy);
-      SharedGroup sg(*replication);
+      std::unique_ptr<ClientHistory> hist = make_client_history(temp_copy);
+      SharedGroup sg(*hist);
       ReadTransaction rt(sg);
       ConstTableRef t = rt.get_table("table");
 
@@ -224,7 +224,7 @@ TEST(Upgrade_Database_2_3)
           StringData sd(str);
           size_t f = t->find_first_string(0, sd);
           CHECK_EQUAL(f, i);
-          
+
           f = t->find_first_int(1, i);
           CHECK_EQUAL(f, i);
       }

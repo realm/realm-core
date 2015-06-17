@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Generic networking API added.
 
 ### Internals:
 
