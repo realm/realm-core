@@ -1573,10 +1573,10 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     // traversal to the set of accessors that were touched by the changes in the
     // transaction logs.
 
-    MultiLogInputStream in(logs_begin, logs_end);
-    Replication::TransactLogParser parser(in);
+    MultiLogNoCopyInputStream in(logs_begin, logs_end);
+    _impl::TransactLogParser parser; // Throws
     TransactAdvancer advancer(*this);
-    parser.parse(advancer); // Throws
+    parser.parse(in, advancer); // Throws
 
     m_alloc.reset_free_space_tracking(); // Throws
 
@@ -1596,10 +1596,13 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 
 void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
 {
-    MultiLogInputStream in(&log, (&log)+1);
-    Replication::TransactLogParser parser(in);
+    // FIXME: We are currently creating two transaction log parsers, one here,
+    // and one in TransactReverser::execute(). That is wasteful as the parser
+    // creation is expensive.
+    MultiLogNoCopyInputStream in(&log, (&log)+1);
+    _impl::TransactLogParser parser; // Throws
     TransactReverser reverser;
-    parser.parse(reverser);
+    parser.parse(in, reverser);
     TransactAdvancer advancer(*this);
     reverser.execute(advancer);
 

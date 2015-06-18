@@ -70,7 +70,7 @@ public:
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
         for (iter i = m_transact_logs.begin(); i != end; ++i)
-            apply_transact_log(i->data(), i->size(), target, replay_log);
+            apply_changeset(i->data(), i->size(), target, replay_log);
         for (iter i = m_transact_logs.begin(); i != end; ++i)
             delete[] i->data();
         m_transact_logs.clear();
@@ -190,9 +190,8 @@ TEST(Replication_General)
         CHECK_EQUAL(8,  table[3].my_int);
 
         StringData sd1 = table[4].my_string.get();
-        StringData sd2 = table[5].my_string.get();
 
-        CHECK(!table[4].my_string.get().is_null());
+        CHECK(!sd1.is_null());
     }
 }
 
