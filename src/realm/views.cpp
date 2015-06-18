@@ -36,33 +36,35 @@ void RowIndexes::sort(Sorter& sorting_predicate)
 // FIXME: this only works (and is only used) for row indexes with memory
 // managed by the default allocator, e.q. for TableViews.
 RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
-    : m_row_indexes(Column::unattached_root_tag(), Allocator::get_default())
+    : m_row_indexes()
 {
 #ifdef REALM_COOKIE_CHECK
     cookie = source.cookie;
 #endif
     if (mode == ConstSourcePayload::Copy) {
-        const Array* root = source.m_row_indexes.get_root_array();
-        if (root) {
+        if (source.m_row_indexes.is_attached()) {
             // we only clone if there is something to clone:
             //m_row_indexes.destroy();
             // MemRef mem = root->clone_deep(Allocator::get_default());
             MemRef mem = source.m_row_indexes.clone_deep(Allocator::get_default());
-            m_row_indexes.init_from_ref(Allocator::get_default(), mem.m_ref);
+            m_row_indexes.destroy();
+            m_row_indexes.init_from_mem(Allocator::get_default(), mem);
         }
     }
 }
 
 RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
-    : m_row_indexes(Column::unattached_root_tag(), Allocator::get_default())
+    : m_row_indexes()
 {
     // move the data payload, but make sure to leave the source array intact or
     // attempts to reuse it for a query rerun will crash (or assert, if lucky)
-    Array* src_root = source.m_row_indexes.get_root_array();
-    source.m_row_indexes.detach();
     // There really *has* to be a way where we don't need to first create an empty
     // array, and then destroy it
-    m_row_indexes.init_from_ref(Allocator::get_default(), src_root->get_mem().m_ref);
+    if (source.m_row_indexes.is_attached()) {
+        m_row_indexes.detach();
+        m_row_indexes.init_from_mem(Allocator::get_default(), source.m_row_indexes.get_mem());
+        source.m_row_indexes.init_from_ref(Allocator::get_default(), Column::create(Allocator::get_default()));
+    }
 
 #ifdef REALM_COOKIE_CHECK
     cookie = source.cookie;

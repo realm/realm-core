@@ -7166,25 +7166,31 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv.get_int(0,i));
+
             handover2.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
             CHECK(tv.is_attached());
             CHECK(tv.is_in_sync());
             handover3.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Stay));
             CHECK(tv.is_attached());
             CHECK(tv.is_in_sync());
+
             handover4.reset(sg_w.export_for_handover(tv, MutableSourcePayload::Move));
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
+
             // and again, but this time with the source out of sync:
             handover5.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
+
             handover6.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Stay));
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
+
             handover7.reset(sg_w.export_for_handover(tv, MutableSourcePayload::Move));
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
+
             // and verify, that even though it was out of sync, we can bring it in sync again
             tv.sync_if_needed();
             CHECK(tv.is_in_sync());
@@ -7194,6 +7200,7 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(7, row.get_int(0));
             handover_row.reset(sg_w.export_for_handover(row));
             CHECK(row.is_attached());
+
         }
         {
             LangBindHelper::advance_read(sg,vid);
@@ -7213,6 +7220,7 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv3->size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv3->get_int(0,i));
+
             // one with payload:
             std::unique_ptr<TableView> tv4( sg.import_from_handover(handover4.release()) );
             CHECK(tv4->is_attached());
@@ -7220,21 +7228,27 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv4->size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv4->get_int(0,i));
+
             // verify that subsequent imports are all without payload:
             std::unique_ptr<TableView> tv5( sg.import_from_handover(handover5.release()) );
             CHECK(tv5->is_attached());
             CHECK(!tv5->is_in_sync());
+
             std::unique_ptr<TableView> tv6( sg.import_from_handover(handover6.release()) );
             CHECK(tv6->is_attached());
             CHECK(!tv6->is_in_sync());
+
             std::unique_ptr<TableView> tv7( sg.import_from_handover(handover7.release()) );
             CHECK(tv7->is_attached());
             CHECK(!tv7->is_in_sync());
+
             // importing row:
             std::unique_ptr<Row> row( sg.import_from_handover(handover_row.release()) );
             CHECK(row->is_attached());
             CHECK_EQUAL(7, row->get_int(0));
+
         }
+
     }
 
 }

@@ -402,8 +402,8 @@ public:
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
-        typename T::Handover_patch* patch;
-        T* clone;
+        typename T::Handover_patch* patch = 0;
+        T* clone = 0;
         VersionID version;
         ~Handover() { delete patch; delete clone; }
     };

@@ -656,7 +656,11 @@ void TableViewBase::do_sync()
     }
     else  {
         // valid query, so clear earlier results and reexecute it.
-        m_row_indexes.clear();
+        if (m_row_indexes.is_attached())
+            m_row_indexes.clear();
+        else
+            m_row_indexes.init_from_ref(Allocator::get_default(), 
+                                        Column::create(Allocator::get_default()));
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
