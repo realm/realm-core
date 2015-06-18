@@ -52,8 +52,6 @@ typedef struct SHA256state_st {
 namespace realm {
 namespace util {
 
-size_t page_size();
-
 struct iv_table;
 
 class AESCryptor {
