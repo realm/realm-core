@@ -1480,7 +1480,7 @@ public:
         return true; // No-op
     }
 
-    bool link_list_clear() REALM_NOEXCEPT
+    bool link_list_clear(const std::vector<std::size_t>&) REALM_NOEXCEPT
     {
         return true; // No-op
     }
