@@ -780,7 +780,7 @@ public:
         return true;
     }
 
-    bool link_list_clear()
+    bool link_list_clear(const std::vector<std::size_t>&)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;

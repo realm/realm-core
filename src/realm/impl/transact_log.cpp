@@ -150,6 +150,15 @@ void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
 #endif
 }
 
+void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
+{
+    select_link_list(list); // Throws
+    m_encoder.link_list_clear(list.m_row_indexes); // Throws
+#ifdef REALM_DEBUG
+    m_log << "link_list->clear();\n";
+#endif
+}
+
 REALM_NORETURN
 void TransactLogParser::parser_error() const
 {

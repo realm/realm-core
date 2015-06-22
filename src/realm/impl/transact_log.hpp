@@ -194,7 +194,7 @@ public:
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     bool link_list_erase(std::size_t link_ndx);
     bool link_list_nullify(std::size_t link_ndx);
-    bool link_list_clear();
+    bool link_list_clear(const Column& values);
 
     /// End of methods expected by parser.
 
@@ -1551,19 +1551,12 @@ inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, 
 #endif
 }
 
-inline bool TransactLogEncoder::link_list_clear()
+inline bool TransactLogEncoder::link_list_clear(const Column& values)
 {
-    simple_cmd(instr_LinkListClear, util::tuple()); // Throws
+    simple_cmd(instr_LinkListClear, util::tuple(values.size())); // Throws
+    for (std::size_t i = 0; i < values.size(); i++)
+        append_num(values.get(i));
     return true;
-}
-
-inline void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
-{
-    select_link_list(list); // Throws
-    m_encoder.link_list_clear(); // Throws
-#ifdef REALM_DEBUG
-    m_log << "link_list->clear();\n";
-#endif
 }
 
 inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) REALM_NOEXCEPT
@@ -1933,7 +1926,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_LinkListClear: {
-            if (!handler.link_list_clear()) // Throws
+            std::size_t size = read_int<std::size_t>(); // Throws
+            std::vector<std::size_t> values;
+            values.resize(size); // Throws
+            for (std::size_t i = 0; i < size; ++i)
+                values[i] = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_clear(values)) // Throws
                 parser_error();
             return;
         }
@@ -2591,10 +2589,16 @@ public:
         return true;
     }
 
-    bool link_list_clear()
+    bool link_list_clear(const std::vector<std::size_t>& values)
     {
-        // FIXME
-        return true; // No-op
+        // Append in reverse order because the reversed log is itself applied
+        // in reverse, and this way it generates all back-insertions rather than
+        // all front-insertions
+        for (std::size_t i = values.size(); i > 0; --i) {
+            m_encoder.link_list_insert(i - 1, values[i - 1]);
+            append_instruction();
+        }
+        return true;
     }
 
     bool nullify_link(size_t col_ndx, size_t row_ndx)
