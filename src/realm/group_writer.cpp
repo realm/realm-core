@@ -230,7 +230,6 @@ size_t GroupWriter::get_free_space(size_t size)
     ArrayInteger& lengths   = m_group.m_free_lengths;
     ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
-    size_t mmap_chunk_size = m_group.m_alloc.m_chunk_size;
 
     for (size_t i = 0; i < lengths.size(); ++i)
         REALM_ASSERT((lengths.get(i) % 8) == 0);
@@ -249,57 +248,9 @@ size_t GroupWriter::get_free_space(size_t size)
     size_t rest = chunk_size - size;
     if (rest > 0) {
         // Allocating part of chunk
-        bool allocate_from_beginning = true;
-        if (mmap_chunk_size) {
-            // We must avoid allocating memory which straddles a mmap boundary
-            // coming here, we know that the allocation will succeed, we just don't
-            // know if we can allocate from the beginning of the chunk or somewhere
-            // inside it.
-            size_t first_mmap_boundary = chunk_pos + mmap_chunk_size - (chunk_pos % mmap_chunk_size);
-            if (chunk_pos + size > first_mmap_boundary) {
-                REALM_ASSERT(false);
-                // We have to allocate from the mmap_boundary instead of the beginning of the block,
-                allocate_from_beginning = false;
-                if (first_mmap_boundary + size == chunk_pos + chunk_size) {
-                    // special lucky case, where we allocate the end of the chunk, so we do
-                    // not need to split it:
-                    size_t sz = first_mmap_boundary - chunk_pos;
-                    REALM_ASSERT(sz);
-                    REALM_ASSERT((sz % 8) == 0);
-                    lengths.set(chunk_ndx, sz);
-                    chunk_pos = first_mmap_boundary;
-                    std::cerr << "  - lucky, end of chunk" << std::endl;
-                }
-                else {
-                    // we need to split the chunk - first add the free space from before
-                    // mmap boundary:
-                    positions.insert(chunk_ndx, chunk_pos);
-                    size_t sz = first_mmap_boundary - chunk_pos;
-                    REALM_ASSERT(sz);
-                    REALM_ASSERT((sz % 8) == 0);
-                    lengths.insert(chunk_ndx, sz);
-                    if (is_shared)
-                        versions.insert(chunk_ndx, 0);
-                    // next change the existing free chunk to reflect the memory area
-                    // placed after the allocation:
-                    ++chunk_ndx;
-                    positions.set(chunk_ndx, first_mmap_boundary + size);
-                    sz = chunk_pos + chunk_size - first_mmap_boundary - size;
-                    REALM_ASSERT(sz);
-                    REALM_ASSERT((sz % 8) == 0);
-                    lengths.set(chunk_ndx, sz);
-                    chunk_pos = first_mmap_boundary;
-                    std::cerr << "  - split chunk" << std::endl;
-                }
-            }
-            else
-                allocate_from_beginning = true;
-        }
-        if (allocate_from_beginning) {
-            std::cerr << "  - from beginning" << std::endl;
-            positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
-            lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
-        }
+        std::cerr << "  - from beginning" << std::endl;
+        positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
+        lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
     }
     else {
         // Allocating entire chunk
