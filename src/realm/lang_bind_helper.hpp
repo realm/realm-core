@@ -324,7 +324,8 @@ template<typename Handler>
 inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, Handler&& handler,
                                          SharedGroup::VersionID version)
 {
-    sg.advance_read(history, handler, version);
+    using sgf = _impl::SharedGroupFriend;
+    sgf::advance_read(sg, history, handler, version);
 }
 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
@@ -336,7 +337,8 @@ inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
 template<typename Handler>
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history, Handler&& handler)
 {
-    sg.promote_to_write(history, handler);
+    using sgf = _impl::SharedGroupFriend;
+    sgf::promote_to_write(sg, history, handler);
 }
 
 inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)

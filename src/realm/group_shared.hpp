@@ -717,9 +717,21 @@ public:
         sg.advance_read(hist, ver); // Throws
     }
 
+    template<typename Handler>
+    static void advance_read(SharedGroup& sg, History& hist, Handler&& handler, SharedGroup::VersionID ver)
+    {
+        sg.advance_read(hist, std::forward<Handler&&>(handler), ver); // Throws
+    }
+
     static void promote_to_write(SharedGroup& sg, History& hist)
     {
         sg.promote_to_write(hist); // Throws
+    }
+
+    template<typename Handler>
+    static void promote_to_write(SharedGroup& sg, History& hist, Handler&& handler)
+    {
+        sg.promote_to_write(hist, std::forward<Handler&&>(handler)); // Throws
     }
 
     static void commit_and_continue_as_read(SharedGroup& sg)
@@ -730,6 +742,12 @@ public:
     static void rollback_and_continue_as_read(SharedGroup& sg, History& hist)
     {
         sg.rollback_and_continue_as_read(hist); // Throws
+    }
+
+    template<typename Handler>
+    static void rollback_and_continue_as_read(SharedGroup& sg, History& hist, Handler&& handler)
+    {
+        sg.rollback_and_continue_as_read(hist, std::forward<Handler&&>(handler)); // Throws
     }
 };
 
