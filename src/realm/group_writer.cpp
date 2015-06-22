@@ -80,7 +80,6 @@ size_t GroupWriter::write_group()
     std::pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
     size_t reserve_ndx  = reserve.first;
     size_t reserve_size = reserve.second;
-
     // At this point we have allocated all the space we need, so we can add to
     // the free-lists any free space created during the current transaction (or
     // since last commit). Had we added it earlier, we would have risked
@@ -114,6 +113,7 @@ size_t GroupWriter::write_group()
     size_t reserve_pos = to_size_t(fpositions.get(reserve_ndx));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     fpositions.ensure_minimum_width(reserve_pos + max_free_space_needed); // Throws
+    std::cerr << "Free space reservation: [" << reserve_pos << ", " << reserve_size << "]" << std::endl;
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = fpositions.get_byte_size();
@@ -172,6 +172,7 @@ size_t GroupWriter::write_group()
 
 void GroupWriter::merge_free_space()
 {
+    std::cerr << "----------------------------------------- merge ------------------------" << std::endl;
     ArrayInteger& positions = m_group.m_free_positions;
     ArrayInteger& lengths   = m_group.m_free_lengths;
     ArrayInteger& versions  = m_group.m_free_versions;
@@ -229,25 +230,91 @@ size_t GroupWriter::get_free_space(size_t size)
     ArrayInteger& lengths   = m_group.m_free_lengths;
     ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
+    size_t mmap_chunk_size = m_group.m_alloc.m_chunk_size;
+
+    for (size_t i = 0; i < lengths.size(); ++i)
+        REALM_ASSERT((lengths.get(i) % 8) == 0);
 
     // Claim space from identified chunk
     size_t chunk_ndx  = p.first;
     size_t chunk_pos  = to_size_t(positions.get(chunk_ndx));
     size_t chunk_size = p.second;
     REALM_ASSERT_3(chunk_size, >=, size);
+    REALM_ASSERT((chunk_size % 8) == 0);
+    std::cerr << "alloc(" << size << ") from chunk [" << chunk_pos << ", " << chunk_size << "]" << std::endl;
 
+    // TODO: Change logic to detect and handle allocation in chunk
+    // that crosses a mmap boundary - may end up with two free spaces
+    // and an allocation in between.
     size_t rest = chunk_size - size;
     if (rest > 0) {
-        positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
-        lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
+        // Allocating part of chunk
+        bool allocate_from_beginning = true;
+        if (mmap_chunk_size) {
+            // We must avoid allocating memory which straddles a mmap boundary
+            // coming here, we know that the allocation will succeed, we just don't
+            // know if we can allocate from the beginning of the chunk or somewhere
+            // inside it.
+            size_t first_mmap_boundary = chunk_pos + mmap_chunk_size - (chunk_pos % mmap_chunk_size);
+            if (chunk_pos + size > first_mmap_boundary) {
+                REALM_ASSERT(false);
+                // We have to allocate from the mmap_boundary instead of the beginning of the block,
+                allocate_from_beginning = false;
+                if (first_mmap_boundary + size == chunk_pos + chunk_size) {
+                    // special lucky case, where we allocate the end of the chunk, so we do
+                    // not need to split it:
+                    size_t sz = first_mmap_boundary - chunk_pos;
+                    REALM_ASSERT(sz);
+                    REALM_ASSERT((sz % 8) == 0);
+                    lengths.set(chunk_ndx, sz);
+                    chunk_pos = first_mmap_boundary;
+                    std::cerr << "  - lucky, end of chunk" << std::endl;
+                }
+                else {
+                    // we need to split the chunk - first add the free space from before
+                    // mmap boundary:
+                    positions.insert(chunk_ndx, chunk_pos);
+                    size_t sz = first_mmap_boundary - chunk_pos;
+                    REALM_ASSERT(sz);
+                    REALM_ASSERT((sz % 8) == 0);
+                    lengths.insert(chunk_ndx, sz);
+                    if (is_shared)
+                        versions.insert(chunk_ndx, 0);
+                    // next change the existing free chunk to reflect the memory area
+                    // placed after the allocation:
+                    ++chunk_ndx;
+                    positions.set(chunk_ndx, first_mmap_boundary + size);
+                    sz = chunk_pos + chunk_size - first_mmap_boundary - size;
+                    REALM_ASSERT(sz);
+                    REALM_ASSERT((sz % 8) == 0);
+                    lengths.set(chunk_ndx, sz);
+                    chunk_pos = first_mmap_boundary;
+                    std::cerr << "  - split chunk" << std::endl;
+                }
+            }
+            else
+                allocate_from_beginning = true;
+        }
+        if (allocate_from_beginning) {
+            std::cerr << "  - from beginning" << std::endl;
+            positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
+            lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
+        }
     }
     else {
+        // Allocating entire chunk
         positions.erase(chunk_ndx);
         lengths.erase(chunk_ndx);
         if (is_shared)
             versions.erase(chunk_ndx);
+        std::cerr << "  - entire chunk" << std::endl;
     }
-
+    for (size_t i = 0; i < lengths.size(); ++i)
+        REALM_ASSERT((lengths.get(i) % 8) == 0);
+    for (size_t i = 0; i < positions.size(); ++i)
+        REALM_ASSERT((positions.get(i) % 8) == 0);
+    REALM_ASSERT((chunk_pos % 8) == 0);
+    std::cerr << "  - got [" << chunk_pos << ", " << size << "]" << std::endl;
     return chunk_pos;
 }
 
@@ -256,7 +323,9 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
     ArrayInteger& lengths  = m_group.m_free_lengths;
     ArrayInteger& versions = m_group.m_free_versions;
+    ArrayInteger& pos      = m_group.m_free_positions;
     bool is_shared = m_group.m_is_shared;
+    size_t mmap_chunk_size = m_group.m_alloc.m_chunk_size;
 
     // Since we do a first-fit search for small chunks, the top pieces
     // are likely to get smaller and smaller. So when we are looking
@@ -277,7 +346,36 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
                 if (ver >= m_readlock_version)
                     continue;
             }
+            // if we're using chunked memory mapping, we have to check
+            // for mmap boundaries
+            if (mmap_chunk_size) {
+                // split block, if the allocation cannot be placed inside it
+                // without crossing mmap boundary.
+                size_t start_pos = to_size_t(pos.get(i));
+                size_t first_mmap_boundary = start_pos + mmap_chunk_size - (start_pos % mmap_chunk_size);
 
+                // if chunk straddles one or more chunk boundaries:
+                if (start_pos + chunk_size > first_mmap_boundary) {
+                    // and there's too little space before the first boundary:
+                    if (start_pos + size > first_mmap_boundary) {
+                        // and there's also too little space after it:
+                        if (first_mmap_boundary + size >= start_pos + chunk_size)
+                            continue;
+                        // there's room, but it's after the boundary. We split the
+                        // chunk, so that the room before the boundary becomes a
+                        // chunk on it's own
+                        std::cerr << "  - split [" << start_pos << ", " << chunk_size << "]" << std::endl;
+                        pos.insert(i, start_pos);
+                        lengths.insert(i, first_mmap_boundary - start_pos);
+                        if (is_shared)
+                            versions.insert(i, 0);
+                        ++i; ++end;
+                        pos.set(i, first_mmap_boundary);
+                        chunk_size = start_pos + chunk_size - first_mmap_boundary;
+                        lengths.set(i, chunk_size);
+                    }
+                }
+            }
             // Match found!
             return std::make_pair(i, chunk_size);
         }
@@ -290,7 +388,10 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     }
 
     // No free space, so we have to extend the file.
-    return extend_free_space(size);
+    extend_free_space(size);
+    return reserve_free_space(size);
+
+    // TODO: Do the chunk splitting here instead of inside the loop above
 }
 
 
@@ -301,6 +402,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
     std::size_t alloc_chunk_size = m_alloc.m_chunk_size;
+    if (alloc_chunk_size)
+        REALM_ASSERT_3(requested_size, <=, alloc_chunk_size);
 
     // We need to consider the "logical" size of the file here, and
     // not the real size. The real size may have changed without the
@@ -325,7 +428,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         if (!in_use) {
             size_t last_pos  = to_size_t(positions.back());
             size_t last_size = to_size_t(lengths.back());
-            REALM_ASSERT_3(last_size, <, extend_size);
+            //REALM_ASSERT_3(last_size, <, extend_size);
             REALM_ASSERT_3(last_pos + last_size, <=, logical_file_size);
             if (last_pos + last_size == logical_file_size) {
                 extend_last_chunk = true;
@@ -382,6 +485,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
+    std::cerr << "--------------------- extend(" << logical_file_size << " to "
+              << new_file_size << ") ---------------" << std::endl;
 
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can
@@ -410,7 +515,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
     // Update the logical file size
     m_group.m_top.set(2, 1 + 2*new_file_size); // Throws
-
+    REALM_ASSERT(chunk_size != 0);
+    REALM_ASSERT((chunk_size % 8) == 0);
     return std::make_pair(chunk_ndx, chunk_size);
 }
 

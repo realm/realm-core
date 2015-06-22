@@ -109,7 +109,11 @@ void SlabAlloc::detach() REALM_NOEXCEPT
             goto found;
         case attach_SharedFile:
         case attach_UnsharedFile:
-            File::unmap(m_data, m_baseline);
+            File::unmap(m_data, m_initial_mapping_size);
+            if (m_additional_mappings) {
+                delete[] m_additional_mappings;
+                m_additional_mappings = 0;
+            }
             m_file.close();
             goto found;
     }
@@ -693,18 +697,22 @@ void SlabAlloc::reset_free_space_tracking()
 
 bool SlabAlloc::remap(size_t file_size)
 {
+    std::cerr << "------------------------- remap(" << file_size << ") --------------------------" << std::endl;
+
     REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
     REALM_ASSERT_DEBUG(m_baseline <= file_size);
 
+    bool addr_changed;
     if (m_chunk_size) {
 
         // Extend mapping by adding chunks
-        REALM_ASSERT_DEBUG(file_size % m_chunk_size);
+        REALM_ASSERT_DEBUG((file_size % m_chunk_size) == 0);
         m_file.resize(file_size);
+        m_baseline = file_size;
         auto additional_mapping_size = file_size - m_initial_mapping_size;
-        auto num_additional_mappings = additional_mapping_size / m_chunk_size;
+        auto num_additional_mappings = 1 + ((additional_mapping_size-1) / m_chunk_size);
         if (num_additional_mappings > m_capacity_additional_mappings) {
             // FIXME: No harcoded constants here
             m_capacity_additional_mappings = num_additional_mappings + 128;
@@ -720,32 +728,32 @@ bool SlabAlloc::remap(size_t file_size)
             util::File::Map<char> map(m_file, chunk_start_offset, File::access_ReadOnly, m_chunk_size);
             m_additional_mappings[k].move(map);
         }
-        return false; // mappings never change :-)
+        m_num_additional_mappings = num_additional_mappings;
+        addr_changed = false; // mappings never change :-)
     }
     else {
 
         void* addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
-        bool addr_changed = addr != m_data;
+        addr_changed = addr != m_data;
 
         m_data = static_cast<char*>(addr);
         m_baseline = file_size;
         m_initial_mapping_size = file_size;
-
-        // Rebase slabs and free list (assumes exactly one entry in m_free_space for
-        // each entire slab in m_slabs)
-        size_t slab_ref = file_size;
-        size_t n = m_free_space.size();
-        REALM_ASSERT_DEBUG(m_slabs.size() == n);
-        for (size_t i = 0; i < n; ++i) {
-            Chunk& free_chunk = m_free_space[i];
-            free_chunk.ref = slab_ref;
-            ref_type slab_ref_end = slab_ref + free_chunk.size;
-            m_slabs[i].ref_end = slab_ref_end;
-            slab_ref = slab_ref_end;
-        }
-
-        return addr_changed;
     }
+    // Rebase slabs and free list (assumes exactly one entry in m_free_space for
+    // each entire slab in m_slabs)
+    size_t slab_ref = file_size;
+    size_t n = m_free_space.size();
+    REALM_ASSERT_DEBUG(m_slabs.size() == n);
+    for (size_t i = 0; i < n; ++i) {
+        Chunk& free_chunk = m_free_space[i];
+        free_chunk.ref = slab_ref;
+        ref_type slab_ref_end = slab_ref + free_chunk.size;
+        m_slabs[i].ref_end = slab_ref_end;
+        slab_ref = slab_ref_end;
+    }
+
+    return addr_changed;
 }
 
 const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
