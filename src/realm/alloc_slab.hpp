@@ -403,6 +403,18 @@ private:
     Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
 #endif
+    /// Indicates whether chunked memory mapping is in use or not.
+    bool chunk_mapping_enabled() { return m_chunk_size != 0; }
+
+    /// Returns the first mmap boundary *after* the given position.
+    std::size_t get_first_mmap_boundary(std::size_t start_pos) {
+        return start_pos + m_chunk_size - (start_pos % m_chunk_size);
+    }
+
+    /// Returns true if the given position is at a mmap boundary
+    bool matches_mmap_boundary(std::size_t pos) {
+        return (pos % m_chunk_size) == 0;
+    }
 
     friend class Group;
     friend class GroupWriter;

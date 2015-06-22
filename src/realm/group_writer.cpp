@@ -276,7 +276,8 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     ArrayInteger& versions = m_group.m_free_versions;
     ArrayInteger& pos      = m_group.m_free_positions;
     bool is_shared = m_group.m_is_shared;
-    size_t mmap_chunk_size = m_group.m_alloc.m_chunk_size;
+    SlabAlloc& alloc = m_group.m_alloc;
+    bool uses_chunked_mapping = alloc.chunk_mapping_enabled();
 
     // Since we do a first-fit search for small chunks, the top pieces
     // are likely to get smaller and smaller. So when we are looking
@@ -299,11 +300,12 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             }
             // if we're using chunked memory mapping, we have to check
             // for mmap boundaries
-            if (mmap_chunk_size) {
+            if (uses_chunked_mapping) {
                 // split block, if the allocation cannot be placed inside it
                 // without crossing mmap boundary.
                 size_t start_pos = to_size_t(pos.get(i));
-                size_t first_mmap_boundary = start_pos + mmap_chunk_size - (start_pos % mmap_chunk_size);
+                size_t first_mmap_boundary = alloc.get_first_mmap_boundary(start_pos);
+                    // start_pos + mmap_chunk_size - (start_pos % mmap_chunk_size);
 
                 // if chunk straddles one or more chunk boundaries:
                 if (start_pos + chunk_size > first_mmap_boundary) {
@@ -352,9 +354,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     ArrayInteger& lengths   = m_group.m_free_lengths;
     ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
-    std::size_t alloc_chunk_size = m_alloc.m_chunk_size;
-    if (alloc_chunk_size)
-        REALM_ASSERT_3(requested_size, <=, alloc_chunk_size);
+    SlabAlloc& alloc = m_group.m_alloc;
+    bool uses_chunked_mapping = alloc.chunk_mapping_enabled();
 
     // We need to consider the "logical" size of the file here, and
     // not the real size. The real size may have changed without the
@@ -391,11 +392,12 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
     size_t new_file_size = logical_file_size;
 
-    if (alloc_chunk_size) {
-        REALM_ASSERT_3(requested_size, <=, alloc_chunk_size);
+    if (uses_chunked_mapping) {
         new_file_size = logical_file_size + extend_size;
-        if ((new_file_size % alloc_chunk_size) != 0)
-            new_file_size += alloc_chunk_size - (new_file_size % alloc_chunk_size);
+        if (!alloc.matches_mmap_boundary(new_file_size))
+            new_file_size = alloc.get_first_mmap_boundary(new_file_size);
+            //if ((new_file_size % alloc_chunk_size) != 0)
+            //new_file_size += alloc_chunk_size - (new_file_size % alloc_chunk_size);
     }
     else {
 
