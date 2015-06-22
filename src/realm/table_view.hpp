@@ -551,7 +551,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) REALM_NOEXCEPT:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(move(tv.m_table)),
-    m_distinct_column_source(tv.m_distinct_column_source)
+    m_distinct_column_source(tv.m_distinct_column_source),
+    m_query(tv.m_query, Query::TCopyExpressionTag())
 {
 #ifdef REALM_ENABLE_REPLICATION
     // if we are created from a table view which is outdated, take care to use the outdated

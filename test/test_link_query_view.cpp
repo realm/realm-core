@@ -261,10 +261,6 @@ TEST(LinkList_QuerySingle)
 
 TEST(LinkList_TableViewTracking)
 {
-#ifdef _WIN32
-    // fixme
-    std::cerr << "\nLinkList_TableViewTracking commented away because it asserts on Windows\n";
-#else
     Group group;
 
     TableRef table1 = group.add_table("table1");
@@ -307,7 +303,6 @@ TEST(LinkList_TableViewTracking)
     CHECK_EQUAL(0, tv.size());
     tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
-#endif
 }
 
 
@@ -1229,10 +1224,6 @@ TEST(Link_FirstResultPastRow1000)
 // Tests queries on a LinkList
 TEST(LinkList_QueryOnLinkList)
 {
-#ifdef _WIN32
-    // fixme
-    std::cerr << "\nLinkList_QueryOnLinkList commented away because it asserts on Windows\n";
-#else
     Group group;
 
     TableRef table1 = group.add_table("table1");
@@ -1315,7 +1306,6 @@ TEST(LinkList_QueryOnLinkList)
     }
     query2.find_all();
     query2.find();
-#endif
 }
 
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
