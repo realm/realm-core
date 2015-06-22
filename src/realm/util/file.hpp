@@ -713,7 +713,7 @@ inline bool File::try_lock_shared()
 
 inline File::MapBase::MapBase() REALM_NOEXCEPT
 {
-    m_addr = 0;
+    m_addr = nullptr;
 }
 
 inline File::MapBase::~MapBase() REALM_NOEXCEPT
@@ -733,7 +733,7 @@ inline void File::MapBase::unmap() REALM_NOEXCEPT
 {
     if (!m_addr) return;
     File::unmap(m_addr, m_size);
-    m_addr = 0;
+    m_addr = nullptr;
 }
 
 inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
@@ -803,7 +803,7 @@ template<class T> inline std::size_t File::Map<T>::get_size() const REALM_NOEXCE
 template<class T> inline T* File::Map<T>::release() REALM_NOEXCEPT
 {
     T* addr = static_cast<T*>(m_addr);
-    m_addr = 0;
+    m_addr = nullptr;
     return addr;
 }
 

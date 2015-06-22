@@ -889,7 +889,7 @@ public:
         if (m_begin != 0) {
             begin = m_begin;
             end = m_end;
-            m_begin = 0;
+            m_begin = nullptr;
             return end - begin;
         }
         return 0;

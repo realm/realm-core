@@ -1440,7 +1440,7 @@ inline void Array::destroy() REALM_NOEXCEPT
         return;
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
-    m_data = 0;
+    m_data = nullptr;
 }
 
 inline void Array::destroy_deep() REALM_NOEXCEPT
@@ -1453,7 +1453,7 @@ inline void Array::destroy_deep() REALM_NOEXCEPT
 
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
-    m_data = 0;
+    m_data = nullptr;
 }
 
 
