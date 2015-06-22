@@ -103,7 +103,7 @@ inline void ArrayBlob::insert(std::size_t pos, const char* data, std::size_t siz
 
 inline void ArrayBlob::erase(std::size_t begin, std::size_t end)
 {
-    const char* data = 0;
+    const char* data = nullptr;
     std::size_t size = 0;
     replace(begin, end, data, size);
 }

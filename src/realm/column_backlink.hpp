@@ -95,7 +95,7 @@ protected:
 
 private:
     TableRef        m_origin_table;
-    ColumnLinkBase* m_origin_column = 0;
+    ColumnLinkBase* m_origin_column = nullptr;
     std::size_t     m_origin_column_ndx = npos;
 
     template<typename Func>

@@ -328,7 +328,7 @@ public:
         m_table = &table;
         if (m_child)
             m_child->init(table);
-        m_column_action_specializer = NULL;
+        m_column_action_specializer = nullptr;
     }
 
     virtual bool is_initialized() const
@@ -680,7 +680,7 @@ template <class TConditionValue, class TConditionFunction> class IntegerNode: pu
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
-    IntegerNode(TConditionValue v, size_t column) : m_value(v), m_find_callback_specialized(NULL)
+    IntegerNode(TConditionValue v, size_t column) : m_value(v), m_find_callback_specialized(nullptr)
     {
         m_condition_column_idx = column;
     }

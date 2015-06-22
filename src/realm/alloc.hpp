@@ -287,7 +287,7 @@ inline bool Allocator::is_read_only(ref_type ref) const REALM_NOEXCEPT
 inline Allocator::Allocator() REALM_NOEXCEPT
 {
 #ifdef REALM_ENABLE_REPLICATION
-    m_replication = 0;
+    m_replication = nullptr;
 #endif
 #ifdef REALM_DEBUG
     m_watch = 0;

@@ -107,7 +107,7 @@ uint_fast64_t Timer::get_timer_ticks() const
 {
     static const InitialTimes init_times;
     clockid_t clock_id = clockid_t();
-    const timespec* init_time = 0;
+    const timespec* init_time = nullptr;
     switch (m_type) {
         case type_RealTime:
             clock_id = real_time_clock_id;

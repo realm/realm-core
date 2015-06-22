@@ -343,7 +343,7 @@ inline bool Thread::joinable() REALM_NOEXCEPT
 
 inline void Thread::start(entry_func_type entry_func, void* arg)
 {
-    const pthread_attr_t* attr = 0; // Use default thread attributes
+    const pthread_attr_t* attr = nullptr; // Use default thread attributes
     int r = pthread_create(&m_id, attr, entry_func, arg);
     if (REALM_UNLIKELY(r != 0))
         create_failed(r); // Throws

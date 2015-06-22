@@ -530,7 +530,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
 
     const char* host = query.m_host.empty() ? 0 : query.m_host.c_str();
     const char* service = query.m_service.empty() ? 0 : query.m_service.c_str();
-    struct addrinfo* first = 0;
+    struct addrinfo* first = nullptr;
     int ret = getaddrinfo(host, service, &hints, &first);
     if (REALM_UNLIKELY(ret != 0)) {
 #ifdef EAI_SYSTEM

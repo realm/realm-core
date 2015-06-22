@@ -442,7 +442,7 @@ inline SlabAlloc::DetachGuard::~DetachGuard() REALM_NOEXCEPT
 inline SlabAlloc* SlabAlloc::DetachGuard::release() REALM_NOEXCEPT
 {
     SlabAlloc* alloc = m_alloc;
-    m_alloc = 0;
+    m_alloc = nullptr;
     return alloc;
 }
 
