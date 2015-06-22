@@ -425,12 +425,12 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         if (read_only)
             goto invalid_database;
 
-        const char* data = reinterpret_cast<const char*>(&empty_file_header);
-        m_file.write(data, sizeof empty_file_header); // Throws
-
         // Pre-alloc initial space
         m_file.prealloc(0, initial_size); // Throws
         size = initial_size;
+
+        const char* data = reinterpret_cast<const char*>(&empty_file_header);
+        m_file.write(data, sizeof empty_file_header); // Throws
     }
 
     try {
