@@ -11,6 +11,7 @@
 ### Enhancements:
 
 * Generic networking API added.
+* Avoid using F_FULLFSYNC at some times when it's unneeded.
 
 ### Internals:
 
