@@ -415,7 +415,7 @@ TEST(ArrayStringLong_Null)
                 for (size_t i = 0; i < a.size(); i++) {
                     if (v[i] == "realm::null()") {
                         CHECK(a.is_null(i));
-                        CHECK(a.get(i).data() == 0);
+                        CHECK(a.get(i).data() == nullptr);
                     }
                     else {
                         CHECK(a.get(i) == v[i]);

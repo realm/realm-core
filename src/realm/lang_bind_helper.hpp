@@ -167,7 +167,7 @@ inline Table* LangBindHelper::new_table()
     typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = tf::create_empty_table(alloc); // Throws
-    Table::Parent* parent = 0;
+    Table::Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     Table* table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
     tf::bind_ref(*table);
@@ -179,7 +179,7 @@ inline Table* LangBindHelper::copy_table(const Table& table)
     typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = tf::clone(table, alloc); // Throws
-    Table::Parent* parent = 0;
+    Table::Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     Table* copy_of_table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
     tf::bind_ref(*copy_of_table);

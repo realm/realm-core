@@ -36,8 +36,8 @@ void PlatformSpecificCondVar::set_resource_naming_prefix(std::string prefix)
 
 PlatformSpecificCondVar::PlatformSpecificCondVar()
 {
-    m_shared_part = 0;
-    m_sem = 0;
+    m_shared_part = nullptr;
+    m_sem = nullptr;
 }
 
 
@@ -49,11 +49,11 @@ void PlatformSpecificCondVar::close() REALM_NOEXCEPT
 {
     if (m_sem) { // true if emulating a process shared condvar
         sem_close(m_sem);
-        m_sem = 0;
+        m_sem = nullptr;
         return; // we don't need to clean up the SharedPart
     }
     // we don't do anything to the shared part, other CondVars may shared it
-    m_shared_part = 0;
+    m_shared_part = nullptr;
 }
 
 
@@ -66,7 +66,7 @@ PlatformSpecificCondVar::~PlatformSpecificCondVar() REALM_NOEXCEPT
 
 void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar)
 {
-    REALM_ASSERT(m_shared_part == 0);
+    REALM_ASSERT(m_shared_part == nullptr);
     close();
     m_shared_part = &shared_part;
     static_cast<void>(path);
@@ -90,7 +90,7 @@ sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, std::size_t offs
     name += 'A'+(magic % 23);
     magic /= 23;
     REALM_ASSERT(m_shared_part);
-    if (m_sem == 0) {
+    if (m_sem == nullptr) {
         m_sem = sem_open(name.c_str(), O_CREAT, S_IRWXG | S_IRWXU, 0);
         // FIXME: error checking
     }

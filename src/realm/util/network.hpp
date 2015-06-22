@@ -834,7 +834,7 @@ inline void acceptor::accept(socket& sock, endpoint& ep)
 
 inline std::error_code acceptor::accept(socket& sock, std::error_code& ec)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     return accept(sock, ep, ec);
 }
 
@@ -845,7 +845,7 @@ inline std::error_code acceptor::accept(socket& sock, endpoint& ep, std::error_c
 
 template<class H> inline void acceptor::async_accept(socket& sock, const H& handler)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     async_accept(sock, ep, handler);
 }
 
