@@ -51,7 +51,7 @@ void keep_test_files();
 void set_test_path_prefix(const std::string&);
 std::string get_test_path_prefix();
 
-std::string get_test_path(const unit_test::TestDetails&, const char* suffix);
+std::string get_test_path(const unit_test::TestDetails&, const std::string& suffix);
 
 std::string get_test_resource_path();
 void set_test_resource_path(const std::string&);

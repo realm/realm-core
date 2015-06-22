@@ -22,12 +22,14 @@
 #define REALM_IMPL_TRANSACT_LOG_HPP
 
 #include <stdexcept>
+#include <iostream>
 
 #include <realm/string_data.hpp>
 #include <realm/data_type.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/datetime.hpp>
 #include <realm/mixed.hpp>
+#include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/tuple.hpp>
@@ -123,7 +125,7 @@ public:
     void transact_log_append(const char* data, std::size_t size, char** out_free_begin, char** out_free_end) override;
 
     const char* transact_log_data() const;
-private:
+
     util::Buffer<char> m_buffer;
 };
 
@@ -332,20 +334,23 @@ class TransactLogParser {
 public:
     class BadTransactLog; // Exception
 
-    TransactLogParser(InputStream& transact_log);
-
+    TransactLogParser();
     ~TransactLogParser() REALM_NOEXCEPT;
 
     /// See `TransactLogEncoder` for a list of methods that the `InstructionHandler` must define.
     /// parse() promises that the path passed by reference to
     /// InstructionHandler::select_descriptor() will remain valid
     /// during subsequent calls to all descriptor modifying functions.
-    template<class InstructionHandler> void parse(InstructionHandler&);
+    template <class InstructionHandler> void parse(InputStream&, InstructionHandler&);
+
+    template<class InstructionHandler> void parse(NoCopyInputStream&, InstructionHandler&);
 
 private:
+    util::Buffer<char> m_input_buffer;
+
     // The input stream is assumed to consist of chunks of memory organised such that
     // every instruction resides in a single chunk only.
-    InputStream& m_input;
+    NoCopyInputStream* m_input;
     // pointer into transaction log, each instruction is parsed from m_input_begin and onwards.
     // Each instruction are assumed to be contiguous in memory.
     const char* m_input_begin;
@@ -359,7 +364,9 @@ private:
     util::Buffer<std::size_t> m_path;
 
     REALM_NORETURN void parser_error() const;
-    template<class InstructionHandler> void do_parse(InstructionHandler&);
+
+    template<class InstructionHandler> void parse_one(InstructionHandler&);
+    bool has_next() REALM_NOEXCEPT;
 
     template<class T> T read_int();
 
@@ -1330,20 +1337,20 @@ inline void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
 inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) REALM_NOEXCEPT
 {
     if (m_selected_table == t)
-        m_selected_table = 0;
+        m_selected_table = nullptr;
 }
 
 inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) REALM_NOEXCEPT
 {
     if (m_selected_spec == s)
-        m_selected_spec = 0;
+        m_selected_spec = nullptr;
 }
 
 
 inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) REALM_NOEXCEPT
 {
     if (m_selected_link_list == &list)
-        m_selected_link_list = 0;
+        m_selected_link_list = nullptr;
 }
 
 inline std::size_t TransactLogEncoder::max_required_bytes_for_string_value(std::size_t size) const
@@ -1361,10 +1368,10 @@ inline std::size_t TransactLogEncoder::max_required_bytes_for_simple_cmd(std::si
     return 1 + max_enc_bytes_per_num * num_numbers;
 }
 
-inline TransactLogParser::TransactLogParser(InputStream& transact_log):
-    m_input(transact_log)
+
+inline TransactLogParser::TransactLogParser():
+    m_input_buffer(1024) // Throws
 {
-    m_input_begin = m_input_end = 0;
 }
 
 
@@ -1373,437 +1380,448 @@ inline TransactLogParser::~TransactLogParser() REALM_NOEXCEPT
 }
 
 
-template<class InstructionHandler>
-void TransactLogParser::parse(InstructionHandler& handler)
+template <class InstructionHandler>
+void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler)
 {
-    do_parse(handler);
+    m_input = &in;
+    m_input_begin = m_input_end = nullptr;
+
+    while (has_next())
+        parse_one(handler); // Throws
 }
 
-
-template<class InstructionHandler>
-void TransactLogParser::do_parse(InstructionHandler& handler)
+template <class InstructionHandler>
+void TransactLogParser::parse(InputStream& in, InstructionHandler& handler)
 {
-    while (m_input_begin != m_input_end || next_input_buffer()) {
+    NoCopyInputStreamAdaptor in_2(in, m_input_buffer.data(), m_input_buffer.size());
+    parse(in_2, handler); // Throws
+}
 
-        char instr;
-        if (!read_char(instr))
-            parser_error();
+inline bool TransactLogParser::has_next() REALM_NOEXCEPT
+{
+    return m_input_begin != m_input_end || next_input_buffer();
+}
 
-        // std::cout << "parsing " << (int) instr << " @ " << std::hex << (long) m_input_begin << std::endl;
-        switch (Instruction(instr)) {
-            case instr_SetInt: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                // FIXME: Don't depend on the existence of int64_t,
-                // but don't allow values to use more than 64 bits
-                // either.
-                int_fast64_t value = read_int<int64_t>(); // Throws
-                if (!handler.set_int(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetBool: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                bool value = read_int<bool>(); // Throws
-                if (!handler.set_bool(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetFloat: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                float value = read_float(); // Throws
-                if (!handler.set_float(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetDouble: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                double value = read_double(); // Throws
-                if (!handler.set_double(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetString: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                StringData value = read_string(m_string_buffer); // Throws
-                if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetBinary: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                BinaryData value = read_binary(m_string_buffer); // Throws
-                if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetDateTime: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::time_t value = read_int<std::time_t>(); // Throws
-                if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetTable: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.set_table(col_ndx, row_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetMixed: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                Mixed value;
-                read_mixed(&value); // Throws
-                if (!handler.set_mixed(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetLink: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t value = read_int<std::size_t>(); // Throws
-                if (!handler.set_link(col_ndx, row_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertInt: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                // FIXME: Don't depend on the existence of int64_t,
-                // but don't allow values to use more than 64 bits
-                // either.
-                int_fast64_t value = read_int<int64_t>(); // Throws
-                if (!handler.insert_int(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertBool: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                bool value = read_int<bool>(); // Throws
-                if (!handler.insert_bool(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertFloat: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                float value = read_float(); // Throws
-                if (!handler.insert_float(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertDouble: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                double value = read_double(); // Throws
-                if (!handler.insert_double(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertString: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                StringData value = read_string(m_string_buffer); // Throws
-                if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertBinary: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                BinaryData value = read_binary(m_string_buffer); // Throws
-                if (!handler.insert_binary(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertDateTime: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                std::time_t value = read_int<std::time_t>(); // Throws
-                if (!handler.insert_date_time(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertTable: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                if (!handler.insert_table(col_ndx, row_ndx, tbl_sz)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertMixed: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                Mixed value;
-                read_mixed(&value); // Throws
-                if (!handler.insert_mixed(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertLink: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                std::size_t value = read_int<std::size_t>(); // Throws
-                if (!handler.insert_link(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertLinkList: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                if (!handler.insert_link_list(col_ndx, row_ndx, tbl_sz)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_RowInsertComplete: {
-                if (!handler.row_insert_complete()) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertEmptyRows: {
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t num_rows = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                bool unordered = read_int<bool>(); // Throws
-                if (!handler.insert_empty_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_EraseRows: {
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                std::size_t num_rows = read_int<std::size_t>(); // Throws
-                std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                bool unordered = read_int<bool>(); // Throws
-                if (!handler.erase_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_AddIntToColumn: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                // FIXME: Don't depend on the existence of int64_t,
-                // but don't allow values to use more than 64 bits
-                // either.
-                int_fast64_t value = read_int<int64_t>(); // Throws
-                if (!handler.add_int_to_column(col_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SelectTable: {
-                int levels = read_int<int>(); // Throws
-                if (levels < 0 || levels > m_max_levels)
-                    parser_error();
-                m_path.reserve(0, 2*levels); // Throws
-                std::size_t* path = m_path.data();
-                std::size_t group_level_ndx = read_int<std::size_t>(); // Throws
-                for (int i = 0; i != levels; ++i) {
-                    std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                    std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                    path[2*i + 0] = col_ndx;
-                    path[2*i + 1] = row_ndx;
-                }
-                if (!handler.select_table(group_level_ndx, levels, path)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_ClearTable: {
-                if (!handler.clear_table()) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_LinkListSet: {
-                std::size_t link_ndx = read_int<std::size_t>(); // Throws
-                std::size_t value = read_int<std::size_t>(); // Throws
-                if (!handler.link_list_set(link_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_LinkListSetAll: {
-                // todo, log that it's a SetAll we're doing
-                std::size_t size = read_int<std::size_t>(); // Throws
-                for (std::size_t i = 0; i < size; i++) {
-                    std::size_t link = read_int<std::size_t>(); // Throws
-                    if (!handler.link_list_set(i, link)) // Throws
-                        parser_error();
-                }
-                continue;
-            }
-            case instr_LinkListInsert: {
-                std::size_t link_ndx = read_int<std::size_t>(); // Throws
-                std::size_t value = read_int<std::size_t>(); // Throws
-                if (!handler.link_list_insert(link_ndx, value)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_LinkListMove: {
-                std::size_t old_link_ndx = read_int<std::size_t>(); // Throws
-                std::size_t new_link_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.link_list_move(old_link_ndx, new_link_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_LinkListErase: {
-                std::size_t link_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.link_list_erase(link_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_LinkListClear: {
-                if (!handler.link_list_clear()) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SelectLinkList: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.select_link_list(col_ndx, row_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_AddSearchIndex: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.add_search_index(col_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_RemoveSearchIndex: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.remove_search_index(col_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_AddPrimaryKey: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.add_primary_key(col_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_RemovePrimaryKey: {
-                if (!handler.remove_primary_key()) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SetLinkType: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                int link_type = read_int<int>(); // Throws
-                if (!is_valid_link_type(link_type))
-                    parser_error();
-                if (!handler.set_link_type(col_ndx, LinkType(link_type))) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertColumn:
-            case instr_InsertNullableColumn: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                int type = read_int<int>(); // Throws
-                if (!is_valid_data_type(type))
-                    parser_error();
-                StringData name = read_string(m_string_buffer); // Throws
-                bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
-                if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertLinkColumn: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                int type = read_int<int>(); // Throws
-                if (!is_valid_data_type(type))
-                    parser_error();
-                StringData name = read_string(m_string_buffer); // Throws
-                std::size_t link_target_table_ndx = read_int<std::size_t>(); // Throws
-                std::size_t backlink_col_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.insert_link_column(col_ndx, DataType(type), name,
-                                                link_target_table_ndx, backlink_col_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_EraseColumn: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                if (!handler.erase_column(col_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_EraseLinkColumn: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t link_target_table_ndx = read_int<std::size_t>(); // Throws
-                std::size_t backlink_col_ndx      = read_int<std::size_t>(); // Throws
-                if (!handler.erase_link_column(col_ndx, link_target_table_ndx,
-                                               backlink_col_ndx)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_RenameColumn: {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                StringData name = read_string(m_string_buffer); // Throws
-                if (!handler.rename_column(col_ndx, name)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_SelectDescriptor: {
-                int levels = read_int<int>(); // Throws
-                if (levels < 0 || levels > m_max_levels)
-                    parser_error();
-                m_path.reserve(0, levels); // Throws
-                std::size_t* path = m_path.data();
-                for (int i = 0; i != levels; ++i) {
-                    std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                    path[i] = col_ndx;
-                }
-                if (!handler.select_descriptor(levels, path)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_InsertGroupLevelTable: {
-                std::size_t table_ndx  = read_int<std::size_t>(); // Throws
-                std::size_t num_tables = read_int<std::size_t>(); // Throws
-                StringData name = read_string(m_string_buffer); // Throws
-                if (!handler.insert_group_level_table(table_ndx, num_tables, name)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_EraseGroupLevelTable: {
-                std::size_t table_ndx  = read_int<std::size_t>(); // Throws
-                std::size_t num_tables = read_int<std::size_t>(); // Throws
-                if (!handler.erase_group_level_table(table_ndx, num_tables)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_RenameGroupLevelTable: {
-                std::size_t table_ndx = read_int<std::size_t>(); // Throws
-                StringData new_name = read_string(m_string_buffer); // Throws
-                if (!handler.rename_group_level_table(table_ndx, new_name)) // Throws
-                    parser_error();
-                continue;
-            }
-            case instr_OptimizeTable: {
-                if (!handler.optimize_table()) // Throws
-                    parser_error();
-                continue;
-            }
+template <class InstructionHandler>
+void TransactLogParser::parse_one(InstructionHandler& handler)
+{
+    char instr;
+    if (!read_char(instr))
+        parser_error();
+
+//    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << "\n";
+    switch (Instruction(instr)) {
+        case instr_SetInt: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            // FIXME: Don't depend on the existence of int64_t,
+            // but don't allow values to use more than 64 bits
+            // either.
+            int_fast64_t value = read_int<int64_t>(); // Throws
+            if (!handler.set_int(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
         }
-        // coming here is not possible
-        REALM_ASSERT(false);
-        return;
+        case instr_SetBool: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            bool value = read_int<bool>(); // Throws
+            if (!handler.set_bool(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetFloat: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            float value = read_float(); // Throws
+            if (!handler.set_float(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetDouble: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            double value = read_double(); // Throws
+            if (!handler.set_double(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetString: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            StringData value = read_string(m_string_buffer); // Throws
+            if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetBinary: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            BinaryData value = read_binary(m_string_buffer); // Throws
+            if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetDateTime: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::time_t value = read_int<std::time_t>(); // Throws
+            if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetTable: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.set_table(col_ndx, row_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetMixed: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            Mixed value;
+            read_mixed(&value); // Throws
+            if (!handler.set_mixed(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetLink: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t value = read_int<std::size_t>(); // Throws
+            if (!handler.set_link(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertInt: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            // FIXME: Don't depend on the existence of int64_t,
+            // but don't allow values to use more than 64 bits
+            // either.
+            int_fast64_t value = read_int<int64_t>(); // Throws
+            if (!handler.insert_int(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertBool: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            bool value = read_int<bool>(); // Throws
+            if (!handler.insert_bool(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertFloat: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            float value = read_float(); // Throws
+            if (!handler.insert_float(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertDouble: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            double value = read_double(); // Throws
+            if (!handler.insert_double(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertString: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            StringData value = read_string(m_string_buffer); // Throws
+            if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertBinary: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            BinaryData value = read_binary(m_string_buffer); // Throws
+            if (!handler.insert_binary(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertDateTime: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            std::time_t value = read_int<std::time_t>(); // Throws
+            if (!handler.insert_date_time(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertTable: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            if (!handler.insert_table(col_ndx, row_ndx, tbl_sz)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertMixed: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            Mixed value;
+            read_mixed(&value); // Throws
+            if (!handler.insert_mixed(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertLink: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            std::size_t value = read_int<std::size_t>(); // Throws
+            if (!handler.insert_link(col_ndx, row_ndx, tbl_sz, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertLinkList: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            if (!handler.insert_link_list(col_ndx, row_ndx, tbl_sz)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_RowInsertComplete: {
+            if (!handler.row_insert_complete()) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertEmptyRows: {
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t num_rows = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            bool unordered = read_int<bool>(); // Throws
+            if (!handler.insert_empty_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_EraseRows: {
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t num_rows = read_int<std::size_t>(); // Throws
+            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            bool unordered = read_int<bool>(); // Throws
+            if (!handler.erase_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_AddIntToColumn: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            // FIXME: Don't depend on the existence of int64_t,
+            // but don't allow values to use more than 64 bits
+            // either.
+            int_fast64_t value = read_int<int64_t>(); // Throws
+            if (!handler.add_int_to_column(col_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SelectTable: {
+            int levels = read_int<int>(); // Throws
+            if (levels < 0 || levels > m_max_levels)
+                parser_error();
+            m_path.reserve(0, 2*levels); // Throws
+            std::size_t* path = m_path.data();
+            std::size_t group_level_ndx = read_int<std::size_t>(); // Throws
+            for (int i = 0; i != levels; ++i) {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                path[2*i + 0] = col_ndx;
+                path[2*i + 1] = row_ndx;
+            }
+            if (!handler.select_table(group_level_ndx, levels, path)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_ClearTable: {
+            if (!handler.clear_table()) // Throws
+                parser_error();
+            return;
+        }
+        case instr_LinkListSet: {
+            std::size_t link_ndx = read_int<std::size_t>(); // Throws
+            std::size_t value = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_set(link_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_LinkListSetAll: {
+            // todo, log that it's a SetAll we're doing
+            std::size_t size = read_int<std::size_t>(); // Throws
+            for (std::size_t i = 0; i < size; i++) {
+                std::size_t link = read_int<std::size_t>(); // Throws
+                if (!handler.link_list_set(i, link)) // Throws
+                    parser_error();
+            }
+            return;
+        }
+        case instr_LinkListInsert: {
+            std::size_t link_ndx = read_int<std::size_t>(); // Throws
+            std::size_t value = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_insert(link_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_LinkListMove: {
+            std::size_t old_link_ndx = read_int<std::size_t>(); // Throws
+            std::size_t new_link_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_move(old_link_ndx, new_link_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_LinkListErase: {
+            std::size_t link_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_erase(link_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_LinkListClear: {
+            if (!handler.link_list_clear()) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SelectLinkList: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.select_link_list(col_ndx, row_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_AddSearchIndex: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.add_search_index(col_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_RemoveSearchIndex: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.remove_search_index(col_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_AddPrimaryKey: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.add_primary_key(col_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_RemovePrimaryKey: {
+            if (!handler.remove_primary_key()) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetLinkType: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            int link_type = read_int<int>(); // Throws
+            if (!is_valid_link_type(link_type))
+                parser_error();
+            if (!handler.set_link_type(col_ndx, LinkType(link_type))) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertColumn:
+        case instr_InsertNullableColumn: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            int type = read_int<int>(); // Throws
+            if (!is_valid_data_type(type))
+                parser_error();
+            StringData name = read_string(m_string_buffer); // Throws
+            bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
+            if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertLinkColumn: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            int type = read_int<int>(); // Throws
+            if (!is_valid_data_type(type))
+                parser_error();
+            StringData name = read_string(m_string_buffer); // Throws
+            std::size_t link_target_table_ndx = read_int<std::size_t>(); // Throws
+            std::size_t backlink_col_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.insert_link_column(col_ndx, DataType(type), name,
+                                            link_target_table_ndx, backlink_col_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_EraseColumn: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.erase_column(col_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_EraseLinkColumn: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t link_target_table_ndx = read_int<std::size_t>(); // Throws
+            std::size_t backlink_col_ndx      = read_int<std::size_t>(); // Throws
+            if (!handler.erase_link_column(col_ndx, link_target_table_ndx,
+                                           backlink_col_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_RenameColumn: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            StringData name = read_string(m_string_buffer); // Throws
+            if (!handler.rename_column(col_ndx, name)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SelectDescriptor: {
+            int levels = read_int<int>(); // Throws
+            if (levels < 0 || levels > m_max_levels)
+                parser_error();
+            m_path.reserve(0, levels); // Throws
+            std::size_t* path = m_path.data();
+            for (int i = 0; i != levels; ++i) {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                path[i] = col_ndx;
+            }
+            if (!handler.select_descriptor(levels, path)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertGroupLevelTable: {
+            std::size_t table_ndx  = read_int<std::size_t>(); // Throws
+            std::size_t num_tables = read_int<std::size_t>(); // Throws
+            StringData name = read_string(m_string_buffer); // Throws
+            if (!handler.insert_group_level_table(table_ndx, num_tables, name)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_EraseGroupLevelTable: {
+            std::size_t table_ndx  = read_int<std::size_t>(); // Throws
+            std::size_t num_tables = read_int<std::size_t>(); // Throws
+            if (!handler.erase_group_level_table(table_ndx, num_tables)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_RenameGroupLevelTable: {
+            std::size_t table_ndx = read_int<std::size_t>(); // Throws
+            StringData new_name = read_string(m_string_buffer); // Throws
+            if (!handler.rename_group_level_table(table_ndx, new_name)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_OptimizeTable: {
+            if (!handler.optimize_table()) // Throws
+                parser_error();
+            return;
+        }
     }
+
+    REALM_UNREACHABLE();
 }
 
 
@@ -1976,7 +1994,7 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
 
 inline bool TransactLogParser::next_input_buffer()
 {
-    std::size_t sz = m_input.next_block(m_input_begin, m_input_end);
+    std::size_t sz = m_input->next_block(m_input_begin, m_input_end);
     if (sz == 0)
         return false;
     else
@@ -2340,9 +2358,9 @@ public:
         sync_table();
 
         // then execute the instructions in the transformed order
-        ReversedInputStream reversed_log(m_buffer.transact_log_data(), m_instructions);
-        TransactLogParser parser(reversed_log);
-        parser.parse(std::forward<Handler&&>(handler));
+        ReversedNoCopyInputStream reversed_log(m_buffer.transact_log_data(), m_instructions);
+        TransactLogParser parser;
+        parser.parse(reversed_log, std::forward<Handler&&>(handler));
     }
 
 private:
@@ -2398,10 +2416,11 @@ private:
         sync_select(m_pending_ts_instr);
     }
 
-    class ReversedInputStream : public InputStream {
+    class ReversedNoCopyInputStream: public NoCopyInputStream {
     public:
-        ReversedInputStream(const char* buffer, std::vector<Instr>& instr_order)
-            : m_buffer(buffer), m_instr_order(instr_order)
+        ReversedNoCopyInputStream(const char* buffer, std::vector<Instr>& instr_order):
+            m_buffer(buffer),
+            m_instr_order(instr_order)
         {
             m_current = m_instr_order.size();
         }
@@ -2414,8 +2433,7 @@ private:
                 end   = m_buffer + m_instr_order[m_current].end;
                 return end-begin;
             }
-            else
-                return 0;
+            return 0;
         }
 
     private:

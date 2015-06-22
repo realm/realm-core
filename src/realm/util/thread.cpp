@@ -92,7 +92,7 @@ void Thread::join()
 {
     if (!m_joinable)
         throw std::runtime_error("Thread is not joinable");
-    void** value_ptr = 0; // Ignore return value
+    void** value_ptr = nullptr; // Ignore return value
     int r = pthread_join(m_id, value_ptr);
     if (REALM_UNLIKELY(r != 0))
         join_failed(r); // Throws

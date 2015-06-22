@@ -216,15 +216,15 @@ double TableViewBase::average_double(size_t column_ndx) const
 // Count
 size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
 {
-    return aggregate<act_Count, int64_t, size_t, Column>(NULL, column_ndx, target);
+    return aggregate<act_Count, int64_t, size_t, Column>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_float(size_t column_ndx, float target) const
 {
-    return aggregate<act_Count, float, size_t, ColumnFloat>(NULL, column_ndx, target);
+    return aggregate<act_Count, float, size_t, ColumnFloat>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_double(size_t column_ndx, double target) const
 {
-    return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
+    return aggregate<act_Count, double, size_t, ColumnDouble>(nullptr, column_ndx, target);
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.

@@ -1440,7 +1440,7 @@ inline void Array::destroy() REALM_NOEXCEPT
         return;
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
-    m_data = 0;
+    m_data = nullptr;
 }
 
 inline void Array::destroy_deep() REALM_NOEXCEPT
@@ -1453,7 +1453,7 @@ inline void Array::destroy_deep() REALM_NOEXCEPT
 
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
-    m_data = 0;
+    m_data = nullptr;
 }
 
 
@@ -1928,12 +1928,12 @@ inline ref_type Array::get_ref_from_parent() const REALM_NOEXCEPT
 
 inline bool Array::is_attached() const REALM_NOEXCEPT
 {
-    return m_data != 0;
+    return m_data != nullptr;
 }
 
 inline void Array::detach() REALM_NOEXCEPT
 {
-    m_data = 0;
+    m_data = nullptr;
 }
 
 inline std::size_t Array::size() const REALM_NOEXCEPT

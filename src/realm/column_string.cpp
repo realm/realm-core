@@ -29,7 +29,7 @@ void copy_leaf(const ArrayString& from, ArrayStringLong& to)
     size_t n = from.size();
     for (size_t i = 0; i != n; ++i) {
         StringData str = from.get(i);
-        to.add(from.get(i)); // Throws
+        to.add(str); // Throws
     }
 }
 

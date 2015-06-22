@@ -250,7 +250,7 @@ protected:
 private:
     enum AttachMode {
         attach_None,        // Nothing is attached
-        attach_OwnedBuffer, // We own the buffer (m_data = 0 for empty buffer)
+        attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
         attach_UsersBuffer, // We do not own the buffer
         attach_SharedFile,  // On behalf of SharedGroup
         attach_UnsharedFile // Not on behalf of SharedGroup
@@ -442,7 +442,7 @@ inline SlabAlloc::DetachGuard::~DetachGuard() REALM_NOEXCEPT
 inline SlabAlloc* SlabAlloc::DetachGuard::release() REALM_NOEXCEPT
 {
     SlabAlloc* alloc = m_alloc;
-    m_alloc = 0;
+    m_alloc = nullptr;
     return alloc;
 }
 
