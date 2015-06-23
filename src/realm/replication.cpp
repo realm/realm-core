@@ -15,17 +15,11 @@ using namespace realm;
 using namespace realm::util;
 
 
-Group& Replication::get_group(SharedGroup& sg) REALM_NOEXCEPT
-{
-    return sg.m_group;
-}
-
 void Replication::set_replication(Group& group, Replication* repl) REALM_NOEXCEPT
 {
     typedef _impl::GroupFriend gf;
     gf::set_replication(group, repl);
 }
-
 
 Replication::version_type Replication::get_current_version(SharedGroup& sg)
 {
@@ -37,6 +31,10 @@ class Replication::TransactLogApplier {
 public:
     TransactLogApplier(Group& group):
         m_group(group)
+    {
+    }
+
+    ~TransactLogApplier() REALM_NOEXCEPT
     {
     }
 
@@ -306,6 +304,7 @@ public:
     bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t, std::size_t value)
     {
         REALM_ASSERT_3(value, >, 0); // Not yet any support for inserting null links
+        REALM_ASSERT_3(value, >, 0); // Not yet any support for inserting null links
         if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef REALM_DEBUG
             if (m_log)
@@ -547,10 +546,10 @@ public:
 #ifdef REALM_DEBUG
                 if (m_log) {
                     *m_log << "desc->insert_column("<<col_ndx<<", "<<data_type_to_str(type)<<", "
-                        "\""<<name<< ", " << nullable << ")\")\n";
+                        "\""<<name<< "\", "<<nullable<<")\n";
                 }
 #endif
-                Table* link_target_table = 0;
+                Table* link_target_table = nullptr;
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
                 return true;
             }
@@ -869,18 +868,18 @@ private:
 };
 
 
-void Replication::apply_transact_log(InputStream& transact_log, Group& group, std::ostream* log)
+void Replication::apply_changeset(InputStream& in, Group& group, std::ostream* log)
 {
-    TransactLogParser parser(transact_log);
+    _impl::TransactLogParser parser; // Throws
     TransactLogApplier applier(group);
     applier.set_apply_log(log);
-    parser.parse(applier); // Throws
+    parser.parse(in, applier); // Throws
 }
 
 
 namespace {
 
-class InputStreamImpl: public _impl::InputStream {
+class InputStreamImpl: public _impl::NoCopyInputStream {
 public:
     InputStreamImpl(const char* data, size_t size) REALM_NOEXCEPT:
         m_begin(data), m_end(data+size) {}
@@ -892,7 +891,7 @@ public:
         if (m_begin != 0) {
             begin = m_begin;
             end = m_end;
-            m_begin = 0;
+            m_begin = nullptr;
             return end - begin;
         }
         return 0;
@@ -903,12 +902,12 @@ public:
 
 } // anonymous namespace
 
-void TrivialReplication::apply_transact_log(const char* data, size_t size, SharedGroup& target,
-                                            std::ostream* log)
+void TrivialReplication::apply_changeset(const char* data, size_t size, SharedGroup& target,
+                                         std::ostream* log)
 {
     InputStreamImpl in(data, size);
     WriteTransaction wt(target); // Throws
-    Replication::apply_transact_log(in, wt.get_group(), log); // Throws
+    Replication::apply_changeset(in, wt.get_group(), log); // Throws
     wt.commit(); // Throws
 }
 
@@ -937,10 +936,6 @@ TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_ver
     version_type new_version = orig_version + 1;
     handle_transact_log(data, size, new_version); // Throws
     return new_version;
-}
-
-void TrivialReplication::do_rollback_write_transact(SharedGroup&) REALM_NOEXCEPT
-{
 }
 
 void TrivialReplication::do_interrupt() REALM_NOEXCEPT

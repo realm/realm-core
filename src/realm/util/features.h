@@ -95,14 +95,6 @@
 #endif
 
 
-/* Support for C++11 <type_traits>. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CXX11 && _LIBCPP_VERSION >= 1001 || \
-    REALM_HAVE_AT_LEAST_MSVC_10_2010
-#  define REALM_HAVE_CXX11_TYPE_TRAITS 1
-#endif
-
-
 /* Support for C++11 <atomic>.
  *
  * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
@@ -256,8 +248,6 @@
 
 #if defined ANDROID
 #  define REALM_ANDROID 1
-/* std::is_integral doesn't work on some Android platforms for whatever reason */
-#  undef REALM_HAVE_CXX11_TYPE_TRAITS
 #endif
 
 

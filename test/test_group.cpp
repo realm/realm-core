@@ -1728,6 +1728,341 @@ TEST(Group_Commit_Update_Integer_Index)
 }
 
 
+TEST(Group_CascadeNotify_Simple)
+{
+    GROUP_TEST_PATH(path);
+
+    Group g(path, 0, Group::mode_ReadWrite);
+    TableRef t = g.add_table("target");
+    t->add_column(type_Int, "int");
+
+    // Add some extra rows so that the indexes being tested aren't all 0
+    t->add_empty_row(100);
+
+    // remove() does not send a notification as it can't be used on tables with
+    // links, so it can never cause a cascade
+    bool called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification&) {
+        called = true;
+    });
+    t->remove(5);
+    CHECK(!called);
+
+    // move_last_over() on a table with no (back)links just sends that single
+    // row in the notification
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(5, notification.rows[0].row_ndx);
+    });
+    t->move_last_over(5);
+    CHECK(called);
+
+    // Add another table which links to the target table
+    TableRef origin = g.add_table("origin");
+    origin->add_column_link(type_Link, "link", *t);
+    origin->add_column_link(type_LinkList, "linklist", *t);
+
+    origin->add_empty_row(100);
+
+    // calling remove() is now an error, so no more tests of it
+
+    // move_last_over() on an un-linked-to row should still just send that row
+    // in the notification
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(5, notification.rows[0].row_ndx);
+    });
+    t->move_last_over(5);
+    CHECK(called);
+
+    // move_last_over() on a linked-to row should send information about the
+    // links which had linked to it
+    origin->set_link(0, 10, 11); // rows are arbitrarily different to make things less likely to pass by coincidence
+    LinkViewRef lv = origin->get_linklist(1, 15);
+    lv->add(11);
+    lv->add(30);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(11, notification.rows[0].row_ndx);
+
+        CHECK_EQUAL(2, notification.links.size());
+        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(10, notification.links[0].origin_row_ndx);
+        CHECK_EQUAL(11, notification.links[0].old_target_row_ndx);
+
+        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(15, notification.links[1].origin_row_ndx);
+        CHECK_EQUAL(11, notification.links[1].old_target_row_ndx);
+    });
+    t->move_last_over(11);
+    CHECK(called);
+
+    // move_last_over() on the origin table just sends the row being removed
+    // because the links are weak
+    origin->set_link(0, 10, 11);
+    origin->get_linklist(1, 10)->add(11);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(1, notification.rows.size());
+        CHECK_EQUAL(1, notification.rows[0].table_ndx);
+        CHECK_EQUAL(10, notification.rows[0].row_ndx);
+
+        CHECK_EQUAL(0, notification.links.size());
+    });
+    origin->move_last_over(10);
+    CHECK(called);
+
+    // move_last_over() on the origin table with strong links lists the target
+    // rows that are removed
+    origin->get_descriptor()->set_link_type(0, link_Strong);
+    origin->get_descriptor()->set_link_type(1, link_Strong);
+
+    origin->set_link(0, 10, 50);
+    origin->set_link(0, 11, 62);
+    lv = origin->get_linklist(1, 10);
+    lv->add(60);
+    lv->add(61);
+    lv->add(61);
+    lv->add(62);
+    // 50, 60 and 61 should be removed; 62 should not as there's still a strong link
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(4, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(50, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[1].table_ndx);
+        CHECK_EQUAL(60, notification.rows[1].row_ndx);
+        CHECK_EQUAL(0, notification.rows[2].table_ndx);
+        CHECK_EQUAL(61, notification.rows[2].row_ndx);
+        CHECK_EQUAL(1, notification.rows[3].table_ndx);
+        CHECK_EQUAL(10, notification.rows[3].row_ndx);
+
+        CHECK_EQUAL(0, notification.links.size());
+    });
+    origin->move_last_over(10);
+    CHECK(called);
+
+    g.set_cascade_notification_handler(nullptr);
+    t->clear();
+    origin->clear();
+    t->add_empty_row(100);
+    origin->add_empty_row(100);
+
+    // Indirect nullifications: move_last_over() on a row with the last strong
+    // links to a row that still has weak links to it
+    origin->add_column_link(type_Link, "link2", *t);
+    origin->add_column_link(type_LinkList, "linklist2", *t);
+
+    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 0));
+    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 1));
+    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 2));
+    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 3));
+    origin->set_link(0, 20, 30);
+    origin->get_linklist(1, 20)->add(31);
+    origin->set_link(2, 25, 31);
+    origin->get_linklist(3, 25)->add(30);
+    CHECK_EQUAL(1, t->get_backlink_count(30, *origin, 0));
+    CHECK_EQUAL(1, t->get_backlink_count(31, *origin, 1));
+    CHECK_EQUAL(1, t->get_backlink_count(31, *origin, 2));
+    CHECK_EQUAL(1, t->get_backlink_count(30, *origin, 3));
+
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(3, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(30, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[1].table_ndx);
+        CHECK_EQUAL(31, notification.rows[1].row_ndx);
+        CHECK_EQUAL(1, notification.rows[2].table_ndx);
+        CHECK_EQUAL(20, notification.rows[2].row_ndx);
+
+        CHECK_EQUAL(2, notification.links.size());
+        CHECK_EQUAL(3, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(25, notification.links[0].origin_row_ndx);
+        CHECK_EQUAL(30, notification.links[0].old_target_row_ndx);
+
+        CHECK_EQUAL(2, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(25, notification.links[1].origin_row_ndx);
+        CHECK_EQUAL(31, notification.links[1].old_target_row_ndx);
+    });
+    origin->move_last_over(20);
+    CHECK(called);
+}
+
+
+TEST(Group_CascadeNotify_TableClear)
+{
+    GROUP_TEST_PATH(path);
+
+    Group g(path, 0, Group::mode_ReadWrite);
+    TableRef t = g.add_table("target");
+    t->add_column(type_Int, "int");
+
+    t->add_empty_row(10);
+
+    // clear() does not list the rows in the table being cleared because it
+    // would be expensive and mostly pointless to do so
+    bool called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(0, notification.rows.size());
+    });
+    t->clear();
+    CHECK(called);
+
+    // Add another table which links to the target table
+    TableRef origin = g.add_table("origin");
+    origin->add_column_link(type_Link, "link", *t);
+    origin->add_column_link(type_LinkList, "linklist", *t);
+
+    t->add_empty_row(10);
+    origin->add_empty_row(10);
+
+    // clear() does report nullified links
+    origin->set_link(0, 1, 2);
+    origin->get_linklist(1, 3)->add(4);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.rows.size());
+
+        CHECK_EQUAL(2, notification.links.size());
+        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(1, notification.links[0].origin_row_ndx);
+        CHECK_EQUAL(2, notification.links[0].old_target_row_ndx);
+
+        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(3, notification.links[1].origin_row_ndx);
+        CHECK_EQUAL(4, notification.links[1].old_target_row_ndx);
+    });
+    t->clear();
+    CHECK(called);
+
+    t->add_empty_row(10);
+    origin->add_empty_row(10);
+
+    // and cascaded deletions
+    origin->get_descriptor()->set_link_type(0, link_Strong);
+    origin->get_descriptor()->set_link_type(1, link_Strong);
+    origin->set_link(0, 1, 2);
+    origin->get_linklist(1, 3)->add(4);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(2, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(2, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[1].table_ndx);
+        CHECK_EQUAL(4, notification.rows[1].row_ndx);
+    });
+    origin->clear();
+    CHECK(called);
+}
+
+
+TEST(Group_CascadeNotify_TableViewClear)
+{
+    GROUP_TEST_PATH(path);
+
+    Group g(path, 0, Group::mode_ReadWrite);
+    TableRef t = g.add_table("target");
+    t->add_column(type_Int, "int");
+
+    t->add_empty_row(10);
+
+    // No link columns, so remove() is used
+    // Unlike clearing a table, the rows removed by the clear() are included in
+    // the notification so that cascaded deletions and direct deletions don't
+    // need to be handled separately
+    bool called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(10, notification.rows.size());
+    });
+    t->where().find_all().clear();
+    CHECK(called);
+
+    // Add another table which links to the target table
+    TableRef origin = g.add_table("origin");
+    origin->add_column_link(type_Link, "link", *t);
+    origin->add_column_link(type_LinkList, "linklist", *t);
+
+    // Now has backlinks, so move_last_over() is used
+    t->add_empty_row(10);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(10, notification.rows.size());
+    });
+    t->where().find_all().clear();
+    CHECK(called);
+
+    t->add_empty_row(10);
+    origin->add_empty_row(10);
+
+    // should list which links were nullified
+    origin->set_link(0, 1, 2);
+    origin->get_linklist(1, 3)->add(4);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(10, notification.rows.size());
+        CHECK_EQUAL(2, notification.links.size());
+
+        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(1, notification.links[0].origin_row_ndx);
+        CHECK_EQUAL(2, notification.links[0].old_target_row_ndx);
+
+        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(3, notification.links[1].origin_row_ndx);
+        CHECK_EQUAL(4, notification.links[1].old_target_row_ndx);
+    });
+    t->where().find_all().clear();
+    CHECK(called);
+
+    g.set_cascade_notification_handler(nullptr);
+    origin->clear();
+    t->add_empty_row(10);
+    origin->add_empty_row(10);
+
+    // should included cascaded deletions
+    origin->get_descriptor()->set_link_type(0, link_Strong);
+    origin->get_descriptor()->set_link_type(1, link_Strong);
+    origin->set_link(0, 1, 2);
+    origin->get_linklist(1, 3)->add(4);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(0, notification.links.size());
+        CHECK_EQUAL(12, notification.rows.size()); // 10 from origin, 2 from target
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(2, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[1].table_ndx);
+        CHECK_EQUAL(4, notification.rows[1].row_ndx);
+    });
+    origin->where().find_all().clear();
+    CHECK(called);
+}
+
+
 
 #ifdef REALM_DEBUG
 #ifdef REALM_TO_DOT

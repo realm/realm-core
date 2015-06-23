@@ -182,7 +182,7 @@ public:
     template<class U> BasicRowExpr(const BasicRowExpr<U>&) REALM_NOEXCEPT;
 
 private:
-    T* m_table; // Null if detached.
+    T* m_table; // nullptr if detached.
     std::size_t m_row_ndx; // Undefined if detached.
 
     BasicRowExpr(T*, std::size_t row_ndx) REALM_NOEXCEPT;
@@ -212,7 +212,7 @@ class Group;
 
 class RowBase {
 protected:
-    TableRef m_table; // Null if detached.
+    TableRef m_table; // nullptr if detached.
     std::size_t m_row_ndx; // Undefined if detached.
 
     void attach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
@@ -226,8 +226,8 @@ protected:
     RowBase(const RowBase& source, Handover_patch& patch);
     void apply_patch(Handover_patch& patch, Group& group);
 private:
-    RowBase* m_prev; // Null if first, undefined if detached.
-    RowBase* m_next; // Null if last, undefined if detached.
+    RowBase* m_prev; // nullptr if first, undefined if detached.
+    RowBase* m_next; // nullptr if last, undefined if detached.
 
     // Table needs to be able to modify m_table and m_row_ndx.
     friend class Table;
@@ -635,7 +635,7 @@ template<class T> inline std::size_t BasicRowExpr<T>::impl_get_row_ndx() const R
 
 template<class T> inline void BasicRowExpr<T>::impl_detach() REALM_NOEXCEPT
 {
-    m_table = 0;
+    m_table = nullptr;
 }
 
 

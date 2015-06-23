@@ -1258,8 +1258,8 @@ public:
 
     void init(Action action, Array*, size_t limit)
     {
-        REALM_STATIC_ASSERT((util::SameType<R, float>::value ||
-                               util::SameType<R, double>::value), "");
+        REALM_STATIC_ASSERT((std::is_same<R, float>::value ||
+                               std::is_same<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
         m_minmax_index = not_found;
@@ -1440,7 +1440,7 @@ inline void Array::destroy() REALM_NOEXCEPT
         return;
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
-    m_data = 0;
+    m_data = nullptr;
 }
 
 inline void Array::destroy_deep() REALM_NOEXCEPT
@@ -1453,7 +1453,7 @@ inline void Array::destroy_deep() REALM_NOEXCEPT
 
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
-    m_data = 0;
+    m_data = nullptr;
 }
 
 
@@ -1928,12 +1928,12 @@ inline ref_type Array::get_ref_from_parent() const REALM_NOEXCEPT
 
 inline bool Array::is_attached() const REALM_NOEXCEPT
 {
-    return m_data != 0;
+    return m_data != nullptr;
 }
 
 inline void Array::detach() REALM_NOEXCEPT
 {
-    m_data = 0;
+    m_data = nullptr;
 }
 
 inline std::size_t Array::size() const REALM_NOEXCEPT
@@ -2410,7 +2410,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
 #if defined(REALM_COMPILER_SSE)
     if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
-    ||  (sseavx<30>() && (util::SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
+    ||  (sseavx<30>() && (std::is_same<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
 
         // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));

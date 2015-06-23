@@ -1,13 +1,26 @@
 # NEXT RELEASE
 
-### Enhancements
+### Bugfixes:
 
+* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Generic networking API added.
 * Support for transfer/handover of TableViews, Queries, ListViews and Rows between SharedGroups in different threads.
   Cooperative handover (where boths threads participate) is supported for arbitrarily nested TableViews and Queries.
   Restrictions apply for non-cooperative handover (aka stealing): user must ensure that the producing thread does not
   trigger a modifying operation on any of the involved TableViews.
   For TableViews the handover can be one of *moving*, *copying* or *staying*, reflecting how the actual payload
   is treated.
+
+### Internals:
+
+* Lorem ipsum.
 
 ----------------------------------------------
 
@@ -23,6 +36,16 @@ StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
 is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.6 Release notes
+
+### Bugfixes:
+
+* Fixed durability issue in case of power / system failures on Apple platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to stable storage when the file is extended.
+
+----------------------------------------------
 
 # 0.89.5 Release notes
 
@@ -58,6 +81,8 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 * SharedGroup::compact() will now throw a runtime_error if called in detached state.
 * Make the start index of `ListView::find()` overrideable for finding multiple
   occurances of a given row in a LinkList.
+* Add `Group::set_cascade_notification_handler()` to simplify tracking changes
+  due to link nullification and cascading deletes.
 
 ### Internals:
 

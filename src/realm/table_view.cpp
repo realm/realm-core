@@ -305,15 +305,15 @@ double TableViewBase::average_double(size_t column_ndx) const
 // Count
 size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
 {
-    return aggregate<act_Count, int64_t, size_t, Column>(NULL, column_ndx, target);
+    return aggregate<act_Count, int64_t, size_t, Column>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_float(size_t column_ndx, float target) const
 {
-    return aggregate<act_Count, float, size_t, ColumnFloat>(NULL, column_ndx, target);
+    return aggregate<act_Count, float, size_t, ColumnFloat>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_double(size_t column_ndx, double target) const
 {
-    return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
+    return aggregate<act_Count, double, size_t, ColumnDouble>(nullptr, column_ndx, target);
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
@@ -535,49 +535,10 @@ void TableView::clear()
         }
     }
 
-    // Test if tableview is sorted ascendingly
-    bool is_sorted = true;
-    for (size_t t = 1; t < size(); t++) {
-        if (m_row_indexes.get(t) < m_row_indexes.get(t - 1)) {
-            is_sorted = false;
-            break;
-        }
-    }
-
-    if (is_sorted) {
-        // Delete all referenced rows in source table
-        // (in reverse order to avoid index drift)
-        for (size_t i = m_row_indexes.size(); i != 0; --i) {
-            size_t ndx = size_t(m_row_indexes.get(i - 1));
-            if (ndx == detached_ref) // skip detached refs
-                continue;
-            // If table is unordered, we must use move_last_over()
-            if (is_ordered)
-                m_table->remove(ndx);
-            else
-                m_table->move_last_over(ndx);
-        }
-    }
-    else {
-        // sort tableview
-        std::vector<size_t> v;
-        for (size_t t = 0; t < size(); t++) {
-            size_t real_ndx = m_row_indexes.get(t);
-            if (real_ndx != detached_ref)
-                v.push_back(to_size_t(real_ndx));
-        }
-        std::sort(v.begin(), v.end());
-
-        for (size_t i = v.size(); i != 0; --i) {
-            size_t ndx = size_t(v[i - 1]);
-
-            // If table is unordered, we must use move_last_over()
-            if (is_ordered)
-                m_table->remove(ndx);
-            else
-                m_table->move_last_over(ndx);
-        }
-    }
+    if (is_ordered)
+        m_table->batch_remove(m_row_indexes);
+    else
+        m_table->batch_move_last_over(m_row_indexes);
 
     m_row_indexes.clear();
     m_num_detached_refs = 0;

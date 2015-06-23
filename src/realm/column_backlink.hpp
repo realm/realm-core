@@ -58,7 +58,7 @@ public:
     Table& get_origin_table() const REALM_NOEXCEPT;
     void set_origin_table(Table&) REALM_NOEXCEPT;
     ColumnLinkBase& get_origin_column() const REALM_NOEXCEPT;
-    void set_origin_column(ColumnLinkBase&) REALM_NOEXCEPT;
+    void set_origin_column(ColumnLinkBase& column, std::size_t col_ndx) REALM_NOEXCEPT;
 
     void erase(std::size_t, bool) override;
     void move_last_over(std::size_t, std::size_t, bool) override;
@@ -70,6 +70,9 @@ public:
     void mark(int) REALM_NOEXCEPT override;
 
     void bump_link_origin_table_version() REALM_NOEXCEPT override;
+
+    void cascade_break_backlinks_to(size_t row_ndx, CascadeState& state) override;
+    void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&) override;
 
 #ifdef REALM_DEBUG
     void Verify() const override;
@@ -92,9 +95,11 @@ protected:
 
 private:
     TableRef        m_origin_table;
-    ColumnLinkBase* m_origin_column;
+    ColumnLinkBase* m_origin_column = nullptr;
+    std::size_t     m_origin_column_ndx = npos;
 
-    void nullify_links(std::size_t row_ndx, bool do_destroy);
+    template<typename Func>
+    std::size_t for_each_link(std::size_t row_ndx, bool do_destroy, Func&& f);
 };
 
 
@@ -103,8 +108,7 @@ private:
 // Implementation
 
 inline ColumnBackLink::ColumnBackLink(Allocator& alloc, ref_type ref):
-    Column(alloc, ref), // Throws
-    m_origin_column(0)
+    Column(alloc, ref) // Throws
 {
 }
 
@@ -134,9 +138,10 @@ inline ColumnLinkBase& ColumnBackLink::get_origin_column() const REALM_NOEXCEPT
     return *m_origin_column;
 }
 
-inline void ColumnBackLink::set_origin_column(ColumnLinkBase& column) REALM_NOEXCEPT
+inline void ColumnBackLink::set_origin_column(ColumnLinkBase& column, std::size_t col_ndx) REALM_NOEXCEPT
 {
     m_origin_column = &column;
+    m_origin_column_ndx = col_ndx;
 }
 
 inline void ColumnBackLink::add_row()
