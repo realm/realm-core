@@ -40,9 +40,24 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ArrayStringLong_Basic)
+namespace {
+
+struct nullable {
+    static constexpr bool value = true;
+};
+
+struct non_nullable {
+    static constexpr bool value = false;
+};
+    
+} // anonymous namespace
+
+
+TEST_TYPES(ArrayStringLong_Basic, non_nullable, nullable)
 {
-    ArrayStringLong c(Allocator::get_default(), false);
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ArrayStringLong c(Allocator::get_default(), nullable);
     c.create();
 
     // TEST(ArrayStringLong_MultiEmpty)
