@@ -2409,8 +2409,10 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     REALM_ASSERT_3(m_width, !=, 0);
 
 #if defined(REALM_COMPILER_SSE)
-    if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
-    ||  (sseavx<30>() && (std::is_same<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
+    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support 
+    // Less-than comparison for 64-bit values. 
+    if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start >= sizeof(__m128i) && m_width >= 8 &&
+        (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
 
         // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
@@ -2823,7 +2825,7 @@ bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64
         search = _mm_set1_epi32(static_cast<int>(value));
     else if (width == 64) {
         if (cond2::condition == cond_Less)
-            search = _mm_set_epi64x(value - 1, value - 1);
+            REALM_ASSERT(false);
         else
             search = _mm_set_epi64x(value, value);
     }
@@ -2872,15 +2874,12 @@ REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data
         else if (cond == cond_Less) {
             if (width == 8)
                 compare = _mm_cmplt_epi8(action_data[i], *data);
-            if (width == 16)
+            else if (width == 16)
                 compare = _mm_cmplt_epi16(action_data[i], *data);
-            if (width == 32)
+            else if (width == 32)
                 compare = _mm_cmplt_epi32(action_data[i], *data);
-            if (width == 64) {
-                // There exists no _mm_cmplt_epi64 instruction, so emulate it. _mm_set1_epi8(0xff) is pre-calculated by compiler.
-                compare = _mm_cmpgt_epi64(action_data[i], *data);
-                compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffff));
-            }
+            else
+                REALM_ASSERT(false);
         }
 
         resmask = _mm_movemask_epi8(compare);

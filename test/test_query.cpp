@@ -6062,16 +6062,30 @@ TEST(Query_BinaryNull)
 TEST(Query_64BitValues)
 {
     Group g;
+    size_t m;
     TableRef table = g.add_table("table");
     table->insert_column(0, type_Int, "key");
+    table->insert_column(1, type_Int, "16bit");
 
     const int64_t start = 4485019129LL;
     const int64_t count = 20; // First 16 SSE-searched, four fallback
     const int64_t min = std::numeric_limits<int64_t>::min();
     const int64_t max = std::numeric_limits<int64_t>::max();
     table->add_empty_row(count);
-    for (int64_t i = 0; i < count; ++i)
+    for (int64_t i = 0; i < count; ++i) {
         table->set_int(0, i, start + i);
+    }
+
+    for (int64_t i = 0; i < 5; i++) {
+        // Insert values 5, 4, 3, 2, 1
+        table->set_int(1, i, 5 - i);
+    }
+
+    m = table->where().less(1, 4).find();
+    CHECK_EQUAL(2, m);
+
+    m = table->where().less(1, 5).find();
+    CHECK_EQUAL(1, m);
 
     CHECK_EQUAL(0, table->where().less(0, min).count());
     CHECK_EQUAL(0, table->where().less(0, start).count());
