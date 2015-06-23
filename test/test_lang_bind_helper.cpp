@@ -63,36 +63,6 @@ using unit_test::TestResults;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(LangBindHelper_InsertSubtable)
-{
-    Table t1;
-    DescriptorRef s;
-    t1.add_column(type_Table, "sub", &s);
-    s->add_column(type_Int, "i1");
-    s->add_column(type_Int, "i2");
-    s.reset();
-
-    Table t2;
-    t2.add_column(type_Int, "i1");
-    t2.add_column(type_Int, "i2");
-    t2.insert_int(0, 0, 10);
-    t2.insert_int(1, 0, 120);
-    t2.insert_done();
-    t2.insert_int(0, 1, 12);
-    t2.insert_int(1, 1, 100);
-    t2.insert_done();
-
-    LangBindHelper::insert_subtable(t1, 0, 0, t2);
-    t1.insert_done();
-
-    TableRef sub = t1.get_subtable(0, 0);
-
-    CHECK_EQUAL(t2.get_column_count(), sub->get_column_count());
-    CHECK_EQUAL(t2.size(), sub->size());
-    CHECK(t2 == *sub);
-}
-
-
 // FIXME: Move this test to test_table.cpp
 TEST(LangBindHelper_SetSubtable)
 {
@@ -107,12 +77,12 @@ TEST(LangBindHelper_SetSubtable)
     Table t2;
     t2.add_column(type_Int, "i1");
     t2.add_column(type_Int, "i2");
-    t2.insert_int(0, 0, 10);
-    t2.insert_int(1, 0, 120);
-    t2.insert_done();
-    t2.insert_int(0, 1, 12);
-    t2.insert_int(1, 1, 100);
-    t2.insert_done();
+    t2.insert_empty_row(0);
+    t2.set_int(0, 0, 10);
+    t2.set_int(1, 0, 120);
+    t2.insert_empty_row(1);
+    t2.set_int(0, 1, 12);
+    t2.set_int(1, 1, 100);
 
     t1.set_subtable( 0, 0, &t2);
 
@@ -2948,12 +2918,12 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     {
         WriteTransaction wt(sg_w);
         TableRef origin_2_w = wt.get_table("origin_2");
-        origin_2_w->insert_link(0, 2, 1);  // O_2_L_2[2] -> T_1[1]
-        origin_2_w->insert_int(1, 2, 19);
-        origin_2_w->insert_linklist(2, 2);
-        origin_2_w->insert_int(3, 2, 0);
-        origin_2_w->insert_link(4, 2, 0);  // O_2_L_4[2] -> T_2[0]
-        origin_2_w->insert_done();
+        origin_2_w->insert_empty_row(2);
+        origin_2_w->set_link(0, 2, 1);  // O_2_L_2[2] -> T_1[1]
+        origin_2_w->set_int(1, 2, 19);
+        // linklist is empty by default
+        origin_2_w->set_int(3, 2, 0);
+        origin_2_w->set_link(4, 2, 0);  // O_2_L_4[2] -> T_2[0]
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
@@ -5666,8 +5636,8 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
     {
         WriteTransaction wt(sg_w);
         TableRef origin_w = wt.get_table("origin");
-        origin_w->insert_link(0,0,0);
-        origin_w->insert_done();
+        origin_w->insert_empty_row(0);
+        origin_w->set_link(0,0,0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
@@ -7350,24 +7320,24 @@ TEST(LangBindHelper_MixedCommitSizes)
     // large commits to re-expand them
     for (int i = 0; i < 4; ++i) {
         LangBindHelper::promote_to_write(sg, *hist);
-        table->insert_binary(0, 0, BinaryData(buffer.get(), 65536));
-        table->insert_done();
+        table->insert_empty_row(0);
+        table->set_binary(0, 0, BinaryData(buffer.get(), 65536));
         LangBindHelper::commit_and_continue_as_read(sg);
         g.Verify();
     }
 
     for (int i = 0; i < 2; ++i) {
         LangBindHelper::promote_to_write(sg, *hist);
-        table->insert_binary(0, 0, BinaryData(buffer.get(), 1024));
-        table->insert_done();
+        table->insert_empty_row(0);
+        table->set_binary(0, 0, BinaryData(buffer.get(), 1024));
         LangBindHelper::commit_and_continue_as_read(sg);
         g.Verify();
     }
 
     for (int i = 0; i < 2; ++i) {
         LangBindHelper::promote_to_write(sg, *hist);
-        table->insert_binary(0, 0, BinaryData(buffer.get(), 65536));
-        table->insert_done();
+        table->insert_empty_row(0);
+        table->set_binary(0, 0, BinaryData(buffer.get(), 65536));
         LangBindHelper::commit_and_continue_as_read(sg);
         g.Verify();
     }

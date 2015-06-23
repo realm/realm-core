@@ -91,11 +91,11 @@ TEST(Links_Basic)
         CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
         // add a few links
-        table2->insert_link(col_link, 0, 1);
-        table2->insert_done();
+        table2->insert_empty_row(0);
+        table2->set_link(col_link, 0, 1);
 
-        table2->insert_link(col_link, 1, 0);
-        table2->insert_done();
+        table2->insert_empty_row(1);
+        table2->set_link(col_link, 1, 0);
 
         // Verify that links were set correctly
         size_t link_ndx1 = table2->get_link(col_link, 0);
@@ -188,10 +188,10 @@ TEST(Links_Deletes)
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     // add a few links
-    table2->insert_link(col_link, 0, 1);
-    table2->insert_done();
-    table2->insert_link(col_link, 1, 0);
-    table2->insert_done();
+    table2->insert_empty_row(0);
+    table2->set_link(col_link, 0, 1);
+    table2->insert_empty_row(1);
+    table2->set_link(col_link, 1, 0);
 
     while (!table2->is_empty())
         table2->move_last_over(0);
@@ -201,10 +201,10 @@ TEST(Links_Deletes)
     CHECK_EQUAL(0, table1->get_backlink_count(2, *table2, col_link));
 
     // add links again
-    table2->insert_link(col_link, 0, 1);
-    table2->insert_done();
-    table2->insert_link(col_link, 1, 0);
-    table2->insert_done();
+    table2->insert_empty_row(0);
+    table2->set_link(col_link, 0, 1);
+    table2->insert_empty_row(1);
+    table2->set_link(col_link, 1, 0);
 
     // remove all rows in target table
     while (!table1->is_empty())
@@ -227,10 +227,10 @@ TEST(Links_Deletes)
     CHECK_EQUAL(0, table1->get_backlink_count(2, *table2, col_link));
 
     // add links again
-    table2->insert_link(col_link, 0, 1);
-    table2->insert_done();
-    table2->insert_link(col_link, 1, 0);
-    table2->insert_done();
+    table2->insert_empty_row(0);
+    table2->set_link(col_link, 0, 1);
+    table2->insert_empty_row(1);
+    table2->set_link(col_link, 1, 0);
 
     // clear target table and make sure links are nullified
     table1->clear();
@@ -255,12 +255,12 @@ TEST(Links_Multi)
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     // add a few links pointing to same row
-    table2->insert_link(col_link, 0, 1);
-    table2->insert_done();
-    table2->insert_link(col_link, 1, 1);
-    table2->insert_done();
-    table2->insert_link(col_link, 2, 1);
-    table2->insert_done();
+    table2->insert_empty_row(0);
+    table2->set_link(col_link, 0, 1);
+    table2->insert_empty_row(1);
+    table2->set_link(col_link, 1, 1);
+    table2->insert_empty_row(2);
+    table2->set_link(col_link, 2, 1);
 
     CHECK_EQUAL(3, table1->get_backlink_count(1, *table2, col_link));
     CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
@@ -290,10 +290,10 @@ TEST(Links_Multi)
 
     // add some more links and see that they get nullified when the target
     // is removed
-    table2->insert_link(col_link, 2, 2);
-    table2->insert_done();
-    table2->insert_link(col_link, 3, 2);
-    table2->insert_done();
+    table2->insert_empty_row(2);
+    table2->set_link(col_link, 2, 2);
+    table2->insert_empty_row(3);
+    table2->set_link(col_link, 3, 2);
     CHECK_EQUAL(2, table1->get_backlink_count(2, *table2, col_link));
 
     table1->move_last_over(1);
@@ -351,30 +351,23 @@ TEST(Links_LinkList_TableOps)
     size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    origin->insert_linklist(col_link, 0);
-    origin->insert_done();
+    origin->insert_empty_row(0);
     CHECK(origin->linklist_is_empty(col_link, 0));
     CHECK_EQUAL(0, origin->get_link_count(col_link, 0));
 
     // add some more rows and test that they can be deleted
-    origin->insert_linklist(col_link, 1);
-    origin->insert_done();
-    origin->insert_linklist(col_link, 2);
-    origin->insert_done();
-    origin->insert_linklist(col_link, 3);
-    origin->insert_done();
+    origin->insert_empty_row(1);
+    origin->insert_empty_row(2);
+    origin->insert_empty_row(3);
 
     while (!origin->is_empty()) {
         origin->move_last_over(0);
     }
 
     // add some more rows and clear
-    origin->insert_linklist(col_link, 0);
-    origin->insert_done();
-    origin->insert_linklist(col_link, 1);
-    origin->insert_done();
-    origin->insert_linklist(col_link, 2);
-    origin->insert_done();
+    origin->insert_empty_row(0);
+    origin->insert_empty_row(1);
+    origin->insert_empty_row(2);
     origin->clear();
 
 }
@@ -394,8 +387,7 @@ TEST(Links_LinkList_Basics)
     size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    origin->insert_linklist(col_link, 0);
-    origin->insert_done();
+    origin->insert_empty_row(0);
 
     LinkViewRef links = origin->get_linklist(col_link, 0);
 
@@ -482,8 +474,7 @@ TEST(Links_LinkList_Backlinks)
     size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    origin->insert_linklist(col_link, 0);
-    origin->insert_done();
+    origin->insert_empty_row(0);
 
     LinkViewRef links = origin->get_linklist(col_link, 0);
     links->add(2);
@@ -562,12 +553,9 @@ TEST(Links_LinkList_AccessorUpdates)
     size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
-    origin->insert_linklist(col_link, 0);
-    origin->insert_done();
-    origin->insert_linklist(col_link, 1);
-    origin->insert_done();
-    origin->insert_linklist(col_link, 2);
-    origin->insert_done();
+    origin->insert_empty_row(0);
+    origin->insert_empty_row(1);
+    origin->insert_empty_row(2);
 
     LinkViewRef links0 = origin->get_linklist(col_link, 0);
     links0->add(2);
@@ -681,13 +669,13 @@ TEST(Links_Transactions)
         owners->add_column_link(type_Link, "dog", *dogs);
 
         // Insert a single dog
-        dogs->insert_string(name_col, harvey_row, "Harvey");
-        dogs->insert_done();
+        dogs->insert_empty_row(harvey_row);
+        dogs->set_string(name_col, harvey_row, "Harvey");
 
         // Insert an owner with link to dog
-        owners->insert_string(name_col, tim_row, "Tim");
-        owners->insert_link(dog_col, tim_row, harvey_row);
-        owners->insert_done();
+        owners->insert_empty_row(tim_row);
+        owners->set_string(name_col, tim_row, "Tim");
+        owners->set_link(dog_col, tim_row, harvey_row);
 
         group.commit();
     }

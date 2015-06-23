@@ -1261,16 +1261,16 @@ TEST(TableView_RefCounting)
     {
         TableRef t = Table::create();
         t->add_column(type_Int, "myint");
-        t->insert_int(0, 0, 12);
-        t->insert_done();
+        t->add_empty_row();
+        t->set_int(0, 0, 12);
         tv = t->where().find_all();
     }
 
     {
         TableRef t2 = Table::create();
         t2->add_column(type_String, "mystr");
-        t2->insert_string(0, 0, "just a test string");
-        t2->insert_done();
+        t2->add_empty_row();
+        t2->set_string(0, 0, "just a test string");
         tv2 = t2->where().find_all();
     }
 
@@ -1292,10 +1292,10 @@ TEST(TableView_DynPivot)
     size_t count = 5000;
     for (size_t i = 0; i < count; ++i) {
         StringData sex = i % 2 ? "Male" : "Female";
-        table->insert_string(0, i, sex);
-        table->insert_int(1, i, 20 + (i%20));
-        table->insert_bool(2, i, true);
-        table->insert_done();
+        table->insert_empty_row(i);
+        table->set_string(0, i, sex);
+        table->set_int(1, i, 20 + (i%20));
+        table->set_bool(2, i, true);
     }
 
     TableView tv = table->where().find_all();

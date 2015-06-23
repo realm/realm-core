@@ -1843,8 +1843,8 @@ TEST(Query_StrIndexCrash)
             char dst[100];
             memset(dst, 0, sizeof(dst));
             sprintf(dst, "%d", v);
-            table->insert_string(0, i, dst);
-            table->insert_done();
+            table->insert_empty_row(i);
+            table->set_string(0, i, dst);
         }
 
         table->add_search_index(0);
@@ -3361,47 +3361,43 @@ TEST(Query_Subtable)
     CHECK_EQUAL(3, table->get_column_count());
 
     // Main table
-    table->insert_int(0, 0, 111);
-    table->insert_string(1, 0, "this");
-    table->insert_subtable(2, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 111);
+    table->set_string(1, 0, "this");
 
-    table->insert_int(0, 1, 222);
-    table->insert_string(1, 1, "is");
-    table->insert_subtable(2, 1);
-    table->insert_done();
+    table->insert_empty_row(1);
+    table->set_int(0, 1, 222);
+    table->set_string(1, 1, "is");
 
-    table->insert_int(0, 2, 333);
-    table->insert_string(1, 2, "a test");
-    table->insert_subtable(2, 2);
-    table->insert_done();
+    table->insert_empty_row(2);
+    table->set_int(0, 2, 333);
+    table->set_string(1, 2, "a test");
 
-    table->insert_int(0, 3, 444);
-    table->insert_string(1, 3, "of queries");
-    table->insert_subtable(2, 3);
-    table->insert_done();
+    table->insert_empty_row(3);
+    table->set_int(0, 3, 444);
+    table->set_string(1, 3, "of queries");
 
 
     // Sub tables
     TableRef subtable = table->get_subtable(2, 0);
-    subtable->insert_int(0, 0, 11);
-    subtable->insert_string(1, 0, "a");
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 11);
+    subtable->set_string(1, 0, "a");
 
     subtable = table->get_subtable(2, 1);
-    subtable->insert_int(0, 0, 22);
-    subtable->insert_string(1, 0, "b");
-    subtable->insert_done();
-    subtable->insert_int(0, 1, 33);
-    subtable->insert_string(1, 1, "c");
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 22);
+    subtable->set_string(1, 0, "b");
+    subtable->insert_empty_row(1);
+    subtable->set_int(0, 1, 33);
+    subtable->set_string(1, 1, "c");
 
     //  Intentioally have empty (degenerate) subtable at 2,2
 
     subtable = table->get_subtable(2, 3);
-    subtable->insert_int(0, 0, 55);
-    subtable->insert_string(1, 0, "e");
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 55);
+    subtable->set_string(1, 0, "e");
 
 
     int64_t val50 = 50;
@@ -3469,15 +3465,14 @@ TEST(Query_SubtableBug)
     CHECK_EQUAL(2, table->get_column_count());
 
     for (int i = 0; i<5; i++) {
-        table->insert_int(0, i, 100);
-        table->insert_subtable(1, i);
-        table->insert_done();
+        table->insert_empty_row(i);
+        table->set_int(0, i, 100);
     }
     TableRef subtable = table->get_subtable(1, 0);
-    subtable->insert_int(0, 0, 11);
-    subtable->insert_string(1, 0, "a");
-    subtable->insert_bool(2, 0, true);
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 11);
+    subtable->set_string(1, 0, "a");
+    subtable->set_bool(2, 0, true);
 
     Query q1 = table->where();
     q1.subtable(1);
@@ -3603,12 +3598,12 @@ TEST(Query_SortDates)
     Table table;
     table.add_column(type_DateTime, "first");
 
-    table.insert_datetime(0, 0, 1000);
-    table.insert_done();
-    table.insert_datetime(0, 1, 3000);
-    table.insert_done();
-    table.insert_datetime(0, 2, 2000);
-    table.insert_done();
+    table.insert_empty_row(0);
+    table.set_datetime(0, 0, 1000);
+    table.insert_empty_row(1);
+    table.set_datetime(0, 1, 3000);
+    table.insert_empty_row(2);
+    table.set_datetime(0, 2, 2000);
 
     TableView tv = table.where().find_all();
     CHECK(tv.size() == 3);
@@ -3630,12 +3625,12 @@ TEST(Query_SortBools)
     Table table;
     table.add_column(type_Bool, "first");
 
-    table.insert_bool(0, 0, true);
-    table.insert_done();
-    table.insert_bool(0, 0, false);
-    table.insert_done();
-    table.insert_bool(0, 0, true);
-    table.insert_done();
+    table.insert_empty_row(0);
+    table.set_bool(0, 0, true);
+    table.insert_empty_row(0);
+    table.set_bool(0, 0, false);
+    table.insert_empty_row(0);
+    table.set_bool(0, 0, true);
 
     TableView tv = table.where().find_all();
     tv.sort(0);
@@ -4998,50 +4993,46 @@ TEST(Query_SubtableSyntaxCheck)
     subdesc->add_column(type_String, "sub_second");
 
     // Main table
-    table->insert_int(0, 0, 111);
-    table->insert_string(1, 0, "this");
-    table->insert_subtable(2, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 111);
+    table->set_string(1, 0, "this");
 
-    table->insert_int(0, 1, 222);
-    table->insert_string(1, 1, "is");
-    table->insert_subtable(2, 1);
-    table->insert_done();
+    table->insert_empty_row(1);
+    table->set_int(0, 1, 222);
+    table->set_string(1, 1, "is");
 
-    table->insert_int(0, 2, 333);
-    table->insert_string(1, 2, "a test");
-    table->insert_subtable(2, 2);
-    table->insert_done();
+    table->insert_empty_row(2);
+    table->set_int(0, 2, 333);
+    table->set_string(1, 2, "a test");
 
-    table->insert_int(0, 3, 444);
-    table->insert_string(1, 3, "of queries");
-    table->insert_subtable(2, 3);
-    table->insert_done();
+    table->insert_empty_row(3);
+    table->set_int(0, 3, 444);
+    table->set_string(1, 3, "of queries");
 
 
     // Sub tables
     TableRef subtable = table->get_subtable(2, 0);
-    subtable->insert_int(0, 0, 11);
-    subtable->insert_string(1, 0, "a");
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 11);
+    subtable->set_string(1, 0, "a");
 
     subtable = table->get_subtable(2, 1);
-    subtable->insert_int(0, 0, 22);
-    subtable->insert_string(1, 0, "b");
-    subtable->insert_done();
-    subtable->insert_int(0, 1, 33);
-    subtable->insert_string(1, 1, "c");
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 22);
+    subtable->set_string(1, 0, "b");
+    subtable->insert_empty_row(1);
+    subtable->set_int(0, 1, 33);
+    subtable->set_string(1, 1, "c");
 
     subtable = table->get_subtable(2, 2);
-    subtable->insert_int(0, 0, 44);
-    subtable->insert_string(1, 0, "d");
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 44);
+    subtable->set_string(1, 0, "d");
 
     subtable = table->get_subtable(2, 3);
-    subtable->insert_int(0, 0, 55);
-    subtable->insert_string(1, 0, "e");
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_int(0, 0, 55);
+    subtable->set_string(1, 0, "e");
 
     Query q1 = table->where();
     q1.subtable(2);
@@ -5598,8 +5589,8 @@ TEST(Query_RefCounting)
 {
     Table* t = LangBindHelper::new_table();
     t->add_column(type_Int, "myint");
-    t->insert_int(0, 0, 12);
-    t->insert_done();
+    t->insert_empty_row(0);
+    t->set_int(0, 0, 12);
 
     Query q = t->where();
 
