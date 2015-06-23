@@ -6734,10 +6734,6 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string 
 
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
-#ifdef _WIN32
-    // fixme
-    std::cerr << "\nLangBindHelper_ImplicitTransactions_MultipleTrackers commented away because it asserts on Windows\n";
-#else
     const int write_thread_count = 7;
     const int read_thread_count = 3; // must be less than 42 for correct operation
 
@@ -6789,7 +6785,6 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     // cleanup
     sg.end_read();
-#endif
 }
 
 #ifndef _WIN32
