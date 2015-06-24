@@ -7169,12 +7169,12 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
 TEST(LangBindHelper_HandoverQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -7182,7 +7182,7 @@ TEST(LangBindHelper_HandoverQuery)
         // Typed interface
         std::unique_ptr<SharedGroup::Handover<TestTableInts::Query> > handover;
         {
-            LangBindHelper::promote_to_write(sg_w);
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
             for (int i = 0; i <100; ++i)
                 table->add(i);
@@ -7195,7 +7195,7 @@ TEST(LangBindHelper_HandoverQuery)
             handover.reset(sg_w.export_for_handover(query, ConstSourcePayload::Copy));
         }
         {
-            LangBindHelper::advance_read(sg,vid);
+            LangBindHelper::advance_read(sg, *hist, vid);
             sg_w.close();
             // importing query
             std::unique_ptr<TestTableInts::Query> q(sg.import_from_handover(handover.release()));
@@ -7212,12 +7212,12 @@ TEST(LangBindHelper_HandoverQuery)
 TEST(LangBindHelper_HandoverAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -7226,7 +7226,7 @@ TEST(LangBindHelper_HandoverAccessors)
         std::unique_ptr<SharedGroup::Handover<TestTableInts::View> > handover;
         {
             TestTableInts::View tv;
-            LangBindHelper::promote_to_write(sg_w);
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
             for (int i = 0; i <100; ++i)
                 table->add(i);
@@ -7244,7 +7244,7 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK(tv.is_attached());
         }
         {
-            LangBindHelper::advance_read(sg,vid);
+            LangBindHelper::advance_read(sg, *hist, vid);
             //sg_w.end_read();
             sg_w.close();
             // importing tv
@@ -7268,9 +7268,9 @@ TEST(LangBindHelper_HandoverAccessors)
         {
             TableView tv;
             Row row;
-            sg_w.open(*repl_w, SharedGroup::durability_Full, crypt_key());
+            sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
             sg_w.begin_read();
-            LangBindHelper::promote_to_write(sg_w);
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -7321,7 +7321,7 @@ TEST(LangBindHelper_HandoverAccessors)
 
         }
         {
-            LangBindHelper::advance_read(sg,vid);
+            LangBindHelper::advance_read(sg, *hist, vid);
             sg_w.close();
             // importing tv:
             std::unique_ptr<TableView> tv( sg.import_from_handover(handover2.release()) );
@@ -7424,18 +7424,18 @@ struct HandoverControl {
 
 void handover_writer(std::string path)
 {
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TheTable::Ref table = g.get_table<TheTable>("table");
     Random random(random_int<unsigned long>());
     for (int i = 1; i < 500; ++i)
     {
-        LangBindHelper::promote_to_write(sg);
+        LangBindHelper::promote_to_write(sg, *hist);
         table->add(1 + random.draw_int_mod(100));
         LangBindHelper::commit_and_continue_as_read(sg);
     }
-    LangBindHelper::promote_to_write(sg);
+    LangBindHelper::promote_to_write(sg, *hist);
     table[0].first = 0; // <---- signals other threads to stop
     LangBindHelper::commit_and_continue_as_read(sg);
     sg.end_read();
@@ -7445,8 +7445,8 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
                       TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
@@ -7457,7 +7457,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
             sched_yield();
             continue;
         }
-        LangBindHelper::advance_read(sg);
+        LangBindHelper::advance_read(sg, *hist);
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
@@ -7473,8 +7473,8 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
                        TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
         SharedGroup::Handover<TableView>* handover;
         SharedGroup::VersionID version;
@@ -7502,8 +7502,8 @@ TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(p);
     std::string path(p);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = sg.begin_write();
     TheTable::Ref table = g.add_table<TheTable>("table");
     sg.commit();
@@ -7536,8 +7536,8 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
                       TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
@@ -7548,7 +7548,7 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
             sched_yield();
             continue;
         }
-        LangBindHelper::advance_read(sg);
+        LangBindHelper::advance_read(sg, *hist);
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
@@ -7564,7 +7564,7 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
             while (!sg.has_changed()) {
                 sched_yield();
             }
-            LangBindHelper::advance_read(sg);
+            LangBindHelper::advance_read(sg, *hist);
             if (table->get_int(0,0) == -1)
                 break;
         }
@@ -7576,8 +7576,8 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
                        TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
         StealingInfo* info;
         SharedGroup::Handover<TableView>* handover;
@@ -7604,7 +7604,7 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
             CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
         delete tv2;
         if (table->size() > 0 && table->get_int(0,0) == 0) {
-            LangBindHelper::promote_to_write(sg);
+            LangBindHelper::promote_to_write(sg, *hist);
             table->set_int(0,0,-1);
             sg.commit();
             break;
@@ -7620,8 +7620,8 @@ TEST(LangBindHelper_HandoverStealing)
 {
     SHARED_GROUP_TEST_PATH(p);
     std::string path(p);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = sg.begin_write();
     TheTable::Ref table = g.add_table<TheTable>("table");
     sg.commit();
@@ -7645,12 +7645,12 @@ TEST(LangBindHelper_HandoverStealing)
 TEST(LangBindHelper_HandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -7661,7 +7661,7 @@ TEST(LangBindHelper_HandoverDependentViews)
         {
             TableView tv1;
             TableView tv2;
-            LangBindHelper::promote_to_write(sg_w);
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -7685,7 +7685,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             CHECK(tv2.is_attached());
         }
         {
-            LangBindHelper::advance_read(sg,vid);
+            LangBindHelper::advance_read(sg, *hist, vid);
             sg_w.close();
             // importing tv:
             std::unique_ptr<TableView> tv2(sg.import_from_handover(handover2.release()) );
@@ -7704,18 +7704,18 @@ TEST(LangBindHelper_HandoverDependentViews)
 TEST(LangBindHelper_HandoverTableViewWithLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
     std::unique_ptr<SharedGroup::Handover<TableView> > handover;
     SharedGroup::VersionID vid;
     {
         TableView tv;
-        LangBindHelper::promote_to_write(sg_w);
+        LangBindHelper::promote_to_write(sg_w, *hist);
 
         TableRef table1 = group_w.add_table("table1");
         TableRef table2 = group_w.add_table("table2");
@@ -7765,7 +7765,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         handover.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
     }
     {
-        LangBindHelper::advance_read(sg, vid);
+        LangBindHelper::advance_read(sg, *hist, vid);
         sg_w.close();
         std::unique_ptr<TableView> tv( sg.import_from_handover(handover.release()) ); // <-- import tv
 
@@ -7777,19 +7777,19 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
 TEST(LangBindHelper_HandoverLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 
-    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<LinkView> > handover;
     SharedGroup::VersionID vid;
     {
 
-        LangBindHelper::promote_to_write(sg_w);
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
 
         TableRef table1 = group_w.add_table("table1");
         TableRef table2 = group_w.add_table("table2");
@@ -7830,7 +7830,7 @@ TEST(LangBindHelper_HandoverLinkView)
         handover.reset(sg_w.export_linkview_for_handover(lvr));
     }
     {
-        LangBindHelper::advance_read(sg, vid);
+        LangBindHelper::advance_read(sg, *hist, vid);
         sg_w.close();
         LinkViewRef lvr = sg.import_linkview_from_handover(handover.release()); // <-- import lvr
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
@@ -7855,12 +7855,12 @@ TEST(LangBindHelper_HandoverLinkView)
 TEST(LangBindHelper_HandoverWithReverseDependency)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -7871,7 +7871,7 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
         TableView tv1;
         TableView tv2;
         {
-            LangBindHelper::promote_to_write(sg_w);
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -7895,7 +7895,6 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
             CHECK(tv2.is_attached());
         }
     }
-
 }
 
 REALM_TABLE_1(MyTable, first,  Int)
@@ -8059,16 +8058,16 @@ TEST(LangBindHelper_LinkListCrash)
 TEST(LangBindHelper_OpenCloseOpen)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    LangBindHelper::promote_to_write(sg_w);
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
     group_w.add_table("bar");
     LangBindHelper::commit_and_continue_as_read(sg_w);
     sg_w.close();
-    sg_w.open(*repl_w, SharedGroup::durability_Full, crypt_key());
+    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
     sg_w.begin_read();
-    LangBindHelper::promote_to_write(sg_w);
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
     group_w.add_table("foo");
     LangBindHelper::commit_and_continue_as_read(sg_w);
     sg_w.close();
