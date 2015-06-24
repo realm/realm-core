@@ -507,6 +507,12 @@ void File::resize(SizeType size)
     }
 
 #ifdef __APPLE__
+    // If we're expanding the file, issue a full fsync to ensure that the file
+    // expanding is committed to disk before returning to avoid the scenario
+    // where writes to the pre-existing portion of the file are committed to
+    // disk before subsequent writes to the new portion of the file.
+    // This is unnecessary if the file was previously empty, as there is no
+    // pre-existing portion of the file.
     if (old_size != 0 && old_size < size) {
         if (::fcntl(m_fd, F_FULLFSYNC) != 0) {
             int err = errno; // Eliminate any risk of clobbering
