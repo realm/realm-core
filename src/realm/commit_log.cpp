@@ -32,13 +32,13 @@
 
 #ifdef REALM_ENABLE_REPLICATION
 
-using namespace util;
+using namespace realm::util;
 
 namespace {
 
 class HistoryEntry {
 public:
-    BinaryData changeset;
+    realm::BinaryData changeset;
 };
 
 } // anonymous namespace
