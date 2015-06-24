@@ -494,6 +494,11 @@ void File::resize(SizeType size)
     if (int_cast_with_overflow_detect(size, size2))
         throw std::runtime_error("File size overflow");
 
+
+#ifdef __APPLE__
+    SizeType old_size = get_size();
+#endif
+
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
     if (::ftruncate(m_fd, size2) != 0) {
@@ -502,9 +507,17 @@ void File::resize(SizeType size)
     }
 
 #ifdef __APPLE__
-    if (::fcntl(m_fd, F_FULLFSYNC) != 0) {
-        int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("fcntl(F_FULLFSYNC) failed: ", err));
+    // If we're expanding the file, issue a full fsync to ensure that the file
+    // expanding is committed to disk before returning to avoid the scenario
+    // where writes to the pre-existing portion of the file are committed to
+    // disk before subsequent writes to the new portion of the file.
+    // This is unnecessary if the file was previously empty, as there is no
+    // pre-existing portion of the file.
+    if (old_size != 0 && old_size < size) {
+        if (::fcntl(m_fd, F_FULLFSYNC) != 0) {
+            int err = errno; // Eliminate any risk of clobbering
+            throw std::runtime_error(get_errno_msg("fcntl(F_FULLFSYNC) failed: ", err));
+        }
     }
 #endif
 
