@@ -1623,7 +1623,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetLink: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t value = read_int<std::size_t>(); // Throws
+            // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
+            std::size_t value = read_int<std::size_t>() - 1; // Throws
             if (!handler.set_link(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
