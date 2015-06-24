@@ -377,11 +377,12 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
 
         // reference must be inside a chunk mapped later
         REALM_ASSERT_DEBUG(m_chunk_size);
-        std::size_t chunk_index = (ref - m_initial_mapping_size) / m_chunk_size;
-        std::size_t chunk_offset = (ref - m_initial_mapping_size) % m_chunk_size;
+        std::size_t chunk_index = get_chunk_index(ref);
+        std::size_t mapping_index = chunk_index - m_first_additional_chunk;
+        std::size_t chunk_offset = ref - get_lower_mmap_boundary(ref);
         REALM_ASSERT_DEBUG(m_additional_mappings);
-        REALM_ASSERT_DEBUG(chunk_index < m_num_additional_mappings);
-        return m_additional_mappings[chunk_index].get_addr() + chunk_offset;
+        REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
+        return m_additional_mappings[mapping_index].get_addr() + chunk_offset;
     }
 
     typedef slabs::const_iterator iter;
@@ -460,11 +461,15 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // first, save the original filesize for use later when converting from streaming format
     size_of_streaming_file = size;
 
-    // next extend the file to a multiple of chunk_size (unless already there)
+    // next extend the file to a mmapping boundary (unless already there)
     // The file must be extended prior to being mmapped, as extending it after mmap has
     // undefined behavior.
-    if (m_chunk_size && ((size % m_chunk_size) != 0)) {
-        size += m_chunk_size - (size % m_chunk_size); // realign on chunk boundary
+    // The mapping of the first part of the file *must* be contiguous, because
+    // we do not know if the file was created without chunking. If it was created 
+    // without chunking, we cannot map it in chunks without risking datastructures
+    // that cross a mapping boundary.
+    if (chunk_mapping_enabled() && !matches_mmap_boundary(size)) {
+        size = get_upper_mmap_boundary(size);
         m_file.resize(size);
         // resizing the file (as we do here) without actually changing any internal
         // datastructures to reflect the additional free space will work, because the
@@ -484,6 +489,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_data        = map.release();
         m_baseline    = size;
         m_initial_mapping_size = size;
+        m_first_additional_chunk = get_chunk_index(m_initial_mapping_size);
         m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
 
         Header* header;
@@ -705,14 +711,17 @@ bool SlabAlloc::remap(size_t file_size)
     REALM_ASSERT_DEBUG(m_baseline <= file_size);
 
     bool addr_changed;
-    if (m_chunk_size) {
+    if (chunk_mapping_enabled()) {
 
         // Extend mapping by adding chunks
-        REALM_ASSERT_DEBUG((file_size % m_chunk_size) == 0);
+        REALM_ASSERT_DEBUG(matches_mmap_boundary(file_size));
         m_file.resize(file_size);
         m_baseline = file_size;
-        auto additional_mapping_size = file_size - m_initial_mapping_size;
-        auto num_additional_mappings = 1 + ((additional_mapping_size-1) / m_chunk_size);
+        auto num_chunks = get_chunk_index(file_size);
+        auto num_additional_mappings = num_chunks - m_first_additional_chunk;
+
+        //auto additional_mapping_size = file_size - m_initial_mapping_size;
+        //auto num_additional_mappings = 1 + ((additional_mapping_size-1) / m_chunk_size);
         if (num_additional_mappings > m_capacity_additional_mappings) {
             // FIXME: No harcoded constants here
             m_capacity_additional_mappings = num_additional_mappings + 128;
@@ -722,7 +731,7 @@ bool SlabAlloc::remap(size_t file_size)
             delete[] m_additional_mappings;
             m_additional_mappings = new_mappings;
         }
-        for (std::size_t k = m_num_additional_mappings; k < num_additional_mappings; ++k)
+        for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
         {
             auto chunk_start_offset = m_initial_mapping_size + k * m_chunk_size;
             util::File::Map<char> map(m_file, chunk_start_offset, File::access_ReadOnly, m_chunk_size);
@@ -763,6 +772,36 @@ const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
     return m_free_read_only;
 }
 
+
+bool SlabAlloc::chunk_mapping_enabled() const REALM_NOEXCEPT
+{ 
+    return m_chunk_size != 0; 
+}
+
+std::size_t SlabAlloc::get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+{
+    return get_chunk_base(1+get_chunk_index(start_pos));
+}
+
+std::size_t SlabAlloc::get_lower_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+{
+    return get_chunk_base(get_chunk_index(start_pos));
+}
+
+bool SlabAlloc::matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT
+{
+    return pos == get_lower_mmap_boundary(pos);
+}
+
+std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
+{
+    return chunk_mapping_enabled() ? (pos / m_chunk_size) : 0;
+}
+
+std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
+{
+    return index * m_chunk_size;
+}
 
 #ifdef REALM_DEBUG
 

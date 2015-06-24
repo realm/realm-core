@@ -272,6 +272,7 @@ size_t GroupWriter::get_free_space(size_t size)
 
 std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
+    REALM_ASSERT(size < 512 * 1024);
     ArrayInteger& lengths  = m_group.m_free_lengths;
     ArrayInteger& versions = m_group.m_free_versions;
     ArrayInteger& pos      = m_group.m_free_positions;
@@ -287,8 +288,12 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     size_t begin = size < 1024 ? 0 : end / 2;
 
     // Do we have a free space we can reuse?
-  again:
-    for (size_t i = begin; i != end; ++i) {
+    for (size_t v = 0, i = begin; v != end; ++v, ++i) {
+
+        // if we started at the middle, we have to wrap around when we reach the end:
+        if (i == end) {
+            i = 0;
+        }
         size_t chunk_size = to_size_t(lengths.get(i));
         if (chunk_size >= size) {
             // Only blocks that are not occupied by current readers
@@ -304,7 +309,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
                 // split block, if the allocation cannot be placed inside it
                 // without crossing mmap boundary.
                 size_t start_pos = to_size_t(pos.get(i));
-                size_t first_mmap_boundary = alloc.get_first_mmap_boundary(start_pos);
+                size_t first_mmap_boundary = alloc.get_upper_mmap_boundary(start_pos);
                     // start_pos + mmap_chunk_size - (start_pos % mmap_chunk_size);
 
                 // if chunk straddles one or more chunk boundaries:
@@ -332,12 +337,6 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             // Match found!
             return std::make_pair(i, chunk_size);
         }
-    }
-
-    if (begin > 0) {
-        end = begin;
-        begin = 0;
-        goto again;
     }
 
     // No free space, so we have to extend the file.
@@ -395,7 +394,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     if (uses_chunked_mapping) {
         new_file_size = logical_file_size + extend_size;
         if (!alloc.matches_mmap_boundary(new_file_size))
-            new_file_size = alloc.get_first_mmap_boundary(new_file_size);
+            new_file_size = alloc.get_upper_mmap_boundary(new_file_size);
             //if ((new_file_size % alloc_chunk_size) != 0)
             //new_file_size += alloc_chunk_size - (new_file_size % alloc_chunk_size);
     }

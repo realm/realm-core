@@ -344,6 +344,7 @@ private:
     // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
     char* m_data = 0;
     std::size_t m_initial_mapping_size = 0;
+    std::size_t m_first_additional_chunk = 0;
     std::size_t m_num_additional_mappings = 0;
     std::size_t m_capacity_additional_mappings = 0;
     std::size_t m_chunk_size = 0;
@@ -404,17 +405,25 @@ private:
     void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
 #endif
     /// Indicates whether chunked memory mapping is in use or not.
-    bool chunk_mapping_enabled() { return m_chunk_size != 0; }
+    bool chunk_mapping_enabled() const REALM_NOEXCEPT;
 
-    /// Returns the first mmap boundary *after* the given position.
-    std::size_t get_first_mmap_boundary(std::size_t start_pos) {
-        return start_pos + m_chunk_size - (start_pos % m_chunk_size);
-    }
+    /// Returns the first mmap boundary *above* the given position.
+    std::size_t get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
+
+    /// Returns the first mmap boundary *at or below* the given position.
+    std::size_t get_lower_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
 
     /// Returns true if the given position is at a mmap boundary
-    bool matches_mmap_boundary(std::size_t pos) {
-        return (pos % m_chunk_size) == 0;
-    }
+    bool matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT;
+
+    /// Returns the index of the chunk holding a given address.
+    /// The chunk index is determined solely by the minimal chunk size,
+    /// and does not necessarily reflect the mapping. A mapping may
+    /// cover multiple chunks - the initial mapping often does.
+    std::size_t get_chunk_index(std::size_t pos) const REALM_NOEXCEPT;
+
+    /// Reverse: get the base offset of a chunk at a given index
+    std::size_t get_chunk_base(std::size_t index) const REALM_NOEXCEPT;
 
     friend class Group;
     friend class GroupWriter;

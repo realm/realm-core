@@ -697,7 +697,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
 #endif
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
                                                  no_create, skip_validate, key, 
-                                                 server_sync_mode, begin_new_session, 16*1024*1024); // Throws
+                                                 server_sync_mode, begin_new_session, 512 * 1024); // Throws
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
@@ -888,7 +888,7 @@ bool SharedGroup::compact()
     bool is_session_initiator = true;
     ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create, 
                                          skip_validate, m_key, server_sync_mode,
-                                         is_session_initiator, 16 * 1024 * 1024); // Throws
+                                         is_session_initiator, 512 * 1024); // Throws
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match
