@@ -1761,9 +1761,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_EraseRows: {
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t num_rows = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            std::size_t last_row_ndx = read_int<std::size_t>(); // Throws
             bool unordered = read_int<bool>(); // Throws
-            if (!handler.erase_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
+            if (!handler.erase_rows(row_ndx, num_rows, last_row_ndx, unordered)) // Throws
                 parser_error();
             return;
         }
@@ -2253,9 +2253,9 @@ public:
         return true;
     }
 
-    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t last_row_ndx, bool unordered)
     {
-        m_encoder.insert_empty_rows(idx, num_rows, tbl_sz, unordered);
+        m_encoder.insert_empty_rows(idx, num_rows, last_row_ndx + 1, unordered);
         append_instruction();
         return true;
     }

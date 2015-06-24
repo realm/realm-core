@@ -7110,7 +7110,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
 }
 
 
-ONLY(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
+TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
