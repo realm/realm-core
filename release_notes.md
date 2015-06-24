@@ -6,7 +6,10 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Support for the following deprecated operations on Table has been removed:
+  insert_int, insert_string, etc., insert_done, and add_int. To insert a value,
+  one must now call insert_empty_row, then set the appropriate values for each
+  column.
 
 ### Enhancements:
 
