@@ -1123,18 +1123,17 @@ public:
                            bool unordered) REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
-        if (unordered) {
-            if (m_table) {
+        if (m_table) {
+            if (unordered) {
                 if (num_rows == 0)
                     tf::mark_opposite_link_tables(*m_table);
                 while (num_rows--) {
                     tf::adj_acc_move_over(*m_table, row_ndx + num_rows, last_row_ndx - num_rows);
                 }
             }
-        }
-        else {
-            if (m_table)
+            else {
                 tf::adj_acc_insert_rows(*m_table, row_ndx, num_rows);
+            }
         }
         return true;
     }

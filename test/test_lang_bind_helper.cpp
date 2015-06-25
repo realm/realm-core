@@ -460,6 +460,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     LangBindHelper::advance_read(sg, *hist);
 }
 
+
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -512,6 +513,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
     CHECK_EQUAL(3, lvr->get(2).get_index());
     CHECK_EQUAL(0, lvr->get(3).get_index());
 }
+
 
 TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {
@@ -5645,6 +5647,103 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_NonEndRowInsertWithLinks)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+
+    // Create two inter-linked tables, each with four rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        TableRef bar_w = wt.add_table("bar");
+        foo_w->add_column_link(type_Link,     "l",  *bar_w);
+        bar_w->add_column_link(type_LinkList, "ll", *foo_w);
+        foo_w->add_empty_row(4);
+        bar_w->add_empty_row(4);
+        foo_w->set_link(0,0,3);
+        foo_w->set_link(0,1,0);
+        foo_w->set_link(0,3,0);
+        bar_w->get_linklist(0,0)->add(1);
+        bar_w->get_linklist(0,0)->add(2);
+        bar_w->get_linklist(0,1)->add(0);
+        bar_w->get_linklist(0,1)->add(3);
+        bar_w->get_linklist(0,1)->add(0);
+        bar_w->get_linklist(0,2)->add(2);
+        bar_w->get_linklist(0,2)->add(2);
+        bar_w->get_linklist(0,2)->add(2);
+        bar_w->get_linklist(0,2)->add(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.Verify();
+
+    ConstTableRef foo = rt.get_table("foo");
+    ConstTableRef bar = rt.get_table("bar");
+    ConstRow foo_0 = (*foo)[0];
+    ConstRow foo_1 = (*foo)[1];
+    ConstRow foo_2 = (*foo)[2];
+    ConstRow foo_3 = (*foo)[3];
+    ConstRow bar_0 = (*bar)[0];
+    ConstRow bar_1 = (*bar)[1];
+    ConstRow bar_2 = (*bar)[2];
+    ConstRow bar_3 = (*bar)[3];
+    ConstLinkViewRef link_list_0 = bar->get_linklist(0,0);
+    ConstLinkViewRef link_list_1 = bar->get_linklist(0,1);
+    ConstLinkViewRef link_list_2 = bar->get_linklist(0,2);
+    ConstLinkViewRef link_list_3 = bar->get_linklist(0,3);
+
+    // Perform two non-end insertions in each table.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.get_table("foo");
+        TableRef bar_w = wt.get_table("bar");
+        foo_w->insert_empty_row(2,1);
+        foo_w->insert_empty_row(0,1);
+        bar_w->insert_empty_row(3,1);
+        bar_w->insert_empty_row(1,3);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.Verify();
+
+    // Check that row and link list accessors are also properly adjusted.
+    CHECK_EQUAL(1, foo_0.get_index());
+    CHECK_EQUAL(2, foo_1.get_index());
+    CHECK_EQUAL(4, foo_2.get_index());
+    CHECK_EQUAL(5, foo_3.get_index());
+    CHECK_EQUAL(0, bar_0.get_index());
+    CHECK_EQUAL(4, bar_1.get_index());
+    CHECK_EQUAL(5, bar_2.get_index());
+    CHECK_EQUAL(7, bar_3.get_index());
+    CHECK_EQUAL(0, link_list_0->get_origin_row_index());
+    CHECK_EQUAL(4, link_list_1->get_origin_row_index());
+    CHECK_EQUAL(5, link_list_2->get_origin_row_index());
+    CHECK_EQUAL(7, link_list_3->get_origin_row_index());
+
+    // Check that links and backlinks are properly adjusted.
+    CHECK_EQUAL(7, foo_0.get_link(0));
+    CHECK_EQUAL(0, foo_1.get_link(0));
+    CHECK(foo_2.is_null_link(0));
+    CHECK_EQUAL(0, foo_3.get_link(0));
+    CHECK_EQUAL(2, link_list_0->get(0).get_index());
+    CHECK_EQUAL(4, link_list_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1->get(0).get_index());
+    CHECK_EQUAL(5, link_list_1->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1->get(2).get_index());
+    CHECK_EQUAL(4, link_list_2->get(0).get_index());
+    CHECK_EQUAL(4, link_list_2->get(1).get_index());
+    CHECK_EQUAL(4, link_list_2->get(2).get_index());
+    CHECK_EQUAL(1, link_list_2->get(3).get_index());
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -6704,10 +6803,6 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string 
 
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
-#ifdef _WIN32
-    // fixme
-    std::cerr << "\nLangBindHelper_ImplicitTransactions_MultipleTrackers commented away because it asserts on Windows\n";
-#else
     const int write_thread_count = 7;
     const int read_thread_count = 3; // must be less than 42 for correct operation
 
@@ -6759,7 +6854,6 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     // cleanup
     sg.end_read();
-#endif
 }
 
 #ifndef _WIN32

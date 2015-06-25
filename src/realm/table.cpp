@@ -1978,6 +1978,8 @@ void Table::move_last_over(size_t row_ndx)
     REALM_ASSERT_3(row_ndx, <, m_size);
 
     size_t table_ndx = get_index_in_group();
+
+    // this is a subtable or freestanding table:
     if (table_ndx == realm::npos) {
 #ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl()) {
@@ -2710,7 +2712,6 @@ size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     bump_version();
     return old_target_row_ndx;
 }
-
 
 ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
 {
@@ -4465,7 +4466,7 @@ void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
 
     adj_row_acc_insert_rows(row_ndx, num_rows);
 
-    // Adjust subtable accessors after insertion of new rows
+    // Adjust column and subtable accessors after insertion of new rows
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
