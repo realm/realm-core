@@ -259,26 +259,23 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 {
 #if REALM_NULL_STRINGS == 1
     if (str.is_null())
-    return 0;
+        return 0;
 
     if (offset > str.size())
         return 0;
-    else {
-        size_t tail = str.size() - offset;
-        if (tail <= sizeof(key_type)-1) {
-            char buf[sizeof(key_type)];
-            memset(buf, 0, sizeof(key_type));
-            buf[tail] = 'X';
-            memcpy(buf, str.data() + offset, tail);
-            return create_key(StringData(buf, tail + 1));
-        }
-        else {
-            return create_key(str.substr(offset));
-        }
+
+    // for very short strings
+    size_t tail = str.size() - offset;
+    if (tail <= sizeof(key_type)-1) {
+        char buf[sizeof(key_type)];
+        memset(buf, 0, sizeof(key_type));
+        buf[tail] = 'X';
+        memcpy(buf, str.data() + offset, tail);
+        return create_key(StringData(buf, tail + 1));
     }
-#else
-    return create_key(str.substr(offset));
+    // else fallback
 #endif
+    return create_key(str.substr(offset));
 }
 
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
