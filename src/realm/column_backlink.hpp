@@ -60,6 +60,7 @@ public:
     ColumnLinkBase& get_origin_column() const REALM_NOEXCEPT;
     void set_origin_column(ColumnLinkBase& column, std::size_t col_ndx) REALM_NOEXCEPT;
 
+    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) override;
     void erase(std::size_t, bool) override;
     void move_last_over(std::size_t, std::size_t, bool) override;
     void clear(std::size_t, bool) override;
