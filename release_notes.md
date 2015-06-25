@@ -13,6 +13,7 @@
 ### Enhancements:
 
 * Generic networking API added.
+* Support for non-end row insertion in tables with link and link list columns.
 
 ### Internals:
 
