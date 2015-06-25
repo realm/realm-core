@@ -215,32 +215,21 @@ void ColumnBackLink::insert(size_t row_ndx, size_t num_rows, bool is_append)
 {
     Column::insert(row_ndx, num_rows, is_append);
 
-    // nov move forward linkrefs reachable through backlinks:
-    size_t last_row_ndx = size() - 1; // FIXME: Expensive to compute the number of rows this way. The number of rows should probably be passed as an extra argument.
-    for (size_t target_ndx = last_row_ndx; target_ndx >= row_ndx+num_rows; --target_ndx) { // FIXME: Bad aritjmetic here, if row_ndx+num_rows == 0, then this loop runs forever
-        size_t source_ndx = target_ndx - num_rows;
-        // We have already moved the content, so the backward link
-        // is already at the target index:
-        uint_fast64_t backward_link = Column::get_uint(target_ndx);
-        if (backward_link != 0) {
-            if ((backward_link & 1) != 0) {
-                // the leaf is a single link, so update a single link target
-                size_t origin_row_ndx = to_size_t(backward_link >> 1);
-                m_origin_column->do_update_link(origin_row_ndx, source_ndx, target_ndx); // Throws
-            }
-            else {
-                // the leaf holds multiple links, so update all targets at list of links
-                ref_type ref = to_ref(backward_link);
-                Column backlink_list(get_alloc(), ref); // Throws
+    if (is_append)
+        return;
 
-                size_t n = backlink_list.size();
-                for (size_t i = 0; i < n; ++i) {
-                    int_fast64_t value_2 = backlink_list.get(i);
-                    size_t origin_row_ndx = to_size_t(value_2);
-                    m_origin_column->do_update_link(origin_row_ndx, source_ndx, target_ndx); // Throws
-                }
-            }
-        }
+    // Update forward links to moved rows
+    size_t new_total_num_rows = size(); // FIXME: Expensive to compute the number of rows this way. The number of rows should probably be passed as an extra argument.
+    size_t old_total_num_rows = new_total_num_rows - num_rows;
+    for (size_t i = old_total_num_rows; i > row_ndx; --i) {
+        size_t old_target_row_ndx = i - 1;
+        size_t new_target_row_ndx = old_target_row_ndx + num_rows;
+        auto handler = [=](size_t origin_row_ndx) {
+            m_origin_column->do_update_link(origin_row_ndx, old_target_row_ndx,
+                                            new_target_row_ndx); // Throws
+        };
+        bool do_destroy = false;
+        for_each_link(new_target_row_ndx, do_destroy, handler); // Throws
     }
 }
 

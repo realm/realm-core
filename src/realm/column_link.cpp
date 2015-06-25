@@ -75,15 +75,20 @@ void ColumnLink::insert(std::size_t row_ndx, std::size_t num_rows, bool is_appen
 {
     ColumnLinkBase::insert(row_ndx, num_rows, is_append); // Throws
 
-    // update all backlinks to reflect the insertion.
-    size_t last_row_ndx = size() - 1; // FIXME: Expensive to compute the number of rows this way. The number of rows should probably be passed as an extra argument.
-    for (size_t target_ndx = last_row_ndx; target_ndx >= row_ndx+num_rows; --target_ndx) { // FIXME: Bad aritjmetic here, if row_ndx+num_rows == 0, then this loop runs forever
-        size_t source_ndx = target_ndx - num_rows;
-        uint_fast64_t forward_link_ndx = ColumnLinkBase::get_uint(target_ndx);
-        if (forward_link_ndx) {
-            // remember that the forward link index is of by 1 to make room
-            // for 0 to mean "no link" - so subtract one in the call to update_backlink
-            m_backlink_column->update_backlink(forward_link_ndx-1,source_ndx,target_ndx);
+    if (is_append)
+        return;
+
+    // Update backlinks to moved rows
+    size_t new_total_num_rows = size(); // FIXME: Expensive to compute the number of rows this way. The number of rows should probably be passed as an extra argument.
+    size_t old_total_num_rows = new_total_num_rows - num_rows;
+    for (size_t i = old_total_num_rows; i > row_ndx; --i) {
+        size_t old_source_row_ndx = i - 1;
+        size_t new_source_row_ndx = old_source_row_ndx + num_rows;
+        uint_fast64_t value = ColumnLinkBase::get_uint(new_source_row_ndx);
+        if (value != 0) { // Zero means null
+            size_t target_row_ndx = to_size_t(value - 1);
+            m_backlink_column->update_backlink(target_row_ndx, old_source_row_ndx,
+                                               new_source_row_ndx); // Throws
         }
     }
 }
