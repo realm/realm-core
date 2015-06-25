@@ -336,13 +336,12 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
 {
     REALM_ASSERT(m_row_indexes.is_attached());
 
-    // FIXME: This code assumes that a linklist/view holds exactly one link to
-    // a given target. However, the public interface allows for adding/setting
-    // multiple links to the same target. The following code *only* updates the
-    // first of any target index.
-    //
-    // META FIXME: Oops, I don't think this assumption is fair. Link lists are
-    // allowed to hold multiple links to the same target row.
+    // While there may be multiple links in this list pointing to the specified
+    // old target row index, This function is supposed to only update the first
+    // one. If there are more links pointing to the same target row, they will
+    // be updated by subsequent involcations of this function. I.e., it is the
+    // responsibility of the caller to call this function the right number of
+    // times.
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
     REALM_ASSERT_3(pos, !=, realm::not_found);
 

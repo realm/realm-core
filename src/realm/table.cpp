@@ -4709,7 +4709,7 @@ void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
 
     adj_row_acc_insert_rows(row_ndx, num_rows);
 
-    // Adjust subtable accessors after insertion of new rows
+    // Adjust column and subtable accessors after insertion of new rows
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
