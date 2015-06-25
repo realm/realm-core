@@ -6476,10 +6476,27 @@ public:
     bool insert_link(size_t, size_t, size_t, size_t) { return false; }
     bool insert_link_list(size_t, size_t, size_t) { return false; }
 };
+
+struct AdvanceReadTransact {
+    template<typename Func>
+    static void call(SharedGroup& sg, History& history, Func&& func)
+    {
+        LangBindHelper::advance_read(sg, history, std::forward<Func&&>(func));
+    }
+};
+
+struct PromoteThenRollback {
+    template<typename Func>
+    static void call(SharedGroup& sg, History& history, Func&& func)
+    {
+        LangBindHelper::promote_to_write(sg, history, std::forward<Func&&>(func));
+        LangBindHelper::rollback_and_continue_as_read(sg, history);
+    }
+};
 }
 
 
-TEST(LangBindHelper_AdvanceReadTransact_TransactLog)
+TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, PromoteThenRollback)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
@@ -6502,7 +6519,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TransactLog)
                 CHECK(false);
             }
         } parser(test_results);
-        LangBindHelper::advance_read(sg, *hist, parser);
+        TEST_TYPE::call(sg, *hist, parser);
     }
 
     std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
@@ -6521,7 +6538,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TransactLog)
                 called = true;
             }
         } parser(test_results);
-        LangBindHelper::advance_read(sg, *hist, parser);
+        TEST_TYPE::call(sg, *hist, parser);
         CHECK(parser.called);
     }
 
@@ -6549,7 +6566,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TransactLog)
                 return true;
             }
         } parser(test_results);
-        LangBindHelper::advance_read(sg, *hist, parser);
+        TEST_TYPE::call(sg, *hist, parser);
         CHECK_EQUAL(2, parser.expected_table);
     }
 
@@ -6604,7 +6621,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TransactLog)
                 return true;
             }
         } parser(test_results);
-        LangBindHelper::advance_read(sg, *hist, parser);
+        TEST_TYPE::call(sg, *hist, parser);
     }
 
     { // Verify that clear() logs the correct rows
@@ -6641,7 +6658,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TransactLog)
                 return true;
             }
         } parser(test_results);
-        LangBindHelper::advance_read(sg, *hist, parser);
+        TEST_TYPE::call(sg, *hist, parser);
     }
 }
 
