@@ -121,7 +121,7 @@ Array(alloc), m_nullable(nullable)
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in ArrayString.*
 inline ArrayString::ArrayString(no_prealloc_tag) REALM_NOEXCEPT:
-    Array(*static_cast<Allocator*>(0))
+    Array(*static_cast<Allocator*>(nullptr))
 {
 }
 

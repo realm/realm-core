@@ -143,7 +143,7 @@ private:
     void bind(T* p) REALM_NOEXCEPT { if (p) p->bind_ref(); m_ptr = p; }
     void unbind() REALM_NOEXCEPT { if (m_ptr) m_ptr->unbind_ref(); }
 
-    T* release() REALM_NOEXCEPT { T* const p = m_ptr; m_ptr = 0; return p; }
+    T* release() REALM_NOEXCEPT { T* const p = m_ptr; m_ptr = nullptr; return p; }
 
     template<class> friend class bind_ptr;
 };

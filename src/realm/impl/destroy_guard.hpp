@@ -134,7 +134,7 @@ template<class T> inline T* DestroyGuard<T>::get() const REALM_NOEXCEPT
 template<class T> inline T* DestroyGuard<T>::release() REALM_NOEXCEPT
 {
     T* ptr = m_ptr;
-    m_ptr = 0;
+    m_ptr = nullptr;
     return ptr;
 }
 
@@ -172,7 +172,7 @@ inline Array* DeepArrayDestroyGuard::get() const REALM_NOEXCEPT
 inline Array* DeepArrayDestroyGuard::release() REALM_NOEXCEPT
 {
     Array* ptr = m_ptr;
-    m_ptr = 0;
+    m_ptr = nullptr;
     return ptr;
 }
 

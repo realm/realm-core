@@ -171,7 +171,7 @@ TEST(Replication_General)
         wt.commit();
     }
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -212,7 +212,7 @@ TEST(Replication_Links)
         wt.commit();
     }
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -296,7 +296,7 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
 
     MyTrivialReplication repl(path_1);
@@ -501,7 +501,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
 
     SharedGroup sg(path_1);
@@ -605,7 +605,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
 
     SharedGroup sg(path_1);
@@ -718,7 +718,7 @@ TEST(Replication_NullStrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);

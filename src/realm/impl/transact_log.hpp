@@ -1337,20 +1337,20 @@ inline void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
 inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) REALM_NOEXCEPT
 {
     if (m_selected_table == t)
-        m_selected_table = 0;
+        m_selected_table = nullptr;
 }
 
 inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) REALM_NOEXCEPT
 {
     if (m_selected_spec == s)
-        m_selected_spec = 0;
+        m_selected_spec = nullptr;
 }
 
 
 inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) REALM_NOEXCEPT
 {
     if (m_selected_link_list == &list)
-        m_selected_link_list = 0;
+        m_selected_link_list = nullptr;
 }
 
 inline std::size_t TransactLogEncoder::max_required_bytes_for_string_value(std::size_t size) const
@@ -1384,7 +1384,7 @@ template <class InstructionHandler>
 void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler)
 {
     m_input = &in;
-    m_input_begin = m_input_end = 0;
+    m_input_begin = m_input_end = nullptr;
 
     while (has_next())
         parse_one(handler); // Throws
