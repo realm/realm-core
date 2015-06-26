@@ -547,7 +547,7 @@ public:
                         "\""<<name<< "\", "<<nullable<<")\n";
                 }
 #endif
-                Table* link_target_table = 0;
+                Table* link_target_table = nullptr;
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
                 return true;
             }
@@ -889,7 +889,7 @@ public:
         if (m_begin != 0) {
             begin = m_begin;
             end = m_end;
-            m_begin = 0;
+            m_begin = nullptr;
             return end - begin;
         }
         return 0;

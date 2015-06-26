@@ -18,7 +18,7 @@
     std::string resource_path{[[[NSBundle mainBundle] resourcePath] UTF8String]};
     realm::test_util::set_test_resource_path(resource_path + "/");
 
-    test_all(0, NULL);
+    test_all(0, nullptr);
     exit(0);
 }
 

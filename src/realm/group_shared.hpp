@@ -595,7 +595,7 @@ public:
     {
         REALM_ASSERT(m_shared_group);
         SharedGroup::version_type new_version = m_shared_group->commit();
-        m_shared_group = 0;
+        m_shared_group = nullptr;
         return new_version;
     }
 
@@ -603,7 +603,7 @@ public:
     {
         REALM_ASSERT(m_shared_group);
         m_shared_group->rollback();
-        m_shared_group = 0;
+        m_shared_group = nullptr;
     }
 
 private:

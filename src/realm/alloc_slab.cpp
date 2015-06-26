@@ -513,7 +513,7 @@ void SlabAlloc::attach_empty()
     REALM_ASSERT(!is_attached());
 
     m_attach_mode = attach_OwnedBuffer;
-    m_data = 0; // Empty buffer
+    m_data = nullptr; // Empty buffer
 
     // No ref must ever be less that the header size, so we will use that as the
     // baseline here.

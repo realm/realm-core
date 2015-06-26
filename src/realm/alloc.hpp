@@ -221,7 +221,7 @@ inline ref_type to_ref(int_fast64_t v) REALM_NOEXCEPT
 }
 
 inline MemRef::MemRef() REALM_NOEXCEPT:
-    m_addr(0),
+    m_addr(nullptr),
     m_ref(0)
 {
 }
@@ -287,7 +287,7 @@ inline bool Allocator::is_read_only(ref_type ref) const REALM_NOEXCEPT
 inline Allocator::Allocator() REALM_NOEXCEPT
 {
 #ifdef REALM_ENABLE_REPLICATION
-    m_replication = 0;
+    m_replication = nullptr;
 #endif
 #ifdef REALM_DEBUG
     m_watch = 0;
