@@ -56,7 +56,13 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
 
 size_t get_page_size()
 {
+#ifdef _WIN32
+    SYSTEM_INFO sysinfo;
+    GetNativeSystemInfo(&sysinfo);
+    DWORD size = sysinfo.dwPageSize;
+#else
     long size = sysconf(_SC_PAGESIZE);
+#endif
     REALM_ASSERT(size > 0 && size % 4096 == 0);
     return static_cast<size_t>(size);
 }
