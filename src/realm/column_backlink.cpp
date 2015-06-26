@@ -211,6 +211,29 @@ void ColumnBackLink::erase(size_t, bool)
 }
 
 
+void ColumnBackLink::insert(size_t row_ndx, size_t num_rows, bool is_append)
+{
+    Column::insert(row_ndx, num_rows, is_append);
+
+    if (is_append)
+        return;
+
+    // Update forward links to moved rows
+    size_t new_total_num_rows = size(); // FIXME: Expensive to compute the number of rows this way. The number of rows should probably be passed as an extra argument.
+    size_t old_total_num_rows = new_total_num_rows - num_rows;
+    for (size_t i = old_total_num_rows; i > row_ndx; --i) {
+        size_t old_target_row_ndx = i - 1;
+        size_t new_target_row_ndx = old_target_row_ndx + num_rows;
+        auto handler = [=](size_t origin_row_ndx) {
+            m_origin_column->do_update_link(origin_row_ndx, old_target_row_ndx,
+                                            new_target_row_ndx); // Throws
+        };
+        bool do_destroy = false;
+        for_each_link(new_target_row_ndx, do_destroy, handler); // Throws
+    }
+}
+
+
 void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx, bool)
 {
     REALM_ASSERT_DEBUG(row_ndx <= last_row_ndx);

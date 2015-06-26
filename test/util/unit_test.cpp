@@ -289,7 +289,7 @@ void TestList::ExecContext::run()
 {
     Timer timer;
     double time = 0;
-    Test* test = 0;
+    Test* test = nullptr;
     for (;;) {
         double prev_time = time;
         time = timer.get_elapsed_time();

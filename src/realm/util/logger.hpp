@@ -36,81 +36,12 @@ namespace util {
 ///
 ///    logger.log("Overlong message from master coordinator");
 ///    logger.log("Listening for peers on %1:%2", listen_address, listen_port);
-///    logger.log_with_tuple("c=%3, a=%1, b=%2", (tuple(), a, b, c));
 class Logger {
 public:
-#ifdef REALM_HAVE_CXX11_VARIADIC_TEMPLATES
-
     template<class... Params> void log(const char* message, Params... params)
     {
         State state(message);
         log_impl(state, params...);
-    }
-
-#else
-
-    void log(const char* message)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple());
-    }
-
-    template<class A> void log(const char* message, const A& a)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple(a));
-    }
-
-    template<class A, class B> void log(const char* message, const A& a, const B& b)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple(a,b));
-    }
-
-    template<class A, class B, class C>
-    void log(const char* message, const A& a, const B& b, const C& c)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple(a,b,c));
-    }
-
-    template<class A, class B, class C, class D>
-    void log(const char* message, const A& a, const B& b, const C& c, const D& d)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple(a,b,c,d));
-    }
-
-    template<class A, class B, class C, class D, class E>
-    void log(const char* message, const A& a, const B& b, const C& c, const D& d,
-             const E& e)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple(a,b,c,d,e));
-    }
-
-    template<class A, class B, class C, class D, class E, class F>
-    void log(const char* message, const A& a, const B& b, const C& c, const D& d,
-             const E& e, const F& f)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple(a,b,c,d,e,f));
-    }
-
-    template<class A, class B, class C, class D, class E, class F, class G>
-    void log(const char* message, const A& a, const B& b, const C& c, const D& d,
-             const E& e, const F& f, const G& g)
-    {
-        State state(message);
-        log_impl_with_tuple(state, tuple(a,b,c,d,e,f,g));
-    }
-
-#endif
-
-    template<class L> void log_with_tuple(const char* message, const Tuple<L>& params)
-    {
-        State state(message);
-        log_impl_with_tuple(state, params);
     }
 
     virtual ~Logger() {}
@@ -130,9 +61,13 @@ private:
     struct State {
         std::string m_message;
         std::string m_search;
-        int m_param_num;
+        int m_param_num = 1;
         std::ostringstream m_formatter;
-        State(const char* s): m_message(s), m_search(m_message), m_param_num(1) {}
+        State(const char* s):
+            m_message(s),
+            m_search(m_message)
+        {
+        }
     };
 
     template<class T> struct Subst {
@@ -158,19 +93,11 @@ private:
         do_log(state.m_message);
     }
 
-#ifdef REALM_HAVE_CXX11_VARIADIC_TEMPLATES
     template<class Param, class... Params>
-    void log_impl(State& state, const T& param, Params... params)
+    void log_impl(State& state, const Param& param, Params... params)
     {
-        Subst<T>()(param, &state);
+        Subst<Param>()(param, &state);
         log_impl(state, params...);
-    }
-#endif
-
-    template<class L> void log_impl_with_tuple(State& state, const Tuple<L>& params)
-    {
-        for_each<Subst>(params, &state);
-        log_impl(state);
     }
 };
 
@@ -179,7 +106,10 @@ private:
 /// this makes all the log() methods are thread-safe.
 class ThreadSafeLogger: public Logger {
 public:
-    ThreadSafeLogger(Logger& base_logger): m_base_logger(&base_logger) {}
+    ThreadSafeLogger(Logger& base_logger):
+        m_base_logger(&base_logger)
+    {
+    }
 
 protected:
     Logger* const m_base_logger;
@@ -197,7 +127,9 @@ protected:
 class PrefixLogger: public Logger {
 public:
     PrefixLogger(std::string prefix, Logger& base_logger):
-        m_prefix(prefix), m_base_logger(&base_logger) {}
+        m_prefix(prefix), m_base_logger(&base_logger)
+    {
+    }
 
 protected:
     const std::string m_prefix;

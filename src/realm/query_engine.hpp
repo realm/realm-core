@@ -329,7 +329,7 @@ public:
         m_table = &table;
         if (m_child)
             m_child->init(table);
-        m_column_action_specializer = NULL;
+        m_column_action_specializer = nullptr;
     }
 
     virtual bool is_initialized() const
@@ -355,8 +355,8 @@ public:
         using TResult = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
 
         // Sum of float column must accumulate in double
-        REALM_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceValue, float>::value &&
-                                                        !util::SameType<TResult, double>::value)), "");
+        REALM_STATIC_ASSERT( !(TAction == act_Sum && (std::is_same<TSourceColumn, float>::value &&
+                                                        !std::is_same<TResult, double>::value)), "");
 
         TSourceValue av{};
         // uses_val test because compiler cannot see that Column::get has no side effect and result is discarded
@@ -377,7 +377,7 @@ public:
     {
         if (error_code != "")
             return error_code;
-        if (m_child == 0)
+        if (m_child == nullptr)
             return "";
         else
             return m_child->validate();
@@ -528,7 +528,7 @@ public:
     {
         if (error_code != "")
             return error_code;
-        if (m_child == 0)
+        if (m_child == nullptr)
             return "Unbalanced subtable/end_subtable block";
         else
             return m_child->validate();
@@ -685,7 +685,7 @@ template <class TConditionValue, class TConditionFunction> class IntegerNode: pu
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
-    IntegerNode(TConditionValue v, size_t column) : m_value(v), m_find_callback_specialized(NULL)
+    IntegerNode(TConditionValue v, size_t column) : m_value(v), m_find_callback_specialized(nullptr)
     {
         m_condition_column_idx = column;
     }
@@ -889,7 +889,7 @@ public:
     FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
     {
         m_condition_column_idx = column_ndx;
-        m_child = 0;
+        m_child = nullptr;
         m_dT = 1.0;
     }
     ~FloatDoubleNode() REALM_NOEXCEPT override {}
@@ -944,7 +944,7 @@ public:
     {
         m_dT = 100.0;
         m_condition_column_idx = column;
-        m_child = 0;
+        m_child = nullptr;
 
         // FIXME: Store this in std::string instead.
         char* data = v.is_null() ? nullptr : new char[v.size()];
@@ -1017,7 +1017,7 @@ public:
     StringNodeBase(StringData v, size_t column)
     {
         m_condition_column_idx = column;
-        m_child = 0;
+        m_child = nullptr;
         m_dT = 10.0;
         m_leaf = nullptr;
 
@@ -1630,7 +1630,7 @@ public:
         m_dT = 100.0;
         m_condition_column_idx1 = column1;
         m_condition_column_idx2 = column2;
-        m_child = 0;
+        m_child = nullptr;
     }
 
     ~TwoColumnsNode() REALM_NOEXCEPT override
@@ -1660,7 +1660,7 @@ public:
         size_t s = start;
 
         while (s < end) {
-            if (util::SameType<TConditionValue, int64_t>::value) {
+            if (std::is_same<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 m_getter1.cache_next(s);
@@ -1745,7 +1745,7 @@ public:
     ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
-        m_child = 0;
+        m_child = nullptr;
         m_compare = util::SharedPtr<Expression>(compare);
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1786,7 +1786,7 @@ public:
     LinksToNode(size_t origin_column_index, size_t target_row) : m_origin_column(origin_column_index),
                                                                  m_target_row(target_row)
     {
-        m_child = 0;
+        m_child = nullptr;
         m_dD = 10.0;
         m_dT = 50.0;
     }

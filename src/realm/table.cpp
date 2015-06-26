@@ -433,7 +433,7 @@ DescriptorRef Table::get_descriptor()
     if (!m_descriptor) {
         typedef _impl::DescriptorFriend df;
         desc.reset(df::create()); // Throws
-        Descriptor* parent = 0;
+        Descriptor* parent = nullptr;
         df::attach(*desc, this, parent, &m_spec);
         m_descriptor = desc.get();
     }
@@ -902,7 +902,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 {
     LockGuard lock(m_accessor_mutex);
-    row->m_prev = 0;
+    row->m_prev = nullptr;
     row->m_next = m_row_accessors;
     if (m_row_accessors)
         m_row_accessors->m_prev = row;
@@ -1184,7 +1184,7 @@ void Table::discard_desc_accessor() REALM_NOEXCEPT
         DescriptorRef desc(m_descriptor);
         typedef _impl::DescriptorFriend df;
         df::detach(*desc);
-        m_descriptor = 0;
+        m_descriptor = nullptr;
     }
 }
 
@@ -1199,7 +1199,7 @@ void Table::instantiate_before_change()
 
 ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, size_t ndx_in_parent)
 {
-    ColumnBase* col = 0;
+    ColumnBase* col = nullptr;
     ref_type ref = m_columns.get_as_ref(ndx_in_parent);
     Allocator& alloc = m_columns.get_alloc();
 
@@ -1564,7 +1564,7 @@ void Table::remove_primary_key()
         if (attr & col_attr_PrimaryKey) {
             attr &= ~(col_attr_Unique | col_attr_PrimaryKey);
             m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-            m_primary_key = 0;
+            m_primary_key = nullptr;
 
             ColumnType type = get_real_column_type(col_ndx);
             ColumnBase& col = get_column_base(col_ndx);
@@ -2003,6 +2003,8 @@ void Table::move_last_over(size_t row_ndx)
     REALM_ASSERT_3(row_ndx, <, m_size);
 
     size_t table_ndx = get_index_in_group();
+
+    // this is a subtable or freestanding table:
     if (table_ndx == realm::npos) {
 #ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl()) {
@@ -2953,7 +2955,7 @@ void Table::insert_linklist(size_t col_ndx, size_t row_ndx)
     REALM_ASSERT_3(row_ndx, ==, m_size); // can only append to unorded tables
 
     ColumnLinkList& column = get_column_link_list(col_ndx);
-    column.insert(row_ndx);
+    column.insert(row_ndx, 1, true);
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -3616,7 +3618,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     Column& dst_column = result.get_column(1);
 
     AggrState state(*this);
-    get_group_fnc get_group_ndx_fnc = NULL;
+    get_group_fnc get_group_ndx_fnc = nullptr;
 
     // When doing grouped aggregates, the column to group on is likely
     // to be auto-enumerated (without a lot of duplicates grouping does not
@@ -4800,7 +4802,7 @@ void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
 
     adj_row_acc_insert_rows(row_ndx, num_rows);
 
-    // Adjust subtable accessors after insertion of new rows
+    // Adjust column and subtable accessors after insertion of new rows
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
@@ -5055,7 +5057,7 @@ void Table::refresh_accessor_tree()
 
 void Table::refresh_column_accessors(size_t col_ndx_begin)
 {
-    m_primary_key = 0;
+    m_primary_key = nullptr;
 
     // Index of column in Table::m_columns, which is not always equal to the
     // 'logical' column index.

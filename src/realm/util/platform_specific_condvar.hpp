@@ -93,7 +93,7 @@ public:
     void wait(LockGuard& l) REALM_NOEXCEPT;
 
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
     /// If any threads are waiting for this condition, wake up at least one.
     void notify() REALM_NOEXCEPT;
 
@@ -172,7 +172,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
         int r;
 #ifdef __APPLE__
         // no timeout support on apple
-        REALM_ASSERT(tp == 0);
+        REALM_ASSERT(tp == nullptr);
         static_cast<void>(tp);
 #else
         if (tp) {

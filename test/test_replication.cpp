@@ -70,7 +70,7 @@ public:
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
         for (iter i = m_transact_logs.begin(); i != end; ++i)
-            apply_transact_log(i->data(), i->size(), target, replay_log);
+            apply_changeset(i->data(), i->size(), target, replay_log);
         for (iter i = m_transact_logs.begin(); i != end; ++i)
             delete[] i->data();
         m_transact_logs.clear();
@@ -171,7 +171,7 @@ TEST(Replication_General)
         wt.commit();
     }
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -190,9 +190,8 @@ TEST(Replication_General)
         CHECK_EQUAL(8,  table[3].my_int);
 
         StringData sd1 = table[4].my_string.get();
-        StringData sd2 = table[5].my_string.get();
 
-        CHECK(!table[4].my_string.get().is_null());
+        CHECK(!sd1.is_null());
     }
 }
 
@@ -213,7 +212,7 @@ TEST(Replication_Links)
         wt.commit();
     }
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
@@ -297,7 +296,7 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
 
     MyTrivialReplication repl(path_1);
@@ -502,7 +501,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
 
     SharedGroup sg(path_1);
@@ -606,7 +605,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 //    replay_log = &cout;
 
     SharedGroup sg(path_1);
@@ -719,7 +718,7 @@ TEST(Replication_NullStrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::ostream* replay_log = nullptr;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);

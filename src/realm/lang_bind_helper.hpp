@@ -30,7 +30,6 @@
 
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
-#  include <realm/impl/input_stream.hpp>
 #endif
 
 namespace realm {
@@ -120,17 +119,24 @@ public:
 
 #ifdef REALM_ENABLE_REPLICATION
 
-    /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
-    static void advance_read(SharedGroup&, SharedGroup::VersionID version = SharedGroup::VersionID());
+    static void advance_read(SharedGroup&, History&,
+                             SharedGroup::VersionID = SharedGroup::VersionID());
     template<typename Handler>
-    static void advance_read(SharedGroup&, Handler&&, SharedGroup::VersionID version = SharedGroup::VersionID());
-    static void promote_to_write(SharedGroup&);
+    static void advance_read(SharedGroup&, History&, Handler&&,
+                             SharedGroup::VersionID = SharedGroup::VersionID());
+    static void promote_to_write(SharedGroup&, History&);
     template<typename Handler>
-    static void promote_to_write(SharedGroup&, Handler&&);
+    static void promote_to_write(SharedGroup&, History&, Handler&&);
     static void commit_and_continue_as_read(SharedGroup&);
-    static void rollback_and_continue_as_read(SharedGroup&);
+    static void rollback_and_continue_as_read(SharedGroup&, History&);
     template<typename Handler>
-    static void rollback_and_continue_as_read(SharedGroup&, Handler&&);
+    static void rollback_and_continue_as_read(SharedGroup&, History&, Handler&&);
+
+    static Replication::version_type get_current_version(SharedGroup& sg)
+    {
+        return Replication::version_type(sg.get_current_version());
+    }
+
 #endif
 
     /// Returns the name of the specified data type as follows:
@@ -161,7 +167,7 @@ inline Table* LangBindHelper::new_table()
     typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = tf::create_empty_table(alloc); // Throws
-    Table::Parent* parent = 0;
+    Table::Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     Table* table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
     tf::bind_ref(*table);
@@ -173,7 +179,7 @@ inline Table* LangBindHelper::copy_table(const Table& table)
     typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = tf::clone(table, alloc); // Throws
-    Table::Parent* parent = 0;
+    Table::Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     Table* copy_of_table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
     tf::bind_ref(*copy_of_table);
@@ -307,94 +313,57 @@ inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
 
 #ifdef REALM_ENABLE_REPLICATION
 
-// The implementation of these are here to avoid having to drag things into
-// group_shared.hpp
-template<typename Handler>
-void SharedGroup::advance_read(Handler&& handler, VersionID specific_version)
+inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,
+                                         SharedGroup::VersionID version)
 {
-    REALM_ASSERT(m_transact_stage == transact_Reading);
-    ReadLockInfo old_readlock = m_readlock;
-
-    std::unique_ptr<BinaryData[]> logs = advance_readlock(specific_version);
-    if (logs) {
-        _impl::MultiLogInputStream in(logs.get(),
-                                      logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
-        Replication::TransactLogParser parser(in);
-        parser.parse(handler); // Throws
-        handler.parse_complete();
-    }
-
-    do_advance_read(old_readlock, std::move(logs));
+    using sgf = _impl::SharedGroupFriend;
+    sgf::advance_read(sg, history, version);
 }
 
 template<typename Handler>
-void SharedGroup::promote_to_write(Handler&& handler)
+inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, Handler&& handler,
+                                         SharedGroup::VersionID version)
 {
-    REALM_ASSERT(m_transact_stage == transact_Reading);
-    Replication* repl = m_group.get_replication();
-    REALM_ASSERT(repl);
+    sg.advance_read(history, handler, version);
+}
 
-    repl->begin_write_transact(*this); // Throws
-
-    try {
-        do_begin_write();
-        advance_read(handler);
-    }
-    catch (...) {
-        repl->rollback_write_transact(*this);
-        throw;
-    }
-
-    m_transact_stage = transact_Writing;
+inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
+{
+    using sgf = _impl::SharedGroupFriend;
+    sgf::promote_to_write(sg, history);
 }
 
 template<typename Handler>
-inline void LangBindHelper::advance_read(SharedGroup& sg, Handler&& handler, SharedGroup::VersionID specific_version)
+inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history, Handler&& handler)
 {
-    sg.advance_read(handler, specific_version);
-}
-
-template<typename Handler>
-inline void LangBindHelper::promote_to_write(SharedGroup& sg, Handler&& handler)
-{
-    sg.promote_to_write(handler);
-}
-
-inline void LangBindHelper::advance_read(SharedGroup& sg, SharedGroup::VersionID version_id)
-{
-    sg.advance_read(version_id);
-}
-
-inline void LangBindHelper::promote_to_write(SharedGroup& sg)
-{
-    sg.promote_to_write();
+    sg.promote_to_write(history, handler);
 }
 
 inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 {
-    sg.commit_and_continue_as_read();
+    using sgf = _impl::SharedGroupFriend;
+    sgf::commit_and_continue_as_read(sg);
 }
 
-inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
+inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history)
 {
-    sg.rollback_and_continue_as_read();
+    using sgf = _impl::SharedGroupFriend;
+    sgf::rollback_and_continue_as_read(sg, history);
 }
 
 template<typename Handler>
-inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, Handler&& handler)
+inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history,
+                                                          Handler&& handler)
 {
-    if (Replication* repl = sg.get_replication()) {
-        BinaryData buffer = repl->get_pending_entries();
-
-        _impl::MultiLogInputStream in(&buffer, (&buffer)+1);
-        Replication::TransactLogParser parser(in);
-        _impl::TransactReverser reverser;
-        parser.parse(reverser);
-        reverser.execute(handler);
-        handler.parse_complete();
-    }
-
-    sg.rollback_and_continue_as_read();
+    BinaryData buffer = history.get_uncommitted_changes();
+    _impl::MultiLogNoCopyInputStream in(&buffer, (&buffer)+1);
+    _impl::TransactLogParser parser;
+    _impl::TransactReverser reverser;
+    parser.parse(in, reverser);
+    reverser.execute(handler);
+    handler.parse_complete();
+    using sgf = _impl::SharedGroupFriend;
+    sgf::rollback_and_continue_as_read(sg, history);
 }
 
 
