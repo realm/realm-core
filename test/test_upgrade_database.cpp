@@ -52,7 +52,8 @@ using namespace realm::util;
 
 TEST(Upgrade_Database_2_3)
 {
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    CHECK_OR_RETURN(File::exists(path));
 
     // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
     // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
@@ -71,7 +72,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from Group
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        CHECK(File::copy(path, temp_copy);
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
 
         // Open copy. Group constructor will upgrade automatically if needed, also even though user requested ReadOnly. Todo,
         // discuss if this is OK.
@@ -112,7 +113,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        CHECK(File::copy(path, temp_copy));
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
 
         SharedGroup sg(temp_copy);
         ReadTransaction rt(sg);
@@ -163,7 +164,7 @@ TEST(Upgrade_Database_2_3)
     // Begin from scratch; see if we can upgrade file and then use a write transaction
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        CHECK(File::copy(path, temp_copy));
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
 
         SharedGroup sg(temp_copy);
         WriteTransaction rt(sg);
@@ -207,7 +208,7 @@ TEST(Upgrade_Database_2_3)
 
     // Automatic upgrade from SharedGroup with replication
     {
-      CHECK(File::copy(path, temp_copy));
+      CHECK_OR_RETURN(File::copy(path, temp_copy));
 
       std::unique_ptr<ClientHistory> hist = make_client_history(temp_copy);
       SharedGroup sg(*hist);
@@ -262,13 +263,14 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    CHECK_OR_RETURN(File::exists(path));
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    CHECK(File::copy(path, temp_copy));
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
     SharedGroup g(temp_copy, 0);
 
     // First table is non-indexed for all columns, second is indexed for all columns
@@ -405,14 +407,15 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    CHECK_OR_RETURN(File::exists(path));
 
 #if 1
     // Make a copy of the database so that we keep the original file intact and unmodified
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    CHECK(File::copy(path, temp_copy));
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
     SharedGroup g(temp_copy, 0);
 
     // First table is non-indexed for all columns, second is indexed for all columns
@@ -547,7 +550,8 @@ TEST(Upgrade_Database_Binary)
 {
     // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
     // version 2 database file. Then copy it into the /test directory of this current Realm core.
-    const std::string path = test_util::get_test_path_prefix() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
+    CHECK_OR_RETURN(File::exists(path));
 
 #if 1
     size_t f;
@@ -555,7 +559,7 @@ TEST(Upgrade_Database_Binary)
     // Make a copy of the database so that we keep the original file intact and unmodified
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    CHECK(File::copy(path, temp_copy));
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
     SharedGroup g(temp_copy, 0);
 
     WriteTransaction wt(g);

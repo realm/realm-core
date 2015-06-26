@@ -240,11 +240,11 @@ TEST(File_Resize)
     File f(path, File::mode_Write);
     f.set_encryption_key(crypt_key(true));
 
-    f.resize(8192);
-    CHECK_EQUAL(8192, f.get_size());
+    f.resize(page_size() * 2);
+    CHECK_EQUAL(page_size() * 2, f.get_size());
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
-        for (int i = 0; i < 8192; ++i)
+        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
+        for (unsigned int i = 0; i < page_size() * 2; ++i)
             m.get_addr()[i] = static_cast<unsigned char>(i);
 
         // Resizing away the first write is indistinguishable in encrypted files
@@ -252,31 +252,31 @@ TEST(File_Resize)
         // but with subsequent writes it can tell that there was once valid
         // encrypted data there, so flush and write a second time
         m.sync();
-        for (int i = 0; i < 8192; ++i)
+        for (unsigned int i = 0; i < page_size() * 2; ++i)
             m.get_addr()[i] = static_cast<unsigned char>(i);
     }
 
-    f.resize(4096);
-    CHECK_EQUAL(4096, f.get_size());
+    f.resize(page_size());
+    CHECK_EQUAL(page_size(), f.get_size());
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, 4096);
-        for (int i = 0; i < 4096; ++i) {
+        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size());
+        for (unsigned int i = 0; i < page_size(); ++i) {
             CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
             if (static_cast<unsigned char>(i) != m.get_addr()[i])
                 return;
         }
     }
 
-    f.resize(8192);
-    CHECK_EQUAL(8192, f.get_size());
+    f.resize(page_size() * 2);
+    CHECK_EQUAL(page_size() * 2, f.get_size());
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
-        for (int i = 0; i < 8192; ++i)
+        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
+        for (unsigned int i = 0; i < page_size() * 2; ++i)
             m.get_addr()[i] = static_cast<unsigned char>(i);
     }
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
-        for (int i = 0; i < 8192; ++i) {
+        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
+        for (unsigned int i = 0; i < page_size() * 2; ++i) {
             CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
             if (static_cast<unsigned char>(i) != m.get_addr()[i])
                 return;
