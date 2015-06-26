@@ -703,7 +703,7 @@ inline std::size_t Group::find_table(StringData name) const REALM_NOEXCEPT
 inline TableRef Group::get_table(std::size_t table_ndx)
 {
     REALM_ASSERT(is_attached());
-    DescMatcher desc_matcher = 0; // Do not check descriptor
+    DescMatcher desc_matcher = nullptr; // Do not check descriptor
     Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return TableRef(table);
 }
@@ -711,7 +711,7 @@ inline TableRef Group::get_table(std::size_t table_ndx)
 inline ConstTableRef Group::get_table(std::size_t table_ndx) const
 {
     REALM_ASSERT(is_attached());
-    DescMatcher desc_matcher = 0; // Do not check descriptor
+    DescMatcher desc_matcher = nullptr; // Do not check descriptor
     const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return ConstTableRef(table);
 }
@@ -719,7 +719,7 @@ inline ConstTableRef Group::get_table(std::size_t table_ndx) const
 inline TableRef Group::get_table(StringData name)
 {
     REALM_ASSERT(is_attached());
-    DescMatcher desc_matcher = 0; // Do not check descriptor
+    DescMatcher desc_matcher = nullptr; // Do not check descriptor
     Table* table = do_get_table(name, desc_matcher); // Throws
     return TableRef(table);
 }
@@ -727,7 +727,7 @@ inline TableRef Group::get_table(StringData name)
 inline ConstTableRef Group::get_table(StringData name) const
 {
     REALM_ASSERT(is_attached());
-    DescMatcher desc_matcher = 0; // Do not check descriptor
+    DescMatcher desc_matcher = nullptr; // Do not check descriptor
     const Table* table = do_get_table(name, desc_matcher); // Throws
     return ConstTableRef(table);
 }
@@ -735,7 +735,7 @@ inline ConstTableRef Group::get_table(StringData name) const
 inline TableRef Group::add_table(StringData name, bool require_unique_name)
 {
     REALM_ASSERT(is_attached());
-    DescSetter desc_setter = 0; // Do not add any columns
+    DescSetter desc_setter = nullptr; // Do not add any columns
     Table* table = do_add_table(name, desc_setter, require_unique_name); // Throws
     return TableRef(table);
 }
@@ -743,8 +743,8 @@ inline TableRef Group::add_table(StringData name, bool require_unique_name)
 inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 {
     REALM_ASSERT(is_attached());
-    DescMatcher desc_matcher = 0; // Do not check descriptor
-    DescSetter desc_setter = 0; // Do not add any columns
+    DescMatcher desc_matcher = nullptr; // Do not check descriptor
+    DescSetter desc_setter = nullptr; // Do not add any columns
     Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
     return TableRef(table);
 }
@@ -987,7 +987,7 @@ public:
 };
 
 
-struct CascadeState : Group::CascadeNotification {
+struct CascadeState: Group::CascadeNotification {
     /// If non-null, then no recursion will be performed for rows of that
     /// table. The effect is then exactly as if all the rows of that table were
     /// added to \a state.rows initially, and then removed again after the

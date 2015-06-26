@@ -83,8 +83,6 @@ public:
     /// a null reference.
     StringData(const char* c_str) REALM_NOEXCEPT;
 
-    ~StringData() REALM_NOEXCEPT;
-
     char operator[](std::size_t i) const REALM_NOEXCEPT;
 
     const char* data() const REALM_NOEXCEPT;
@@ -181,10 +179,6 @@ inline StringData::StringData(const char* c_str) REALM_NOEXCEPT:
 {
     if (c_str)
         m_size = std::char_traits<char>::length(c_str);
-}
-
-inline StringData::~StringData() REALM_NOEXCEPT
-{
 }
 
 inline char StringData::operator[](std::size_t i) const REALM_NOEXCEPT

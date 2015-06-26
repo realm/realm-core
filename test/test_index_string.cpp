@@ -7,6 +7,7 @@
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
+#include "util/random.hpp"
 
 using namespace realm;
 using namespace util;
@@ -69,14 +70,24 @@ const int64_t ints[] = {
     0x78923
 };
 
+struct nullable {
+    static constexpr bool value = true;
+};
+
+struct non_nullable {
+    static constexpr bool value = false;
+};
+
 } // anonymous namespace
 
 
-TEST(StringIndex_IsEmpty)
+TEST_TYPES(StringIndex_IsEmpty, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with string values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
@@ -87,11 +98,13 @@ TEST(StringIndex_IsEmpty)
     col.destroy();
 }
 
-TEST(StringIndex_BuildIndex)
+TEST_TYPES(StringIndex_BuildIndex, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with string values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -122,11 +135,13 @@ TEST(StringIndex_BuildIndex)
     col.destroy();
 }
 
-TEST(StringIndex_DeleteAll)
+TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with string values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -182,11 +197,13 @@ TEST(StringIndex_DeleteAll)
     col.destroy();
 }
 
-TEST(StringIndex_Delete)
+TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with random values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -232,10 +249,12 @@ TEST(StringIndex_Delete)
     col.destroy();
 }
 
-TEST(StringIndex_MoveLastOver)
+TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -302,11 +321,13 @@ TEST(StringIndex_MoveLastOver)
     col.destroy();
 }
 
-TEST(StringIndex_ClearEmpty)
+TEST_TYPES(StringIndex_ClearEmpty, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with string values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
@@ -323,11 +344,13 @@ TEST(StringIndex_ClearEmpty)
     col.destroy();
 }
 
-TEST(StringIndex_Clear)
+TEST_TYPES(StringIndex_Clear, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with string values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -375,11 +398,13 @@ TEST(StringIndex_Clear)
     col.destroy();
 }
 
-TEST(StringIndex_Insert)
+TEST_TYPES(StringIndex_Insert, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with random values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -425,11 +450,13 @@ TEST(StringIndex_Insert)
     col.destroy();
 }
 
-TEST(StringIndex_Set)
+TEST_TYPES(StringIndex_Set, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with random values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -474,11 +501,13 @@ TEST(StringIndex_Set)
     col.destroy();
 }
 
-TEST(StringIndex_Count)
+TEST_TYPES(StringIndex_Count, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with duplcate values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -510,11 +539,13 @@ TEST(StringIndex_Count)
     col.destroy();
 }
 
-TEST(StringIndex_Distinct)
+TEST_TYPES(StringIndex_Distinct, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with duplcate values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -547,11 +578,13 @@ TEST(StringIndex_Distinct)
     col.destroy();
 }
 
-TEST(StringIndex_FindAllNoCopy)
+TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // Create a column with duplcate values
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -821,13 +854,67 @@ TEST(StringIndex_FuzzyTest_Int)
     col.destroy();
 }
 
+namespace {
+
+// Generate string where the bit pattern in bits is converted to NUL bytes. E.g. (length=2):
+// bits=0 -> "\0\0", bits=1 -> "\x\0", bits=2 -> "\0\x", bits=3 -> "\x\x", where x is a random byte
+StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random) {
+    for (size_t i = 0; i < length; ++i) {
+        tmp[i] = (bits & (1 << i)) == 0 ? '\0' : static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
+    }
+    return StringData(tmp, length);
+}
+
+} // anonymous namespace
+
+
+// Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
+TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // String index
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    const size_t MAX_LENGTH = 16; // Test medium
+    char tmp[MAX_LENGTH]; // this is a bit of a hack, that relies on the string being copied in column.add()
+
+    for (size_t length = 1; length <= MAX_LENGTH; ++length) {
+        Random random(42);
+        const size_t combinations = 1 << length;
+        for (size_t i = 0; i < combinations; ++i) {
+            StringData str = create_string_with_nuls(i, length, tmp, random);
+            col.add(str);
+        }
+
+        // check index up to this length
+        size_t expected_index = 0;
+        for (size_t l = 1; l <= length; ++l) {
+            Random random(42);
+            const size_t combinations = 1 << l;
+            for (size_t i = 0; i < combinations; ++i) {
+                StringData needle = create_string_with_nuls(i, l, tmp, random);
+                CHECK_EQUAL(ndx.find_first(needle), expected_index);
+                CHECK(strncmp(col.get(expected_index).data(), needle.data(), l) == 0);
+                CHECK_EQUAL(col.get(expected_index).size(), needle.size());
+                expected_index++;
+            }
+        }
+    }
+
+    col.destroy();
+}
 
 // Tests for a bug with strings containing zeroes
-TEST(StringIndex_EmbeddedZeroes)
+TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // String index
     ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col2(Allocator::get_default(), ref2);
+    AdaptiveStringColumn col2(Allocator::get_default(), ref2, nullable);
     const StringIndex& ndx2 = *col2.create_search_index();
 
 #if REALM_NULL_STRINGS == 1
@@ -884,11 +971,13 @@ TEST(StringIndex_Null)
 #endif
 
 #if REALM_NULL_STRINGS == 1
-TEST(StringIndex_Zero_Crash)
+TEST_TYPES(StringIndex_Zero_Crash, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // StringIndex could crash if strings ended with one or more 0-bytes
     Table table;
-    table.add_column(type_String, "");
+    table.add_column(type_String, "", nullable);
     table.add_empty_row(3);
 
     table.set_string(0, 0, StringData(""));

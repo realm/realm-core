@@ -2822,7 +2822,7 @@ TEST(Table_SubtableSizeAndClear)
     CHECK_EQUAL(0, table.get_subtable_size(1,1)); // Mixed column, table value
 
     CHECK(table.get_subtable(0,0));  // Subtable column
-    CHECK(!table.get_subtable(1,0)); // Mixed column, bool value, must return NULL
+    CHECK(!table.get_subtable(1,0)); // Mixed column, bool value, must return nullptr
     CHECK(table.get_subtable(1,1));  // Mixed column, table value
 
     table.set_mixed(1, 0, Mixed::subtable_tag());

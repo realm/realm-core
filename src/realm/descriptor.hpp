@@ -514,7 +514,7 @@ inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, Str
     REALM_ASSERT_3(column_ndx, <=, get_column_count());
     REALM_ASSERT(!tf::is_link_type(ColumnType(type)));
 
-    Table* link_target_table = 0;
+    Table* link_target_table = nullptr;
     tf::insert_column(*this, column_ndx, type, name, link_target_table, nullable); // Throws
     adj_insert_column(column_ndx);
     if (subdesc && type == type_Table)

@@ -23,10 +23,53 @@
 
 #include <algorithm>
 
+
 namespace realm {
 namespace _impl {
 
+
 class InputStream {
+public:
+    /// Read bytes from this input stream and place them in the specified
+    /// buffer. The returned value is the actual number of bytes that were read,
+    /// and this is some number `n` such that `n <= min(size, m)` where `m` is
+    /// the number of bytes that could have been read from this stream before
+    /// reaching its end. Also, `n` cannot be zero unless `m` or `size` is
+    /// zero. The intention is that `size` should be non-zero, a the return
+    /// value used as the end-of-input indicator.
+    ///
+    /// Implementations are only allowed to block (put the calling thread to
+    /// sleep) up until the point in time where the first byte can be made
+    /// availble.
+    virtual size_t read(char* buffer, size_t size) = 0;
+
+    virtual ~InputStream() REALM_NOEXCEPT {}
+};
+
+
+class SimpleInputStream: public InputStream {
+public:
+    SimpleInputStream(const char* data, std::size_t size) REALM_NOEXCEPT:
+        m_ptr(data),
+        m_end(data + size)
+    {
+    }
+    size_t read(char* buffer, size_t size) override
+    {
+        size_t n = std::min(size, size_t(m_end-m_ptr));
+        const char* begin = m_ptr;
+        m_ptr += n;
+        const char* end = m_ptr;
+        std::copy(begin, end, buffer);
+        return n;
+    }
+private:
+    const char* m_ptr;
+    const char* const m_end;
+};
+
+
+class NoCopyInputStream {
 public:
     /// \return the number of accessible bytes.
     /// A value of zero indicates end-of-input.
@@ -35,20 +78,63 @@ public:
     /// contiguous memory chunk.
     virtual size_t next_block(const char*& begin, const char*& end) = 0;
 
-    virtual ~InputStream() {}
+    virtual ~NoCopyInputStream() REALM_NOEXCEPT {}
 };
 
-class MultiLogInputStream: public InputStream {
+
+class NoCopyInputStreamAdaptor: public NoCopyInputStream {
 public:
-    MultiLogInputStream(const BinaryData* logs_begin, const BinaryData* logs_end):
+    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) REALM_NOEXCEPT:
+        m_in(in),
+        m_buffer(buffer),
+        m_buffer_size(buffer_size)
+    {
+    }
+    size_t next_block(const char*& begin, const char*& end) override
+    {
+        size_t n = m_in.read(m_buffer, m_buffer_size);
+        begin = m_buffer;
+        end = m_buffer + n;
+        return n;
+    }
+private:
+    InputStream& m_in;
+    char* m_buffer;
+    size_t m_buffer_size;
+};
+
+
+class SimpleNoCopyInputStream: public NoCopyInputStream {
+public:
+    SimpleNoCopyInputStream(const char* data, std::size_t size):
+        m_data(data),
+        m_size(size)
+    {
+    }
+
+    std::size_t next_block(const char*& begin, const char*& end) override
+    {
+        if (m_size == 0)
+            return 0;
+        std::size_t size = m_size;
+        begin = m_data;
+        end = m_data + size;
+        m_size = 0;
+        return size;
+    }
+
+private:
+    const char* m_data;
+    std::size_t m_size;
+};
+
+class MultiLogNoCopyInputStream: public NoCopyInputStream {
+public:
+    MultiLogNoCopyInputStream(const BinaryData* logs_begin, const BinaryData* logs_end):
         m_logs_begin(logs_begin), m_logs_end(logs_end)
     {
         if (m_logs_begin != m_logs_end)
             m_curr_buf_remaining_size = m_logs_begin->size();
-    }
-
-    ~MultiLogInputStream() override
-    {
     }
 
     size_t read(char* buffer, size_t size)
@@ -98,8 +184,7 @@ private:
 };
 
 
-
-}
-}
+} // namespace _impl
+} // namespace realm
 
 #endif // REALM_IMPL_INPUT_STREAM_HPP

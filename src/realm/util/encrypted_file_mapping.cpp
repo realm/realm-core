@@ -376,7 +376,7 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, siz
 : m_file(file)
 , m_page_size(realm::util::page_size())
 , m_blocks_per_page(m_page_size / block_size)
-, m_addr(0)
+, m_addr(nullptr)
 , m_size(0)
 , m_page_count(0)
 , m_access(access)
@@ -577,7 +577,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size)
     REALM_ASSERT(new_size % m_page_size == 0);
     REALM_ASSERT(new_size > 0);
 
-    bool first_init = m_addr == 0;
+    bool first_init = m_addr == nullptr;
 
     flush();
     m_addr = new_addr;

@@ -101,7 +101,6 @@
     <ClCompile Include="..\..\test\util\timer.cpp" />
     <ClCompile Include="..\..\test\util\unit_test.cpp" />
     <ClCompile Include="..\..\test\util\wildcard.cpp" />
-    <ClCompile Include="..\..\src\realm\util\errno.cpp" />
     <ClCompile Include="..\..\src\realm\util\file_mapper.cpp" />
     <ClCompile Include="..\..\src\realm\query_engine.cpp" />
     <ClCompile Include="..\..\src\realm\util\encrypted_file_mapping.cpp" />
@@ -112,6 +111,9 @@
     <ClCompile Include="..\..\src\realm\impl\transact_log.cpp" />
     <ClCompile Include="..\..\test\test_array_integer.cpp" />
     <ClCompile Include="..\..\src\realm\array_integer.cpp" />
+    <ClCompile Include="..\..\src\realm\bptree.cpp" />
+    <ClCompile Include="..\..\src\realm\util\basic_system_errors.cpp" />
+    <ClCompile Include="..\..\src\realm\util\misc_errors.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
@@ -213,8 +215,14 @@
     <ClInclude Include="..\..\src\realm\impl\transact_log.hpp" />
     <ClInclude Include="..\..\src\realm\array_integer.hpp" />
     <ClInclude Include="..\..\src\realm\impl\array_writer.hpp" />
+    <ClInclude Include="..\..\src\realm\bptree.hpp" />
+    <ClInclude Include="..\..\src\realm\history.hpp" />
+    <ClInclude Include="..\..\src\realm\util\basic_system_errors.hpp" />
+    <ClInclude Include="..\..\src\realm\util\misc_errors.hpp" />
+    <ClInclude Include="..\..\src\realm\util\optional.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
+    <None Include="..\..\src\realm\util\config.sh" />
   </ItemGroup>
 </Project>

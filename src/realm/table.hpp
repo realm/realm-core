@@ -1583,10 +1583,10 @@ inline Table::Table(Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = 0;
+    m_descriptor = nullptr;
 
     ref_type ref = create_empty_table(alloc); // Throws
-    Parent* parent = 0;
+    Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     init(ref, parent, ndx_in_parent);
 }
@@ -1597,10 +1597,10 @@ inline Table::Table(const Table& t, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = 0;
+    m_descriptor = nullptr;
 
     ref_type ref = t.clone(alloc); // Throws
-    Parent* parent = 0;
+    Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     init(ref, parent, ndx_in_parent);
 }
@@ -1611,7 +1611,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 0; // Lifetime managed by reference counting
-    m_descriptor = 0;
+    m_descriptor = nullptr;
 }
 
 inline Allocator& Table::get_alloc() const
@@ -1623,7 +1623,7 @@ inline TableRef Table::create(Allocator& alloc)
 {
     std::unique_ptr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
     ref_type ref = create_empty_table(alloc); // Throws
-    Parent* parent = 0;
+    Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     table->init(ref, parent, ndx_in_parent); // Throws
     return table.release()->get_table_ref();
@@ -1633,7 +1633,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 {
     std::unique_ptr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
     ref_type ref = clone(alloc); // Throws
-    Parent* parent = 0;
+    Parent* parent = nullptr;
     std::size_t ndx_in_parent = 0;
     table->init(ref, parent, ndx_in_parent); // Throws
     return table.release()->get_table_ref();
@@ -1643,7 +1643,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
-    if (util::SameType<T, Link>::value || util::SameType<T, LinkList>::value) {
+    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
         tmp.push_back(column);
     }
     m_link_chain.clear();
@@ -1790,7 +1790,7 @@ inline bool Table::is_group_level() const REALM_NOEXCEPT
 
 inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
 {
-    Table* table = 0;
+    Table* table = nullptr;
     std::size_t row_ndx = do_find_pkey_int(value); // Throws
     if (row_ndx != realm::not_found)
         table = this;
@@ -1799,7 +1799,7 @@ inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
 
 inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
 {
-    const Table* table = 0;
+    const Table* table = nullptr;
     std::size_t row_ndx = do_find_pkey_int(value); // Throws
     if (row_ndx != realm::not_found)
         table = this;
@@ -1808,7 +1808,7 @@ inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
 
 inline Table::RowExpr Table::find_pkey_string(StringData value)
 {
-    Table* table = 0;
+    Table* table = nullptr;
     std::size_t row_ndx = do_find_pkey_string(value); // Throws
     if (row_ndx != realm::not_found)
         table = this;
@@ -1817,7 +1817,7 @@ inline Table::RowExpr Table::find_pkey_string(StringData value)
 
 inline Table::ConstRowExpr Table::find_pkey_string(StringData value) const
 {
-    const Table* table = 0;
+    const Table* table = nullptr;
     std::size_t row_ndx = do_find_pkey_string(value); // Throws
     if (row_ndx != realm::not_found)
         table = this;
@@ -2130,7 +2130,7 @@ public:
     static void clear_root_table_desc(const Table& root_table) REALM_NOEXCEPT
     {
         REALM_ASSERT(!root_table.has_shared_type());
-        root_table.m_descriptor = 0;
+        root_table.m_descriptor = nullptr;
     }
 
     static Table* get_subtable_accessor(Table& table, std::size_t col_ndx,

@@ -24,14 +24,6 @@ namespace realm {
 namespace util {
 
 
-/// A ternary operator that selects the first type if the condition
-/// evaluates to true, otherwise it selects the second type.
-template<bool cond, class A, class B> struct CondType   { typedef A type; };
-template<class A, class B> struct CondType<false, A, B> { typedef B type; };
-
-template<class A, class B> struct SameType { static bool const value = false; };
-template<class A> struct SameType<A,A>     { static bool const value = true;  };
-
 template<class T, class A, class B> struct EitherTypeIs { static const bool value = false; };
 template<class T, class A> struct EitherTypeIs<T,T,A> { static const bool value = true; };
 template<class T, class A> struct EitherTypeIs<T,A,T> { static const bool value = true; };

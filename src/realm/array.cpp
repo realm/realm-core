@@ -2758,7 +2758,6 @@ template <IndexMethod method, class T> size_t Array::index_string(StringData val
     bool all(method == index_FindAll);
     bool allnocopy(method == index_FindAll_nocopy);
 
-    StringData value_2 = value;
     const char* data = m_data;
     const char* header;
     size_t width = m_width;

@@ -1110,7 +1110,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
     else {
         QueryState<int64_t> st;
         st.init(act_FindAll, &ret.m_row_indexes, limit);
-        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t, false>::id, false, first[0], &st, start, end, NULL);
+        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t, false>::id, false, first[0], &st, start, end, nullptr);
     }
 }
 
@@ -1148,7 +1148,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     else {
         QueryState<int64_t> st;
         st.init(act_Count, nullptr, limit);
-        aggregate_internal(act_Count, ColumnTypeTraits<int64_t, false>::id, false, first[0], &st, start, end, NULL);
+        aggregate_internal(act_Count, ColumnTypeTraits<int64_t, false>::id, false, first[0], &st, start, end, nullptr);
         cnt = size_t(st.m_state);
     }
 

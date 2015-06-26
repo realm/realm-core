@@ -22,19 +22,17 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
 #include <exception>
 #include <string>
+#include <ostream>
 
 #include <realm/util/assert.hpp>
 #include <realm/util/tuple.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <memory>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
-#include <realm/util/file.hpp>
-#include <realm/descriptor.hpp>
-#include <realm/group.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/history.hpp>
 #include <realm/impl/transact_log.hpp>
 
 #include <iostream>
@@ -49,18 +47,15 @@ namespace realm {
 
 /// Replication is enabled by passing an instance of an implementation
 /// of this class to the SharedGroup constructor.
-class Replication:
-    public _impl::TransactLogConvenientEncoder,
-    protected _impl::TransactLogStream
-{
+class Replication: public _impl::TransactLogConvenientEncoder, protected _impl::TransactLogStream {
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
-    typedef uint_fast64_t version_type;
-    typedef _impl::InputStream InputStream;
-    typedef _impl::TransactLogParser TransactLogParser;
+    using version_type = History::version_type;
+    using InputStream = _impl::NoCopyInputStream;
     class TransactLogApplier;
     class Interrupted; // Exception
+    class SimpleIndexTranslator;
 
     std::string get_database_path();
 
@@ -72,10 +67,10 @@ public:
     /// a sharing scheme it will continue from the last version commited to
     /// the database.
     ///
-    /// The call also indicates that the current thread (and current process) has
-    /// exclusive access to the commitlogs, allowing them to reset synchronization
-    /// variables. This can be beneficial on systems without proper support for robust
-    /// mutexes.
+    /// The call also indicates that the current thread (and current process)
+    /// has exclusive access to the commitlogs, allowing them to reset
+    /// synchronization variables. This can be beneficial on systems without
+    /// proper support for robust mutexes.
     virtual void reset_log_management(version_type last_version);
 
     /// Cleanup, remove any log files
@@ -97,44 +92,11 @@ public:
     ///   created on demand.
     virtual bool is_in_server_synchronization_mode();
 
-    /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
-    /// keep the commit log management in sync with what versions can possibly be interesting
-    /// in the future.
+    /// Called by SharedGroup during a write transaction, when readlocks are
+    /// recycled, to keep the commit log management in sync with what versions
+    /// can possibly be interesting in the future.
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
         REALM_NOEXCEPT;
-
-    /// Get all transaction logs between the specified versions. The number
-    /// of requested logs is exactly `to_version - from_version`. If this
-    /// number is greater than zero, the first requested log is the one that
-    /// brings the database from `from_version` to `from_version +
-    /// 1`. References to the requested logs are stored in successive entries
-    /// of `logs_buffer`. The calee retains ownership of the memory
-    /// referenced by those entries, but the memory will remain accessible
-    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally'
-    /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
-    virtual void get_commit_entries(version_type from_version, version_type to_version,
-                                    BinaryData* logs_buffer) REALM_NOEXCEPT;
-
-    virtual BinaryData get_pending_entries() REALM_NOEXCEPT;
-
-    /// Set the latest version that is known to be received and accepted by the
-    /// server. All later versions are guaranteed to be available to the caller
-    /// of get_commit_entries(). This function is guaranteed to have no effect,
-    /// if the specified version is earlier than a version, that has already
-    /// been set.
-    virtual void set_last_version_synced(version_type version) REALM_NOEXCEPT;
-
-    /// Get the value set by last call to 'set_last_version_synced'
-    /// If 'end_version_number' is non null, a limit to version numbering is returned.
-    /// The limit returned is the version number of the latest commit.
-    /// If sync versioning is disabled, the last version seen locally is returned.
-    virtual version_type get_last_version_synced(version_type* end_version_number = 0)
-        REALM_NOEXCEPT;
-
-    /// Submit a transact log directly into the system bypassing the normal
-    /// collection of replication entries. This is used to add a transactlog
-    /// just for updating accessors. The caller retains ownership of the buffer.
-    virtual void submit_transact_log(BinaryData);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -206,8 +168,8 @@ public:
     ///
     /// \throw BadTransactLog If the transaction log could not be
     /// successfully parsed, or ended prematurely.
-    static void apply_transact_log(InputStream& transact_log, Group& target,
-                                   std::ostream* apply_log = 0);
+    static void apply_changeset(InputStream& transact_log, Group& target,
+                                std::ostream* apply_log = 0);
 
     virtual ~Replication() REALM_NOEXCEPT {}
 
@@ -230,10 +192,6 @@ protected:
 
     virtual void do_clear_interrupt() REALM_NOEXCEPT = 0;
 
-    /// Must be called only from do_begin_write_transact(),
-    /// do_commit_write_transact().
-    static Group& get_group(SharedGroup&) REALM_NOEXCEPT;
-
     // Part of a temporary ugly hack to avoid generating new
     // transaction logs during application of ones that have olready
     // been created elsewhere. See
@@ -247,6 +205,11 @@ protected:
 
     friend class _impl::TransactReverser;
 };
+
+// re server_version: This field is written by Sync (if enabled) on commits which
+// are foreign. It is carried over as part of a commit, allowing other threads involved
+// with Sync to observet it. For local commits, the value of server_version is taken
+// from any previous forewign commmit.
 
 
 class Replication::Interrupted: public std::exception {
@@ -270,8 +233,8 @@ protected:
     virtual void handle_transact_log(const char* data, std::size_t size,
                                      version_type new_version) = 0;
 
-    static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target,
-                                   std::ostream* apply_log = 0);
+    static void apply_changeset(const char* data, std::size_t size, SharedGroup& target,
+                                std::ostream* apply_log = 0);
     void prepare_to_write();
 
 private:
@@ -319,32 +282,6 @@ inline void Replication::stop_logging()
 
 inline void Replication::set_last_version_seen_locally(version_type) REALM_NOEXCEPT
 {
-}
-
-inline void Replication::set_last_version_synced(version_type) REALM_NOEXCEPT
-{
-}
-
-inline Replication::version_type Replication::get_last_version_synced(version_type*) REALM_NOEXCEPT
-{
-    return 0;
-}
-
-inline void Replication::submit_transact_log(BinaryData)
-{
-    // Unimplemented!
-    REALM_ASSERT(false);
-}
-
-inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) REALM_NOEXCEPT
-{
-    // Unimplemented!
-    REALM_ASSERT(false);
-}
-
-inline BinaryData Replication::get_pending_entries() REALM_NOEXCEPT
-{
-    return BinaryData(0, 0);
 }
 
 inline void Replication::begin_write_transact(SharedGroup& sg)

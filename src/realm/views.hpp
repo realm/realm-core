@@ -5,7 +5,7 @@
 #include <realm/column_string_enum.hpp>
 #include <realm/index_string.hpp>
 
-using namespace realm;
+namespace realm {
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only 
 // supports sorting.
@@ -115,5 +115,7 @@ public:
     Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
     bool m_auto_sort;
 };
+
+} // namespace realm
 
 #endif // REALM_VIEWS_HPP

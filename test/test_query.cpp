@@ -934,13 +934,13 @@ TEST(Query_LimitUntyped)
     Query q = table.where();
     int64_t sum;
 
-    sum = q.sum_int(0, NULL, 0, -1, 1);
+    sum = q.sum_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
 
-    sum = q.sum_int(0, NULL, 0, -1, 2);
+    sum = q.sum_int(0, nullptr, 0, -1, 2);
     CHECK_EQUAL(40000, sum);
 
-    sum = q.sum_int(0, NULL, 0, -1, 3);
+    sum = q.sum_int(0, nullptr, 0, -1, 3);
     CHECK_EQUAL(50000, sum);
 
 }
@@ -1671,144 +1671,144 @@ TEST(Query_LimitUntyped2)
     double sumd;
 
     // sum, limited by 'limit'
-    sum = q.sum_int(0, NULL, 0, -1, 1);
+    sum = q.sum_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
-    sum = q.sum_int(0, NULL, 0, -1, 2);
+    sum = q.sum_int(0, nullptr, 0, -1, 2);
     CHECK_EQUAL(40000, sum);
-    sum = q.sum_int(0, NULL, 0, -1);
+    sum = q.sum_int(0, nullptr, 0, -1);
     CHECK_EQUAL(80000, sum);
 
-    sumd = q.sum_float(1, NULL, 0, -1, 1);
+    sumd = q.sum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_float(1, NULL, 0, -1, 2);
+    sumd = q.sum_float(1, nullptr, 0, -1, 2);
     CHECK_EQUAL(40000., sumd);
-    sumd = q.sum_float(1, NULL, 0, -1);
+    sumd = q.sum_float(1, nullptr, 0, -1);
     CHECK_EQUAL(80000., sumd);
 
-    sumd = q.sum_double(2, NULL, 0, -1, 1);
+    sumd = q.sum_double(2, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_double(2, NULL, 0, -1, 2);
+    sumd = q.sum_double(2, nullptr, 0, -1, 2);
     CHECK_EQUAL(40000., sumd);
-    sumd = q.sum_double(2, NULL, 0, -1);
+    sumd = q.sum_double(2, nullptr, 0, -1);
     CHECK_EQUAL(80000., sumd);
 
     // sum, limited by 'end', but still having 'limit' specified
-    sum = q.sum_int(0, NULL, 0, 1, 3);
+    sum = q.sum_int(0, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
-    sum = q.sum_int(0, NULL, 0, 2, 3);
+    sum = q.sum_int(0, nullptr, 0, 2, 3);
     CHECK_EQUAL(40000, sum);
 
-    sumd = q.sum_float(1, NULL, 0, 1, 3);
+    sumd = q.sum_float(1, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_float(1, NULL, 0, 2, 3);
+    sumd = q.sum_float(1, nullptr, 0, 2, 3);
     CHECK_EQUAL(40000., sumd);
 
-    sumd = q.sum_double(2, NULL, 0, 1, 3);
+    sumd = q.sum_double(2, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_double(2, NULL, 0, 2, 3);
+    sumd = q.sum_double(2, nullptr, 0, 2, 3);
     CHECK_EQUAL(40000., sumd);
 
     size_t ndx = not_found;
 
     // max, limited by 'limit'
-    sum = q.maximum_int(0, NULL, 0, -1, 1);
+    sum = q.maximum_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, NULL, 0, -1, 1, &ndx);
+    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    sum = q.maximum_int(0, NULL, 0, -1, 2);
+    sum = q.maximum_int(0, nullptr, 0, -1, 2);
     CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, NULL, 0, -1, 2, &ndx);
+    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    sum = q.maximum_int(0, NULL, 0, -1);
+    sum = q.maximum_int(0, nullptr, 0, -1);
     CHECK_EQUAL(40000, sum);
-    q.maximum_int(0, NULL, 0, -1, -1, &ndx);
+    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 
-    sumf = q.maximum_float(1, NULL, 0, -1, 1);
+    sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, NULL, 0, -1, 1, &ndx);
+    q.maximum_float(1, nullptr, 0, -1, 1, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    sumf = q.maximum_float(1, NULL, 0, -1, 2);
+    sumf = q.maximum_float(1, nullptr, 0, -1, 2);
     CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, NULL, 0, -1, 2, &ndx);
+    q.maximum_float(1, nullptr, 0, -1, 2, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    sumf = q.maximum_float(1, NULL, 0, -1);
+    sumf = q.maximum_float(1, nullptr, 0, -1);
     CHECK_EQUAL(40000., sumf);
-    q.maximum_float(1, NULL, 0, -1, -1, &ndx);
+    q.maximum_float(1, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 
-    sumd = q.maximum_double(2, NULL, 0, -1, 1);
+    sumd = q.maximum_double(2, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, NULL, 0, -1, 1, &ndx);
+    q.maximum_double(2, nullptr, 0, -1, 1, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    sumd = q.maximum_double(2, NULL, 0, -1, 2);
+    sumd = q.maximum_double(2, nullptr, 0, -1, 2);
     CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, NULL, 0, -1, 2, &ndx);
+    q.maximum_double(2, nullptr, 0, -1, 2, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    sumd = q.maximum_double(2, NULL, 0, -1);
+    sumd = q.maximum_double(2, nullptr, 0, -1);
     CHECK_EQUAL(40000., sumd);
-    q.maximum_double(2, NULL, 0, -1, -1, &ndx);
+    q.maximum_double(2, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 
     // max, limited by 'end', but still having 'limit' specified
-    sum = q.maximum_int(0, NULL, 0, 1, 3);
+    sum = q.maximum_int(0, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, NULL, 0, 1, 3, &ndx);
+    q.maximum_int(0, nullptr, 0, 1, 3, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    sum = q.maximum_int(0, NULL, 0, 2, 3);
+    sum = q.maximum_int(0, nullptr, 0, 2, 3);
     CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, NULL, 0, 2, 3, &ndx);
+    q.maximum_int(0, nullptr, 0, 2, 3, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    sumf = q.maximum_float(1, NULL, 0, 1, 3);
+    sumf = q.maximum_float(1, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, NULL, 0, 1, 3, &ndx);
+    q.maximum_float(1, nullptr, 0, 1, 3, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    sumf = q.maximum_float(1, NULL, 0, 2, 3);
+    sumf = q.maximum_float(1, nullptr, 0, 2, 3);
     CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, NULL, 0, 2, 3, &ndx);
+    q.maximum_float(1, nullptr, 0, 2, 3, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    sumd = q.maximum_double(2, NULL, 0, 1, 3);
+    sumd = q.maximum_double(2, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, NULL, 0, 1, 3, &ndx);
+    q.maximum_double(2, nullptr, 0, 1, 3, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    sumd = q.maximum_double(2, NULL, 0, 2, 3);
+    sumd = q.maximum_double(2, nullptr, 0, 2, 3);
     CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, NULL, 0, 2, 3, &ndx);
+    q.maximum_double(2, nullptr, 0, 2, 3, &ndx);
     CHECK_EQUAL(1, ndx);
 
 
     // avg
-    sumd = q.average_int(0, NULL, 0, -1, 1);
+    sumd = q.average_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sumd);
-    sumd = q.average_int(0, NULL, 0, -1, 2);
+    sumd = q.average_int(0, nullptr, 0, -1, 2);
     CHECK_EQUAL((10000 + 30000) / 2, sumd);
 
-    sumd = q.average_float(1, NULL, 0, -1, 1);
+    sumd = q.average_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumd);
-    sumd = q.average_float(1, NULL, 0, -1, 2);
+    sumd = q.average_float(1, nullptr, 0, -1, 2);
     CHECK_EQUAL((10000. + 30000.) / 2., sumd);
 
 
     // avg, limited by 'end', but still having 'limit' specified
-    sumd = q.average_int(0, NULL, 0, 1, 3);
+    sumd = q.average_int(0, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000, sumd);
-    sumd = q.average_int(0, NULL, 0, 2, 3);
+    sumd = q.average_int(0, nullptr, 0, 2, 3);
     CHECK_EQUAL((10000 + 30000) / 2, sumd);
 
-    sumd = q.average_float(1, NULL, 0, 1, 3);
+    sumd = q.average_float(1, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000., sumd);
-    sumd = q.average_float(1, NULL, 0, 2, 3);
+    sumd = q.average_float(1, nullptr, 0, 2, 3);
     CHECK_EQUAL((10000. + 30000.) / 2., sumd);
 
     // count
@@ -5263,15 +5263,15 @@ TEST(Query_Avg)
     t.add(30, "b");
     CHECK_EQUAL(20, t.where().first.average());
 
-    CHECK_EQUAL(0, t.where().first.average(NULL, 0, 0));     // none
-    CHECK_EQUAL(0, t.where().first.average(NULL, 1, 1));     // none
-    CHECK_EQUAL(20, t.where().first.average(NULL, 0, 2));     // both
-    CHECK_EQUAL(20, t.where().first.average(NULL, 0, -1));     // both
+    CHECK_EQUAL(0, t.where().first.average(nullptr, 0, 0));     // none
+    CHECK_EQUAL(0, t.where().first.average(nullptr, 1, 1));     // none
+    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, 2));     // both
+    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, -1));     // both
 
     CHECK_EQUAL(10, t.where().first.average(&cnt, 0, 1));     // first
 
-    CHECK_EQUAL(30, t.where().first.sum(NULL, 1, 2));     // second
-    CHECK_EQUAL(30, t.where().first.average(NULL, 1, 2));     // second
+    CHECK_EQUAL(30, t.where().first.sum(nullptr, 1, 2));     // second
+    CHECK_EQUAL(30, t.where().first.average(nullptr, 1, 2));     // second
 }
 
 TEST(Query_Avg2)
@@ -5382,11 +5382,11 @@ TEST(Query_SubtablesTyped)
     EmployeeTable employees;
 
     // Add initial rows
-    employees.add("joe", 42, false, NULL);
+    employees.add("joe", 42, false, nullptr);
     employees[0].phones->add("home", "324-323-3214");
     employees[0].phones->add("work", "321-564-8678");
 
-    employees.add("jessica", 22, true, NULL);
+    employees.add("jessica", 22, true, nullptr);
     employees[1].phones->add("mobile", "434-426-4646");
     employees[1].phones->add("school", "345-543-5345");
 
@@ -5819,7 +5819,6 @@ TEST(Query_StringIndexCrash)
     Query(q, Query::TCopyExpressionTag());
 }
 
-
 TEST(Query_NullStrings)
 {
     Table table;
@@ -6160,5 +6159,58 @@ TEST(Query_IntegerNull_ExpressionSyntax)
 }
 
 #endif
+
+TEST(Query_64BitValues)
+{
+    Group g;
+    size_t m;
+    TableRef table = g.add_table("table");
+    table->insert_column(0, type_Int, "key");
+    table->insert_column(1, type_Int, "16bit");
+
+    const int64_t start = 4485019129LL;
+    const int64_t count = 20; // First 16 SSE-searched, four fallback
+    const int64_t min = std::numeric_limits<int64_t>::min();
+    const int64_t max = std::numeric_limits<int64_t>::max();
+    table->add_empty_row(count);
+    for (int64_t i = 0; i < count; ++i) {
+        table->set_int(0, i, start + i);
+    }
+
+    for (int64_t i = 0; i < 5; i++) {
+        // Insert values 5, 4, 3, 2, 1
+        table->set_int(1, i, 5 - i);
+    }
+
+    m = table->where().less(1, 4).find();
+    CHECK_EQUAL(2, m);
+
+    m = table->where().less(1, 5).find();
+    CHECK_EQUAL(1, m);
+
+    CHECK_EQUAL(0, table->where().less(0, min).count());
+    CHECK_EQUAL(0, table->where().less(0, start).count());
+    CHECK_EQUAL(1, table->where().less(0, start + 1).count());
+    CHECK_EQUAL(count, table->where().less(0, start + count).count());
+    CHECK_EQUAL(count, table->where().less(0, max).count());
+
+    CHECK_EQUAL(0, table->where().less_equal(0, min).count());
+    CHECK_EQUAL(1, table->where().less_equal(0, start).count());
+    CHECK_EQUAL(count, table->where().less_equal(0, start + count).count());
+    CHECK_EQUAL(count, table->where().less_equal(0, max).count());
+
+    CHECK_EQUAL(count, table->where().greater(0, min).count());
+    CHECK_EQUAL(count - 1, table->where().greater(0, start).count());
+    CHECK_EQUAL(1, table->where().greater(0, start + count - 2).count());
+    CHECK_EQUAL(0, table->where().greater(0, start + count - 1).count());
+    CHECK_EQUAL(0, table->where().greater(0, max).count());
+
+    CHECK_EQUAL(count, table->where().greater_equal(0, min).count());
+    CHECK_EQUAL(count, table->where().greater_equal(0, start).count());
+    CHECK_EQUAL(count - 1, table->where().greater_equal(0, start + 1).count());
+    CHECK_EQUAL(1, table->where().greater_equal(0, start + count - 1).count());
+    CHECK_EQUAL(0, table->where().greater_equal(0, start + count).count());
+    CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
+}
 
 #endif // TEST_QUERY

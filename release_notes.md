@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
+* Fix incorrect results when querying for < or <= on ints which requires 64
+  bits to represent with a CPU that supports SSE 4.2.
 
 ### API breaking changes:
 
@@ -10,17 +12,12 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
-
------------
+* Generic networking API added.
+* Support for non-end row insertion in tables with link and link list columns.
 
 ### Internals:
 
 * Lorem ipsum.
-
-----------------------------------------------
-
-# NEXT RELEASE
 
 ----------------------------------------------
 
@@ -74,10 +71,6 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
   containing a table clear is rolled back.
 * Fixed errors when a changes to a table with an indexed int column are rolled
   back.
-
-### API breaking changes:
-
-* Lorem ipsum.
 
 ### Enhancements:
 
