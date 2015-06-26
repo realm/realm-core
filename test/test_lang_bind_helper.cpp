@@ -9,7 +9,6 @@
 #include <realm/table_macros.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
-#include "realm/util/file_mapper.hpp"
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
 #  include <realm/commit_log.hpp>

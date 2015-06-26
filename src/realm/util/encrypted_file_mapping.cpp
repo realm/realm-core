@@ -32,7 +32,6 @@
 #include <unistd.h>
 
 #include <realm/util/terminate.hpp>
-#include "realm/util/file_mapper.hpp"
 
 namespace {
 template<typename T>

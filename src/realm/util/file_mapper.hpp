@@ -34,8 +34,6 @@ File::SizeType encrypted_size_to_data_size(File::SizeType size) REALM_NOEXCEPT;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT;
 size_t round_up_to_page_size(size_t size) REALM_NOEXCEPT;
 
-size_t page_size();
-
 }
 }
 #endif

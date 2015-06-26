@@ -24,7 +24,6 @@
 
 #include <cerrno>
 #include <sys/mman.h>
-#include <unistd.h>
 
 #include <realm/util/errno.hpp>
 
@@ -35,6 +34,7 @@
 #include <memory>
 #include <signal.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <string.h>
 #include <atomic>
 
@@ -54,14 +54,10 @@
 #include <sys/syscall.h>
 #endif
 
-#endif // REALM_ENABLE_ENCRYPTION
-
 using namespace realm;
 using namespace realm::util;
 
 namespace {
-#ifdef REALM_ENABLE_ENCRYPTION
-
 bool handle_access(void *addr);
 
 #ifdef __APPLE__
@@ -614,16 +610,9 @@ void* mmap_anon(size_t size)
     }
     return addr;
 }
-#endif // REALM_ENABLE_ENCRYPTION
-
-size_t get_page_size()
-{
-    long size = sysconf(_SC_PAGESIZE);
-    REALM_ASSERT(size > 0 && size % 4096 == 0);
-    return static_cast<size_t>(size);
-}
 
 } // anonymous namespace
+#endif
 
 namespace realm {
 namespace util {
@@ -750,12 +739,6 @@ void msync(void* addr, size_t size)
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));
     }
-}
-
-size_t page_size()
-{
-    static size_t cached_page_size = get_page_size(); // thread safe in C++11
-    return cached_page_size;
 }
 
 }

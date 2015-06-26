@@ -5,7 +5,6 @@
 #include <ostream>
 
 #include <realm/util/file.hpp>
-#include "realm/util/file_mapper.hpp" // for page_size
 
 #include "test.hpp"
 #include "crypt_key.hpp"

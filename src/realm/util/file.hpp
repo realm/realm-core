@@ -59,6 +59,8 @@ void remove_dir(const std::string& path);
 /// path to the new directory is returned without a trailing slash.
 std::string make_temp_dir();
 
+size_t page_size();
+
 
 /// This class provides a RAII abstraction over the concept of a file
 /// descriptor (or file handle).
