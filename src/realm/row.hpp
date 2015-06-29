@@ -101,6 +101,7 @@ public:
     void nullify_link(std::size_t col_ndx);
     void set_mixed(std::size_t col_ndx, Mixed value);
     void set_mixed_subtable(std::size_t col_ndx, const Table* value);
+    void set_null(std::size_t col_ndx);
 
     //@{
     /// Note that these operations will cause the row accessor to be detached.
@@ -474,6 +475,12 @@ template<class T, class R>
 inline void RowFuncs<T,R>::set_mixed_subtable(std::size_t col_ndx, const Table* value)
 {
     table()->set_mixed_subtable(col_ndx, row_ndx(), value); // Throws
+}
+
+template<class T, class R>
+inline void RowFuncs<T,R>::set_null(std::size_t col_ndx)
+{
+    table()->set_null(col_ndx, row_ndx()); // Throws
 }
 
 template<class T, class R> inline void RowFuncs<T,R>::remove()
