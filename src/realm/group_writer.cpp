@@ -113,7 +113,7 @@ size_t GroupWriter::write_group()
     size_t reserve_pos = to_size_t(fpositions.get(reserve_ndx));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     fpositions.ensure_minimum_width(reserve_pos + max_free_space_needed); // Throws
-    std::cerr << "Free space reservation: [" << reserve_pos << ", " << reserve_size << "]" << std::endl;
+    //std::cerr << "Free space reservation: [" << reserve_pos << ", " << reserve_size << "]" << std::endl;
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = fpositions.get_byte_size();
@@ -172,7 +172,7 @@ size_t GroupWriter::write_group()
 
 void GroupWriter::merge_free_space()
 {
-    std::cerr << "----------------------------------------- merge ------------------------" << std::endl;
+    //std::cerr << "----------------------------------------- merge ------------------------" << std::endl;
     ArrayInteger& positions = m_group.m_free_positions;
     ArrayInteger& lengths   = m_group.m_free_lengths;
     ArrayInteger& versions  = m_group.m_free_versions;
@@ -240,7 +240,7 @@ size_t GroupWriter::get_free_space(size_t size)
     size_t chunk_size = p.second;
     REALM_ASSERT_3(chunk_size, >=, size);
     REALM_ASSERT((chunk_size % 8) == 0);
-    std::cerr << "alloc(" << size << ") from chunk [" << chunk_pos << ", " << chunk_size << "]" << std::endl;
+    //std::cerr << "alloc(" << size << ") from chunk [" << chunk_pos << ", " << chunk_size << "]" << std::endl;
 
     size_t rest = chunk_size - size;
     if (rest > 0) {
@@ -248,7 +248,7 @@ size_t GroupWriter::get_free_space(size_t size)
         // of the chunk. The call to reserve_free_space may split chunks
         // in order to make sure that it returns a chunk from which allocation
         // can be done from the beginning
-        std::cerr << "  - from beginning" << std::endl;
+        //std::cerr << "  - from beginning" << std::endl;
         positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
         lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
     }
@@ -258,14 +258,14 @@ size_t GroupWriter::get_free_space(size_t size)
         lengths.erase(chunk_ndx);
         if (is_shared)
             versions.erase(chunk_ndx);
-        std::cerr << "  - entire chunk" << std::endl;
+        //std::cerr << "  - entire chunk" << std::endl;
     }
     for (size_t i = 0; i < lengths.size(); ++i)
         REALM_ASSERT((lengths.get(i) % 8) == 0);
     for (size_t i = 0; i < positions.size(); ++i)
         REALM_ASSERT((positions.get(i) % 8) == 0);
     REALM_ASSERT((chunk_pos % 8) == 0);
-    std::cerr << "  - got [" << chunk_pos << ", " << size << "]" << std::endl;
+    //std::cerr << "  - got [" << chunk_pos << ", " << size << "]" << std::endl;
     return chunk_pos;
 }
 
@@ -338,7 +338,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
                 // we split the block so that the allocation can be done from the
                 // beginning of the second block.
                 if (alloc_pos != start_pos) {
-                    std::cerr << "  - split [" << start_pos << ", " << chunk_size << "]" << " at " << alloc_pos << std::endl;
+                    // std::cerr << "  - split [" << start_pos << ", " << chunk_size << "]" << " at " << alloc_pos << std::endl;
                     pos.insert(i, start_pos);
                     lengths.insert(i, alloc_pos - start_pos);
                     if (is_shared)
@@ -461,8 +461,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // the initial size is a multiple of 8.
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
-    std::cerr << "--------------------- extend(" << logical_file_size << " to "
-              << new_file_size << ") ---------------" << std::endl;
+    //std::cerr << "--------------------- extend(" << logical_file_size << " to "
+    //          << new_file_size << ") ---------------" << std::endl;
 
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can

@@ -703,7 +703,7 @@ void SlabAlloc::reset_free_space_tracking()
 
 bool SlabAlloc::remap(size_t file_size)
 {
-    std::cerr << "------------------------- remap(" << file_size << ") --------------------------" << std::endl;
+    //std::cerr << "------------------------- remap(" << file_size << ") --------------------------" << std::endl;
 
     REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
