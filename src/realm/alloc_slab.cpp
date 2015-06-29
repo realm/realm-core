@@ -720,8 +720,6 @@ bool SlabAlloc::remap(size_t file_size)
         auto num_chunks = get_chunk_index(file_size);
         auto num_additional_mappings = num_chunks - m_first_additional_chunk;
 
-        //auto additional_mapping_size = file_size - m_initial_mapping_size;
-        //auto num_additional_mappings = 1 + ((additional_mapping_size-1) / m_chunk_size);
         if (num_additional_mappings > m_capacity_additional_mappings) {
             // FIXME: No harcoded constants here
             m_capacity_additional_mappings = num_additional_mappings + 128;
@@ -733,8 +731,9 @@ bool SlabAlloc::remap(size_t file_size)
         }
         for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
         {
-            auto chunk_start_offset = m_initial_mapping_size + k * m_chunk_size;
-            util::File::Map<char> map(m_file, chunk_start_offset, File::access_ReadOnly, m_chunk_size);
+            auto chunk_start_offset = get_chunk_base(k + m_first_additional_chunk);
+            auto chunk_size = get_chunk_base(1 + k + m_first_additional_chunk) - chunk_start_offset;
+            util::File::Map<char> map(m_file, chunk_start_offset, File::access_ReadOnly, chunk_size);
             m_additional_mappings[k].move(map);
         }
         m_num_additional_mappings = num_additional_mappings;
@@ -795,12 +794,44 @@ bool SlabAlloc::matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT
 
 std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
 {
-    return chunk_mapping_enabled() ? (pos / m_chunk_size) : 0;
+    if (!chunk_mapping_enabled()) return 0;
+    size_t chunk_base_number = pos/m_chunk_size;
+    size_t chunk_group_number = chunk_base_number/16;
+    size_t index;
+    if (chunk_group_number == 0) {
+        // first 16 entries aligns 1:1
+        index = chunk_base_number;
+    }
+    else {
+        // remaning entries are exponential
+        size_t log_index = log2(chunk_group_number);
+        size_t chunk_index_in_group = (chunk_base_number >> (1+log_index)) & 0x7;
+        index = (16 + (log_index * 8)) + chunk_index_in_group;
+//        std::cerr << "  group_number = " << chunk_group_number
+//                  << "  log_index = " << log_index << "  in group = " << chunk_index_in_group << std::endl;
+    }
+//    std::cerr << "chunk_index( " << pos << " ) -> " << index << std::endl;
+    return index;
+
+//    return chunk_mapping_enabled() ? (pos / m_chunk_size) : 0;
 }
 
 std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
 {
-    return index * m_chunk_size;
+    size_t base;
+    if (index < 16) {
+        base = index * m_chunk_size;
+    }
+    else {
+        size_t chunk_index_in_group = index & 7;
+        size_t log_index = (index - chunk_index_in_group)/8 - 2;
+        size_t chunk_base_number = (8 + chunk_index_in_group)<<(1+log_index);
+        base = m_chunk_size * chunk_base_number;
+    }
+//    std::cerr << "                                   chunk_base( " << 
+//        index << " ) -> " << base << std::endl;
+    return base;
+//    return index * m_chunk_size;
 }
 
 #ifdef REALM_DEBUG

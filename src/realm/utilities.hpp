@@ -128,7 +128,7 @@ uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 #if defined(__GNUC__)
 inline int log2(std::size_t x) {
     if (x)
-        return 64 - __builtin_clzll(x);
+        return 63 - __builtin_clzll(x);
     else
         return -1;
 }
