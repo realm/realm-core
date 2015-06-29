@@ -82,6 +82,14 @@
 #define CHECK_GREATER_EQUAL(a,b) \
     test_results.check_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
+#define CHECK_OR_RETURN(cond) \
+    do { \
+        if (!CHECK(cond)) { \
+            return; \
+        } \
+    } \
+    while(false)
+
 #define CHECK_THROW(expr, exception_class) \
     do { \
         try { \

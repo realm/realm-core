@@ -23,7 +23,7 @@ void keep_test_files()
     keep_files = true;
 }
 
-std::string get_test_path(const TestDetails& test_details, const char* suffix)
+std::string get_test_path(const TestDetails& test_details, const std::string& suffix)
 {
     std::string path = path_prefix;
     path += test_details.test_name;

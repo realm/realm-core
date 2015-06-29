@@ -47,8 +47,6 @@ public:
     template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
 #endif
 
-    ~BinaryData() REALM_NOEXCEPT {}
-
     char operator[](std::size_t i) const REALM_NOEXCEPT { return m_data[i]; }
 
     const char* data() const REALM_NOEXCEPT { return m_data; }

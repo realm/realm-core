@@ -53,7 +53,7 @@ public:
     void nullify_link(std::size_t row_ndx);
     void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
     void insert_null_link(std::size_t row_ndx);
-
+    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) override;
     //@}
 
     void move_last_over(std::size_t, std::size_t, bool) override;

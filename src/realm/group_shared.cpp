@@ -1237,25 +1237,21 @@ void SharedGroup::end_read() REALM_NOEXCEPT
 
 #ifdef REALM_ENABLE_REPLICATION
 
-void SharedGroup::promote_to_write()
+void SharedGroup::promote_to_write(History& history)
 {
     REALM_ASSERT(m_transact_stage == transact_Reading);
 
-#ifdef REALM_ENABLE_REPLICATION
     Replication* repl = m_group.get_replication();
     if (repl)
         repl->begin_write_transact(*this); // Throws
-#endif
 
     try {
         do_begin_write();
-        advance_read();
+        advance_read(history);
     }
     catch (...) {
-#ifdef REALM_ENABLE_REPLICATION
         if (repl)
             repl->rollback_write_transact(*this);
-#endif
         throw;
     }
 
@@ -1263,10 +1259,10 @@ void SharedGroup::promote_to_write()
 }
 
 
-std::unique_ptr<BinaryData[]> SharedGroup::advance_readlock(VersionID specific_version)
+std::unique_ptr<BinaryData[]>
+SharedGroup::advance_readlock(History& history,VersionID specific_version)
 {
     bool same_as_before;
-    Replication* repl = _impl::GroupFriend::get_replication(m_group);
     ReadLockInfo old_readlock = m_readlock;
 
     // we cannot move backward in time (yet)
@@ -1281,7 +1277,7 @@ std::unique_ptr<BinaryData[]> SharedGroup::advance_readlock(VersionID specific_v
     // before allowing that to happen.
     if (specific_version.version) {
         bool success = grab_specific_readlock(m_readlock, same_as_before, specific_version);
-        if (!success) 
+        if (!success)
             throw UnreachableVersion();
     }
     else {
@@ -1306,34 +1302,41 @@ std::unique_ptr<BinaryData[]> SharedGroup::advance_readlock(VersionID specific_v
     // because in order for us to get the new version when we grab the
     // readlock, the new version must have been entered into the ringbuffer.
     // commit always updates the replication log BEFORE updating the ringbuffer.
-    std::unique_ptr<BinaryData[]>
-        logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
-
-    repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs.get());
-    return logs;
+    size_t num_changesets = m_readlock.m_version - old_readlock.m_version;
+    std::unique_ptr<BinaryData[]> changesets(new BinaryData[num_changesets]); // Throws
+    history.get_changesets(old_readlock.m_version, m_readlock.m_version, changesets.get());
+    return changesets;
 }
 
-void SharedGroup::do_advance_read(ReadLockInfo old_readlock, std::unique_ptr<BinaryData []> logs)
+
+void SharedGroup::do_advance_read(ReadLockInfo old_readlock,
+                                  std::unique_ptr<BinaryData[]> changesets)
 {
-    m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size,
-                             logs.get(),
-                             logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
+    size_t num_changesets = m_readlock.m_version - old_readlock.m_version;
+    m_group.advance_transact(m_readlock.m_top_ref,
+                             m_readlock.m_file_size,
+                             changesets.get(),
+                             changesets.get() + num_changesets); // Throws
     release_readlock(old_readlock);
 }
 
-void SharedGroup::advance_read(VersionID specific_version)
+
+void SharedGroup::advance_read(History& history, VersionID specific_version)
 {
     REALM_ASSERT(m_transact_stage == transact_Reading);
 
     ReadLockInfo old_readlock = m_readlock;
-    auto logs = advance_readlock(specific_version);
-    if (logs)
-        do_advance_read(old_readlock, std::move(logs));
-    else
+    std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, specific_version);
+    if (changesets) {
+        do_advance_read(old_readlock, move(changesets)); // Throws
+    }
+    else {
         release_readlock(old_readlock);
+    }
 }
 
 #endif // REALM_ENABLE_REPLICATION
+
 
 Group& SharedGroup::begin_write()
 {
@@ -1390,14 +1393,16 @@ void SharedGroup::do_begin_write()
 }
 
 
-void SharedGroup::commit()
+SharedGroup::version_type SharedGroup::commit()
 {
-    do_commit();
+    version_type new_version = do_commit();
 
     end_read();
     // complete detach
     // (end_read allows group to retain data, but accessors become invalid after commit):
     m_group.complete_detach();
+
+    return new_version;
 }
 
 
@@ -1423,7 +1428,7 @@ void SharedGroup::commit_and_continue_as_read()
     m_group.update_refs(m_readlock.m_top_ref, old_baseline);
 }
 
-void SharedGroup::rollback_and_continue_as_read()
+void SharedGroup::rollback_and_continue_as_read(History& history)
 {
     // Mark all managed space (beyond the attached file) as free.
     m_group.m_alloc.reset_free_space_tracking(); // Throws
@@ -1431,12 +1436,12 @@ void SharedGroup::rollback_and_continue_as_read()
     m_transact_stage = transact_Reading;
 
     // get the commit log and use it to rollback all accessors:
-    if (Replication* repl = m_group.get_replication()) {
-        BinaryData buffer = repl->get_pending_entries();
-        m_group.reverse_transact(m_readlock.m_top_ref, buffer);
+    BinaryData buffer = history.get_uncommitted_changes();
+    m_group.reverse_transact(m_readlock.m_top_ref, buffer);
 
-        repl->rollback_write_transact(*this);
-    }
+    using gf = _impl::GroupFriend;
+    Replication* repl = gf::get_replication(m_group);
+    repl->rollback_write_transact(*this);
 
     // release exclusive write access: (FIXME: do this earlier?)
     SharedInfo* info = m_file_map.get_addr();
@@ -1446,7 +1451,7 @@ void SharedGroup::rollback_and_continue_as_read()
 #endif // REALM_ENABLE_REPLICATION
 
 
-void SharedGroup::do_commit()
+Replication::version_type SharedGroup::do_commit()
 {
     REALM_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1467,8 +1472,8 @@ void SharedGroup::do_commit()
     // local database as not-up-to-date. The exception should not be
     // rethrown, because the commit was effectively successful.
 
+    version_type new_version;
     {
-        uint_fast64_t new_version;
 #ifdef REALM_ENABLE_REPLICATION
         // It is essential that if Replication::commit_write_transact() fails,
         // then the transaction is not completed. In that case, a subsequent
@@ -1506,6 +1511,8 @@ void SharedGroup::do_commit()
     m_transact_stage = transact_Reading;
     // Release write lock
     info->writemutex.unlock();
+
+    return new_version;
 }
 
 

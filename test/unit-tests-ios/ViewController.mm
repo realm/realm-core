@@ -11,10 +11,14 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    NSString* tmpDir = NSTemporaryDirectory();
-    std::string tmp_dir{tmpDir.UTF8String, tmpDir.length};
+
+    std::string tmp_dir{[NSTemporaryDirectory() UTF8String]};
     realm::test_util::set_test_path_prefix(tmp_dir);
-    test_all(0, NULL);
+
+    std::string resource_path{[[[NSBundle mainBundle] resourcePath] UTF8String]};
+    realm::test_util::set_test_resource_path(resource_path + "/");
+
+    test_all(0, nullptr);
     exit(0);
 }
 

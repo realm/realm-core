@@ -376,7 +376,7 @@ public:
             pos = slice.write(m_out); // Throws
         }
         ref_type ref = pos;
-        ref_type* is_last = 0;
+        ref_type* is_last = nullptr;
         if (leaf_end >= m_end)
             is_last = &m_top_ref;
         m_tree_writer.add_leaf_ref(ref, size, is_last); // Throws

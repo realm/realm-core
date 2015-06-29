@@ -73,7 +73,7 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
 
     ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
 #ifdef REALM_DEBUG
-    std::cerr << ss.rdbuf();
+    std::cerr << ss.rdbuf() << '\n';
 #endif
 
 #if defined(__APPLE__)

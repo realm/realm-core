@@ -16,9 +16,13 @@ util/string_buffer.hpp \
 util/shared_ptr.hpp \
 util/memory_stream.hpp \
 util/logger.hpp \
+util/misc_errors.hpp \
+util/basic_system_errors.hpp \
 util/thread.hpp \
 util/file.hpp \
+util/network.hpp \
 util/utf8.hpp \
+util/platform_specific_condvar.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
@@ -53,6 +57,7 @@ descriptor_fwd.hpp \
 descriptor.hpp \
 group.hpp \
 group_shared.hpp \
+history.hpp \
 $(REPLICATION_HPP) \
 query.hpp \
 query_conditions.hpp \
@@ -64,8 +69,7 @@ unicode.hpp \
 commit_log.hpp \
 link_view_fwd.hpp \
 link_view.hpp \
-views.hpp \
-util/platform_specific_condvar.hpp
+views.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
@@ -105,13 +109,16 @@ DEV_PROGRAMS     = realm-config
 
 librealm_a_SOURCES = \
 util/encrypted_file_mapping.cpp \
-util/errno.cpp \
+util/misc_errors.cpp \
+util/basic_system_errors.cpp \
 util/file.cpp \
 util/file_mapper.cpp \
 util/memory_stream.cpp \
 util/string_buffer.cpp \
 util/terminate.cpp \
 util/thread.cpp \
+util/network.cpp \
+util/platform_specific_condvar.cpp \
 $(REPLICATION_CPP) \
 alloc.cpp \
 alloc_slab.cpp \
@@ -155,7 +162,6 @@ unicode.cpp \
 utilities.cpp \
 version.cpp \
 views.cpp \
-util/platform_specific_condvar.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #

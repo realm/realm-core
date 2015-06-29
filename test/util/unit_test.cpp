@@ -108,8 +108,8 @@ public:
         for (test_iter i_1 = m_tests.begin(); i_1 != tests_end; ++i_1) {
             const test& t = i_1->second;
             m_out <<
-                "  <test suite=\""<< t.m_details.suite_name <<"\" "
-                "name=\"" << t.m_details.test_name << "\" "
+                "  <test suite=\""<< xml_escape(t.m_details.suite_name) <<"\" "
+                "name=\"" << xml_escape(t.m_details.test_name) << "\" "
                 "time=\"" << t.m_elapsed_seconds << "\"";
             if (t.m_failures.empty()) {
                 m_out << "/>\n";
@@ -289,7 +289,7 @@ void TestList::ExecContext::run()
 {
     Timer timer;
     double time = 0;
-    Test* test = 0;
+    Test* test = nullptr;
     for (;;) {
         double prev_time = time;
         time = timer.get_elapsed_time();

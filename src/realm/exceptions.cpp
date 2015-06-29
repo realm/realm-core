@@ -20,6 +20,8 @@ const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
             return "Row index out of range";
         case LogicError::column_index_out_of_range:
             return "Column index out of range";
+        case LogicError::bad_version_number:
+            return "Bad version number";
         case LogicError::illegal_combination:
             return "Illegal combination";
         case LogicError::type_mismatch:
@@ -43,4 +45,3 @@ const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
     }
     return "Unknown error";
 }
-

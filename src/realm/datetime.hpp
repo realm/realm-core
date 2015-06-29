@@ -34,8 +34,6 @@ public:
     /// 1970.
     DateTime(std::time_t d) REALM_NOEXCEPT : m_time(d) {}
 
-    ~DateTime() REALM_NOEXCEPT {}
-
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
     std::time_t get_datetime() const REALM_NOEXCEPT { return m_time; }
 

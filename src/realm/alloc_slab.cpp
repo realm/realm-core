@@ -513,7 +513,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         }
 
         int select_field = header->m_flags;
-        select_field ^= SlabAlloc::flags_SelectBit;
+        select_field = ((select_field & 1) ^ SlabAlloc::flags_SelectBit);
         m_file_format_version = header->m_file_format_version[select_field];
 
     }
@@ -590,7 +590,7 @@ void SlabAlloc::attach_empty()
     REALM_ASSERT(!is_attached());
 
     m_attach_mode = attach_OwnedBuffer;
-    m_data = 0; // Empty buffer
+    m_data = nullptr; // Empty buffer
 
     // No ref must ever be less that the header size, so we will use that as the
     // baseline here.

@@ -26,17 +26,25 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
 #include <realm/group.hpp>
+#include <realm/history.hpp>
+#include <realm/impl/input_stream.hpp>
+#include <realm/impl/transact_log.hpp>
+#include <realm/replication.hpp>
 
 namespace realm {
 
 namespace _impl {
+class SharedGroupFriend;
 class WriteLogCollector;
 }
 
 // Thrown by SharedGroup::open if the lock file is already open in another
 // process which can't share mutexes with this process
-struct IncompatibleLockFile : std::runtime_error {
-    IncompatibleLockFile() : std::runtime_error("Incompatible lock file") { }
+struct IncompatibleLockFile: std::runtime_error {
+    IncompatibleLockFile():
+        std::runtime_error("Incompatible lock file")
+    {
+    }
 };
 
 /// A SharedGroup facilitates transactions.
@@ -196,8 +204,6 @@ public:
     void open(Replication&, DurabilityLevel dlevel = durability_Full,
               const char* encryption_key = 0);
 
-    friend class Replication;
-
 #endif
 
     /// A SharedGroup may be created in the unattached state, and then
@@ -303,14 +309,20 @@ public:
     /// to start transaction at a specific version.
     VersionID get_version_of_current_transaction();
 
+    typedef uint_fast64_t version_type;
+
     /// Begin a new write transaction. Accessors obtained prior to this point
     /// are invalid (if they weren't already) and new accessors must be
     /// obtained from the group returned. It is illegal to call begin_write
     /// inside an active transaction.
     Group& begin_write();
 
-    /// End the current write transaction. All accessors are detached.
-    void commit();
+    /// Commit the current write transaction.
+    ///
+    /// This with detach all accessors that were previsously attached to objects
+    /// in this group. Returns the version number of the new version produced by
+    /// the comitted transaction.
+    version_type commit();
 
     /// End the current write transaction. All accessors are detached.
     void rollback() REALM_NOEXCEPT;
@@ -399,7 +411,7 @@ private:
 
     // Try to grab a readlock for a specific version. Fails if the version is no longer
     // accessible.
-    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before,
                                 VersionID specific_version);
 
     // Release a specific readlock. The readlock info MUST have been obtained by a
@@ -407,11 +419,13 @@ private:
     void release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT;
 
     void do_begin_write();
-    void do_commit();
+    version_type do_commit();
 
+public:
     // return the current version of the database - note, this is not necessarily
     // the version seen by any currently open transactions.
     uint_fast64_t get_current_version();
+private:
 
     // make sure the given index is within the currently mapped area.
     // if not, expand the mapped area. Returns true if the area is expanded.
@@ -436,22 +450,24 @@ private:
     /// open pointing at that specific version, and if the version requested
     /// is the same or later than the one currently accessed.
     /// Fails with exception UnreachableVersion.
+    void advance_read(History&, VersionID specific_version=VersionID());
+
     template<typename Handler>
-    void advance_read(Handler&& handler, VersionID specific_version=VersionID());
-    void advance_read(VersionID specific_version=VersionID());
+    void advance_read(History&, Handler&&, VersionID specific_version=VersionID());
 
     /// Promote the current read transaction to a write transaction.
     /// CAUTION: This also synchronizes with latest state of the database,
     /// including synchronization of all accessors.
     /// FIXME: A version of this which does NOT synchronize with latest
     /// state will be made available later, once we are able to merge commits.
-    void promote_to_write();
+    void promote_to_write(History&);
+
     template<typename Handler>
-    void promote_to_write(Handler&& handler);
+    void promote_to_write(History&, Handler&&);
 
     // Advance the readlock to the given version and return the transaction logs
     // between the old version and the given version, or nullptr if none.
-    std::unique_ptr<BinaryData[]> advance_readlock(VersionID specific_version);
+    std::unique_ptr<BinaryData[]> advance_readlock(History&, VersionID specific_version);
 
     // Advance the group to the current readlock version
     void do_advance_read(ReadLockInfo old_readlock, std::unique_ptr<BinaryData[]> logs);
@@ -469,14 +485,11 @@ private:
     /// Any accessors referring to the aborted state will be detached. Accessors
     /// which was detached during the write transaction (for whatever reason)
     /// are not restored but will remain detached.
-    void rollback_and_continue_as_read();
+    void rollback_and_continue_as_read(History&);
 
-    Replication* get_replication() { return m_group.get_replication(); }
 #endif
-    friend class ReadTransaction;
-    friend class WriteTransaction;
-    friend class LangBindHelper;
-    friend class _impl::WriteLogCollector;
+
+    friend class _impl::SharedGroupFriend;
 };
 
 
@@ -514,10 +527,7 @@ public:
         return get_group().get_table<T>(name); // Throws
     }
 
-    const Group& get_group() const REALM_NOEXCEPT
-    {
-        return m_shared_group.m_group;
-    }
+    const Group& get_group() const REALM_NOEXCEPT;
 
 private:
     SharedGroup& m_shared_group;
@@ -579,29 +589,27 @@ public:
         return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
 
-    Group& get_group() const REALM_NOEXCEPT
-    {
-        REALM_ASSERT(m_shared_group);
-        return m_shared_group->m_group;
-    }
+    Group& get_group() const REALM_NOEXCEPT;
 
-    void commit()
+    SharedGroup::version_type commit()
     {
         REALM_ASSERT(m_shared_group);
-        m_shared_group->commit();
-        m_shared_group = 0;
+        SharedGroup::version_type new_version = m_shared_group->commit();
+        m_shared_group = nullptr;
+        return new_version;
     }
 
     void rollback() REALM_NOEXCEPT
     {
         REALM_ASSERT(m_shared_group);
         m_shared_group->rollback();
-        m_shared_group = 0;
+        m_shared_group = nullptr;
     }
 
 private:
     SharedGroup* m_shared_group;
 };
+
 
 
 
@@ -624,7 +632,7 @@ inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
 
 #ifdef REALM_ENABLE_REPLICATION
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
-m_group(Group::shared_tag())
+    m_group(Group::shared_tag())
 {
     open(repl, dlevel, key);
 
@@ -637,7 +645,48 @@ inline bool SharedGroup::is_attached() const REALM_NOEXCEPT
     return m_file_map.is_attached();
 }
 
-inline void SharedGroup::upgrade_file_format() {
+template<class Handler>
+void SharedGroup::advance_read(History& history, Handler&& handler, VersionID specific_version)
+{
+    REALM_ASSERT(m_transact_stage == transact_Reading);
+    ReadLockInfo old_readlock = m_readlock;
+
+    std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, specific_version);
+    if (changesets) {
+        size_t num_changesets = size_t(m_readlock.m_version - old_readlock.m_version);
+        _impl::MultiLogNoCopyInputStream in(changesets.get(),
+                                            changesets.get() + num_changesets); // Throws
+        _impl::TransactLogParser parser;
+        parser.parse(in, handler); // Throws
+        handler.parse_complete();
+    }
+
+    do_advance_read(old_readlock, std::move(changesets));
+}
+
+template<class Handler>
+void SharedGroup::promote_to_write(History& history, Handler&& handler)
+{
+    REALM_ASSERT(m_transact_stage == transact_Reading);
+    Replication* repl = m_group.get_replication();
+    REALM_ASSERT(repl);
+
+    repl->begin_write_transact(*this); // Throws
+
+    try {
+        do_begin_write();
+        advance_read(history, handler);
+    }
+    catch (...) {
+        repl->rollback_write_transact(*this);
+        throw;
+    }
+
+    m_transact_stage = transact_Writing;
+}
+
+inline void SharedGroup::upgrade_file_format()
+{
     // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set
     // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
     // call returns immediately if it finds that the upgrade is already complete.
@@ -652,6 +701,49 @@ inline void SharedGroup::upgrade_file_format() {
         m_group.upgrade_file_format();
         commit();
     }
+}
+
+// The purpose of this class is to give internal access to some, but
+// not all of the non-public parts of the SharedGroup class.
+class _impl::SharedGroupFriend {
+public:
+    static Group& get_group(SharedGroup& sg) REALM_NOEXCEPT
+    {
+        return sg.m_group;
+    }
+
+    static void advance_read(SharedGroup& sg, History& hist, SharedGroup::VersionID ver)
+    {
+        sg.advance_read(hist, ver); // Throws
+    }
+
+    static void promote_to_write(SharedGroup& sg, History& hist)
+    {
+        sg.promote_to_write(hist); // Throws
+    }
+
+    static void commit_and_continue_as_read(SharedGroup& sg)
+    {
+        sg.commit_and_continue_as_read(); // Throws
+    }
+
+    static void rollback_and_continue_as_read(SharedGroup& sg, History& hist)
+    {
+        sg.rollback_and_continue_as_read(hist); // Throws
+    }
+};
+
+inline const Group& ReadTransaction::get_group() const REALM_NOEXCEPT
+{
+    using sgf = _impl::SharedGroupFriend;
+    return sgf::get_group(m_shared_group);
+}
+
+inline Group& WriteTransaction::get_group() const REALM_NOEXCEPT
+{
+    REALM_ASSERT(m_shared_group);
+    using sgf = _impl::SharedGroupFriend;
+    return sgf::get_group(*m_shared_group);
 }
 
 } // namespace realm

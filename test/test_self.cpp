@@ -416,7 +416,7 @@ TEST_EX(Failure_String, failure_list, true) // Test #4, accum checks = 77 + 16 =
 TEST_EX(Success_Pointer, success_list, true) // Test #5, accum checks = 73 + 12 = 85
 {
     int i;
-    int* p_1 = 0;
+    int* p_1 = nullptr;
     int* p_2 = &i;
     CHECK_EQUAL(p_1, p_1);
     CHECK_EQUAL(p_2, p_2);
@@ -435,7 +435,7 @@ TEST_EX(Success_Pointer, success_list, true) // Test #5, accum checks = 73 + 12 
 TEST_EX(Failure_Pointer, failure_list, true) // Test #5, accum checks = 93 + 12 = 105
 {
     int i;
-    int* p_1 = 0;
+    int* p_1 = nullptr;
     int* p_2 = &i;
     CHECK_EQUAL(p_1, p_2);
     CHECK_EQUAL(p_2, p_1);
