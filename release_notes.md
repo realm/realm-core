@@ -3,6 +3,8 @@
 ### Bugfixes:
 
 * Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
+* Fix incorrect results when querying for < or <= on ints which requires 64
+  bits to represent with a CPU that supports SSE 4.2.
 
 ### API breaking changes:
 
@@ -17,6 +19,7 @@
   trigger a modifying operation on any of the involved TableViews.
   For TableViews the handover can be one of *moving*, *copying* or *staying*, reflecting how the actual payload
   is treated.
+* Support for non-end row insertion in tables with link and link list columns.
 
 ### Internals:
 

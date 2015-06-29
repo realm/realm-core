@@ -6,7 +6,7 @@
 #include <realm/handover_defs.hpp>
 #include <realm/index_string.hpp>
 
-using namespace realm;
+namespace realm {
 
 const std::size_t detached_ref = std::size_t(-1);
 
@@ -112,5 +112,7 @@ public:
 
     Column m_row_indexes;
 };
+
+} // namespace realm
 
 #endif // REALM_VIEWS_HPP

@@ -171,7 +171,7 @@
 /* Support for the C++11 'noexcept' specifier.
  *
  * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 6) || \
+#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 6) || defined(_MSC_VER) || \
     REALM_HAVE_CLANG_FEATURE(cxx_noexcept)
 #  define REALM_HAVE_CXX11_NOEXCEPT 1
 #endif

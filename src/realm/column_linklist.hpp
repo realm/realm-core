@@ -63,12 +63,15 @@ public:
     void to_json_row(std::size_t row_ndx, std::ostream& out) const;
 
     void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) override;
     void clear(std::size_t, bool) override;
     void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_clear_root_table() REALM_NOEXCEPT override;
+    void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT override;
+    void adj_acc_insert_rows_and_fix(std::size_t row_ndx, std::size_t num_rows);
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
