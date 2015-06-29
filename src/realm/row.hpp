@@ -81,6 +81,7 @@ public:
     std::size_t get_subtable_size(std::size_t col_ndx) const REALM_NOEXCEPT;
     std::size_t get_link(std::size_t col_ndx) const REALM_NOEXCEPT;
     bool is_null_link(std::size_t col_ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t col_ndx) const REALM_NOEXCEPT;
     ConstLinkViewRef get_linklist(std::size_t col_ndx) const;
     LinkViewRef get_linklist(std::size_t col_ndx);
     bool linklist_is_empty(std::size_t col_ndx) const REALM_NOEXCEPT;
@@ -359,6 +360,12 @@ template<class T, class R>
 inline bool RowFuncs<T,R>::is_null_link(std::size_t col_ndx) const REALM_NOEXCEPT
 {
     return table()->is_null_link(col_ndx, row_ndx());
+}
+
+template<class T, class R>
+inline bool RowFuncs<T,R>::is_null(std::size_t col_ndx) const REALM_NOEXCEPT
+{
+    return table()->is_null(col_ndx, row_ndx());
 }
 
 template<class T, class R> inline typename RowFuncs<T,R>::ConstLinkViewRef
