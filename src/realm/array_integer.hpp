@@ -42,7 +42,7 @@ public:
 
     void add(int64_t value);
     void set(std::size_t ndx, int64_t value);
-    void set_uint(std::size_t ndx, uint64_t value);
+    void set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT;
     int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
     uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
     static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
@@ -94,9 +94,12 @@ public:
     bool is_empty() const REALM_NOEXCEPT;
 
     void insert(std::size_t ndx, int_fast64_t value);
+    void insert(std::size_t ndx, null);
     void add(int64_t value);
-    void set(std::size_t ndx, int64_t value);
-    void set_uint(std::size_t ndx, uint64_t value);
+    void add(null);
+    void set(std::size_t ndx, int64_t value) REALM_NOEXCEPT;
+    void set(std::size_t ndx, null) REALM_NOEXCEPT;
+    void set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT;
     int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
     uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
     static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
@@ -113,7 +116,7 @@ public:
     void truncate(std::size_t size);
     void clear();
     void set_all_to_zero();
-    
+
     void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
     void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
 
@@ -168,8 +171,19 @@ public:
 
     std::size_t find_first(int64_t value, std::size_t begin = 0,
                            std::size_t end = npos) const;
+
+    // Overwrite Array::bptree_leaf_insert to correctly split nodes.
+    ref_type bptree_leaf_insert(std::size_t ndx, int64_t value, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, null, TreeInsertBase& state);
+
+    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+
+    /// Construct a deep copy of the specified slice of this array using the
+    /// specified target allocator. Subarrays will be cloned.
+    MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
+                                    Allocator& target_alloc) const;
 protected:
-    void ensure_not_null(int64_t value);
+    void avoid_null_collision(int64_t value);
 private:
     template<bool find_max>
     bool minmax_helper(int64_t& result, std::size_t start = 0, std::size_t end = npos,
@@ -224,7 +238,7 @@ inline void ArrayInteger::set(size_t ndx, int64_t value)
     Array::set(ndx, value);
 }
 
-inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value)
+inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value) REALM_NOEXCEPT
 {
     // When a value of a signed type is converted to an unsigned type, the C++
     // standard guarantees that negative values are converted from the native
@@ -310,28 +324,52 @@ bool ArrayIntNull::is_empty() const REALM_NOEXCEPT
 inline
 void ArrayIntNull::insert(std::size_t ndx, int_fast64_t value)
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::insert(ndx + 1, value);
+}
+
+inline
+void ArrayIntNull::insert(std::size_t ndx, null)
+{
+    Array::insert(ndx + 1, null_value());
 }
 
 inline
 void ArrayIntNull::add(int64_t value)
 {
-    ensure_not_null(value);
+    avoid_null_collision(value);
     Array::add(value);
 }
 
 inline
-void ArrayIntNull::set(std::size_t ndx, int64_t value)
+void ArrayIntNull::add(null)
 {
-    ensure_not_null(value);
+    Array::add(null_value());
+}
+
+inline
+void ArrayIntNull::set(std::size_t ndx, int64_t value) REALM_NOEXCEPT
+{
+    avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
 inline
-void ArrayIntNull::set_uint(std::size_t ndx, uint64_t value)
+void ArrayIntNull::set(std::size_t ndx, null) REALM_NOEXCEPT
 {
-    ensure_not_null(value);
+    Array::set(ndx + 1, null_value());
+}
+
+inline
+void ArrayIntNull::set_null(std::size_t ndx) REALM_NOEXCEPT
+{
+    Array::set(ndx + 1, null_value());
+}
+
+inline
+void ArrayIntNull::set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT
+{
+    avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
@@ -354,12 +392,6 @@ int64_t ArrayIntNull::get(const char* header, std::size_t ndx) REALM_NOEXCEPT
 }
 
 inline
-void ArrayIntNull::set_null(std::size_t ndx) REALM_NOEXCEPT
-{
-    Array::set(ndx + 1, null_value());
-}
-
-inline
 bool ArrayIntNull::is_null(std::size_t ndx) const REALM_NOEXCEPT
 {
     return Array::get(ndx + 1) == null_value();
@@ -377,7 +409,7 @@ int64_t ArrayIntNull::operator[](std::size_t ndx) const REALM_NOEXCEPT
     return get(ndx);
 }
 
-inline    
+inline
 int64_t ArrayIntNull::front() const REALM_NOEXCEPT
 {
     return get(0);

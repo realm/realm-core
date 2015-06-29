@@ -77,7 +77,9 @@ public:
     }
 
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT final;
     void set(std::size_t ndx, StringData value);
+    void set_null(std::size_t ndx) override;
     void add();
     void add(StringData value);
     void insert(std::size_t ndx);
@@ -85,7 +87,7 @@ public:
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
-    bool is_nullable() const;
+    bool is_nullable() const REALM_NOEXCEPT final;
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -180,6 +182,11 @@ inline StringData ColumnStringEnum::get(std::size_t ndx) const REALM_NOEXCEPT
     return sd;
 }
 
+inline bool ColumnStringEnum::is_null(std::size_t ndx) const REALM_NOEXCEPT
+{
+    return is_nullable() ? get(ndx).is_null() : false;
+}
+
 inline void ColumnStringEnum::add()
 {
     add(m_nullable ? realm::null() : StringData(""));
@@ -264,6 +271,11 @@ inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const 
 inline void ColumnStringEnum::set_string(std::size_t row_ndx, StringData value)
 {
     set(row_ndx, value); // Throws
+}
+
+inline void ColumnStringEnum::set_null(std::size_t row_ndx)
+{
+    set(row_ndx, realm::null{});
 }
 
 inline AdaptiveStringColumn& ColumnStringEnum::get_keys()

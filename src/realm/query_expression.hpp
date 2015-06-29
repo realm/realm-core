@@ -1338,6 +1338,7 @@ private:
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
+    using ColType = typename ColumnTypeTraits<T>::column_type;
 
     Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr), 
                                                                             m_table(nullptr), sg(nullptr),
@@ -1368,7 +1369,7 @@ public:
     {
         Columns<T>& n = *new Columns<T>();
         n = *this;
-        SequentialGetter<T> *s = new SequentialGetter<T>();
+        SequentialGetter<ColType> *s = new SequentialGetter<ColType>();
         n.sg = s;
         return n;
     }
@@ -1376,7 +1377,6 @@ public:
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     virtual void set_table()
     {
-        typedef typename ColumnTypeTraits<T>::column_type ColType;
         const ColType* c;
         if (m_link_map.m_link_columns.size() == 0)
             c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
@@ -1384,7 +1384,7 @@ public:
             c = static_cast<const ColType*>(&m_link_map.m_table->get_column_base(m_column));
 
         if (sg == nullptr)
-            sg = new SequentialGetter<T>();
+            sg = new SequentialGetter<ColType>();
         sg->init(c);
     }
 
@@ -1444,7 +1444,7 @@ public:
     const Table* m_table;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
-    SequentialGetter<T>* sg;
+    SequentialGetter<ColType>* sg;
 
     // Column index of payload column of m_table
     size_t m_column;

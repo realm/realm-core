@@ -231,93 +231,93 @@ template <class TColumnType> Query& Query::not_equal(size_t column_ndx1, size_t 
 // column vs column, integer
 Query& Query::equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<int64_t>(column_ndx1, column_ndx2);
+    return equal<Column>(column_ndx1, column_ndx2);
 }
 
 Query& Query::not_equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<int64_t>(column_ndx1, column_ndx2);
+    return not_equal<Column>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<int64_t>(column_ndx1, column_ndx2);
+    return less<Column>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<int64_t>(column_ndx1, column_ndx2);
+    return greater_equal<Column>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<int64_t>(column_ndx1, column_ndx2);
+    return less_equal<Column>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<int64_t>(column_ndx1, column_ndx2);
+    return greater<Column>(column_ndx1, column_ndx2);
 }
 
 
 // column vs column, float
 Query& Query::not_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<float>(column_ndx1, column_ndx2);
+    return not_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<float>(column_ndx1, column_ndx2);
+    return less<BasicColumn<float>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<float>(column_ndx1, column_ndx2);
+    return greater<BasicColumn<float>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<float>(column_ndx1, column_ndx2);
+    return greater_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<float>(column_ndx1, column_ndx2);
+    return less_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<float>(column_ndx1, column_ndx2);
+    return equal<BasicColumn<float>>(column_ndx1, column_ndx2);
 }
 
 // column vs column, double
 Query& Query::equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<double>(column_ndx1, column_ndx2);
+    return equal<BasicColumn<double>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<double>(column_ndx1, column_ndx2);
+    return less_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<double>(column_ndx1, column_ndx2);
+    return greater_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
 }
 Query& Query::greater_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<double>(column_ndx1, column_ndx2);
+    return greater<BasicColumn<double>>(column_ndx1, column_ndx2);
 }
 Query& Query::less_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<double>(column_ndx1, column_ndx2);
+    return less<BasicColumn<double>>(column_ndx1, column_ndx2);
 }
 
 Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<double>(column_ndx1, column_ndx2);
+    return not_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
 }
 
 
@@ -419,27 +419,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Equal>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Equal>>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, NotEqual>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, NotEqual>>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Greater>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Greater>>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, GreaterEqual>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, GreaterEqual>>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, LessEqual>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, LessEqual>>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, FloatDoubleNode<float, Less>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Less>>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -454,27 +454,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Equal>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Equal>>(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, NotEqual>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, NotEqual>>(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Greater>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Greater>>(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, GreaterEqual>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, GreaterEqual>>(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, LessEqual>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, LessEqual>>(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, FloatDoubleNode<double, Less>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Less>>(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -595,7 +595,7 @@ template <Action action, typename T, typename R, class ColType>
         QueryState<R> st;
         st.init(action, nullptr, limit);
 
-        SequentialGetter<T> source_column(*m_table, column_ndx);
+        SequentialGetter<ColType> source_column(*m_table, column_ndx);
 
         if (!m_view) {
             aggregate_internal(action, ColumnTypeTraits<T>::id, first[0], &st, start, end, &source_column);

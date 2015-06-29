@@ -58,8 +58,8 @@ public:
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
-    void set_null(std::size_t ndx);
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT final;
+    void set_null(std::size_t ndx) final;
     StringData get(std::size_t ndx) const REALM_NOEXCEPT;
     void set(std::size_t ndx, StringData);
     void add();
@@ -90,7 +90,7 @@ public:
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
-    bool is_nullable() const;
+    bool is_nullable() const REALM_NOEXCEPT final;
 
     // Search index
     StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT final;

@@ -1,16 +1,16 @@
-     int   bool                 date           float          double    string              string_long         string_big_blobs  string_enum     binary  tables                mixed
- 0:    0  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string0   string0 very long st...  string0 very long st...  enum1          7 bytes     [6]                false
- 1:   -1   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string1   string1 very long st...                           enum2          7 bytes     [7]                   -1
- 2:    2  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string2   string2 very long st...  string2 very long st...  enum3          7 bytes     [8]  string             
- 3:   -3   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string3   string3 very long st...                           enum1          7 bytes     [9]  1973-11-29 21:33:09
- 4:    4  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string4   string4 very long st...  string4 very long st...  enum2          7 bytes    [10]              7 bytes
- 5:   -5   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string5   string5 very long st...                           enum3          7 bytes    [11]                  [2]
- 6:    6  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string6   string6 very long st...  string6 very long st...  enum1          7 bytes    [12]         7.386000e+02
- 7:   -7   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string7   string7 very long st...                           enum2          7 bytes    [13]        -6.913550e+03
- 8:    8  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string8   string8 very long st...  string8 very long st...  enum3          7 bytes    [14]                false
- 9:   -9   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string9   string9 very long st...                           enum1          7 bytes    [15]                  -81
-10:   10  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string10  string10 very long s...  string10 very long s...  enum2          7 bytes    [16]  string             
-11:  -11   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string11  string11 very long s...                           enum3          7 bytes    [17]  1973-11-29 21:33:09
-12:   12  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string12  string12 very long s...  string12 very long s...  enum1          7 bytes    [18]              7 bytes
-13:  -13   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string13  string13 very long s...                           enum2          7 bytes    [19]                  [2]
-14:   14  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string14  string14 very long s...  string14 very long s...  enum3          7 bytes    [20]         1.723400e+03
+     int   bool                 date           float          double    string              string_long         string_big_blobs  string_enum     binary  tables                mixed  int_null
+ 0:    0  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string0   string0 very long st...  string0 very long st...  enum1          7 bytes     [6]                false    (null)
+ 1:   -1   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string1   string1 very long st...                           enum2          7 bytes     [7]                   -1        -1
+ 2:    2  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string2   string2 very long st...  string2 very long st...  enum3          7 bytes     [8]  string                      2
+ 3:   -3   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string3   string3 very long st...                           enum1          7 bytes     [9]  1973-11-29 21:33:09        -3
+ 4:    4  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string4   string4 very long st...  string4 very long st...  enum2          7 bytes    [10]              7 bytes    (null)
+ 5:   -5   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string5   string5 very long st...                           enum3          7 bytes    [11]                  [2]        -5
+ 6:    6  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string6   string6 very long st...  string6 very long st...  enum1          7 bytes    [12]         7.386000e+02         6
+ 7:   -7   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string7   string7 very long st...                           enum2          7 bytes    [13]        -6.913550e+03        -7
+ 8:    8  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string8   string8 very long st...  string8 very long st...  enum3          7 bytes    [14]                false    (null)
+ 9:   -9   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string9   string9 very long st...                           enum1          7 bytes    [15]                  -81        -9
+10:   10  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string10  string10 very long s...  string10 very long s...  enum2          7 bytes    [16]  string                     10
+11:  -11   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string11  string11 very long s...                           enum3          7 bytes    [17]  1973-11-29 21:33:09       -11
+12:   12  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string12  string12 very long s...  string12 very long s...  enum1          7 bytes    [18]              7 bytes    (null)
+13:  -13   true  1970-01-01 03:25:45   -1.234560e+02   -9.876543e+03  string13  string13 very long s...                           enum2          7 bytes    [19]                  [2]       -13
+14:   14  false  1970-01-01 03:25:45    1.234560e+02    9.876543e+03  string14  string14 very long s...  string14 very long s...  enum3          7 bytes    [20]         1.723400e+03        14

@@ -148,7 +148,7 @@ void ArrayIntNull::replace_nulls_with(int64_t new_null)
 }
 
 
-void ArrayIntNull::ensure_not_null(int64_t value)
+void ArrayIntNull::avoid_null_collision(int64_t value)
 {
     if (m_width == 64) {
         if (value == null_value()) {
@@ -185,10 +185,102 @@ void ArrayIntNull::ensure_not_null(int64_t value)
 
 void ArrayIntNull::find_all(Column* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
 {
-    ++begin;
-    if (end != npos) {
-        ++end;
+    // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
+    // in the result column. Since find_all may be invoked many times for different leaves in the
+    // B+tree with the same result column, we also can't simply adjust indices after finding them
+    // (because then the first indices would be adjusted multiple times for each subsequent leaf)
+    
+    if (end == npos) {
+        end = size();
     }
-    Array::find_all(result, value, col_offset, begin, end);
-    result->adjust(-1);
+    
+    for (size_t i = begin; i < end; ++i) {
+        if (get(i) == value) {
+            result->add(col_offset + i);
+        }
+    }
+}
+
+namespace {
+    
+// FIXME: Move this logic to BpTree.
+struct ArrayIntNullLeafInserter {
+    template <class T>
+    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, std::size_t ndx, T value, Array::TreeInsertBase& state)
+    {
+        size_t leaf_size = self.size();
+        REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
+        if (leaf_size < ndx)
+            ndx = leaf_size;
+        if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
+            self.insert(ndx, value); // Throws
+            return 0; // Leaf was not split
+        }
+
+        // Split leaf node
+        ArrayIntNull new_leaf(alloc);
+        new_leaf.create(Array::type_Normal); // Throws
+        if (ndx == leaf_size) {
+            new_leaf.add(value); // Throws
+            state.m_split_offset = ndx;
+        }
+        else {
+            for (size_t i = ndx; i < leaf_size; ++i) {
+                if (self.is_null(i)) {
+                    new_leaf.add(null{}); // Throws
+                }
+                else {
+                    new_leaf.add(self.get(i)); // Throws
+                }
+            }
+            self.truncate(ndx); // Throws
+            self.add(value); // Throws
+            state.m_split_offset = ndx + 1;
+        }
+        state.m_split_size = leaf_size + 1;
+        return new_leaf.get_ref();
+    }
+};
+
+} // anonymous namespace
+
+ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, int64_t value, Array::TreeInsertBase& state)
+{
+    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, value, state);
+}
+
+ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, null, Array::TreeInsertBase& state)
+{
+    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, null{}, state);
+}
+
+MemRef ArrayIntNull::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const
+{
+    // NOTE: It would be nice to consolidate this with Array::slice somehow.
+
+    REALM_ASSERT(is_attached());
+
+    Array slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&slice);
+    Type type = get_type();
+    slice.create(type, m_context_flag); // Throws
+    slice.add(null_value());
+
+    size_t begin = offset + 1;
+    size_t end   = offset + size + 1;
+    for (size_t i = begin; i != end; ++i) {
+        int_fast64_t value = Array::get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+MemRef ArrayIntNull::slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    // NOTE: It would be nice to consolidate this with Array::slice_and_clone_children somehow.
+
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(!has_refs());
+    return slice(offset, size, target_alloc);
 }
