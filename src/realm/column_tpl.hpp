@@ -29,7 +29,7 @@
 namespace realm {
 
 template<class T, class cond> class FloatDoubleNode;
-template<class T, class cond> class IntegerNode;
+template <class ColType, class Cond> class IntegerNode;
 template<class T> class SequentialGetter;
 
 template<class cond, class T> struct ColumnTypeTraits2;
@@ -52,42 +52,59 @@ template<class cond> struct ColumnTypeTraits2<cond, double> {
 };
 
 
-template <class T, class R, Action action, class condition>
-    R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
-                            std::size_t limit, std::size_t* return_ndx) const
+namespace _impl {
+
+template <class ColType>
+struct FindInLeaf {
+    using LeafType = typename ColType::LeafType;
+
+    template <Action action, class Condition, class T, class R>
+    static bool find(const LeafType& leaf, T target, std::size_t local_start, std::size_t local_end, std::size_t leaf_start, QueryState<R>& state)
+    {
+        Condition cond;
+        bool cont = true;
+        for (size_t local_index = local_start; cont && local_index < local_end; local_index++) {
+            auto v = leaf.get(local_index);
+            if (cond(v, target)) {
+                cont = state.template match<action, false>(leaf_start + local_index , 0, static_cast<R>(v));
+            }
+        }
+        return cont;
+    }
+};
+
+template <bool Nullable>
+struct FindInLeaf<TColumn<int64_t, Nullable>> {
+    using LeafType = typename TColumn<int64_t, Nullable>::LeafType;
+
+    template <Action action, class Condition, class T, class R>
+    static bool find(const LeafType& leaf, T target, std::size_t local_start, std::size_t local_end, std::size_t leaf_start, QueryState<R>& state)
+    {
+        const int c = Condition::condition;
+        return leaf.find(c, action, target, local_start, local_end, leaf_start, &state);
+    }
+};
+
+} // namespace _impl
+
+template <class T, class R, Action action, class Condition, class ColType>
+R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
+            std::size_t limit, std::size_t* return_ndx)
 {
-
-    condition cond;
-    int c = condition::condition;
-    typedef typename ColumnTypeTraits2<condition, T>::column_type ColType;
-    typedef typename ColumnTypeTraits2<condition, T>::array_type ArrType;
-
-    if (end == std::size_t(-1))
-        end = size();
+    if (end == npos)
+        end = column.size();
 
     QueryState<R> state;
     state.init(action, nullptr, limit);
-
-    ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
-    SequentialGetter<T> sg(column);
+    SequentialGetter<ColType> sg { &column };
 
     bool cont = true;
-    for (size_t s = start; cont && s < end; ) {
+    for (std::size_t s = start; cont && s < end; ) {
         sg.cache_next(s);
-        size_t end2 = sg.local_end(end);
-
-        if(std::is_same<T, int64_t>::value) {
-            cont = (static_cast<const Array*>(sg.m_leaf_ptr))->find(c, action, int64_t(target), s - sg.m_leaf_start, end2, sg.m_leaf_start, reinterpret_cast<QueryState<int64_t>*>(&state));
-        }
-        else {
-            for(size_t local_index = s - sg.m_leaf_start; cont && local_index < end2; local_index++) {
-                T v = static_cast<const ArrType*>(sg.m_leaf_ptr)->get(local_index);
-                if(cond(v, target)) {
-                    cont = (static_cast<QueryState<R>*>(&state))->template match<action, false>(s + local_index , 0, static_cast<R>(v));
-                }
-            }
-        }
-        s = end2 + sg.m_leaf_start;
+        std::size_t start2 = s - sg.m_leaf_start;
+        std::size_t end2 = sg.local_end(end);
+        cont = _impl::FindInLeaf<ColType>::template find<action, Condition>(*sg.m_leaf_ptr, target, start2, end2, sg.m_leaf_start, state);
+        s = sg.m_leaf_start + end2;
     }
 
     if (return_ndx)

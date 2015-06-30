@@ -662,6 +662,51 @@ TEST(StringIndex_FindAllNoCopy2_Int)
     col.destroy();
 }
 
+TEST(StringIndex_FindAllNoCopy2_IntNull)
+{
+    // Create a column with duplcate values
+    ref_type ref = ColumnIntNull::create(Allocator::get_default());
+    ColumnIntNull col(Allocator::get_default(), ref);
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
+        col.add(ints[t]);
+    col.insert(npos, null{});
+
+    // Create a new index on column
+    col.create_search_index();
+    StringIndex& ndx = *col.get_search_index();
+    size_t results = not_found;
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
+        FindRes res = ndx.find_all(ints[t], results);
+
+        size_t real = 0;
+        for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
+            if (ints[t] == ints[y])
+                real++;
+        }
+
+        if (real == 1) {
+            CHECK_EQUAL(res, FindRes_single);
+            CHECK_EQUAL(ints[t], ints[results]);
+        }
+        else if (real > 1) {
+            CHECK_EQUAL(FindRes_column, res);
+            const Column results2(Allocator::get_default(), ref_type(results));
+            CHECK_EQUAL(real, results2.size());
+            for (size_t y = 0; y < real; y++)
+                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
+        }
+    }
+
+    FindRes res = ndx.find_all(null{}, results);
+    CHECK_EQUAL(FindRes_single, res);
+    CHECK_EQUAL(results, col.size()-1);
+
+    // Clean up
+    col.destroy();
+}
+
 
 TEST(StringIndex_Count_Int)
 {

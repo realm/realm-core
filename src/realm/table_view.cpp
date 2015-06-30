@@ -75,14 +75,15 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 {
     check_cookie();
 
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
+    using ColTypeTraits = ColumnTypeTraits<T, ColType::nullable>;
+    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
     REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
     if (m_row_indexes.size() == 0)
         return 0;
 
-    typedef typename ColumnTypeTraits<T>::array_type ArrType;
+    typedef typename ColumnTypeTraits<T, ColType::nullable>::leaf_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
     if (m_row_indexes.size() == column->size()) {

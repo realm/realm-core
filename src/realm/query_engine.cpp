@@ -1,5 +1,16 @@
 #include <realm/query_engine.hpp>
 
+namespace realm {
+namespace _impl {
+
+const double CostHeuristic<Column>::dD = 100.0;
+const double CostHeuristic<Column>::dT = 1.0 / 4.0;
+const double CostHeuristic<ColumnIntNull>::dD = 100.0;
+const double CostHeuristic<ColumnIntNull>::dT = 1.0 / 4.0;
+
+}
+}
+
 using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)
@@ -27,41 +38,43 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
-void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id)
+void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
+    static_cast<void>(nullable);
+
     if (TAction == act_ReturnFirst)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, int64_t>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, Column>;
 
     else if (TAction == act_Count)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Count, int64_t>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Count, Column>;
 
     else if (TAction == act_Sum && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, int64_t>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, Column>;
 
     else if (TAction == act_Sum && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, float>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<float>>;
     else if (TAction == act_Sum && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, double>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<double>>;
 
     else if (TAction == act_Max && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, int64_t>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, Column>;
     else if (TAction == act_Max && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, float>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<float>>;
     else if (TAction == act_Max && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, double>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<double>>;
 
     else if (TAction == act_Min && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, int64_t>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, Column>;
     else if (TAction == act_Min && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, float>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<float>>;
     else if (TAction == act_Min && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, double>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<double>>;
 
     else if (TAction == act_FindAll)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, int64_t>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, Column>;
 
     else if (TAction == act_CallbackIdx)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, int64_t>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, Column>;
 
     else {
         REALM_ASSERT(false);

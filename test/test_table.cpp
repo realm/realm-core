@@ -137,7 +137,29 @@ TEST(Table_Null)
         CHECK(!table->get_string(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
-        CHECK_THROW_ANY(table->set_string(0, 0, realm::null()));
+        CHECK_LOGIC_ERROR(table->set_string(0, 0, realm::null()), LogicError::column_not_nullable);
+    }
+
+    {
+        // Check that add_empty_row() adds null integer as default
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column(type_Int, "name", true);
+        table->add_empty_row();
+        CHECK(table->is_null(0, 0));
+    }
+
+    {
+        // Check that add_empty_row() adds 0 integer as default.
+        Group group;
+        TableRef table = group.add_table("test");
+        table->add_column(type_Int, "name");
+        table->add_empty_row();
+        CHECK(!table->is_null(0, 0));
+        CHECK_EQUAL(0, table->get_int(0, 0));
+
+        // Check that inserting null in non-nullable column will throw
+        CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
     }
 
     {
@@ -569,6 +591,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         table.add_column(type_Binary,   "binary");           //  9
         table.add_column(type_Table,    "tables", &sub1);    // 10
         table.add_column(type_Mixed,    "mixed");            // 11
+        table.add_column(type_Int,      "int_null", true);   // 12
         sub1->add_column(type_Int,        "sub_first");
         sub1->add_column(type_String,     "sub_second");
     }
@@ -578,6 +601,13 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_int(0, i, int64_t(i*sign));
+        
+        if (i % 4 == 0) {
+            table.set_null(12, i);
+        }
+        else {
+            table.set_int(12, i, int64_t(i*sign));
+        }
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
@@ -830,6 +860,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
         sub_1->add_column(type_Binary,   "binary");        // 6
         sub_1->add_column(type_Table,    "table", &sub_2); // 7
         sub_1->add_column(type_Mixed,    "mixed");         // 8
+        sub_1->add_column(type_Int,      "int_null", nullptr, true); // 9
         sub_2->add_column(type_Int,        "i");
     }
 
@@ -838,7 +869,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     ConstTableRef degen_child = parent.get_subtable(0,0); // NOTE: Constness is essential here!!!
 
     CHECK_EQUAL(0, degen_child->size());
-    CHECK_EQUAL(9, degen_child->get_column_count());
+    CHECK_EQUAL(10, degen_child->get_column_count());
 
     // Searching:
 
@@ -1000,7 +1031,7 @@ TEST(Table_ToString)
     std::string file_name = get_test_resource_path();
     file_name += "expect_string.txt";
 #if GENERATE   // enable to generate testfile - check it manually
-    std::ofstream test_file(file_name.c_str(), ios::out);
+    std::ofstream test_file(file_name.c_str(), std::ios::out);
     test_file << result;
     std::cerr << "to_string() test:\n" << result << std::endl;
 #else

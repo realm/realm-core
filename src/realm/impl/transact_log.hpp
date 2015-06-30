@@ -57,6 +57,7 @@ enum Instruction {
     instr_SetTable              = 12,
     instr_SetMixed              = 13,
     instr_SetLink               = 14,
+    instr_SetNull               = 51, // FIXME: Re-enumerate
     instr_InsertInt             = 15,
     instr_InsertBool            = 16,
     instr_InsertFloat           = 17,
@@ -169,6 +170,7 @@ public:
     bool set_table(std::size_t col_ndx, std::size_t row_ndx);
     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&);
     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t);
+    bool set_null(std::size_t col_ndx, std::size_t row_ndx);
     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value);
     bool optimize_table();
 
@@ -267,7 +269,9 @@ public:
     void set_table(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
     void set_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
+    void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_link_list(const LinkView&, const Column& values);
+
 
     void insert_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
     void insert_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
@@ -643,11 +647,8 @@ void TransactLogEncoder::string_cmd(Instruction instr, std::size_t col_ndx,
 inline
 void TransactLogEncoder::string_value(const char* data, std::size_t size)
 {
-    if (!data)
-        size = static_cast<size_t>(-1);
-
     char* buf = reserve(max_required_bytes_for_string_value(size));
-    buf = encode_int(buf, uint64_t(size));
+    buf = encode_int(buf, size);
     buf = std::copy(data, data + (data ? size : 0), buf);
     advance(buf);
 }
@@ -886,7 +887,12 @@ inline void TransactLogConvenientEncoder::set_double(const Table* t, std::size_t
 
 inline bool TransactLogEncoder::set_string(std::size_t col_ndx, std::size_t ndx, StringData value)
 {
-    string_cmd(instr_SetString, col_ndx, ndx, value.data(), value.size()); // Throws
+    if (value.is_null()) {
+        set_null(col_ndx, ndx); // Throws
+    }
+    else {
+        string_cmd(instr_SetString, col_ndx, ndx, value.data(), value.size()); // Throws
+    }
     return true;
 }
 
@@ -899,7 +905,12 @@ inline void TransactLogConvenientEncoder::set_string(const Table* t, std::size_t
 
 inline bool TransactLogEncoder::set_binary(std::size_t col_ndx, std::size_t ndx, BinaryData value)
 {
-    string_cmd(instr_SetBinary, col_ndx, ndx, value.data(), value.size()); // Throws
+    if (value.is_null()) {
+        set_null(col_ndx, ndx); // Throws
+    }
+    else {
+        string_cmd(instr_SetBinary, col_ndx, ndx, value.data(), value.size()); // Throws
+    }
     return true;
 }
 
@@ -963,6 +974,19 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, std::size_t c
 {
     select_table(t); // Throws
     m_encoder.set_link(col_ndx, ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::set_null(std::size_t col_ndx, std::size_t ndx)
+{
+    simple_cmd(instr_SetNull, util::tuple(col_ndx, ndx));
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_null(const Table* t, std::size_t col_ndx,
+                                                   std::size_t row_ndx)
+{
+    select_table(t); // Throws
+    m_encoder.set_null(col_ndx, row_ndx); // Throws
 }
 
 
@@ -1408,7 +1432,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     char instr;
     if (!read_char(instr))
         parser_error();
-
 //    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << "\n";
     switch (Instruction(instr)) {
         case instr_SetInt: {
@@ -1491,6 +1514,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t value = read_int<std::size_t>(); // Throws
             if (!handler.set_link(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetNull: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.set_null(col_ndx, row_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -1906,10 +1936,7 @@ inline double TransactLogParser::read_double()
 
 inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
-    std::size_t size = read_int<std::size_t>(); // Throws
-
-    if (size == static_cast<size_t>(-1))
-        return StringData(nullptr, 0);
+    size_t size = read_int<size_t>(); // Throws
 
     const std::size_t avail = m_input_end - m_input_begin;
     if (avail >= size) {
@@ -1918,9 +1945,6 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     }
 
     buf.clear();
-    if (size == static_cast<size_t>(-1)) {
-        return StringData(nullptr, 0); // null        
-    }
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);
     return StringData(buf.data(), size);
@@ -2232,6 +2256,13 @@ public:
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
     {
         m_encoder.set_mixed(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_null(size_t col_ndx, size_t row_ndx)
+    {
+        m_encoder.set_null(col_ndx, row_ndx);
         append_instruction();
         return true;
     }

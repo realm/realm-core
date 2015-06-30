@@ -213,6 +213,11 @@ inline bool operator!=(const StringData& a, const StringData& b) REALM_NOEXCEPT
 
 inline bool operator<(const StringData& a, const StringData& b) REALM_NOEXCEPT
 {
+    if (a.is_null() && !b.is_null()) {
+        // Null strings are smaller than all other strings, and not
+        // equal to empty strings.
+        return true;
+    }
     return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
                                         b.m_data, b.m_data + b.m_size);
 }
