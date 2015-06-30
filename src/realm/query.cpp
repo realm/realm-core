@@ -200,9 +200,9 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        Node::implicit_nullable
-        && !std::is_same<T, typename Node::TConditionValue>::value
-        && !std::is_same<T, null>::value
+        Node::implicit_nullable &&
+        !std::is_same<T, typename Node::TConditionValue>::value &&
+        !std::is_same<T, null>::value
         , ParentNode*>::type
     make(size_t, T)
     {
@@ -211,8 +211,8 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        !Node::implicit_nullable
-        && std::is_same<T, null>::value
+        !Node::implicit_nullable &&
+        std::is_same<T, null>::value
         , ParentNode*>::type
     make(size_t col_ndx, T value)
     {
@@ -222,8 +222,8 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        !Node::implicit_nullable
-        && std::is_same<T, typename Node::TConditionValue>::value
+        !Node::implicit_nullable &&
+        std::is_same<T, typename Node::TConditionValue>::value
         , ParentNode*>::type
     make(size_t col_ndx, T value)
     {
@@ -232,9 +232,9 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        !Node::implicit_nullable
-        && !std::is_same<T, null>::value
-        && !std::is_same<T, typename Node::TConditionValue>::value
+        !Node::implicit_nullable &&
+        !std::is_same<T, null>::value &&
+        !std::is_same<T, typename Node::TConditionValue>::value
         , ParentNode*>::type
     make(size_t, T)
     {

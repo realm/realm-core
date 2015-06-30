@@ -822,8 +822,8 @@ protected:
     {
         return (m_conds == 1 &&
                 (source_column == nullptr ||
-                 (!m_fastmode_disabled
-                  && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));
+                 (!m_fastmode_disabled &&
+                  static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));
     }
 
     // Search value:
