@@ -902,6 +902,7 @@ EOF
 
         sh build.sh build-osx || exit 1
         sh build.sh build-iphone || exit 1
+        sh build.sh build-watch || exit 1
 
         echo "Copying files"
         tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
@@ -911,8 +912,15 @@ EOF
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
         cp "$IPHONE_DIR/librealm-ios.a" "$tmpdir/$BASENAME" || exit 1
         cp "$IPHONE_DIR/librealm-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$WATCH_DIR/librealm-watchos.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$WATCH_DIR/librealm-watchos-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
         for x in $iphone_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
+            cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        done
+        for x in $watch_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
