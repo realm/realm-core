@@ -52,6 +52,9 @@ IPHONE_EXTENSIONS="objc"
 IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
 IPHONE_DIR="iphone-lib"
 
+WATCH_PLATFORMS="WatchOS WatchSimulator"
+WATCH_DIR="watch-lib"
+
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
@@ -554,6 +557,36 @@ case "$MODE" in
             done
         fi
 
+        # Find Watch SDKs
+        watch_sdks=""
+        watch_sdks_avail="no"
+        if [ "$xcode_home" != "none" ]; then
+            # Xcode provides the WatchOS SDK
+            watch_sdks_avail="yes"
+            for x in $WATCH_PLATFORMS; do
+                platform_home="$xcode_home/Platforms/$x.platform"
+                if ! [ -e "$platform_home/Info.plist" ]; then
+                    echo "Failed to find '$platform_home/Info.plist'"
+                    watch_sdks_avail="no"
+                else
+                    sdk="$(find_iphone_sdk "$platform_home")" || exit 1
+                    if ! [ "$sdk" ]; then
+                        echo "Found no SDKs in '$platform_home'"
+                        watch_sdks_avail="no"
+                    else
+                        if [ "$x" = "WatchSimulator" ]; then
+                            archs="i386,x86_64"
+                        elif [ "$x" = "WatchOS" ]; then
+                            archs="armv7k"
+                        else
+                            continue
+                        fi
+                        word_list_append "watch_sdks" "$x:$sdk:$archs" || exit 1
+                    fi
+                fi
+            done
+        fi
+
         # Find Android NDK
         if [ "$ANDROID_NDK_HOME" ]; then
             android_ndk_home="$ANDROID_NDK_HOME"
@@ -578,6 +611,8 @@ ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
+WATCH_SDKS           = ${watch_sdks:-none}
+WATCH_SDKS_AVAIL     = $watch_sdks_avail
 ANDROID_NDK_HOME      = $android_ndk_home
 EOF
         if ! [ "$INTERACTIVE" ]; then
