@@ -698,6 +698,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
 #ifdef _GNU_SOURCE
     static_cast<void>(fd);
     static_cast<void>(a);
+    static_cast<void>(file_offset);
     void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
     if (new_addr != MAP_FAILED)
         return new_addr;
