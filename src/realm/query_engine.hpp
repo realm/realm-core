@@ -200,10 +200,11 @@ public:
     virtual ~SequentialGetterBase() REALM_NOEXCEPT {}
 };
 
-template<class T>class SequentialGetter : public SequentialGetterBase {
+template <class ColType>
+class SequentialGetter : public SequentialGetterBase {
 public:
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    typedef typename ColumnTypeTraits<T>::array_type ArrayType;
+    using T = typename ColType::value_type;
+    using ArrayType = typename ColType::LeafType;
 
     SequentialGetter() {}
 
@@ -348,15 +349,17 @@ public:
     template<Action TAction, class TSourceColumn>
     bool column_action_specialization(QueryStateBase* st, SequentialGetterBase* source_column, size_t r)
     {
+        // TResult: type of query result
+        // TSourceValue: type of aggregate source
+        using TSourceValue = typename TSourceColumn::value_type;
+        using TResult = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
+
         // Sum of float column must accumulate in double
-        typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
         REALM_STATIC_ASSERT( !(TAction == act_Sum && (std::is_same<TSourceColumn, float>::value &&
                                                         !std::is_same<TResult, double>::value)), "");
 
-        // TResult: type of query result
-        // TSourceColumn: type of aggregate source
-        TSourceColumn av = static_cast<TSourceColumn>(0);
-        // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
+        TSourceValue av{};
+        // uses_val test because compiler cannot see that Column::get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
             REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
@@ -587,15 +590,17 @@ public:
     // This function is called from Array::find() for each search result if TAction == act_CallbackIdx
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
     // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
-    template <Action TAction, class TSourceColumn> bool match_callback(int64_t v)
+    template <Action TAction, class ColType> bool match_callback(int64_t v)
     {
+        using TSourceValue = typename ColType::value_type;
+        using QueryStateType = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
+
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
 
-        typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
         QueryState<QueryStateType>* state = static_cast<QueryState<QueryStateType>*>(m_state);
-        SequentialGetter<TSourceColumn>* source_column = static_cast<SequentialGetter<TSourceColumn>*>(m_source_column);
+        SequentialGetter<ColType>* source_column = static_cast<SequentialGetter<ColType>*>(m_source_column);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
         for (size_t c = 1; c < m_conds; c++) {
@@ -607,11 +612,11 @@ public:
 
         bool b;
         if (state->template uses_val<TAction>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded
-            TSourceColumn av = source_column->get_next(i);
+            TSourceValue av = source_column->get_next(i);
             b = state->template match<TAction, false>(i, 0, av);
         }
         else {
-            b = state->template match<TAction, false>(i, 0, TSourceColumn(0));
+            b = state->template match<TAction, false>(i, 0, TSourceValue{});
         }
 
         return b;
@@ -703,49 +708,49 @@ public:
         m_TAction = TAction;
 
         if (TAction == act_ReturnFirst)
-            m_find_callback_specialized = &ThisType::template find_callback_specialization<act_ReturnFirst, int64_t>;
+            m_find_callback_specialized = &ThisType::template find_callback_specialization<act_ReturnFirst, Column>;
 
         else if (TAction == act_Count)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Count, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Count, Column>;
 
         else if (TAction == act_Sum && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, Column>;
         else if (TAction == act_Sum && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, BasicColumn<float>>;
         else if (TAction == act_Sum && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, BasicColumn<double>>;
 
         else if (TAction == act_Max && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, Column>;
         else if (TAction == act_Max && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, BasicColumn<float>>;
         else if (TAction == act_Max && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, BasicColumn<double>>;
 
         else if (TAction == act_Min && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, Column>;
         else if (TAction == act_Min && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, BasicColumn<float>>;
         else if (TAction == act_Min && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, BasicColumn<double>>;
 
         else if (TAction == act_FindAll)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_FindAll, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_FindAll, Column>;
 
         else if (TAction == act_CallbackIdx)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_CallbackIdx, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_CallbackIdx, Column>;
 
         else {
             REALM_ASSERT(false);
         }
     }
 
-    template <Action TAction, class TSourceColumn>
+    template <Action TAction, class ColType>
     bool find_callback_specialization(size_t s, size_t end2)
     {
         bool cont = m_leaf_ptr->find<TConditionFunction, act_CallbackIdx>
             (m_value, s - m_leaf_start, end2, m_leaf_start, nullptr,
-             std::bind1st(std::mem_fun(&IntegerNodeBase::template match_callback<TAction, TSourceColumn>), this));
+             std::bind1st(std::mem_fun(&IntegerNodeBase::template match_callback<TAction, ColType>), this));
         return cont;
     }
 
@@ -766,7 +771,7 @@ public:
         bool fastmode = (m_conds == 1 &&
                          (source_column == nullptr ||
                           (!m_fastmode_disabled
-                           && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
+                           && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));
         for (size_t s = start; s < end; ) {
             // Cache internal leaves
             if (s >= m_leaf_end || s < m_leaf_start) {
@@ -877,9 +882,9 @@ protected:
 
 
 // This node is currently used for floats and doubles only
-template <class TConditionValue, class TConditionFunction> class FloatDoubleNode: public ParentNode {
+template <class ColType, class TConditionFunction> class FloatDoubleNode: public ParentNode {
 public:
-    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
+    using TConditionValue = typename ColType::value_type;
 
     FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
     {
@@ -927,7 +932,7 @@ public:
 
 protected:
     TConditionValue m_value;
-    SequentialGetter<TConditionValue> m_condition_column;
+    SequentialGetter<ColType> m_condition_column;
 };
 
 
@@ -1262,7 +1267,7 @@ public:
             }
 
             if (m_index_matches) {
-                m_index_getter.reset(new SequentialGetter<int64_t>(m_index_matches.get()));
+                m_index_getter.reset(new SequentialGetter<Column>(m_index_matches.get()));
                 m_index_size = m_index_getter->m_column->size();
             }
 
@@ -1383,12 +1388,12 @@ private:
     size_t m_last_indexed;
 
     // Used for linear scan through enum-string
-    SequentialGetter<int64_t> m_cse;
+    SequentialGetter<ColumnStringEnum> m_cse;
 
     // Used for index lookup
     std::unique_ptr<Column> m_index_matches;
     bool m_index_matches_destroy = false;
-    std::unique_ptr<SequentialGetter<int64_t>> m_index_getter;
+    std::unique_ptr<SequentialGetter<Column>> m_index_getter;
     size_t m_index_size;
     size_t m_last_start;
 };
@@ -1614,8 +1619,10 @@ private:
 
 
 // Compare two columns with eachother row-by-row
-template <class TConditionValue, class TConditionFunction> class TwoColumnsNode: public ParentNode {
+template <class ColType, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
+    using TConditionValue = typename ColType::value_type;
+
     template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     TwoColumnsNode(size_t column1, size_t column2)
@@ -1633,7 +1640,6 @@ public:
 
     void init(const Table& table) override
     {
-        typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
         m_dD = 100.0;
         m_table = &table;
 
@@ -1697,7 +1703,7 @@ public:
 
     ParentNode* clone() override
     {
-        return new TwoColumnsNode<TConditionValue, TConditionFunction>(*this);
+        return new TwoColumnsNode<ColType, TConditionFunction>(*this);
     }
 
     TwoColumnsNode(const TwoColumnsNode& from)
@@ -1722,8 +1728,8 @@ protected:
     size_t m_condition_column_idx1;
     size_t m_condition_column_idx2;
 
-    SequentialGetter<TConditionValue> m_getter1;
-    SequentialGetter<TConditionValue> m_getter2;
+    SequentialGetter<ColType> m_getter1;
+    SequentialGetter<ColType> m_getter2;
 };
 
 // todo, fixme: move this up! There are just some annoying compiler errors that need to be resolved when doing this

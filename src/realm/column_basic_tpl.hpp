@@ -510,25 +510,25 @@ void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::s
 
 template<class T> std::size_t BasicColumn<T>::count(T target) const
 {
-    return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size()));
+    return std::size_t(aggregate<T, int64_t, act_Count, Equal>(*this, target, 0, size(), npos, nullptr));
 }
 
 template<class T>
 typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t begin, std::size_t end,
     std::size_t limit, std::size_t* return_ndx) const
 {
-    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, limit, return_ndx);
+    return aggregate<T, SumType, act_Sum, None>(*this, 0, begin, end, limit, return_ndx);
 }
 template<class T>
 T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    return ColumnBase::aggregate<T, T, act_Min, None>(0, begin, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, None>(*this, 0, begin, end, limit, return_ndx);
 }
 
 template<class T>
 T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    return ColumnBase::aggregate<T, T, act_Max, None>(0, begin, end, limit, return_ndx);
+    return aggregate<T, T, act_Max, None>(*this, 0, begin, end, limit, return_ndx);
 }
 
 template<class T>

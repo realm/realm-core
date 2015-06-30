@@ -1307,6 +1307,11 @@ public:
         return true;
     }
 
+    bool set_null(size_t, size_t) REALM_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool set_link(size_t col_ndx, size_t, size_t) REALM_NOEXCEPT
     {
         // When links are changed, the link-target table is also affected and

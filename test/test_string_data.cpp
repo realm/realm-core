@@ -58,6 +58,13 @@ TEST(StringData_Null)
         CHECK(sd);
         CHECK(!sd.is_null());
     }
+    // Null must be strictly less-than the empty string.
+    {
+        StringData a = realm::null{};
+        StringData b{""};
+        CHECK(a < b);
+        CHECK(b > a);
+    }
 }
 
 
