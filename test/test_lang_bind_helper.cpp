@@ -7476,7 +7476,7 @@ namespace {
 // thread B listens and continously does advance_read to see the updates.
 // thread B also has a table view, which it continuosly keeps in sync in response
 // to the updates. It then hands over the result to thread C.
-// thread C continously recieves copies of the results obtained in thead B and
+// thread C continuously recieves copies of the results obtained in thead B and
 // verifies them (by comparing with its own local, but identical query)
 REALM_TABLE_1(TheTable, first, Int)
 
