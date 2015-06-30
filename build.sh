@@ -640,6 +640,17 @@ EOF
                 rm -f "$IPHONE_DIR/realm-config" "$IPHONE_DIR/realm-config-dbg" || exit 1
                 rmdir "$IPHONE_DIR" || exit 1
             fi
+            for x in $WATCH_PLATFORMS; do
+                $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
+            done
+            $MAKE -C "src/realm" clean BASE_DENOM="watch" || exit 1
+            if [ -e "$WATCH_DIR" ]; then
+                echo "Removing '$WATCH_DIR'"
+                rm -fr "$WATCH_DIR/include" || exit 1
+                rm -f "$WATCH_DIR/librealm-watchos.a" "$WATCH_DIR/librealm-watchos-dbg.a" || exit 1
+                rm -f "$WATCH_DIR/realm-config" "$WATCH_DIR/realm-config-dbg" || exit 1
+                rmdir "$WATCH_DIR" || exit 1
+            fi
         fi
         for x in $ANDROID_PLATFORMS; do
             denom="android-$x"
