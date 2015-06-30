@@ -716,8 +716,16 @@ EOF
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
+            if [ "$platform" = 'iPhoneOS' ]; then
+                word_list_append "cflags_arch" "-mstrict-align" || exit 1
+                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+                word_list_append "cflags_arch" "-miphoneos-version-min=8.0" || exit 1
+            fi
+            if [ "$platform" = 'iPhoneSimulator' ]; then
+                word_list_append "cflags_arch" "-mios-simulator-version-min=8.0" || exit 1
+            fi
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root' -mstrict-align" || exit 1
+            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
             cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
