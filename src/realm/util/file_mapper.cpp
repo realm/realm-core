@@ -704,7 +704,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
     int err = errno; // Eliminate any risk of clobbering
     throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
 #else
-    void* new_addr = mmap(fd, new_size, a, nullptr, 0);
+    void* new_addr = mmap(fd, new_size, a, 0, nullptr);
     if(::munmap(old_addr, old_size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
