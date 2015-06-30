@@ -6112,4 +6112,13 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
+ONLY(Query_IntegerNullNGSyntax)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    table->insert_column(0, type_Int, "key", true);
+
+
+}
+
 #endif // TEST_QUERY

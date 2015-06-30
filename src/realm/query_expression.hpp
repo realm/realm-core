@@ -574,16 +574,121 @@ public:
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 5 * 20 = 100. Todo: We can
 // consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
-    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
-    public Overloads<T, bool>, public Overloads<T, DateTime>
+Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
+public Overloads<T, bool>, public Overloads<T, DateTime>
 {
 public:
     virtual ~Subexpr2() {};
 
-    #define RLM_U2(t, o) using Overloads<T, t>::operator o;
-    #define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o)
-    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
+#define RLM_U2(t, o) using Overloads<T, t>::operator o;
+#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o)
+    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
 };
+
+
+
+
+
+template <class T, size_t prealloc = 8> struct NullableVector
+{
+    NullableVector() {};
+
+    NullableVector(const NullableVector<T, prealloc>& other)
+    {
+        other.init(m_size);
+        for (size_t t = 0; t < m_size; t++) {
+            other.set((*this)[t]);
+        }
+    }
+
+    ~NullableVector()
+    {
+        dealloc();
+    }
+
+    T operator[](size_t index) const
+    {
+        REALM_ASSERT_3(index, < , m_size);
+        return m_first[index];
+    }
+
+    inline void set(size_t index, T value)
+    {
+        REALM_ASSERT_3(index, < , m_size);
+        m_first[index] = value;
+    }
+
+    void init(size_t size, T values)
+    {
+        dealloc();
+        m_size = size;
+        if (m_size > 0) {
+            if (m_size > prealloc)
+                m_first = new T[m_size];
+            else
+                m_first = m_cache;
+            std::fill(m_first, m_first + m_size, values);
+        }
+    }
+
+    void dealloc()
+    {
+        if (m_first) {
+            if (m_size > prealloc)
+                delete[] m_first;
+            m_first = nullptr;
+        }
+    }
+
+    inline bool is_null(size_t)
+    {
+        return false;
+    }
+
+    inline void set_null(size_t) { }
+
+    T m_cache[prealloc];
+    T* m_first = &m_cache[0];
+    size_t m_size = 0;
+
+    int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
+};
+
+
+template<> inline bool NullableVector<int64_t>::is_null(size_t index)
+{
+    return m_first[index] == m_null;
+}
+
+template<> inline void NullableVector<int64_t>::set_null(size_t index)
+{
+    m_first[index] = m_null;
+}
+
+template<> inline void NullableVector<int64_t>::set(size_t index, int64_t value)
+{
+    // If value collides with magic null value, then switch to a new unique representation for null
+    if(REALM_UNLIKELY(value == m_null)) {
+        int64_t cand = m_null + 0xfffffffbULL; // adding a prime will generate 2^64 unique values
+        while (std::find(m_first, m_first + m_size, cand) != m_first + m_size)
+            cand += 0xfffffffbULL;
+        std::replace_if(m_first, m_first + m_size, [&](int64_t v) { return v == m_null; }, cand);
+    }
+    m_first[index] = value;
+}
+
+
+template<> inline void NullableVector<StringData>::set_null(size_t index)
+{
+    m_first[index] = StringData();
+}
+
+template<> inline bool NullableVector<StringData>::is_null(size_t index)
+{
+    return m_first[index].is_null();
+}
+
+
 
 // Stores N values of type T. Can also exchange data with other ValueBase of different types
 template<class T> class Value : public ValueBase, public Subexpr2<T>
@@ -591,51 +696,26 @@ template<class T> class Value : public ValueBase, public Subexpr2<T>
 public:
     Value()
     {
-        m_v = nullptr;
         init(false, ValueBase::default_size, 0);
     }
     Value(T v)
     {
-        m_v = nullptr;
         init(false, ValueBase::default_size, v);
     }
     Value(bool link, size_t values)
     {
-        m_v = nullptr;
         init(link, values, 0);
     }
 
     Value(bool link, size_t values, T v)
     {
-        m_v = nullptr;
         init(link, values, v);
     }
 
-    ~Value()
-    {
-        // If we store more than default_size elements then we used 'new', else we used m_cache
-        if (m_values > ValueBase::default_size)
-            delete[] m_v;
-        m_v = nullptr;
-    }
-
     void init(bool link, size_t values, T v) {
-        if (m_v) {
-            // If we store more than default_size elements then we used 'new', else we used m_cache
-            if (m_values > ValueBase::default_size)
-                delete[] m_v;
-            m_v = nullptr;
-        }
+        m_storage.init(values, v);
         ValueBase::from_link = link;
         ValueBase::m_values = values;
-        if (m_values > 0) {
-            // If we store more than default_size elements then use 'new', else use m_cache
-            if (m_values > ValueBase::default_size)
-                m_v = new T[m_values];
-            else
-                m_v = m_cache;
-            std::fill(m_v, m_v + ValueBase::m_values, v);
-        }
     }
 
     void evaluate(size_t, ValueBase& destination)
@@ -647,15 +727,17 @@ public:
     {
         TOperator o;
         size_t vals = minimum(left->m_values, right->m_values);
-        for (size_t t = 0; t < vals; t++)
-            m_v[t] = o(left->m_v[t], right->m_v[t]);
+        for (size_t t = 0; t < vals; t++) {
+            m_storage.set(t, o(left->m_storage[t], right->m_storage[t]));
+        }
     }
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* value)
     {
         TOperator o;
-        for (size_t t = 0; t < value->m_values; t++)
-            m_v[t] = o(value->m_v[t]);
+        for (size_t t = 0; t < value->m_values; t++) {
+            m_storage.set(t, o(value->m_storage[t]));
+        }
     }
 
 
@@ -670,8 +752,8 @@ public:
         Value<dst_t>& d = static_cast<Value<dst_t>&>(destination);
         d.init(ValueBase::from_link, ValueBase::m_values, 0);
         for (size_t t = 0; t < ValueBase::m_values; t++) {
-            src_t* source = reinterpret_cast<src_t*>(m_v);
-            d.m_v[t] = static_cast<dst_t>(source[t]);
+            src_t* source = reinterpret_cast<src_t*>(m_storage.m_first);
+            d.m_storage.set(t, static_cast<dst_t>(source[t]));
         }
     }
 
@@ -731,7 +813,7 @@ public:
             // Compare values one-by-one (one value is one row; no links)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
-                if (c(left->m_v[m], right->m_v[m]))
+                if (c(left->m_storage[m], right->m_storage[m]))
                     return m;
             }
         }
@@ -744,7 +826,7 @@ public:
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
-                if (c(left->m_v[0], right->m_v[r]))
+                if (c(left->m_storage[0], right->m_storage[r]))
                     return 0;
             }
         }
@@ -752,7 +834,7 @@ public:
             // Same as above, right left values coming from links
             REALM_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
-                if (c(left->m_v[l], right->m_v[0]))
+                if (c(left->m_storage[l], right->m_storage[0]))
                     return 0;
             }
         }
@@ -763,23 +845,11 @@ public:
     virtual Subexpr& clone()
     {
         Value<T>& n = *new Value<T>();
-
-        // Copy all members, except the m_v pointer which the above Value constructor allocated
-        T* tmp = n.m_v;
-        n = *this;
-        n.m_v = tmp;
-
-        // Copy payload
-        memcpy(n.m_v, m_v, sizeof(T)* m_values);
-
+        n.m_storage = m_storage;
         return n;
     }
 
-    // Pointer to value payload
-    T *m_v;
-
-    // If there is less than default_size elements in payload, then use this cache, else use 'new'
-    T m_cache[ValueBase::default_size];
+    NullableVector<T> m_storage;
 };
 
 
@@ -1107,14 +1177,14 @@ public:
             Value<StringData> v(true, links.size());
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                v.m_v[t] = m_link_map.m_table->get_string(m_column, link_to);
+                v.m_storage.set(t, m_link_map.m_table->get_string(m_column, link_to));
             }
             destination.import(v);
         }
         else {
             // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
-                d.m_v[t] = m_table->get_string(m_column, index + t);
+                d.m_storage.set(t, m_table->get_string(m_column, index + t));
             }
         }
     }
@@ -1406,7 +1476,7 @@ public:
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
                 sg->cache_next(link_to); // todo, needed?
-                v.m_v[t] = sg->get_next(link_to);
+                v.m_storage.set(t, sg->get_next(link_to));
             }
             destination.import(v);
         }
@@ -1419,7 +1489,8 @@ public:
                 Value<T> v;
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
                 // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-                sg->m_leaf_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+                sg->m_leaf_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
+
                 destination.import(v);
             }
             else {
@@ -1430,8 +1501,9 @@ public:
                     rows = ValueBase::default_size;
                 Value<T> v(false, rows);
 
-                for (size_t t = 0; t < rows; t++)
-                    v.m_v[t] = sg->get_next(index + t);
+                for (size_t t = 0; t < rows; t++) {
+                    v.m_storage.set(t, sg->get_next(index + t));
+                }
 
                 destination.import(v);
             }
