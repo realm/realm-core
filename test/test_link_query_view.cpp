@@ -830,6 +830,87 @@ TEST(LinkList_MultiLinkQuery)
     CHECK_EQUAL(0, tv.size());
 }
 
+ONLY(LinkList_MultiQuery)
+{
+    Group group;
+
+    TableRef root = group.add_table("root");
+    TableRef level = group.add_table("level");
+    TableRef point = group.add_table("point");
+
+    size_t level_col = root->add_column_link(type_LinkList, "levels", *level);
+
+    size_t zoom_col = level->add_column(type_Int, "zoom");
+    size_t point_col = level->add_column_link(type_LinkList, "points", *point);
+
+    size_t col_x = point->add_column(type_Int, "x");
+    size_t col_y = point->add_column(type_Int, "y");
+
+    point->add_empty_row();
+    point->set_int(0, 0, 17000);
+    point->set_int(1, 0, 13000);
+
+    point->add_empty_row();
+    point->set_int(0, 1, 19200);
+    point->set_int(1, 1, 19500);
+
+    point->add_empty_row();
+    point->set_int(0, 2, 22000);
+    point->set_int(1, 2, 25000);
+
+    point->add_empty_row();
+    point->set_int(0, 3, 27000);
+    point->set_int(1, 3, 30000);
+
+    LinkViewRef lvr;
+
+    level->add_empty_row();
+    level->set_int(0, 0, 15);
+    lvr = level->get_linklist(point_col, 0);
+    lvr->add(0);
+
+    level->add_empty_row();
+    level->set_int(0, 1, 16);
+    lvr = level->get_linklist(point_col, 1);
+    lvr->add(1);
+
+    level->add_empty_row();
+    level->set_int(0, 2, 17);
+    lvr = level->get_linklist(point_col, 2);
+    lvr->add(2);
+
+    level->add_empty_row();
+    level->set_int(0, 3, 18);
+    lvr = level->get_linklist(point_col, 3);
+    lvr->add(3);
+
+    root->add_empty_row();
+    lvr = root->get_linklist(level_col, 0);
+    lvr->add(0);
+    lvr->add(1);
+    lvr->add(2);
+    lvr->add(3);
+
+    CHECK_EQUAL(1, root->size());
+    CHECK_EQUAL(4, level->size());
+    CHECK_EQUAL(4, point->size());
+
+
+    int64_t min_x = 17345;
+    int64_t max_x = 18500;
+    int64_t min_y = 14000;
+    int64_t max_y = 15000;
+    int64_t zoom_level = 15;
+
+    TableView tv = (root->link(level_col).column<Int>(zoom_col) == zoom_level)
+        .and_query(root->link(level_col).link(point_col).column<Int>(col_x) >= min_x)
+        .and_query(root->link(level_col).link(point_col).column<Int>(col_x) <= max_x)
+        .and_query(root->link(level_col).link(point_col).column<Int>(col_y) >= min_y)
+        .and_query(root->link(level_col).link(point_col).column<Int>(col_y) <= max_y)
+        .find_all();
+    CHECK_EQUAL(0, tv.size());
+}
+
 
 TEST(LinkList_SortLinkView)
 {
