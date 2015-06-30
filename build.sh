@@ -70,6 +70,7 @@ Available modes are:
     build-config-progs:                 
     build-osx:                          
     build-iphone:                       
+    build-watch:
     build-android:                      
     build-cocoa:                        
     build-osx-framework:                
@@ -727,6 +728,62 @@ EOF
             echo "Creating '$IPHONE_DIR/$x'"
             y="$(printf "%s\n" "$x" | sed 's/realm-config/realm-config-ios/')" || exit 1
             cp "src/realm/$y" "$REALM_HOME/$IPHONE_DIR/$x" || exit 1
+        done
+        echo "Done building"
+        exit 0
+        ;;
+
+    "build-watch")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        watch_sdks_avail="$(get_config_param "WATCH_SDKS_AVAIL")" || exit 1
+        if [ "$watch_sdks_avail" != "yes" ]; then
+            echo "ERROR: Required Watch SDKs are not available" 1>&2
+            exit 1
+        fi
+        temp_dir="$(mktemp -d /tmp/realm.build-watch.XXXX)" || exit 1
+        mkdir "$temp_dir/platforms" || exit 1
+        xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
+        watch_sdks="$(get_config_param "WATCH_SDKS")" || exit 1
+        for x in $watch_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
+            archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
+            cflags_arch="-stdlib=libc++"
+            for y in $archs; do
+                word_list_append "cflags_arch" "-arch $y" || exit 1
+            done
+            if [ "$platform" = 'WatchOS' ]; then
+                word_list_append "cflags_arch" "-mstrict-align" || exit 1
+                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+                word_list_append "cflags_arch" "-mwatchos-version-min=2.0" || exit 1
+            fi
+            if [ "$platform" = 'WatchSimulator' ]; then
+                word_list_append "cflags_arch" "-mwatchos-simulator-version-min=2.0" || exit 1
+            fi
+            sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
+            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
+            mkdir "$temp_dir/platforms/$platform" || exit 1
+            cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
+            cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
+        done
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-watchos" "realm-config-watchos-dbg" BASE_DENOM="watchos" CFLAGS_ARCH="-DREALM_CONFIG_WATCHOS" || exit 1
+        mkdir -p "$WATCH_DIR" || exit 1
+        echo "Creating '$WATCH_DIR/librealm-ios.a'"
+        lipo "$temp_dir/platforms"/*/"librealm.a"     -create -output "$WATCH_DIR/librealm-watchos.a"     || exit 1
+        echo "Creating '$WATCH_DIR/librealm-ios-dbg.a'"
+        lipo "$temp_dir/platforms"/*/"librealm-dbg.a" -create -output "$WATCH_DIR/librealm-watchos-dbg.a" || exit 1
+        echo "Copying headers to '$WATCH_DIR/include'"
+        mkdir -p "$WATCH_DIR/include" || exit 1
+        cp "src/realm.hpp" "$WATCH_DIR/include/" || exit 1
+        mkdir -p "$WATCH_DIR/include/realm" || exit 1
+        inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+        (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+        (cd "$REALM_HOME/$WATCH_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        for x in "realm-config" "realm-config-dbg"; do
+            echo "Creating '$WATCH_DIR/$x'"
+            y="$(printf "%s\n" "$x" | sed 's/realm-config/realm-config-watchos/')" || exit 1
+            cp "src/realm/$y" "$REALM_HOME/$WATCH_DIR/$x" || exit 1
         done
         echo "Done building"
         exit 0
