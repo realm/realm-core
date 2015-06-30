@@ -333,7 +333,7 @@ public:
     /// If this function throws, the old address range will remain
     /// mapped.
     void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size,
-                int map_flags = 0) const;
+                int map_flags = 0, size_t file_offset = 0) const;
 
     /// Unmap the specified address range which must have been
     /// previously returned by map().
