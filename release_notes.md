@@ -20,6 +20,7 @@
   of transactions.
 * Improved exception safety in connection with the initiation and termination of
   transactions.
+* Add support for systems where mremap() exists but fails with ENOTSUP.
 
 ### Internals:
 
