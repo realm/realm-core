@@ -54,6 +54,14 @@
 /realm-config-ios
 /realm-config-ios-dbg
 
+# Watch
+/librealm-WatchOS.a
+/librealm-WatchOS-dbg.a
+/librealm-WatchSimulator.a
+/librealm-WatchSimulator-dbg.a
+/realm-config-watchos
+/realm-config-watchos-dbg
+
 # Android
 /librealm-android-*.a
 
