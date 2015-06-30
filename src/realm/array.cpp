@@ -2616,7 +2616,7 @@ bool Array::find(int cond, Action action, null, size_t start, size_t end, size_t
 {
     if (cond == cond_Equal) {
         if (action == act_ReturnFirst) {
-            
+            return false;
         }
     }
 }

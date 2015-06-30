@@ -30,26 +30,43 @@ namespace realm {
 
 enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, cond_LessEqual, cond_None, cond_Count};
 
+// Quick hack to make "Queries with Integer null columns" able to compile in Visual Studio 2015 which doesn't full support sfinae
+// (real cause hasn't been investigated yet, cannot exclude that we don't obey c++11 standard)
+struct HackClass
+{
+    template <class A, class B, class C> bool can_match(A, B, C) { REALM_ASSERT(false); return false; }
+    template <class A, class B, class C> bool will_match(A, B, C) { REALM_ASSERT(false); return false; }
+};
 
 // Does v2 contain v1?
-struct Contains {
+struct Contains : public HackClass {
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v2.contains(v1); }
     bool operator()(StringData v1, StringData v2) const { return v2.contains(v1); }
     bool operator()(BinaryData v1, BinaryData v2) const { return v2.contains(v1); }
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
+    static const int condition = -1;
 };
 
 // Does v2 begin with v1?
-struct BeginsWith {
+struct BeginsWith : public HackClass {
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v2.begins_with(v1); }
     bool operator()(StringData v1, StringData v2) const { return v2.begins_with(v1); }
     bool operator()(BinaryData v1, BinaryData v2) const { return v2.begins_with(v1); }
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
+    static const int condition = -1;
 };
 
 // Does v2 end with v1?
-struct EndsWith {
+struct EndsWith : public HackClass {
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v2.ends_with(v1); }
     bool operator()(StringData v1, StringData v2) const { return v2.ends_with(v1); }
     bool operator()(BinaryData v1, BinaryData v2) const { return v2.ends_with(v1); }
+
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
+    static const int condition = -1;
 };
 
 struct Equal {
@@ -79,7 +96,7 @@ struct NotEqual {
 };
 
 // Does v2 contain v1?
-struct ContainsIns {
+struct ContainsIns : public HackClass {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
         if (v2.is_null() && !v1.is_null())
@@ -105,11 +122,13 @@ struct ContainsIns {
         return search_case_fold(v2, v1_upper.c_str(), v1_lower.c_str(), v1.size()) != v2.size();
     }
 
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
     static const int condition = -1;
 };
 
 // Does v2 begin with v1?
-struct BeginsWithIns {
+struct BeginsWithIns : public HackClass {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
         if (v2.is_null() && !v1.is_null())
@@ -130,11 +149,13 @@ struct BeginsWithIns {
         return equal_case_fold(v2.prefix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
     }
 
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
     static const int condition = -1;
 };
 
 // Does v2 end with v1?
-struct EndsWithIns {
+struct EndsWithIns : public HackClass {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
         if (v2.is_null() && !v1.is_null())
@@ -156,10 +177,12 @@ struct EndsWithIns {
         return equal_case_fold(v2.suffix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
     }
 
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
     static const int condition = -1;
 };
 
-struct EqualIns {
+struct EqualIns : public HackClass {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
         if (v1.is_null() != v2.is_null())
@@ -181,10 +204,12 @@ struct EqualIns {
         return equal_case_fold(v2, v1_upper.c_str() , v1_lower.c_str());
     }
 
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
     static const int condition = -1;
 };
 
-struct NotEqualIns {
+struct NotEqualIns : public HackClass {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
         if (v1.is_null() != v2.is_null())
@@ -204,6 +229,9 @@ struct NotEqualIns {
         std::string v1_lower = case_map(v1, false);
         return !equal_case_fold(v2, v1_upper.c_str(), v1_lower.c_str());
     }
+
+    template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+
     static const int condition = -1;
 };
 
@@ -211,6 +239,8 @@ struct Greater {
     static const int avx = 0x1E;  // _CMP_GT_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
     static const int condition = cond_Greater;
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
+
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound > v; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound > v; }
 };
@@ -218,6 +248,7 @@ struct Greater {
 struct None {
     template<class T> bool operator()(const T& v1, const T& v2) const {static_cast<void>(v1); static_cast<void>(v2); return true;}
     static const int condition = cond_None;
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
 
@@ -226,20 +257,23 @@ struct None {
 struct Less {
     static const int avx = 0x11; // _CMP_LT_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 < v2; }
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     static const int condition = cond_Less;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound < v; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound < v; }
 };
 
-struct LessEqual {
+struct LessEqual : public HackClass {
     static const int avx = 0x12;  // _CMP_LE_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     static const int condition = cond_LessEqual;
 };
 
-struct GreaterEqual {
+struct GreaterEqual : public HackClass {
     static const int avx = 0x1D;  // _CMP_GE_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     static const int condition = cond_GreaterEqual;
 };
 

@@ -865,12 +865,12 @@ public:
     using TConditionValue = typename BaseType::TConditionValue;
 
     IntegerNode(TConditionValue value, size_t column_ndx)
-    : IntegerNodeBase<ColType>{value, column_ndx}
+    : IntegerNodeBase<ColType>(value, column_ndx)
     {
     }
 
     IntegerNode(null n, size_t column_ndx)
-    : IntegerNodeBase<ColType>{n, column_ndx}
+    : IntegerNodeBase<ColType>(n, column_ndx)
     {
     }
 
