@@ -5,6 +5,8 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
+#include <functional>
+
 #include "test.hpp"
 
 using namespace realm;
@@ -1204,71 +1206,69 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     link_list_0->add(0); // origin[0].o_1 -> [ target[0] ]
     link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
     link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+    
+    auto assertGroup = [&] (std::function<void ()> assertsFunc) {
+        // Each assertGroup is responsible for reverting all state mutations
+        // to the initial preconditions, but not the last one.
+        CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
+        CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
+              link_list_1->get(1).get_index() == 1);
+        CHECK(target_row_0 && target_row_1);
+        assertsFunc();
+    };
 
     // Break link by clearing list
-    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
-    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
-          link_list_1->get(1).get_index() == 1);
-    CHECK(target_row_0 && target_row_1);
-    link_list_1->clear(); // origin[1].o_1 -> []
-    CHECK(target_row_0 && !target_row_1);
-    target->add_empty_row();
-    target_row_1 = target->get(1);
-    link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
-    link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+    assertGroup([&] () {
+        link_list_1->clear(); // origin[1].o_1 -> []
+        CHECK(target_row_0 && !target_row_1);
+        target->add_empty_row();
+        target_row_1 = target->get(1);
+        link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
+        link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+    });
 
     // Break link by removal from list
-    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
-    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
-          link_list_1->get(1).get_index() == 1);
-    CHECK(target_row_0 && target_row_1);
-    link_list_1->remove(1); // origin[1].o_1 -> [ target[0] ]
-    CHECK(target_row_0 && !target_row_1);
-    target->add_empty_row();
-    target_row_1 = target->get(1);
-    link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+    assertGroup([&] () {
+        link_list_1->remove(1); // origin[1].o_1 -> [ target[0] ]
+        CHECK(target_row_0 && !target_row_1);
+        target->add_empty_row();
+        target_row_1 = target->get(1);
+        link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+    });
 
     // Break link by reassign
-    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
-    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
-          link_list_1->get(1).get_index() == 1);
-    CHECK(target_row_0 && target_row_1);
-    link_list_1->set(1,0); // origin[1].o_1 -> [ target[0], target[0] ]
-    CHECK(target_row_0 && !target_row_1);
-    target->add_empty_row();
-    target_row_1 = target->get(1);
-    link_list_1->set(1,1); // origin[1].o_1 -> [ target[0], target[1] ]
+    assertGroup([&] () {
+        link_list_1->set(1,0); // origin[1].o_1 -> [ target[0], target[0] ]
+        CHECK(target_row_0 && !target_row_1);
+        target->add_empty_row();
+        target_row_1 = target->get(1);
+        link_list_1->set(1,1); // origin[1].o_1 -> [ target[0], target[1] ]
+    });
 
     // Avoid breaking link by reassigning self
-    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
-    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
-          link_list_1->get(1).get_index() == 1);
-    CHECK(target_row_0 && target_row_1);
-    link_list_1->set(1,1); // No effective change!
-    CHECK(target_row_0 && target_row_1);
+    assertGroup([&] () {
+        link_list_1->set(1,1); // No effective change!
+        CHECK(target_row_0 && target_row_1);
+    });
 
     // Break link by explicit row removal
-    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
-    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
-          link_list_1->get(1).get_index() == 1);
-    CHECK(target_row_0 && target_row_1);
-    origin_row_1.move_last_over();
-    CHECK(target_row_0 && !target_row_1);
-    origin->add_empty_row();
-    target->add_empty_row();
-    origin_row_1 = origin->get(1);
-    target_row_1 = target->get(1);
-    link_list_1 = origin_row_1.get_linklist(0);
-    link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
-    link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+    assertGroup([&] () {
+        origin_row_1.move_last_over();
+        CHECK(target_row_0 && !target_row_1);
+        origin->add_empty_row();
+        target->add_empty_row();
+        origin_row_1 = origin->get(1);
+        target_row_1 = target->get(1);
+        link_list_1 = origin_row_1.get_linklist(0);
+        link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
+        link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+    });
 
     // Break link by clearing table
-    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
-    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
-          link_list_1->get(1).get_index() == 1);
-    CHECK(target_row_0 && target_row_1);
-    origin->clear();
-    CHECK(!target_row_0 && !target_row_1);
+    assertGroup([&] () {
+        origin->clear();
+        CHECK(!target_row_0 && !target_row_1);
+    });
 }
 
 
