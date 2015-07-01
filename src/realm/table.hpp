@@ -430,6 +430,7 @@ public:
     void insert_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void insert_linklist(std::size_t column_ndx, std::size_t row_ndx); // Insert empty link list
+    void insert_null(std::size_t column_ndx, std::size_t row_ndx);
     void insert_done();
 
     //@}
@@ -450,6 +451,7 @@ public:
     ConstLinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx) const;
     std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
     bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
 
     TableRef get_link_target(std::size_t column_ndx) REALM_NOEXCEPT;
     ConstTableRef get_link_target(std::size_t column_ndx) const REALM_NOEXCEPT;
@@ -485,6 +487,7 @@ public:
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
+    void set_null(std::size_t column_ndx, std::size_t row_ndx);
 
     //@}
 
@@ -586,6 +589,7 @@ public:
     std::size_t    find_first_double(std::size_t column_ndx, double value) const;
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
     std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
+    std::size_t    find_first_null(std::size_t column_ndx) const;
 
     TableView      find_all_link(size_t target_row_index);
     ConstTableView find_all_link(size_t target_row_index) const;
@@ -603,6 +607,8 @@ public:
     ConstTableView find_all_string(std::size_t column_ndx, StringData value) const;
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
+    TableView      find_all_null(std::size_t column_ndx);
+    ConstTableView find_all_null(std::size_t column_ndx) const;
 
     /// The following column types are supported: String, Integer, DateTime, Bool
     TableView      get_distinct_view(std::size_t column_ndx);
@@ -1065,6 +1071,8 @@ private:
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
     Column& get_column(std::size_t column_ndx);
     const Column& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
+    ColumnIntNull& get_column_int_null(std::size_t column_ndx);
+    const ColumnIntNull& get_column_int_null(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnFloat& get_column_float(std::size_t column_ndx);
     const ColumnFloat& get_column_float(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnDouble& get_column_double(std::size_t column_ndx);
@@ -1106,7 +1114,7 @@ private:
     /// Create a column of the specified type, fill it with the
     /// specified number of default values, and return just the
     /// reference to the underlying memory.
-    static ref_type create_column(ColumnType column_type, size_t num_default_values, Allocator&);
+    static ref_type create_column(ColumnType column_type, size_t num_default_values, bool nullable, Allocator&);
 
     /// Construct a copy of the columns array of this table using the
     /// specified allocator and return just the ref to that array.

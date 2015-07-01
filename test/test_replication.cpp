@@ -762,6 +762,44 @@ TEST(Replication_NullStrings)
     }
 }
 
+TEST(Replication_NullInteger)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::ostream* replay_log = 0;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1", true);
+        table1->add_empty_row(3);                   // default value is null
+
+        table1->set_int(0, 1, 0);
+        table1->set_null(0, 2);
+
+        CHECK(table1->is_null(0, 0));
+        CHECK(!table1->is_null(0, 1));
+        CHECK(table1->is_null(0, 2));
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_log);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK(table2->is_null(0, 0));
+        CHECK(!table2->is_null(0, 1));
+        CHECK(table2->is_null(0, 2));
+    }
+}
+
+
 } // anonymous namespace
 
 #endif // REALM_ENABLE_REPLICATION

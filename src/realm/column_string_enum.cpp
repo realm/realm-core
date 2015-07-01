@@ -56,7 +56,7 @@ void ColumnStringEnum::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
     m_keys.update_from_parent(old_baseline);
 }
 
-bool ColumnStringEnum::is_nullable() const
+bool ColumnStringEnum::is_nullable() const REALM_NOEXCEPT
 {
     return m_nullable;
 }
@@ -64,6 +64,10 @@ bool ColumnStringEnum::is_nullable() const
 void ColumnStringEnum::set(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <, Column::size());
+
+    if (!is_nullable() && value.is_null()) {
+        throw LogicError{LogicError::column_not_nullable};
+    }
 
     // Update search index
     // (it is important here that we do it before actually setting

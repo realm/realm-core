@@ -162,6 +162,19 @@ public:
         return false;
     }
 
+    bool set_null(size_t col_ndx, size_t row_ndx)
+    {
+        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+#ifdef REALM_DEBUG
+            if (m_log)
+                *m_log << "table->set_null("<<col_ndx<<", "<<row_ndx<<")\n";
+#endif
+            m_table->set_null(col_ndx, row_ndx); // Throws
+            return true;
+        }
+        return false;
+    }
+
     bool set_link(size_t col_ndx, size_t row_ndx, std::size_t value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {

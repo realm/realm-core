@@ -118,7 +118,7 @@ void AdaptiveStringColumn::destroy() REALM_NOEXCEPT
         m_search_index->destroy();
 }
 
-bool AdaptiveStringColumn::is_nullable() const
+bool AdaptiveStringColumn::is_nullable() const REALM_NOEXCEPT
 {
     return m_nullable;
 }
@@ -179,7 +179,9 @@ StringData AdaptiveStringColumn::get_index_data(std::size_t ndx, char*) const RE
 
 void AdaptiveStringColumn::set_null(std::size_t ndx)
 {
-    REALM_ASSERT_DEBUG(m_nullable);
+    if (!m_nullable) {
+        throw LogicError{LogicError::column_not_nullable};
+    }
     StringData sd = realm::null();
     set(ndx, sd);
 }

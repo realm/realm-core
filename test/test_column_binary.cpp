@@ -296,8 +296,10 @@ TEST(ColumnBinary_Nulls)
     c.add(BinaryData("foo"));
 
     CHECK(c.get(0).is_null());
+    CHECK(c.is_null(0));
     CHECK(!c.get(1).is_null());
-    CHECK(!c.get(1).is_null());
+    CHECK(!c.is_null(1));
+    CHECK(!c.get(2).is_null());
 
     // Contains
     //      Null
