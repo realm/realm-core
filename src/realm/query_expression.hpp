@@ -1408,8 +1408,6 @@ private:
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    bool nullable = true;
-
     using ColType = typename ColumnTypeTraits<T, false>::column_type;
     using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
@@ -1457,27 +1455,32 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    template <class C>void set_table()
-    {
-        const C* c;
-        if (m_link_map.m_link_columns.size() == 0)
-            c = static_cast<const C*>(&m_table->get_column_base(m_column));
-        else
-            c = static_cast<const C*>(&m_link_map.m_table->get_column_base(m_column));
-
-        if (sg == nullptr)
-            sg = new SequentialGetter<C>();
-        static_cast<SequentialGetter<C>*>(sg)->init(c);
-
-    }
-
     virtual void set_table()
     {
-        if (nullable)
-            set_table<ColTypeN>();
+        const ColumnBase* c;
+        if (m_link_map.m_link_columns.size() == 0) {
+            nullable = m_table->is_nullable(m_column);
+            c = &m_table->get_column_base(m_column);
+        }
+        else {
+            nullable = m_link_map.m_table->is_nullable(m_column);
+            c = &m_link_map.m_table->get_column_base(m_column);
+
+        }
+
+        if (sg == nullptr) {
+            if (nullable)
+                sg = new SequentialGetter<ColTypeN>();
+            else
+                sg = new SequentialGetter<ColType>();
+        }
+
+        if(nullable)
+            static_cast<SequentialGetter<ColTypeN>*>(sg)->init( (ColTypeN*)(c)); // fixme, c cast
         else
-            set_table<ColType>();
+            static_cast<SequentialGetter<ColType>*>(sg)->init( (ColType*)(c));
     }
+
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
@@ -1550,6 +1553,9 @@ public:
     size_t m_column;
 
     LinkMap m_link_map;
+
+private:
+    bool nullable;
 };
 
 
