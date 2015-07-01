@@ -42,12 +42,12 @@ public:
     bool is_nullable() const REALM_NOEXCEPT override;
 
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT override;
     StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT final;
 
     void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void set_null(std::size_t ndx);
+    void set_null(std::size_t ndx) override;
     void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);

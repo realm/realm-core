@@ -429,11 +429,11 @@ public:
     // Getting and setting values
     T get_val(std::size_t ndx) const REALM_NOEXCEPT final { return get(ndx); }
     T get(std::size_t ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT override;
     T back() const REALM_NOEXCEPT;
     void set(std::size_t, T value);
     void set(std::size_t, null);
-    void set_null(std::size_t);
+    void set_null(std::size_t) override;
     void add(T value = T{});
     void add(null);
     void insert(std::size_t ndx, T value = T{}, std::size_t num_rows = 1);
