@@ -414,51 +414,50 @@ public:
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
-        typename T::Handover_patch* patch = 0;
-        T* clone = 0;
+        std::unique_ptr<typename T::Handover_patch> patch;
+        std::unique_ptr<T> clone;
         VersionID version;
-        ~Handover() { delete patch; delete clone; }
     };
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
     /// - advance_read(), promote_to_write(), close()
     template<typename T>
-    Handover<T>* export_for_handover(const T& accessor, ConstSourcePayload mode)
+    std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode)
     {
         util::LockGuard lg(m_handover_lock);
-        Handover<T>* result = new Handover<T>();
+        std::unique_ptr<Handover<T>> result(new Handover<T>());
         // Implementation note:
         // often, the return value from clone will be T*, BUT it may be ptr to some base of T
         // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
         // clone() will clone the actual accessor instance, and hence return an instance of the
         // same type.
-        result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode));
+        result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
         result->version = get_version_of_current_transaction();
-        return result;
+        return move(result);
     }
     // specialization for handover of Rows
     template<typename T>
-    Handover<BasicRow<T>>* export_for_handover(const BasicRow<T>& accessor)
+    std::unique_ptr<Handover<BasicRow<T>>> export_for_handover(const BasicRow<T>& accessor)
     {
         util::LockGuard lg(m_handover_lock);
-        Handover<BasicRow<T>>* result = new Handover<BasicRow<T>>();
+        std::unique_ptr<Handover<BasicRow<T>>> result(new Handover<BasicRow<T>>());
         // See implementation note above.
-        result->clone = dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch));
+        result->clone.reset(dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch).release()));
         result->version = get_version_of_current_transaction();
-        return result;
+        return move(result);
     }
     // destructive export (mode is Move)
     template<typename T>
-    Handover<T>* export_for_handover(T& accessor, MutableSourcePayload mode)
+    std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode)
     {
         // We'll take a lock here for the benefit of users truly knowing what they are doing.
         util::LockGuard lg(m_handover_lock);
-        Handover<T>* result = new Handover<T>();
+        std::unique_ptr<Handover<T>> result(new Handover<T>());
         // see implementation note above.
-        result->clone = dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode));
+        result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
         result->version = get_version_of_current_transaction();
-        return result;
+        return move(result);
     }
 
     /// Import an accessor wrapped in a handover object. The import will fail if the
@@ -468,21 +467,18 @@ public:
     /// imported again. If the import fails with a version mismatch, an UnreachableVersion
     /// is thrown and the handover object is *not* "consumed".
     template<typename T>
-    T* import_from_handover(Handover<T>* handover)
+    std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover)
     {
         if (handover->version != get_version_of_current_transaction()) {
-            // TODO: Clean up both patch data and cloned data
             throw UnreachableVersion();
         }
-        T* result = handover->clone;
-        handover->clone = 0;
+        std::unique_ptr<T> result = move(handover->clone);
         result->apply_and_consume_patch(handover->patch, m_group);
-        delete handover;
         return result;
     }
     // we need to special case handling of LinkViews, because they are ref counted.
-    Handover<LinkView>* export_linkview_for_handover(const LinkViewRef& accessor);
-    LinkViewRef import_linkview_from_handover(Handover<LinkView>* handover);
+    std::unique_ptr<Handover<LinkView>> export_linkview_for_handover(const LinkViewRef& accessor);
+    LinkViewRef import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover);
 
 private:
     struct SharedInfo;

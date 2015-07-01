@@ -290,17 +290,17 @@ private:
     // for any U.
     template<class> friend class BasicRow;
 
-    virtual BasicRow<T>* clone_for_handover(Handover_patch*& patch) const
+    virtual std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
     {
-        patch = new Handover_patch;
-        return new BasicRow<T>(*this, *patch);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<BasicRow<T>> retval(new BasicRow<T>(*this, *patch));
+        return retval;
     }
 
-    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
     {
         apply_patch(*patch, group);
-        delete patch;
-        patch = 0;
+        patch.reset();
     }
 
     void apply_patch(Handover_patch& patch, Group& group)

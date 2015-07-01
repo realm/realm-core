@@ -7291,13 +7291,13 @@ TEST(LangBindHelper_HandoverQuery)
             LangBindHelper::commit_and_continue_as_read(sg_w);
             vid = sg_w.get_version_of_current_transaction();
             TestTableInts::Query query(table->where());
-            handover.reset(sg_w.export_for_handover(query, ConstSourcePayload::Copy));
+            handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
         }
         {
             LangBindHelper::advance_read(sg, *hist, vid);
             sg_w.close();
             // importing query
-            std::unique_ptr<TestTableInts::Query> q(sg.import_from_handover(handover.release()));
+            std::unique_ptr<TestTableInts::Query> q(sg.import_from_handover(move(handover)));
             TestTableInts::View tv = q->find_all();
             CHECK(tv.is_attached());
             CHECK_EQUAL(100, tv.size());
@@ -7339,7 +7339,7 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(100, tv.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv[i].first);
-            handover.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
+            handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
             CHECK(tv.is_attached());
         }
         {
@@ -7347,7 +7347,7 @@ TEST(LangBindHelper_HandoverAccessors)
             //sg_w.end_read();
             sg_w.close();
             // importing tv
-            std::unique_ptr<TestTableInts::View> tv( sg.import_from_handover(handover.release()) );
+            std::unique_ptr<TestTableInts::View> tv( sg.import_from_handover(move(handover)) );
             CHECK(tv->is_attached());
             CHECK_EQUAL(100, tv->size());
             for (int i = 0; i<100; ++i)
@@ -7384,27 +7384,27 @@ TEST(LangBindHelper_HandoverAccessors)
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv.get_int(0,i));
 
-            handover2.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
+            handover2 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
             CHECK(tv.is_attached());
             CHECK(tv.is_in_sync());
-            handover3.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Stay));
+            handover3 = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
             CHECK(tv.is_attached());
             CHECK(tv.is_in_sync());
 
-            handover4.reset(sg_w.export_for_handover(tv, MutableSourcePayload::Move));
+            handover4 = sg_w.export_for_handover(tv, MutableSourcePayload::Move);
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
 
             // and again, but this time with the source out of sync:
-            handover5.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
+            handover5 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
 
-            handover6.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Stay));
+            handover6 = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
 
-            handover7.reset(sg_w.export_for_handover(tv, MutableSourcePayload::Move));
+            handover7 = sg_w.export_for_handover(tv, MutableSourcePayload::Move);
             CHECK(tv.is_attached());
             CHECK(!tv.is_in_sync());
 
@@ -7415,7 +7415,7 @@ TEST(LangBindHelper_HandoverAccessors)
             // Aaaaand rows!
             row = (*table)[7];
             CHECK_EQUAL(7, row.get_int(0));
-            handover_row.reset(sg_w.export_for_handover(row));
+            handover_row = sg_w.export_for_handover(row);
             CHECK(row.is_attached());
 
         }
@@ -7423,14 +7423,14 @@ TEST(LangBindHelper_HandoverAccessors)
             LangBindHelper::advance_read(sg, *hist, vid);
             sg_w.close();
             // importing tv:
-            std::unique_ptr<TableView> tv( sg.import_from_handover(handover2.release()) );
+            std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover2)) );
             CHECK(tv->is_attached());
             CHECK(tv->is_in_sync());
             CHECK_EQUAL(100, tv->size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv->get_int(0,i));
             // importing one without payload:
-            std::unique_ptr<TableView> tv3( sg.import_from_handover(handover3.release()) );
+            std::unique_ptr<TableView> tv3( sg.import_from_handover(move(handover3)) );
             CHECK(tv3->is_attached());
             CHECK(!tv3->is_in_sync());
             tv3->sync_if_needed();
@@ -7439,7 +7439,7 @@ TEST(LangBindHelper_HandoverAccessors)
                 CHECK_EQUAL(i, tv3->get_int(0,i));
 
             // one with payload:
-            std::unique_ptr<TableView> tv4( sg.import_from_handover(handover4.release()) );
+            std::unique_ptr<TableView> tv4( sg.import_from_handover(move(handover4)) );
             CHECK(tv4->is_attached());
             CHECK(tv4->is_in_sync());
             CHECK_EQUAL(100, tv4->size());
@@ -7447,20 +7447,20 @@ TEST(LangBindHelper_HandoverAccessors)
                 CHECK_EQUAL(i, tv4->get_int(0,i));
 
             // verify that subsequent imports are all without payload:
-            std::unique_ptr<TableView> tv5( sg.import_from_handover(handover5.release()) );
+            std::unique_ptr<TableView> tv5( sg.import_from_handover(move(handover5)) );
             CHECK(tv5->is_attached());
             CHECK(!tv5->is_in_sync());
 
-            std::unique_ptr<TableView> tv6( sg.import_from_handover(handover6.release()) );
+            std::unique_ptr<TableView> tv6( sg.import_from_handover(move(handover6)) );
             CHECK(tv6->is_attached());
             CHECK(!tv6->is_in_sync());
 
-            std::unique_ptr<TableView> tv7( sg.import_from_handover(handover7.release()) );
+            std::unique_ptr<TableView> tv7( sg.import_from_handover(move(handover7)) );
             CHECK(tv7->is_attached());
             CHECK(!tv7->is_in_sync());
 
             // importing row:
-            std::unique_ptr<Row> row( sg.import_from_handover(handover_row.release()) );
+            std::unique_ptr<Row> row( sg.import_from_handover(move(handover_row)) );
             CHECK(row->is_attached());
             CHECK_EQUAL(7, row->get_int(0));
 
@@ -7485,33 +7485,33 @@ struct HandoverControl {
     Mutex m_lock;
     CondVar m_changed;
     SharedGroup::VersionID m_version;
-    T* m_handover = 0;
-    void put(T* h, SharedGroup::VersionID v)
+    std::unique_ptr<T> m_handover;
+    void put(std::unique_ptr<T> h, SharedGroup::VersionID v)
     {
         LockGuard lg(m_lock);
         //std::cout << "put " << h << std::endl;
         while (m_handover != 0) m_changed.wait(lg);
         //std::cout << " -- put " << h << std::endl;
-        m_handover = h;
+        m_handover = move(h);
         m_version = v;
         m_changed.notify_all();
     }
-    void get(T*& h, SharedGroup::VersionID &v)
+    void get(std::unique_ptr<T>& h, SharedGroup::VersionID &v)
     {
         LockGuard lg(m_lock);
         //std::cout << "get " << std::endl;
         while (m_handover == 0) m_changed.wait(lg);
         //std::cout << " -- get " << m_handover << std::endl;
-        h = m_handover;
+        h = move(m_handover);
         v = m_version;
         m_handover = 0;
         m_changed.notify_all();
     }
-    bool try_get(T*& h, SharedGroup::VersionID& v)
+    bool try_get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
     {
         LockGuard lg(m_lock);
         if (m_handover == 0) return false;
-        h = m_handover;
+        h = move(m_handover);
         v = m_version;
         m_handover = 0;
         m_changed.notify_all();
@@ -7575,20 +7575,19 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
-        SharedGroup::Handover<TableView>* handover;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID version;
         control->get(handover, version);
         Group& g = const_cast<Group&>(sg.begin_read(version));
         TableRef table = g.get_table("table");
         TableView tv = table->where().greater(0,50).find_all();
         CHECK(tv.is_in_sync());
-        TableView* tv2 = sg.import_from_handover(handover);
+        std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
         CHECK(tv.size() == tv2->size());
         for (std::size_t k=0; k<tv.size(); ++k)
             CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
-        delete tv2;
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
         sg.end_read();
@@ -7651,10 +7650,10 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
-        StealingInfo* info = new StealingInfo;
+        std::unique_ptr<StealingInfo> info(new StealingInfo);
         info->sg = &sg;
         info->tv = &tv;
-        control->put(info, sg.get_version_of_current_transaction());
+        control->put(move(info), sg.get_version_of_current_transaction());
         if (table->size() > 0 && table->get_int(0,0) == 0) {
             // we need to wait for the verifier to steal our latest payload.
             // if we go out of scope too early, the payload will become invalid
@@ -7678,8 +7677,8 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
-        StealingInfo* info;
-        SharedGroup::Handover<TableView>* handover;
+        std::unique_ptr<StealingInfo> info;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID version;
         control->get(info, version);
         // Actually steal the payload:
@@ -7695,13 +7694,12 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
         TableView tv = table->where().greater(0,50).find_all();
         CHECK(tv.is_in_sync());
 
-        TableView* tv2 = sg.import_from_handover(handover);
+        std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
         CHECK(tv.size() == tv2->size());
         for (std::size_t k=0; k<tv.size(); ++k)
             CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
-        delete tv2;
         if (table->size() > 0 && table->get_int(0,0) == 0) {
             LangBindHelper::promote_to_write(sg, *hist);
             table->set_int(0,0,-1);
@@ -7779,7 +7777,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv2.get_int(0,i));
-            handover2.reset(sg_w.export_for_handover(tv2, ConstSourcePayload::Copy));
+            handover2 = sg_w.export_for_handover(tv2, ConstSourcePayload::Copy);
             CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
         }
@@ -7787,7 +7785,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             LangBindHelper::advance_read(sg, *hist, vid);
             sg_w.close();
             // importing tv:
-            std::unique_ptr<TableView> tv2(sg.import_from_handover(handover2.release()) );
+            std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)) );
             // CHECK(tv1.is_in_sync()); -- not possible, tv1 is now owned by tv2 and not reachable
             CHECK(tv2->is_in_sync());
             // CHECK(tv1.is_attached());
@@ -7861,12 +7859,12 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         // TableView tv2 = lvr->get_sorted_view(0);
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
-        handover.reset(sg_w.export_for_handover(tv, ConstSourcePayload::Copy));
+        handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
     }
     {
         LangBindHelper::advance_read(sg, *hist, vid);
         sg_w.close();
-        std::unique_ptr<TableView> tv( sg.import_from_handover(handover.release()) ); // <-- import tv
+        std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover)) ); // <-- import tv
 
         CHECK_EQUAL(2, tv->size());
         CHECK_EQUAL(0, tv->get_source_ndx(0));
@@ -7926,12 +7924,12 @@ TEST(LangBindHelper_HandoverLinkView)
         // TableView tv2 = lvr->get_sorted_view(0);
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
-        handover.reset(sg_w.export_linkview_for_handover(lvr));
+        handover = sg_w.export_linkview_for_handover(lvr);
     }
     {
         LangBindHelper::advance_read(sg, *hist, vid);
         sg_w.close();
-        LinkViewRef lvr = sg.import_linkview_from_handover(handover.release()); // <-- import lvr
+        LinkViewRef lvr = sg.import_linkview_from_handover(move(handover)); // <-- import lvr
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
         // q.m_table = table1
@@ -7989,7 +7987,7 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv2.get_int(0,i));
-            handover2.reset(sg_w.export_for_handover(tv1, ConstSourcePayload::Copy));
+            handover2 = sg_w.export_for_handover(tv1, ConstSourcePayload::Copy);
             CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
         }

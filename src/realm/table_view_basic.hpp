@@ -195,25 +195,26 @@ public:
     }
     typedef TableView_Handover_patch Handover_patch;
 
-    BasicTableView<Tab>*
-    clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const
+    std::unique_ptr<BasicTableView<Tab>>
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
     {
-        patch = new Handover_patch;
-        return new BasicTableView<Tab>(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
+        return retval;
     }
 
-    BasicTableView<Tab>*
-    clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode)
+    std::unique_ptr<BasicTableView<Tab>>
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
     {
-        patch = new Handover_patch;
-        return new BasicTableView<Tab>(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
+        return retval;
     }
 
-    void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
     {
         apply_patch(*patch, group);
-        delete patch;
-        patch = 0;
+        patch.reset();
     }
 
     BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch, 

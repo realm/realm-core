@@ -29,26 +29,25 @@
 
 using namespace realm;
 
-void LinkView::generate_patch(const ConstLinkViewRef& ref, Handover_patch*& patch)
+void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Handover_patch>& patch)
 {
     if (bool(ref)) {
-        patch = new Handover_patch;
+        patch.reset(new Handover_patch);
         patch->m_table_num = ref->m_origin_table->get_index_in_group();
         patch->m_col_num = ref->m_origin_column.m_column_ndx;
         patch->m_row_ndx = ref->get_origin_row_index();
     }
     else
-        patch = 0;
+        patch.reset();
 }
 
 
-LinkViewRef LinkView::create_from_and_consume_patch(Handover_patch*& patch, Group& group) 
+LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group) 
 {
     if (patch) {
         TableRef tr(group.get_table(patch->m_table_num));
         LinkViewRef result = tr->get_linklist(patch->m_col_num, patch->m_row_ndx);
-        delete patch;
-        patch = 0;
+        patch.reset();
         return result;
     }
     else

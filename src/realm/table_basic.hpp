@@ -415,23 +415,26 @@ protected:
         m_impl.apply_patch(patch, group);
     }
 
-    virtual Query* clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const
+    virtual std::unique_ptr<Query> 
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
     {
-        patch = new Handover_patch;
-        return new Query(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
+        return retval;
     }
 
-    virtual Query* clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode)
+    virtual std::unique_ptr<Query> 
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
     {
-        patch = new Handover_patch;
-        return new Query(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
+        return retval;
     }
 
-    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
     {
         apply_patch(*patch, group);
-        delete patch;
-        patch = 0;
+        patch.reset();
     }
 
 private:

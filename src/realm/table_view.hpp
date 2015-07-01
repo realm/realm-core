@@ -308,6 +308,7 @@ public:
     // Actual sorting facility is provided by the base class:
     using RowIndexes::sort;
 
+    virtual ~TableViewBase() REALM_NOEXCEPT;
 
 protected:
 #ifdef REALM_ENABLE_REPLICATION
@@ -349,8 +350,6 @@ protected:
     /// Move constructor.
     TableViewBase(TableViewBase&&) REALM_NOEXCEPT;
 
-    ~TableViewBase() REALM_NOEXCEPT;
-
     TableViewBase& operator=(const TableViewBase&) REALM_NOEXCEPT;
     TableViewBase& operator=(TableViewBase&&) REALM_NOEXCEPT;
 
@@ -364,25 +363,26 @@ protected:
     // handover machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
-    virtual TableViewBase* clone_for_handover(Handover_patch*& patch, 
-                                              ConstSourcePayload mode) const
+    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+                                                              ConstSourcePayload mode) const
     {
-        patch = new Handover_patch;
-        return new TableViewBase(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<TableViewBase> retval(new TableViewBase(*this, *patch, mode));
+        return move(retval);
     }
 
-    virtual TableViewBase* clone_for_handover(Handover_patch*& patch, 
-                                              MutableSourcePayload mode)
+    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+                                                              MutableSourcePayload mode)
     {
-        patch = new Handover_patch;
-        return new TableViewBase(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<TableViewBase> retval(new TableViewBase(*this, *patch, mode));
+        return move(retval);
     }
 
-    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
     {
         apply_patch(*patch, group);
-        delete patch;
-        patch = 0;
+        patch.reset();
     }
     // handover machinery entry points based on static type
     void apply_patch(Handover_patch& patch, Group& group);
@@ -492,25 +492,28 @@ public:
     Table& get_parent() REALM_NOEXCEPT;
     const Table& get_parent() const REALM_NOEXCEPT;
 
-    TableViewBase* clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const override
+    std::unique_ptr<TableViewBase> 
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const override
     {
-        patch = new Handover_patch;
-        return new TableView(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<TableViewBase> retval(new TableView(*this, *patch, mode));
+        return retval;
     }
 
-    TableViewBase* clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode) override
+    std::unique_ptr<TableViewBase> 
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode) override
     {
-        patch = new Handover_patch;
-        return new TableView(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<TableViewBase> retval(new TableView(*this, *patch, mode));
+        return retval;
     }
 
     // this one is here to follow the general scheme, it is not really needed, the
     // one in the base class would be sufficient
-    void apply_and_consume_patch(Handover_patch*& patch, Group& group) override
+    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group) override
     {
         apply_patch(*patch, group);
-        delete patch;
-        patch = 0;
+        patch.reset();
     }
 
     TableView(const TableView& src, Handover_patch& patch, ConstSourcePayload mode)
@@ -597,25 +600,28 @@ public:
 
     const Table& get_parent() const REALM_NOEXCEPT;
 
-    TableViewBase* clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const override
+    std::unique_ptr<TableViewBase>
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const override
     {
-        patch = new Handover_patch;
-        return new ConstTableView(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<TableViewBase> retval(new ConstTableView(*this, *patch, mode));
+        return move(retval);
     }
 
-    TableViewBase* clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode) override
+    std::unique_ptr<TableViewBase> 
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode) override
     {
-        patch = new Handover_patch;
-        return new ConstTableView(*this, *patch, mode);
+        patch.reset(new Handover_patch);
+        std::unique_ptr<TableViewBase> retval(new ConstTableView(*this, *patch, mode));
+        return move(retval);
     }
 
     // this one is here to follow the general scheme, it is not really needed, the
     // one in the base class would be sufficient
-    void apply_and_consume_patch(Handover_patch*& patch, Group& group) override
+    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group) override
     {
         apply_patch(*patch, group);
-        delete patch;
-        patch = 0;
+        patch.reset();
     }
 
     ConstTableView(const ConstTableView& src, Handover_patch& patch, ConstSourcePayload mode)

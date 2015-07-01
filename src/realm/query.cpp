@@ -158,7 +158,8 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
         patch.m_table_num = source.m_table.get()->get_index_in_group();
     }
     if (source.m_source_table_view) {
-        m_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_source_table_view = 
+            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
         m_owns_source_table_view = true;
     }
     else { 
@@ -180,7 +181,8 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
         patch.m_table_num = source.m_table.get()->get_index_in_group();
     }
     if (source.m_source_table_view) {
-        m_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_source_table_view = 
+            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
         m_owns_source_table_view = true;
     }
     else {

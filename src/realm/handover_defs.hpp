@@ -20,6 +20,8 @@
 #ifndef REALM_HANDOVER_DEFS
 #define REALM_HANDOVER_DEFS
 
+#include <memory>
+
 namespace realm {
 
 enum class ConstSourcePayload { Copy, Stay };
@@ -36,20 +38,20 @@ struct LinkView_Handover_patch {
 struct Query_Handover_patch {
     std::size_t m_table_num;
     bool m_has_table;
-    TableView_Handover_patch* table_view_data;
-    LinkView_Handover_patch* link_view_data;
-    ~Query_Handover_patch();
+    std::unique_ptr<TableView_Handover_patch> table_view_data;
+    std::unique_ptr<LinkView_Handover_patch> link_view_data;
+    ~Query_Handover_patch() {};
 };
 
 struct TableView_Handover_patch {
     std::size_t table_num;
     bool was_in_sync;
     Query_Handover_patch query_patch;
-    LinkView_Handover_patch* linkview_patch;
-    ~TableView_Handover_patch() { delete linkview_patch; }
+    std::unique_ptr<LinkView_Handover_patch> linkview_patch;
+    ~TableView_Handover_patch() { }
 };
 
-inline Query_Handover_patch::~Query_Handover_patch() { delete table_view_data; delete link_view_data; }
+//inline Query_Handover_patch::~Query_Handover_patch() { delete table_view_data; delete link_view_data; }
 
 struct RowBase_Handover_patch {
     std::size_t table_num;
