@@ -1408,7 +1408,10 @@ private:
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
+    bool nullable = true;
+
     using ColType = typename ColumnTypeTraits<T, false>::column_type;
+    using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
     Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr), 
                                                                             m_table(nullptr), sg(nullptr),
@@ -1435,27 +1438,45 @@ public:
         delete sg;
     }
 
-    virtual Subexpr& clone()
+    template<class C> Subexpr& clone()
     {
         Columns<T>& n = *new Columns<T>();
         n = *this;
-        SequentialGetter<ColType> *s = new SequentialGetter<ColType>();
+        SequentialGetter<C> *s = new SequentialGetter<C>();
         n.sg = s;
         return n;
+
+    }
+
+    virtual Subexpr& clone()
+    {
+        if (nullable)
+            return clone<ColTypeN>();
+        else
+            return clone<ColType>();
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table()
+    template <class C>void set_table()
     {
-        const ColType* c;
+        const C* c;
         if (m_link_map.m_link_columns.size() == 0)
-            c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
+            c = static_cast<const C*>(&m_table->get_column_base(m_column));
         else
-            c = static_cast<const ColType*>(&m_link_map.m_table->get_column_base(m_column));
+            c = static_cast<const C*>(&m_link_map.m_table->get_column_base(m_column));
 
         if (sg == nullptr)
-            sg = new SequentialGetter<ColType>();
-        sg->init(c);
+            sg = new SequentialGetter<C>();
+        static_cast<SequentialGetter<C>*>(sg)->init(c);
+
+    }
+
+    virtual void set_table()
+    {
+        if (nullable)
+            set_table<ColTypeN>();
+        else
+            set_table<ColType>();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -1465,8 +1486,15 @@ public:
         return m_table;
     }
 
-    // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) {
+        if (nullable)
+            evaluate<ColTypeN>(index, destination);
+        else
+            evaluate<ColType>(index, destination);
+    }
+
+    // Load values from Column into destination
+    template<class C>void evaluate(size_t index, ValueBase& destination) {
         if (m_link_map.m_link_columns.size() > 0) {
             // LinkList with more than 0 values. Create Value with payload for all fields
 
@@ -1475,21 +1503,21 @@ public:
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                sg->cache_next(link_to); // todo, needed?
-                v.m_storage.set(t, sg->get_next(link_to));
+                static_cast<SequentialGetter<C>*>(sg)->cache_next(link_to); // todo, needed?
+                v.m_storage.set(t, static_cast<SequentialGetter<C>*>(sg)->get_next(link_to));
             }
             destination.import(v);
         }
         else {
             // Not a Link column
-            sg->cache_next(index);
-            size_t colsize = sg->m_column->size();
+            static_cast<SequentialGetter<C>*>(sg)->cache_next(index);
+            size_t colsize = static_cast<SequentialGetter<C>*>(sg)->m_column->size();
 
-            if (std::is_same<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
+            if (std::is_same<T, int64_t>::value && index + ValueBase::default_size < static_cast<SequentialGetter<C>*>(sg)->m_leaf_end) {
                 Value<T> v;
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
                 // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-                sg->m_leaf_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
+                static_cast<SequentialGetter<C>*>(sg)->m_leaf_ptr->get_chunk(index - static_cast<SequentialGetter<C>*>(sg)->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
 
                 destination.import(v);
             }
@@ -1502,7 +1530,7 @@ public:
                 Value<T> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++) {
-                    v.m_storage.set(t, sg->get_next(index + t));
+                    v.m_storage.set(t, static_cast<SequentialGetter<C>*>(sg)->get_next(index + t));
                 }
 
                 destination.import(v);
@@ -1516,7 +1544,7 @@ public:
     const Table* m_table;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
-    SequentialGetter<ColType>* sg;
+    SequentialGetterBase* sg;
 
     // Column index of payload column of m_table
     size_t m_column;

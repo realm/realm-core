@@ -6218,13 +6218,22 @@ ONLY(Query_IntegerNullNGSyntax)
     Group g;
     TableRef table = g.add_table("table");
     table->insert_column(0, type_Int, "key", true);
+    table->insert_column(1, type_String, "key", true);
     table->add_empty_row(3);
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
     table->set_int(0, 2, 20);
 
+    table->set_string(1, 0, null());
+    table->set_string(1, 1, "foo");
+    table->set_string(1, 2, "bar");
+
     size_t t = (table->column<Int>(0) + 10 == 30).find();
     CHECK_EQUAL(t, 2);
+
+    t = (table->column<String>(1) == "bar").find();
+    CHECK_EQUAL(t, 2);
+
 
 }
 

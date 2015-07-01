@@ -103,7 +103,7 @@ public:
     int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
     uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
     static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
-
+    void get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT;
     void set_null(std::size_t ndx) REALM_NOEXCEPT;
     bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
     int64_t null_value() const REALM_NOEXCEPT;
@@ -319,6 +319,8 @@ void ArrayIntNull::create(Type type, bool context_flag)
     MemRef r = create_array(type, context_flag, 0, 0, m_alloc);
     init_from_mem(r);
 }
+
+
 
 inline
 std::size_t ArrayIntNull::size() const REALM_NOEXCEPT
