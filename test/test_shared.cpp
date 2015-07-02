@@ -23,6 +23,8 @@
 #include <realm/util/terminate.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/impl/simulated_failure.hpp>
+
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
@@ -2715,5 +2717,17 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
         wt.commit();
     }
 }
+
+
+#ifdef REALM_DEBUG
+TEST(Shared_BeginReadFailure)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    using SimulatedFailure = _impl::SimulatedFailure;
+    SimulatedFailure::PrimeGuard pg(SimulatedFailure::shared_group__grow_reader_mapping);
+    CHECK_THROW(sg.begin_read(), SimulatedFailure);
+}
+#endif // REALM_DEBUG
 
 #endif // TEST_SHARED
