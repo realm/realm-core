@@ -45,9 +45,7 @@ class GroupWriter;
 /// Thrown by Group and SharedGroup constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid Realm
 /// database.
-struct InvalidDatabase: util::File::AccessError {
-    InvalidDatabase(): util::File::AccessError("Invalid database") {}
-};
+struct InvalidDatabase;
 
 
 /// The allocator that is used to manage the memory of a Realm
@@ -65,9 +63,6 @@ struct InvalidDatabase: util::File::AccessError {
 /// of slabs.
 class SlabAlloc: public Allocator {
 public:
-    /// Construct a slab allocator in the unattached state.
-    SlabAlloc();
-
     ~SlabAlloc() REALM_NOEXCEPT override;
 
     /// Attach this allocator to the specified file.
@@ -224,7 +219,7 @@ public:
     /// size becomes available in memory. If sucessfull,
     /// get_baseline() will return the specified new file size.
     ///
-    /// It is an error to call this function on a detached allocator,
+    /// It is an error to call this function on a detasched allocator,
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
@@ -308,7 +303,7 @@ private:
 
     util::File m_file;
     char* m_data;
-    AttachMode m_attach_mode;
+    AttachMode m_attach_mode = attach_None;
 
     /// If a file or buffer is currently attached and validation was
     /// not skipped during attachement, this flag is true if, and only
@@ -333,9 +328,9 @@ private:
     /// get_free_read_only() must throw. This member is deliberately
     /// placed here (after m_attach_mode) in the hope that it leads to
     /// less padding between members due to alignment requirements.
-    FeeeSpaceState m_free_space_state;
+    FeeeSpaceState m_free_space_state = free_space_Clean;
 
-    unsigned char m_file_format_version;
+    unsigned char m_file_format_version = default_file_format_version;
 
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;
@@ -344,7 +339,7 @@ private:
     chunks m_free_read_only;
 
 #ifdef REALM_DEBUG
-    bool m_debug_out;
+    bool m_debug_out = false;
 #endif
 
     /// Throws if free-lists are no longer valid.
@@ -385,16 +380,12 @@ private:
 
 // Implementation:
 
-inline SlabAlloc::SlabAlloc():
-    m_attach_mode(attach_None),
-    m_free_space_state(free_space_Clean),
-    m_file_format_version(default_file_format_version)
-{
-    m_baseline = 0; // Unattached
-#ifdef REALM_DEBUG
-    m_debug_out = false;
-#endif
-}
+struct InvalidDatabase: util::File::AccessError {
+    InvalidDatabase(const std::string& msg):
+        util::File::AccessError(msg)
+    {
+    }
+};
 
 inline void SlabAlloc::own_buffer() REALM_NOEXCEPT
 {

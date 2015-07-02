@@ -166,30 +166,38 @@ public:
 
     ~ShortCircuitHistory() REALM_NOEXCEPT
     {
-        typedef TransactLogs::const_iterator iter;
-        iter end = m_transact_logs.end();
-        for (iter i = m_transact_logs.begin(); i != end; ++i)
-            delete[] i->second.data();
     }
 
-    void handle_transact_log(const char* data, size_t size, Replication::version_type new_version)
+    void prepare_changeset(const char* data, size_t size, Replication::version_type new_version)
         override
     {
-        std::unique_ptr<char[]> log(new char[size]); // Throws
-        std::copy(data, data+size, log.get());
-        m_transact_logs[new_version] = BinaryData(log.get(), size); // Throws
-        log.release();
+        m_incoming_changeset = Buffer<char>(size); // Throws
+        std::copy(data, data+size, m_incoming_changeset.data());
+        m_incoming_version = new_version;
+        // Allocate space for the new changeset in m_changesets such that we can
+        // be sure no exception will be thrown whan adding the changeset in
+        // finalize_changeset().
+        m_changesets[new_version]; // Throws
+    }
+
+    void finalize_changeset() REALM_NOEXCEPT override
+    {
+        // The following operation will not throw due to the space reservation
+        // carried out in prepare_new_changeset().
+        m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
     }
 
     void get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer)
         const REALM_NOEXCEPT override
     {
-        size_t n = end_version - begin_version;
+        size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i != n; ++i) {
             uint_fast64_t version = begin_version + i + 1;
-            auto j = m_transact_logs.find(version);
-            REALM_ASSERT(j != m_transact_logs.end());
-            buffer[i] = j->second;
+            auto j = m_changesets.find(version);
+            REALM_ASSERT(j != m_changesets.end());
+            const Buffer<char>& changeset = j->second;
+            REALM_ASSERT(changeset); // Must have been finalized
+            buffer[i] = BinaryData(changeset.data(), changeset.size());
         }
     }
 
@@ -200,8 +208,9 @@ public:
     }
 
 private:
-    typedef std::map<uint_fast64_t, BinaryData> TransactLogs;
-    TransactLogs m_transact_logs;
+    Buffer<char> m_incoming_changeset;
+    version_type m_incoming_version;
+    std::map<uint_fast64_t, Buffer<char>> m_changesets;
 };
 
 } // anonymous namespace
@@ -7310,6 +7319,10 @@ TEST(LangBindHelper_VersionControl)
                 MyTable::ConstRef t = g.get_table<MyTable>("test");
                 CHECK(versions[k] >= versions[0]);
                 g.Verify();
+
+                // FIXME: Oops, illegal attempt to access a specific version
+                // that is not currently tethered via another transaction.
+
                 LangBindHelper::advance_read(sg_w, *hist_w, versions[k]);
                 g.Verify();
                 CHECK_EQUAL(k, t[k].first);
@@ -7320,6 +7333,10 @@ TEST(LangBindHelper_VersionControl)
         // step through the versions backward:
         for (int i = num_versions-1; i >= 0; --i) {
             // std::cerr << "Jumping directly to version " << i << std::endl;
+
+            // FIXME: Oops, illegal attempt to access a specific version
+            // that is not currently tethered via another transaction.
+
             const Group& g = sg_w.begin_read(versions[i]);
             g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
@@ -7335,6 +7352,10 @@ TEST(LangBindHelper_VersionControl)
             for (int k = 0; k < num_versions; ++k) {
                 // std::cerr << "Advancing to version " << k << std::endl;
                 CHECK(k==0 || versions[k] >= versions[k-1]);
+
+                // FIXME: Oops, illegal attempt to access a specific version
+                // that is not currently tethered via another transaction.
+
                 LangBindHelper::advance_read(sg_w, *hist_w, versions[k]);
                 g.Verify();
                 CHECK_EQUAL(k, t[k].first);
@@ -7349,11 +7370,15 @@ TEST(LangBindHelper_VersionControl)
         MyTable::ConstRef t = g.get_table<MyTable>("test");
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
-            int new_version = random() % num_versions;
+            int new_version = random() % num_versions; // FIXME: Use of wrong random generator. See note at beginning of file.
             // std::cerr << "Random jump: version " << old_version << " -> " << new_version << std::endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
                 sg_w.end_read();
+
+                // FIXME: Oops, illegal attempt to access a specific version
+                // that is not currently tethered via another transaction.
+
                 sg_w.begin_read(versions[new_version]);
                 g.Verify();
                 t = g.get_table<MyTable>("test");
@@ -7362,6 +7387,10 @@ TEST(LangBindHelper_VersionControl)
             else {
                 CHECK(versions[new_version] >= versions[old_version]);
                 g.Verify();
+
+                // FIXME: Oops, illegal attempt to access a specific version
+                // that is not currently tethered via another transaction.
+
                 LangBindHelper::advance_read(sg_w, *hist_w, versions[new_version]);
                 g.Verify();
                 CHECK_EQUAL(new_version, t[new_version].first);
@@ -7379,18 +7408,14 @@ TEST(LangBindHelper_VersionControl)
         sg_w.begin_write();
         sg_w.commit();
 
-        // validate that all the versions are now unreachable
-        for (int i = 0; i < num_versions; ++i) {
-            try {
-                sg.begin_read(versions[i]);
-                CHECK(false);
-            } catch (...) {
-            }
-        }
+        // Validate that all the versions are now unreachable
+        for (int i = 0; i < num_versions; ++i)
+            CHECK_THROW(sg.begin_read(versions[i]), SharedGroup::BadVersion);
     }
 }
 
-#endif
+#endif // not defined _WIN32
+
 
 TEST(Shared_LinkListCrash)
 {

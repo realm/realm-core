@@ -36,8 +36,8 @@
 #endif
 
 
-// Enables null support for strings, and also fixes an old bug in Index where it didn't support 0-bytes in 
-// strings. If enabled, then existing database files made by older versions of Core will be upgraded 
+// Enables null support for strings, and also fixes an old bug in Index where it didn't support 0-bytes in
+// strings. If enabled, then existing database files made by older versions of Core will be upgraded
 // automatically the first time you open it. Hence, it must be opened with write access (through SharedGroup).
 // If you open it for read access (through Group) it will throw an exception (with a descriptive user friendly
 // error message).
@@ -229,20 +229,28 @@
 
 
 #if defined(__GNUC__) || defined(__HP_aCC)
-    #define REALM_FORCEINLINE inline __attribute__((always_inline))
+#  define REALM_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
-    #define REALM_FORCEINLINE __forceinline
+#  define REALM_FORCEINLINE __forceinline
 #else
-    #define REALM_FORCEINLINE inline
+#  define REALM_FORCEINLINE inline
 #endif
 
 
 #if defined(__GNUC__) || defined(__HP_aCC)
-    #define REALM_NOINLINE  __attribute__((noinline))
+#  define REALM_NOINLINE  __attribute__((noinline))
 #elif defined(_MSC_VER)
-    #define REALM_NOINLINE __declspec(noinline)
+#  define REALM_NOINLINE __declspec(noinline)
 #else
-    #define REALM_NOINLINE
+#  define REALM_NOINLINE
+#endif
+
+
+/* Thread specific data (only for POD types) */
+#if defined __clang__
+#  define REALM_THREAD_LOCAL __thread
+#else
+#  define REALM_THREAD_LOCAL thread_local
 #endif
 
 

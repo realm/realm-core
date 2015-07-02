@@ -2,22 +2,28 @@
 
 ### Bugfixes:
 
-* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
-* Fix incorrect results when querying for < or <= on ints which requires 64
-  bits to represent with a CPU that supports SSE 4.2.
+* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by
+  updating Value::import to work with DateTime
+* Fix incorrect results when querying for < or <= on ints which requires 64 bits
+  to represent with a CPU that supports SSE 4.2.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Named exception UnreachableVersion replaced by "unspecified" LogicError
+  exception.
 
 ### Enhancements:
 
 * Generic networking API added.
 * Support for non-end row insertion in tables with link and link list columns.
+* Improved documentation of functions concerning the initiation and termination
+  of transactions.
+* Improved exception safety in connection with the initiation and termination of
+  transactions.
 
 ### Internals:
 
-* Lorem ipsum.
+* New facility for simulating failures, such as system call failures.
 
 ----------------------------------------------
 
@@ -40,7 +46,9 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 
 ### Bugfixes:
 
-* Fixed durability issue in case of power / system failures on Apple platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to stable storage when the file is extended.
+* Fixed durability issue in case of power / system failures on Apple
+  platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to
+  stable storage when the file is extended.
 
 ----------------------------------------------
 
@@ -91,7 +99,9 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 
 ### Bugfixes:
 
-* Fixed bug in "index rebuilding" (would delete the wrong column, causing crash). See https://github.com/realm/realm-core/pull/798 ;  "Remove the correct column when removing search indexes #798"
+* Fixed bug in "index rebuilding" (would delete the wrong column, causing
+  crash). See https://github.com/realm/realm-core/pull/798 ; "Remove the correct
+  column when removing search indexes #798"
 
 ----------------------------------------------
 

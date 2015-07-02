@@ -6,42 +6,48 @@ using namespace realm;
 const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     switch (m_kind) {
-        case LogicError::string_too_big:
+        case string_too_big:
             return "String too big";
-        case LogicError::binary_too_big:
+        case binary_too_big:
             return "Binary too big";
-        case LogicError::table_name_too_long:
+        case table_name_too_long:
             return "Table name too long";
-        case LogicError::column_name_too_long:
+        case column_name_too_long:
             return "Column name too long";
-        case LogicError::table_index_out_of_range:
+        case table_index_out_of_range:
             return "Table index out of range";
-        case LogicError::row_index_out_of_range:
+        case row_index_out_of_range:
             return "Row index out of range";
-        case LogicError::column_index_out_of_range:
+        case column_index_out_of_range:
             return "Column index out of range";
-        case LogicError::bad_version_number:
+        case bad_version:
             return "Bad version number";
-        case LogicError::illegal_combination:
+        case illegal_combination:
             return "Illegal combination";
-        case LogicError::type_mismatch:
+        case type_mismatch:
             return "Type mismatch";
-        case LogicError::wrong_kind_of_table:
+        case wrong_kind_of_table:
             return "Wrong kind of table";
-        case LogicError::detached_accessor:
+        case detached_accessor:
             return "Detached accessor";
-        case LogicError::no_search_index:
+        case no_search_index:
             return "Column has no search index";
-        case LogicError::no_primary_key:
+        case no_primary_key:
             return "Table has no primary key";
-        case LogicError::is_primary_key:
+        case is_primary_key:
             return "Column is the primary key of the table";
-        case LogicError::has_primary_key:
+        case has_primary_key:
             return "Primary key already added";
-        case LogicError::unique_constraint_violation:
+        case unique_constraint_violation:
             return "Unique constraint violation";
-        case LogicError::column_not_nullable:
+        case column_not_nullable:
             return "Attempted to insert null into non-nullable column";
+        case wrong_group_state:
+            return "Wrong state og group accessor (already attached, "
+                "or managed by a SharedGroup object)";
+        case wrong_transact_state:
+            return "Wrong transactional state (no active transaction, wrong type of transaction, "
+                "or transaction already in progress)";
     }
     return "Unknown error";
 }
