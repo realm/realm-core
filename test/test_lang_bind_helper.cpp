@@ -7410,7 +7410,7 @@ TEST(LangBindHelper_VersionControl)
 
         // Validate that all the versions are now unreachable
         for (int i = 0; i < num_versions; ++i)
-            CHECK_LOGIC_ERROR(sg.begin_read(versions[i]), LogicError::bad_version);
+            CHECK_THROW(sg.begin_read(versions[i]), SharedGroup::BadVersion);
     }
 }
 

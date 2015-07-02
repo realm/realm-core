@@ -1268,6 +1268,10 @@ void SharedGroup::rollback() REALM_NOEXCEPT
 
 void SharedGroup::do_begin_read(VersionID version)
 {
+    // FIXME: BadVersion must be thrown in every case where the specified
+    // version is not tethered in accordance with the documentation of
+    // begin_read().
+
     if (version.version == 0) {
         bool dummy;
         grab_latest_readlock(m_readlock, dummy); // Throws
@@ -1276,7 +1280,7 @@ void SharedGroup::do_begin_read(VersionID version)
         bool dummy;
         bool success = grab_specific_readlock(m_readlock, dummy, version); // Throws
         if (!success)
-            throw LogicError(LogicError::bad_version);
+            throw BadVersion();
     }
 
     ReadLockUnlockGuard rlug(*this, m_readlock);
@@ -1386,9 +1390,13 @@ SharedGroup::advance_readlock(History& history,VersionID specific_version)
     bool same_as_before;
     ReadLockInfo old_readlock = m_readlock;
 
+    // FIXME: BadVersion must be thrown in every case where the specified
+    // version is not tethered in accordance with the documentation of
+    // begin_read().
+
     // we cannot move backward in time (yet)
     if (specific_version.version && specific_version.version < m_readlock.m_version)
-        throw LogicError(LogicError::bad_version);
+        throw BadVersion();
 
     // advance current readlock while holding onto old one - we MUST hold onto
     // the old readlock until after the call to advance_transact(). Once a readlock
@@ -1398,7 +1406,7 @@ SharedGroup::advance_readlock(History& history,VersionID specific_version)
     if (specific_version.version) {
         bool success = grab_specific_readlock(m_readlock, same_as_before, specific_version);
         if (!success)
-            throw LogicError(LogicError::bad_version);
+            throw BadVersion();
     }
     else {
         grab_latest_readlock(m_readlock, same_as_before); // Throws

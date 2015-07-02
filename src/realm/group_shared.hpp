@@ -284,6 +284,11 @@ public:
 
     typedef uint_fast64_t version_type;
 
+    /// Thrown by begin_read() if the specified version does not correspond to a
+    /// bound (or tethered) snapshot.
+    struct BadVersion;
+
+
     //@{
 
     /// begin_read() initiates a new read transaction. A read transaction is
@@ -350,9 +355,11 @@ public:
     /// is at least one active read or write transaction bound to it. A read
     /// transaction is bound to the snapshot that it provides access to. A write
     /// transaction is bound to the latest snapshot available at the time of
-    /// initiation of the write transaction. It is an error to specify a version
-    /// that is not associated with a bound snapshot, and the effect of doing so
-    /// is unspecified.
+    /// initiation of the write transaction. If the specified version is not
+    /// associated with a bound snapshot, this function throws BadVersion.
+    ///
+    /// \throw BadVersion Thrown by begin_read() if the specified version does
+    /// not correspond to a bound (or tethered) snapshot.
 
     const Group& begin_read(VersionID version = VersionID());
     void end_read() REALM_NOEXCEPT;
@@ -361,6 +368,7 @@ public:
     void rollback() REALM_NOEXCEPT;
 
     //@}
+
 
     /// Get a version id which may be used to request a different SharedGroup
     /// to start transaction at a specific version.
@@ -629,6 +637,8 @@ private:
 
 
 // Implementation:
+
+struct SharedGroup::BadVersion: std::exception {};
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const char* key):
     m_group(Group::shared_tag())

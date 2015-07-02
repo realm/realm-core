@@ -176,6 +176,9 @@ public:
     /// \param observer An optional custom replication instruction handler. The
     /// application may pass such a handler to observe the sequence of
     /// modifications that advances (or rolls back) the state of the Realm.
+    ///
+    /// \throw SharedGroup::BadVersion Thrown by advance_read() if the specified
+    /// version does not correspond to a bound (or tethered) snapshot.
 
     static void advance_read(SharedGroup&, History&,
                              SharedGroup::VersionID version = SharedGroup::VersionID());
