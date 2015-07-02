@@ -36,8 +36,8 @@
 #endif
 
 
-// Enables null support for strings, and also fixes an old bug in Index where it didn't support 0-bytes in 
-// strings. If enabled, then existing database files made by older versions of Core will be upgraded 
+// Enables null support for strings, and also fixes an old bug in Index where it didn't support 0-bytes in
+// strings. If enabled, then existing database files made by older versions of Core will be upgraded
 // automatically the first time you open it. Hence, it must be opened with write access (through SharedGroup).
 // If you open it for read access (through Group) it will throw an exception (with a descriptive user friendly
 // error message).

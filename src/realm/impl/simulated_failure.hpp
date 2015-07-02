@@ -53,8 +53,9 @@ public:
 
 private:
 #ifdef REALM_DEBUG
-    static const int num_failure_types = _num_failure_types;
-    static REALM_THREAD_LOCAL bool primed_failure_types[_num_failure_types];
+    static void do_prime(type);
+    static void do_unprime(type) REALM_NOEXCEPT;
+    static void do_check(type);
 #endif
 };
 
@@ -85,7 +86,7 @@ private:
 inline void SimulatedFailure::prime(type failure_type)
 {
 #ifdef REALM_DEBUG
-    primed_failure_types[failure_type] = true;
+    do_prime(failure_type);
 #else
     static_cast<void>(failure_type);
 #endif
@@ -94,7 +95,7 @@ inline void SimulatedFailure::prime(type failure_type)
 inline void SimulatedFailure::unprime(type failure_type) REALM_NOEXCEPT
 {
 #ifdef REALM_DEBUG
-    primed_failure_types[failure_type] = false;
+    do_unprime(failure_type);
 #else
     static_cast<void>(failure_type);
 #endif
@@ -103,15 +104,11 @@ inline void SimulatedFailure::unprime(type failure_type) REALM_NOEXCEPT
 inline void SimulatedFailure::check(type failure_type)
 {
 #ifdef REALM_DEBUG
-    if (primed_failure_types[failure_type]) {
-        primed_failure_types[failure_type] = false;
-        throw SimulatedFailure();
-    }
+    do_check(failure_type);
 #else
     static_cast<void>(failure_type);
 #endif
 }
-
 
 } // namespace _impl
 } // namespace realm
