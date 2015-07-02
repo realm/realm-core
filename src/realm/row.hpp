@@ -81,6 +81,7 @@ public:
     std::size_t get_subtable_size(std::size_t col_ndx) const REALM_NOEXCEPT;
     std::size_t get_link(std::size_t col_ndx) const REALM_NOEXCEPT;
     bool is_null_link(std::size_t col_ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t col_ndx) const REALM_NOEXCEPT;
     ConstLinkViewRef get_linklist(std::size_t col_ndx) const;
     LinkViewRef get_linklist(std::size_t col_ndx);
     bool linklist_is_empty(std::size_t col_ndx) const REALM_NOEXCEPT;
@@ -100,6 +101,7 @@ public:
     void nullify_link(std::size_t col_ndx);
     void set_mixed(std::size_t col_ndx, Mixed value);
     void set_mixed_subtable(std::size_t col_ndx, const Table* value);
+    void set_null(std::size_t col_ndx);
 
     //@{
     /// Note that these operations will cause the row accessor to be detached.
@@ -361,6 +363,12 @@ inline bool RowFuncs<T,R>::is_null_link(std::size_t col_ndx) const REALM_NOEXCEP
     return table()->is_null_link(col_ndx, row_ndx());
 }
 
+template<class T, class R>
+inline bool RowFuncs<T,R>::is_null(std::size_t col_ndx) const REALM_NOEXCEPT
+{
+    return table()->is_null(col_ndx, row_ndx());
+}
+
 template<class T, class R> inline typename RowFuncs<T,R>::ConstLinkViewRef
 RowFuncs<T,R>::get_linklist(std::size_t col_ndx) const
 {
@@ -467,6 +475,12 @@ template<class T, class R>
 inline void RowFuncs<T,R>::set_mixed_subtable(std::size_t col_ndx, const Table* value)
 {
     table()->set_mixed_subtable(col_ndx, row_ndx(), value); // Throws
+}
+
+template<class T, class R>
+inline void RowFuncs<T,R>::set_null(std::size_t col_ndx)
+{
+    table()->set_null(col_ndx, row_ndx()); // Throws
 }
 
 template<class T, class R> inline void RowFuncs<T,R>::remove()
