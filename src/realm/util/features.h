@@ -247,7 +247,7 @@
 
 
 /* Thread specific data (only for POD types) */
-#if defined __APPLE__ && defined __MACH__
+#if defined __clang__
 #  define REALM_THREAD_LOCAL __thread
 #else
 #  define REALM_THREAD_LOCAL thread_local
