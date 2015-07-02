@@ -36,6 +36,7 @@
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
 #endif
+#include <realm/impl/simulated_failure.hpp>
 
 #ifndef _WIN32
 #  include <sys/wait.h>
@@ -527,7 +528,7 @@ void spawn_daemon(const std::string& file)
         }
         while (pid_changed == -1 && errno == EINTR);
         if (pid_changed != pid) {
-            std::cerr << "Waitpid returned pid = " << pid_changed 
+            std::cerr << "Waitpid returned pid = " << pid_changed
                       << " and status = " << std::hex << status << std::endl;
             throw std::runtime_error("call to waitpid failed");
         }
@@ -605,7 +606,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
         }
 
         // we hold the shared lock from here until we close the file!
-        m_file.lock_shared(); 
+        m_file.lock_shared();
 
         // Once we get the shared lock, we'll need to verify that the initialization of the
         // lock file has been completed succesfully. The initializing process could have crashed
@@ -616,13 +617,13 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
         size_t info_size;
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
             throw std::runtime_error("Lock file too large");
-        
+
         // Compile time validate the alignment of the first three fields in SharedInfo
         REALM_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
         REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
         REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
 
-        // If this ever triggers we are on a really weird architecture 
+        // If this ever triggers we are on a really weird architecture
         REALM_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
 
         // we need to have the size_of_mutex, size_of_condvar and init_complete
@@ -838,6 +839,9 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
 
 bool SharedGroup::compact()
 {
+    // FIXME: ExcetionSafety: This function must be rewritten with exception
+    // safety in mind.
+
     // Verify that the database file is attached
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
@@ -857,9 +861,9 @@ bool SharedGroup::compact()
     // before calling group::write().
     File::try_remove(tmp_path);
 
-    // Using begin_read here ensures that we have access to the latest and greatest entry
+    // Using begin_read here ensures that we have access to the latest entry
     // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
-    begin_read();
+    begin_read(); // Throws
 
     // Compact by writing a new file holding only live data, then renaming the new file
     // so it becomes the database file, replacing the old one in the process.
@@ -873,9 +877,6 @@ bool SharedGroup::compact()
     }
     end_read();
 
-    // We must detach group complety to force it to fully refresh its accessors for use
-    // in later transactions
-    m_group.complete_detach();
     SlabAlloc& alloc = m_group.m_alloc;
 
     // close and reopen the database file.
@@ -885,7 +886,7 @@ bool SharedGroup::compact()
     bool read_only = false;
     bool is_shared = true;
     bool server_sync_mode = false;
-    ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create, 
+    ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create,
                                          skip_validate, m_key, server_sync_mode); // Throws
     size_t file_size = alloc.get_baseline();
 
@@ -1044,10 +1045,10 @@ void SharedGroup::do_async_commits()
         info->daemon_ready = true;
         m_daemon_becomes_ready.notify_all();
     }
-    m_group.detach();
+    using gf = _impl::GroupFriend;
+    gf::detach(m_group);
 
     while(true) {
-
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
             shutdown = true;
@@ -1128,12 +1129,17 @@ void SharedGroup::do_async_commits()
 #endif // _WIN32
 
 
+SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
+{
+    return VersionID(m_readlock.m_version, m_readlock.m_reader_idx);
+}
+
 void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before)
 {
     for (;;) {
         SharedInfo* r_info = m_reader_map.get_addr();
         readlock.m_reader_idx = r_info->readers.last();
-        if (grow_reader_mapping(readlock.m_reader_idx)) { // throws
+        if (grow_reader_mapping(readlock.m_reader_idx)) { // Throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
@@ -1150,18 +1156,13 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
     }
 }
 
-SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
-{
-    return VersionID(m_readlock.m_version, m_readlock.m_reader_idx);
-}
-
-bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before,
 					 VersionID specific_version)
 {
     for (;;) {
         SharedInfo* r_info = m_reader_map.get_addr();
         readlock.m_reader_idx = specific_version.index;
-        if (grow_reader_mapping(readlock.m_reader_idx)) { // throws
+        if (grow_reader_mapping(readlock.m_reader_idx)) { // Throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
@@ -1187,193 +1188,128 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
 }
 
 
-const Group& SharedGroup::begin_read(VersionID specific_version)
+const Group& SharedGroup::begin_read(VersionID version)
 {
-    REALM_ASSERT(m_transact_stage == transact_Ready);
+    if (m_transact_stage != transact_Ready)
+        throw LogicError(LogicError::wrong_transact_state);
 
-    bool same_version_as_before;
-    if (specific_version.version) {
-        bool success = grab_specific_readlock(m_readlock, same_version_as_before, specific_version);
-        if (!success)
-            throw UnreachableVersion();
-    }
-    else {
-        grab_latest_readlock(m_readlock, same_version_as_before);
-    }
-    if (same_version_as_before && m_group.may_reattach_if_same_version()) {
-        m_group.reattach_from_retained_data();
-    }
-    else {
-        // Prepare the group for a new transaction. A zero top ref
-        // means that the file has just been created.
-        try {
-            m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
-        }
-        catch (...) {
-            end_read();
-            throw;
-        }
-    }
+    do_begin_read(version); // Throws
+
     m_transact_stage = transact_Reading;
-
     return m_group;
-}
-
-
-void SharedGroup::release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT
-{
-    SharedInfo* r_info = m_reader_map.get_addr();
-    const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
-    atomic_double_dec(r.count); // <-- most of the exec time spent here
 }
 
 
 void SharedGroup::end_read() REALM_NOEXCEPT
 {
-    if (!m_group.is_attached())
-        return;
+    if (m_transact_stage == transact_Ready)
+        return; // Idempotency
 
-    REALM_ASSERT(m_transact_stage == transact_Reading);
-    REALM_ASSERT(m_readlock.m_version != std::numeric_limits<size_t>::max());
+    if (m_transact_stage != transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
 
-    release_readlock(m_readlock);
+    do_end_read();
 
-    // The read may have allocated some temporary state
-    m_group.detach_but_retain_data();
     m_transact_stage = transact_Ready;
 }
-
-#ifdef REALM_ENABLE_REPLICATION
-
-void SharedGroup::promote_to_write(History& history)
-{
-    REALM_ASSERT(m_transact_stage == transact_Reading);
-
-    Replication* repl = m_group.get_replication();
-    if (repl)
-        repl->begin_write_transact(*this); // Throws
-
-    try {
-        do_begin_write();
-        advance_read(history);
-    }
-    catch (...) {
-        if (repl)
-            repl->rollback_write_transact(*this);
-        throw;
-    }
-
-    m_transact_stage = transact_Writing;
-}
-
-
-std::unique_ptr<BinaryData[]>
-SharedGroup::advance_readlock(History& history,VersionID specific_version)
-{
-    REALM_ASSERT(m_transact_stage == transact_Reading);
-
-    // protect against any concurrent handover export:
-    util::LockGuard lg(m_handover_lock);
-
-    bool same_as_before;
-    ReadLockInfo old_readlock = m_readlock;
-
-    // we cannot move backward in time (yet)
-    if (specific_version.version && specific_version.version < m_readlock.m_version) {
-        throw UnreachableVersion();
-    }
-
-    // advance current readlock while holding onto old one - we MUST hold onto
-    // the old readlock until after the call to advance_transact. Once a readlock
-    // is released, the release may propagate to the commit log management, causing
-    // it to reclaim memory for old commit logs. We must finished use of the commit log
-    // before allowing that to happen.
-    if (specific_version.version) {
-        bool success = grab_specific_readlock(m_readlock, same_as_before, specific_version);
-        if (!success)
-            throw UnreachableVersion();
-    }
-    else {
-        grab_latest_readlock(m_readlock, same_as_before); // Throws
-    }
-    if (same_as_before) {
-        return nullptr;
-    }
-
-    // If the new top-ref is zero, then the previous top-ref must have
-    // been zero too, and we are still seing an empty Realm file
-    // (note that this is possible even if the version has
-    // changed). The purpose of the early-out in this case, is to
-    // retain the temporary arrays that were created earlier by
-    // Group::init_for_transact() to put the group accessor into a
-    // valid state.
-    if (m_readlock.m_top_ref == 0) {
-        return nullptr;
-    }
-
-    // We know that the log_registry already knows about the new_version,
-    // because in order for us to get the new version when we grab the
-    // readlock, the new version must have been entered into the ringbuffer.
-    // commit always updates the replication log BEFORE updating the ringbuffer.
-    size_t num_changesets = m_readlock.m_version - old_readlock.m_version;
-    std::unique_ptr<BinaryData[]> changesets(new BinaryData[num_changesets]); // Throws
-    history.get_changesets(old_readlock.m_version, m_readlock.m_version, changesets.get());
-    return changesets;
-}
-
-
-void SharedGroup::do_advance_read(ReadLockInfo old_readlock,
-                                  std::unique_ptr<BinaryData[]> changesets)
-{
-    size_t num_changesets = m_readlock.m_version - old_readlock.m_version;
-    m_group.advance_transact(m_readlock.m_top_ref,
-                             m_readlock.m_file_size,
-                             changesets.get(),
-                             changesets.get() + num_changesets); // Throws
-    release_readlock(old_readlock);
-}
-
-
-void SharedGroup::advance_read(History& history, VersionID specific_version)
-{
-    REALM_ASSERT(m_transact_stage == transact_Reading);
-
-    ReadLockInfo old_readlock = m_readlock;
-    std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, specific_version);
-    if (changesets) {
-        do_advance_read(old_readlock, move(changesets)); // Throws
-    }
-    else {
-        release_readlock(old_readlock);
-    }
-}
-
-#endif // REALM_ENABLE_REPLICATION
 
 
 Group& SharedGroup::begin_write()
 {
-    REALM_ASSERT(m_transact_stage == transact_Ready);
+    if (m_transact_stage != transact_Ready)
+        throw LogicError(LogicError::wrong_transact_state);
 
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        repl->begin_write_transact(*this); // Throws
-#endif
-
+    do_begin_write(); // Throws
     try {
-        do_begin_write();
-        begin_read(0);
+        // We can be sure that do_begin_read() will bind to the latest snapshot,
+        // since no other write transaction can be initated while we hold the
+        // write mutex.
+        VersionID version = VersionID(); // Latest
+        do_begin_read(version); // Throws
+
+        Replication* repl = m_group.get_replication();
+        if (repl) {
+            version_type current_version = m_readlock.m_version;
+            repl->initiate_transact(*this, current_version); // Throws
+        }
     }
     catch (...) {
-#ifdef REALM_ENABLE_REPLICATION
-        if (Replication* repl = m_group.get_replication())
-            repl->rollback_write_transact(*this);
-#endif
+        do_end_write();
         throw;
     }
 
     m_transact_stage = transact_Writing;
     return m_group;
+}
+
+
+SharedGroup::version_type SharedGroup::commit()
+{
+    if (m_transact_stage != transact_Writing)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    REALM_ASSERT(m_group.is_attached());
+
+    version_type new_version = do_commit(); // Throws
+    do_end_write();
+    do_end_read();
+
+    m_transact_stage = transact_Ready;
+    return new_version;
+}
+
+
+void SharedGroup::rollback() REALM_NOEXCEPT
+{
+    if (m_transact_stage == transact_Ready)
+        return; // Idempotency
+
+    if (m_transact_stage != transact_Writing)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    util::LockGuard lg(m_handover_lock);
+    do_end_write();
+    do_end_read();
+
+    if (Replication* repl = m_group.get_replication())
+        repl->abort_transact(*this);
+
+    m_transact_stage = transact_Ready;
+}
+
+
+void SharedGroup::do_begin_read(VersionID version)
+{
+    // FIXME: BadVersion must be thrown in every case where the specified
+    // version is not tethered in accordance with the documentation of
+    // begin_read().
+
+    if (version.version == 0) {
+        bool dummy;
+        grab_latest_readlock(m_readlock, dummy); // Throws
+    }
+    else {
+        bool dummy;
+        bool success = grab_specific_readlock(m_readlock, dummy, version); // Throws
+        if (!success)
+            throw BadVersion();
+    }
+
+    ReadLockUnlockGuard rlug(*this, m_readlock);
+
+    using gf = _impl::GroupFriend;
+    gf::attach_shared(m_group, m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
+
+    rlug.release();
+}
+
+
+void SharedGroup::do_end_read() REALM_NOEXCEPT
+{
+    REALM_ASSERT(m_readlock.m_version != std::numeric_limits<size_t>::max());
+    release_readlock(m_readlock);
+    using gf = _impl::GroupFriend;
+    gf::detach(m_group);
 }
 
 
@@ -1406,64 +1342,11 @@ void SharedGroup::do_begin_write()
 }
 
 
-SharedGroup::version_type SharedGroup::commit()
+void SharedGroup::do_end_write() REALM_NOEXCEPT
 {
-    version_type new_version = do_commit();
-
-    end_read();
-    // complete detach
-    // (end_read allows group to retain data, but accessors become invalid after commit):
-    m_group.complete_detach();
-
-    return new_version;
-}
-
-
-#ifdef REALM_ENABLE_REPLICATION
-
-void SharedGroup::commit_and_continue_as_read()
-{
-    do_commit();
-
-    // Mark all managed space (beyond the attached file) as free.
-    m_group.m_alloc.reset_free_space_tracking(); // Throws
-
-    size_t old_baseline = m_group.m_alloc.get_baseline();
-
-    // Remap file if it has grown
-    if (m_readlock.m_file_size > old_baseline) {
-        bool addr_changed = m_group.m_alloc.remap(m_readlock.m_file_size); // Throws
-        // If the file was mapped to a new address, all array accessors must be
-        // updated.
-        if (addr_changed)
-            old_baseline = 0;
-    }
-    m_group.update_refs(m_readlock.m_top_ref, old_baseline);
-}
-
-void SharedGroup::rollback_and_continue_as_read(History& history)
-{
-    util::LockGuard lg(m_handover_lock);
-
-    // Mark all managed space (beyond the attached file) as free.
-    m_group.m_alloc.reset_free_space_tracking(); // Throws
-
-    m_transact_stage = transact_Reading;
-
-    // get the commit log and use it to rollback all accessors:
-    BinaryData buffer = history.get_uncommitted_changes();
-    m_group.reverse_transact(m_readlock.m_top_ref, buffer);
-
-    using gf = _impl::GroupFriend;
-    Replication* repl = gf::get_replication(m_group);
-    repl->rollback_write_transact(*this);
-
-    // release exclusive write access: (FIXME: do this earlier?)
     SharedInfo* info = m_file_map.get_addr();
     info->writemutex.unlock();
 }
-
-#endif // REALM_ENABLE_REPLICATION
 
 
 Replication::version_type SharedGroup::do_commit()
@@ -1476,92 +1359,106 @@ Replication::version_type SharedGroup::do_commit()
     if (m_readlock.m_version == 1)
         m_group.reset_free_space_versions(); // Throws
 
-    SharedInfo* info = m_file_map.get_addr();
     SharedInfo* r_info = m_reader_map.get_addr();
 
-    // FIXME: ExceptionSafety: Corruption has happened if
-    // low_level_commit() throws, because we have already told the
-    // replication manager to commit. It is not yet clear how this
-    // conflict should be solved. The solution is probably to catch
-    // the exception from low_level_commit() and when caught, mark the
-    // local database as not-up-to-date. The exception should not be
-    // rethrown, because the commit was effectively successful.
-
-    version_type new_version;
-    {
-#ifdef REALM_ENABLE_REPLICATION
-        // It is essential that if Replication::commit_write_transact() fails,
-        // then the transaction is not completed. In that case, a subsequent
-        // call to rollback() must still roll the transaction back.
-        if (Replication* repl = m_group.get_replication()) {
-            uint_fast64_t current_version = r_info->get_current_version_unchecked();
-            new_version = repl->commit_write_transact(*this, current_version); // Throws
+    version_type current_version = r_info->get_current_version_unchecked();
+    version_type new_version = current_version + 1;
+    if (Replication* repl = m_group.get_replication()) {
+        // If Replication::prepare_commit() fails, then the entire transaction
+        // fails. The application then has the option of terminating the
+        // transaction with a call to SharedGroup::rollback(), which in turn
+        // must call Replication::abort_transact().
+        new_version = repl->prepare_commit(*this, current_version); // Throws
+        try {
+            low_level_commit(new_version); // Throws
         }
-        else {
-            new_version = r_info->get_current_version_unchecked() + 1;
+        catch (...) {
+            repl->abort_transact(*this);
+            throw;
         }
-#else
-        new_version = r_info->get_current_version_unchecked() + 1;
-#endif
+        repl->finalize_commit(*this);
+    }
+    else {
         low_level_commit(new_version); // Throws
     }
-
-    // advance readlock but dont update accessors:
-    // As this is done under lock, along with the addition above of the newest commit,
-    // we know for certain that the readlock we will grab WILL refer to our own newly
-    // completed commit.
-    release_readlock(m_readlock);
-    // FIXME: Why grab a new read-lock as part of a regular commit? It seems
-    // wrong.
-    //
-    // FIXME: We need to find a way to give SharedGroup::commit() a sound and
-    // intelligable exception behavior. The desirable exception behavior is
-    // probably that the commit has occured if, and only if it does not
-    // throw. The possible exception from grab_latest_readlock() makes this
-    // harder than it would otherwise have been.
-    bool ignored;
-    grab_latest_readlock(m_readlock, ignored); // Throws
-
-    // downgrade to a read transaction (if not, assert in end_read)
-    m_transact_stage = transact_Reading;
-    // Release write lock
-    info->writemutex.unlock();
 
     return new_version;
 }
 
 
-void SharedGroup::rollback() REALM_NOEXCEPT
+void SharedGroup::release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT
 {
-    // FIXME: This method must work correctly even if it is called after a
-    // failed call to commit(). A failed call to commit() is any that returns to
-    // the caller by throwing an exception. As it is right now, rollback() does
-    // not handle all cases.
+    SharedInfo* r_info = m_reader_map.get_addr();
+    const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+    atomic_double_dec(r.count); // <-- most of the exec time spent here
+}
 
-    if (m_group.is_attached()) {
-        REALM_ASSERT(m_transact_stage == transact_Writing);
-        util::LockGuard lg(m_handover_lock);
 
 #ifdef REALM_ENABLE_REPLICATION
-        if (Replication* repl = m_group.get_replication())
-            repl->rollback_write_transact(*this);
-#endif
-        m_transact_stage = transact_Reading;
-        end_read();
 
-        SharedInfo* info = m_file_map.get_addr();
+std::unique_ptr<BinaryData[]>
+SharedGroup::advance_readlock(History& history,VersionID specific_version)
+{
+    bool same_as_before;
+    ReadLockInfo old_readlock = m_readlock;
 
-        // Release write lock
-        info->writemutex.unlock();
+    // protect against any concurrent handover export:
+    util::LockGuard lg(m_handover_lock);
 
-        // Clear all changes made during transaction
-        m_group.detach();
+    // FIXME: BadVersion must be thrown in every case where the specified
+    // version is not tethered in accordance with the documentation of
+    // begin_read().
+
+    // we cannot move backward in time (yet)
+    if (specific_version.version && specific_version.version < m_readlock.m_version)
+        throw BadVersion();
+
+    // advance current readlock while holding onto old one - we MUST hold onto
+    // the old readlock until after the call to advance_transact(). Once a readlock
+    // is released, the release may propagate to the commit log management, causing
+    // it to reclaim memory for old commit logs. We must finished use of the commit log
+    // before allowing that to happen.
+    if (specific_version.version) {
+        bool success = grab_specific_readlock(m_readlock, same_as_before, specific_version);
+        if (!success)
+            throw BadVersion();
     }
+    else {
+        grab_latest_readlock(m_readlock, same_as_before); // Throws
+    }
+    if (same_as_before) {
+        return nullptr;
+    }
+
+    // If the new top-ref is zero, then the previous top-ref must have
+    // been zero too, and we are still seing an empty Realm file
+    // (note that this is possible even if the version has
+    // changed). The purpose of the early-out in this case, is to
+    // retain the temporary arrays that were created earlier by
+    // Group::init_for_transact() to put the group accessor into a
+    // valid state.
+    if (m_readlock.m_top_ref == 0) {
+        return nullptr;
+    }
+
+    // We know that the log_registry already knows about the new_version,
+    // because in order for us to get the new version when we grab the
+    // readlock, the new version must have been entered into the ringbuffer.
+    // commit always updates the replication log BEFORE updating the ringbuffer.
+    size_t num_changesets = m_readlock.m_version - old_readlock.m_version;
+    std::unique_ptr<BinaryData[]> changesets(new BinaryData[num_changesets]); // Throws
+    history.get_changesets(old_readlock.m_version, m_readlock.m_version, changesets.get());
+    return changesets;
 }
+
+#endif // REALM_ENABLE_REPLICATION
 
 
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
+    using _impl::SimulatedFailure;
+    SimulatedFailure::check(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
+
     if (index >= m_local_max_entry) {
         // handle mapping expansion if required
         SharedInfo* r_info = m_reader_map.get_addr();
@@ -1625,7 +1522,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
 #ifdef REALM_ENABLE_REPLICATION
-        // If replication is enabled, we need to propagate knowledge of the earliest 
+        // If replication is enabled, we need to propagate knowledge of the earliest
         // available version:
         Replication* repl = _impl::GroupFriend::get_replication(m_group);
         if (repl)
