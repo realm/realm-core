@@ -947,7 +947,7 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
 
     if (observer) {
         _impl::ReversedNoCopyInputStream reversed_in(reverser);
-        parser.parse(in, *observer); // Throws
+        parser.parse(reversed_in, *observer); // Throws
         observer->parse_complete(); // Throws
     }
 
