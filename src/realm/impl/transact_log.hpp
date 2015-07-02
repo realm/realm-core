@@ -91,6 +91,7 @@ enum Instruction {
     instr_LinkListSet           = 44, // Assign to link list entry
     instr_LinkListInsert        = 45, // Insert entry into link list
     instr_LinkListMove          = 46, // Move an entry within a link list
+    instr_LinkListSwap          = 52, // Swap two entries within a link list
     instr_LinkListErase         = 47, // Remove an entry from a link list
     instr_LinkListClear         = 48, // Ramove all entries from a link list
     instr_LinkListSetAll        = 49  // Assign to link list entry
@@ -190,6 +191,7 @@ public:
     bool link_list_set(std::size_t, std::size_t) { return true; }
     bool link_list_insert(std::size_t, std::size_t) { return true; }
     bool link_list_move(std::size_t, std::size_t) { return true; }
+    bool link_list_swap(std::size_t, std::size_t) { return true; }
     bool link_list_erase(std::size_t) { return true; }
     bool link_list_clear() { return true; }
 
@@ -257,6 +259,7 @@ public:
     bool link_list_set_all(const Column& values);
     bool link_list_insert(std::size_t link_ndx, std::size_t value);
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
+    bool link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx);
     bool link_list_erase(std::size_t link_ndx);
     bool link_list_clear();
 
@@ -366,6 +369,7 @@ public:
     void link_list_set(const LinkView&, std::size_t link_ndx, std::size_t value);
     void link_list_insert(const LinkView&, std::size_t link_ndx, std::size_t value);
     void link_list_move(const LinkView&, std::size_t old_link_ndx, std::size_t new_link_ndx);
+    void link_list_swap(const LinkView&, std::size_t link1_ndx, std::size_t link2_ndx);
     void link_list_erase(const LinkView&, std::size_t link_ndx);
     void link_list_clear(const LinkView&);
 
@@ -1400,6 +1404,19 @@ inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, s
     m_encoder.link_list_move(old_link_ndx, new_link_ndx); // Throws
 }
 
+inline bool TransactLogEncoder::link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx)
+{
+    simple_cmd(instr_LinkListSwap, util::tuple(link1_ndx, link2_ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::link_list_swap(const LinkView& list, std::size_t link1_ndx,
+                                                         std::size_t link2_ndx)
+{
+    select_link_list(list); // Throws
+    m_encoder.link_list_swap(link1_ndx, link2_ndx); // Throws
+}
+
 inline bool TransactLogEncoder::link_list_erase(std::size_t link_ndx)
 {
     simple_cmd(instr_LinkListErase, util::tuple(link_ndx)); // Throws
@@ -1774,6 +1791,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             std::size_t old_link_ndx = read_int<std::size_t>(); // Throws
             std::size_t new_link_ndx = read_int<std::size_t>(); // Throws
             if (!handler.link_list_move(old_link_ndx, new_link_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_LinkListSwap: {
+            std::size_t link1_ndx = read_int<std::size_t>(); // Throws
+            std::size_t link2_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_swap(link1_ndx, link2_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -2433,6 +2457,13 @@ public:
     bool link_list_move(size_t old_link_ndx, size_t new_link_ndx)
     {
         m_encoder.link_list_move(new_link_ndx, old_link_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool link_list_swap(size_t link1_ndx, size_t link2_ndx)
+    {
+        m_encoder.link_list_swap(link1_ndx, link2_ndx);
         append_instruction();
         return true;
     }

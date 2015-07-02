@@ -64,6 +64,7 @@ public:
     void insert(std::size_t link_ndx, std::size_t target_row_ndx);
     void set(std::size_t link_ndx, std::size_t target_row_ndx);
     void move(std::size_t old_link_ndx, std::size_t new_link_ndx);
+    void swap(std::size_t link1_ndx, std::size_t link2_ndx);
     void remove(std::size_t link_ndx);
     void clear();
 
