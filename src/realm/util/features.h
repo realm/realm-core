@@ -229,20 +229,28 @@
 
 
 #if defined(__GNUC__) || defined(__HP_aCC)
-    #define REALM_FORCEINLINE inline __attribute__((always_inline))
+#  define REALM_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
-    #define REALM_FORCEINLINE __forceinline
+#  define REALM_FORCEINLINE __forceinline
 #else
-    #define REALM_FORCEINLINE inline
+#  define REALM_FORCEINLINE inline
 #endif
 
 
 #if defined(__GNUC__) || defined(__HP_aCC)
-    #define REALM_NOINLINE  __attribute__((noinline))
+#  define REALM_NOINLINE  __attribute__((noinline))
 #elif defined(_MSC_VER)
-    #define REALM_NOINLINE __declspec(noinline)
+#  define REALM_NOINLINE __declspec(noinline)
 #else
-    #define REALM_NOINLINE
+#  define REALM_NOINLINE
+#endif
+
+
+/* Thread specific data (only for POD types) */
+#if defined __APPLE__ && defined __MACH__
+#  define REALM_THREAD_LOCAL __thread
+#else
+#  define REALM_THREAD_LOCAL thread_local
 #endif
 
 

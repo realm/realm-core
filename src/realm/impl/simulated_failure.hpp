@@ -54,7 +54,7 @@ public:
 private:
 #ifdef REALM_DEBUG
     static const int num_failure_types = _num_failure_types;
-    thread_local static bool primed_failure_types[num_failure_types];
+    REALM_THREAD_LOCAL static bool primed_failure_types[num_failure_types];
 #endif
 };
 
