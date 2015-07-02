@@ -1610,7 +1610,7 @@ SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
-        throw UnreachableVersion();
+        throw BadVersion();
     }
     // move data
     LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);

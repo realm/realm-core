@@ -514,13 +514,13 @@ public:
     /// importing SharedGroup is viewing a version of the database that is different
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
     /// If the import is succesfull, The handover object is "consumed", it cannot be 
-    /// imported again. If the import fails with a version mismatch, an UnreachableVersion
+    /// imported again. If the import fails with a version mismatch, an BadVersion
     /// is thrown and the handover object is *not* "consumed".
     template<typename T>
     std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover)
     {
         if (handover->version != get_version_of_current_transaction()) {
-            throw UnreachableVersion();
+            throw BadVersion();
         }
         std::unique_ptr<T> result = move(handover->clone);
         result->apply_and_consume_patch(handover->patch, m_group);
