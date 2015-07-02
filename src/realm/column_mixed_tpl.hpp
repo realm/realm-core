@@ -137,7 +137,7 @@ inline DateTime ColumnMixed::get_datetime(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Date);
 
-    return DateTime(std::time_t(get_value(ndx)));
+    return DateTime(get_value(ndx));
 }
 
 inline float ColumnMixed::get_float(std::size_t ndx) const REALM_NOEXCEPT

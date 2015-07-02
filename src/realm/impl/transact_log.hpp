@@ -1554,7 +1554,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetDateTime: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::time_t value = read_int<std::time_t>(); // Throws
+            int_fast64_t value = read_int<int_fast64_t>(); // Throws
             if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
@@ -1651,7 +1651,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            std::time_t value = read_int<std::time_t>(); // Throws
+            int_fast64_t value = read_int<int_fast64_t>(); // Throws
             if (!handler.insert_date_time(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 parser_error();
             return;
@@ -2052,7 +2052,7 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
             return;
         }
         case type_DateTime: {
-            std::time_t value = read_int<std::time_t>(); // Throws
+            int_fast64_t value = read_int<int_fast64_t>(); // Throws
             mixed->set_datetime(value);
             return;
         }

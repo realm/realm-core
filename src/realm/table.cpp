@@ -2505,11 +2505,11 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 
     if (is_nullable(col_ndx)) {
         const ColumnIntNull& column = get_column_int_null(col_ndx);
-        return time_t(column.get(ndx));
+        return column.get(ndx);
     }
     else {
         const Column& column = get_column(col_ndx);
-        return time_t(column.get(ndx));
+        return column.get(ndx);
     }
 }
 
@@ -2522,11 +2522,11 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 
     if (is_nullable(col_ndx)) {
         ColumnIntNull& column = get_column_int_null(col_ndx);
-        column.set(ndx, int64_t(value.get_datetime()));
+        column.set(ndx, value.get_datetime());
     }
     else {
         Column& column = get_column(col_ndx);
-        column.set(ndx, int64_t(value.get_datetime()));
+        column.set(ndx, value.get_datetime());
     }
 
 #ifdef REALM_ENABLE_REPLICATION
