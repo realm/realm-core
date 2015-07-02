@@ -5966,6 +5966,10 @@ TEST(Table_Nulls)
         CHECK_EQUAL(false, t.get_bool(1, 0));
         CHECK_EQUAL(DateTime(3), t.get_datetime(2, 0));
 
+        CHECK(!t.is_null(0, 0));
+        CHECK(!t.is_null(1, 0));
+        CHECK(!t.is_null(2, 0));
+
         t.set_null(0, 1);
         t.set_null(1, 1);
         t.set_null(2, 1);
