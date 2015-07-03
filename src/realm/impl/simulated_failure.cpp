@@ -35,19 +35,43 @@ void SimulatedFailure::do_check(type failure_type)
 
 #  else // !REALM_IOS
 
-void SimulatedFailure::do_prime(type)
+#include <pthread.h>
+#include <stdlib.h>
+
+namespace {
+
+    const int num_failure_types = SimulatedFailure::_num_failure_types;
+    pthread_key_t key;
+
+    bool * get_threadlocal_primed_failure_types() {
+        pthread_key_create(&key, NULL);
+        if (bool *primed_failure_types = static_cast<bool *>(pthread_getspecific(key))) {
+            return primed_failure_types;
+        }
+        auto primed_failure_types = calloc(num_failure_types, sizeof(bool));
+        pthread_setspecific(key, primed_failure_types);
+        return static_cast<bool *>(primed_failure_types);
+    }
+
+} // anonymous namespace
+
+void SimulatedFailure::do_prime(type failure_type)
 {
-    throw std::runtime_error("Simulated failure is not supported on iOS");
+    get_threadlocal_primed_failure_types()[failure_type] = true;
 }
 
-void SimulatedFailure::do_unprime(type) REALM_NOEXCEPT
+void SimulatedFailure::do_unprime(type failure_type) REALM_NOEXCEPT
 {
-    throw std::runtime_error("Simulated failure is not supported on iOS");
+    get_threadlocal_primed_failure_types()[failure_type] = false;
 }
 
-void SimulatedFailure::do_check(type)
+void SimulatedFailure::do_check(type failure_type)
 {
-    throw std::runtime_error("Simulated failure is not supported on iOS");
+    auto primed_failure_types = get_threadlocal_primed_failure_types();
+    if (primed_failure_types[failure_type]) {
+        primed_failure_types[failure_type] = false;
+        throw SimulatedFailure();
+    }
 }
 
 #  endif // !REALM_IOS

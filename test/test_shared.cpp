@@ -2719,7 +2719,7 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 }
 
 
-#if defined REALM_DEBUG && !REALM_IOS
+#ifdef REALM_DEBUG
 TEST(Shared_BeginReadFailure)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2728,6 +2728,6 @@ TEST(Shared_BeginReadFailure)
     SimulatedFailure::PrimeGuard pg(SimulatedFailure::shared_group__grow_reader_mapping);
     CHECK_THROW(sg.begin_read(), SimulatedFailure);
 }
-#endif // defined REALM_DEBUG && !REALM_IOS
+#endif // REALM_DEBUG
 
 #endif // TEST_SHARED
