@@ -463,69 +463,28 @@ public:
     /// of all other accessors (if any) being created as part of the import.
 
     /// Type used to support handover of accessors between shared groups.
-    template<typename T> struct Handover {
-        std::unique_ptr<typename T::Handover_patch> patch;
-        std::unique_ptr<T> clone;
-        VersionID version;
-    };
+    template<typename T> struct Handover;
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
     /// - advance_read(), promote_to_write(), close()
     template<typename T>
-    std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode)
-    {
-        util::LockGuard lg(m_handover_lock);
-        std::unique_ptr<Handover<T>> result(new Handover<T>());
-        // Implementation note:
-        // often, the return value from clone will be T*, BUT it may be ptr to some base of T
-        // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
-        // clone() will clone the actual accessor instance, and hence return an instance of the
-        // same type.
-        result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
-        result->version = get_version_of_current_transaction();
-        return move(result);
-    }
+    std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
+
     // specialization for handover of Rows
     template<typename T>
-    std::unique_ptr<Handover<BasicRow<T>>> export_for_handover(const BasicRow<T>& accessor)
-    {
-        util::LockGuard lg(m_handover_lock);
-        std::unique_ptr<Handover<BasicRow<T>>> result(new Handover<BasicRow<T>>());
-        // See implementation note above.
-        result->clone.reset(dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch).release()));
-        result->version = get_version_of_current_transaction();
-        return move(result);
-    }
+    std::unique_ptr<Handover<BasicRow<T>>> export_for_handover(const BasicRow<T>& accessor);
+
     // destructive export (mode is Move)
     template<typename T>
-    std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode)
-    {
-        // We'll take a lock here for the benefit of users truly knowing what they are doing.
-        util::LockGuard lg(m_handover_lock);
-        std::unique_ptr<Handover<T>> result(new Handover<T>());
-        // see implementation note above.
-        result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
-        result->version = get_version_of_current_transaction();
-        return move(result);
-    }
+    std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode);
 
     /// Import an accessor wrapped in a handover object. The import will fail if the
     /// importing SharedGroup is viewing a version of the database that is different
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
-    /// If the import is succesfull, The handover object is "consumed", it cannot be 
-    /// imported again. If the import fails with a version mismatch, an BadVersion
-    /// is thrown and the handover object is *not* "consumed".
     template<typename T>
-    std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover)
-    {
-        if (handover->version != get_version_of_current_transaction()) {
-            throw BadVersion();
-        }
-        std::unique_ptr<T> result = move(handover->clone);
-        result->apply_and_consume_patch(handover->patch, m_group);
-        return result;
-    }
+    std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover);
+
     // we need to special case handling of LinkViews, because they are ref counted.
     std::unique_ptr<Handover<LinkView>> export_linkview_for_handover(const LinkViewRef& accessor);
     LinkViewRef import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover);
@@ -817,6 +776,69 @@ private:
     SharedGroup& m_shared_group;
     ReadLockInfo* m_read_lock;
 };
+
+
+template<typename T> struct SharedGroup::Handover {
+    std::unique_ptr<typename T::Handover_patch> patch;
+    std::unique_ptr<T> clone;
+    VersionID version;
+};
+
+template<typename T>
+std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const T& accessor, ConstSourcePayload mode)
+{
+    util::LockGuard lg(m_handover_lock);
+    std::unique_ptr<Handover<T>> result(new Handover<T>());
+    // Implementation note:
+    // often, the return value from clone will be T*, BUT it may be ptr to some base of T
+    // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
+    // clone() will clone the actual accessor instance, and hence return an instance of the
+    // same type.
+    result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
+    result->version = get_version_of_current_transaction();
+    return move(result);
+}
+
+
+template<typename T>
+std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_handover(const BasicRow<T>& accessor)
+{
+    util::LockGuard lg(m_handover_lock);
+    std::unique_ptr<Handover<BasicRow<T>>> result(new Handover<BasicRow<T>>());
+    // See implementation note above.
+    result->clone.reset(dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch).release()));
+    result->version = get_version_of_current_transaction();
+    return move(result);
+}
+
+
+template<typename T>
+std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& accessor, MutableSourcePayload mode)
+{
+    // We'll take a lock here for the benefit of users truly knowing what they are doing.
+    util::LockGuard lg(m_handover_lock);
+    std::unique_ptr<Handover<T>> result(new Handover<T>());
+    // see implementation note above.
+    result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
+    result->version = get_version_of_current_transaction();
+    return move(result);
+}
+
+
+template<typename T>
+std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup::Handover<T>> handover)
+{
+    if (handover->version != get_version_of_current_transaction()) {
+        throw BadVersion();
+    }
+    std::unique_ptr<T> result = move(handover->clone);
+    result->apply_and_consume_patch(handover->patch, m_group);
+    return result;
+}
+
+
+
+
 
 template<class O>
 inline void SharedGroup::advance_read(History& history, O* observer, VersionID version)
