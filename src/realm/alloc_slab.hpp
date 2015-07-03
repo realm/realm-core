@@ -100,35 +100,14 @@ public:
     /// \param session_initiator if set, the caller is the session initiator and
     /// guarantees exclusive access to the file. If attaching in read/write mode,
     /// the file is modified: files on streaming form is changed to non-streaming
-    /// form, and if a non-zero chunk_size is set, the file size is aligned to the
-    /// nearest chunk boundary. 
-    ///
-    /// \param chunk_size if non-zero, any growth of the file will be done in
-    /// chunks which are mmapped separately. This may give a non-contiguous virtual
-    /// address space range for the file. This allows us to expand the file without
-    /// having to change any existing memory mapping - only adding new ones.
-    /// If a file is mapped with a non-zero chunksize, references to mapped memory
-    /// needs to be translated seperately for every chunk. This effectively limits
-    /// use, so that datastructures cannot cross a chunk boundary. The chunk_size
-    /// must be a power of 2 and at least equal to the page size, if not 0.
-    ///
-    /// If the file is opened for read/write with a non-zero chunk size, the
-    /// file must be extended to a chunk boundary. open() will do this for the session
-    /// initiator and validate it for all non-initiators.
-    ///
-    /// If the file is shared, all allocators *must* attach to the file using the
-    /// same chunk_size (specifically, they must all respect the chunk boundaries set by
-    /// the one that has the smallest chunk_size, so it's most likely smarter to
-    /// ensure that all just use the same setting).
-    ///
-    /// If the file is opened in read-only mode, chunk_size must be 0.
+    /// form, and if needed the file size is adjusted to match mmap boundaries.
     ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
                          bool skip_validate, const char* encryption_key, bool server_sync_mode, 
-                         bool session_initiator, std::size_t chunk_size = 0);
+                         bool session_initiator);
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -178,28 +157,6 @@ public:
     /// the attached state and attachment was not established using
     /// attach_empty().
     bool nonempty_attachment() const REALM_NOEXCEPT;
-
-    /// Convert the attached file if the top-ref is not specified in
-    /// the header, but in the footer, that is, if the file is on the
-    /// streaming form. The streaming form is incompatible with
-    /// in-place file modification.
-    ///
-    /// If validation was disabled at the time the file was attached,
-    /// this function does nothing, as it assumes that the file is
-    /// already prepared for update in that case.
-    ///
-    /// It is an error to call this function on an allocator that is
-    /// not attached to a file. Doing so will result in undefined
-    /// behavior.
-    ///
-    /// The caller must ensure that the file is not accessed
-    /// concurrently by anyone else while this function executes.
-    ///
-    /// The specified address must be a writable memory mapping of the
-    /// attached file, and the mapped region must be at least as big
-    /// as what is returned by get_baseline().
-    /// TODO: Fix this for chunked memory mappings!!!
-    void prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
     /// Reserve disk space now to avoid allocation errors at a later
     /// point in time, and to minimize on-disk fragmentation. In some
@@ -389,8 +346,6 @@ private:
 
     bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
 
-    void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
-
     class ChunkRefEq;
     class ChunkRefEndEq;
     class SlabRefEndEq;
@@ -400,9 +355,6 @@ private:
     Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
 #endif
-    /// Indicates whether chunked memory mapping is in use or not.
-    bool chunk_mapping_enabled() const REALM_NOEXCEPT;
-
     /// Returns the first mmap boundary *above* the given position.
     std::size_t get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
 
@@ -470,14 +422,6 @@ inline std::size_t SlabAlloc::get_baseline() const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_baseline;
-}
-
-inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
-{
-    REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    if (REALM_LIKELY(!m_file_on_streaming_form))
-        return;
-    do_prepare_for_update(mutable_data, mapping);
 }
 
 inline void SlabAlloc::reserve(std::size_t size)

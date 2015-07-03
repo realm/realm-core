@@ -698,19 +698,10 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
 #endif
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
                                                  no_create, skip_validate, key, 
-                                                 server_sync_mode, begin_new_session, page_size()); // Throws
+                                                 server_sync_mode, begin_new_session); // Throws
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
-                /*
-                if (alloc.m_file_on_streaming_form) {
-                    util::File::Map<char> db_map;
-                    db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
-                    File::UnmapGuard db_ug(db_map);
-                    alloc.prepare_for_update(db_map.get_addr(), db_map);
-                    db_map.sync();
-                }
-                */
 
                 // determine version
                 uint_fast64_t version;
@@ -889,7 +880,7 @@ bool SharedGroup::compact()
     bool is_session_initiator = true;
     ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create, 
                                          skip_validate, m_key, server_sync_mode,
-                                         is_session_initiator, page_size()); // Throws
+                                         is_session_initiator); // Throws
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match

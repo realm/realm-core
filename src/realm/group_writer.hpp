@@ -80,18 +80,21 @@ private:
     /// Allocate a chunk of free space of the specified size. The
     /// specified size must be 8-byte aligned. Extend the file if
     /// required. The returned chunk is removed from the amount of
-    /// remaing free space.
+    /// remaing free space. The returned chunk is guaranteed to be
+    /// within a single contiguous memory mapping.
     ///
     /// \return The position within the database file of the allocated
     /// chunk.
     std::size_t get_free_space(std::size_t size);
 
     /// Find a block of free space that is at least as big as the
-    /// specified size. The specified size does not need to be 8-byte
-    /// aligned. Extend the file if required. The returned chunk is
-    /// not removed from the amount of remaing free space. This
-    /// function guarantees that it will add at most one entry to the
-    /// free-lists.
+    /// specified size and which will allow an allocation that is mapped
+    /// inside a contiguous address range. The specified size does not
+    /// need to be 8-byte aligned. Extend the file if required.
+    /// The returned chunk is not removed from the amount of remaing
+    /// free space. This function guarantees that it will add at most one
+    /// entry to the free-lists. [FIXME: No it does not! and this breaks
+    /// an invariant required when deciding where to write the free lists]
     ///
     /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
     /// is the index of a chunk whose size is at least the requestd
