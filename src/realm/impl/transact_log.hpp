@@ -78,6 +78,7 @@ enum Instruction {
     instr_SelectDescriptor      = 32, // Select descriptor from currently selected root table
     instr_InsertColumn          = 33, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
     instr_InsertLinkColumn      = 34, // do, but for a link-type column
+    instr_InsertNullableColumn  = 50, // Insert nullable column                                    // FIXME: Re-enumerate
     instr_EraseColumn           = 35, // Remove column from selected descriptor
     instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
     instr_RenameColumn          = 37, // Rename column in selected descriptor
@@ -92,8 +93,7 @@ enum Instruction {
     instr_LinkListMove          = 46, // Move an entry within a link list
     instr_LinkListErase         = 47, // Remove an entry from a link list
     instr_LinkListClear         = 48, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 49, // Assign to link list entry
-    instr_InsertNullableColumn = 50   // Insert nullable column  
+    instr_LinkListSetAll        = 49  // Assign to link list entry
 };
 
 
@@ -128,6 +128,72 @@ public:
     const char* transact_log_data() const;
 
     util::Buffer<char> m_buffer;
+};
+
+
+class NullInstructionObserver {
+public:
+    /// The following methods are also those that TransactLogParser expects
+    /// to find on the `InstructionHandler`.
+
+    // No selection needed:
+    bool select_table(std::size_t, std::size_t, const std::size_t*) { return true; }
+    bool select_descriptor(std::size_t, const std::size_t*) { return true; }
+    bool select_link_list(std::size_t, std::size_t) { return true; }
+    bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
+    bool erase_group_level_table(std::size_t, std::size_t) { return true; }
+    bool rename_group_level_table(std::size_t, StringData) { return true; }
+
+    // Must have table selected:
+    bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool) { return true; }
+    bool erase_rows(std::size_t, std::size_t, std::size_t, bool) { return true; }
+    bool clear_table() { return true; }
+    bool insert_int(std::size_t, std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool insert_bool(std::size_t, std::size_t, std::size_t, bool) { return true; }
+    bool insert_float(std::size_t, std::size_t, std::size_t, float) { return true; }
+    bool insert_double(std::size_t, std::size_t, std::size_t, double) { return true; }
+    bool insert_string(std::size_t, std::size_t, std::size_t, StringData) { return true; }
+    bool insert_binary(std::size_t, std::size_t, std::size_t, BinaryData) { return true; }
+    bool insert_date_time(std::size_t, std::size_t, std::size_t, DateTime) { return true; }
+    bool insert_table(std::size_t, std::size_t, std::size_t) { return true; }
+    bool insert_mixed(std::size_t, std::size_t, std::size_t, const Mixed&) { return true; }
+    bool insert_link(std::size_t, std::size_t, std::size_t, std::size_t) { return true; }
+    bool insert_link_list(std::size_t, std::size_t, std::size_t) { return true; }
+    bool row_insert_complete() { return true; }
+    bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool set_bool(std::size_t, std::size_t, bool) { return true; }
+    bool set_float(std::size_t, std::size_t, float) { return true; }
+    bool set_double(std::size_t, std::size_t, double) { return true; }
+    bool set_string(std::size_t, std::size_t, StringData) { return true; }
+    bool set_binary(std::size_t, std::size_t, BinaryData) { return true; }
+    bool set_date_time(std::size_t, std::size_t, DateTime) { return true; }
+    bool set_table(std::size_t, std::size_t) { return true; }
+    bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
+    bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
+    bool set_null(std::size_t, std::size_t) { return true; }
+    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
+    bool optimize_table() { return true; };
+
+    // Must have descriptor selected:
+    bool insert_link_column(std::size_t, DataType, StringData, std::size_t, std::size_t) { return true; }
+    bool insert_column(std::size_t, DataType, StringData, bool) { return true; }
+    bool erase_link_column(std::size_t, std::size_t, std::size_t) { return true; }
+    bool erase_column(std::size_t) { return true; }
+    bool rename_column(std::size_t, StringData) { return true; }
+    bool add_search_index(std::size_t) { return true; }
+    bool remove_search_index(std::size_t) { return true; }
+    bool add_primary_key(std::size_t) { return true; }
+    bool remove_primary_key() { return true; }
+    bool set_link_type(std::size_t, LinkType) { return true; }
+
+    // Must have linklist selected:
+    bool link_list_set(std::size_t, std::size_t) { return true; }
+    bool link_list_insert(std::size_t, std::size_t) { return true; }
+    bool link_list_move(std::size_t, std::size_t) { return true; }
+    bool link_list_erase(std::size_t) { return true; }
+    bool link_list_clear() { return true; }
+
+    void parse_complete() {}
 };
 
 
@@ -2065,6 +2131,7 @@ inline bool TransactLogParser::is_valid_link_type(int type)
     return false;
 }
 
+
 class TransactReverser {
 public:
     bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
@@ -2382,18 +2449,6 @@ public:
         return true; // No-op
     }
 
-    template<typename Handler>
-    void execute(Handler&& handler)
-    {
-        // push any pending select_table or select_descriptor into the buffer:
-        sync_table();
-
-        // then execute the instructions in the transformed order
-        ReversedNoCopyInputStream reversed_log(m_buffer.transact_log_data(), m_instructions);
-        TransactLogParser parser;
-        parser.parse(reversed_log, std::forward<Handler&&>(handler));
-    }
-
 private:
     _impl::TransactLogBufferStream m_buffer;
     _impl::TransactLogEncoder m_encoder{m_buffer};
@@ -2404,7 +2459,8 @@ private:
     Instr m_pending_ds_instr{0, 0};
     Instr m_pending_lv_instr{0, 0};
 
-    Instr get_inst() {
+    Instr get_inst()
+    {
         Instr instr;
         instr.begin = current_instr_start;
         current_instr_start = transact_log_size();
@@ -2418,63 +2474,75 @@ private:
         return m_encoder.write_position() - m_buffer.transact_log_data();
     }
 
-    void append_instruction() {
+    void append_instruction()
+    {
         m_instructions.push_back(get_inst());
     }
 
-    void append_instruction(Instr instr) {
+    void append_instruction(Instr instr)
+    {
         m_instructions.push_back(instr);
     }
 
-    void sync_select(Instr& pending_instr) {
+    void sync_select(Instr& pending_instr)
+    {
         if (pending_instr.begin != pending_instr.end) {
             append_instruction(pending_instr);
             pending_instr = {0, 0};
         }
     }
 
-    void sync_linkview() {
+    void sync_linkview()
+    {
         sync_select(m_pending_lv_instr);
     }
 
-    void sync_descriptor() {
+    void sync_descriptor()
+    {
         sync_linkview();
         sync_select(m_pending_ds_instr);
     }
 
-    void sync_table() {
+    void sync_table()
+    {
         sync_descriptor();
         sync_select(m_pending_ts_instr);
     }
 
-    class ReversedNoCopyInputStream: public NoCopyInputStream {
-    public:
-        ReversedNoCopyInputStream(const char* buffer, std::vector<Instr>& instr_order):
-            m_buffer(buffer),
-            m_instr_order(instr_order)
-        {
-            m_current = m_instr_order.size();
-        }
-
-        size_t next_block(const char*& begin, const char*& end) override
-        {
-            if (m_current != 0) {
-                m_current--;
-                begin = m_buffer + m_instr_order[m_current].begin;
-                end   = m_buffer + m_instr_order[m_current].end;
-                return end-begin;
-            }
-            return 0;
-        }
-
-    private:
-        const char* m_buffer;
-        std::vector<Instr>& m_instr_order;
-        size_t m_current;
-    };
+    friend class ReversedNoCopyInputStream;
 };
 
-}
-}
+
+class ReversedNoCopyInputStream: public NoCopyInputStream {
+public:
+    ReversedNoCopyInputStream(TransactReverser& reverser):
+        m_instr_order(reverser.m_instructions)
+    {
+        // push any pending select_table or select_descriptor into the buffer
+        reverser.sync_table();
+
+        m_buffer = reverser.m_buffer.transact_log_data();
+        m_current = m_instr_order.size();
+    }
+
+    size_t next_block(const char*& begin, const char*& end) override
+    {
+        if (m_current != 0) {
+            m_current--;
+            begin = m_buffer + m_instr_order[m_current].begin;
+            end   = m_buffer + m_instr_order[m_current].end;
+            return end-begin;
+        }
+        return 0;
+    }
+
+private:
+    const char* m_buffer;
+    std::vector<TransactReverser::Instr>& m_instr_order;
+    size_t m_current;
+};
+
+} // namespace _impl
+} // namespace realm
 
 #endif // REALM_IMPL_TRANSACT_LOG_HPP

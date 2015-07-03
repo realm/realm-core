@@ -399,6 +399,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
                                 const char* encryption_key, bool server_sync_mode,
                                 bool session_initiator, std::size_t chunk_size)
 {
+    // ExceptionSafety: If this function throws, it must leave the allocator in
+    // the detached state.
+
     REALM_ASSERT(!is_attached());
     m_chunk_size = chunk_size;
 
@@ -486,11 +489,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
             if (!validate_buffer(map.get_addr(), size_of_streaming_file, top_ref))
                 goto invalid_database;
         }
-        m_data        = map.release();
-        m_baseline    = size;
-        m_initial_mapping_size = size;
-        m_first_additional_chunk = get_chunk_index(m_initial_mapping_size);
-        m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
 
         Header* header;
 
@@ -498,24 +496,31 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             header = writable_map.get_addr();
             header->m_flags |= server_sync_mode ? flags_ServerSyncMode : 0x0;
-            header = reinterpret_cast<Header*>(m_data);
-            bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
-            if (server_sync_mode != stored_server_sync_mode)
-                throw std::runtime_error(path + ": failed to write!");
+            header = reinterpret_cast<Header*>(map.get_addr());
+            REALM_ASSERT(server_sync_mode == ((header->m_flags & flags_ServerSyncMode) != 0));
         }
         else {
-            header = reinterpret_cast<Header*>(m_data);
+            header = reinterpret_cast<Header*>(map.get_addr());
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode &&  !stored_server_sync_mode)
-                throw std::runtime_error(path + ": expected db in server sync mode, found local mode");
+                throw InvalidDatabase("Specified Realm file was not created with support for "
+                                      "client/server synchronization");
             if (!server_sync_mode &&  stored_server_sync_mode)
-                throw std::runtime_error(path + ": found db in server sync mode, expected local mode");
+                throw InvalidDatabase("Specified Realm file requires support for client/server "
+                                      "synchronization");
         }
 
         int select_field = header->m_flags;
         select_field = ((select_field & 1) ^ SlabAlloc::flags_SelectBit);
         m_file_format_version = header->m_file_format_version[select_field];
 
+        m_data        = map.release();
+        m_baseline    = size;
+        m_initial_mapping_size = size;
+        m_first_additional_chunk = get_chunk_index(m_initial_mapping_size);
+        m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
+
+        // Below this point (assignment to `m_attach_mode`), nothing must throw.
     }
     catch (DecryptionFailed) {
         goto invalid_database;
@@ -558,7 +563,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     return top_ref;
 
   invalid_database:
-    throw InvalidDatabase();
+    throw InvalidDatabase("Invalid database");
 }
 
 unsigned char SlabAlloc::get_file_format() const
@@ -568,18 +573,23 @@ unsigned char SlabAlloc::get_file_format() const
 
 ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 {
+    // ExceptionSafety: If this function throws, it must leave the allocator in
+    // the detached state.
+
     REALM_ASSERT(!is_attached());
 
     // Verify the data structures
     m_file_on_streaming_form = false; // May be updated by validate_buffer()
     ref_type top_ref;
     if (!validate_buffer(data, size, top_ref))
-        throw InvalidDatabase();
+        throw InvalidDatabase("Invalid database");
 
     m_data        = data;
     m_baseline    = size;
     m_initial_mapping_size = size;
     m_attach_mode = attach_UsersBuffer;
+
+    // Below this point (assignment to `m_attach_mode`), nothing must throw.
 
     return top_ref;
 }
@@ -587,10 +597,15 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 
 void SlabAlloc::attach_empty()
 {
+    // ExceptionSafety: If this function throws, it must leave the allocator in
+    // the detached state.
+
     REALM_ASSERT(!is_attached());
 
     m_attach_mode = attach_OwnedBuffer;
     m_data = nullptr; // Empty buffer
+
+    // Below this point (assignment to `m_attach_mode`), nothing must throw.
 
     // No ref must ever be less that the header size, so we will use that as the
     // baseline here.
@@ -649,7 +664,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>&
     REALM_ASSERT(m_file_on_streaming_form);
     Header* header = reinterpret_cast<Header*>(mutable_data);
 
-    // Don't compare file format version fields as they are allowed to differ. 
+    // Don't compare file format version fields as they are allowed to differ.
     // Also don't compare reserved fields (todo, is it correct to ignore?)
     REALM_ASSERT_3(header->m_flags, == , streaming_header.m_flags);
     REALM_ASSERT_3(header->m_mnemonic[0], == , streaming_header.m_mnemonic[0]);

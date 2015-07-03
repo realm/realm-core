@@ -5949,6 +5949,35 @@ TEST(Table_Nulls)
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(2, tv.get_source_ndx(0));
     }
+
+    {
+        Table t;
+        t.add_column(type_Int, "int", true);
+        t.add_column(type_Bool, "bool", true);
+        t.add_column(type_DateTime, "bool", true);
+
+        t.add_empty_row(2);
+
+        t.set_int(0, 0, 65);
+        t.set_bool(1, 0, false);
+        t.set_datetime(2, 0, DateTime(3));
+
+        CHECK_EQUAL(65, t.get_int(0, 0));
+        CHECK_EQUAL(false, t.get_bool(1, 0));
+        CHECK_EQUAL(DateTime(3), t.get_datetime(2, 0));
+
+        CHECK(!t.is_null(0, 0));
+        CHECK(!t.is_null(1, 0));
+        CHECK(!t.is_null(2, 0));
+
+        t.set_null(0, 1);
+        t.set_null(1, 1);
+        t.set_null(2, 1);
+
+        CHECK(t.is_null(0, 1));
+        CHECK(t.is_null(1, 1));
+        CHECK(t.is_null(2, 1));
+    }
 }
 #endif 
 

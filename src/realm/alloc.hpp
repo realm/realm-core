@@ -124,7 +124,7 @@ public:
 #endif
 
 protected:
-    std::size_t m_baseline; // Separation line between immutable and mutable refs.
+    std::size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
 #ifdef REALM_ENABLE_REPLICATION
     Replication* m_replication;

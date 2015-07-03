@@ -696,22 +696,23 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
 #endif
 
 #ifdef _GNU_SOURCE
-    static_cast<void>(fd);
-    static_cast<void>(a);
-    static_cast<void>(file_offset);
-    void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
-    if (new_addr != MAP_FAILED)
-        return new_addr;
-    int err = errno; // Eliminate any risk of clobbering
-    throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
-#else
-    void* new_addr = mmap(fd, 0, new_size, a, nullptr);
-    if(::munmap(old_addr, old_size) != 0) {
+    {
+        void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
+        if (new_addr != MAP_FAILED)
+            return new_addr;
+        int err = errno; // Eliminate any risk of clobbering
+        if (err != ENOTSUP)
+            throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
+    }
+    // Fall back to no-mremap case if it's not supported
+#endif
+
+    void* new_addr = mmap(fd, file_offset, new_size, a, nullptr);
+    if (::munmap(old_addr, old_size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
     }
     return new_addr;
-#endif
 }
 
 void msync(void* addr, size_t size)

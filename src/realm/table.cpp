@@ -2465,8 +2465,14 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const Column& column = get_column(col_ndx);
-    return column.get(ndx) != 0;
+    if (is_nullable(col_ndx)) {
+        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        return column.get(ndx) != 0;
+    }
+    else {
+        const Column& column = get_column(col_ndx);
+        return column.get(ndx) != 0;
+    }
 }
 
 void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
@@ -2476,8 +2482,14 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    Column& column = get_column(col_ndx);
-    column.set(ndx, value ? 1 : 0);
+    if (is_nullable(col_ndx)) {
+        ColumnIntNull& column = get_column_int_null(col_ndx);
+        column.set(ndx, value ? 1 : 0);
+    }
+    else {
+        Column& column = get_column(col_ndx);
+        column.set(ndx, value ? 1 : 0);
+    }
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -2491,8 +2503,14 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const Column& column = get_column(col_ndx);
-    return time_t(column.get(ndx));
+    if (is_nullable(col_ndx)) {
+        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        return time_t(column.get(ndx));
+    }
+    else {
+        const Column& column = get_column(col_ndx);
+        return time_t(column.get(ndx));
+    }
 }
 
 void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
@@ -2502,8 +2520,14 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    Column& column = get_column(col_ndx);
-    column.set(ndx, int64_t(value.get_datetime()));
+    if (is_nullable(col_ndx)) {
+        ColumnIntNull& column = get_column_int_null(col_ndx);
+        column.set(ndx, int64_t(value.get_datetime()));
+    }
+    else {
+        Column& column = get_column(col_ndx);
+        column.set(ndx, int64_t(value.get_datetime()));
+    }
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())

@@ -927,12 +927,7 @@ std::string TrivialReplication::do_get_database_path()
     return m_database_file;
 }
 
-void TrivialReplication::do_begin_write_transact(SharedGroup&)
-{
-    prepare_to_write();
-}
-
-void TrivialReplication::prepare_to_write()
+void TrivialReplication::do_initiate_transact(SharedGroup&, version_type)
 {
     char* data = m_transact_log_buffer.data();
     std::size_t size = m_transact_log_buffer.size();
@@ -940,13 +935,22 @@ void TrivialReplication::prepare_to_write()
 }
 
 Replication::version_type
-TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_version)
+TrivialReplication::do_prepare_commit(SharedGroup&, version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
     std::size_t size = write_position() - data;
     version_type new_version = orig_version + 1;
-    handle_transact_log(data, size, new_version); // Throws
+    prepare_changeset(data, size, new_version); // Throws
     return new_version;
+}
+
+void TrivialReplication::do_finalize_commit(SharedGroup&) REALM_NOEXCEPT
+{
+    finalize_changeset();
+}
+
+void TrivialReplication::do_abort_transact(SharedGroup&) REALM_NOEXCEPT
+{
 }
 
 void TrivialReplication::do_interrupt() REALM_NOEXCEPT
