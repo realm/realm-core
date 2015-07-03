@@ -787,13 +787,13 @@ public:
         size_t num_links = m_link_list->size();
         if (REALM_UNLIKELY(link1_ndx >= num_links))
             return false;
-        if (REALM_UNLIKELY(link2_ndx > num_links))
+        if (REALM_UNLIKELY(link2_ndx >= num_links))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "link_list->swap("<<link1_ndx<<", "<<link2_ndx<<")\n";
 #endif
-        m_link_list->move(link1_ndx, link2_ndx); // Throws
+        m_link_list->swap(link1_ndx, link2_ndx); // Throws
         return true;
     }
 
