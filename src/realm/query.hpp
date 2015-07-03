@@ -281,25 +281,26 @@ public:
     std::vector<bool> pending_not;
     typedef Query_Handover_patch Handover_patch;
 
-    virtual std::unique_ptr<Query> clone_for_handover(Handover_patch*& patch, ConstSourcePayload mode) const
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+                                                      ConstSourcePayload mode) const
     {
-        patch = new Handover_patch;
+        patch.reset(new Handover_patch);
         std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
         return retval;
     }
 
-    virtual std::unique_ptr<Query> clone_for_handover(Handover_patch*& patch, MutableSourcePayload mode)
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+                                                      MutableSourcePayload mode)
     {
-        patch = new Handover_patch;
+        patch.reset(new Handover_patch);
         std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
         return retval;
     }
 
-    virtual void apply_and_consume_patch(Handover_patch*& patch, Group& group)
+    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
     {
         apply_patch(*patch, group);
-        delete patch;
-        patch = 0;
+        patch.reset();
     }
 
     void apply_patch(Handover_patch& patch, Group& group);
