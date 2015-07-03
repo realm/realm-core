@@ -13,13 +13,12 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/version.hpp>
 
 #include "test.hpp"
 
 using namespace realm;
 using namespace realm::util;
-
-#include "realm/version.hpp"
 
 // First iteration of an automatic read / upgrade test
 // When in core version <= 89 / file version 2, this test will write files and
