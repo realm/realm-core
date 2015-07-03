@@ -29,7 +29,7 @@
 namespace realm {
 
 template<class T, class cond> class FloatDoubleNode;
-template<class T, class cond> class IntegerNode;
+template <class ColType, class Cond> class IntegerNode;
 template<class T> class SequentialGetter;
 
 template<class cond, class T> struct ColumnTypeTraits2;

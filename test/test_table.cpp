@@ -137,7 +137,29 @@ TEST(Table_Null)
         CHECK(!table->get_string(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
-        CHECK_THROW_ANY(table->set_string(0, 0, realm::null()));
+        CHECK_LOGIC_ERROR(table->set_string(0, 0, realm::null()), LogicError::column_not_nullable);
+    }
+
+    {
+        // Check that add_empty_row() adds null integer as default
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column(type_Int, "name", true);
+        table->add_empty_row();
+        CHECK(table->is_null(0, 0));
+    }
+
+    {
+        // Check that add_empty_row() adds 0 integer as default.
+        Group group;
+        TableRef table = group.add_table("test");
+        table->add_column(type_Int, "name");
+        table->add_empty_row();
+        CHECK(!table->is_null(0, 0));
+        CHECK_EQUAL(0, table->get_int(0, 0));
+
+        // Check that inserting null in non-nullable column will throw
+        CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
     }
 
     {

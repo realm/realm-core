@@ -6057,6 +6057,107 @@ TEST(Query_BinaryNull)
     CHECK_EQUAL(2, t.get_source_ndx(0));
 }
 
+TEST(Query_IntegerNull)
+{
+    Table table;
+    table.add_column(type_Int, "first", true);
+    table.add_empty_row(3);
+    table.set_int(0, 1, 0);
+    table.set_int(0, 2, 123);
+
+    TableView t;
+
+    t = table.where().equal(0, null{}).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+
+    t = table.where().equal(0, 0).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+
+    t = table.where().equal(0, 123).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+
+    t = table.where().not_equal(0, null{}).find_all();
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+
+    t = table.where().not_equal(0, 0).find_all();
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.size());
+}
+
+TEST(Query_IntegerNonNull)
+{
+    Table table;
+    table.add_column(type_Int, "first", false);
+    table.add_empty_row(3);
+    table.set_int(0, 1, 123);
+    table.set_int(0, 2, 456);
+
+    TableView t;
+
+    t = table.where().equal(0, null{}).find_all();
+    CHECK_EQUAL(0, t.size());
+
+    t = table.where().not_equal(0, null{}).find_all();
+    CHECK_EQUAL(3, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.get_source_ndx(1));
+    CHECK_EQUAL(2, t.get_source_ndx(2));
+
+    // Should any non-null value compare greater than null?
+    // t = table.where().greater(0, null{}).find_all();
+    // CHECK_EQUAL(3, t.size());
+    // CHECK_EQUAL(0, t.get_source_ndx(0));
+    // CHECK_EQUAL(1, t.get_source_ndx(1));
+    // CHECK_EQUAL(2, t.get_source_ndx(2));
+
+    // t = table.where().greater(null{}, 0).find_all();
+    // CHECK_EQUAL(0, t.size());
+}
+
+// Test nullable integer columns with queries using query_expression.hpp
+TEST(Query_IntegerNull_ExpressionSyntax)
+{
+    size_t match;
+    Table untyped;
+
+    // Test works fine for nullable = false, but asserts for nullable = true.
+    untyped.add_column(type_Int, "firs1", true);
+    untyped.add_column(type_Int, "firs2", true);
+    untyped.add_column(type_Float, "second", true);
+
+    untyped.add_empty_row(2);
+
+    untyped.set_int(0, 0, 44);
+    untyped.set_int(1, 0, 55);
+    untyped.set_float(2, 0, 66.0f);
+
+    untyped.set_int(0, 1, 77);
+    untyped.set_int(1, 1, 88);
+    untyped.set_float(2, 1, 99.0f);
+
+    // Enforce use of query_expression.hpp by specifying an advanced query that is not supported by query_engine.hpp.
+    // Search for the REALM_OLDQUERY_FALLBACK flag (in the query_expression.hpp file) to find an explanation of when 
+    // a query will use query_expression.hpp.
+    match = (untyped.column<Int>(0) + untyped.column<Int>(1) == 77 + 88).find();
+    CHECK_EQUAL(match, 1);
+
+    // Should any non-null value compare greater than null?
+    match = (untyped.column<Int>(0) + untyped.column<Int>(1) > null{}).find();
+    CHECK_EQUAL(match, 2);
+
+    TableView tv = (untyped.column<Int>(0) + untyped.column<Int>(1) != null{}).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    match = (untyped.column<Int>(0) + untyped.column<Int>(1) < null{}).find();
+    CHECK_EQUAL(match, not_found);
+}
+
 #endif
 
 TEST(Query_64BitValues)
