@@ -363,7 +363,7 @@ void LinkView::remove_all_target_rows()
 }
 
 
-void LinkView::do_nullify_link(size_t old_target_row_ndx, size_t)
+void LinkView::do_nullify_link(size_t old_target_row_ndx)
 {
     REALM_ASSERT(m_row_indexes.is_attached());
 
