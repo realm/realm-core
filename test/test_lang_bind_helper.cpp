@@ -7650,7 +7650,7 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     sg.begin_read();
     table = g.get_table<TheTable>("table");
     CHECK(bool(table));
-    sg.end_read();
+
     HandoverControl<SharedGroup::Handover<TableView>> control;
     Thread writer, querier, verifier;
     writer.start(bind(&handover_writer, path));
@@ -7659,6 +7659,8 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     writer.join();
     querier.join();
     verifier.join();
+
+    sg.end_read(); // Keep all versions alive for the duration of the test
 }
 
 namespace {
@@ -7767,7 +7769,6 @@ TEST(LangBindHelper_HandoverStealing)
     sg.begin_read();
     table = g.get_table<TheTable>("table");
     CHECK(bool(table));
-    sg.end_read();
     HandoverControl<StealingInfo> control;
     Thread writer, querier, verifier;
     writer.start(bind(&handover_writer, path));
@@ -7778,6 +7779,7 @@ TEST(LangBindHelper_HandoverStealing)
     querier.join();
     verifier.join();
 
+    sg.end_read();
 }
 
 
