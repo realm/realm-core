@@ -219,7 +219,7 @@ public:
             if (m_num_poll_handlers == 0)
                 continue;
 
-            size_t num_ready_descriptors;
+            size_t num_ready_descriptors = 0;
             {
                 pollfd* fds = &m_pollfd_slots.front(); // std::vector guarantees contiguous storage
                 nfds_t nfds = m_pollfd_slots.size();
