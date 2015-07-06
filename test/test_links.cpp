@@ -538,6 +538,14 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(1, links->get(2).get_index());
     CHECK_EQUAL(1, links->get(3).get_index());
 
+    // swap a link with itself
+    links->swap(2, 2);
+    CHECK_EQUAL(4, origin->get_link_count(col_link, 0));
+    CHECK_EQUAL(0, links->get(0).get_index());
+    CHECK_EQUAL(2, links->get(1).get_index());
+    CHECK_EQUAL(1, links->get(2).get_index());
+    CHECK_EQUAL(1, links->get(3).get_index());
+
     // remove a link
     links->remove(0);
     CHECK_EQUAL(3, origin->get_link_count(col_link, 0));

@@ -3329,6 +3329,65 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
     CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
 
+    // Check that a link list can "swap" a member with itself
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_2_w = wt.get_table("origin_2");
+        LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
+        link_list_2_2_w->swap(1,1); // [ 0, 1 ] -> [ 0, 1 ]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[1]
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK(link_list_1_2->is_attached());
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
+
     // Reset to the state before testing swap
     {
         WriteTransaction wt(sg_w);
