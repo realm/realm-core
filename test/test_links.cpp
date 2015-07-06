@@ -1272,13 +1272,179 @@ TEST(Links_CascadeRemove_ColumnLinkList)
 }
 
 
-TEST(Links_CascadeRemove_MultiLevel)
+TEST_SET(Links_CascadeRemove_MultiLevel)
 {
+    // - origin
+    //   - o_1: middle (strong)
+    // - middle:
+    //   - m_1: target (strong)
+    // - target
+    //   - t_1: Int
+    Group *group;
+    TableRef origin;
+    TableRef middle;
+    TableRef target;
+    Row origin_row_0;
+    Row origin_row_1;
+    Row middle_row_0;
+    Row middle_row_1;
+    Row target_row_0;
+    Row target_row_1;
+    LinkViewRef origin_link_list_0;
+    LinkViewRef origin_link_list_1;
+    
+    void test_before() {
+        group = new Group();
+        origin = group->add_table("origin");
+        middle = group->add_table("middle");
+        target = group->add_table("target");
+        origin->add_column_link(type_LinkList, "o_1", *middle, link_Strong);
+        middle->add_column_link(type_LinkList, "m_1", *target, link_Strong);
+        target->add_column(type_Int, "t_1");
+        origin->add_empty_row(2);
+        middle->add_empty_row(2);
+        target->add_empty_row(2);
+        origin_row_0 = origin->get(0);
+        origin_row_1 = origin->get(1);
+        middle_row_0 = middle->get(0);
+        middle_row_1 = middle->get(1);
+        target_row_0 = target->get(0);
+        target_row_1 = target->get(1);
+        origin_link_list_0 = origin_row_0.get_linklist(0);
+        origin_link_list_1 = origin_row_1.get_linklist(0);
+        origin_link_list_0->add(0); // origin[0].o_1 -> [ middle[0] ]
+        origin_link_list_1->add(0); // origin[1].o_1 -> [ middle[0] ]
+        origin_link_list_1->add(1); // origin[1].o_1 -> [ middle[0], middle[1] ]
+        LinkViewRef middle_link_list_0 = middle_row_0.get_linklist(0);
+        LinkViewRef middle_link_list_1 = middle_row_1.get_linklist(0);
+        middle_link_list_0->add(0); // middle[0].o_1 -> [ target[0] ]
+        middle_link_list_1->add(0); // middle[1].o_1 -> [ target[0] ]
+        middle_link_list_1->add(1); // middle[1].o_1 -> [ target[0], target[1] ]
+    }
+    
+    void test_after() {
+        delete group;
+    }
+};
+
+TEST_IN_SET(Links_CascadeRemove_MultiLevel, Break_link_by_clearing_list)
+{
+    origin_link_list_1->clear(); // origin[1].o_1 -> []
+    CHECK(middle_row_0 && !middle_row_1);
+    CHECK(target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_MultiLevel, Break_link_by_removal_from_list)
+{
+    origin_link_list_1->remove(1); // origin[1].o_1 -> [ target[0] ]
+    CHECK(middle_row_0 && !middle_row_1);
+    CHECK(target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_MultiLevel, Break_link_by_reassign)
+{
+    origin_link_list_1->set(1,0); // origin[1].o_1 -> [ target[0], target[0] ]
+    CHECK(middle_row_0 && !middle_row_1);
+    CHECK(target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_MultiLevel, Avoid_breaking_link_by_reassigning_self)
+{
+    origin_link_list_1->set(1,1); // No effective change!
+    CHECK(middle_row_0 && middle_row_1);
+    CHECK(target_row_0 && target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_MultiLevel, Break_link_by_explicit_row_removal)
+{
+    origin_row_1.move_last_over();
+    CHECK(middle_row_0 && !middle_row_1);
+    CHECK(target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_MultiLevel, Break_link_by_clearing_table)
+{
+    origin->clear();
+    CHECK(!middle_row_0 && !middle_row_1);
+    CHECK(!target_row_0 && !target_row_1);
 }
 
 
-TEST(Links_CascadeRemove_Cycles)
+TEST_SET(Links_CascadeRemove_Cycle) {
+    // - origin
+    //   - o_1: target (strong)
+    // - target
+    //   - t_1: origin (strong)
+    Group *group;
+    TableRef origin;
+    TableRef target;
+    Row origin_row_0;
+    Row origin_row_1;
+    Row target_row_0;
+    Row target_row_1;
+    LinkViewRef origin_link_list_0;
+    LinkViewRef origin_link_list_1;
+    LinkViewRef target_link_list_0;
+    LinkViewRef target_link_list_1;
+    
+    void test_before() {
+        // Setup a new group schema
+        group = new Group();
+        origin = group->add_table("origin");
+        target = group->add_table("target");
+        origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
+        target->add_column_link(type_LinkList, "o_1", *origin, link_Strong);
+        
+        // Fill with data and make it accessible
+        origin->add_empty_row(2);
+        target->add_empty_row(2);
+        origin_row_0 = origin->get(0);
+        origin_row_1 = origin->get(1);
+        target_row_0 = target->get(0);
+        target_row_1 = target->get(1);
+        origin_link_list_0 = origin_row_0.get_linklist(0);
+        origin_link_list_1 = origin_row_1.get_linklist(0);
+        target_link_list_0 = target_row_0.get_linklist(0);
+        target_link_list_1 = target_row_1.get_linklist(0);
+        origin_link_list_0->add(0); // origin[0].o_1 -> [ target[0] ]
+        origin_link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
+        origin_link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+        target_link_list_1->add(1); // target[1].o_1 -> [ origin[1] ]
+    }
+    
+    void test_after() {
+        delete group;
+    }
+};
+
+TEST_IN_SET(Links_CascadeRemove_Cycle, Break_link_by_clearing_list)
 {
+    origin_link_list_1->clear(); // origin[1].o_1 -> []
+    CHECK(!origin_row_1 && target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_Cycle, Break_link_by_removal_from_list)
+{
+    origin_link_list_1->remove(1); // origin[1].o_1 -> [ target[0] ]
+    CHECK(!origin_row_1 && target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_Cycle, Break_link_by_reassign)
+{
+    origin_link_list_1->set(1,0); // origin[1].o_1 -> [ target[0], target[0] ]
+    CHECK(!origin_row_1 && target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_Cycle, Avoid_breaking_link_by_reassigning_self)
+{
+    origin_link_list_1->set(1,1); // No effective change!
+    CHECK(origin_row_1 && target_row_0 && target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_Cycle, Break_link_by_explicit_row_removal)
+{
+    origin_row_1.move_last_over();
+    CHECK(!origin_row_1 && target_row_0 && !target_row_1);
 }
 
 #endif // TEST_LINKS
