@@ -3,6 +3,8 @@
 #include <ostream>
 #include <iomanip>
 
+
+#include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/descriptor.hpp>
 #include <realm/link_view.hpp>

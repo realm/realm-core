@@ -15,6 +15,12 @@
 ### Enhancements:
 
 * Generic networking API added.
+* Support for transfer/handover of TableViews, Queries, ListViews and Rows between SharedGroups in different threads.
+  Cooperative handover (where boths threads participate) is supported for arbitrarily nested TableViews and Queries.
+  Restrictions apply for non-cooperative handover (aka stealing): user must ensure that the producing thread does not
+  trigger a modifying operation on any of the involved TableViews.
+  For TableViews the handover can be one of *moving*, *copying* or *staying*, reflecting how the actual payload
+  is treated.
 * Support for non-end row insertion in tables with link and link list columns.
 * Improved documentation of functions concerning the initiation and termination
   of transactions.

@@ -59,6 +59,7 @@ descriptor.hpp \
 group.hpp \
 group_shared.hpp \
 history.hpp \
+handover_defs.hpp \
 $(REPLICATION_HPP) \
 query.hpp \
 query_conditions.hpp \

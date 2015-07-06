@@ -25,7 +25,6 @@
 #include <realm/column_linklist.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/table.hpp>
-#include <realm/table_view.hpp>
 
 namespace realm {
 
@@ -104,6 +103,10 @@ private:
     ColumnLinkList& m_origin_column;
     mutable std::size_t m_ref_count;
 
+    typedef LinkView_Handover_patch Handover_patch;
+    static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Handover_patch>& patch);
+    static LinkViewRef create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group);
+
     // constructor (protected since it can only be used by friends)
     LinkView(Table* origin_table, ColumnLinkList&, std::size_t row_ndx);
 
@@ -139,6 +142,9 @@ private:
     friend class util::bind_ptr<LinkView>;
     friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
+    friend class SharedGroup;
+    friend class Query;
+    friend class TableViewBase;
 };
 
 

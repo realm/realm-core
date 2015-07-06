@@ -32,6 +32,7 @@
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
+#include <realm/link_view.hpp>
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
 #endif
@@ -939,10 +940,15 @@ void SharedGroup::close() REALM_NOEXCEPT
             rollback();
             break;
     }
-
+    m_group.detach();
+    m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+
+        if (m_group.m_alloc.is_attached())
+            m_group.m_alloc.detach();
+
         --info->num_participants;
         bool end_of_session = info->num_participants == 0;
         // std::cerr << "closing" << std::endl;
@@ -952,7 +958,6 @@ void SharedGroup::close() REALM_NOEXCEPT
             // we can delete it when done.
             if (info->flags == durability_MemOnly) {
                 try {
-                    m_group.m_alloc.detach();
                     util::File::remove(m_db_path.c_str());
                 }
                 catch(...) {} // ignored on purpose.
@@ -974,6 +979,12 @@ void SharedGroup::close() REALM_NOEXCEPT
 #endif
         }
     }
+#ifndef _WIN32
+    m_room_to_write.close();
+    m_work_to_do.close();
+    m_daemon_becomes_ready.close();
+    m_new_commit_available.close();
+#endif
     m_file.unlock();
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
@@ -1577,3 +1588,31 @@ void SharedGroup::reserve(size_t size)
     // the file. This assumption must be verified though.
     m_group.m_alloc.reserve(size);
 }
+
+
+
+std::unique_ptr<SharedGroup::Handover<LinkView>> 
+SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
+{
+    LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading) {
+        throw LogicError(LogicError::wrong_transact_state);
+    }
+    std::unique_ptr<Handover<LinkView>> result(new Handover<LinkView>());
+    LinkView::generate_patch(accessor, result->patch);
+    result->clone = 0; // not used for LinkView - maybe specialize Handover<LinkView> ?
+    result->version = get_version_of_current_transaction();
+    return result;
+}
+
+
+LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover)
+{
+    if (handover->version != get_version_of_current_transaction()) {
+        throw BadVersion();
+    }
+    // move data
+    LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);
+    return result;
+}
+
