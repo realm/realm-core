@@ -34,7 +34,9 @@
 #include <realm/util/bind_ptr.hpp>
 
 
-#define TEST(name) TEST_IF(name, true)
+#define TEST(name)              TEST_IF(name, true)
+#define TEST_SET(name)          TEST_SET_IF(name, true)
+#define TEST_IN_SET(set, name)  TEST_IN_SET_IF(set, name, true)
 
 /// Allows you to control whether the test will be enabled or
 /// disabled. The test will be compiled in both cases. You can pass
@@ -45,6 +47,10 @@
 /// TestList::run().
 #define TEST_IF(name, enabled) \
     TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled)
+#define TEST_SET_IF(name, enabled) \
+    TEST_SET_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled)
+#define TEST_IN_SET_IF(set, name, enabled) \
+    TEST_IN_SET_EX(set, name, enabled)
 
 #define TEST_EX(name, list, enabled) \
     struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
@@ -56,6 +62,43 @@
         realm_unit_test_reg__##name((list), realm_unit_test__##name, \
                                       "DefaultSuite", #name, __FILE__, __LINE__); \
     void Realm_UnitTest__##name::test_run()
+
+#define TEST_SET_EX(name, list, enabled) \
+    struct Realm_UnitTestSet__##name: realm::test_util::unit_test::TestSet { \
+        bool test_enabled() const { return bool(enabled); } \
+        static Realm_UnitTestSet__##name& get_instance() \
+        { \
+            static Realm_UnitTestSet__##name realm_unit_test__##name; \
+            return realm_unit_test__##name; \
+        } \
+        struct RegisterTest { \
+            RegisterTest(realm::test_util::unit_test::Test& test, const char* name, \
+                         const char* file, long line) \
+            { \
+                register_test(test, name, file, line); \
+            } \
+            static void register_test(realm::test_util::unit_test::Test& test, \
+                                      const std::string& name, const char* file, long line) \
+            { \
+                Realm_UnitTestSet__##name::get_instance().add(test, name, file, line); \
+            } \
+        }; \
+    }; \
+    realm::test_util::unit_test::RegisterTest \
+        realm_unit_test_reg__##name((list), Realm_UnitTestSet__##name::get_instance(), \
+                                      "DefaultSuite", #name, __FILE__, __LINE__); \
+    struct Realm_UnitTestSetBase__##name: realm::test_util::unit_test::TestSetBase
+
+#define TEST_IN_SET_EX(set, name, enabled) \
+    struct Realm_UnitTest__##set##_##name: Realm_UnitTestSetBase__##set { \
+        bool test_enabled() const { return bool(enabled); } \
+        void test_run(); \
+    }; \
+    Realm_UnitTest__##set##_##name realm_unit_test__##set##_##name; \
+    Realm_UnitTestSet__##set::RegisterTest \
+          realm_unit_test_reg__##set##_##name(realm_unit_test__##set##_##name, \
+                                            #name, __FILE__, __LINE__); \
+    void Realm_UnitTest__##set##_##name::test_run()
 
 
 #define CHECK(cond) \
@@ -246,9 +289,10 @@ public:
     /// Called automatically when you use the `TEST` macro (or one of
     /// its friends).
     void add(Test&, const char* suite, const std::string& name, const char* file, long line);
+    
+    class ExecContext;
 
 private:
-    class ExecContext;
     template<class Compare> class CompareAdaptor;
 
     std::vector<Test*> m_tests;
@@ -416,12 +460,15 @@ private:
                                 long double a, long double b, long double eps);
 
     friend class Test;
+    friend class TestSet;
     friend class TestList;
 };
 
 
 class Test {
 public:
+    virtual void visit(TestList::ExecContext* context);
+    
     virtual bool test_enabled() const = 0;
     virtual void test_run() = 0;
 
@@ -430,9 +477,45 @@ protected:
     TestResults test_results;
     Test() {}
 
-private:
     friend class TestList;
     friend class TestResults;
+    friend class TestSet;
+};
+    
+
+/// Parent class when you use the `TEST_IN_SET` macro.
+class TestSetBase : public Test {
+public:
+    void visit(TestList::ExecContext* context);
+
+    virtual void test_before_all();
+    virtual void test_before();
+    virtual void test_after();
+    virtual void test_after_all();
+    
+protected:
+    TestSetBase() {}
+};
+
+
+class TestSet : public Test {
+public:
+    void visit(TestList::ExecContext* context);
+    
+    virtual void test_before_all();
+    virtual void test_after_all();
+    
+    void test_run();
+    
+    /// Called automatically when you use the `TEST_IN_SET` macro.
+    void add(Test& test, const std::string& name, const char* file, long line);
+
+protected:
+    TestSet() {}
+
+private:
+    std::vector<Test*> m_tests;
+    TestList::ExecContext* m_context;
 };
 
 
