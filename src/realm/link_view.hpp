@@ -25,7 +25,6 @@
 #include <realm/column_linklist.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/table.hpp>
-//#include <realm/table_view.hpp>
 
 namespace realm {
 
@@ -150,7 +149,6 @@ private:
 
 
 // Implementation
-//#include <tightdb/table_view.hpp>
 
 inline LinkView::LinkView(Table* origin_table, ColumnLinkList& column, std::size_t row_ndx):
     RowIndexes(Column::unattached_root_tag(), column.get_alloc()), // Throws

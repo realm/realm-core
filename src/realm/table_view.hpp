@@ -325,7 +325,7 @@ protected:
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source;
     Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
-    bool m_auto_sort;
+    bool m_auto_sort = false;
 
     // A valid query holds a reference to its table which must match our m_table.
     // hence we can use a query with a null table reference to indicate that the view
@@ -336,7 +336,7 @@ protected:
     size_t m_end;
     size_t m_limit;
 
-    size_t m_num_detached_refs;
+    size_t m_num_detached_refs = 0;
     /// Construct null view (no memory allocated).
     TableViewBase();
 
@@ -547,7 +547,7 @@ private:
     friend class TableViewBase;
     friend class ListviewNode;
     friend class LinkView;
-    template<typename A, typename B, typename C> friend class BasicTableViewBase;
+    template<typename, typename, typename> friend class BasicTableViewBase;
 };
 
 
@@ -696,7 +696,7 @@ inline std::size_t TableViewBase::find_by_source_ndx(std::size_t source_ndx) con
 
 inline TableViewBase::TableViewBase():
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
-    m_distinct_column_source(npos), m_auto_sort(false), m_num_detached_refs(0)
+    m_distinct_column_source(npos)
 {
 #ifdef REALM_ENABLE_REPLICATION
     m_last_seen_version = 0;
@@ -709,7 +709,7 @@ inline TableViewBase::TableViewBase():
 inline TableViewBase::TableViewBase(Table* parent):
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), 
     m_table(parent->get_table_ref()), // Throws
-    m_distinct_column_source(npos), m_auto_sort(false), m_num_detached_refs(0)
+    m_distinct_column_source(npos)
     {
 #ifdef REALM_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
@@ -728,10 +728,10 @@ inline TableViewBase::TableViewBase(Table* parent):
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
     m_table(parent->get_table_ref()),
-    m_distinct_column_source(npos), m_auto_sort(false),
-    m_query(query, Query::TCopyExpressionTag()), m_num_detached_refs(0)
+    m_distinct_column_source(npos),
+    m_query(query, Query::TCopyExpressionTag())
 {
-#ifdef REALM_ENABLE_REPLICATION    
+#ifdef REALM_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
     m_auto_sort = false;
 #endif
@@ -751,7 +751,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
-    m_distinct_column_source(tv.m_distinct_column_source), m_auto_sort(false),
+    m_distinct_column_source(tv.m_distinct_column_source),
     m_query(tv.m_query, Query::TCopyExpressionTag()), 
     m_num_detached_refs(tv.m_num_detached_refs)
     {

@@ -218,16 +218,14 @@ protected:
     void attach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
     void reattach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
     void impl_detach() REALM_NOEXCEPT;
-protected:
-    // FIXME: not confident about exposing this one:
-    RowBase() { m_prev = m_next = 0; };
+    RowBase() { };
 
     typedef RowBase_Handover_patch Handover_patch;
     RowBase(const RowBase& source, Handover_patch& patch);
     void apply_patch(Handover_patch& patch, Group& group);
 private:
-    RowBase* m_prev; // nullptr if first, undefined if detached.
-    RowBase* m_next; // nullptr if last, undefined if detached.
+    RowBase* m_prev = nullptr; // nullptr if first, undefined if detached.
+    RowBase* m_next = nullptr; // nullptr if last, undefined if detached.
 
     // Table needs to be able to modify m_table and m_row_ndx.
     friend class Table;
@@ -276,7 +274,7 @@ public:
     template<class U> BasicRow& operator=(BasicRow<U>) REALM_NOEXCEPT;
     BasicRow& operator=(const BasicRow<T>&) REALM_NOEXCEPT;
 
-    virtual ~BasicRow() REALM_NOEXCEPT;
+    ~BasicRow() REALM_NOEXCEPT;
 
 private:
     T* impl_get_table() const REALM_NOEXCEPT;
@@ -290,14 +288,14 @@ private:
     // for any U.
     template<class> friend class BasicRow;
 
-    virtual std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
+    std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
     {
         patch.reset(new Handover_patch);
         std::unique_ptr<BasicRow<T>> retval(new BasicRow<T>(*this, *patch));
         return retval;
     }
 
-    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
     {
         apply_patch(*patch, group);
         patch.reset();

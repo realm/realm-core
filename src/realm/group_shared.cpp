@@ -1267,7 +1267,6 @@ void SharedGroup::rollback() REALM_NOEXCEPT
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    util::LockGuard lg(m_handover_lock);
     do_end_write();
     do_end_read();
 
@@ -1401,9 +1400,6 @@ SharedGroup::advance_readlock(History& history,VersionID specific_version)
 {
     bool same_as_before;
     ReadLockInfo old_readlock = m_readlock;
-
-    // protect against any concurrent handover export:
-    util::LockGuard lg(m_handover_lock);
 
     // FIXME: BadVersion must be thrown in every case where the specified
     // version is not tethered in accordance with the documentation of
@@ -1599,6 +1595,9 @@ std::unique_ptr<SharedGroup::Handover<LinkView>>
 SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 {
     LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading) {
+        throw LogicError(LogicError::wrong_transact_state);
+    }
     std::unique_ptr<Handover<LinkView>> result(new Handover<LinkView>());
     LinkView::generate_patch(accessor, result->patch);
     result->clone = 0; // not used for LinkView - maybe specialize Handover<LinkView> ?

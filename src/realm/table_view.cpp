@@ -295,11 +295,13 @@ double TableViewBase::average_int(size_t column_ndx) const
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) / static_cast<double>(num_attached_rows());
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) 
+        / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) / static_cast<double>(num_attached_rows());
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) 
+        / static_cast<double>(num_attached_rows());
 }
 
 // Count

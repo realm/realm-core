@@ -415,7 +415,7 @@ public:
     ///
     /// - with payload move: the payload is handed over and ends up as a payload
     ///   held by the accessor at the importing side. The accessor on the exporting
-    ///   side will rerun its query and generate a new payload, if sync_if_needed() is
+    ///   side will rerun its query and generate a new payload, if TableView::sync_if_needed() is
     ///   called. If the original payload was in sync at the exporting side, it will
     ///   also be in sync at the importing side. This is indicated to handover_export()
     ///   by the argument MutableSourcePayload::Move
@@ -427,7 +427,7 @@ public:
     ///
     /// - without payload: the payload stays with the accessor on the exporting
     ///   side. On the importing side, the new accessor is created without payload.
-    ///   a call to sync_if_needed() will trigger generation of a new payload.
+    ///   a call to TableView::sync_if_needed() will trigger generation of a new payload.
     ///   This form of handover is indicated to handover_export() by the argument
     ///   ConstSourcePayload::Stay.
     ///
@@ -467,7 +467,8 @@ public:
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
-    /// - advance_read(), promote_to_write(), close()
+    /// - advance_read(), promote_to_write(), commit_and_continue_as_read(), 
+    ///   rollback_and_continue_as_read(), close()
     template<typename T>
     std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
 
@@ -788,6 +789,8 @@ template<typename T>
 std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const T& accessor, ConstSourcePayload mode)
 {
     util::LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
     std::unique_ptr<Handover<T>> result(new Handover<T>());
     // Implementation note:
     // often, the return value from clone will be T*, BUT it may be ptr to some base of T
@@ -804,6 +807,8 @@ template<typename T>
 std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_handover(const BasicRow<T>& accessor)
 {
     util::LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
     std::unique_ptr<Handover<BasicRow<T>>> result(new Handover<BasicRow<T>>());
     // See implementation note above.
     result->clone.reset(dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch).release()));
@@ -817,6 +822,8 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& ac
 {
     // We'll take a lock here for the benefit of users truly knowing what they are doing.
     util::LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
     std::unique_ptr<Handover<T>> result(new Handover<T>());
     // see implementation note above.
     result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
@@ -837,15 +844,13 @@ std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup
 }
 
 
-
-
-
 template<class O>
 inline void SharedGroup::advance_read(History& history, O* observer, VersionID version)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
+    util::LockGuard lg(m_handover_lock);
     ReadLockInfo old_readlock = m_readlock;
     std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, version); // Throws
     ReadLockUnlockGuard rlug(*this, old_readlock);
@@ -894,6 +899,7 @@ inline void SharedGroup::commit_and_continue_as_read()
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
+    util::LockGuard lg(m_handover_lock);
     do_commit(); // Throws
 
     // advance readlock but dont update accessors:
