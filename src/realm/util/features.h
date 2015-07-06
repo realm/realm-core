@@ -56,11 +56,6 @@
 #  define REALM_HAVE_CXX11 1
 #endif
 
-// Fixme, remove?
-#ifndef REALM_HAVE_NULL_SUPPORT
-#  define REALM_HAVE_NULL_SUPPORT 1
-#endif
-
 
 /* See these links for information about feature check macroes in GCC,
  * Clang, and MSVC:
