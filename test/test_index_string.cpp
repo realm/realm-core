@@ -824,7 +824,11 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 
 
 // Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
+#if REALM_NULL_STRINGS == 1
 TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
+#else
+TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable)
+#endif
 {
     constexpr bool nullable = TEST_TYPE::value;
 
