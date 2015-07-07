@@ -90,9 +90,9 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         MyTable::Ref table = wt.get_or_add_table<MyTable>("my_table");
         if (table->is_empty()) {
             table->add();
-            table->add(0, false, moja, time_t(), "", EmptyNonNul, 0, Mixed(int64_t()));
+            table->add(0, false, moja, 0, "", EmptyNonNul, 0, Mixed(int64_t()));
             char binary_data[] = { 7, 6, 5, 7, 6, 5, 4, 3, 113 };
-            table->add(749321, true, kumi_na_tatu, time_t(99992), "click",
+            table->add(749321, true, kumi_na_tatu, 99992, "click",
                        BinaryData(binary_data), 0, Mixed("fido"));
         }
         wt.commit();
@@ -270,14 +270,14 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         for (int i=0; i<n; ++i) {
             BinaryData bin("", 0);
             Mixed mix = int64_t(i);
-            subtable->add(0, false, moja,  time_t(), "alpha",   bin, 0, mix);
-            subtable->add(1, false, mbili, time_t(), "beta",    bin, 0, mix);
-            subtable->add(2, false, tatu,  time_t(), "gamma",   bin, 0, mix);
-            subtable->add(3, false, nne,   time_t(), "delta",   bin, 0, mix);
-            subtable->add(4, false, tano,  time_t(), "epsilon", bin, 0, mix);
-            subtable->add(5, false, sita,  time_t(), "zeta",    bin, 0, mix);
-            subtable->add(6, false, saba,  time_t(), "eta",     bin, 0, mix);
-            subtable->add(7, false, nane,  time_t(), "theta",   bin, 0, mix);
+            subtable->add(0, false, moja,  0, "alpha",   bin, 0, mix);
+            subtable->add(1, false, mbili, 0, "beta",    bin, 0, mix);
+            subtable->add(2, false, tatu,  0, "gamma",   bin, 0, mix);
+            subtable->add(3, false, nne,   0, "delta",   bin, 0, mix);
+            subtable->add(4, false, tano,  0, "epsilon", bin, 0, mix);
+            subtable->add(5, false, sita,  0, "zeta",    bin, 0, mix);
+            subtable->add(6, false, saba,  0, "eta",     bin, 0, mix);
+            subtable->add(7, false, nane,  0, "theta",   bin, 0, mix);
         }
         wt.commit();
     }
@@ -444,7 +444,7 @@ TEST(Transactions_General)
     CHECK_EQUAL(num_threads*num_rounds*4, table[0].alpha);
     CHECK_EQUAL(false,             table[0].beta);
     CHECK_EQUAL(moja,              table[0].gamma);
-    CHECK_EQUAL(time_t(0),         table[0].delta);
+    CHECK_EQUAL(0,                 table[0].delta);
     CHECK_EQUAL("",                table[0].epsilon);
     CHECK_EQUAL(3u,                table[0].eta->size());
     CHECK_EQUAL(0,                 table[0].theta);
@@ -452,7 +452,7 @@ TEST(Transactions_General)
     CHECK_EQUAL(749321,            table[1].alpha);
     CHECK_EQUAL(true,              table[1].beta);
     CHECK_EQUAL(kumi_na_tatu,      table[1].gamma);
-    CHECK_EQUAL(time_t(99992),     table[1].delta);
+    CHECK_EQUAL(99992,             table[1].delta);
     CHECK_EQUAL("click",           table[1].epsilon);
     CHECK_EQUAL(0u,                table[1].eta->size());
     CHECK_EQUAL(table1_theta_size, table[1].theta.get_subtable_size());
