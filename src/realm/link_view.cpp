@@ -25,8 +25,34 @@
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
 #endif
+#include <realm/table_view.hpp>
 
 using namespace realm;
+
+void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Handover_patch>& patch)
+{
+    if (bool(ref)) {
+        patch.reset(new Handover_patch);
+        patch->m_table_num = ref->m_origin_table->get_index_in_group();
+        patch->m_col_num = ref->m_origin_column.m_column_ndx;
+        patch->m_row_ndx = ref->get_origin_row_index();
+    }
+    else
+        patch.reset();
+}
+
+
+LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group) 
+{
+    if (patch) {
+        TableRef tr(group.get_table(patch->m_table_num));
+        LinkViewRef result = tr->get_linklist(patch->m_col_num, patch->m_row_ndx);
+        patch.reset();
+        return result;
+    }
+    else
+        return LinkViewRef();
+}
 
 
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
@@ -261,7 +287,8 @@ void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
 #endif
-    RowIndexes::sort(columns, ascending);
+    Sorter predicate(columns, ascending);
+    RowIndexes::sort(predicate);
 }
 
 TableView LinkView::get_sorted_view(std::vector<size_t> column_indexes, std::vector<bool> ascending) const

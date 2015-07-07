@@ -2774,7 +2774,7 @@ TEST(Table_Mixed2)
 
     CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
-    CHECK_EQUAL(time_t(1234), table[2].first.get_datetime());
+    CHECK_EQUAL(1234,         table[2].first.get_datetime());
     CHECK_EQUAL("test",       table[3].first.get_string());
 }
 
@@ -3121,15 +3121,27 @@ REALM_TABLE_2(TableDateAndBinary,
 
 TEST(Table_DateAndBinary)
 {
-    TableDateAndBinary t;
+    {
+        TableDateAndBinary t;
 
-    const size_t size = 10;
-    char data[size];
-    for (size_t i=0; i<size; ++i) data[i] = (char)i;
-    t.add(8, BinaryData(data, size));
-    CHECK_EQUAL(t[0].date, 8);
-    CHECK_EQUAL(t[0].bin.size(), size);
-    CHECK(std::equal(t[0].bin.data(), t[0].bin.data()+size, data));
+        const size_t size = 10;
+        char data[size];
+        for (size_t i=0; i<size; ++i) data[i] = (char)i;
+        t.add(8, BinaryData(data, size));
+        CHECK_EQUAL(t[0].date, 8);
+        CHECK_EQUAL(t[0].bin.size(), size);
+        CHECK(std::equal(t[0].bin.data(), t[0].bin.data()+size, data));
+    }
+
+    // Test that 64-bit dates are preserved
+    {
+        TableDateAndBinary t;
+
+        int64_t date = std::numeric_limits<int64_t>::max() - 400;
+
+        t.add(date, BinaryData(""));
+        CHECK_EQUAL(t[0].date.get().get_datetime(), date);
+    }
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable

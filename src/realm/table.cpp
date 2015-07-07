@@ -1142,7 +1142,9 @@ void Table::move_registered_view(const TableViewBase* old_addr,
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i) {
         if (*i == old_addr) {
-            *i = new_addr;
+            // casting away constness here... all operations on members
+            // of  m_views are preserving logical constness on the table views.
+            *i = const_cast<TableViewBase*>(new_addr);
             return;
         }
     }
@@ -2505,11 +2507,11 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 
     if (is_nullable(col_ndx)) {
         const ColumnIntNull& column = get_column_int_null(col_ndx);
-        return time_t(column.get(ndx));
+        return column.get(ndx);
     }
     else {
         const Column& column = get_column(col_ndx);
-        return time_t(column.get(ndx));
+        return column.get(ndx);
     }
 }
 
@@ -2522,11 +2524,11 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 
     if (is_nullable(col_ndx)) {
         ColumnIntNull& column = get_column_int_null(col_ndx);
-        column.set(ndx, int64_t(value.get_datetime()));
+        column.set(ndx, value.get_datetime());
     }
     else {
         Column& column = get_column(col_ndx);
-        column.set(ndx, int64_t(value.get_datetime()));
+        column.set(ndx, value.get_datetime());
     }
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -4909,6 +4911,11 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXC
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
     }
+
+    // Adjust rows in tableviews after insertion of new rows
+    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
+        (*i)->adj_row_acc_insert_rows(row_ndx, num_rows);
+    }
 }
 
 
@@ -4932,6 +4939,11 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
         }
         row = next;
     }
+
+    // Adjust rows in tableviews after removal of row
+    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
+        (*i)->adj_row_acc_erase_row(row_ndx);
+    }
 }
 
 
@@ -4953,6 +4965,11 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
             row->m_row_ndx = to_row_ndx;
         }
         row = next;
+    }
+
+    // Adjust rows in tableviews after move over of new row
+    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
+        (*i)->adj_row_acc_move_over(from_row_ndx, to_row_ndx);
     }
 }
 

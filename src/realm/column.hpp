@@ -154,6 +154,7 @@ public:
 
     /// Returns the 'ref' of the root array.
     virtual ref_type get_ref() const REALM_NOEXCEPT = 0;
+    virtual MemRef get_mem() const REALM_NOEXCEPT = 0;
 
     virtual void replace_root_array(std::unique_ptr<Array> leaf) = 0;
     virtual MemRef clone_deep(Allocator& alloc) const = 0;
@@ -316,6 +317,7 @@ public:
     Allocator& get_alloc() const REALM_NOEXCEPT final { return m_array->get_alloc(); }
     void destroy() REALM_NOEXCEPT override { if (m_array) m_array->destroy_deep(); }
     ref_type get_ref() const REALM_NOEXCEPT final { return m_array->get_ref(); }
+    MemRef get_mem() const REALM_NOEXCEPT final { return m_array->get_mem(); }
     void detach() REALM_NOEXCEPT final { m_array->detach(); }
     bool is_attached() const REALM_NOEXCEPT final { return m_array->is_attached(); }
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT final { m_array->set_parent(parent, ndx_in_parent); }
@@ -386,13 +388,15 @@ public:
     TColumn(unattached_root_tag, Allocator&);
     TColumn(TColumn<T, Nullable>&&) REALM_NOEXCEPT = default;
     ~TColumn() REALM_NOEXCEPT override;
-    
-    void init_from_parent();
 
+    void init_from_parent();
+    void init_from_ref(Allocator&, ref_type);
+    void init_from_mem(Allocator&, MemRef);
     // Accessor concept:
     void destroy() REALM_NOEXCEPT override;
     Allocator& get_alloc() const REALM_NOEXCEPT final;
     ref_type get_ref() const REALM_NOEXCEPT final;
+    MemRef get_mem() const REALM_NOEXCEPT final;
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT override;
     std::size_t get_ndx_in_parent() const REALM_NOEXCEPT final;
     void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT final;
@@ -934,6 +938,18 @@ void TColumn<T,N>::init_from_parent()
 }
 
 template <class T, bool N>
+void TColumn<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
+{
+    m_tree.init_from_ref(alloc, ref);
+}
+
+template <class T, bool N>
+void TColumn<T,N>::init_from_mem(Allocator& alloc, MemRef mem)
+{
+    m_tree.init_from_mem(alloc, mem);
+}
+
+template <class T, bool N>
 void TColumn<T,N>::destroy() REALM_NOEXCEPT
 {
     ColumnBaseWithIndex::destroy();
@@ -994,6 +1010,12 @@ template <class T, bool N>
 ref_type TColumn<T,N>::get_ref() const REALM_NOEXCEPT
 {
     return get_root_array()->get_ref();
+}
+
+template <class T, bool N>
+MemRef TColumn<T,N>::get_mem() const REALM_NOEXCEPT
+{
+    return get_root_array()->get_mem();
 }
 
 template <class T, bool N>

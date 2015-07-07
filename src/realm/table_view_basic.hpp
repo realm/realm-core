@@ -116,6 +116,12 @@ protected:
     Impl m_impl;
 
     BasicTableViewBase() {}
+    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+                       ConstSourcePayload mode)
+        : m_impl(tv.m_impl, patch, mode) { }
+    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+                       MutableSourcePayload mode)
+        : m_impl(tv.m_impl, patch, mode) { }
     BasicTableViewBase(Impl i): m_impl(std::move(i)) {}
 
     Impl* get_impl() REALM_NOEXCEPT { return &m_impl; }
@@ -179,6 +185,51 @@ public:
     const Tab& get_parent() const REALM_NOEXCEPT
     {
         return static_cast<const Tab&>(Base::m_impl.get_parent());
+    }
+
+
+public:
+    void move_assign(BasicTableView<Tab>& tv)
+    {
+        Base::m_impl.move_assign(tv.m_impl);
+    }
+    typedef TableView_Handover_patch Handover_patch;
+
+    std::unique_ptr<BasicTableView<Tab>>
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
+    {
+        patch.reset(new Handover_patch);
+        std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
+        return retval;
+    }
+
+    std::unique_ptr<BasicTableView<Tab>>
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
+    {
+        patch.reset(new Handover_patch);
+        std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
+        return retval;
+    }
+
+    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        patch.reset();
+    }
+
+    BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch, 
+                   ConstSourcePayload mode)
+        : Base(source, patch, mode)
+    {}
+
+    BasicTableView(BasicTableView<Tab>& source, Handover_patch& patch, 
+                   MutableSourcePayload mode)
+        : Base(source, patch, mode)
+    {}
+
+    void apply_patch(TableView::Handover_patch& patch, Group& group)
+    {
+        Base::m_impl.apply_patch(patch, group);
     }
 
 private:

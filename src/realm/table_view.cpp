@@ -1,3 +1,23 @@
+/*************************************************************************
+ *
+ * REALM CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] Realm Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of Realm Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to Realm Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from Realm Incorporated.
+ *
+ **************************************************************************/
+
 #include <realm/table_view.hpp>
 
 
@@ -9,6 +29,71 @@
 
 using namespace realm;
 
+TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch, 
+                             MutableSourcePayload mode)
+    : RowIndexes(src, mode), 
+      m_linkview_source(LinkViewRef()),
+      m_query(src.m_query, patch.query_patch, mode)
+{
+    patch.was_in_sync = src.is_in_sync();
+    patch.table_num = src.m_table->get_index_in_group();
+    // must be group level table!
+    if (patch.table_num == npos) {
+        throw std::runtime_error("TableView handover failed: not a group level table");
+    }
+    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
+    m_table = TableRef();
+    src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
+    m_last_seen_version = 0;
+    m_distinct_column_source = src.m_distinct_column_source;
+    m_sorting_predicate = src.m_sorting_predicate;
+    m_auto_sort = src.m_auto_sort;
+    m_start = src.m_start;
+    m_end = src.m_end;
+    m_limit = src.m_limit;
+    m_num_detached_refs = 0;
+}
+
+TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch, 
+                             ConstSourcePayload mode)
+    : RowIndexes(src, mode), 
+      m_linkview_source(LinkViewRef()),
+      m_query(src.m_query, patch.query_patch, mode)
+{
+    if (mode == ConstSourcePayload::Stay)
+        patch.was_in_sync = false;
+    else
+        patch.was_in_sync = src.is_in_sync();
+    patch.table_num = src.m_table->get_index_in_group();
+    // must be group level table!
+    if (patch.table_num == npos) {
+        throw std::runtime_error("TableView handover failed: not a group level table");
+    }
+    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
+    m_table = TableRef();
+    m_last_seen_version = 0;
+    m_distinct_column_source = src.m_distinct_column_source;
+    m_sorting_predicate = src.m_sorting_predicate;
+    m_auto_sort = src.m_auto_sort;
+    m_start = src.m_start;
+    m_end = src.m_end;
+    m_limit = src.m_limit;
+    m_num_detached_refs = 0;
+}
+
+void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
+{
+    TableRef tr = group.get_table(patch.table_num);
+    m_table = tr;
+    if (patch.was_in_sync)
+        m_last_seen_version = tr->m_version;
+    else
+        m_last_seen_version = -1;
+    tr->register_view(this);
+    m_query.apply_patch(patch.query_patch, group);
+    m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
+}
+
 // Searching
 
 // find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
@@ -18,7 +103,7 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_int(column_ndx, i) == value)
+        if (is_row_attached(i) && get_int(column_ndx, i) == value)
             return i;
     return size_t(-1);
 }
@@ -28,7 +113,7 @@ size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_float(column_ndx, i) == value)
+        if (is_row_attached(i) && get_float(column_ndx, i) == value)
             return i;
     return size_t(-1);
 }
@@ -38,7 +123,7 @@ size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_double(column_ndx, i) == value)
+        if (is_row_attached(i) && get_double(column_ndx, i) == value)
             return i;
     return size_t(-1);
 }
@@ -50,7 +135,7 @@ size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) con
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_string(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_string(column_ndx, i) == value) return i;
     return size_t(-1);
 }
 
@@ -61,7 +146,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_binary(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_binary(column_ndx, i) == value) return i;
     return size_t(-1);
 }
 
@@ -79,13 +164,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
-    if (m_row_indexes.size() == 0)
+    if ((m_row_indexes.size() - m_num_detached_refs) == 0)
         return 0;
 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
-    if (m_row_indexes.size() == column->size()) {
+    if (m_num_detached_refs == 0 && m_row_indexes.size() == column->size()) {
         // direct aggregate on the column
         if(function == act_Count)
             return static_cast<R>(column->count(count_target));
@@ -115,6 +200,10 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
         row_ndx = to_size_t(m_row_indexes.get(ss));
+
+        // skip detached references:
+        if (row_ndx == detached_ref) continue;
+
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
             typename ColType::LeafInfo leaf { &arrp, &arr };
@@ -202,15 +291,17 @@ DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) 
 
 double TableViewBase::average_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(size());
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) / static_cast<double>(size());
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) 
+        / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) / static_cast<double>(size());
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) 
+        / static_cast<double>(num_attached_rows());
 }
 
 // Count
@@ -242,10 +333,12 @@ void TableViewBase::to_json(std::ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        if (r > 0)
-            out << ",";
         const size_t real_row_index = get_source_ndx(r);
-        m_table->to_json_row(real_row_index, out);
+        if (real_row_index != detached_ref) {
+            if (r > 0)
+                out << ",";
+            m_table->to_json_row(real_row_index, out);
+        }
     }
 
     out << "]";
@@ -260,14 +353,21 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     m_table->to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
-    const size_t row_count = size();
-    const size_t out_count = (limit == size_t(-1)) ? row_count
-                                                   : (row_count < limit) ? row_count : limit;
+    const size_t row_count = num_attached_rows();
+    const size_t out_count = (limit == size_t(-1)) 
+        ? row_count
+        : (row_count < limit) ? row_count : limit;
 
     // Print rows
-    for (size_t i = 0; i < out_count; ++i) {
+    size_t i = 0;
+    size_t count = out_count;
+    while (count) {
         const size_t real_row_index = get_source_ndx(i);
-        m_table->to_string_row(real_row_index, out, widths);
+        if (real_row_index != detached_ref) {
+            m_table->to_string_row(real_row_index, out, widths);
+            --count;
+        }
+        ++i;
     }
 
     if (out_count < row_count) {
@@ -287,7 +387,9 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
+    size_t real_ndx = get_source_ndx(row_ndx);
+    REALM_ASSERT(real_ndx != detached_ref);
+    m_table->to_string_row(real_ndx, out, widths);
 }
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -336,6 +438,53 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 uint_fast64_t sync_if_needed() const { return 0; };
 #endif
 
+
+
+void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT
+{
+    m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
+}
+
+
+void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
+{
+    std::size_t it = 0;
+    for (;;) {
+        it = m_row_indexes.find_first(row_ndx, it);
+        if (it == not_found) 
+            break;
+        ++m_num_detached_refs;
+        m_row_indexes.set(it, -1);
+    }
+    m_row_indexes.adjust_ge(int_fast64_t(row_ndx)+1, -1);
+}
+
+
+void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT
+{
+    std::size_t it = 0;
+    // kill any refs to the target row ndx
+    for (;;) {
+        it = m_row_indexes.find_first(to_row_ndx, it);
+        if (it == not_found) 
+            break;
+        ++m_num_detached_refs;
+        m_row_indexes.set(it, -1);
+    }
+    // adjust any refs to the source row ndx to point to the target row ndx.
+    it = 0;
+    for (;;) {
+        it = m_row_indexes.find_first(from_row_ndx, it);
+        if (it == not_found)
+            break;
+        m_row_indexes.set(it, to_row_ndx);
+    }
+}
+
+
+
+
+
 // O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
@@ -362,10 +511,9 @@ void TableView::remove(size_t ndx)
     // Update refs
     m_row_indexes.erase(ndx, ndx == size() - 1);
 
-    // Decrement row indexes greater than or equal to ndx
-    //
-    // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
-    m_row_indexes.adjust_ge(int_fast64_t(real_ndx), -1);
+    // Adjustment of row indexes greater than the removed index is done by 
+    // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
+    // update of the table, so we don't need to do it here (it has already been done)
 }
 
 
@@ -378,8 +526,8 @@ void TableView::clear()
 #endif
 
     // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
-    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered tables
-    // with no links
+    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered 
+    // tables with no links - and then this test will break.
     bool is_ordered = true;
     for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
         ColumnType t = m_table->m_spec.get_column_type(c);
@@ -395,6 +543,7 @@ void TableView::clear()
         m_table->batch_move_last_over(m_row_indexes);
 
     m_row_indexes.clear();
+    m_num_detached_refs = 0;
 
 #ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
@@ -407,6 +556,7 @@ void TableView::clear()
 void TableViewBase::sync_distinct_view(size_t column)
 {
     m_row_indexes.clear();
+    m_num_detached_refs = 0;
     m_distinct_column_source = column;
     if (m_distinct_column_source != npos) {
         REALM_ASSERT(m_table);
@@ -419,6 +569,30 @@ void TableViewBase::sync_distinct_view(size_t column)
 }
 
 #ifdef REALM_ENABLE_REPLICATION
+// Sort according to one column
+void TableViewBase::sort(size_t column, bool ascending)
+{
+    std::vector<size_t> c;
+    std::vector<bool> a;
+    c.push_back(column);
+    a.push_back(ascending);
+    sort(c, a);
+}
+
+// Sort according to multiple columns, user specified order on each column
+void TableViewBase::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+{
+    REALM_ASSERT(columns.size() == ascending.size());
+    m_auto_sort = true;
+    m_sorting_predicate = Sorter(columns, ascending);
+    sort(m_sorting_predicate);
+}
+
+void TableViewBase::re_sort()
+{
+    sort(m_sorting_predicate);
+}
+
 
 void TableViewBase::do_sync() 
 {
@@ -445,7 +619,11 @@ void TableViewBase::do_sync()
     }
     else  {
         // valid query, so clear earlier results and reexecute it.
-        m_row_indexes.clear();
+        if (m_row_indexes.is_attached())
+            m_row_indexes.clear();
+        else
+            m_row_indexes.init_from_ref(Allocator::get_default(), 
+                                        Column::create(Allocator::get_default()));
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();

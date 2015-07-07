@@ -26,6 +26,7 @@
 #include <realm/mixed.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
+#include <realm/handover_defs.hpp>
 
 namespace realm {
 
@@ -208,6 +209,8 @@ private:
     friend class Table;
 };
 
+// fwd decl
+class Group;
 
 class RowBase {
 protected:
@@ -217,13 +220,18 @@ protected:
     void attach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
     void reattach(Table*, std::size_t row_ndx) REALM_NOEXCEPT;
     void impl_detach() REALM_NOEXCEPT;
+    RowBase() { };
 
+    typedef RowBase_Handover_patch Handover_patch;
+    RowBase(const RowBase& source, Handover_patch& patch);
+    void apply_patch(Handover_patch& patch, Group& group);
 private:
-    RowBase* m_prev; // nullptr if first, undefined if detached.
-    RowBase* m_next; // nullptr if last, undefined if detached.
+    RowBase* m_prev = nullptr; // nullptr if first, undefined if detached.
+    RowBase* m_next = nullptr; // nullptr if last, undefined if detached.
 
     // Table needs to be able to modify m_table and m_row_ndx.
     friend class Table;
+
 };
 
 
@@ -281,6 +289,30 @@ private:
     // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.
     template<class> friend class BasicRow;
+
+    std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
+    {
+        patch.reset(new Handover_patch);
+        std::unique_ptr<BasicRow<T>> retval(new BasicRow<T>(*this, *patch));
+        return retval;
+    }
+
+    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        patch.reset();
+    }
+
+    void apply_patch(Handover_patch& patch, Group& group)
+    {
+        RowBase::apply_patch(patch, group);
+    }
+
+    BasicRow(const BasicRow<T>& source, Handover_patch& patch)
+        : RowBase(source, patch)
+    {
+    }
+    friend class SharedGroup;
 };
 
 typedef BasicRow<Table> Row;

@@ -26,6 +26,7 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
 #include <realm/group.hpp>
+#include <realm/handover_defs.hpp>
 #include <realm/history.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
@@ -402,6 +403,93 @@ public:
     void test_ringbuf();
 #endif
 
+    /// To handover a table view, query, linkview or row accessor of type T, you must 
+    /// wrap it into a Handover<T> for the transfer. Wrapping and unwrapping of a handover
+    /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
+    /// declared below. 'export_for_handover()' returns a Handover object, and 
+    /// 'import_for_handover()' consumes that object, producing a new accessor which
+    /// is ready for use in the context of the importing SharedGroup.
+    ///
+    /// The Handover always creates a new accessor object at the importing side.
+    /// For TableViews, there are 3 forms of handover.
+    ///
+    /// - with payload move: the payload is handed over and ends up as a payload
+    ///   held by the accessor at the importing side. The accessor on the exporting
+    ///   side will rerun its query and generate a new payload, if TableView::sync_if_needed() is
+    ///   called. If the original payload was in sync at the exporting side, it will
+    ///   also be in sync at the importing side. This is indicated to handover_export()
+    ///   by the argument MutableSourcePayload::Move
+    ///
+    /// - with payload copy: a copy of the payload is handed over, so both the accessors
+    ///   on the exporting side *and* the accessors created at the importing side has 
+    ///   their own payload. This is indicated to handover_export() by the argument
+    ///   ConstSourcePayload::Copy
+    ///
+    /// - without payload: the payload stays with the accessor on the exporting
+    ///   side. On the importing side, the new accessor is created without payload.
+    ///   a call to TableView::sync_if_needed() will trigger generation of a new payload.
+    ///   This form of handover is indicated to handover_export() by the argument
+    ///   ConstSourcePayload::Stay.
+    ///
+    /// For all other (non-TableView) accessors, handover is done with payload copy,
+    /// since the payload is trival.
+    ///
+    /// Handover *without* payload is useful when you want to ship a tableview with its query for 
+    /// execution in a background thread. Handover with *payload move* is useful when you want to 
+    /// transfer the result back.
+    ///
+    /// Handover *without* payload or with payload copy is guaranteed *not* to change 
+    /// the accessors on the exporting side and is mutually exclusive with respect to 
+    /// advance_read(), promote_to_write etc - but it is not interlocked with deletion of 
+    /// the accessors: The caller must ensure that the accessors relevant for the export 
+    /// operation stays valid for the duration of the export. Usually, this is trivially
+    /// ensured because the reference to the accessor will keep it alive.
+    ///
+    /// Handover is also *not* interlocked with other operations on the TableView, because
+    /// it would require lots of locking.
+    /// This is a decision we might have to change! (FIXME)
+    ///
+    /// Handover with payload *move* is *not* thread safe and should be carried out 
+    /// by the thread that "owns" the involved accessors.
+    ///
+    /// Handover is transitive:
+    /// If the object being handed over depends on other views (table- or link- ), those
+    /// objects will be handed over as well. The mode of handover (payload copy, payload
+    /// move, without payload) is applied recursively. Note: If you are handing over
+    /// a tableview dependent upon another tableview and using MutableSourcePayload::Move,
+    /// you are on thin ice!
+    ///
+    /// On the importing side, the toplevel accessor being created during import takes ownership
+    /// of all other accessors (if any) being created as part of the import.
+
+    /// Type used to support handover of accessors between shared groups.
+    template<typename T> struct Handover;
+
+    /// thread-safe/const export (mode is Stay or Copy)
+    /// during export, the following operations on the shared group is locked:
+    /// - advance_read(), promote_to_write(), commit_and_continue_as_read(), 
+    ///   rollback_and_continue_as_read(), close()
+    template<typename T>
+    std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
+
+    // specialization for handover of Rows
+    template<typename T>
+    std::unique_ptr<Handover<BasicRow<T>>> export_for_handover(const BasicRow<T>& accessor);
+
+    // destructive export (mode is Move)
+    template<typename T>
+    std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode);
+
+    /// Import an accessor wrapped in a handover object. The import will fail if the
+    /// importing SharedGroup is viewing a version of the database that is different
+    /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
+    template<typename T>
+    std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover);
+
+    // we need to special case handling of LinkViews, because they are ref counted.
+    std::unique_ptr<Handover<LinkView>> export_linkview_for_handover(const LinkViewRef& accessor);
+    LinkViewRef import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover);
+
 private:
     struct SharedInfo;
     struct ReadCount;
@@ -433,6 +521,7 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
+    util::Mutex m_handover_lock;
 #ifndef _WIN32
     util::PlatformSpecificCondVar m_room_to_write;
     util::PlatformSpecificCondVar m_work_to_do;
@@ -689,12 +778,79 @@ private:
     ReadLockInfo* m_read_lock;
 };
 
+
+template<typename T> struct SharedGroup::Handover {
+    std::unique_ptr<typename T::Handover_patch> patch;
+    std::unique_ptr<T> clone;
+    VersionID version;
+};
+
+template<typename T>
+std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const T& accessor, ConstSourcePayload mode)
+{
+    util::LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
+    std::unique_ptr<Handover<T>> result(new Handover<T>());
+    // Implementation note:
+    // often, the return value from clone will be T*, BUT it may be ptr to some base of T
+    // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
+    // clone() will clone the actual accessor instance, and hence return an instance of the
+    // same type.
+    result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
+    result->version = get_version_of_current_transaction();
+    return move(result);
+}
+
+
+template<typename T>
+std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_handover(const BasicRow<T>& accessor)
+{
+    util::LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
+    std::unique_ptr<Handover<BasicRow<T>>> result(new Handover<BasicRow<T>>());
+    // See implementation note above.
+    result->clone.reset(dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch).release()));
+    result->version = get_version_of_current_transaction();
+    return move(result);
+}
+
+
+template<typename T>
+std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& accessor, MutableSourcePayload mode)
+{
+    // We'll take a lock here for the benefit of users truly knowing what they are doing.
+    util::LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
+    std::unique_ptr<Handover<T>> result(new Handover<T>());
+    // see implementation note above.
+    result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
+    result->version = get_version_of_current_transaction();
+    return move(result);
+}
+
+
+template<typename T>
+std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup::Handover<T>> handover)
+{
+    if (handover->version != get_version_of_current_transaction()) {
+        throw BadVersion();
+    }
+    std::unique_ptr<T> result = move(handover->clone);
+    result->apply_and_consume_patch(handover->patch, m_group);
+    return result;
+}
+
+
 template<class O>
 inline void SharedGroup::advance_read(History& history, O* observer, VersionID version)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
+    util::LockGuard lg(m_handover_lock);
     ReadLockInfo old_readlock = m_readlock;
     std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, version); // Throws
     ReadLockUnlockGuard rlug(*this, old_readlock);
@@ -743,6 +899,7 @@ inline void SharedGroup::commit_and_continue_as_read()
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
+    util::LockGuard lg(m_handover_lock);
     do_commit(); // Throws
 
     // advance readlock but dont update accessors:
@@ -771,6 +928,8 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
+
+    util::LockGuard lg(m_handover_lock);
 
     // Mark all managed space (beyond the attached file) as free.
     using gf = _impl::GroupFriend;

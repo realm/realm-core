@@ -13,11 +13,31 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/version.hpp>
 
 #include "test.hpp"
 
 using namespace realm;
 using namespace realm::util;
+
+// First iteration of an automatic read / upgrade test
+// When in core version <= 89 / file version 2, this test will write files and
+// when in core version > 89 / file version 3, it will read / upgrade the
+// previously written files version 2 files.
+
+#if REALM_VER_MINOR > 89
+#  define TEST_READ_UPGRADE_MODE 1
+#else
+#  define TEST_READ_UPGRADE_MODE 0
+#endif
+
+
+// FIXME: This will not work when we hit 1.0, but we should also consider
+// testing the half matrix of all possible upgrade paths. E.g.:
+// 0.88.5->0.88.6->0.89.0->0.89.1->0.90.0->... and 0.88.5->0.90.0 directly etc.
+#if REALM_VER_MAJOR != 0
+#  error FIXME
+#endif
 
 
 // Test independence and thread-safety
@@ -53,19 +73,16 @@ using namespace realm::util;
 TEST(Upgrade_Database_2_3)
 {
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
-    CHECK_OR_RETURN(File::exists(path));
 
     // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
     // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
     // even read using Get()) without upgrading the database first.
 
-    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
-    // version 2 database file. Then copy it into the /test directory of this current Realm core.
-
     // If REALM_NULL_STRINGS is NOT defined to 1, then this Realm core still operates in format 2 (null not supported)
     // and this unit test will not upgrade the file. The REALM_NULL_STRINGS flag was introduced to be able to merge
     // null branch into master but without activating version 3 yet.
-#if 1
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
 
 #if 0 // Not possible to upgrade from Group (needs write access to file)
@@ -231,8 +248,7 @@ TEST(Upgrade_Database_2_3)
       }
     }
 
-#else   
-    // For creating a version 2 database; use in OLD (0.84) core
+#else // test write mode
     char leafsize[20];
     sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
     File::try_remove(path);
@@ -253,7 +269,7 @@ TEST(Upgrade_Database_2_3)
         t->set_int(1, i, i);
     }
     g.write(path);
-#endif    
+#endif // TEST_READ_UPGRADE_MODE
 }
 
 
@@ -261,12 +277,10 @@ TEST(Upgrade_Database_2_3)
 // that all have been modified by null support
 TEST(Upgrade_Database_2_Backwards_Compatible)
 {
-    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
-    // version 2 database file. Then copy it into the /test directory of this current Realm core.
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
-    CHECK_OR_RETURN(File::exists(path));
 
-#if 1
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
     // Make a copy of the database so that we keep the original file intact and unmodified
     SHARED_GROUP_TEST_PATH(temp_copy);
 
@@ -351,8 +365,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
         CHECK(!(t->get_string(6, 0) != ""));
 
     }
-#else
-    // Create database file (run this from old core)
+#else // test write mode
     File::try_remove(path);
 
     Group g;
@@ -397,7 +410,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     t[1]->add_search_index(6);
 
     g.write(path);
-#endif
+#endif // TEST_READ_UPGRADE_MODE
 }
 
 
@@ -405,12 +418,10 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
 TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 {
-    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
-    // version 2 database file. Then copy it into the /test directory of this current Realm core.
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
-    CHECK_OR_RETURN(File::exists(path));
 
-#if 1
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
     // Make a copy of the database so that we keep the original file intact and unmodified
 
     SHARED_GROUP_TEST_PATH(temp_copy);
@@ -494,8 +505,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
             CHECK(!(t->get_string(6, 0) != ""));
         }
     }
-#else
-    // Create database file (run this from old core)
+#else // test write mode
     File::try_remove(path);
 
     Group g;
@@ -540,7 +550,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     t[1]->add_search_index(6);
 
     g.write(path);
-#endif
+#endif // TEST_READ_UPGRADE_MODE
 }
 
 
@@ -548,12 +558,10 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 // Test reading/writing of old version 2 ColumnBinary.
 TEST(Upgrade_Database_Binary)
 {
-    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
-    // version 2 database file. Then copy it into the /test directory of this current Realm core.
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
-    CHECK_OR_RETURN(File::exists(path));
 
-#if 1
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
     size_t f;
 
     // Make a copy of the database so that we keep the original file intact and unmodified
@@ -605,8 +613,7 @@ TEST(Upgrade_Database_Binary)
     CHECK(f == 0);
 
 
-#else
-    // Create database file (run this from old core)
+#else // test write mode
     File::try_remove(path);
 
     Group g;
@@ -628,7 +635,7 @@ TEST(Upgrade_Database_Binary)
     t->set_binary(0, 1, BinaryData("1234567890123456789012345678901234567890123456789012345678901234567890"));
 
     g.write(path);
-#endif
+#endif // TEST_READ_UPGRADE_MODE
 }
 
 
