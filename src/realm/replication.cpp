@@ -780,6 +780,23 @@ public:
         return true;
     }
 
+    bool link_list_swap(size_t link1_ndx, size_t link2_ndx)
+    {
+        if (REALM_UNLIKELY(!m_link_list))
+            return false;
+        size_t num_links = m_link_list->size();
+        if (REALM_UNLIKELY(link1_ndx >= num_links))
+            return false;
+        if (REALM_UNLIKELY(link2_ndx >= num_links))
+            return false;
+#ifdef REALM_DEBUG
+        if (m_log)
+            *m_log << "link_list->swap("<<link1_ndx<<", "<<link2_ndx<<")\n";
+#endif
+        m_link_list->swap(link1_ndx, link2_ndx); // Throws
+        return true;
+    }
+
     bool link_list_erase(size_t link_ndx)
     {
         if (REALM_UNLIKELY(!m_link_list))

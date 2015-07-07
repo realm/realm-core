@@ -1470,6 +1470,11 @@ public:
         return true; // No-op
     }
 
+    bool link_list_swap(size_t, size_t) REALM_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool link_list_erase(size_t) REALM_NOEXCEPT
     {
         return true; // No-op
