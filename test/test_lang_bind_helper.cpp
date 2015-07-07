@@ -6445,7 +6445,7 @@ public:
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }
     bool link_list_erase(size_t) { return false; }
-    bool link_list_nullify(size_t, size_t) { return false; }
+    bool link_list_nullify(size_t) { return false; }
     bool link_list_clear(const std::vector<std::size_t>&) { return false; }
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
@@ -6460,7 +6460,7 @@ public:
     bool set_mixed(size_t, size_t, const Mixed&) { return false; }
     bool set_link(size_t, size_t, size_t) { return false; }
     bool set_null(size_t, size_t) { return false; }
-    bool nullify_link(size_t, size_t, size_t) { return false; }
+    bool nullify_link(size_t, size_t) { return false; }
     bool optimize_table() { return false; }
     bool row_insert_complete() { return false; }
     bool add_int_to_column(size_t, int_fast64_t) { return false; }
@@ -6601,23 +6601,21 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
 
-            bool link_list_nullify(std::size_t ndx, std::size_t old_target_row_ndx)
+            bool link_list_nullify(std::size_t ndx)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
                 CHECK_EQUAL(0, get_current_linkview().second);
 
                 CHECK_EQUAL(0, ndx);
-                CHECK_EQUAL(0, old_target_row_ndx);
                 return true;
             }
 
-            bool nullify_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t old_target_row_ndx)
+            bool nullify_link(std::size_t col_ndx, std::size_t row_ndx)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
                 CHECK_EQUAL(0, row_ndx);
-                CHECK_EQUAL(0, old_target_row_ndx);
                 return true;
             }
         } parser(test_results);
@@ -7275,14 +7273,13 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
             std::size_t list_ndx = 0;
 
-            bool link_list_insert(std::size_t ndx, std::size_t value)
+            bool link_list_insert(std::size_t ndx, std::size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
                 CHECK_EQUAL(0, get_current_linkview().second);
 
                 CHECK_EQUAL(list_ndx, ndx);
-                CHECK_EQUAL(list_ndx * 2 + 1, value);
                 ++list_ndx;
                 return true;
             }

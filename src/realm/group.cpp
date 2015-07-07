@@ -1485,12 +1485,12 @@ public:
         return true; // No-op
     }
 
-    bool nullify_link(size_t, size_t, size_t)
+    bool nullify_link(size_t, size_t)
     {
         return true; // No-op
     }
 
-    bool link_list_nullify(size_t, size_t)
+    bool link_list_nullify(size_t)
     {
         return true; // No-op
     }

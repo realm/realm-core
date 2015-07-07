@@ -174,7 +174,7 @@ public:
     bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
     bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
     bool set_null(std::size_t, std::size_t) { return true; }
-    bool nullify_link(std::size_t, std::size_t, std::size_t) { return true; }
+    bool nullify_link(std::size_t, std::size_t) { return true; }
     bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
     bool optimize_table() { return true; };
 
@@ -196,7 +196,7 @@ public:
     bool link_list_move(std::size_t, std::size_t) { return true; }
     bool link_list_swap(std::size_t, std::size_t) { return true; }
     bool link_list_erase(std::size_t) { return true; }
-    bool link_list_nullify(std::size_t, std::size_t) { return true; }
+    bool link_list_nullify(std::size_t) { return true; }
     bool link_list_clear(const std::vector<std::size_t>&) { return true; }
 
     void parse_complete() {}
@@ -243,7 +243,7 @@ public:
     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&);
     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t);
     bool set_null(std::size_t col_ndx, std::size_t row_ndx);
-    bool nullify_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t old_value);
+    bool nullify_link(std::size_t col_ndx, std::size_t row_ndx);
     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value);
     bool optimize_table();
 
@@ -266,7 +266,7 @@ public:
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     bool link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx);
     bool link_list_erase(std::size_t link_ndx);
-    bool link_list_nullify(std::size_t link_ndx, std::size_t old_target_row_ndx);
+    bool link_list_nullify(std::size_t link_ndx);
     bool link_list_clear(const Column& values);
 
     /// End of methods expected by parser.
@@ -347,7 +347,7 @@ public:
     void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_link_list(const LinkView&, const Column& values);
 
-    void nullify_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t old_value);
+    void nullify_link(const Table*, std::size_t col_ndx, std::size_t ndx);
 
     void insert_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
     void insert_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
@@ -378,7 +378,7 @@ public:
     void link_list_move(const LinkView&, std::size_t old_link_ndx, std::size_t new_link_ndx);
     void link_list_swap(const LinkView&, std::size_t link1_ndx, std::size_t link2_ndx);
     void link_list_erase(const LinkView&, std::size_t link_ndx);
-    void link_list_nullify(const LinkView&, std::size_t link_ndx, std::size_t old_target_row_ndx);
+    void link_list_nullify(const LinkView&, std::size_t link_ndx);
     void link_list_clear(const LinkView&);
 
     void on_table_destroyed(const Table*) REALM_NOEXCEPT;
@@ -1067,16 +1067,16 @@ inline void TransactLogConvenientEncoder::set_null(const Table* t, std::size_t c
     m_encoder.set_null(col_ndx, row_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::nullify_link(std::size_t col_ndx, std::size_t ndx, std::size_t old_value)
+inline bool TransactLogEncoder::nullify_link(std::size_t col_ndx, std::size_t ndx)
 {
-    simple_cmd(instr_NullifyLink, util::tuple(col_ndx, ndx, old_value)); // Throws
+    simple_cmd(instr_NullifyLink, util::tuple(col_ndx, ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::nullify_link(const Table* t, std::size_t col_ndx, std::size_t ndx, std::size_t old_value)
+inline void TransactLogConvenientEncoder::nullify_link(const Table* t, std::size_t col_ndx, std::size_t ndx)
 {
     select_table(t); // Throws
-    m_encoder.nullify_link(col_ndx, ndx, old_value); // Throws
+    m_encoder.nullify_link(col_ndx, ndx); // Throws
 }
 
 
@@ -1384,16 +1384,16 @@ inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, st
     m_encoder.link_list_set(link_ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_nullify(std::size_t link_ndx, std::size_t old_target_row_ndx)
+inline bool TransactLogEncoder::link_list_nullify(std::size_t link_ndx)
 {
-    simple_cmd(instr_LinkListNullify, util::tuple(link_ndx, old_target_row_ndx)); // Throws
+    simple_cmd(instr_LinkListNullify, util::tuple(link_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, std::size_t link_ndx, std::size_t old_target_row_ndx)
+inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, std::size_t link_ndx)
 {
     select_link_list(list); // Throws
-    m_encoder.link_list_nullify(link_ndx, old_target_row_ndx); // Throws
+    m_encoder.link_list_nullify(link_ndx); // Throws
 }
 
 inline bool TransactLogEncoder::link_list_set_all(const Column& values)
@@ -1639,8 +1639,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_NullifyLink: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t old_target_row_ndx = read_int<std::size_t>(); // Throws
-            if (!handler.nullify_link(col_ndx, row_ndx, old_target_row_ndx)) // Throws
+            if (!handler.nullify_link(col_ndx, row_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -1846,8 +1845,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_LinkListNullify: {
             std::size_t link_ndx = read_int<std::size_t>(); // Throws
-            std::size_t old_target_row_ndx = read_int<std::size_t>(); // Throws
-            if (!handler.link_list_nullify(link_ndx, old_target_row_ndx)) // Throws
+            if (!handler.link_list_nullify(link_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -2536,16 +2534,16 @@ public:
         return true;
     }
 
-    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t old_target_row_ndx)
+    bool nullify_link(size_t col_ndx, size_t row_ndx)
     {
-        m_encoder.set_link(col_ndx, row_ndx, old_target_row_ndx);
+        m_encoder.set_link(col_ndx, row_ndx, 0);
         append_instruction();
         return true;
     }
 
-    bool link_list_nullify(size_t link_ndx, size_t old_target_row_ndx)
+    bool link_list_nullify(size_t link_ndx)
     {
-        m_encoder.link_list_insert(link_ndx, old_target_row_ndx);
+        m_encoder.link_list_insert(link_ndx, 0);
         append_instruction();
         return true;
     }

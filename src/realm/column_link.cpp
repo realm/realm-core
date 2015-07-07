@@ -142,11 +142,11 @@ void ColumnLink::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
 }
 
 
-void ColumnLink::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
+void ColumnLink::do_nullify_link(size_t row_ndx, size_t)
 {
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_root_array()->get_alloc().get_replication()) {
-        repl->nullify_link(m_table, m_column_ndx, row_ndx, old_target_row_ndx);
+        repl->nullify_link(m_table, m_column_ndx, row_ndx);
     }
 #endif
     ColumnLinkBase::set(row_ndx, 0);

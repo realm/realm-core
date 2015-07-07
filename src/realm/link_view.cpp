@@ -372,7 +372,7 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_origin_table->get_repl())
-        repl->link_list_nullify(*this, pos, old_target_row_ndx);
+        repl->link_list_nullify(*this, pos);
 #endif
 
     bool is_last = (pos + 1 == m_row_indexes.size());
