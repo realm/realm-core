@@ -197,7 +197,7 @@ public:
     bool link_list_swap(std::size_t, std::size_t) { return true; }
     bool link_list_erase(std::size_t) { return true; }
     bool link_list_nullify(std::size_t) { return true; }
-    bool link_list_clear(const std::vector<std::size_t>&) { return true; }
+    bool link_list_clear(std::size_t) { return true; }
 
     void parse_complete() {}
 };
@@ -267,7 +267,7 @@ public:
     bool link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx);
     bool link_list_erase(std::size_t link_ndx);
     bool link_list_nullify(std::size_t link_ndx);
-    bool link_list_clear(const Column& values);
+    bool link_list_clear(std::size_t old_list_size);
 
     /// End of methods expected by parser.
 
@@ -1461,11 +1461,9 @@ inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, 
     m_encoder.link_list_erase(link_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_clear(const Column& values)
+inline bool TransactLogEncoder::link_list_clear(std::size_t old_list_size)
 {
-    simple_cmd(instr_LinkListClear, util::tuple(values.size())); // Throws
-    for (std::size_t i = 0; i < values.size(); i++)
-        append_num(values.get(i));
+    simple_cmd(instr_LinkListClear, util::tuple(old_list_size)); // Throws
     return true;
 }
 
@@ -1850,12 +1848,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_LinkListClear: {
-            std::size_t size = read_int<std::size_t>(); // Throws
-            std::vector<std::size_t> values;
-            values.resize(size); // Throws
-            for (std::size_t i = 0; i < size; ++i)
-                values[i] = read_int<std::size_t>(); // Throws
-            if (!handler.link_list_clear(values)) // Throws
+            std::size_t old_list_size = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_clear(old_list_size)) // Throws
                 parser_error();
             return;
         }
@@ -2522,13 +2516,13 @@ public:
         return true;
     }
 
-    bool link_list_clear(const std::vector<std::size_t>& values)
+    bool link_list_clear(size_t old_list_size)
     {
         // Append in reverse order because the reversed log is itself applied
         // in reverse, and this way it generates all back-insertions rather than
         // all front-insertions
-        for (std::size_t i = values.size(); i > 0; --i) {
-            m_encoder.link_list_insert(i - 1, values[i - 1]);
+        for (std::size_t i = old_list_size; i > 0; --i) {
+            m_encoder.link_list_insert(i - 1, 0);
             append_instruction();
         }
         return true;

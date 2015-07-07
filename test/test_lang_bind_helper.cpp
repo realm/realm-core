@@ -6446,7 +6446,7 @@ public:
     bool link_list_insert(size_t, size_t) { return false; }
     bool link_list_erase(size_t) { return false; }
     bool link_list_nullify(size_t) { return false; }
-    bool link_list_clear(const std::vector<std::size_t>&) { return false; }
+    bool link_list_clear(size_t) { return false; }
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
     bool set_int(size_t, size_t, int_fast64_t) { return false; }
@@ -6643,16 +6643,13 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool link_list_clear(const std::vector<std::size_t>& values)
+            bool link_list_clear(std::size_t old_list_size) const
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
                 CHECK_EQUAL(0, get_current_linkview().second);
 
-                CHECK_EQUAL(3, values.size());
-                CHECK_EQUAL(1, values[0]);
-                CHECK_EQUAL(3, values[1]);
-                CHECK_EQUAL(5, values[2]);
+                CHECK_EQUAL(3, old_list_size);
                 return true;
             }
         } parser(test_results);

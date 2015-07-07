@@ -137,7 +137,7 @@ void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
 void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
 {
     select_link_list(list); // Throws
-    m_encoder.link_list_clear(list.m_row_indexes); // Throws
+    m_encoder.link_list_clear(list.size()); // Throws
 }
 
 REALM_NORETURN
