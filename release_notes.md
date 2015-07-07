@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a performance regression in TableView::clear().
 
 ### API breaking changes:
 
