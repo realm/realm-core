@@ -7528,6 +7528,7 @@ struct HandoverControl {
     CondVar m_changed;
     SharedGroup::VersionID m_version;
     std::unique_ptr<T> m_handover;
+    bool m_has_feedback = false;
     void put(std::unique_ptr<T> h, SharedGroup::VersionID v)
     {
         LockGuard lg(m_lock);
@@ -7559,6 +7560,18 @@ struct HandoverControl {
         m_changed.notify_all();
         return true;
     }
+    void signal_feedback()
+    {
+        LockGuard lg(m_lock);
+        m_has_feedback = true;
+        m_changed.notify_all();
+    }
+    void wait_feedback()
+    {
+        LockGuard lg(m_lock);
+        while (!m_has_feedback) m_changed.wait(lg);
+        m_has_feedback = false;
+    }
     HandoverControl(const HandoverControl&) = delete;
     HandoverControl() {}
 };
@@ -7573,8 +7586,13 @@ void handover_writer(std::string path)
     for (int i = 1; i < 500; ++i)
     {
         LangBindHelper::promote_to_write(sg, *hist);
+        // table holds random numbers >= 1, until the writing process
+        // finishes, after which table[0] is set to 0 to signal termination
         table->add(1 + random.draw_int_mod(100));
         LangBindHelper::commit_and_continue_as_read(sg);
+        // improve chance of consumers running concurrently with
+        // new writes:
+        sched_yield();
     }
     LangBindHelper::promote_to_write(sg, *hist);
     table[0].first = 0; // <---- signals other threads to stop
@@ -7592,7 +7610,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
-        // wait here for writer to change the database. Kind of wasteful, but wait_for_change
+        // wait here for writer to change the database. Kind of wasteful, but wait_for_change()
         // is not available on osx.
         if (!sg.has_changed()) {
             sched_yield();
@@ -7604,6 +7622,11 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         CHECK(tv.is_in_sync());
         control->put(sg.export_for_handover(tv, MutableSourcePayload::Move), 
                      sg.get_version_of_current_transaction());
+
+        // here we need to allow the reciever to get hold on the proper version before
+        // we go through the loop again and advance_read().
+        control->wait_feedback();
+
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
     }
@@ -7621,6 +7644,7 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         SharedGroup::VersionID version;
         control->get(handover, version);
         Group& g = const_cast<Group&>(sg.begin_read(version));
+        control->signal_feedback();
         TableRef table = g.get_table("table");
         TableView tv = table->where().greater(0,50).find_all();
         CHECK(tv.is_in_sync());
@@ -7651,6 +7675,7 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     table = g.get_table<TheTable>("table");
     CHECK(bool(table));
     sg.end_read();
+
     HandoverControl<SharedGroup::Handover<TableView>> control;
     Thread writer, querier, verifier;
     writer.start(bind(&handover_writer, path));
@@ -7659,6 +7684,7 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     writer.join();
     querier.join();
     verifier.join();
+
 }
 
 namespace {
@@ -7696,14 +7722,10 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
         info->sg = &sg;
         info->tv = &tv;
         control->put(move(info), sg.get_version_of_current_transaction());
-        if (table->size() > 0 && table->get_int(0,0) == 0) {
+        control->wait_feedback();
+        if (table->size() > 0 && table->get_int(0,0) <= 0) {
             // we need to wait for the verifier to steal our latest payload.
             // if we go out of scope too early, the payload will become invalid
-            // wait here for writer to change the database. Kind of wasteful, but wait_for_change
-            // is not available on osx.
-            while (!sg.has_changed()) {
-                sched_yield();
-            }
             LangBindHelper::advance_read(sg, *hist);
             if (table->get_int(0,0) == -1)
                 break;
@@ -7732,6 +7754,7 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
         // before we did the export_for_handover() above.
         version = handover->version;
         Group& g = const_cast<Group&>(sg.begin_read(version));
+        control->signal_feedback();
         TableRef table = g.get_table("table");
         TableView tv = table->where().greater(0,50).find_all();
         CHECK(tv.is_in_sync());
@@ -7742,10 +7765,12 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
         CHECK(tv.size() == tv2->size());
         for (std::size_t k=0; k<tv.size(); ++k)
             CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
+        // this looks wrong!
         if (table->size() > 0 && table->get_int(0,0) == 0) {
             LangBindHelper::promote_to_write(sg, *hist);
             table->set_int(0,0,-1);
             sg.commit();
+            control->signal_feedback();
             break;
         } 
         else
