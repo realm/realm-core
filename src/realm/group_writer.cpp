@@ -63,8 +63,20 @@ size_t GroupWriter::write_group()
     max_free_list_size += new_free_space.size();
 
     // The final allocation of free space (i.e., the call to
-    // reserve_free_space() below) may add an extra entry to the free-lists.
-    ++max_free_list_size;
+    // reserve_free_space() below) may add extra entries to the free-lists.
+    // We reserve room for the worst case scenario, which is as follows:
+    // If the database has *max* theoretical fragmentation, it'll need one
+    // entry in the free list for every 16 bytes, because both allocated and
+    // free chunks are at least 8 bytes in size. In the worst case each
+    // free list entry requires 17 bytes (8 for the position, 8 for the version
+    // and a single one for the size). The worst case scenario thus needs access
+    // to a contiguous address range of 17/16 * the existing database size.
+    // The memory mapping grows with one contiguous memory range at a time,
+    // each of these being at least 1/16 of the existing database size.
+    // To be sure to get a contiguous range of 17/16 of the current database
+    // size, the database itself would have to grow x17. This growth requires
+    // at the most 5x16 = 80 extension steps, each adding one entry to the free list.
+    max_free_list_size += 80;
 
     int num_free_lists = is_shared ? 3 : 2;
     int max_top_size = 3 + num_free_lists;
