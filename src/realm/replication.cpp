@@ -175,21 +175,21 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t value)
+    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t target_row_ndx)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef REALM_DEBUG
             if (m_log) {
-                if (value == 0) {
+                if (target_row_ndx == realm::npos) {
                     *m_log << "table->nullify_link("<<col_ndx<<", "<<row_ndx<<")\n";
                 }
                 else {
-                    *m_log << "table->set_link("<<col_ndx<<", "<<row_ndx<<", "<<(value-1)<<")\n";
+                    *m_log << "table->set_link("<<col_ndx<<", "<<row_ndx<<", "<<target_row_ndx<<")\n";
                 }
             }
 #endif
             typedef _impl::TableFriend tf;
-            tf::do_set_link(*m_table, col_ndx, row_ndx, value); // Throws
+            tf::do_set_link(*m_table, col_ndx, row_ndx, target_row_ndx); // Throws
             return true;
         }
         return false;
