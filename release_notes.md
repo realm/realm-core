@@ -2,6 +2,28 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# NEXT RELEASE
+
+### Bugfixes:
+
 * Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by
   updating Value::import to work with DateTime
 * Fix incorrect results when querying for < or <= on ints which requires 64 bits
