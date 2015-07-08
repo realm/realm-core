@@ -1447,4 +1447,80 @@ TEST_IN_SET(Links_CascadeRemove_Cycle, Break_link_by_explicit_row_removal)
     CHECK(!origin_row_1 && target_row_0 && !target_row_1);
 }
 
+
+TEST_SET_IF(Links_CascadeRemove_Transaction, false)
+{
+    // - origin
+    //   - o_1: target (strong)
+    // - target
+    //   - t_1: Int
+    SharedGroup *db;
+    WriteTransaction *wt;
+    TableRef origin;
+    TableRef target;
+    Row origin_row_0;
+    Row origin_row_1;
+    Row target_row_0;
+    Row target_row_1;
+    LinkViewRef link_list_0;
+    LinkViewRef link_list_1;
+    
+    void test_before() {
+        SHARED_GROUP_TEST_PATH(path);
+        db = new SharedGroup(path);
+        {
+            // Setup schema
+            WriteTransaction wt(*db);
+            TableRef origin = wt.add_table("origin");
+            TableRef target = wt.add_table("target");
+            origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
+            target->add_column(type_Int, "t_1");
+            origin->add_empty_row(2);
+            target->add_empty_row(2);
+            Row origin_row_0 = origin->get(0);
+            Row origin_row_1 = origin->get(1);
+            LinkViewRef link_list_0 = origin_row_0.get_linklist(0);
+            LinkViewRef link_list_1 = origin_row_1.get_linklist(0);
+            link_list_0->add(0); // origin[0].o_1 -> [ target[0] ]
+            link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
+            link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+            wt.commit();
+        }
+        
+        // Start transaction and retrieve accessors for tests
+        wt = new WriteTransaction(*db);
+        origin = wt->get_table("origin");
+        target = wt->get_table("target");
+        origin_row_0 = origin->get(0);
+        origin_row_1 = origin->get(1);
+        target_row_0 = target->get(0);
+        target_row_1 = target->get(1);
+        link_list_0 = origin_row_0.get_linklist(0);
+        link_list_1 = origin_row_1.get_linklist(0);
+    }
+    
+    void test_after() {
+        delete wt;
+        delete db;
+    }
+};
+
+TEST_IN_SET(Links_CascadeRemove_Transaction, Deletion_is_delayed)
+{
+    link_list_1->clear(); // origin[1].o_1 -> []
+    CHECK(target_row_0 && target_row_1);
+    wt->commit();
+    CHECK(target_row_0 && !target_row_1);
+}
+
+TEST_IN_SET(Links_CascadeRemove_Transaction, Avoid_deletion_by_readding)
+{
+    link_list_1->clear(); // origin[1].o_1 -> []
+    CHECK(target_row_0 && target_row_1);
+    link_list_0->add(1);
+    CHECK(target_row_0 && target_row_1);
+    wt->commit();
+    CHECK(target_row_0 && target_row_1);
+}
+
 #endif // TEST_LINKS
