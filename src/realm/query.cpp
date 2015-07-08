@@ -40,6 +40,14 @@ Query::Query(const Table& table, TableViewBase* tv)
     Create();
 }
 
+Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
+    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv.get()), m_source_table_view(tv.get()), m_owns_source_table_view(true)
+{
+    tv.release();
+
+    REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
+    Create();
+}
 void Query::Create()
 {
     // fixme, hack that prevents 'first' from relocating; this limits queries to 16 nested levels of group/end_group
