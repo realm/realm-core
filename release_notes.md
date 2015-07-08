@@ -6,11 +6,16 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Argument `is_backend` removed from from the public version of
+  `SharedGroup::open()`. Fortunately, bindings are not currently calling
+  `SharedGroup::open()`.
+* `File::resize()` no longer calls `fcntl()` with `F_FULLFSYNC`. This feature
+  has been moved to `File::sync()`.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* New feature added to disable all forms of 'sync to disk'. This is supposed to
+  be used only during unit testing. See header `disable_sync_to_disk.hpp`.
 
 -----------
 
@@ -37,12 +42,14 @@
 ### Enhancements:
 
 * Generic networking API added.
-* Support for transfer/handover of TableViews, Queries, ListViews and Rows between SharedGroups in different threads.
-  Cooperative handover (where boths threads participate) is supported for arbitrarily nested TableViews and Queries.
-  Restrictions apply for non-cooperative handover (aka stealing): user must ensure that the producing thread does not
-  trigger a modifying operation on any of the involved TableViews.
-  For TableViews the handover can be one of *moving*, *copying* or *staying*, reflecting how the actual payload
-  is treated.
+* Support for transfer/handover of TableViews, Queries, ListViews and Rows
+  between SharedGroups in different threads.  Cooperative handover (where boths
+  threads participate) is supported for arbitrarily nested TableViews and
+  Queries.  Restrictions apply for non-cooperative handover (aka stealing): user
+  must ensure that the producing thread does not trigger a modifying operation
+  on any of the involved TableViews.  For TableViews the handover can be one of
+  *moving*, *copying* or *staying*, reflecting how the actual payload is
+  treated.
 * Support for non-end row insertion in tables with link and link list columns.
 * Improved documentation of functions concerning the initiation and termination
   of transactions.

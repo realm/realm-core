@@ -71,7 +71,8 @@ unicode.hpp \
 commit_log.hpp \
 link_view_fwd.hpp \
 link_view.hpp \
-views.hpp
+views.hpp \
+disable_sync_to_disk.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
@@ -165,6 +166,7 @@ version.cpp \
 views.cpp \
 $(REPLICATION_CPP) \
 commit_log.cpp \
+disable_sync_to_disk.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #

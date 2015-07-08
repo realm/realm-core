@@ -5,6 +5,7 @@
 #include <realm/group_writer.hpp>
 #include <realm/group.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -378,7 +379,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // occur, because in transactional mode we hold a write lock at this time,
     // and in non-transactional mode it is the responsibility of the user to
     // ensure non-concurrent file mutation.
-    m_alloc.m_file.prealloc(0, new_file_size);
+    m_alloc.resize_file(new_file_size); // Throws
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
 
@@ -476,8 +477,12 @@ void GroupWriter::commit(ref_type new_top_ref)
     uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
     top_refs[new_valid_ref] = new_top_ref;
 
+    // When running the test suite, device synchronization is disabled
+    bool disable_sync = get_disable_sync_to_disk();
+
     // Make sure that all data and the top pointer is written to stable storage
-    m_file_map.sync(); // Throws
+    if (!disable_sync)
+        m_file_map.sync(); // Throws
 
     // update selector - must happen after write of all data and top pointer
     file_header[16+7] = char(select_field); // swap
@@ -487,7 +492,8 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
-    m_file_map.sync(); // Throws
+    if (!disable_sync)
+        m_file_map.sync(); // Throws
 }
 
 
