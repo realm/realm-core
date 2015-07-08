@@ -639,4 +639,70 @@ TEST(Upgrade_Database_Binary)
 }
 
 
-#endif 
+
+// Test upgrading database with strings with embedded nul-bytes
+TEST(Upgrade_Database_Strings_Nul_Bytes)
+{
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
+
+    // entries in this array must have length == index
+    const char* const nul_strings[] = {
+        "", // length == 0
+        "\0",  // length == 1 etc.
+        "\0\0",
+        "\0\0\0",
+        "\0\0\0\0",
+    };
+    constexpr size_t num_nul_strings = sizeof(nul_strings) / sizeof(nul_strings[0]);
+
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    SharedGroup g(temp_copy, 0);
+
+    WriteTransaction wt(g);
+    TableRef t = wt.get_table("table");
+
+    for (int i = 0; i < 2; ++i) {
+        for (size_t j = 0; j < num_nul_strings; ++j) {
+            size_t f = t->find_first_string(0, StringData(nul_strings[j], j));
+            CHECK_EQUAL(f, j);
+            f = t->where().equal(0, StringData(nul_strings[j], j)).find();
+            CHECK_EQUAL(f, j);
+            CHECK(t->get_string(0, j) == StringData(nul_strings[j], j));
+        }
+
+        t->add_search_index(0);
+
+        size_t f = t->where().not_equal(0, StringData(nul_strings[0], 0)).find();
+        CHECK(f == 1);
+        f = t->where().not_equal(0, StringData("foo")).find();
+        CHECK(f == 0);
+
+        t->add_empty_row();
+        t->set_string(0, num_nul_strings, StringData("1234567890123456789012345678901234567890123456789012345678901234567890"));
+    }
+
+#else // test write mode
+    File::try_remove(path);
+
+    Group g;
+
+    TableRef t = g.add_table("table");
+    t->add_column(type_String, "strings_with_nul_bytes");
+    t->add_empty_row(num_nul_strings);
+    for (size_t i = 0; i < num_nul_strings; ++i) {
+        t->set_string(0, i, StringData(nul_strings[i], i));
+    }
+    //    t->add_search_index(0); // CRASHES?!?
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
+
+
+#endif // TEST_GROUP
