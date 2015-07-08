@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added `LinkList.swap()` to swap two members of a link list.
 
 -----------
 
