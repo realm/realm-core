@@ -5883,7 +5883,7 @@ TEST(Query_NullStrings)
     
 }
 
-#if REALM_NULL_STRINGS == 1
+
 TEST(Query_Nulls_Fuzzy)
 {
     for (int attributes = 1; attributes < 5; attributes++) {
@@ -6103,6 +6103,8 @@ TEST(Query_IntegerNonNull)
     t = table.where().equal(0, null{}).find_all();
     CHECK_EQUAL(0, t.size());
 
+    // fixme, discuss behaviour
+/*
     t = table.where().not_equal(0, null{}).find_all();
     CHECK_EQUAL(3, t.size());
     CHECK_EQUAL(0, t.get_source_ndx(0));
@@ -6118,6 +6120,8 @@ TEST(Query_IntegerNonNull)
 
     // t = table.where().greater(null{}, 0).find_all();
     // CHECK_EQUAL(0, t.size());
+
+    */
 }
 
 // Test nullable integer columns with queries using query_expression.hpp
@@ -6129,9 +6133,9 @@ TEST(Query_IntegerNull_ExpressionSyntax)
     // Test works fine for nullable = false, but asserts for nullable = true.
     untyped.add_column(type_Int, "firs1", true);
     untyped.add_column(type_Int, "firs2", true);
-    untyped.add_column(type_Float, "second", true);
+    untyped.add_column(type_Float, "second", false);
 
-    untyped.add_empty_row(2);
+    untyped.add_empty_row(4);
 
     untyped.set_int(0, 0, 44);
     untyped.set_int(1, 0, 55);
@@ -6141,6 +6145,10 @@ TEST(Query_IntegerNull_ExpressionSyntax)
     untyped.set_int(1, 1, 88);
     untyped.set_float(2, 1, 99.0f);
 
+    untyped.set_int(0, 2, 20);
+    untyped.set_null(1, 2);
+    untyped.set_float(2, 2, 90.0f);
+
     // Enforce use of query_expression.hpp by specifying an advanced query that is not supported by query_engine.hpp.
     // Search for the REALM_OLDQUERY_FALLBACK flag (in the query_expression.hpp file) to find an explanation of when 
     // a query will use query_expression.hpp.
@@ -6148,17 +6156,16 @@ TEST(Query_IntegerNull_ExpressionSyntax)
     CHECK_EQUAL(match, 1);
 
     // Should any non-null value compare greater than null?
-    match = (untyped.column<Int>(0) + untyped.column<Int>(1) > null{}).find();
-    CHECK_EQUAL(match, 2);
+    match = (untyped.column<Int>(0) + untyped.column<Int>(1) > null()).find();
+    CHECK_EQUAL(match, not_found);
 
     TableView tv = (untyped.column<Int>(0) + untyped.column<Int>(1) != null{}).find_all();
     CHECK_EQUAL(tv.size(), 2);
 
-    match = (untyped.column<Int>(0) + untyped.column<Int>(1) < null{}).find();
-    CHECK_EQUAL(match, not_found);
+    tv = (untyped.column<Int>(0) + untyped.column<Int>(1) == null{}).find_all();
+    CHECK_EQUAL(tv.size(), 2);
 }
 
-#endif
 
 TEST(Query_64BitValues)
 {
@@ -6215,26 +6222,80 @@ TEST(Query_64BitValues)
 
 ONLY(Query_IntegerNullNGSyntax)
 {
+/*
+    Price<int>      Shipping<int>       Description<String>     Rating<double>
+0   null            null                null                    1.1 
+1   10              null                "foo"                   2.2
+2   20              30                  "bar"                   3.3
+   
+*/
+
     Group g;
-    TableRef table = g.add_table("table");
-    table->insert_column(0, type_Int, "key", true);
-    table->insert_column(1, type_String, "key", true);
-    table->add_empty_row(3);
+    TableRef table = g.add_table("Inventory");
+    table->insert_column(0, type_Int, "Price", true);
+    table->insert_column(1, type_Int, "Shipping", true);
+    table->insert_column(2, type_String, "Description", true);
+    table->insert_column(3, type_Double, "Rating");
+    table->add_empty_row(8); // at least 8 to trigger Array*::get_chunk
+
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
     table->set_int(0, 2, 20);
 
-    table->set_string(1, 0, null());
-    table->set_string(1, 1, "foo");
-    table->set_string(1, 2, "bar");
+    table->set_null(1, 0);
+    table->set_null(1, 1);
+    table->set_int(1, 2, 30);
+    
+    table->set_string(2, 0, null());
+    table->set_string(2, 1, "foo");
+    table->set_string(2, 2, "bar");
 
-    size_t t = (table->column<Int>(0) + 10 == 30).find();
-    CHECK_EQUAL(t, 2);
+    table->set_double(3, 0, 1.1);
+    table->set_double(3, 1, 2.2);
+    table->set_double(3, 2, 3.3);
 
-    t = (table->column<String>(1) == "bar").find();
-    CHECK_EQUAL(t, 2);
+    Columns<Int> price = table->column<Int>(0);
+    Columns<Int> shipping = table->column<Int>(1);
+    size_t t;
+    
+    /*
+    t = (price == null()).find();
+    CHECK_EQUAL(t, 0);
+
+    t = (price != null()).find();
+    CHECK_EQUAL(t, 1);
+
+    // Note that this returns rows with null, which may not be wanted and differs from SQL! Todo, discuss.
+    t = (price == shipping).find();
+    CHECK_EQUAL(t, 0); // null == null
+
+    // This may be more like what users expect; they need to add != null criteria
+    t = (price == shipping && price != null()).find();
+    CHECK_EQUAL(t, not_found);
+
+    t = (price != shipping).find();
+    CHECK_EQUAL(t, 1); // 10 != null
+    */
+    //  null < 0   == false
+    //  null > 0   == false
+    // (null == 0) == false
+
+    t = table->where().less(0, null()).find();
+    CHECK_EQUAL(t, not_found);
+
+    t = table->where().equal(0, null()).find();
+    CHECK_EQUAL(t, not_found);
+
+    t = table->where().greater(0, null()).find();
+    CHECK_EQUAL(t, 1);
 
 
+    t = (price < 0 || price > 0 || price == 0).find();
+    CHECK_EQUAL(t, 1);
+
+    // Shows that null + null == null, and 10 + null == null, and null < 100 == false
+  //  t = (price + shipping < 100).find();
+  //  CHECK_EQUAL(t, 2);
 }
 
 #endif // TEST_QUERY

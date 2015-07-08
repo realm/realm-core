@@ -281,7 +281,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
-    validate_value(value); // Throws
+//    validate_value(value); // Throws
 
     // If the new row is inserted after the last row in the table, we don't need
     // to adjust any row indexes.
@@ -301,7 +301,7 @@ template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_
 
 template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 {
-    validate_value(new_value); // Throws
+   // validate_value(new_value); // Throws
 
     char buffer[sizeof(T)];
     StringData old_value = get(row_ndx, buffer);

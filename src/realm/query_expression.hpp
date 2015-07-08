@@ -233,9 +233,9 @@ template<class T>struct Pow {
 
 // Finds a common type for T1 and T2 according to C++ conversion/promotion in arithmetic (float + int => float, etc)
 template<class T1, class T2,
-    bool T1_is_int = std::numeric_limits<T1>::is_integer,
-    bool T2_is_int = std::numeric_limits<T2>::is_integer,
-    bool T1_is_widest = (sizeof(T1) > sizeof(T2)) > struct Common;
+    bool T1_is_int = std::numeric_limits<T1>::is_integer || std::is_same<T1, null>::value,
+    bool T2_is_int = std::numeric_limits<T2>::is_integer || std::is_same<T2, null>::value,
+    bool T1_is_widest = (sizeof(T1) > sizeof(T2)   ||     std::is_same<T2, null>::value    ) > struct Common;
 template<class T1, class T2, bool b> struct Common<T1, T2, b, b, true > {
     typedef T1 type;
 };
@@ -245,9 +245,11 @@ template<class T1, class T2, bool b> struct Common<T1, T2, b, b, false> {
 template<class T1, class T2, bool b> struct Common<T1, T2, false, true , b> {
     typedef T1 type;
 };
-template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
+template<class T1, class T2, bool b> struct Common<T1, T2, true, false, b> {
     typedef T2 type;
 };
+
+
 
 
 struct ValueBase
@@ -259,6 +261,7 @@ struct ValueBase
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void export_StringData(ValueBase& destination) const = 0;
+    virtual void export_null(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
     // If true, all values in the class come from a link of a single field in the parent table (m_table). If
@@ -473,8 +476,9 @@ public:
         const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
-        // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=}
-        if (left_col && right_col && std::is_same<L, R>::value) {
+        // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
+        // but only if both columns are non-nullable
+        if (left_col && right_col && std::is_same<L, R>::value && !left_col->nullable && !right_col->nullable) {
             const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
             Query q = Query(*t);
 
@@ -575,13 +579,13 @@ public:
 // consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
 Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
-public Overloads<T, bool>, public Overloads<T, DateTime>
+public Overloads<T, bool>, public Overloads<T, DateTime>, public Overloads<T, null>
 {
 public:
     virtual ~Subexpr2() {};
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
-#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o)
+#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o) RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
 };
 
@@ -627,7 +631,17 @@ template <class T, size_t prealloc = 8> struct NullableVector
                 m_first = new T[m_size];
             else
                 m_first = m_cache;
-            std::fill(m_first, m_first + m_size, values);
+
+
+            for (size_t t = 0; t < size; t++) {
+                if (std::is_same<T, null>::value)
+                    set_null(t);
+                else
+                    set(t, values);
+            }
+//            std::fill(m_first, m_first + m_size, values);
+
+
         }
     }
 
@@ -640,24 +654,30 @@ template <class T, size_t prealloc = 8> struct NullableVector
         }
     }
 
-    inline bool is_null(size_t)
+    inline bool is_null(size_t) const // float, double
     {
         return false;
     }
 
-    inline void set_null(size_t) { }
+    inline void set_null(size_t) { } // float, double
 
     T m_cache[prealloc];
     T* m_first = &m_cache[0];
     size_t m_size = 0;
 
     int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
+    bool nullable;
 };
 
 
-template<> inline bool NullableVector<int64_t>::is_null(size_t index)
+template<> inline bool NullableVector<int64_t>::is_null(size_t index) const
 {
     return m_first[index] == m_null;
+}
+
+template<> inline bool NullableVector<null>::is_null(size_t index) const
+{
+    return true;
 }
 
 template<> inline void NullableVector<int64_t>::set_null(size_t index)
@@ -683,7 +703,7 @@ template<> inline void NullableVector<StringData>::set_null(size_t index)
     m_first[index] = StringData();
 }
 
-template<> inline bool NullableVector<StringData>::is_null(size_t index)
+template<> inline bool NullableVector<StringData>::is_null(size_t index) const
 {
     return m_first[index].is_null();
 }
@@ -723,12 +743,18 @@ public:
         destination.import(*this);
     }
 
+
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
     {
         TOperator o;
         size_t vals = minimum(left->m_values, right->m_values);
+
         for (size_t t = 0; t < vals; t++) {
-            m_storage.set(t, o(left->m_storage[t], right->m_storage[t]));
+            if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(t) || right->m_storage.is_null(t))) 
+                m_storage.set_null(t);
+            else
+                m_storage.set(t, o(left->m_storage[t], right->m_storage[t]));
+            
         }
     }
 
@@ -736,7 +762,10 @@ public:
     {
         TOperator o;
         for (size_t t = 0; t < value->m_values; t++) {
-            m_storage.set(t, o(value->m_storage[t]));
+            if (std::is_same<T, int64_t>::value && value->m_storage.is_null(t))
+                m_storage.set_null(t);
+            else
+                m_storage.set(t, o(value->m_storage[t]));
         }
     }
 
@@ -753,7 +782,10 @@ public:
         d.init(ValueBase::from_link, ValueBase::m_values, 0);
         for (size_t t = 0; t < ValueBase::m_values; t++) {
             src_t* source = reinterpret_cast<src_t*>(m_storage.m_first);
-            d.m_storage.set(t, static_cast<dst_t>(source[t]));
+            if (m_storage.is_null(t))
+                d.m_storage.set_null(t);
+            else
+                d.m_storage.set(t, static_cast<dst_t>(source[t]));
         }
     }
 
@@ -783,7 +815,11 @@ public:
     }
     REALM_FORCEINLINE void export_StringData(ValueBase& destination) const
     {
-        export2<StringData>(destination); 
+        export2<StringData>(destination);
+    }
+    REALM_FORCEINLINE void export_null(ValueBase& destination) const
+    {
+        export2<null>(destination);
     }
 
     REALM_FORCEINLINE void import(const ValueBase& source)
@@ -800,6 +836,8 @@ public:
             source.export_int64_t(*this);
         else if (std::is_same<T, StringData>::value)
             source.export_StringData(*this);
+        else if (std::is_same<T, null>::value)
+            source.export_null(*this);
         else
             REALM_ASSERT_DEBUG(false);
     }
@@ -813,7 +851,8 @@ public:
             // Compare values one-by-one (one value is one row; no links)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
-                if (c(left->m_storage[m], right->m_storage[m]))
+
+                if (c(left->m_storage[m], right->m_storage[m], left->m_storage.is_null(m), right->m_storage.is_null(m)))
                     return m;
             }
         }
@@ -826,7 +865,7 @@ public:
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
-                if (c(left->m_storage[0], right->m_storage[r]))
+                if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0), right->m_storage.is_null(r)))
                     return 0;
             }
         }
@@ -834,7 +873,7 @@ public:
             // Same as above, right left values coming from links
             REALM_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
-                if (c(left->m_storage[l], right->m_storage[0]))
+                if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l), right->m_storage.is_null(0)))
                     return 0;
             }
         }
@@ -1465,7 +1504,6 @@ public:
         else {
             nullable = m_link_map.m_table->is_nullable(m_column);
             c = &m_link_map.m_table->get_column_base(m_column);
-
         }
 
         if (sg == nullptr) {
@@ -1476,7 +1514,7 @@ public:
         }
 
         if(nullable)
-            static_cast<SequentialGetter<ColTypeN>*>(sg)->init( (ColTypeN*)(c)); // fixme, c cast
+            static_cast<SequentialGetter<ColTypeN>*>(sg)->init(  (ColTypeN*) (c)); // todo, c cast
         else
             static_cast<SequentialGetter<ColType>*>(sg)->init( (ColType*)(c));
     }
@@ -1497,7 +1535,9 @@ public:
     }
 
     // Load values from Column into destination
-    template<class C>void evaluate(size_t index, ValueBase& destination) {
+    template<class C> void evaluate(size_t index, ValueBase& destination) {
+        SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(sg);
+
         if (m_link_map.m_link_columns.size() > 0) {
             // LinkList with more than 0 values. Create Value with payload for all fields
 
@@ -1506,21 +1546,23 @@ public:
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                static_cast<SequentialGetter<C>*>(sg)->cache_next(link_to); // todo, needed?
-                v.m_storage.set(t, static_cast<SequentialGetter<C>*>(sg)->get_next(link_to));
+                sgc->cache_next(link_to); // todo, needed?
+                v.m_storage.set(t, sgc->get_next(link_to));
             }
             destination.import(v);
         }
         else {
             // Not a Link column
-            static_cast<SequentialGetter<C>*>(sg)->cache_next(index);
-            size_t colsize = static_cast<SequentialGetter<C>*>(sg)->m_column->size();
+            sgc->cache_next(index);
+            size_t colsize = sgc->m_column->size();
 
-            if (std::is_same<T, int64_t>::value && index + ValueBase::default_size < static_cast<SequentialGetter<C>*>(sg)->m_leaf_end) {
+            if (std::is_same<T, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
                 Value<T> v;
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
-                // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-                static_cast<SequentialGetter<C>*>(sg)->m_leaf_ptr->get_chunk(index - static_cast<SequentialGetter<C>*>(sg)->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
+                sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
+
+                if (nullable)
+                   v.m_storage.m_null = ((ArrayIntNull*)(sgc->m_leaf_ptr))->null_value();
 
                 destination.import(v);
             }
@@ -1533,8 +1575,11 @@ public:
                 Value<T> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++) {
-                    v.m_storage.set(t, static_cast<SequentialGetter<C>*>(sg)->get_next(index + t));
+                    v.m_storage.set(t, sgc->get_next(index + t));
                 }
+
+                if (std::is_same<T, int64_t>::value && nullable)
+                    v.m_storage.m_null = ((ArrayIntNull*)(sgc->m_leaf_ptr))->null_value();
 
                 destination.import(v);
             }
@@ -1554,7 +1599,6 @@ public:
 
     LinkMap m_link_map;
 
-private:
     bool nullable;
 };
 
