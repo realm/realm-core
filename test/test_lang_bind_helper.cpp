@@ -6529,7 +6529,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         WriteTransaction wt(sg_w);
         wt.commit();
 
-        struct : NoOpTransactionLogParser {
+        struct foo: NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             bool called = false;
@@ -6548,7 +6548,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         wt.get_table("table 2")->add_empty_row();
         wt.commit();
 
-        struct : NoOpTransactionLogParser {
+        struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             std::size_t expected_table = 0;
@@ -7157,7 +7157,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     table2->add_empty_row();
 
     {
-        struct : NoOpTransactionLogParser {
+        struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             std::size_t expected_table = 1;
@@ -7199,7 +7199,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     table2->move_last_over(0);
 
     {
-        struct : NoOpTransactionLogParser {
+        struct foo: NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             std::size_t expected_table = 1;
@@ -7265,7 +7265,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     link_table->get_linklist(1, 0)->clear();
 
     {
-        struct : NoOpTransactionLogParser {
+        struct foo: NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             std::size_t list_ndx = 0;
