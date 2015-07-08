@@ -24,8 +24,11 @@
 
 #include <realm/group.hpp>
 
-using namespace realm;
+#ifdef REALM_ENABLE_REPLICATION
+#include <realm/replication.hpp>
+#endif
 
+using namespace realm;
 
 void ColumnLink::remove_backlinks(size_t row_ndx)
 {
@@ -136,6 +139,17 @@ void ColumnLink::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
         size_t target_row_ndx = to_size_t(value - 1);
         check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
     }
+}
+
+
+void ColumnLink::do_nullify_link(size_t row_ndx, size_t)
+{
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_root_array()->get_alloc().get_replication()) {
+        repl->nullify_link(m_table, m_column_ndx, row_ndx);
+    }
+#endif
+    ColumnLinkBase::set(row_ndx, 0);
 }
 
 
