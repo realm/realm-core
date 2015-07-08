@@ -640,8 +640,8 @@ TEST(Upgrade_Database_Binary)
 
 
 
-// Test upgrading database with strings with embedded nul-bytes
-TEST(Upgrade_Database_Strings_Nul_Bytes)
+// Test upgrading a database with single column containing strings with embedded NULs
+TEST(Upgrade_Database_Strings_With_NUL)
 {
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
 
@@ -666,8 +666,13 @@ TEST(Upgrade_Database_Strings_Nul_Bytes)
 
     WriteTransaction wt(g);
     TableRef t = wt.get_table("table");
+    size_t reserved_row_index = t->add_empty_row(); // reserved for "upgrading" entry
 
-    for (int i = 0; i < 2; ++i) {
+    // Check if the previously added strings are in the column, 3 times:
+    // 0) as is (with ArrayString leafs)
+    // 1) after upgrading to ArrayStringLong
+    // 2) after upgrading to ArrayBigBlobs
+    for (int test_num = 0; test_num < 3; ++test_num) {
         for (size_t j = 0; j < num_nul_strings; ++j) {
             size_t f = t->find_first_string(0, StringData(nul_strings[j], j));
             CHECK_EQUAL(f, j);
@@ -680,11 +685,17 @@ TEST(Upgrade_Database_Strings_Nul_Bytes)
 
         size_t f = t->where().not_equal(0, StringData(nul_strings[0], 0)).find();
         CHECK(f == 1);
-        f = t->where().not_equal(0, StringData("foo")).find();
+        f = t->where().not_equal(0, StringData(nul_strings[1], 1)).find();
         CHECK(f == 0);
 
-        t->add_empty_row();
-        t->set_string(0, num_nul_strings, StringData("1234567890123456789012345678901234567890123456789012345678901234567890"));
+        switch (test_num) {
+            case 0:
+                t->set_string(0, reserved_row_index, StringData("12345678901234567890")); // length == 20
+            case 1:
+                t->set_string(0, reserved_row_index, StringData("1234567890123456789012345678901234567890123456789012345678901234567890")); // length == 70
+            default:
+                break;
+        }
     }
 
 #else // test write mode
@@ -698,7 +709,7 @@ TEST(Upgrade_Database_Strings_Nul_Bytes)
     for (size_t i = 0; i < num_nul_strings; ++i) {
         t->set_string(0, i, StringData(nul_strings[i], i));
     }
-    //    t->add_search_index(0); // CRASHES?!?
+
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
