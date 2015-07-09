@@ -1179,7 +1179,7 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
         // if the entry is stale and has been cleared by the cleanup process,
         // the requested version is no longer available
         while (! atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
-	    if (& r_info->readers.get_oldest() != &r)
+            if (& r_info->readers.get_oldest() != &r)
 	        return false;
 	}
 	// we managed to lock an entry in the ringbuffer, but it may be so old that
