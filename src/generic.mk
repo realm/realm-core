@@ -860,7 +860,7 @@ GCC_LIKE_COMPILERS = gcc clang
 CC_TO_CXXL_MAP = gcc:g++ g++:g++ clang:clang++ clang++:clang++
 
 # How to map C compiler to corresponding archiver (static libraries).
-CC_TO_AR_MAP  = gcc:gcc-ar g++:gcc-ar gcc:ar g++:ar clang:clang-ar clang++:clang-ar clang:ar clang++:ar
+CC_TO_AR_MAP  = gcc:gcc-ar g++:gcc-ar gcc:ar g++:ar clang:libtool clang++:libtool clang:clang-ar clang++:clang-ar clang:ar clang++:ar
 
 DETECT_COMPILER = $(call FIND,HAVE_CMD,$(COMPILER_DETECT_LIST))
 IDENT_COMPILER = $(call IDENT_CMD,$(1),$(COMPILER_IDENT_MAP))
@@ -1834,6 +1834,12 @@ define SHARED_LIBRARY_RULE_VER_2
 $(1) $(4): $(2)
 	$$(strip $(3) -install_name @rpath/$(notdir $(4)) -compatibility_version $(5) -current_version $(6)) -o $(4)
 	ln -s -f $(notdir $(4)) $(1)
+endef
+
+define STATIC_LIBRARY_RULE
+$(1): $(2) $(3)
+	$$(RM) $(1)
+	$$(strip $$(AR) -o $(1) $(2))
 endef
 
 endif

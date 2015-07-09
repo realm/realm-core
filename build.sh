@@ -712,13 +712,12 @@ EOF
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch="-stdlib=libc++"
+            cflags_arch="-stdlib=libc++ -fembed-bitcode"
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             if [ "$platform" = 'iPhoneOS' ]; then
                 word_list_append "cflags_arch" "-mstrict-align" || exit 1
-                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
                 word_list_append "cflags_arch" "-miphoneos-version-min=7.0" || exit 1
             fi
             if [ "$platform" = 'iPhoneSimulator' ]; then
@@ -730,12 +729,12 @@ EOF
             cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
         done
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-ios" "realm-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DREALM_CONFIG_IOS" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-ios" "realm-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_IOS" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
         echo "Creating '$IPHONE_DIR/librealm-ios.a'"
-        lipo "$temp_dir/platforms"/*/"librealm.a"     -create -output "$IPHONE_DIR/librealm-ios.a"     || exit 1
+        libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$IPHONE_DIR/librealm-ios.a"     || exit 1
         echo "Creating '$IPHONE_DIR/librealm-ios-dbg.a'"
-        lipo "$temp_dir/platforms"/*/"librealm-dbg.a" -create -output "$IPHONE_DIR/librealm-ios-dbg.a" || exit 1
+        libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$IPHONE_DIR/librealm-ios-dbg.a" || exit 1
         echo "Copying headers to '$IPHONE_DIR/include'"
         mkdir -p "$IPHONE_DIR/include" || exit 1
         cp "src/realm.hpp" "$IPHONE_DIR/include/" || exit 1
@@ -768,13 +767,12 @@ EOF
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch="-stdlib=libc++"
+            cflags_arch="-stdlib=libc++ -fembed-bitcode"
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             if [ "$platform" = 'WatchOS' ]; then
                 word_list_append "cflags_arch" "-mstrict-align" || exit 1
-                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
                 word_list_append "cflags_arch" "-mwatchos-version-min=2.0" || exit 1
             fi
             if [ "$platform" = 'WatchSimulator' ]; then
@@ -786,12 +784,12 @@ EOF
             cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
         done
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-watchos" "realm-config-watchos-dbg" BASE_DENOM="watchos" CFLAGS_ARCH="-DREALM_CONFIG_WATCHOS" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-watchos" "realm-config-watchos-dbg" BASE_DENOM="watchos" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_WATCHOS" || exit 1
         mkdir -p "$WATCHOS_DIR" || exit 1
-        echo "Creating '$WATCHOS_DIR/librealm-ios.a'"
-        lipo "$temp_dir/platforms"/*/"librealm.a"     -create -output "$WATCHOS_DIR/librealm-watchos.a"     || exit 1
-        echo "Creating '$WATCHOS_DIR/librealm-ios-dbg.a'"
-        lipo "$temp_dir/platforms"/*/"librealm-dbg.a" -create -output "$WATCHOS_DIR/librealm-watchos-dbg.a" || exit 1
+        echo "Creating '$WATCHOS_DIR/librealm-watchos.a'"
+        libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$WATCHOS_DIR/librealm-watchos.a"     || exit 1
+        echo "Creating '$WATCHOS_DIR/librealm-watchos-dbg.a'"
+        libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$WATCHOS_DIR/librealm-watchos-dbg.a" || exit 1
         echo "Copying headers to '$WATCHOS_DIR/include'"
         mkdir -p "$WATCHOS_DIR/include" || exit 1
         cp "src/realm.hpp" "$WATCHOS_DIR/include/" || exit 1
