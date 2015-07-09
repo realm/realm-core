@@ -537,6 +537,10 @@ void TableView::clear()
         }
     }
 
+    // Temporarily unregister this view so that it's not pointlessly updated
+    // for the row removals
+    m_table->unregister_view(this);
+
     if (is_ordered)
         m_table->batch_remove(m_row_indexes);
     else
@@ -544,6 +548,7 @@ void TableView::clear()
 
     m_row_indexes.clear();
     m_num_detached_refs = 0;
+    m_table->register_view(this);
 
 #ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were

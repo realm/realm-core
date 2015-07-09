@@ -25,10 +25,13 @@
 namespace realm {
 
 class ColumnBackLink;
+class Table;
 
 // Abstract base class for columns containing links
 class ColumnLinkBase: public Column {
 public:
+    // Create unattached root array aaccessor.
+    ColumnLinkBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx);
     ~ColumnLinkBase() REALM_NOEXCEPT override;
 
     bool get_weak_links() const REALM_NOEXCEPT;
@@ -57,12 +60,15 @@ public:
 #endif
 
 protected:
-    TableRef m_target_table;
-    ColumnBackLink* m_backlink_column;
-    bool m_weak_links; // True if these links are weak (not strong)
+    // A pointer to the table that this column is part of.
+    Table* const m_table;
 
-    // Create unattached root array aaccessor.
-    ColumnLinkBase(Allocator&, ref_type);
+    // The index of this column within m_table.m_cols.
+    std::size_t m_column_ndx;
+
+    TableRef m_target_table;
+    ColumnBackLink* m_backlink_column = nullptr;
+    bool m_weak_links = false; // True if these links are weak (not strong)
 
     /// Call Table::cascade_break_backlinks_to() for the specified target row if
     /// it is not already in \a state.rows, and the number of strong links to it
@@ -76,10 +82,10 @@ protected:
 
 // Implementation
 
-inline ColumnLinkBase::ColumnLinkBase(Allocator& alloc, ref_type ref):
-    Column(alloc, ref),
-    m_backlink_column(0),
-    m_weak_links(false)
+inline ColumnLinkBase::ColumnLinkBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx):
+    Column(alloc, ref), // Throws
+    m_table(table),
+    m_column_ndx(column_ndx)
 {
 }
 

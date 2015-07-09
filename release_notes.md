@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a performance regression in TableView::clear().
 
 ### API breaking changes:
 
@@ -16,6 +16,7 @@
 
 * New feature added to disable all forms of 'sync to disk'. This is supposed to
   be used only during unit testing. See header `disable_sync_to_disk.hpp`.
+* Added `LinkList.swap()` to swap two members of a link list.
 
 -----------
 
@@ -25,7 +26,7 @@
 
 ----------------------------------------------
 
-# NEXT RELEASE
+# 0.91.0 Release notes
 
 ### Bugfixes:
 

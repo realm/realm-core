@@ -114,6 +114,7 @@
     <ClCompile Include="..\..\src\realm\bptree.cpp" />
     <ClCompile Include="..\..\src\realm\util\basic_system_errors.cpp" />
     <ClCompile Include="..\..\src\realm\util\misc_errors.cpp" />
+    <ClCompile Include="..\..\src\realm\impl\simulated_failure.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
@@ -220,6 +221,7 @@
     <ClInclude Include="..\..\src\realm\util\basic_system_errors.hpp" />
     <ClInclude Include="..\..\src\realm\util\misc_errors.hpp" />
     <ClInclude Include="..\..\src\realm\util\optional.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\simulated_failure.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
