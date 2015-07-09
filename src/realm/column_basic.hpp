@@ -42,7 +42,7 @@ struct GetLeafType<double, false> {
     using type = BasicArray<double>;
 };
 
-// FIXME: Remove this — it's unused except in tests.
+// FIXME: Remove this - it's unused except in tests.
 template <>
 struct GetLeafType<int, false> {
     using type = ArrayInteger;
