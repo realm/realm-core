@@ -76,4 +76,16 @@ TEST(ColumnBasic_LowerUpperBound)
     col.destroy();
 }
 
+TEST(ColumnBasic_NullOperations)
+{
+    ref_type ref = BasicColumn<int>::create(Allocator::get_default());
+    BasicColumn<int> c(Allocator::get_default(), ref);
+
+    CHECK(!c.is_nullable());
+    CHECK(!c.is_null(0));
+    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
+
+    c.destroy();
+}
+
 #endif // TEST_COLUMN_BASIC
