@@ -2,7 +2,10 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a bug in SharedGroup::grab_specific_readlock() which would fail to
+  grab the specified readlock even though the requested version was available
+  in the case where a concurrent cleanup operation had a conflicting request
+  for the same (oldest) entry in the ringbuffer.
 
 ### API breaking changes:
 
