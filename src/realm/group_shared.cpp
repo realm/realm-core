@@ -290,13 +290,13 @@ public:
 
     const ReadCount& get_oldest() const  REALM_NOEXCEPT
     {
-        return get(old_pos);
+        return get(old_pos.load(std::memory_order_relaxed));
     }
 
     bool is_full() const  REALM_NOEXCEPT
     {
         uint_fast32_t idx = get(last()).next;
-        return idx == old_pos;
+        return idx == old_pos.load(std::memory_order_relaxed);
     }
 
     uint_fast32_t next() const  REALM_NOEXCEPT
@@ -321,11 +321,12 @@ public:
     {   // invariant: entry held by put_pos has count > 1.
         // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
-        while (old_pos != put_pos.load(std::memory_order_relaxed)) {
-            const ReadCount& r = get(old_pos);
+        while (old_pos.load(std::memory_order_relaxed) != put_pos.load(std::memory_order_relaxed)) {
+            const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
             if (! atomic_one_if_zero( r.count ))
                 break;
-            old_pos = get(old_pos).next;
+            auto next = get(old_pos.load(std::memory_order_relaxed)).next;
+            old_pos.store(next, std::memory_order_relaxed);
         }
     }
 
@@ -333,7 +334,7 @@ private:
     // number of entries. Access synchronized through put_pos.
     uint32_t entries;
     std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    uint32_t old_pos; // only accessed during write transactions and under lock
+    std::atomic<uint32_t> old_pos; // only changed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
@@ -1179,6 +1180,11 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
         // if the entry is stale and has been cleared by the cleanup process,
         // the requested version is no longer available
         while (! atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
+            // we failed to lock the version. This could be because the version
+            // is being cleaned up, but also because the cleanup is probing for access
+            // to it. If it's being probed, the tail ptr of the ringbuffer will point
+            // to it. If so we retry. If the tail ptr points somewhere else, the entry
+            // has been cleaned up.
             if (& r_info->readers.get_oldest() != &r)
 	        return false;
 	}
