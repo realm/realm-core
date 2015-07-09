@@ -375,7 +375,7 @@ struct SharedGroup::SharedInfo
 
     // Tracks the most recent version number.
     uint16_t version;
-    uint16_t flags; // offset 8
+    uint16_t durability; // offset 8
     uint16_t free_write_slots;
 
     // number of participating shared groups:
@@ -421,7 +421,7 @@ struct SharedGroup::SharedInfo
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
+SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura):
 #ifndef _WIN32
     size_of_mutex(sizeof(writemutex)),
     size_of_condvar(sizeof(room_to_write)),
@@ -436,7 +436,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
 #endif
 {
     version = SHAREDINFO_VERSION;
-    flags = dlevel; // durability level is fixed from creation
+    durability = dura; // durability level is fixed from creation
 #ifndef _WIN32
     PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
     PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
@@ -575,13 +575,18 @@ void spawn_daemon(const std::string& file) {}
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void SharedGroup::open(const std::string& path, bool no_create_file,
-                       DurabilityLevel dlevel, bool is_backend, const char* key)
+void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityLevel durability,
+                       bool is_backend, const char* encryption_key)
 {
     REALM_ASSERT(!is_attached());
 
+#ifdef _WIN32
+    if (durability == durability_Async)
+        throw std::runtime_error("Async mode not yet supported on Windows");
+#endif
+
     m_db_path = path;
-    m_key = key;
+    m_key = encryption_key;
     m_lockfile_path = path + ".lock";
     SlabAlloc& alloc = m_group.m_alloc;
 
@@ -602,7 +607,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
             m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
-            new (info) SharedInfo(dlevel); // Throws
+            new (info) SharedInfo(durability); // Throws
         }
 
         // we hold the shared lock from here until we close the file!
@@ -698,7 +703,8 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
                 server_sync_mode = repl->is_in_server_synchronization_mode();
 #endif
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
-                                                 no_create, skip_validate, key, server_sync_mode); // Throws
+                                                 no_create, skip_validate,
+                                                 encryption_key, server_sync_mode); // Throws
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
@@ -709,7 +715,9 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
                     db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
                     File::UnmapGuard db_ug(db_map);
                     alloc.prepare_for_update(db_map.get_addr(), db_map);
-                    db_map.sync();
+                    bool disable_sync = get_disable_sync_to_disk();
+                    if (!disable_sync)
+                        db_map.sync();
                 }
 
                 // determine version
@@ -749,7 +757,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
 #endif
 
 #ifndef _WIN32
-                if (key) {
+                if (encryption_key) {
                     REALM_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint64_t(getpid());
                 }
@@ -761,7 +769,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
             }
             else { // not the session initiator!
 #ifndef _WIN32
-                if (key && info->session_initiator_pid != uint64_t(getpid()))
+                if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
                     throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
 #endif
 
@@ -772,7 +780,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
             m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
             m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
             // In async mode, we need to make sure the daemon is running and ready:
-            if (dlevel == durability_Async && !is_backend) {
+            if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
                     if (info->daemon_started == false) {
                         spawn_daemon(path);
@@ -805,7 +813,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
                 throw std::runtime_error("Unsupported version");
 
             // Durability level cannot be changed at runtime
-            if (info->flags != dlevel)
+            if (info->durability != durability)
                 throw std::runtime_error("Inconsistent durability level");
 
             // make our presence noted:
@@ -829,7 +837,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file,
     // std::cerr << "open completed" << std::endl;
 
 #ifndef _WIN32
-    if (dlevel == durability_Async) {
+    if (durability == durability_Async) {
         if (is_backend) {
             do_async_commits();
         }
@@ -907,7 +915,7 @@ uint_fast64_t SharedGroup::get_number_of_versions()
 }
 #ifdef REALM_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* key)
+void SharedGroup::open(Replication& repl, DurabilityLevel durability, const char* encryption_key)
 {
     REALM_ASSERT(!is_attached());
     std::string file = repl.get_database_path();
@@ -915,7 +923,7 @@ void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* ke
     bool is_backend  = false;
     typedef _impl::GroupFriend gf;
     gf::set_replication(m_group, &repl);
-    open(file, no_create, dlevel, is_backend, key); // Throws
+    open(file, no_create, durability, is_backend, encryption_key); // Throws
 }
 
 #endif
@@ -956,7 +964,7 @@ void SharedGroup::close() REALM_NOEXCEPT
 
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
-            if (info->flags == durability_MemOnly) {
+            if (info->durability == durability_MemOnly) {
                 try {
                     util::File::remove(m_db_path.c_str());
                 }
@@ -1322,7 +1330,7 @@ void SharedGroup::do_begin_write()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
 #ifndef _WIN32
-    if (info->flags == durability_Async) {
+    if (info->durability == durability_Async) {
 
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
 
@@ -1537,13 +1545,18 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     ref_type new_top_ref = out.write_group(); // Throws
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Readlock at version " << readlock_version << std::endl;
-    // In durability_Full mode, we just use the file as backing for
-    // the shared memory. So we never actually flush the data to disk
-    // (the OS may do so opportinisticly, or when swapping). So in
-    // this mode the file on disk may very likely be in an invalid
-    // state.
-    if (info->flags == durability_Full)
-        out.commit(new_top_ref); // Throws
+    switch (DurabilityLevel(info->durability)) {
+        case durability_Full:
+            out.commit(new_top_ref); // Throws
+            break;
+        case durability_MemOnly:
+        case durability_Async:
+            // In durability_MemOnly mode, we just use the file as backing for
+            // the shared memory. So we never actually flush the data to disk
+            // (the OS may do so opportinisticly, or when swapping). So in this
+            // mode the file on disk may very likely be in an invalid state.
+            break;
+    }
     size_t new_file_size = out.get_file_size();
     // Update reader info
     {
@@ -1586,7 +1599,7 @@ void SharedGroup::reserve(size_t size)
     // util::File::prealloc_if_supported() (posix_fallocate() on
     // Linux) runs concurrently with modfications via a memory map of
     // the file. This assumption must be verified though.
-    m_group.m_alloc.reserve(size);
+    m_group.m_alloc.reserve_disk_space(size); // Throws
 }
 
 
