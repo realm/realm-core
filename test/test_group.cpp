@@ -131,6 +131,13 @@ TEST(Group_OpenFile)
         group.open(path, crypt_key(), Group::mode_ReadOnly);
         CHECK(group.is_attached());
     }
+
+    // Double open
+    {
+        Group group((Group::unattached_tag()));
+        group.open(path, crypt_key(), Group::mode_ReadOnly);
+        CHECK_LOGIC_ERROR(group.open(path, crypt_key(), Group::mode_ReadOnly), LogicError::wrong_group_state);
+    }
 }
 
 #ifndef _WIN32
@@ -196,7 +203,6 @@ TEST(Group_BadFile)
     }
 }
 
-
 TEST(Group_OpenBuffer)
 {
     // Produce a valid buffer
@@ -224,6 +230,15 @@ TEST(Group_OpenBuffer)
         bool take_ownership = false;
         group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
         CHECK(group.is_attached());
+    }
+
+    // Double open
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK_LOGIC_ERROR(group.open(BinaryData(buffer.get(), buffer_size), take_ownership),
+                          LogicError::wrong_group_state);
     }
 
     // Pass ownership of buffer
