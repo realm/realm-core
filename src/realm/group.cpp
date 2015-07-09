@@ -1093,7 +1093,7 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t last_row_ndx,
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz,
                            bool unordered) REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
@@ -1102,7 +1102,7 @@ public:
                 if (num_rows == 0)
                     tf::mark_opposite_link_tables(*m_table);
                 while (num_rows--) {
-                    tf::adj_acc_move_over(*m_table, row_ndx + num_rows, last_row_ndx - num_rows);
+                    tf::adj_acc_move_over(*m_table, row_ndx + num_rows, tbl_sz - num_rows - 1);
                 }
             }
             else {
@@ -1112,14 +1112,14 @@ public:
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) REALM_NOEXCEPT
+    bool erase_rows(size_t row_ndx, size_t num_rows, size_t last_row_ndx, bool unordered) REALM_NOEXCEPT
     {
         if (unordered) {
             // unordered removal of multiple rows is not supported (and not needed) currently.
             REALM_ASSERT_3(num_rows, ==, 1);
             typedef _impl::TableFriend tf;
             if (m_table)
-                tf::adj_acc_move_over(*m_table, tbl_sz, row_ndx);
+                tf::adj_acc_move_over(*m_table, last_row_ndx, row_ndx);
         }
         else {
             typedef _impl::TableFriend tf;
@@ -1470,12 +1470,27 @@ public:
         return true; // No-op
     }
 
+    bool link_list_swap(size_t, size_t) REALM_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool link_list_erase(size_t) REALM_NOEXCEPT
     {
         return true; // No-op
     }
 
-    bool link_list_clear() REALM_NOEXCEPT
+    bool link_list_clear(size_t) REALM_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
+    bool nullify_link(size_t, size_t)
+    {
+        return true; // No-op
+    }
+
+    bool link_list_nullify(size_t)
     {
         return true; // No-op
     }

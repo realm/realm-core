@@ -6,6 +6,7 @@
   grab the specified readlock even though the requested version was available
   in the case where a concurrent cleanup operation had a conflicting request
   for the same (oldest) entry in the ringbuffer.
+* Fixed a performance regression in TableView::clear().
 
 ### API breaking changes:
 
@@ -19,16 +20,16 @@
 
 * New feature added to disable all forms of 'sync to disk'. This is supposed to
   be used only during unit testing. See header `disable_sync_to_disk.hpp`.
-
------------
+* Added `LinkList.swap()` to swap two members of a link list.
 
 ### Internals:
 
-* Lorem ipsum.
+* On Linux we now call 'sync to disk' after Realm file resizes. Previusly, this
+  was only done on Apple platforms.
 
 ----------------------------------------------
 
-# NEXT RELEASE
+# 0.91.0 Release notes
 
 ### Bugfixes:
 

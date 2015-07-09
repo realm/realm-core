@@ -286,6 +286,8 @@
 		651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */; };
 		651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */; };
 		651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */; };
+		6579EEB91B4E89B6004DE3D8 /* disable_sync_to_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */; };
+		6579EEBA1B4E89B7004DE3D8 /* disable_sync_to_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */; };
 		65BB23001AD80EA30097170F /* test_upgrade_database.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */; };
 		65D3F7A51AA7549600F27CBD /* test_array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A41AA7549100F27CBD /* test_array_integer.cpp */; };
 		65D3F7A71AA75E3A00F27CBD /* array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A61AA75E3400F27CBD /* array_integer.cpp */; };
@@ -789,6 +791,8 @@
 		651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_1.realm; sourceTree = "<group>"; };
 		651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_2.realm; sourceTree = "<group>"; };
 		651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_3.realm; sourceTree = "<group>"; };
+		6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = disable_sync_to_disk.cpp; path = realm/disable_sync_to_disk.cpp; sourceTree = "<group>"; };
+		6579EEB81B4E898B004DE3D8 /* disable_sync_to_disk.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = disable_sync_to_disk.hpp; path = realm/disable_sync_to_disk.hpp; sourceTree = "<group>"; };
 		65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_upgrade_database.cpp; sourceTree = "<group>"; };
 		65D3F7A01AA74E2900F27CBD /* array_integer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = array_integer.hpp; path = realm/array_integer.hpp; sourceTree = "<group>"; };
 		65D3F7A31AA74EA000F27CBD /* array_writer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = array_writer.hpp; sourceTree = "<group>"; };
@@ -1030,6 +1034,8 @@
 				5267884A189AB4B8009CDE7D /* descriptor.cpp */,
 				5267884D189AB4D7009CDE7D /* descriptor.hpp */,
 				5267884F189AB4EA009CDE7D /* descriptor_fwd.hpp */,
+				6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */,
+				6579EEB81B4E898B004DE3D8 /* disable_sync_to_disk.hpp */,
 				52C9B60D19B7406D00248011 /* exceptions.cpp */,
 				36EE6CC417F0F9CB00BA9635 /* exceptions.hpp */,
 				365CCE16157CC37D00172BF8 /* group.cpp */,
@@ -1915,6 +1921,7 @@
 				3620DF0118B6C93C003AD498 /* memory_stream.cpp in Sources */,
 				3620DF0E18B6CA7B003AD498 /* output_stream.cpp in Sources */,
 				3F1967AF1A9530AA0072FE29 /* platform_specific_condvar.cpp in Sources */,
+				6579EEB91B4E89B6004DE3D8 /* disable_sync_to_disk.cpp in Sources */,
 				365CCE62157CC37D00172BF8 /* query.cpp in Sources */,
 				F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */,
 				4222F2FE19640B8400EC86A5 /* replication.cpp in Sources */,
@@ -2039,6 +2046,7 @@
 				F4D0FC7E1B00F62C0040956A /* file.cpp in Sources */,
 				F4D0FC7D1B00F62C0040956A /* file_mapper.cpp in Sources */,
 				4142C9491623478700B3B902 /* group.cpp in Sources */,
+				6579EEBA1B4E89B7004DE3D8 /* disable_sync_to_disk.cpp in Sources */,
 				4142C9511623478700B3B902 /* group_shared.cpp in Sources */,
 				F43098B31B021C04000A2333 /* bptree.cpp in Sources */,
 				4142C9481623478700B3B902 /* group_writer.cpp in Sources */,

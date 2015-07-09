@@ -2668,6 +2668,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // - insert link into list
     // - remove link from list
     // - move link inside list
+    // - swap links inside list
     // - clear link list
     // - move_last_over on origin table
     // - move_last_over on target table
@@ -3268,6 +3269,138 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
     CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
     CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
+
+    // Check that a link list can have members swapped
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_2_w = wt.get_table("origin_2");
+        LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
+        link_list_2_2_w->swap(0,1); // [ 1, 0 ] -> [ 0, 1 ]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[1]
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK(link_list_1_2->is_attached());
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
+
+    // Check that a link list can "swap" a member with itself
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_2_w = wt.get_table("origin_2");
+        LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
+        link_list_2_2_w->swap(1,1); // [ 0, 1 ] -> [ 0, 1 ]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[1]
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK(link_list_1_2->is_attached());
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
+
+    // Reset to the state before testing swap
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_2_w = wt.get_table("origin_2");
+        LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
+        link_list_2_2_w->swap(0,1); // [ 0, 1 ] -> [ 1, 0 ]
+        wt.commit();
+    }
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       []                     null       [ T_2[1], T_2[0] ]     T_2[1]
 
     // Check that an origin-side row can be deleted by a "move last over"
     // operation
@@ -6247,6 +6380,283 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     t_r->clear();
 }
 
+namespace {
+// A base class for transaction log parsers so that tests which want to test
+// just a single part of the transaction log handling don't have to implement
+// the entire interface
+class NoOpTransactionLogParser {
+public:
+    NoOpTransactionLogParser(TestResults& test_results) : test_results(test_results) { }
+
+    std::size_t get_current_table() const
+    {
+        return m_current_table;
+    }
+
+    std::pair<std::size_t, std::size_t> get_current_linkview() const
+    {
+        return {m_current_linkview_col, m_current_linkview_row};
+    }
+
+protected:
+    TestResults& test_results;
+
+private:
+    std::size_t m_current_table = realm::npos;
+    std::size_t m_current_linkview_col = realm::npos;
+    std::size_t m_current_linkview_row = realm::npos;
+
+public:
+    void parse_complete() { }
+
+    bool select_table(size_t group_level_ndx, int, const size_t*)
+    {
+        m_current_table = group_level_ndx;
+        return true;
+    }
+
+    bool select_link_list(size_t col, size_t row)
+    {
+        m_current_linkview_col = col;
+        m_current_linkview_row = row;
+        return true;
+    }
+
+    // subtables not supported
+    bool select_descriptor(int, const size_t*) { return false; }
+
+    // Default no-op implmentations of all of the mutation instructions
+    bool insert_group_level_table(size_t, size_t, StringData) { return false; }
+    bool erase_group_level_table(size_t, size_t) { return false; }
+    bool rename_group_level_table(size_t, StringData) { return false; }
+    bool insert_column(size_t, DataType, StringData, bool) { return false; }
+    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return false; }
+    bool erase_column(size_t) { return false; }
+    bool erase_link_column(size_t, size_t, size_t) { return false; }
+    bool rename_column(size_t, StringData) { return false; }
+    bool add_search_index(size_t) { return false; }
+    bool remove_search_index(size_t) { return false; }
+    bool add_primary_key(size_t) { return false; }
+    bool remove_primary_key() { return false; }
+    bool set_link_type(size_t, LinkType) { return false; }
+    bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
+    bool erase_rows(size_t, size_t, size_t, bool) noexcept { return false; }
+    bool clear_table() noexcept { return false; }
+    bool link_list_set(size_t, size_t) { return false; }
+    bool link_list_insert(size_t, size_t) { return false; }
+    bool link_list_erase(size_t) { return false; }
+    bool link_list_nullify(size_t) { return false; }
+    bool link_list_clear(size_t) { return false; }
+    bool link_list_move(size_t, size_t) { return false; }
+    bool link_list_swap(size_t, size_t) { return false; }
+    bool set_int(size_t, size_t, int_fast64_t) { return false; }
+    bool set_bool(size_t, size_t, bool) { return false; }
+    bool set_float(size_t, size_t, float) { return false; }
+    bool set_double(size_t, size_t, double) { return false; }
+    bool set_string(size_t, size_t, StringData) { return false; }
+    bool set_binary(size_t, size_t, BinaryData) { return false; }
+    bool set_date_time(size_t, size_t, DateTime) { return false; }
+    bool set_table(size_t, size_t) { return false; }
+    bool set_mixed(size_t, size_t, const Mixed&) { return false; }
+    bool set_link(size_t, size_t, size_t) { return false; }
+    bool set_null(size_t, size_t) { return false; }
+    bool nullify_link(size_t, size_t) { return false; }
+    bool optimize_table() { return false; }
+    bool row_insert_complete() { return false; }
+    bool add_int_to_column(size_t, int_fast64_t) { return false; }
+    bool insert_int(size_t, size_t, size_t, int_fast64_t) { return false; }
+    bool insert_bool(size_t, size_t, size_t, bool) { return false; }
+    bool insert_float(size_t, size_t, size_t, float) { return false; }
+    bool insert_double(size_t, size_t, size_t, double) { return false; }
+    bool insert_string(size_t, size_t, size_t, StringData) { return false; }
+    bool insert_binary(size_t, size_t, size_t, BinaryData) { return false; }
+    bool insert_date_time(size_t, size_t, size_t, DateTime) { return false; }
+    bool insert_table(size_t, size_t, size_t) { return false; }
+    bool insert_mixed(size_t, size_t, size_t, const Mixed&) { return false; }
+    bool insert_link(size_t, size_t, size_t, size_t) { return false; }
+    bool insert_link_list(size_t, size_t, size_t) { return false; }
+};
+
+struct AdvanceReadTransact {
+    template<typename Func>
+    static void call(SharedGroup& sg, History& history, Func&& func)
+    {
+        LangBindHelper::advance_read(sg, history, std::forward<Func&&>(func));
+    }
+};
+
+struct PromoteThenRollback {
+    template<typename Func>
+    static void call(SharedGroup& sg, History& history, Func&& func)
+    {
+        LangBindHelper::promote_to_write(sg, history, std::forward<Func&&>(func));
+        LangBindHelper::rollback_and_continue_as_read(sg, history);
+    }
+};
+}
+
+
+TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, PromoteThenRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg);
+        wt.add_table("table 1")->add_column(type_Int, "int");
+        wt.add_table("table 2")->add_column(type_Int, "int");
+        wt.commit();
+    }
+
+    sg.begin_read();
+
+    { // With no changse, the handler should not be called at all
+        struct : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+            void parse_complete()
+            {
+                CHECK(false);
+            }
+        } parser(test_results);
+        TEST_TYPE::call(sg, *hist, parser);
+    }
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+    { // With an empty change, parse_complete() and nothing else should be called
+        WriteTransaction wt(sg_w);
+        wt.commit();
+
+        struct foo: NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            bool called = false;
+            void parse_complete()
+            {
+                called = true;
+            }
+        } parser(test_results);
+        TEST_TYPE::call(sg, *hist, parser);
+        CHECK(parser.called);
+    }
+
+    { // Make a simple modification and verify that the appropriate handler is called
+        WriteTransaction wt(sg_w);
+        wt.get_table("table 1")->add_empty_row();
+        wt.get_table("table 2")->add_empty_row();
+        wt.commit();
+
+        struct foo : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            std::size_t expected_table = 0;
+
+            bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            {
+                CHECK_EQUAL(expected_table, get_current_table());
+                ++expected_table;
+
+                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(1, num_rows);
+                CHECK_EQUAL(1, tbl_sz);
+                CHECK(unordered);
+
+                return true;
+            }
+        } parser(test_results);
+        TEST_TYPE::call(sg, *hist, parser);
+        CHECK_EQUAL(2, parser.expected_table);
+    }
+
+    { // Add a table with some links
+        WriteTransaction wt(sg_w);
+        TableRef table = wt.add_table("link origin");
+        table->add_column_link(type_Link, "link", *wt.get_table("table 1"));
+        table->add_column_link(type_LinkList, "linklist", *wt.get_table("table 2"));
+        table->add_empty_row();
+        table->set_link(0, 0, 0);
+        table->get_linklist(1, 0)->add(0);
+        wt.commit();
+
+        LangBindHelper::advance_read(sg, *hist);
+    }
+
+    { // Verify that deleting the targets of the links logs link nullifications
+        WriteTransaction wt(sg_w);
+        wt.get_table("table 1")->move_last_over(0);
+        wt.get_table("table 2")->move_last_over(0);
+        wt.commit();
+
+        struct : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            {
+                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(1, num_rows);
+                CHECK_EQUAL(0, tbl_sz);
+                CHECK(unordered);
+                return true;
+            }
+
+            bool link_list_nullify(std::size_t ndx)
+            {
+                CHECK_EQUAL(2, get_current_table());
+                CHECK_EQUAL(1, get_current_linkview().first);
+                CHECK_EQUAL(0, get_current_linkview().second);
+
+                CHECK_EQUAL(0, ndx);
+                return true;
+            }
+
+            bool nullify_link(std::size_t col_ndx, std::size_t row_ndx)
+            {
+                CHECK_EQUAL(2, get_current_table());
+                CHECK_EQUAL(0, col_ndx);
+                CHECK_EQUAL(0, row_ndx);
+                return true;
+            }
+        } parser(test_results);
+        TEST_TYPE::call(sg, *hist, parser);
+    }
+
+    { // Verify that clear() logs the correct rows
+        WriteTransaction wt(sg_w);
+        wt.get_table("table 2")->add_empty_row(10);
+
+        LinkViewRef lv = wt.get_table("link origin")->get_linklist(1, 0);
+        lv->add(1);
+        lv->add(3);
+        lv->add(5);
+
+        wt.commit();
+        LangBindHelper::advance_read(sg, *hist);
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_table("link origin")->get_linklist(1, 0)->clear();
+        wt.commit();
+
+        struct : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            bool link_list_clear(std::size_t old_list_size) const
+            {
+                CHECK_EQUAL(2, get_current_table());
+                CHECK_EQUAL(1, get_current_linkview().first);
+                CHECK_EQUAL(0, get_current_linkview().second);
+
+                CHECK_EQUAL(3, old_list_size);
+                return true;
+            }
+        } parser(test_results);
+        TEST_TYPE::call(sg, *hist, parser);
+    }
+}
+
 
 TEST(LangBindHelper_ImplicitTransactions)
 {
@@ -6709,6 +7119,171 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
 
     // Crashes if index has an invalid parent ref
     target->clear();
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg);
+        wt.add_table("table 1")->add_column(type_Int, "int");
+        wt.add_table("table 2")->add_column(type_Int, "int");
+        wt.commit();
+    }
+
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TableRef table1 = g.get_table("table 1");
+    TableRef table2 = g.get_table("table 2");
+
+    { // With no changes, the handler should not be called at all
+        struct : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+            void parse_complete()
+            {
+                CHECK(false);
+            }
+        } parser(test_results);
+        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+    }
+
+    // Make a simple modification and verify that the appropriate handler is called
+    LangBindHelper::promote_to_write(sg, *hist);
+    table1->add_empty_row();
+    table2->add_empty_row();
+
+    {
+        struct foo : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            std::size_t expected_table = 1;
+
+            bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            {
+                CHECK_EQUAL(expected_table, get_current_table());
+                --expected_table;
+
+                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(1, num_rows);
+                CHECK_EQUAL(0, tbl_sz);
+                CHECK(unordered);
+
+                return true;
+            }
+        } parser(test_results);
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+        CHECK_EQUAL(0, parser.expected_table + 1);
+    }
+
+    // Add a table with some links
+    LangBindHelper::promote_to_write(sg, *hist);
+    table1->add_empty_row();
+    table2->add_empty_row();
+
+    TableRef link_table = g.add_table("link origin");
+    link_table->add_column_link(type_Link, "link", *table1);
+    link_table->add_column_link(type_LinkList, "linklist", *table2);
+    link_table->add_empty_row();
+    link_table->set_link(0, 0, 0);
+    link_table->get_linklist(1, 0)->add(0);
+
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    // Verify that link nullification is rolled back appropriately
+    LangBindHelper::promote_to_write(sg, *hist);
+    table1->move_last_over(0);
+    table2->move_last_over(0);
+
+    {
+        struct foo: NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            std::size_t expected_table = 1;
+            bool link_list_insert_called = false;
+            bool set_link_called = false;
+
+            bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            {
+                CHECK_EQUAL(expected_table, get_current_table());
+                --expected_table;
+
+                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(1, num_rows);
+                CHECK_EQUAL(1, tbl_sz);
+                CHECK(unordered);
+                return true;
+            }
+
+            bool link_list_insert(std::size_t ndx, std::size_t value)
+            {
+                CHECK_EQUAL(2, get_current_table());
+                CHECK_EQUAL(1, get_current_linkview().first);
+                CHECK_EQUAL(0, get_current_linkview().second);
+
+                CHECK_EQUAL(0, ndx);
+                CHECK_EQUAL(0, value);
+
+                link_list_insert_called = true;
+                return true;
+            }
+
+            bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t value)
+            {
+                CHECK_EQUAL(2, get_current_table());
+                CHECK_EQUAL(0, col_ndx);
+                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(0, value);
+
+                set_link_called = true;
+                return true;
+            }
+        } parser(test_results);
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+        CHECK_EQUAL(0, parser.expected_table + 1);
+        CHECK(parser.link_list_insert_called);
+        CHECK(parser.set_link_called);
+    }
+
+    // Verify that clear() is rolled back appropriately
+    LangBindHelper::promote_to_write(sg, *hist);
+    table2->add_empty_row(10);
+
+    LinkViewRef lv = link_table->get_linklist(1, 0);
+    lv->clear();
+    lv->add(1);
+    lv->add(3);
+    lv->add(5);
+
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+
+    LangBindHelper::promote_to_write(sg, *hist);
+    link_table->get_linklist(1, 0)->clear();
+
+    {
+        struct foo: NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            std::size_t list_ndx = 0;
+
+            bool link_list_insert(std::size_t ndx, std::size_t)
+            {
+                CHECK_EQUAL(2, get_current_table());
+                CHECK_EQUAL(1, get_current_linkview().first);
+                CHECK_EQUAL(0, get_current_linkview().second);
+
+                CHECK_EQUAL(list_ndx, ndx);
+                ++list_ndx;
+                return true;
+            }
+        } parser(test_results);
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+        CHECK_EQUAL(parser.list_ndx, 3);
+    }
 }
 
 #ifndef _WIN32
