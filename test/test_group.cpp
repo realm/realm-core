@@ -80,7 +80,33 @@ REALM_TABLE_3(TestTableGroup2,
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));
+
     CHECK(!group.is_attached());
+
+    // FIXME: Uncomment the two commented lines below once #935 is fixed.
+
+//    CHECK_LOGIC_ERROR(group.is_empty(),                              LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.size(),                                  LogicError::detached_accessor);
+//    CHECK_LOGIC_ERROR(group.find_table("foo"),                       LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table(0),                            LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table("foo"),                        LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo", false),                 LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0),            LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"),        LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false), LogicError::detached_accessor);
+
+    {
+        const auto& const_group = group;
+        CHECK_LOGIC_ERROR(const_group.get_table(0),                 LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table("foo"),             LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
+    }
+
+    {
+        bool f = false;
+        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f),                 LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f), LogicError::detached_accessor);
+    }
 }
 
 
