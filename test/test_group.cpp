@@ -82,12 +82,18 @@ TEST(Group_Unattached)
     Group group((Group::unattached_tag()));
 
     CHECK(!group.is_attached());
+}
+
+
+TEST(Group_UnattachedErrorHandling)
+{
+    Group group((Group::unattached_tag()));
 
     // FIXME: Uncomment the two commented lines below once #935 is fixed.
 
-//    CHECK_LOGIC_ERROR(group.is_empty(),                              LogicError::detached_accessor);
+//  CHECK_LOGIC_ERROR(group.is_empty(),                              LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.size(),                                  LogicError::detached_accessor);
-//    CHECK_LOGIC_ERROR(group.find_table("foo"),                       LogicError::detached_accessor);
+//  CHECK_LOGIC_ERROR(group.find_table("foo"),                       LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table(0),                            LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"),                        LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.add_table("foo", false),                 LogicError::detached_accessor);
@@ -132,11 +138,47 @@ TEST(Group_OpenFile)
         CHECK(group.is_attached());
     }
 
-    // Double open
+}
+
+// Ensure that Group throws when you attempt to attach it twice in a row
+TEST(Group_DoubleOpening)
+{
+    // File-based open()
     {
+        GROUP_TEST_PATH(path);
         Group group((Group::unattached_tag()));
-        group.open(path, crypt_key(), Group::mode_ReadOnly);
-        CHECK_LOGIC_ERROR(group.open(path, crypt_key(), Group::mode_ReadOnly), LogicError::wrong_group_state);
+
+        group.open(path, crypt_key(), Group::mode_ReadWrite);
+        CHECK_LOGIC_ERROR(group.open(path, crypt_key(), Group::mode_ReadWrite), LogicError::wrong_group_state);
+    }
+
+    // Buffer-based open()
+    {
+        // Produce a valid buffer
+        std::unique_ptr<char[]> buffer;
+        size_t buffer_size;
+
+        {
+            GROUP_TEST_PATH(path);
+            {
+                Group group;
+                group.write(path);
+            }
+            {
+                File file(path);
+                buffer_size = size_t(file.get_size());
+                buffer.reset(static_cast<char*>(malloc(buffer_size)));
+                CHECK(bool(buffer));
+                file.read(buffer.get(), buffer_size);
+            }
+        }
+
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK_LOGIC_ERROR(group.open(BinaryData(buffer.get(), buffer_size), take_ownership),
+                          LogicError::wrong_group_state);
     }
 }
 
@@ -223,22 +265,12 @@ TEST(Group_OpenBuffer)
         }
     }
 
-
     // Keep ownership of buffer
     {
         Group group((Group::unattached_tag()));
         bool take_ownership = false;
         group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
         CHECK(group.is_attached());
-    }
-
-    // Double open
-    {
-        Group group((Group::unattached_tag()));
-        bool take_ownership = false;
-        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
-        CHECK_LOGIC_ERROR(group.open(BinaryData(buffer.get(), buffer_size), take_ownership),
-                          LogicError::wrong_group_state);
     }
 
     // Pass ownership of buffer
