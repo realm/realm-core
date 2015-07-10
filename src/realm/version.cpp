@@ -16,12 +16,12 @@ bool Version::is_at_least(int major, int minor, int patch)
     if (get_major() < major)
         return false;
     if (get_major() > major)
-	return true;
+        return true;
 
     if (get_minor() < minor)
         return false;
     if (get_minor() > minor)
-	return true;
+        return true;
 
     return (get_patch() >= patch);
 }
