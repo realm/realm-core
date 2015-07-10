@@ -28,6 +28,7 @@
 * On Linux we now call 'sync to disk' after Realm file resizes. Previusly, this
   was only done on Apple platforms.
 
+
 ----------------------------------------------
 
 # 0.91.0 Release notes
