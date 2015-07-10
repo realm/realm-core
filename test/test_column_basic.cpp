@@ -83,6 +83,15 @@ TEST(ColumnBasic_NullOperations)
 
     CHECK(!c.is_nullable());
     CHECK(!c.is_null(0));
+
+    c.destroy();
+}
+
+TEST(ColumnBasic_NullErrorHandling)
+{
+    ref_type ref = BasicColumn<int>::create(Allocator::get_default());
+    BasicColumn<int> c(Allocator::get_default(), ref);
+
     CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
 
     c.destroy();
