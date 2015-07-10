@@ -29,6 +29,7 @@
 #include <realm/replication.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 #ifdef REALM_ENABLE_REPLICATION
 
@@ -373,7 +374,10 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     log.file.close();
     File::try_remove(log.name);
     log.file.open(log.name, File::mode_Write);
-    log.file.resize(minimal_pages * page_size);
+    log.file.resize(minimal_pages * page_size); // Throws
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        log.file.sync(); // Throws
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
     log.last_seen_size = minimal_pages * page_size;
 }
@@ -384,7 +388,10 @@ void WriteLogCollector::reset_header()
     File::try_remove(m_header_name);
 
     File header_file(m_header_name, File::mode_Write);
-    header_file.resize(sizeof (CommitLogHeader));
+    header_file.resize(sizeof (CommitLogHeader)); // Throws
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
 }
 
@@ -418,7 +425,10 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
             size -= size/4;
             size *= page_size * minimal_pages;
             active_log->map.unmap();
-            active_log->file.resize(size);
+            active_log->file.resize(size); // Throws
+            bool disable_sync = get_disable_sync_to_disk();
+            if (!disable_sync)
+                active_log->file.sync(); // Throws
         }
     }
 }
@@ -441,8 +451,12 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     File::SizeType size_needed =
         aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
     size_needed = aligned_to(page_size, size_needed);
-    if (size_needed > active_log->file.get_size())
-        active_log->file.resize(size_needed);
+    if (size_needed > active_log->file.get_size()) {
+        active_log->file.resize(size_needed); // Throws
+        bool disable_sync = get_disable_sync_to_disk();
+        if (!disable_sync)
+            active_log->file.sync(); // Throws
+    }
 
     // create/update mapping so that we are sure it covers the file we are about
     // write:
@@ -455,7 +469,9 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
     write_ptr += sizeof(EntryHeader);
     std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr);
-    active_log->map.sync();
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        active_log->map.sync(); // Throws
 
     // update metadata to reflect the added commit log
     preamble->write_offset += aligned_to(sizeof (uint64_t), entry.changeset.size() + sizeof(EntryHeader));
@@ -490,7 +506,9 @@ void WriteLogCollector::reset_log_management(version_type last_version)
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
     new (& m_header.get_addr()->lock) RobustMutex;
-    m_header.sync();
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        m_header.sync(); // Throws
 }
 
 
