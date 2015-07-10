@@ -2,6 +2,10 @@
 
 ### Bugfixes:
 
+* Fixed a bug in SharedGroup::grab_specific_readlock() which would fail to
+  grab the specified readlock even though the requested version was available
+  in the case where a concurrent cleanup operation had a conflicting request
+  for the same (oldest) entry in the ringbuffer.
 * Fixed a performance regression in TableView::clear().
 
 ### API breaking changes:
@@ -17,8 +21,6 @@
 * New feature added to disable all forms of 'sync to disk'. This is supposed to
   be used only during unit testing. See header `disable_sync_to_disk.hpp`.
 * Added `LinkList.swap()` to swap two members of a link list.
-
------------
 
 ### Internals:
 
