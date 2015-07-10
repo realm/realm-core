@@ -296,7 +296,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 #if REALM_NULL_STRINGS == 1
         CHECK_EQUAL(rt.get_group().get_file_format(), 3);
 #else
-        CHECK_EQUAL(g.get_group().get_file_format(), 2);
+        CHECK_EQUAL(rt.get_group().get_file_format(), 2);
 #endif
 
         size_t f;
