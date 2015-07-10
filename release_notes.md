@@ -21,6 +21,7 @@
 * New feature added to disable all forms of 'sync to disk'. This is supposed to
   be used only during unit testing. See header `disable_sync_to_disk.hpp`.
 * Added `LinkList.swap()` to swap two members of a link list.
+* Added a Query constructor that takes ownership of a TableView.
 
 ### Internals:
 
