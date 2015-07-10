@@ -3,6 +3,8 @@
 #include <ostream>
 #include <iomanip>
 
+
+#include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/descriptor.hpp>
 #include <realm/link_view.hpp>
@@ -173,22 +175,20 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t value)
+    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t target_row_ndx)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef REALM_DEBUG
             if (m_log) {
-                if (value == 0) {
+                if (target_row_ndx == realm::npos) {
                     *m_log << "table->nullify_link("<<col_ndx<<", "<<row_ndx<<")\n";
                 }
                 else {
-                    *m_log << "table->set_link("<<col_ndx<<", "<<row_ndx<<", "<<(value-1)<<")\n";
+                    *m_log << "table->set_link("<<col_ndx<<", "<<row_ndx<<", "<<target_row_ndx<<")\n";
                 }
             }
 #endif
             typedef _impl::TableFriend tf;
-            // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
-            size_t target_row_ndx = value - size_t(1);
             tf::do_set_link(*m_table, col_ndx, row_ndx, target_row_ndx); // Throws
             return true;
         }
@@ -778,6 +778,23 @@ public:
         return true;
     }
 
+    bool link_list_swap(size_t link1_ndx, size_t link2_ndx)
+    {
+        if (REALM_UNLIKELY(!m_link_list))
+            return false;
+        size_t num_links = m_link_list->size();
+        if (REALM_UNLIKELY(link1_ndx >= num_links))
+            return false;
+        if (REALM_UNLIKELY(link2_ndx >= num_links))
+            return false;
+#ifdef REALM_DEBUG
+        if (m_log)
+            *m_log << "link_list->swap("<<link1_ndx<<", "<<link2_ndx<<")\n";
+#endif
+        m_link_list->swap(link1_ndx, link2_ndx); // Throws
+        return true;
+    }
+
     bool link_list_erase(size_t link_ndx)
     {
         if (REALM_UNLIKELY(!m_link_list))
@@ -793,7 +810,7 @@ public:
         return true;
     }
 
-    bool link_list_clear()
+    bool link_list_clear(size_t)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;
@@ -804,6 +821,16 @@ public:
         typedef _impl::LinkListFriend llf;
         llf::do_clear(*m_link_list); // Throws
         return true;
+    }
+
+    bool nullify_link(size_t, size_t)
+    {
+        return true; // No-op
+    }
+
+    bool link_list_nullify(size_t)
+    {
+        return true; // No-op
     }
 
 private:
@@ -927,12 +954,7 @@ std::string TrivialReplication::do_get_database_path()
     return m_database_file;
 }
 
-void TrivialReplication::do_begin_write_transact(SharedGroup&)
-{
-    prepare_to_write();
-}
-
-void TrivialReplication::prepare_to_write()
+void TrivialReplication::do_initiate_transact(SharedGroup&, version_type)
 {
     char* data = m_transact_log_buffer.data();
     std::size_t size = m_transact_log_buffer.size();
@@ -940,13 +962,22 @@ void TrivialReplication::prepare_to_write()
 }
 
 Replication::version_type
-TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_version)
+TrivialReplication::do_prepare_commit(SharedGroup&, version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
     std::size_t size = write_position() - data;
     version_type new_version = orig_version + 1;
-    handle_transact_log(data, size, new_version); // Throws
+    prepare_changeset(data, size, new_version); // Throws
     return new_version;
+}
+
+void TrivialReplication::do_finalize_commit(SharedGroup&) REALM_NOEXCEPT
+{
+    finalize_changeset();
+}
+
+void TrivialReplication::do_abort_transact(SharedGroup&) REALM_NOEXCEPT
+{
 }
 
 void TrivialReplication::do_interrupt() REALM_NOEXCEPT

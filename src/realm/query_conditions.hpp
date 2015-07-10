@@ -43,7 +43,9 @@ struct Contains : public HackClass {
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool v1null = false, bool v2null = false) const { return v2.contains(v1); }
     bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const { return v2.contains(v1); }
     bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v2.contains(v1); }
+
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
 };
@@ -53,6 +55,8 @@ struct BeginsWith : public HackClass {
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool v1null = false, bool v2null = false) const { return v2.begins_with(v1); }
     bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const { return v2.begins_with(v1); }
     bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v2.begins_with(v1); }
+
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
@@ -65,6 +69,7 @@ struct EndsWith : public HackClass {
     bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v2.ends_with(v1); }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
 };
@@ -106,6 +111,8 @@ struct NotEqual {
     static const int condition = cond_NotEqual;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return !(v == 0 && ubound == 0 && lbound == 0); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v > ubound || v < lbound); }
+
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
 };
 
 // Does v2 contain v1?
@@ -136,6 +143,7 @@ struct ContainsIns : public HackClass {
     }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
 };
@@ -163,6 +171,7 @@ struct BeginsWithIns : public HackClass {
     }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
 };
@@ -191,6 +200,7 @@ struct EndsWithIns : public HackClass {
     }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
 };
@@ -218,6 +228,7 @@ struct EqualIns : public HackClass {
     }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
 };
@@ -244,6 +255,7 @@ struct NotEqualIns : public HackClass {
     }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
 };

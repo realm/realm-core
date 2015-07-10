@@ -82,9 +82,11 @@ public:
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
     ~WriteLogCollector() REALM_NOEXCEPT;
     std::string do_get_database_path() override { return m_database_name; }
-    void do_begin_write_transact(SharedGroup& sg) override;
-    version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version)
+    void do_initiate_transact(SharedGroup&, version_type) override;
+    version_type do_prepare_commit(SharedGroup& sg, version_type orig_version)
         override;
+    void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT override;
+    void do_abort_transact(SharedGroup&) REALM_NOEXCEPT override;
     BinaryData get_uncommitted_changes() REALM_NOEXCEPT override;
     void do_interrupt() REALM_NOEXCEPT override {};
     void do_clear_interrupt() REALM_NOEXCEPT override {};
@@ -602,10 +604,22 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
 }
 
 
-WriteLogCollector::version_type
-WriteLogCollector::do_commit_write_transact(SharedGroup&,
-                                            WriteLogCollector::version_type orig_version)
+void WriteLogCollector::do_initiate_transact(SharedGroup&, version_type)
 {
+    char* buffer = m_transact_log_buffer.data();
+    set_buffer(buffer, buffer + m_transact_log_buffer.size());
+}
+
+
+WriteLogCollector::version_type
+WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_type orig_version)
+{
+    // Note: This function does not utilize the two-phase changeset submission
+    // scheme, nor does it utilize the ability to discard a submitted changeset
+    // during a subsequent call to do_initiate_transact() in case the transaction
+    // ultimately fails. This means, unfortunately, that an application will
+    // encounter an inconsistent state (and likely crash) it it attempts to
+    // initiate a new transaction after a failed commit.
     char* data = m_transact_log_buffer.data();
     size_t size = write_position() - data;
     HistoryEntry entry;
@@ -618,10 +632,15 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 }
 
 
-void WriteLogCollector::do_begin_write_transact(SharedGroup&)
+void WriteLogCollector::do_finalize_commit(SharedGroup&) REALM_NOEXCEPT
 {
-    char* buffer = m_transact_log_buffer.data();
-    set_buffer(buffer, buffer + m_transact_log_buffer.size());
+    // See note in do_prepare_commit().
+}
+
+
+void WriteLogCollector::do_abort_transact(SharedGroup&) REALM_NOEXCEPT
+{
+    // See note in do_prepare_commit().
 }
 
 

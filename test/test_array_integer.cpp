@@ -313,27 +313,41 @@ TEST(ArrayIntNull_Find)
     }
     a.add(0x100);
     a.set(50, 0x44);
-    a.set(60, 0x44);
     a.set_null(51);
+    a.set(60, 0x44);
 
-    size_t t0 = a.find_first<NotEqual>(0x33);
-    CHECK_EQUAL(50, t0);
+    size_t t = a.find_first<NotEqual>(0x33);
+    CHECK_EQUAL(50, t);
 
-    size_t t1 = a.find_first<NotEqual>(0x33, 0, 50);
-    CHECK_EQUAL(not_found, t1);
+    t = a.find_first<NotEqual>(0x33, 0, 50);
+    CHECK_EQUAL(not_found, t);
+
+    bool b = a.is_null(0);
+
+    t = a.find_first<NotEqual>(null());
+    CHECK_EQUAL(0, t);
+
+    t = a.find_first<NotEqual>(null(), 51);
+    CHECK_EQUAL(52, t);
 
     size_t t2 = a.find_first(0x44);
     CHECK_EQUAL(50, t2);
 
+    t2 = a.find_first(null());
+    CHECK_EQUAL(51, t2);
+
     size_t t3 = a.find_first(0);
     CHECK_EQUAL(not_found, t3);
+
+    size_t t22 = a.find_first<Greater>(0x100);
+    CHECK_EQUAL(t22, not_found);
 
     int64_t t4;
     a.minimum(t4);
     CHECK_EQUAL(0x33, t4);
 
     int64_t t5;
-    a.maximum(t5);
+     a.maximum(t5);
     CHECK_EQUAL(0x100, t5);
 
     int64_t t6;

@@ -23,6 +23,8 @@
 
 #include <algorithm>
 
+#include <realm/binary_data.hpp>
+
 
 namespace realm {
 namespace _impl {

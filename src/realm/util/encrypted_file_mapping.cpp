@@ -43,25 +43,10 @@ void dlsym_cast(T& ptr, const char *name) {
     ptr = reinterpret_cast<T>(reinterpret_cast<size_t>(addr));
 }
 
-size_t cached_page_size;
-void get_page_size()
-{
-    long size = sysconf(_SC_PAGESIZE);
-    REALM_ASSERT(size > 0 && size % 4096 == 0 &&
-                   static_cast<unsigned long>(size) < std::numeric_limits<size_t>::max());
-    cached_page_size = static_cast<size_t>(size);
-}
 } // anonymous namespace
 
 namespace realm {
 namespace util {
-
-size_t page_size()
-{
-    static pthread_once_t once = PTHREAD_ONCE_INIT;
-    pthread_once(&once, get_page_size);
-    return cached_page_size;
-}
 
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
 : fd(fd), cryptor(key)

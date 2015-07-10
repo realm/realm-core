@@ -45,8 +45,8 @@ namespace realm {
 
 // FIXME: Checking on same Table* requires that ~Table checks and nullifies on match. Another option would be to store m_selected_table as a TableRef. Yet another option would be to assign unique identifiers to each Table instance vial Allocator. Yet another option would be to explicitely invalidate subtables recursively when parent is modified.
 
-/// Replication is enabled by passing an instance of an implementation
-/// of this class to the SharedGroup constructor.
+/// Replication is enabled by passing an instance of an implementation of this
+/// class to the SharedGroup constructor.
 class Replication: public _impl::TransactLogConvenientEncoder, protected _impl::TransactLogStream {
 public:
     // Be sure to keep this type aligned with what is actually used in
@@ -98,76 +98,116 @@ public:
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
         REALM_NOEXCEPT;
 
-    /// Acquire permision to start a new 'write' transaction. This
-    /// function must be called by a client before it requests a
-    /// 'write' transaction. This ensures that the local shared
-    /// database is up-to-date. During the transaction, all
-    /// modifications must be posted to this Replication instance as
-    /// calls to set_value() and friends. After the completion of the
-    /// transaction, the client must call either
-    /// commit_write_transact() or rollback_write_transact().
-    ///
-    /// \throw Interrupted If this call was interrupted by an
-    /// asynchronous call to interrupt().
-    void begin_write_transact(SharedGroup&);
 
-    /// Commit the accumulated transaction log. The transaction log
-    /// may not be committed if any of the functions that submit data
-    /// to it, have failed or been interrupted. This operation will
-    /// block until the local coordinator reports that the transaction
-    /// log has been dealt with in a manner that makes the transaction
-    /// persistent. This operation may be interrupted by an
-    /// asynchronous call to interrupt().
-    ///
-    /// \throw Interrupted If this call was interrupted by an
-    /// asynchronous call to interrupt().
-    ///
-    /// FIXME: In general the transaction will be considered complete
-    /// even if this operation is interrupted. Is that ok?
-    version_type commit_write_transact(SharedGroup&, version_type orig_version);
+    //@{
 
-    /// Called by a client to discard the accumulated transaction
-    /// log. This function must be called if a write transaction was
-    /// successfully initiated, but one of the functions that submit
-    /// data to the transaction log has failed or has been
-    /// interrupted. It must also be called after a failed or
-    /// interrupted call to commit_write_transact().
-    void rollback_write_transact(SharedGroup&) REALM_NOEXCEPT;
+    /// From the point of view of the Replication class, a transaction is
+    /// initiated when, and only when the associated SharedGroup object calls
+    /// initiate_transact() and the call is successful. The associated
+    /// SharedGroup object must terminate every such transaction either by
+    /// calling finalize_commit() or by calling abort_transact(). It may only
+    /// call finalize_commit(), however, after calling prepare_commit(), and
+    /// only when prepare_commit() succeeds. If prepare_commit() fails (i.e.,
+    /// throws) abort_transact() must still be called.
+    ///
+    /// The associated SharedGroup object is supposed to terminate a transaction
+    /// as soon as possible, and is required to terminate it before attempting
+    /// to initiate a new one.
+    ///
+    /// initiate_transact() is called by the associated SharedGroup object as
+    /// part of the initiation of a transaction, and at a time where the caller
+    /// has acquired excluse write access to the local Realm. The Replication
+    /// implementation is allowed perform "precursor transactions" on the local
+    /// Realm at this time. During the impending transaction, the associated
+    /// SharedGroup object must inform the Replication object of all modifying
+    /// operations by calling set_value() and friends.
+    ///
+    /// FIXME: There is currently no way for implementations to perform
+    /// precursor transactions, since a regular transaction would cause a dead
+    /// lock when it tries to acquire a write lock. Consider allowing special
+    /// non-locking precursor transactions via an extra argument to this
+    /// function.
+    ///
+    /// prepare_commit() serves as the first phase of a two-phase commit. This
+    /// function is called by the associated SharedGroup instance immediately
+    /// before the commit operation on the local Realm. The associated
+    /// SharedGroup object will then, as the second phase, call either
+    /// finalize_commit() or abort_transact() depending on whether the commit
+    /// operation suceeded or not.
+    ///
+    /// initiate_transact() and prepare_commit() are allowed to block the
+    /// calling thread if, for example, they need to communicate over the
+    /// network. If a calling thread is blocked in one of these functions, it
+    /// must be possible to interrupt the blocking operation by having another
+    /// thread call interrupt(). The contract is as follows: When interrupt() is
+    /// called, then any execution of initiate_transact() or prepare_commit(),
+    /// initiated before the interruption, must complete without blocking, or
+    /// the execution must be aborted by throwing an Interrupted exception. If
+    /// initiate_transact() or prepare_commit() throws Interrupted, it counts as
+    /// a failed operation.
+    ///
+    /// finalize_commit() is called by the associated SharedGroup instance
+    /// immediately after a successful commit operation on the local Realm.
+    ///
+    /// abort_transact() is called by the associated SharedGroup object to
+    /// terminate a transaction without committing. That is, any transaction
+    /// that is not terminated by finalize_commit() is terminated by
+    /// abort_transact(). This could be due to an explicit rollback, or due to a
+    /// failed commit attempt.
+    ///
+    /// Note that finalize_commit() and abort_transact() are not allowed to
+    /// throw.
+    ///
+    /// \param shared_group The associated SharedGRoup object.
+    ///
+    /// \param current_version The version of the snapshot that the current
+    /// transaction is based on.
+    ///
+    /// \return prepare_commit() returns the version of the new snapshot
+    /// produced by the transaction.
+    ///
+    /// \throw Interrupted Thrown by initiate_transact() and prepare_commit() if
+    /// a blocking operation was interrupted.
 
-    /// Interrupt any blocking call to a function in this class. This
-    /// function may be called asyncronously from any thread, but it
-    /// may not be called from a system signal handler.
+    void initiate_transact(SharedGroup& shared_group, version_type current_version);
+    version_type prepare_commit(SharedGroup& shared_group, version_type current_version);
+    void finalize_commit(SharedGroup& shared_group) REALM_NOEXCEPT;
+    void abort_transact(SharedGroup& shared_group) REALM_NOEXCEPT;
+
+    //@}
+
+
+    /// Interrupt any blocking call to a function in this class. This function
+    /// may be called asyncronously from any thread, but it may not be called
+    /// from a system signal handler.
     ///
-    /// Some of the public function members of this class may block,
-    /// but only when it it is explicitely stated in the documention
-    /// for those functions.
+    /// Some of the public function members of this class may block, but only
+    /// when it it is explicitely stated in the documention for those functions.
     ///
-    /// FIXME: Currently we do not state blocking behaviour for all
-    /// the functions that can block.
+    /// FIXME: Currently we do not state blocking behaviour for all the
+    /// functions that can block.
     ///
-    /// After any function has returned with an interruption
-    /// indication, the only functions that may safely be called are
-    /// rollback_write_transact() and the destructor. If a client,
-    /// after having received an interruption indication, calls
-    /// rollback_write_transact() and then clear_interrupt(), it may
+    /// After any function has returned with an interruption indication, the
+    /// only functions that may safely be called are abort_transact() and the
+    /// destructor. If a client, after having received an interruption
+    /// indication, calls abort_transact() and then clear_interrupt(), it may
     /// resume normal operation through this Replication instance.
     void interrupt() REALM_NOEXCEPT;
 
-    /// May be called by a client to reset this replication instance
-    /// after an interrupted transaction. It is not an error to call
-    /// this function in a situation where no interruption has
-    /// occured.
+    /// May be called by a client to reset this replication instance after an
+    /// interrupted transaction. It is not an error to call this function in a
+    /// situation where no interruption has occured.
     void clear_interrupt() REALM_NOEXCEPT;
 
-    /// Called by the local coordinator to apply a transaction log
-    /// received from another local coordinator.
+    /// Called by the local coordinator to apply a transaction log received from
+    /// another local coordinator.
     ///
-    /// \param apply_log If specified, and the library was compiled in
-    /// debug mode, then a line describing each individual operation
-    /// is writted to the specified stream.
+    /// \param apply_log If specified, and the library was compiled in debug
+    /// mode, then a line describing each individual operation is writted to the
+    /// specified stream.
     ///
-    /// \throw BadTransactLog If the transaction log could not be
-    /// successfully parsed, or ended prematurely.
+    /// \throw BadTransactLog If the transaction log could not be successfully
+    /// parsed, or ended prematurely.
     static void apply_changeset(InputStream& transact_log, Group& target,
                                 std::ostream* apply_log = 0);
 
@@ -178,29 +218,47 @@ protected:
 
     virtual std::string do_get_database_path() = 0;
 
-    /// As part of the initiation of a write transaction, this method
-    /// is supposed to update `m_transact_log_free_begin` and
-    /// `m_transact_log_free_end` such that they refer to a (possibly
-    /// empty) chunk of free space.
-    virtual void do_begin_write_transact(SharedGroup&) = 0;
 
-    /// The caller guarantees that `m_transact_log_free_begin` marks
-    /// the end of payload data in the transaction log.
-    virtual version_type do_commit_write_transact(SharedGroup&, version_type orig_version) = 0;
+    //@{
+
+    /// do_initiate_transact() is called by initiate_transact(), and likewise
+    /// for do_prepare_commit), do_finalize_commit(), and do_abort_transact().
+    ///
+    /// Implementations are allowed to assume that every call to
+    /// do_initiate_transact(), do_prepapre_commit(), do_finalize_commit(), and
+    /// do_abort_transact() will pass a reference to the same SharedGroup
+    /// object.
+    ///
+    /// With respect to exception safety, the Replication implementation has two
+    /// options: It can prepare to accept the accumulated changeset in
+    /// do_prepapre_commit() by allocating all required resources, and delay the
+    /// actual acceptance to do_finalize_commit(), which requires that the final
+    /// acceptance can be done without any risk of failure. Alternatively, the
+    /// Replication implementation can fully accept the changeset in
+    /// do_prepapre_commit() (allowing for failure), and then discard that
+    /// changeset during the next invocation of do_initiate_transact() if
+    /// `current_version` indicates that the previous transaction failed.
+
+    virtual void do_initiate_transact(SharedGroup&, version_type current_version) = 0;
+    virtual version_type do_prepare_commit(SharedGroup&, version_type orig_version) = 0;
+    virtual void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT = 0;
+    virtual void do_abort_transact(SharedGroup&) REALM_NOEXCEPT = 0;
+
+    //@}
+
 
     virtual void do_interrupt() REALM_NOEXCEPT = 0;
 
     virtual void do_clear_interrupt() REALM_NOEXCEPT = 0;
 
-    // Part of a temporary ugly hack to avoid generating new
-    // transaction logs during application of ones that have olready
-    // been created elsewhere. See
-    // ReplicationImpl::do_begin_write_transact() in
+    // Part of a temporary ugly hack to avoid generating new transaction logs
+    // during application of ones that have olready been created elsewhere. See
+    // ReplicationImpl::do_initiate_transact() in
     // realm/replication/simplified/provider.cpp for more on this.
     static void set_replication(Group&, Replication*) REALM_NOEXCEPT;
 
-    /// Must be called only from do_begin_write_transact(),
-    /// do_commit_write_transact().
+    /// Must be called only from do_initiate_transact(), do_prepare_commit(), or
+    /// do_abort_transact().
     static version_type get_current_version(SharedGroup&);
 
     friend class _impl::TransactReverser;
@@ -230,24 +288,28 @@ protected:
 
     TrivialReplication(const std::string& database_file);
 
-    virtual void handle_transact_log(const char* data, std::size_t size,
-                                     version_type new_version) = 0;
+    virtual void prepare_changeset(const char* data, std::size_t size,
+                                   version_type new_version) = 0;
+
+    virtual void finalize_changeset() REALM_NOEXCEPT = 0;
 
     static void apply_changeset(const char* data, std::size_t size, SharedGroup& target,
                                 std::ostream* apply_log = 0);
-    void prepare_to_write();
 
 private:
     const std::string m_database_file;
     util::Buffer<char> m_transact_log_buffer;
 
     std::string do_get_database_path() override;
-    void do_begin_write_transact(SharedGroup&) override;
-    version_type do_commit_write_transact(SharedGroup&, version_type orig_version) override;
+    void do_initiate_transact(SharedGroup&, version_type) override;
+    version_type do_prepare_commit(SharedGroup&, version_type orig_version) override;
+    void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT override;
+    void do_abort_transact(SharedGroup&) REALM_NOEXCEPT override;
     void do_interrupt() REALM_NOEXCEPT override;
     void do_clear_interrupt() REALM_NOEXCEPT override;
     void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) override;
-    void transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end) override;
+    void transact_log_append(const char* data, std::size_t size, char** new_begin,
+                             char** new_end) override;
     void internal_transact_log_reserve(std::size_t, char** new_begin, char** new_end);
 
     std::size_t transact_log_size();
@@ -284,20 +346,26 @@ inline void Replication::set_last_version_seen_locally(version_type) REALM_NOEXC
 {
 }
 
-inline void Replication::begin_write_transact(SharedGroup& sg)
+inline void Replication::initiate_transact(SharedGroup& sg, version_type current_version)
 {
-    do_begin_write_transact(sg);
+    do_initiate_transact(sg, current_version);
     reset_selection_caches();
 }
 
 inline Replication::version_type
-Replication::commit_write_transact(SharedGroup& sg, version_type orig_version)
+Replication::prepare_commit(SharedGroup& sg, version_type orig_version)
 {
-    return do_commit_write_transact(sg, orig_version);
+    return do_prepare_commit(sg, orig_version);
 }
 
-inline void Replication::rollback_write_transact(SharedGroup&) REALM_NOEXCEPT
+inline void Replication::finalize_commit(SharedGroup& sg) REALM_NOEXCEPT
 {
+    do_finalize_commit(sg);
+}
+
+inline void Replication::abort_transact(SharedGroup& sg) REALM_NOEXCEPT
+{
+    do_abort_transact(sg);
 }
 
 inline void Replication::interrupt() REALM_NOEXCEPT

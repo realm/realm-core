@@ -5418,7 +5418,7 @@ TEST(Query_AllTypesDynamicallyTyped)
     const char bin[4] = { 0, 1, 2, 3 };
     BinaryData bin1(bin, sizeof bin / 2);
     BinaryData bin2(bin, sizeof bin);
-    time_t time_now = time(0);
+    int_fast64_t time_now = time(0);
     Mixed mix_int(int64_t(1));
     Mixed mix_subtab((Mixed::subtable_tag()));
 
@@ -5534,7 +5534,7 @@ TEST(Query_AllTypesStaticallyTyped)
     const char bin[4] = { 0, 1, 2, 3 };
     BinaryData bin1(bin, sizeof bin / 2);
     BinaryData bin2(bin, sizeof bin);
-    time_t time_now = time(0);
+    int_fast64_t time_now = time(0);
     TestQuerySub subtab;
     subtab.add(100);
     Mixed mix_int(int64_t(1));
@@ -6220,7 +6220,7 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
-ONLY(Query_IntegerNullNGSyntax)
+TEST(Query_IntegerNullNGSyntax)
 {
 /*
     Price<int>      Shipping<int>       Description<String>     Rating<double>
@@ -6258,7 +6258,7 @@ ONLY(Query_IntegerNullNGSyntax)
     Columns<Int> shipping = table->column<Int>(1);
     size_t t;
     
-    /*
+    
     t = (price == null()).find();
     CHECK_EQUAL(t, 0);
 
@@ -6275,11 +6275,10 @@ ONLY(Query_IntegerNullNGSyntax)
 
     t = (price != shipping).find();
     CHECK_EQUAL(t, 1); // 10 != null
-    */
+    
     //  null < 0   == false
     //  null > 0   == false
     // (null == 0) == false
-
     t = table->where().less(0, null()).find();
     CHECK_EQUAL(t, not_found);
 
@@ -6290,12 +6289,21 @@ ONLY(Query_IntegerNullNGSyntax)
     CHECK_EQUAL(t, 1);
 
 
+    t = table->where().less(0, 0).find();
+    CHECK_EQUAL(t, not_found);
+
+    t = table->where().equal(0, 0).find();
+    CHECK_EQUAL(t, not_found);
+    
+    t = table->where().greater(0, 0).find();
+    CHECK_EQUAL(t, 1);
+
     t = (price < 0 || price > 0 || price == 0).find();
     CHECK_EQUAL(t, 1);
 
     // Shows that null + null == null, and 10 + null == null, and null < 100 == false
-  //  t = (price + shipping < 100).find();
-  //  CHECK_EQUAL(t, 2);
+    t = (price + shipping < 100).find();
+    CHECK_EQUAL(t, 2);
 }
 
 #endif // TEST_QUERY

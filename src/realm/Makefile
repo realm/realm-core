@@ -38,6 +38,7 @@ spec.hpp \
 impl/array_writer.hpp \
 impl/destroy_guard.hpp \
 impl/output_stream.hpp \
+impl/simulated_failure.hpp \
 datetime.hpp \
 string_data.hpp \
 impl/input_stream.hpp \
@@ -58,6 +59,7 @@ descriptor.hpp \
 group.hpp \
 group_shared.hpp \
 history.hpp \
+handover_defs.hpp \
 $(REPLICATION_HPP) \
 query.hpp \
 query_conditions.hpp \
@@ -119,7 +121,6 @@ util/terminate.cpp \
 util/thread.cpp \
 util/network.cpp \
 util/platform_specific_condvar.cpp \
-$(REPLICATION_CPP) \
 alloc.cpp \
 alloc_slab.cpp \
 array.cpp \
@@ -140,7 +141,6 @@ column_mixed.cpp \
 column_string.cpp \
 column_string_enum.cpp \
 column_table.cpp \
-commit_log.cpp \
 descriptor.cpp \
 exceptions.cpp \
 group.cpp \
@@ -148,6 +148,7 @@ group_shared.cpp \
 group_writer.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
+impl/simulated_failure.cpp \
 importer.cpp \
 index_string.cpp \
 lang_bind_helper.cpp \
@@ -162,6 +163,8 @@ unicode.cpp \
 utilities.cpp \
 version.cpp \
 views.cpp \
+$(REPLICATION_CPP) \
+commit_log.cpp \
 
 # Format: CURRENT[:REVISION[:AGE]]
 #

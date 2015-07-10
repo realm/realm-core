@@ -54,6 +54,19 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
 
 #endif
 
+size_t get_page_size()
+{
+#ifdef _WIN32
+    SYSTEM_INFO sysinfo;
+    GetNativeSystemInfo(&sysinfo);
+    DWORD size = sysinfo.dwPageSize;
+#else
+    long size = sysconf(_SC_PAGESIZE);
+#endif
+    REALM_ASSERT(size > 0 && size % 4096 == 0);
+    return static_cast<size_t>(size);
+}
+
 
 } // anonymous namespace
 
@@ -154,6 +167,12 @@ std::string make_temp_dir()
     return buffer.str();
 
 #endif
+}
+
+size_t page_size()
+{
+    static size_t cached_page_size = get_page_size(); // thread safe in C++11
+    return cached_page_size;
 }
 
 

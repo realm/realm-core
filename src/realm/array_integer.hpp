@@ -173,15 +173,21 @@ public:
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
+    template<class cond> std::size_t find_first(null, std::size_t start = 0, std::size_t end = npos) const;
+
+
     template<class cond>
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = npos) const;
 
+    std::size_t find_first(null, std::size_t begin = 0, std::size_t end = npos) const;
+
     void find_all(Column* result, int64_t value, std::size_t col_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
-    std::size_t find_first(int64_t value, std::size_t begin = 0,
-                           std::size_t end = npos) const;
+
+    std::size_t find_first(int64_t value, std::size_t begin = 0, std::size_t end = npos) const;
+
 
     // Overwrite Array::bptree_leaf_insert to correctly split nodes.
     ref_type bptree_leaf_insert(std::size_t ndx, int64_t value, TreeInsertBase& state);
@@ -599,7 +605,12 @@ bool ArrayIntNull::find(int cond, Action action, null, std::size_t start, std::s
     if (end != npos) {
         ++end;
     }
-    return Array::find(cond, action, null_value(), start, end, baseindex - 1, state);
+    size_t found = Array::find(cond, action, null_value(), start, end, baseindex - 1, state);
+
+    if (found == not_found)
+        return not_found;
+
+    return found - 1;
 }
 
 
@@ -668,33 +679,47 @@ bool ArrayIntNull::find_action_pattern(std::size_t index, uint64_t pattern, Quer
 }
 
 
-template<class cond>
-std::size_t ArrayIntNull::find_first(int64_t value, std::size_t start, std::size_t end) const
+template<class cond> std::size_t ArrayIntNull::find_first(null, std::size_t start, std::size_t end) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
+    // All variables (found, start, end) are kept relative to ArrayIntNull
+    if (end == npos) 
+        end = size();
+
+    cond c;
+
+    for (size_t t = start; t < end; t++) {
+        if (c(get(t), int64_t(0), is_null(t), true)) // 0 is a dummy, not used
+            return t;
     }
-    std::size_t found = Array::find_first<cond>(value, start, end);
-    if (found != npos) {
-        --found;
-    }
-    return found;
+    return not_found;
 }
 
-inline
-std::size_t ArrayIntNull::find_first(int64_t value, std::size_t begin, std::size_t end) const
+template<class cond> std::size_t ArrayIntNull::find_first(int64_t value, std::size_t start, std::size_t end) const
 {
-    ++begin;
-    if (end != npos) {
-        ++end;
+    // All variables (found, start, end) are kept relative to ArrayIntNull
+    if (end == npos)
+        end = size();
+
+    cond c;
+
+    for (size_t t = start; t < end; t++) {
+        if (c(get(t), value, is_null(t), false))
+            return t;
     }
-    std::size_t found = Array::find_first(value, begin, end);
-    if (found != npos) {
-        --found;
-    }
-    return found;
+    return not_found;
 }
+
+inline std::size_t ArrayIntNull::find_first(null, std::size_t begin, std::size_t end) const
+{
+    return find_first<Equal>(null(), begin, end);
+}
+
+inline std::size_t ArrayIntNull::find_first(int64_t value, std::size_t begin, std::size_t end) const
+{
+    return find_first<Equal>(value, begin, end);
+}
+
+
 
 
 }

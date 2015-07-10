@@ -344,7 +344,7 @@ template<class Spec> class BasicTable<Spec>::Query:
         public Spec::template ColNames<QueryCol, Query*> {
 public:
     Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
-    ~Query() REALM_NOEXCEPT {}
+    virtual ~Query() REALM_NOEXCEPT {}
 
     Query& group() { m_impl.group(); return *this; }
 
@@ -397,10 +397,51 @@ protected:
     Query(const BasicTable<Spec>& table, TableViewBase* tv):
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
+    typedef Query_Handover_patch Handover_patch;
+    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode) : 
+        Spec::template ColNames<QueryCol, Query*>(this), 
+        m_impl(source.m_impl, patch, mode)
+    {
+    }
+
+    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode) : 
+        Spec::template ColNames<QueryCol, Query*>(this), 
+        m_impl(source.m_impl, patch, mode)
+    {
+    }
+
+    void apply_patch(Handover_patch& patch, Group& group)
+    {
+        m_impl.apply_patch(patch, group);
+    }
+
+    virtual std::unique_ptr<Query> 
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
+    {
+        patch.reset(new Handover_patch);
+        std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
+        return retval;
+    }
+
+    virtual std::unique_ptr<Query> 
+    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
+    {
+        patch.reset(new Handover_patch);
+        std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
+        return retval;
+    }
+
+    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        patch.reset();
+    }
+
 private:
     realm::Query m_impl;
 
     friend class BasicTable;
+    friend class SharedGroup;
     template<class, int, class> friend class _impl::QueryColumnBase;
     template<class, int, class> friend class _impl::QueryColumn;
 };

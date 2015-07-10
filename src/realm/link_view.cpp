@@ -25,8 +25,34 @@
 #ifdef REALM_ENABLE_REPLICATION
 #  include <realm/replication.hpp>
 #endif
+#include <realm/table_view.hpp>
 
 using namespace realm;
+
+void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Handover_patch>& patch)
+{
+    if (bool(ref)) {
+        patch.reset(new Handover_patch);
+        patch->m_table_num = ref->m_origin_table->get_index_in_group();
+        patch->m_col_num = ref->m_origin_column.m_column_ndx;
+        patch->m_row_ndx = ref->get_origin_row_index();
+    }
+    else
+        patch.reset();
+}
+
+
+LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group) 
+{
+    if (patch) {
+        TableRef tr(group.get_table(patch->m_table_num));
+        LinkViewRef result = tr->get_linklist(patch->m_col_num, patch->m_row_ndx);
+        patch.reset();
+        return result;
+    }
+    else
+        return LinkViewRef();
+}
 
 
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
@@ -125,6 +151,28 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_move(*this, old_link_ndx, new_link_ndx); // Throws
+#endif
+}
+
+void LinkView::swap(size_t link1_ndx, size_t link2_ndx)
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(m_row_indexes.is_attached());
+    REALM_ASSERT_3(link1_ndx, <, m_row_indexes.size());
+    REALM_ASSERT_3(link2_ndx, <, m_row_indexes.size());
+
+    if (link1_ndx == link2_ndx)
+        return;
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
+
+    size_t target_row_ndx = m_row_indexes.get(link1_ndx);
+    m_row_indexes.set(link1_ndx, m_row_indexes.get(link2_ndx));
+    m_row_indexes.set(link2_ndx, target_row_ndx);
+
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->link_list_swap(*this, link1_ndx, link2_ndx); // Throws
 #endif
 }
 
@@ -261,7 +309,8 @@ void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
 #endif
-    RowIndexes::sort(columns, ascending);
+    Sorter predicate(columns, ascending);
+    RowIndexes::sort(predicate);
 }
 
 TableView LinkView::get_sorted_view(std::vector<size_t> column_indexes, std::vector<bool> ascending) const
@@ -320,6 +369,11 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
 
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
     REALM_ASSERT_3(pos, !=, realm::not_found);
+
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = m_origin_table->get_repl())
+        repl->link_list_nullify(*this, pos);
+#endif
 
     bool is_last = (pos + 1 == m_row_indexes.size());
     m_row_indexes.erase(pos, is_last);
