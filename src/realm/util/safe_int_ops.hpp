@@ -476,7 +476,7 @@ template<class T> inline bool is_negative(T value) REALM_NOEXCEPT
 
 template<class To, class From> inline To cast_to_unsigned(From value) REALM_NOEXCEPT
 {
-	return _impl::CastToUnsigned<To>::cast(value);
+    return _impl::CastToUnsigned<To>::cast(value);
 }
 
 template<class A, class B> inline bool int_equal_to(A a, B b) REALM_NOEXCEPT

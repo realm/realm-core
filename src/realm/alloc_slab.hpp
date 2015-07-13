@@ -27,6 +27,7 @@
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/alloc.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 namespace realm {
 
@@ -173,27 +174,41 @@ public:
     /// as what is returned by get_baseline().
     void prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
-    /// Reserve disk space now to avoid allocation errors at a later
-    /// point in time, and to minimize on-disk fragmentation. In some
-    /// cases, less fragmentation translates into improved
-    /// performance.
+    /// Resize the file that this allocator is attached to using
+    /// File::prealloc(), and then call File::sync().
     ///
-    /// When supported by the system, a call to this function will
-    /// make the database file at least as big as the specified size,
-    /// and cause space on the target device to be allocated (note
-    /// that on many systems on-disk allocation is done lazily by
-    /// default). If the file is already bigger than the specified
-    /// size, the size will be unchanged, and on-disk allocation will
-    /// occur only for the initial section that corresponds to the
-    /// specified size. On systems that do not support preallocation,
-    /// this function has no effect. To know whether preallocation is
-    /// supported by Realm on your platform, call
-    /// util::File::is_prealloc_supported().
+    /// Note: File::prealloc() may misbehave under race conditions (see
+    /// documentation of File::prealloc()). For that reason, to avoid race
+    /// conditions, when this allocator is used in a transactional mode, this
+    /// function may be called only when the caller has exclusive write
+    /// access. In non-transactional mode it is the responsibility of the user
+    /// to ensure non-concurrent file mutation.
     ///
-    /// It is an error to call this function on an allocator that is
-    /// not attached to a file. Doing so will result in undefined
-    /// behavior.
-    void reserve(std::size_t size_in_bytes);
+    /// This function will call File::sync().
+    ///
+    /// It is an error to call this function on an allocator that is not
+    /// attached to a file. Doing so will result in undefined behavior.
+    void resize_file(size_t new_file_size);
+
+    /// Reserve disk space now to avoid allocation errors at a later point in
+    /// time, and to minimize on-disk fragmentation. In some cases, less
+    /// fragmentation translates into improved performance.
+    ///
+    /// When supported by the system, a call to this function will make the
+    /// database file at least as big as the specified size, and cause space on
+    /// the target device to be allocated (note that on many systems on-disk
+    /// allocation is done lazily by default). If the file is already bigger
+    /// than the specified size, the size will be unchanged, and on-disk
+    /// allocation will occur only for the initial section that corresponds to
+    /// the specified size. On systems that do not support preallocation, this
+    /// function has no effect. To know whether preallocation is supported by
+    /// Realm on your platform, call util::File::is_prealloc_supported().
+    ///
+    /// This function will call File::sync() if it changes the size of the file.
+    ///
+    /// It is an error to call this function on an allocator that is not
+    /// attached to a file. Doing so will result in undefined behavior.
+    void reserve_disk_space(size_t size_in_bytes);
 
     /// Get the size of the attached database file or buffer in number
     /// of bytes. This size is not affected by new allocations. After
@@ -419,9 +434,20 @@ inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<ch
     do_prepare_for_update(mutable_data, mapping);
 }
 
-inline void SlabAlloc::reserve(std::size_t size)
+inline void SlabAlloc::resize_file(size_t new_file_size)
 {
-    m_file.prealloc_if_supported(0, size);
+    m_file.prealloc(0, new_file_size); // Throws
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        m_file.sync(); // Throws
+}
+
+inline void SlabAlloc::reserve_disk_space(size_t size)
+{
+    m_file.prealloc_if_supported(0, size); // Throws
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        m_file.sync(); // Throws
 }
 
 inline SlabAlloc::DetachGuard::~DetachGuard() REALM_NOEXCEPT

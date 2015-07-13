@@ -79,7 +79,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v140_xp</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -609,6 +609,8 @@
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
     <ClCompile Include="..\..\src\realm\commit_log.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
+    <ClCompile Include="..\..\src\realm\disable_sync_to_disk.cpp" />
+    <ClCompile Include="..\..\src\realm\impl\simulated_failure.cpp" />
     <ClCompile Include="..\..\src\realm\impl\transact_log.cpp" />
     <ClCompile Include="..\..\src\realm\link_view.cpp" />
     <ClCompile Include="..\..\src\realm\query_engine.cpp" />
@@ -682,6 +684,7 @@
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
     <ClCompile Include="..\..\test\test_basic_utils.cpp" />
+    <ClCompile Include="..\..\test\test_optional.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp" />
     <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\..\test\util\jsmn.cpp" />
@@ -1103,12 +1106,14 @@
     <ClInclude Include="..\..\src\realm\commit_log.hpp" />
     <ClInclude Include="..\..\src\realm\descriptor.hpp" />
     <ClInclude Include="..\..\src\realm\descriptor_fwd.hpp" />
+    <ClInclude Include="..\..\src\realm\disable_sync_to_disk.hpp" />
     <ClInclude Include="..\..\src\realm\exceptions.hpp" />
     <ClInclude Include="..\..\src\realm\history.hpp" />
     <ClInclude Include="..\..\src\realm\impl\array_writer.hpp" />
     <ClInclude Include="..\..\src\realm\impl\destroy_guard.hpp" />
     <ClInclude Include="..\..\src\realm\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\realm\impl\output_stream.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\simulated_failure.hpp" />
     <ClInclude Include="..\..\src\realm\impl\transact_log.hpp" />
     <ClInclude Include="..\..\src\realm\importer.hpp" />
     <ClInclude Include="..\..\src\realm\link_view.hpp" />
