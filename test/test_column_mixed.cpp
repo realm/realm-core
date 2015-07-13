@@ -404,4 +404,24 @@ TEST(ColumnMixed_SubtableSize)
 }
 
 
+TEST(ColumnMixed_WriteLeak)
+{
+    class NullBuffer : public std::streambuf { public: int overflow(int c) { return c; } };
+
+    NullBuffer null_buffer;
+    std::ostream null_stream(&null_buffer);
+    _impl::OutputStream out(null_stream);
+
+    ref_type ref = ColumnMixed::create(Allocator::get_default());
+    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+
+    c.insert_subtable(0, 0);
+    c.insert_subtable(1, 0);
+
+    c.write(0, 2, 2, out);
+
+    c.destroy();
+}
+
+
 #endif // TEST_COLUMN_MIXED
