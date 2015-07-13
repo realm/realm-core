@@ -150,10 +150,7 @@ struct TestingReferenceBinding {
         REALM_ASSERT(&ii == &global_i);
     }
 
-    void operator=(int&&)
-    {
-        REALM_ASSERT(false);
-    }
+    void operator=(int&&) = delete;
 };
 }
 
@@ -161,7 +158,11 @@ TEST(Optional_ReferenceBinding)
 {
     const int& iref = global_i;
     CHECK_EQUAL(&iref, &global_i);
-    TestingReferenceBinding ttt = global_i;
+    // FIXME: The following line (assignment copy-constructor) fails on GCC 5.1.1 due to a regression in GCC:
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66857
+    // Passing global_i as ctor argument fixes the issue.
+    // TestingReferenceBinding ttt = global_i;
+    TestingReferenceBinding ttt(global_i);
     ttt = global_i;
     TestingReferenceBinding ttt2 = iref;
     ttt2 = iref;
