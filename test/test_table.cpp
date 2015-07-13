@@ -6019,7 +6019,7 @@ TEST_TYPES(Test_RenameColumn, non_nullable, nullable)
     t.set_bool(1, 0, true);
 
     size_t column_index = 0;
-    StringData column_name = t.get_column_name(column_index);
+    std::string column_name = t.get_column_name(column_index).data();
     CHECK_EQUAL("string", column_name.data());
     DataType column_type = t.get_column_type(column_index);
     size_t tmp_column_index = t.add_column(column_type, "gnirts", nullable);
