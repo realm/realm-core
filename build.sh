@@ -729,7 +729,7 @@ EOF
             cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
         done
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-ios" "realm-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_IOS" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-ios" "realm-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_IOS" AR="libtool" ARFLAGS="-o" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
         echo "Creating '$IPHONE_DIR/librealm-ios.a'"
         libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$IPHONE_DIR/librealm-ios.a"     || exit 1
@@ -784,7 +784,7 @@ EOF
             cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
         done
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-watchos" "realm-config-watchos-dbg" BASE_DENOM="watchos" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_WATCHOS" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-watchos" "realm-config-watchos-dbg" BASE_DENOM="watchos" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_WATCHOS" AR="libtool" ARFLAGS="-o" || exit 1
         mkdir -p "$WATCHOS_DIR" || exit 1
         echo "Creating '$WATCHOS_DIR/librealm-watchos.a'"
         libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$WATCHOS_DIR/librealm-watchos.a"     || exit 1
