@@ -5991,6 +5991,60 @@ TEST(Table_Nulls)
         CHECK(t.is_null(2, 1));
     }
 }
+
+namespace {
+
+struct nullable {
+    static constexpr bool value = true;
+};
+
+struct non_nullable {
+    static constexpr bool value = false;
+};
+
+} // anonymous namespace
+
+TEST_TYPES(Test_RenameColumn, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    Table t;
+    
+    t.add_column(type_String, "string", false);
+    t.add_column(type_Bool, "bool", false);
+    // Table: ["string": type_String, "bool": type_Bool]
+
+    t.add_empty_row();
+    t.set_string(0, 0, "Foo");
+    t.set_bool(1, 0, true);
+
+    size_t column_index = 0;
+    StringData column_name = t.get_column_name(column_index);
+    CHECK_EQUAL("string", column_name.data());
+    DataType column_type = t.get_column_type(column_index);
+    size_t tmp_column_index = t.add_column(column_type, "gnirts", nullable);
+    
+    // Table: ["string": type_String, "bool": type_Bool, "gnirts": type_String]
+    CHECK_EQUAL(3, t.get_column_count());
+
+    for(size_t i = 0; i < t.size(); ++i) {
+        t.set_string(tmp_column_index, i, t.get_string(column_index, i));
+    }
+    t.remove_column(column_index);
+    // Table: ["bool": type_Bool, "gnirts": type_String]
+    CHECK_EQUAL(2, t.get_column_count());
+    CHECK_EQUAL("bool", t.get_column_name(0));
+    CHECK_EQUAL("gnirts", t.get_column_name(1));
+
+    t.rename_column(t.get_column_index("gnirts"), column_name);
+
+    // Table: ["bool": type_Bool, "string": type_String]
+    CHECK_EQUAL(0, t.get_column_index("bool"));
+
+    CHECK_EQUAL(type_String, t.get_column_type(1));
+    CHECK_EQUAL("string", t.get_column_name(1));
+    CHECK_EQUAL(1, t.get_column_index("string"));
+}
 #endif 
 
 #endif // TEST_TABLE
