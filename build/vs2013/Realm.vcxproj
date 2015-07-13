@@ -683,6 +683,7 @@
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
     <ClCompile Include="..\..\test\test_basic_utils.cpp" />
+    <ClCompile Include="..\..\test\test_optional.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp" />
     <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\..\test\util\jsmn.cpp" />

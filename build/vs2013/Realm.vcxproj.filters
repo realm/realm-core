@@ -115,6 +115,7 @@
     <ClCompile Include="..\..\src\realm\util\basic_system_errors.cpp" />
     <ClCompile Include="..\..\src\realm\util\misc_errors.cpp" />
     <ClCompile Include="..\..\src\realm\impl\simulated_failure.cpp" />
+    <ClCompile Include="..\..\test\test_optional.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
