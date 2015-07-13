@@ -150,10 +150,7 @@ struct TestingReferenceBinding {
         REALM_ASSERT(&ii == &global_i);
     }
 
-    void operator=(int&&)
-    {
-        REALM_ASSERT(false);
-    }
+    void operator=(int&&) = delete;
 };
 }
 
