@@ -58,6 +58,7 @@ class Group;
 class Query {
 public:
     Query(const Table& table, TableViewBase* tv = nullptr);
+    Query(const Table& table, std::unique_ptr<TableViewBase>);
     Query(const Table& table, const LinkViewRef& lv);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this

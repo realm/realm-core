@@ -242,8 +242,10 @@ public:
     // Return file position (like ftell())
     SizeType get_file_position();
 
-    /// Flush in-kernel buffers to disk. This blocks the caller until
-    /// the synchronization operation is complete.
+    /// Flush in-kernel buffers to disk. This blocks the caller until the
+    /// synchronization operation is complete. On POSIX systems this function
+    /// calls `fsync()`. On Apple platforms if calls `fcntl()` with command
+    /// `F_FULLFSYNC`.
     void sync();
 
     /// Place an exclusive lock on this file. This blocks the caller
