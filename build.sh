@@ -576,7 +576,7 @@ case "$MODE" in
                         watchos_sdks_avail="no"
                     else
                         if [ "$x" = "WatchSimulator" ]; then
-                            archs="i386,x86_64"
+                            archs="i386"
                         elif [ "$x" = "WatchOS" ]; then
                             archs="armv7k"
                         else
