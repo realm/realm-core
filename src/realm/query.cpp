@@ -513,9 +513,9 @@ Query& Query::equal(size_t column_ndx, null)
     return *this;
 }
 
-Query& Query::not_equal(size_t column_ndx, null n)
+Query& Query::not_equal(size_t column_ndx, null)
 {
-    add_condition<NotEqual>(column_ndx, n);
+    add_condition<NotEqual>(column_ndx, null());
     return *this;
 }
 

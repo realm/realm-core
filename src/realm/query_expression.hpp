@@ -1456,12 +1456,14 @@ public:
     {
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table; 
+        nullable = m_link_map.m_table->is_nullable(m_column);
     }
 
     Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
                                                  m_column(column)
     {
         m_table = table;
+        nullable = m_table->is_nullable(column);
     }
 
 
@@ -1481,6 +1483,7 @@ public:
         n = *this;
         SequentialGetter<C> *s = new SequentialGetter<C>();
         n.sg = s;
+        n.nullable = nullable;
         return n;
 
     }

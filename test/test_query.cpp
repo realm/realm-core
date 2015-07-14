@@ -6057,13 +6057,31 @@ TEST(Query_BinaryNull)
     CHECK_EQUAL(2, t.get_source_ndx(0));
 }
 
-TEST(Query_IntegerNull)
+ONLY(Query_IntegerNullOldQueryEngine)
 {
+/*
+    first   second  third
+     null      100      1
+        0     null      2
+      123      200      3
+      null    null      4
+*/
     Table table;
     table.add_column(type_Int, "first", true);
-    table.add_empty_row(3);
+    table.add_column(type_Int, "second", true);
+    table.add_column(type_Int, "third", false);
+    table.add_empty_row(4);
+
     table.set_int(0, 1, 0);
     table.set_int(0, 2, 123);
+
+    table.set_int(1, 0, 100);
+    table.set_int(1, 2, 200);
+
+    table.set_int(2, 0, 1);
+    table.set_int(2, 1, 2);
+    table.set_int(2, 2, 3);
+    table.set_int(2, 3, 4);
 
     TableView t;
 
@@ -6088,6 +6106,9 @@ TEST(Query_IntegerNull)
     CHECK_EQUAL(0, t.get_source_ndx(0));
     CHECK_EQUAL(2, t.get_source_ndx(1));
     CHECK_EQUAL(2, t.size());
+
+
+
 }
 
 TEST(Query_IntegerNonNull)
@@ -6122,48 +6143,6 @@ TEST(Query_IntegerNonNull)
     // CHECK_EQUAL(0, t.size());
 
     */
-}
-
-// Test nullable integer columns with queries using query_expression.hpp
-TEST(Query_IntegerNull_ExpressionSyntax)
-{
-    size_t match;
-    Table untyped;
-
-    // Test works fine for nullable = false, but asserts for nullable = true.
-    untyped.add_column(type_Int, "firs1", true);
-    untyped.add_column(type_Int, "firs2", true);
-    untyped.add_column(type_Float, "second", false);
-
-    untyped.add_empty_row(4);
-
-    untyped.set_int(0, 0, 44);
-    untyped.set_int(1, 0, 55);
-    untyped.set_float(2, 0, 66.0f);
-
-    untyped.set_int(0, 1, 77);
-    untyped.set_int(1, 1, 88);
-    untyped.set_float(2, 1, 99.0f);
-
-    untyped.set_int(0, 2, 20);
-    untyped.set_null(1, 2);
-    untyped.set_float(2, 2, 90.0f);
-
-    // Enforce use of query_expression.hpp by specifying an advanced query that is not supported by query_engine.hpp.
-    // Search for the REALM_OLDQUERY_FALLBACK flag (in the query_expression.hpp file) to find an explanation of when 
-    // a query will use query_expression.hpp.
-    match = (untyped.column<Int>(0) + untyped.column<Int>(1) == 77 + 88).find();
-    CHECK_EQUAL(match, 1);
-
-    // Should any non-null value compare greater than null?
-    match = (untyped.column<Int>(0) + untyped.column<Int>(1) > null()).find();
-    CHECK_EQUAL(match, not_found);
-
-    TableView tv = (untyped.column<Int>(0) + untyped.column<Int>(1) != null{}).find_all();
-    CHECK_EQUAL(tv.size(), 2);
-
-    tv = (untyped.column<Int>(0) + untyped.column<Int>(1) == null{}).find_all();
-    CHECK_EQUAL(tv.size(), 2);
 }
 
 
@@ -6220,16 +6199,14 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
-TEST(Query_IntegerNullNGSyntax)
+TEST(Query_IntegerNullExpressionSyntax)
 {
 /*
     Price<int>      Shipping<int>       Description<String>     Rating<double>
 0   null            null                null                    1.1 
 1   10              null                "foo"                   2.2
-2   20              30                  "bar"                   3.3
-   
+2   20              30                  "bar"                   3.3 
 */
-
     Group g;
     TableRef table = g.add_table("Inventory");
     table->insert_column(0, type_Int, "Price", true);
@@ -6258,7 +6235,6 @@ TEST(Query_IntegerNullNGSyntax)
     Columns<Int> shipping = table->column<Int>(1);
     size_t t;
     
-    
     t = (price == null()).find();
     CHECK_EQUAL(t, 0);
 
@@ -6269,7 +6245,7 @@ TEST(Query_IntegerNullNGSyntax)
     t = (price == shipping).find();
     CHECK_EQUAL(t, 0); // null == null
 
-    // This may be more like what users expect; they need to add != null criteria
+    // If you add a != null criteria, you would probably get what most users intended, like in SQL
     t = (price == shipping && price != null()).find();
     CHECK_EQUAL(t, not_found);
 
@@ -6288,7 +6264,6 @@ TEST(Query_IntegerNullNGSyntax)
     t = table->where().greater(0, null()).find();
     CHECK_EQUAL(t, 1);
 
-
     t = table->where().less(0, 0).find();
     CHECK_EQUAL(t, not_found);
 
@@ -6298,12 +6273,17 @@ TEST(Query_IntegerNullNGSyntax)
     t = table->where().greater(0, 0).find();
     CHECK_EQUAL(t, 1);
 
-    t = (price < 0 || price > 0 || price == 0).find();
+    t = (price < 0 || price > 0 || price / 7 + 8.8 == 0).find();
     CHECK_EQUAL(t, 1);
 
     // Shows that null + null == null, and 10 + null == null, and null < 100 == false
     t = (price + shipping < 100).find();
     CHECK_EQUAL(t, 2);
+
+
+
+
+
 }
 
 #endif // TEST_QUERY
