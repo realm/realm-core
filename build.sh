@@ -712,15 +712,15 @@ EOF
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch="-stdlib=libc++ -fembed-bitcode"
+            cflags_arch="-stdlib=libc++"
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             if [ "$platform" = 'iPhoneOS' ]; then
                 word_list_append "cflags_arch" "-mstrict-align" || exit 1
                 word_list_append "cflags_arch" "-miphoneos-version-min=7.0" || exit 1
-            fi
-            if [ "$platform" = 'iPhoneSimulator' ]; then
+                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+            else
                 word_list_append "cflags_arch" "-mios-simulator-version-min=7.0" || exit 1
             fi
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
@@ -767,15 +767,15 @@ EOF
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch="-stdlib=libc++ -fembed-bitcode"
+            cflags_arch="-stdlib=libc++"
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             if [ "$platform" = 'WatchOS' ]; then
                 word_list_append "cflags_arch" "-mstrict-align" || exit 1
                 word_list_append "cflags_arch" "-mwatchos-version-min=2.0" || exit 1
-            fi
-            if [ "$platform" = 'WatchSimulator' ]; then
+                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+            else
                 word_list_append "cflags_arch" "-mwatchos-simulator-version-min=2.0" || exit 1
             fi
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
