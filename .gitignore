@@ -60,6 +60,13 @@ Static library*/
 /iphone-lib/realm-config
 /iphone-lib/realm-config-dbg
 
+# sh build.sh build-watchos
+/watchos-lib/include
+/watchos-lib/librealm-watchos.a
+/watchos-lib/librealm-watchos-dbg.a
+/watchos-lib/realm-config
+/watchos-lib/realm-config-dbg
+
 # sh build.sh build-android
 /android-lib/
 /openssl/
