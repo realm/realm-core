@@ -596,13 +596,13 @@ public:
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
-              QueryState<int64_t>* state) const;
+              QueryState<int64_t>* state, bool nullable_array = false, bool value_null = false) const;
     bool find(int cond, Action action, null, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
 
     template<class cond, Action action, size_t bitwidth, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
-              QueryState<int64_t>* state, Callback callback) const;
+              QueryState<int64_t>* state, Callback callback, bool array_nullable = false, bool value_null = false) const;
 
     // This is the one installed into the m_vtable->finder slots.
     template<class cond, Action action, size_t bitwidth>
@@ -620,7 +620,7 @@ public:
     // Optimized implementation for release mode
     template<class cond2, Action action, size_t bitwidth, class Callback>
     bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
-                        QueryState<int64_t>* state, Callback callback) const;
+                        QueryState<int64_t>* state, Callback callback, bool nullable_array = false, bool value_null = false) const;
 
     // Called for each search result
     template<Action action, class Callback>
@@ -2329,10 +2329,26 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
 // Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
 // for each match. Break and return if find_action() returns false or 'end' is reached.
-template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool value_null) const
 {
     cond2 c;
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    if (end == npos)
+        end = size();
+
+    // We cannot just test if `this` is an ArrayIntNull with dynamic_cast, because sometimes we want non-nullable
+    // behaviour of Array::find()
+    if (nullable_array) {
+        for (; start < end; start++) {
+            int64_t v = get<bitwidth>(start + 1);
+            if (c(v, value, value_null, v == get(0))) {
+                if (!find_action<action, Callback>(start + baseindex, v, state, callback))
+                    return false; // tell caller to stop aggregating/search
+            }
+        }
+        return true; // tell caller to continue aggregating/search (on next array leafs)
+    }
+
 
     // Test first few items with no initial time overhead
     if (start > 0) {
@@ -2816,9 +2832,9 @@ bool Array::find(null, size_t start, size_t end, size_t baseindex, QueryState<in
 
 template<class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback) const
+                 Callback callback, bool array_nullable, bool value_null) const
 {
-    return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+    return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback, array_nullable, value_null);
 }
 
 #ifdef REALM_COMPILER_SSE

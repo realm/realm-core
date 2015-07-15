@@ -591,69 +591,40 @@ bool ArrayIntNull::minimum(int64_t& result, std::size_t start, std::size_t end, 
 inline
 bool ArrayIntNull::find(int cond, Action action, int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find(cond, action, value, start, end, baseindex - 1, state);
+    return Array::find(cond, action, value, start, end, baseindex, state, true, false);
 }
 
 inline
 bool ArrayIntNull::find(int cond, Action action, null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    size_t found = Array::find(cond, action, null_value(), start, end, baseindex - 1, state);
-
-    if (found == not_found)
-        return not_found;
-
-    return found - 1;
+    return Array::find(cond, action, 0 /* unused dummy*/, start, end, baseindex, state, true, true);
 }
 
 
 template<class cond, Action action, std::size_t bitwidth, class Callback>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find<cond, action, bitwidth, Callback>(value, start, end, baseindex - 1, state, callback);
+    return Array::find(cond, action, value, start, end, baseindex, state, true, false);
 }
 
 template<class cond, Action action, std::size_t bitwidth, class Callback>
 bool ArrayIntNull::find(null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find<cond, action, bitwidth, Callback>(null_value(), start, end, baseindex - 1, state, callback);
+    return Array::find(cond, action, 0 /* unused dummy*/, start, end, baseindex, state, true, true);
 }
 
 
 template<class cond, Action action, std::size_t bitwidth>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find<cond, action, bitwidth>(value, start, end, baseindex - 1, state);
+    return Array::find(cond, action, value, start, end, baseindex, state, true, true);
 }
 
 
 template<class cond, Action action, class Callback>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find<cond, action>(value, start, end, baseindex - 1, state, std::forward<Callback>(callback));
+    return Array::find(cond, action, value, start, end, baseindex, state, true, true);
 }
 
 template<class cond, Action action, class Callback>

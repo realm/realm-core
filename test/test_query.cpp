@@ -6057,7 +6057,7 @@ TEST(Query_BinaryNull)
     CHECK_EQUAL(2, t.get_source_ndx(0));
 }
 
-ONLY(Query_IntegerNullOldQueryEngine)
+TEST(Query_IntegerNullOldQueryEngine)
 {
 /*
     first   second  third
@@ -6086,8 +6086,9 @@ ONLY(Query_IntegerNullOldQueryEngine)
     TableView t;
 
     t = table.where().equal(0, null{}).find_all();
-    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.size());
     CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(3, t.get_source_ndx(1));
 
     t = table.where().equal(0, 0).find_all();
     CHECK_EQUAL(1, t.size());
@@ -6098,17 +6099,19 @@ ONLY(Query_IntegerNullOldQueryEngine)
     CHECK_EQUAL(2, t.get_source_ndx(0));
 
     t = table.where().not_equal(0, null{}).find_all();
+    CHECK_EQUAL(2, t.size());
     CHECK_EQUAL(1, t.get_source_ndx(0));
     CHECK_EQUAL(2, t.get_source_ndx(1));
-    CHECK_EQUAL(2, t.size());
 
     t = table.where().not_equal(0, 0).find_all();
+    CHECK_EQUAL(3, t.size());
     CHECK_EQUAL(0, t.get_source_ndx(0));
     CHECK_EQUAL(2, t.get_source_ndx(1));
-    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(3, t.get_source_ndx(2));
 
-
-
+    t = table.where().greater(0, 0).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
 }
 
 TEST(Query_IntegerNonNull)
@@ -6121,28 +6124,9 @@ TEST(Query_IntegerNonNull)
 
     TableView t;
 
-    t = table.where().equal(0, null{}).find_all();
-    CHECK_EQUAL(0, t.size());
-
-    // fixme, discuss behaviour
-/*
-    t = table.where().not_equal(0, null{}).find_all();
-    CHECK_EQUAL(3, t.size());
-    CHECK_EQUAL(0, t.get_source_ndx(0));
-    CHECK_EQUAL(1, t.get_source_ndx(1));
-    CHECK_EQUAL(2, t.get_source_ndx(2));
-
-    // Should any non-null value compare greater than null?
-    // t = table.where().greater(0, null{}).find_all();
-    // CHECK_EQUAL(3, t.size());
-    // CHECK_EQUAL(0, t.get_source_ndx(0));
-    // CHECK_EQUAL(1, t.get_source_ndx(1));
-    // CHECK_EQUAL(2, t.get_source_ndx(2));
-
-    // t = table.where().greater(null{}, 0).find_all();
-    // CHECK_EQUAL(0, t.size());
-
-    */
+    // Fixme, should you be able to query a non-nullable column against null?
+//    t = table.where().equal(0, null{}).find_all();
+//    CHECK_EQUAL(0, t.size());
 }
 
 
