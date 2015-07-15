@@ -32,6 +32,11 @@ ifeq ($(OS),Darwin)
   endif
 endif
 
+# While -Wunreachable-code is accepted by GCC, it is ignored and will be removed
+# in the future.
+ifeq ($(COMPILER_IS),clang)
+  CFLAGS_GENERAL += -Wunreachable-code
+endif
 
 # CoreFoundation is required for logging
 ifeq ($(OS),Darwin)
