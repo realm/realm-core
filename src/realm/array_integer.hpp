@@ -655,7 +655,10 @@ template<class cond> std::size_t ArrayIntNull::find_first(null, std::size_t star
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, nullptr, 1);
     Array::find<cond, act_ReturnFirst>(0 /*dummy*/, start, end, 0, &state, Array::CallbackDummy(), true, true);
-    return state.m_state;
+    if (state.m_match_count > 0)
+        return state.m_state;
+    else
+        return not_found;
 }
 
 template<class cond> std::size_t ArrayIntNull::find_first(int64_t value, std::size_t start, std::size_t end) const
@@ -663,7 +666,10 @@ template<class cond> std::size_t ArrayIntNull::find_first(int64_t value, std::si
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, nullptr, 1);
     Array::find<cond, act_ReturnFirst>(value, start, end, 0, &state, Array::CallbackDummy(), true, false);
-    return state.m_state;
+    if (state.m_match_count > 0)
+        return state.m_state;
+    else
+        return not_found;
 }
 
 inline std::size_t ArrayIntNull::find_first(null, std::size_t begin, std::size_t end) const
