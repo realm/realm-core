@@ -611,7 +611,7 @@ public:
 
     template<class cond, Action action, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback) const;
+                 Callback callback, bool array_nullable = false, bool value_null = false) const;
 
     template<class cond, Action action, class Callback>
     bool find(null, size_t start, size_t end, size_t baseindex,
@@ -917,10 +917,10 @@ public:
     static const int header_size = 8; // Number of bytes used by header
 
 private:
-    typedef bool (*CallbackDummy)(int64_t);
-
     Array& operator=(const Array&); // not allowed
 protected:
+    typedef bool(*CallbackDummy)(int64_t);
+
     /// Insert a new child after original. If the parent has to be
     /// split, this function returns the `ref` of the new parent node.
     ref_type insert_bptree_child(Array& offsets, std::size_t orig_child_ndx,
@@ -2818,9 +2818,9 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 
 template<class cond, Action action, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback) const
+                 Callback callback, bool array_nullable, bool value_null) const
 {
-    REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
+    REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback, array_nullable, value_null));
 }
 
 template<class cond, Action action, class Callback>

@@ -604,27 +604,27 @@ bool ArrayIntNull::find(int cond, Action action, null, std::size_t start, std::s
 template<class cond, Action action, std::size_t bitwidth, class Callback>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return Array::find(cond, action, value, start, end, baseindex, state, true, false);
+    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback), true, false);
 }
 
 template<class cond, Action action, std::size_t bitwidth, class Callback>
 bool ArrayIntNull::find(null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return Array::find(cond, action, 0 /* unused dummy*/, start, end, baseindex, state, true, true);
+    return Array::find<cond, action>(0 /* unused dummy*/, start, end, baseindex, state, std::forward<Callback>(callback), true, true);
 }
 
 
 template<class cond, Action action, std::size_t bitwidth>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    return Array::find(cond, action, value, start, end, baseindex, state, true, true);
+    return Array::find<cond, action>(value, start, end, baseindex, state, true, false);
 }
 
 
 template<class cond, Action action, class Callback>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return Array::find(cond, action, value, start, end, baseindex, state, true, true);
+    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback));
 }
 
 template<class cond, Action action, class Callback>
@@ -652,32 +652,18 @@ bool ArrayIntNull::find_action_pattern(std::size_t index, uint64_t pattern, Quer
 
 template<class cond> std::size_t ArrayIntNull::find_first(null, std::size_t start, std::size_t end) const
 {
-    // All variables (found, start, end) are kept relative to ArrayIntNull
-    if (end == npos) 
-        end = size();
-
-    cond c;
-
-    for (size_t t = start; t < end; t++) {
-        if (c(get(t), int64_t(0), is_null(t), true)) // 0 is a dummy, not used
-            return t;
-    }
-    return not_found;
+    QueryState<int64_t> state;
+    state.init(act_ReturnFirst, nullptr, 1);
+    Array::find<cond, act_ReturnFirst>(0 /*dummy*/, start, end, 0, &state, Array::CallbackDummy(), true, true);
+    return state.m_state;
 }
 
 template<class cond> std::size_t ArrayIntNull::find_first(int64_t value, std::size_t start, std::size_t end) const
 {
-    // All variables (found, start, end) are kept relative to ArrayIntNull
-    if (end == npos)
-        end = size();
-
-    cond c;
-
-    for (size_t t = start; t < end; t++) {
-        if (c(get(t), value, is_null(t), false))
-            return t;
-    }
-    return not_found;
+    QueryState<int64_t> state;
+    state.init(act_ReturnFirst, nullptr, 1);
+    Array::find<cond, act_ReturnFirst>(value, start, end, 0, &state, Array::CallbackDummy(), true, false);
+    return state.m_state;
 }
 
 inline std::size_t ArrayIntNull::find_first(null, std::size_t begin, std::size_t end) const
