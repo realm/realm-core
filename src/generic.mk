@@ -1788,7 +1788,9 @@ $(foreach x,$(INST_PROGRAMS) $(DEV_PROGRAMS),$(call EVAL_PROG_RULES_1,$(x),INST)
 define STATIC_LIBRARY_RULE
 $(1): $(2) $(3)
 	$$(RM) $(1)
-	$$(strip $$(AR) $$(ARFLAGS_GENERAL) $(1) $(2))
+	$(CXX) $(CFLAGS_PTHREADS) $(CFLAGS_ARCH) -Wl,-r -nostdlib $(2) -o $(1).o
+	$$(strip $$(AR) $$(ARFLAGS_GENERAL) $(1) $(1).o)
+	$$(RM) $(1).o
 endef
 
 # ARGS: real_local_path, objects, finalized_expanded_librefs, extra_deps, link_cmd, ldflags, lib_version
