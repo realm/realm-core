@@ -29,7 +29,7 @@
   `Group::m_free_versions`) was moved to `GroupWriter`, as they are now only
   needed during `GroupWriter::write_Group()`. This significantly reduces the
   "shallow" memory footprint of `Group`.
-* Improved exception safety in `Group::write()`.
+* Improved exception safety in `Group::attach()`.
 * `Group::commit()` now throws instead of aborting on an assertion if the group
   accessor is detached or if it is used in transactional mode (via
   `SharedGroup`).
