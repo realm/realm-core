@@ -237,8 +237,7 @@ TEST(Shared_CompactingOnTheFly)
         {
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            for (int i = 0; i < 100; ++i)
-            {
+            for (int i = 0; i < 100; ++i) {
                 t1->add(0, i, false, "test");
             }
             wt.commit();
@@ -2221,7 +2220,9 @@ TEST(Shared_MixedWithNonShared)
     {
         // Create non-empty file without free-space tracking
         Group g;
+        g.Verify();
         g.add_table("x");
+        g.Verify();
         g.write(path, crypt_key());
     }
     {
@@ -2236,6 +2237,7 @@ TEST(Shared_MixedWithNonShared)
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             wt.add_table("foo"); // Add table "foo"
+            wt.get_group().Verify();
             wt.commit();
         }
     }
@@ -2250,13 +2252,18 @@ TEST(Shared_MixedWithNonShared)
     {
         // Access using non-shared group
         Group g(path, crypt_key(), Group::mode_ReadWrite);
+        g.Verify();
         g.commit();
+        g.Verify();
     }
     {
         // Modify using non-shared group
         Group g(path, crypt_key(), Group::mode_ReadWrite);
+        g.Verify();
         g.add_table("bar"); // Add table "bar"
+        g.Verify();
         g.commit();
+        g.Verify();
     }
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());

@@ -1,7 +1,8 @@
-#include "realm/array_integer.hpp"
-#include "realm/column.hpp"
-
 #include <vector>
+
+#include <realm/array_integer.hpp>
+#include <realm/column.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
 
@@ -56,16 +57,18 @@ std::vector<int64_t> ArrayInteger::ToVector() const
 
 MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size, int_fast64_t value, Allocator& alloc)
 {
-    MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, value, alloc);
+    MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, value, alloc); // Throws
     ArrayIntNull arr(alloc);
+    _impl::DestroyGuard<ArrayIntNull> dg(&arr);
     arr.Array::init_from_mem(r);
     if (arr.m_width == 64) {
         int_fast64_t null_value = value ^ 1; // Just anything different from value.
-        arr.Array::set(0, null_value);
+        arr.Array::set(0, null_value); // Throws
     }
     else {
-        arr.Array::set(0, arr.m_ubound);
+        arr.Array::set(0, arr.m_ubound); // Throws
     }
+    dg.release();
     return r;
 }
 

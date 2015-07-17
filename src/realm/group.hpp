@@ -474,16 +474,30 @@ public:
 private:
     SlabAlloc m_alloc;
 
-    // Underlying node structure. The third slot in m_top is the "logical file
-    // size" and it is always present. The 7th slot is the "database version"
-    // (a.k.a. the "transaction number") and is present only when
-    // m_free_versions is present.
+    /// `m_top` is the root node of the Realm, and has the following layout:
+    ///
+    /// <pre>
+    ///
+    ///   slot  value
+    ///   -----------------------
+    ///   1st   m_table_names
+    ///   2nd   m_tables
+    ///   3rd   Logical file size
+    ///   4th   GroupWriter::m_free_positions (optional)
+    ///   5th   GroupWriter::m_free_lengths   (optional)
+    ///   6th   GroupWriter::m_free_versions  (optional)
+    ///   7th   Transaction number / version  (optional)
+    ///
+    /// </pre>
+    ///
+    /// The first tree entries are mandatory. In files created by
+    /// Group::write(), none of the optional entries are present. In files
+    /// updated by Group::commit(), the 4th and 5th entry is present. In files
+    /// updated by way of a transaction (SharedGroup::commit()), the 4th, 5th,
+    /// 6th, and 7th entry is present.
     Array m_top;
-    ArrayInteger m_tables;         // 2nd slot in m_top
-    ArrayString m_table_names;     // 1st slot in m_top
-    ArrayInteger m_free_positions; // 4th slot in m_top (optional)
-    ArrayInteger m_free_lengths;   // 5th slot in m_top (optional)
-    ArrayInteger m_free_versions;  // 6th slot in m_top (optional)
+    ArrayInteger m_tables;
+    ArrayString m_table_names;
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
@@ -496,11 +510,6 @@ private:
     Group(shared_tag) REALM_NOEXCEPT;
 
     void init_array_parents() REALM_NOEXCEPT;
-
-    /// Add free-space versioning nodes, if they do not already exist. Othewise,
-    /// set the version to zero on all free space chunks. This must be done
-    /// whenever the lock file is created or reinitialized.
-    void reset_free_space_versions();
 
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero, create a new node
@@ -606,8 +615,10 @@ private:
 
 inline Group::Group():
     m_alloc(), // Throws
-    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_top(m_alloc),
+    m_tables(m_alloc),
+    m_table_names(m_alloc),
+    m_is_shared(false)
 {
     init_array_parents();
     m_alloc.attach_empty(); // Throws
@@ -617,8 +628,10 @@ inline Group::Group():
 
 inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     m_alloc(), // Throws
-    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_top(m_alloc),
+    m_tables(m_alloc),
+    m_table_names(m_alloc),
+    m_is_shared(false)
 {
     init_array_parents();
 
@@ -633,8 +646,10 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode):
 
 inline Group::Group(BinaryData buffer, bool take_ownership):
     m_alloc(), // Throws
-    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_top(m_alloc),
+    m_tables(m_alloc),
+    m_table_names(m_alloc),
+    m_is_shared(false)
 {
     init_array_parents();
     open(buffer, take_ownership); // Throws
@@ -642,8 +657,10 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
 
 inline Group::Group(unattached_tag) REALM_NOEXCEPT:
     m_alloc(), // Throws
-    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_top(m_alloc),
+    m_tables(m_alloc),
+    m_table_names(m_alloc),
+    m_is_shared(false)
 {
     init_array_parents();
 }
@@ -655,8 +672,10 @@ inline Group* Group::get_parent_group() REALM_NOEXCEPT
 
 inline Group::Group(shared_tag) REALM_NOEXCEPT:
     m_alloc(), // Throws
-    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true)
+    m_top(m_alloc),
+    m_tables(m_alloc),
+    m_table_names(m_alloc),
+    m_is_shared(true)
 {
     init_array_parents();
 }
@@ -855,11 +874,6 @@ inline void Group::init_array_parents() REALM_NOEXCEPT
 {
     m_table_names.set_parent(&m_top, 0);
     m_tables.set_parent(&m_top, 1);
-    // Third slot is "logical file size"
-    m_free_positions.set_parent(&m_top, 3);
-    m_free_lengths.set_parent(&m_top, 4);
-    m_free_versions.set_parent(&m_top, 5);
-    // Seventh slot is "database version" (a.k.a. transaction number)
 }
 
 inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
