@@ -2339,7 +2339,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     // We cannot just test if `this` is an ArrayIntNull with dynamic_cast, because sometimes we want non-nullable
     // behaviour of Array::find()
     if (nullable_array) {
-        for (; start < end; start++) {
+        for (; start + 1 < end; start++) {
             int64_t v = get<bitwidth>(start + 1);
             if (c(v, value, value_null, v == get(0))) {
                 if (!find_action<action, Callback>(start + baseindex, v, state, callback))
