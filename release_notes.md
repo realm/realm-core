@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.91.2 Release notes
 
 ### Bugfixes:
 
@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added support for building for watchOS.
 
 -----------
 
