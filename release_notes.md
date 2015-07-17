@@ -16,7 +16,23 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Added static `Array::create_array()` for creating non-empt arrays, and extend
+  `Array::create()` such that it can create non-empty arrays.
+* The creation of the free-space arrays (`Group::m_free_positions`,
+  `Group::m_free_lengths`, `Group::m_free_versions`) is now always done by
+  `GroupWriter::write_group()`. Previously it was done in various places
+  (`Group::attach()`, `Group::commit()`, `Group::reset_free_space_versions()`).
+* `Group::reset_free_space_versions()` has been eliminated. These days the Realm
+  version is persisted across sessions, so there is no longer any cases where
+  version tracking on free-space chunks needs to be reset.
+* Free-space arrays (`Group::m_free_positions`, `Group::m_free_lengths`,
+  `Group::m_free_versions`) was moved to `GroupWriter`, as they are now only
+  needed during `GroupWriter::write_Group()`. This significantly reduces the
+  "shallow" memory footprint of `Group`.
+* Improved exception safety in `Group::write()`.
+* `Group::commit()` now throws instead of aborting on an assertion if the group
+  accessor is detached or if it is used in transactional mode (via
+  `SharedGroup`).
 
 ----------------------------------------------
 
