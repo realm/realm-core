@@ -40,9 +40,9 @@ struct HackClass
 
 // Does v2 contain v1?
 struct Contains : public HackClass {
-    bool operator()(StringData v1, const char*, const char*, StringData v2, bool v1null = false, bool v2null = false) const { return v2.contains(v1); }
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const { return v2.contains(v1); }
-    bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v2.contains(v1); }
+    bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const { return v2.contains(v1); }
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.contains(v1); }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v2.contains(v1); }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
     bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
@@ -52,9 +52,9 @@ struct Contains : public HackClass {
 
 // Does v2 begin with v1?
 struct BeginsWith : public HackClass {
-    bool operator()(StringData v1, const char*, const char*, StringData v2, bool v1null = false, bool v2null = false) const { return v2.begins_with(v1); }
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const { return v2.begins_with(v1); }
-    bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v2.begins_with(v1); }
+    bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const { return v2.begins_with(v1); }
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.begins_with(v1); }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v2.begins_with(v1); }
 
     template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
@@ -64,9 +64,9 @@ struct BeginsWith : public HackClass {
 
 // Does v2 end with v1?
 struct EndsWith : public HackClass {
-    bool operator()(StringData v1, const char*, const char*, StringData v2, bool v1null = false, bool v2null = false) const { return v2.ends_with(v1); }
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const { return v2.ends_with(v1); }
-    bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v2.ends_with(v1); }
+    bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const { return v2.ends_with(v1); }
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.ends_with(v1); }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v2.ends_with(v1); }
 
     template <class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
     template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
@@ -76,12 +76,12 @@ struct EndsWith : public HackClass {
 
 struct Equal {
     static const int avx = 0x00; // _CMP_EQ_OQ
-    bool operator()(const bool v1, const bool v2, bool v1null = false, bool v2null = false) const { return v1 == v2; }
-    bool operator()(StringData v1, const char*, const char*, StringData v2, bool v1null = false, bool v2null = false) const 
+    bool operator()(const bool v1, const bool v2, bool = false, bool = false) const { return v1 == v2; }
+    bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const 
     { 
         return v1 == v2; 
     }
-    bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v1 == v2; }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v1 == v2; }
 
     template<class T> bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const 
     {
@@ -94,8 +94,8 @@ struct Equal {
 
 struct NotEqual {
     static const int avx = 0x0B; // _CMP_FALSE_OQ
-    bool operator()(StringData v1, const char*, const char*, StringData v2, bool v1null = false, bool v2null = false) const { return v1 != v2; }
-    bool operator()(BinaryData v1, BinaryData v2, bool v1null = false, bool v2null = false) const { return v1 != v2; }
+    bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const { return v1 != v2; }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v1 != v2; }
 
     template<class T> bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const 
     { 
@@ -117,7 +117,7 @@ struct NotEqual {
 
 // Does v2 contain v1?
 struct ContainsIns : public HackClass {
-    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false, bool = false) const
     {
         if (v2.is_null() && !v1.is_null())
             return false;
@@ -129,7 +129,7 @@ struct ContainsIns : public HackClass {
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
     {
         if (v2.is_null() && !v1.is_null())
             return false;
@@ -150,7 +150,7 @@ struct ContainsIns : public HackClass {
 
 // Does v2 begin with v1?
 struct BeginsWithIns : public HackClass {
-    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false, bool = false) const
     {
         if (v2.is_null() && !v1.is_null())
             return false;
@@ -158,7 +158,7 @@ struct BeginsWithIns : public HackClass {
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
     {
         if (v2.is_null() && !v1.is_null())
             return false;
@@ -178,7 +178,7 @@ struct BeginsWithIns : public HackClass {
 
 // Does v2 end with v1?
 struct EndsWithIns : public HackClass {
-    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false, bool = false) const
     {
         if (v2.is_null() && !v1.is_null())
             return false;
@@ -187,7 +187,7 @@ struct EndsWithIns : public HackClass {
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
     {
         if (v2.is_null() && !v1.is_null())
             return false;
@@ -206,7 +206,7 @@ struct EndsWithIns : public HackClass {
 };
 
 struct EqualIns : public HackClass {
-    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false, bool = false) const
     {
         if (v1.is_null() != v2.is_null())
             return false;
@@ -215,7 +215,7 @@ struct EqualIns : public HackClass {
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
     {
         if (v1.is_null() != v2.is_null())
             return false;
@@ -234,7 +234,7 @@ struct EqualIns : public HackClass {
 };
 
 struct NotEqualIns : public HackClass {
-    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false, bool = false) const
     {
         if (v1.is_null() != v2.is_null())
             return true;
@@ -242,7 +242,7 @@ struct NotEqualIns : public HackClass {
     }
 
     // Slow version, used if caller hasn't stored an upper and lower case version
-    bool operator()(StringData v1, StringData v2, bool v1null = false, bool v2null = false) const
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
     {
         if (v1.is_null() != v2.is_null())
             return true;
@@ -277,7 +277,7 @@ struct Greater {
 };
 
 struct None {
-    template<class T> bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const {static_cast<void>(v1); static_cast<void>(v2); return true;}
+    template<class T> bool operator()(const T&, const T&, bool = false, bool = false) const {return true;}
     static const int condition = cond_None;
     template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
@@ -328,14 +328,14 @@ struct GreaterEqual : public HackClass {
 // operator of StringData (currently gives circular header dependency with utf8.hpp)
 template <class T> struct CompareLess
 {
-    static bool compare(T v1, T v2, bool v1null = false, bool v2null = false)
+    static bool compare(T v1, T v2, bool = false, bool = false)
     {
         return v1 < v2;
     }
 };
 template <> struct CompareLess<StringData>
 {
-    static bool compare(StringData v1, StringData v2, bool v1null = false, bool v2null = false)
+    static bool compare(StringData v1, StringData v2, bool = false, bool = false)
     {
         bool ret = utf8_compare(v1.data(), v2.data());
         return ret;

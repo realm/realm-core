@@ -302,7 +302,7 @@ inline StringData::operator unspecified_bool_type() const REALM_NOEXCEPT
 
 // Represents null in Query, find(), get(), set(), etc.
 struct null {
-    null(int i) {}
+    null(int) {}
     null() {}
     operator StringData() { return StringData(0, 0); }
     operator int64_t() { return 0; }

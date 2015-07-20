@@ -6183,7 +6183,7 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
-TEST(Query_IntegerNullExpressionSyntax)
+ONLY(Query_IntegerNull)
 {
 /*
     Price<int>      Shipping<int>       Description<String>     Rating<double>
@@ -6197,7 +6197,7 @@ TEST(Query_IntegerNullExpressionSyntax)
     table->insert_column(1, type_Int, "Shipping", true);
     table->insert_column(2, type_String, "Description", true);
     table->insert_column(3, type_Double, "Rating");
-    table->add_empty_row(8); // at least 8 to trigger Array*::get_chunk
+    table->add_empty_row(10); // at least 8 to trigger Array*::get_chunk
 
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
@@ -6236,9 +6236,26 @@ TEST(Query_IntegerNullExpressionSyntax)
     t = (price != shipping).find();
     CHECK_EQUAL(t, 1); // 10 != null
     
+    t = (price < 0 || price > 0 || price / 7 + 8.8 == 0).find();
+    CHECK_EQUAL(t, 1);
+
+    // Shows that null + null == null, and 10 + null == null, and null < 100 == false
+    t = (price + shipping < 100).find();
+    CHECK_EQUAL(t, 2);
+
     //  null < 0   == false
+    t = (price < 0).find();
+    CHECK_EQUAL(t, not_found);
+
     //  null > 0   == false
+    t = (price == 0).find();
+    CHECK_EQUAL(t, not_found);
+
     // (null == 0) == false
+    t = (price > 0).find();
+    CHECK_EQUAL(t, 1);
+
+    // Old query syntax
     t = table->where().less(0, null()).find();
     CHECK_EQUAL(t, not_found);
 
@@ -6257,12 +6274,6 @@ TEST(Query_IntegerNullExpressionSyntax)
     t = table->where().greater(0, 0).find();
     CHECK_EQUAL(t, 1);
 
-    t = (price < 0 || price > 0 || price / 7 + 8.8 == 0).find();
-    CHECK_EQUAL(t, 1);
-
-    // Shows that null + null == null, and 10 + null == null, and null < 100 == false
-    t = (price + shipping < 100).find();
-    CHECK_EQUAL(t, 2);
 
 
 
