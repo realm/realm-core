@@ -609,6 +609,7 @@
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
     <ClCompile Include="..\..\src\realm\commit_log.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
+    <ClCompile Include="..\..\src\realm\disable_sync_to_disk.cpp" />
     <ClCompile Include="..\..\src\realm\impl\simulated_failure.cpp" />
     <ClCompile Include="..\..\src\realm\impl\transact_log.cpp" />
     <ClCompile Include="..\..\src\realm\link_view.cpp" />
@@ -683,6 +684,7 @@
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
     <ClCompile Include="..\..\test\test_basic_utils.cpp" />
+    <ClCompile Include="..\..\test\test_optional.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp" />
     <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\..\test\util\jsmn.cpp" />
@@ -1104,6 +1106,7 @@
     <ClInclude Include="..\..\src\realm\commit_log.hpp" />
     <ClInclude Include="..\..\src\realm\descriptor.hpp" />
     <ClInclude Include="..\..\src\realm\descriptor_fwd.hpp" />
+    <ClInclude Include="..\..\src\realm\disable_sync_to_disk.hpp" />
     <ClInclude Include="..\..\src\realm\exceptions.hpp" />
     <ClInclude Include="..\..\src\realm\history.hpp" />
     <ClInclude Include="..\..\src\realm\impl\array_writer.hpp" />

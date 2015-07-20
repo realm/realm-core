@@ -36,13 +36,95 @@
 
 ### Enhancements:
 
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.91.2 Release notes
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Added support for building for watchOS.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.91.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug in SharedGroup::grab_specific_readlock() which would fail to
+  grab the specified readlock even though the requested version was available
+  in the case where a concurrent cleanup operation had a conflicting request
+  for the same (oldest) entry in the ringbuffer.
+* Fixed a performance regression in TableView::clear().
+
+### API breaking changes:
+
+* Argument `is_backend` removed from from the public version of
+  `SharedGroup::open()`. Fortunately, bindings are not currently calling
+  `SharedGroup::open()`.
+* `File::resize()` no longer calls `fcntl()` with `F_FULLFSYNC`. This feature
+  has been moved to `File::sync()`.
+
+### Enhancements:
+
+* New feature added to disable all forms of 'sync to disk'. This is supposed to
+  be used only during unit testing. See header `disable_sync_to_disk.hpp`.
+* Added `LinkList.swap()` to swap two members of a link list.
+* Added a Query constructor that takes ownership of a TableView.
+
+### Internals:
+
+* On Linux we now call 'sync to disk' after Realm file resizes. Previusly, this
+  was only done on Apple platforms.
+
+----------------------------------------------
+
+# 0.91.0 Release notes
+
+### Bugfixes:
+
+* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by
+  updating Value::import to work with DateTime
+* Fix incorrect results when querying for < or <= on ints which requires 64 bits
+  to represent with a CPU that supports SSE 4.2.
+
+### API breaking changes:
+
+* Named exception UnreachableVersion replaced by "unspecified" LogicError
+  exception.
+
+### Enhancements:
+
 * Generic networking API added.
-* Support for transfer/handover of TableViews, Queries, ListViews and Rows between SharedGroups in different threads.
-  Cooperative handover (where boths threads participate) is supported for arbitrarily nested TableViews and Queries.
-  Restrictions apply for non-cooperative handover (aka stealing): user must ensure that the producing thread does not
-  trigger a modifying operation on any of the involved TableViews.
-  For TableViews the handover can be one of *moving*, *copying* or *staying*, reflecting how the actual payload
-  is treated.
+* Support for transfer/handover of TableViews, Queries, ListViews and Rows
+  between SharedGroups in different threads.  Cooperative handover (where boths
+  threads participate) is supported for arbitrarily nested TableViews and
+  Queries.  Restrictions apply for non-cooperative handover (aka stealing): user
+  must ensure that the producing thread does not trigger a modifying operation
+  on any of the involved TableViews.  For TableViews the handover can be one of
+  *moving*, *copying* or *staying*, reflecting how the actual payload is
+  treated.
 * Support for non-end row insertion in tables with link and link list columns.
 * Improved documentation of functions concerning the initiation and termination
   of transactions.

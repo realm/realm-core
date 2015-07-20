@@ -71,7 +71,8 @@ unicode.hpp \
 commit_log.hpp \
 link_view_fwd.hpp \
 link_view.hpp \
-views.hpp
+views.hpp \
+disable_sync_to_disk.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
@@ -165,6 +166,7 @@ version.cpp \
 views.cpp \
 $(REPLICATION_CPP) \
 commit_log.cpp \
+disable_sync_to_disk.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
@@ -224,3 +226,15 @@ get-inst-programs:
 
 
 include ../generic.mk
+
+librealm$(BASE_DENOM_2)$(LIB_DENOM_OPTIM)-prelink.a: librealm$(SUFFIX_LIB_STATIC_OPTIM)
+	$(RM) $@
+	$(CXX) -Wl,-r -nostdlib $(CFLAGS_PTHREADS) $(CFLAGS_ARCH) $(CFLAGS_OPTIM) $(call GET_OBJECTS_FOR_TARGET,librealm.a,$(SUFFIX_OBJ_STATIC_OPTIM)) -o $@.o
+	$(strip $(AR) $(ARFLAGS_GENERAL) $@ $@.o)
+	$(RM) $@.o
+
+librealm$(BASE_DENOM_2)$(LIB_DENOM_DEBUG)-prelink.a: librealm$(SUFFIX_LIB_STATIC_DEBUG)
+	$(RM) $@
+	$(CXX) -Wl,-r -nostdlib $(CFLAGS_PTHREADS) $(CFLAGS_ARCH) $(CFLAGS_DEBUG) $(call GET_OBJECTS_FOR_TARGET,librealm.a,$(SUFFIX_OBJ_STATIC_DEBUG)) -o $@.o
+	$(strip $(AR) $(ARFLAGS_GENERAL) $@ $@.o)
+	$(RM) $@.o

@@ -25,17 +25,17 @@ int main(int argc, char* argv[])
 #ifdef REALM_ENABLE_LOGFILE
         std::cerr << "Daemon starting" << std::endl;
 #endif
-        SharedGroup::unattached_tag tag;
-        SharedGroup async_committer(tag);
+        SharedGroup async_committer((SharedGroup::unattached_tag()));
         char* file = argv[1];
-        async_committer.open(file, true, SharedGroup::durability_Async, true);
-
-    } else if (pid > 0) { // in parent, fork was ok, so return succes
-
+        using sgf = _impl::SharedGroupFriend;
+        sgf::async_daemon_open(async_committer, file);
+    }
+    else if (pid > 0) {
+        // in parent, fork was ok, so return succes
         _Exit(0);
-
-    } else { // in parent, fork failed, so return error code
-
+    }
+    else {
+        // in parent, fork failed, so return error code
         return 2;
     }
 }

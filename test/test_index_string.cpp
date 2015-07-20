@@ -854,6 +854,7 @@ TEST(StringIndex_FuzzyTest_Int)
     col.destroy();
 }
 
+#if REALM_NULL_STRINGS == 1
 namespace {
 
 // Generate string where the bit pattern in bits is converted to NUL bytes. E.g. (length=2):
@@ -906,6 +907,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 
     col.destroy();
 }
+#endif
 
 // Tests for a bug with strings containing zeroes
 TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)

@@ -302,7 +302,7 @@ TEST(ArrayIntNull_Relocate) {
     a.destroy();
 }
 
-ONLY(ArrayIntNull_Find)
+TEST(ArrayIntNull_Find)
 {
     ArrayIntNull a(Allocator::get_default());
     a.create(Array::type_Normal);

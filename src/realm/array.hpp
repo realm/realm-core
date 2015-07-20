@@ -2334,12 +2334,12 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     cond2 c;
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     if (end == npos)
-        end = size();
+        end = nullable_array ? size() - 1 : size();
 
     // We cannot just test if `this` is an ArrayIntNull with dynamic_cast, because sometimes we want non-nullable
     // behaviour of Array::find()
     if (nullable_array) {
-        for (; start + 1 < end; start++) {
+        for (; start < end; start++) {
             int64_t v = get<bitwidth>(start + 1);
             if (c(v, value, value_null, v == get(0))) {
                 if (!find_action<action, Callback>(start + baseindex, v, state, callback))

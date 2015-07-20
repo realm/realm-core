@@ -1,3 +1,17 @@
+librealm (0.91.2~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Thomas Goyne <tg@realm.io>  Fri, 17 Jul 2015 12:58:06 -0700
+
+
+librealm (0.91.1~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Fri, 10 Jul 2015 16:39:23 +0200
+
+
 librealm (0.89.5~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

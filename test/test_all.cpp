@@ -20,6 +20,7 @@
 #include <realm.hpp>
 #include <realm/utilities.hpp>
 #include <realm/version.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 #include "test_all.hpp"
 #include "util/timer.hpp"
@@ -355,6 +356,11 @@ int test_all(int argc, char* argv[])
     // Disable buffering on std::cout so that progress messages can be related to
     // error messages.
     std::cout.setf(std::ios::unitbuf);
+
+    // No need to synchronize file changes to physical medium in the test suite,
+    // as that would only make a difference if the entire system crashes,
+    // e.g. due to power off.
+    disable_sync_to_disk();
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 

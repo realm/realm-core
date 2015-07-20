@@ -433,6 +433,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
 
         // Pre-alloc initial space
         m_file.prealloc(0, initial_size); // Throws
+        bool disable_sync = get_disable_sync_to_disk();
+        if (!disable_sync)
+            m_file.sync(); // Throws
         size = initial_size;
     }
 
@@ -599,7 +602,9 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>&
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
-    mapping.sync();
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        mapping.sync();
     header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
     m_file_on_streaming_form = false;
 }
