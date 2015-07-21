@@ -526,6 +526,8 @@ public:
     //@}
 
     std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
+    template<std::size_t w>
+    std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
     void Preset(int64_t min, int64_t max, std::size_t count);
     void Preset(std::size_t bitwidth, std::size_t count);
 
