@@ -1089,6 +1089,8 @@ protected:
     friend class AdaptiveStringColumn;
 };
 
+template<> size_t Array::FindGTE<0>(const int64_t target, size_t start, Array const* indirection) const;
+
 
 
 class Array::NodeInfo {
