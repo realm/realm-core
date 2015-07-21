@@ -127,6 +127,9 @@ Caveats, notes and todos
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
 
+#include <cmath>
+#include <cfloat>
+
 #define REALM_OLDQUERY_FALLBACK
 
 // namespace realm {
@@ -478,7 +481,7 @@ public:
 
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
         // but only if both columns are non-nullable
-        if (left_col && right_col && std::is_same<L, R>::value && !left_col->nullable && !right_col->nullable) {
+        if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable) {
             const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
             Query q = Query(*t);
 
@@ -654,19 +657,21 @@ template <class T, size_t prealloc = 8> struct NullableVector
         }
     }
 
-    inline bool is_null(size_t) const // float, double
+    inline bool is_null(size_t index) const // float, double
     {
-        return false;
+        return std::isnan((double)m_first[index]);
     }
 
-    inline void set_null(size_t) { } // float, double
+    inline void set_null(size_t index) 
+    {
+        m_first[index] = std::numeric_limits<T>::quiet_NaN();
+    } // float, double
 
     T m_cache[prealloc];
     T* m_first = &m_cache[0];
     size_t m_size = 0;
 
     int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
-    bool nullable;
 };
 
 
@@ -675,11 +680,17 @@ template<> inline bool NullableVector<int64_t>::is_null(size_t index) const
     return m_first[index] == m_null;
 }
 
+template<> inline bool NullableVector<DateTime>::is_null(size_t index) const
+{
+    return m_first[index].get_datetime() == m_null;
+}
+
 template<> inline bool NullableVector<null>::is_null(size_t index) const
 {
     return true;
 }
 
+// Also for DateTime
 template<> inline void NullableVector<int64_t>::set_null(size_t index)
 {
     m_first[index] = m_null;
@@ -1456,14 +1467,14 @@ public:
     {
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table; 
-        nullable = m_link_map.m_table->is_nullable(m_column);
+        m_nullable = m_link_map.m_table->is_nullable(m_column);
     }
 
     Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
                                                  m_column(column)
     {
         m_table = table;
-        nullable = m_table->is_nullable(column);
+        m_nullable = m_table->is_nullable(column);
     }
 
 
@@ -1483,14 +1494,14 @@ public:
         n = *this;
         SequentialGetter<C> *s = new SequentialGetter<C>();
         n.sg = s;
-        n.nullable = nullable;
+        n.m_nullable = m_nullable;
         return n;
 
     }
 
     virtual Subexpr& clone()
     {
-        if (nullable)
+        if (m_nullable)
             return clone<ColTypeN>();
         else
             return clone<ColType>();
@@ -1501,22 +1512,22 @@ public:
     {
         const ColumnBase* c;
         if (m_link_map.m_link_columns.size() == 0) {
-            nullable = m_table->is_nullable(m_column);
+            m_nullable = m_table->is_nullable(m_column);
             c = &m_table->get_column_base(m_column);
         }
         else {
-            nullable = m_link_map.m_table->is_nullable(m_column);
+            m_nullable = m_link_map.m_table->is_nullable(m_column);
             c = &m_link_map.m_table->get_column_base(m_column);
         }
 
         if (sg == nullptr) {
-            if (nullable)
+            if (m_nullable)
                 sg = new SequentialGetter<ColTypeN>();
             else
                 sg = new SequentialGetter<ColType>();
         }
 
-        if(nullable)
+        if(m_nullable)
             static_cast<SequentialGetter<ColTypeN>*>(sg)->init(  (ColTypeN*) (c)); // todo, c cast
         else
             static_cast<SequentialGetter<ColType>*>(sg)->init( (ColType*)(c));
@@ -1531,7 +1542,7 @@ public:
     }
 
     void evaluate(size_t index, ValueBase& destination) {
-        if (nullable)
+        if (m_nullable)
             evaluate<ColTypeN>(index, destination);
         else
             evaluate<ColType>(index, destination);
@@ -1564,7 +1575,7 @@ public:
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
                 sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
 
-                if (nullable)
+                if (m_nullable)
                    v.m_storage.m_null = ((ArrayIntNull*)(sgc->m_leaf_ptr))->null_value();
 
                 destination.import(v);
@@ -1581,7 +1592,7 @@ public:
                     v.m_storage.set(t, sgc->get_next(index + t));
                 }
 
-                if (std::is_same<T, int64_t>::value && nullable)
+                if (std::is_same<T, int64_t>::value && m_nullable)
                     v.m_storage.m_null = ((ArrayIntNull*)(sgc->m_leaf_ptr))->null_value();
 
                 destination.import(v);
@@ -1602,7 +1613,7 @@ public:
 
     LinkMap m_link_map;
 
-    bool nullable;
+    bool m_nullable;
 };
 
 

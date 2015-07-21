@@ -307,12 +307,12 @@ struct null {
     operator StringData() { return StringData(0, 0); }
     operator int64_t() { return 0; }
 
-    template <class T> bool operator == (const T& a) const { return false; }
-    template <class T> bool operator != (const T& a) const { return false; }
-    template <class T> bool operator > (const T& a) const { return false; }
-    template <class T> bool operator >= (const T& a) const { return false; }
-    template <class T> bool operator <= (const T& a) const { return false; }
-    template <class T> bool operator < (const T& a) const { return false; }
+    template <class T> bool operator == (const T& a) const { REALM_ASSERT(false); return false; }
+    template <class T> bool operator != (const T& a) const { REALM_ASSERT(false); return false; }
+    template <class T> bool operator > (const T& a) const { REALM_ASSERT(false); return false; }
+    template <class T> bool operator >= (const T& a) const { REALM_ASSERT(false); return false; }
+    template <class T> bool operator <= (const T& a) const { REALM_ASSERT(false); return false; }
+    template <class T> bool operator < (const T& a) const { REALM_ASSERT(false); return false; }
 };
 
 } // namespace realm
