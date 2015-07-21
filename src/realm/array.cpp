@@ -693,7 +693,7 @@ void Array::set_all_to_zero()
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) const
+size_t Array::FindGTE(const int64_t target, size_t start, Array const* indirection) const
 {
     switch (m_width) {
         case 0:

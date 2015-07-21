@@ -525,7 +525,7 @@ public:
     std::size_t upper_bound_int(int64_t value) const REALM_NOEXCEPT;
     //@}
 
-    std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
+    std::size_t FindGTE(const int64_t target, std::size_t start, Array const* indirection) const;
     void Preset(int64_t min, int64_t max, std::size_t count);
     void Preset(std::size_t bitwidth, std::size_t count);
 
@@ -994,7 +994,7 @@ private:
     template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
-    template<size_t w> std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
+    template<size_t w> std::size_t FindGTE(const int64_t target, std::size_t start, Array const* indirection) const;
 
 protected:
     /// The total size in bytes (including the header) of a new empty
