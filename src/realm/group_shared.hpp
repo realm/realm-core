@@ -280,7 +280,7 @@ public:
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
-    typedef uint_fast64_t version_type;
+    using version_type = uint_fast64_t;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.

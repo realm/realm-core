@@ -268,15 +268,13 @@ public:
         type_HasRefs
     };
 
-    /// Create a new empty array of the specified type and attach this accessor
-    /// to it. This does not modify the parent reference information of this
-    /// accessor.
+    /// Create a new integer array of the specified type and size, and filled
+    /// with the specified value, and attach this accessor to it. This does not
+    /// modify the parent reference information of this accessor.
     ///
     /// Note that the caller assumes ownership of the allocated underlying
     /// node. It is not owned by the accessor.
-    ///
-    /// FIXME: Belongs in IntegerArray
-    void create(Type, bool context_flag = false);
+    void create(Type, bool context_flag = false, size_t size = 0, int_fast64_t value = 0);
 
     /// Reinitialize this array accessor to point to the specified new
     /// underlying memory. This does not modify the parent reference information
@@ -317,9 +315,15 @@ public:
 
     void move_assign(Array&) REALM_NOEXCEPT; // Move semantics for assignment
 
-    /// Construct an empty array of the specified type, and return just the
-    /// reference to the underlying memory.
+    /// Construct an empty integer array of the specified type, and return just
+    /// the reference to the underlying memory.
     static MemRef create_empty_array(Type, bool context_flag, Allocator&);
+
+    /// Construct an integer array of the specified type and size, and return
+    /// just the reference to the underlying memory. All elements will be
+    /// initialized to the specified value.
+    static MemRef create_array(Type, bool context_flag, size_t size,
+                               int_fast64_t value, Allocator&);
 
     /// Construct a shallow copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will **not** be cloned. See
@@ -1321,9 +1325,9 @@ inline Array::Array(no_prealloc_tag) REALM_NOEXCEPT:
 }
 
 
-inline void Array::create(Type type, bool context_flag)
+inline void Array::create(Type type, bool context_flag, size_t size, int_fast64_t value)
 {
-    MemRef mem = create_empty_array(type, context_flag, m_alloc); // Throws
+    MemRef mem = create_array(type, context_flag, size, value, m_alloc); // Throws
     init_from_mem(mem);
 }
 
@@ -1881,8 +1885,14 @@ inline void Array::move_assign(Array& a) REALM_NOEXCEPT
 
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
 {
-    std::size_t size = 0;
+    size_t size = 0;
     int_fast64_t value = 0;
+    return create_array(type, context_flag, size, value, alloc); // Throws
+}
+
+inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int_fast64_t value,
+                                  Allocator& alloc)
+{
     return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
