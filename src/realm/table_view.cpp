@@ -509,7 +509,7 @@ void TableView::remove(size_t ndx)
 #endif
 
     // Update refs
-    m_row_indexes.erase(ndx, ndx == size() - 1);
+    m_row_indexes.erase(ndx);
 
     // Adjustment of row indexes greater than the removed index is done by 
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
@@ -541,10 +541,8 @@ void TableView::clear()
     // for the row removals
     m_table->unregister_view(this);
 
-    if (is_ordered)
-        m_table->batch_remove(m_row_indexes);
-    else
-        m_table->batch_move_last_over(m_row_indexes);
+    bool is_move_last_over = !is_ordered;
+    m_table->batch_erase_rows(m_row_indexes, is_move_last_over);
 
     m_row_indexes.clear();
     m_num_detached_refs = 0;

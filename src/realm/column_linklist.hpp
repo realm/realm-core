@@ -62,16 +62,17 @@ public:
 
     void to_json_row(std::size_t row_ndx, std::ostream& out) const;
 
-    void move_last_over(std::size_t, std::size_t, bool) override;
-    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_clear_root_table() REALM_NOEXCEPT override;
-    void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT override;
-    void adj_acc_insert_rows_and_fix(std::size_t row_ndx, std::size_t num_rows);
+    void adj_acc_insert_rows(size_t, size_t) REALM_NOEXCEPT override;
+    void adj_acc_erase_row(size_t) REALM_NOEXCEPT override;
+    void adj_acc_move_over(size_t, size_t) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -87,8 +88,7 @@ private:
         std::size_t m_row_ndx;
         LinkView* m_list;
     };
-    typedef std::vector<list_entry> list_accessors;
-    mutable list_accessors m_list_accessors;
+    mutable std::vector<list_entry> m_list_accessors;
 
     LinkView* get_ptr(std::size_t row_ndx) const;
 
@@ -116,7 +116,11 @@ private:
     void discard_child_accessors() REALM_NOEXCEPT;
 
     template<bool fix_ndx_in_parent>
-    void adj_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT;
+    void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT;
+    template<bool fix_ndx_in_parent>
+    void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT;
+    template<bool fix_ndx_in_parent>
+    void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
@@ -179,9 +183,8 @@ inline void ColumnLinkList::do_discard_child_accessors() REALM_NOEXCEPT
 
 inline void ColumnLinkList::unregister_linkview(const LinkView& list)
 {
-    typedef list_accessors::iterator iter;
-    iter end = m_list_accessors.end();
-    for (iter i = m_list_accessors.begin(); i != end; ++i) {
+    auto end = m_list_accessors.end();
+    for (auto i = m_list_accessors.begin(); i != end; ++i) {
         if (i->m_list == &list) {
             m_list_accessors.erase(i);
             return;

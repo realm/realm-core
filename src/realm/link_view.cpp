@@ -144,8 +144,7 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 
     size_t link_ndx = (new_link_ndx <= old_link_ndx) ? new_link_ndx : new_link_ndx-1;
     size_t target_row_ndx = m_row_indexes.get(old_link_ndx);
-    bool is_last = (old_link_ndx + 1 == m_row_indexes.size());
-    m_row_indexes.erase(old_link_ndx, is_last);
+    m_row_indexes.erase(old_link_ndx);
     m_row_indexes.insert(link_ndx, target_row_ndx);
 
 #ifdef REALM_ENABLE_REPLICATION
@@ -214,8 +213,7 @@ size_t LinkView::do_remove(size_t link_ndx)
     size_t target_row_ndx = m_row_indexes.get(link_ndx);
     size_t origin_row_ndx = get_origin_row_index();
     m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
-    bool is_last = (link_ndx + 1 == m_row_indexes.size());
-    m_row_indexes.erase(link_ndx, is_last); // Throws
+    m_row_indexes.erase(link_ndx); // Throws
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
     return target_row_ndx;
@@ -358,7 +356,8 @@ void LinkView::remove_all_target_rows()
 
     if (m_row_indexes.is_attached()) {
         Table& target_table = get_target_table();
-        target_table.batch_move_last_over(m_row_indexes);
+        bool is_move_last_over = true;
+        target_table.batch_erase_rows(m_row_indexes, is_move_last_over);
     }
 }
 
@@ -375,8 +374,7 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
         repl->link_list_nullify(*this, pos);
 #endif
 
-    bool is_last = (pos + 1 == m_row_indexes.size());
-    m_row_indexes.erase(pos, is_last);
+    m_row_indexes.erase(pos);
 
     if (m_row_indexes.is_empty()) {
         m_row_indexes.destroy();

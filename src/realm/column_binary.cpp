@@ -268,7 +268,7 @@ public:
     }
 };
 
-void ColumnBinary::do_erase(size_t ndx, bool is_last)
+void ColumnBinary::erase(size_t ndx, bool is_last)
 {
     REALM_ASSERT_3(ndx, <, size());
     REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));

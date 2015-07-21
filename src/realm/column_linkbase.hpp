@@ -46,7 +46,6 @@ public:
     virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                                 std::size_t new_target_row_ndx) = 0;
 
-    void erase(std::size_t, bool) override;
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;

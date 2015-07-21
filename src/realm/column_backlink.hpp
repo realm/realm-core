@@ -60,9 +60,9 @@ public:
     ColumnLinkBase& get_origin_column() const REALM_NOEXCEPT;
     void set_origin_column(ColumnLinkBase& column, std::size_t col_ndx) REALM_NOEXCEPT;
 
-    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
@@ -155,14 +155,16 @@ inline void ColumnBackLink::adj_acc_insert_rows(std::size_t row_ndx,
 {
     Column::adj_acc_insert_rows(row_ndx, num_rows);
 
-    // For tables with link-type columns, the insertion point must be after all
-    // existsing rows, so the origin table cannot be affected by this change.
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_origin_table);
 }
 
-inline void ColumnBackLink::adj_acc_erase_row(std::size_t) REALM_NOEXCEPT
+inline void ColumnBackLink::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 {
-    // Rows cannot be erased this way in tables with link-type columns
-    REALM_ASSERT(false);
+    Column::adj_acc_erase_row(row_ndx);
+
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_origin_table);
 }
 
 inline void ColumnBackLink::adj_acc_move_over(std::size_t from_row_ndx,

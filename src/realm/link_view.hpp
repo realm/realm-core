@@ -90,7 +90,7 @@ public:
     /// returned.
     std::size_t find(std::size_t target_row_ndx, std::size_t start=0) const REALM_NOEXCEPT;
 
-    const ColumnBase& get_column_base(size_t index) const;
+    const ColumnBase& get_column_base(size_t index) const; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
     const Table& get_origin_table() const REALM_NOEXCEPT;
     Table& get_origin_table() REALM_NOEXCEPT;
 
@@ -112,7 +112,7 @@ private:
     LinkView(Table* origin_table, ColumnLinkList&, std::size_t row_ndx);
 
     void detach();
-    void set_origin_row_index(std::size_t row_ndx);
+    void set_origin_row_index(std::size_t row_ndx) REALM_NOEXCEPT;
 
     std::size_t do_set(std::size_t link_ndx, std::size_t target_row_ndx);
     std::size_t do_remove(std::size_t link_ndx);
@@ -306,7 +306,7 @@ inline std::size_t LinkView::get_origin_row_index() const REALM_NOEXCEPT
     return m_row_indexes.get_root_array()->get_ndx_in_parent();
 }
 
-inline void LinkView::set_origin_row_index(std::size_t row_ndx)
+inline void LinkView::set_origin_row_index(std::size_t row_ndx) REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
     m_row_indexes.get_root_array()->set_ndx_in_parent(row_ndx);

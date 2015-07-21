@@ -50,6 +50,7 @@ public:
     void set_null(std::size_t ndx) override;
     void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t row_ndx);
+    void erase(std::size_t row_ndx, bool is_last);
     void move_last_over(std::size_t row_ndx);
     void clear();
     size_t find_first(BinaryData value) const;
@@ -72,9 +73,9 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const override;
 
-    void insert(std::size_t, std::size_t, bool) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
@@ -103,7 +104,6 @@ private:
     class CreateHandler;
     class SliceHandler;
 
-    void do_erase(std::size_t row_ndx, bool is_last);
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void do_clear();
 
@@ -150,7 +150,7 @@ inline std::size_t ColumnBinary::size() const  REALM_NOEXCEPT
     // Non-leaf root
     return m_array->get_bptree_size();
 }
-    
+
 inline bool ColumnBinary::is_nullable() const REALM_NOEXCEPT
 {
     return m_nullable;
@@ -269,7 +269,7 @@ inline void ColumnBinary::erase(std::size_t row_ndx)
 {
     std::size_t last_row_ndx = size() - 1; // Note that size() is slow
     bool is_last = row_ndx == last_row_ndx;
-    do_erase(row_ndx, is_last); // Throws
+    erase(row_ndx, is_last); // Throws
 }
 
 inline void ColumnBinary::move_last_over(std::size_t row_ndx)
@@ -284,23 +284,40 @@ inline void ColumnBinary::clear()
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnBinary::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+inline void ColumnBinary::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
+                                      size_t prior_num_rows)
 {
-    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx <= prior_num_rows);
+
+    size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     BinaryData value = m_nullable ? BinaryData() : BinaryData("", 0);
     bool add_zero_term = false;
-    do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
+    do_insert(row_ndx_2, value, add_zero_term, num_rows_to_insert); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnBinary::erase(std::size_t row_ndx, bool is_last)
+inline void ColumnBinary::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+                                     size_t prior_num_rows, bool)
 {
-    do_erase(row_ndx, is_last); // Throws
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+
+    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    for (size_t i = num_rows_to_erase; i > 0; --i) {
+        size_t row_ndx_2 = row_ndx + i - 1;
+        erase(row_ndx_2, is_last); // Throws
+    }
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnBinary::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+inline void ColumnBinary::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
 {
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx < prior_num_rows);
+
+    size_t last_row_ndx = prior_num_rows - 1;
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 

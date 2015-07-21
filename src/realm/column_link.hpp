@@ -53,10 +53,12 @@ public:
     void nullify_link(std::size_t row_ndx);
     void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
     void insert_null_link(std::size_t row_ndx);
-    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) override;
+
     //@}
 
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;

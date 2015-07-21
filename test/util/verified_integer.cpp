@@ -106,7 +106,7 @@ void VerifiedInteger::set(size_t ndx, int64_t value)
 void VerifiedInteger::erase(size_t ndx)
 {
     v.erase(v.begin() + ndx);
-    u.erase(ndx, ndx + 1 == u.size());
+    u.erase(ndx);
     REALM_ASSERT(v.size() == u.size());
     verify_neighbours(ndx);
     REALM_ASSERT(occasional_verify());

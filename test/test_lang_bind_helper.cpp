@@ -6415,10 +6415,10 @@ public:
         return true;
     }
 
-    bool select_link_list(size_t col, size_t row)
+    bool select_link_list(size_t col_ndx, size_t row_ndx)
     {
-        m_current_linkview_col = col;
-        m_current_linkview_row = row;
+        m_current_linkview_col = col_ndx;
+        m_current_linkview_row = row_ndx;
         return true;
     }
 
@@ -6440,7 +6440,7 @@ public:
     bool remove_primary_key() { return false; }
     bool set_link_type(size_t, LinkType) { return false; }
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
-    bool erase_rows(size_t, size_t, size_t, bool) noexcept { return false; }
+    bool erase_rows(size_t, size_t, size_t, bool) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }
@@ -6511,7 +6511,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
     sg.begin_read();
 
-    { // With no changse, the handler should not be called at all
+    { // With no changes, the handler should not be called at all
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
             void parse_complete()
@@ -6553,15 +6553,16 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
             std::size_t expected_table = 0;
 
-            bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
+                                   size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 ++expected_table;
 
                 CHECK_EQUAL(0, row_ndx);
-                CHECK_EQUAL(1, num_rows);
-                CHECK_EQUAL(1, tbl_sz);
-                CHECK(unordered);
+                CHECK_EQUAL(1, num_rows_to_insert);
+                CHECK_EQUAL(0, prior_num_rows);
+                CHECK(!unordered);
 
                 return true;
             }
@@ -6592,11 +6593,12 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+                            size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(0, row_ndx);
-                CHECK_EQUAL(1, num_rows);
-                CHECK_EQUAL(0, tbl_sz);
+                CHECK_EQUAL(1, num_rows_to_erase);
+                CHECK_EQUAL(1, prior_num_rows);
                 CHECK(unordered);
                 return true;
             }
@@ -6949,11 +6951,19 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     // verify that we can revert a link change:
     LangBindHelper::promote_to_write(sg, *hist);
     origin->set_link(0, 0, 1);
+    CHECK_EQUAL(1, origin->get_link(0,0));
     LangBindHelper::rollback_and_continue_as_read(sg, *hist);
     CHECK_EQUAL(2, origin->get_link(0,0));
     // verify that we can revert addition of a row in target table
     LangBindHelper::promote_to_write(sg, *hist);
     target->add_empty_row();
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    // Verify that we can revert a non-end insertion of a row in target table
+    LangBindHelper::promote_to_write(sg, *hist);
+    target->insert_empty_row(0);
+    CHECK_EQUAL(3, origin->get_link(0,0));
     LangBindHelper::rollback_and_continue_as_read(sg, *hist);
     CHECK_EQUAL(2, origin->get_link(0,0));
 }
@@ -7162,15 +7172,16 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
             std::size_t expected_table = 1;
 
-            bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+                            size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 --expected_table;
 
                 CHECK_EQUAL(0, row_ndx);
-                CHECK_EQUAL(1, num_rows);
-                CHECK_EQUAL(0, tbl_sz);
-                CHECK(unordered);
+                CHECK_EQUAL(1, num_rows_to_erase);
+                CHECK_EQUAL(1, prior_num_rows);
+                CHECK_NOT(unordered);
 
                 return true;
             }
@@ -7206,14 +7217,15 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
             bool link_list_insert_called = false;
             bool set_link_called = false;
 
-            bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
+                                   size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 --expected_table;
 
                 CHECK_EQUAL(0, row_ndx);
-                CHECK_EQUAL(1, num_rows);
-                CHECK_EQUAL(1, tbl_sz);
+                CHECK_EQUAL(1, num_rows_to_insert);
+                CHECK_EQUAL(0, prior_num_rows);
                 CHECK(unordered);
                 return true;
             }

@@ -579,7 +579,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_int(0, i, int64_t(i*sign));
-        
+
         if (i % 4 == 0) {
             table.set_null(12, i);
         }

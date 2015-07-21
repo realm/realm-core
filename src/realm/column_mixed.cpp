@@ -121,29 +121,39 @@ ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType 
 }
 
 
-void ColumnMixed::do_erase(size_t row_ndx, bool is_last)
+void ColumnMixed::do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows)
 {
-    REALM_ASSERT_3(row_ndx, <, m_types->size());
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
 
-    // Remove refs or binary data
-    clear_value(row_ndx, mixcol_Int); // Throws
+    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    for (size_t i = num_rows_to_erase; i > 0; --i) {
+        size_t row_ndx_2 = row_ndx + i - 1;
+        // Remove refs or binary data
+        clear_value(row_ndx_2, mixcol_Int); // Throws
+        m_types->erase(row_ndx, is_last); // Throws
+    }
 
-    m_types->erase(row_ndx, is_last); // Throws
-    m_data->erase(row_ndx, is_last); // Throws
+    bool broken_reciprocal_backlinks = false; // Ignored
+    m_data->erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+                       broken_reciprocal_backlinks); // Throws
 }
 
 
-void ColumnMixed::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
+void ColumnMixed::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
 {
-    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
-    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx < prior_num_rows);
 
     // Remove refs or binary data
     clear_value(row_ndx, mixcol_Int); // Throws
 
-    bool broken_reciprocal_backlinks = false; // Value is immaterial for these column types
-    m_types->move_last_over(row_ndx, last_row_ndx, broken_reciprocal_backlinks); // Throws
-    m_data->move_last_over(row_ndx, last_row_ndx, broken_reciprocal_backlinks); // Throws
+    size_t last_row_ndx = prior_num_rows - 1;
+    m_types->move_last_over(row_ndx, last_row_ndx); // Throws
+
+    bool broken_reciprocal_backlinks = false; // Ignored
+    m_data->move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 

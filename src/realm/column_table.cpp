@@ -330,22 +330,31 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
 }
 
 
-void ColumnTable::erase(size_t row_ndx, bool is_last)
+void ColumnTable::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                             bool broken_reciprocal_backlinks)
 {
-    REALM_ASSERT_3(row_ndx, <, size());
-    destroy_subtable(row_ndx);
-    ColumnSubtableParent::erase(row_ndx, is_last); // Throws
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+
+    for (size_t i = 0; i < num_rows_to_erase; ++i)
+        destroy_subtable(row_ndx + i);
+
+    ColumnSubtableParent::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+                                     broken_reciprocal_backlinks); // Throws
 }
 
 
-void ColumnTable::move_last_over(size_t row_ndx, size_t last_row_ndx,
-                                 bool broken_reciprocal_backlinks)
+void ColumnTable::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+                                     bool broken_reciprocal_backlinks)
 {
-    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
-    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx < prior_num_rows);
+
     destroy_subtable(row_ndx);
-    ColumnSubtableParent::move_last_over(row_ndx, last_row_ndx,
-                                         broken_reciprocal_backlinks); // Throws
+
+    ColumnSubtableParent::move_last_row_over(row_ndx, prior_num_rows,
+                                             broken_reciprocal_backlinks); // Throws
 }
 
 

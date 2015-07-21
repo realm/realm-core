@@ -254,7 +254,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Delete1)
 
     // Delete from end
-    c.erase(9, 9 == c.size()-1);
+    c.erase(9);
 
     CHECK_EQUAL(9, c.size());
 
@@ -272,7 +272,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Delete2)
 
     // Delete from top
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
 
     CHECK_EQUAL(8, c.size());
 
@@ -289,7 +289,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Delete3)
 
     // Delete from middle
-    c.erase(3, 3 == c.size()-1);
+    c.erase(3);
 
     CHECK_EQUAL(7, c.size());
 
@@ -305,19 +305,19 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_DeleteAll)
 
     // Delete all items one at a time
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(6, c.size());
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(5, c.size());
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(4, c.size());
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(3, c.size());
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(2, c.size());
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(1, c.size());
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(0, c.size());
 
     CHECK(c.is_empty());
@@ -649,8 +649,8 @@ TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
     CHECK_EQUAL(2, res6);
 
     // Delete values
-    e.erase(1, 1 == e.size()-1);
-    e.erase(0, 0 == e.size()-1);
+    e.erase(1);
+    e.erase(0);
     size_t res7 = e.count("a");
     size_t res8 = e.count("newval");
     CHECK_EQUAL(4, res7);
@@ -1214,9 +1214,9 @@ TEST_TYPES(ColumnString_Index, non_nullable, nullable)
     CHECK_EQUAL(19, ins3);
 
     // Delete some values
-    asc.erase(0,  0  == asc.size()-1);  // top
-    asc.erase(7,  7  == asc.size()-1);  // middle
-    asc.erase(17, 17 == asc.size()-1); // bottom
+    asc.erase(0);  // top
+    asc.erase(7);  // middle
+    asc.erase(17); // bottom
     size_t del1 = asc.find_first("top");
     size_t del2 = asc.find_first("middle");
     size_t del3 = asc.find_first("bottom");

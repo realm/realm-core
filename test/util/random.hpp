@@ -74,8 +74,20 @@ public:
     /// Reseed this pseudorandom number generator.
     void seed(unsigned long) REALM_NOEXCEPT;
 
+    /// Draw a uniformly distributed floating point value from the half-open
+    /// interval [`a`, `b`). It is an error if `b` is less than, or equal to
+    /// `b`.
+    ///
+    /// \tparam T One of the fundamental floating point types.
+    template<class T> T draw_float(T a, T b) REALM_NOEXCEPT;
+
+    /// Same as draw_float(T(0), T(1)).
+    template<class T> T draw_float() REALM_NOEXCEPT;
+
     /// Draw a uniformly distributed integer from the specified range. It is an
     /// error if `min` is greater than `max`.
+    ///
+    /// \tparam T One of the fundamental integer types.
     template<class T> T draw_int(T min, T max) REALM_NOEXCEPT;
 
     /// Same as `draw_int(lim::min(), lim::max())` where `lim` is
@@ -125,6 +137,16 @@ inline Random::Random(unsigned long seed) REALM_NOEXCEPT:
 inline void Random::seed(unsigned long seed) REALM_NOEXCEPT
 {
     m_engine.seed(std::mt19937::result_type(seed));
+}
+
+template<class T> inline T Random::draw_float(T a, T b) REALM_NOEXCEPT
+{
+    return std::uniform_real_distribution<T>(a,b)(m_engine);
+}
+
+template<class T> inline T Random::draw_float() REALM_NOEXCEPT
+{
+    return draw_float(T(0), T(1));
 }
 
 template<class T> inline T Random::draw_int(T min, T max) REALM_NOEXCEPT

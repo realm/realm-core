@@ -7,14 +7,6 @@ using namespace realm;
 
 
 
-void ColumnLinkBase::erase(size_t, bool)
-{
-    // This operation is not available for unordered tables, and only unordered
-    // tables may have link columns.
-    REALM_ASSERT(false);
-}
-
-
 void ColumnLinkBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     Column::refresh_accessor_tree(col_ndx, spec); // Throws

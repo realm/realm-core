@@ -133,9 +133,9 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const override;
 
-    void insert(std::size_t, std::size_t, bool) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
@@ -189,8 +189,8 @@ private:
     /// For string and binary data types, the bytes are stored here.
     std::unique_ptr<ColumnBinary> m_binary_data;
 
-    void do_erase(std::size_t row_ndx, bool is_last);
-    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows);
+    void do_move_last_over(size_t row_ndx, size_t prior_num_rows);
     void do_clear(std::size_t num_rows);
 
     void create(Allocator&, ref_type, Table*, std::size_t column_ndx);

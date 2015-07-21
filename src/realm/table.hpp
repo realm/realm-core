@@ -24,11 +24,11 @@
 #include <map>
 #include <utility>
 #include <typeinfo>
+#include <memory>
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/tuple.hpp>
-#include <memory>
 #include <realm/column_fwd.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
@@ -394,12 +394,6 @@ public:
     void remove_last();
     void move_last_over(std::size_t row_ndx);
     void clear();
-
-private:
-    // batch versions used by TableView and LinkView
-    void batch_remove(const Column& rows);
-    void batch_move_last_over(const Column& rows);
-public:
 
     //@}
 
@@ -897,8 +891,10 @@ private:
     mutable uint_fast64_t m_version;
 #endif
 
-    void do_remove(std::size_t row_ndx);
-    void do_move_last_over(std::size_t row_ndx, bool broken_reciprocal_backlinks);
+    void erase_row(size_t row_ndx, bool is_move_last_over);
+    void batch_erase_rows(const Column& row_indexes, bool is_move_last_over);
+    void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
+    void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_clear(bool broken_reciprocal_backlinks);
     std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
 
@@ -1207,9 +1203,9 @@ private:
     /// state.stop_on_link_list_column must be null.
     ///
     /// It is immaterial which table remove_backlink_broken_rows() is called on,
-    /// as long it that table is in the same group as the specified rows.
+    /// as long it that table is in the same group as the removed rows.
 
-    void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState& state);
+    void cascade_break_backlinks_to(size_t row_ndx, CascadeState& state);
     void cascade_break_backlinks_to_all_rows(CascadeState& state);
     void remove_backlink_broken_rows(const CascadeState&);
 
@@ -1441,6 +1437,18 @@ inline void Table::bump_version(bool) const REALM_NOEXCEPT
 }
 
 #endif // REALM_ENABLE_REPLICATION
+
+inline void Table::remove(size_t row_ndx)
+{
+    bool is_move_last_over = false;
+    erase_row(row_ndx, is_move_last_over); // Throws;
+}
+
+inline void Table::move_last_over(size_t row_ndx)
+{
+    bool is_move_last_over = true;
+    erase_row(row_ndx, is_move_last_over); // Throws;
+}
 
 inline void Table::remove_last()
 {
@@ -2064,7 +2072,8 @@ public:
 
     static void do_remove(Table& table, std::size_t row_ndx)
     {
-        table.do_remove(row_ndx); // Throws
+        bool broken_reciprocal_backlinks = false;
+        table.do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
     }
 
     static void do_move_last_over(Table& table, std::size_t row_ndx)
