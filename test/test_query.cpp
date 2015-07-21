@@ -6184,36 +6184,33 @@ TEST(Query_64BitValues)
 }
 
 
-
-
-TEST(Query_IntegerNull)
+TEST(Query_Nulls)
 {
 /*
 Here we test comparisons and arithmetic with null in queries. Basic rules:
 
-null    +, -, *, /          123456   ==   null
-null    +, -, *, /          null     ==   null
+null    +, -, *, /          value   ==   null
+null    +, -, *, /          null    ==   null
 
-null    ==, >=, <=]         null     ==   true
-null    !=, >, <            null     ==   false
+null    ==, >=, <=]         null    ==   true
+null    !=, >, <            null    ==   false
 
-null    ==, >=, <=, >, <    123456   ==   false
-null    !=                  123456   ==   true
+null    ==, >=, <=, >, <    value   ==   false
+null    !=                  value   ==   true
 
 This does NOT follow SQL! In particular, (null == null) == true and
-(null != 1234) == true.
+(null != value) == true and (null != null) == false.
 
     Price<int>      Shipping<int>       Description<String>     Rating<double>
     --------------------------------------------------------------------------
-0   null            null                null                    0.0
-1   10              null                "foo"                   0.0
-2   20              30                  "bar"                   0.0 
+0   null            null                null                    1.1
+1   10              null                "foo"                   2.2
+2   20              30                  "bar"                   3.3 
 3                                                               0.0
 4                                                               0.0
 5                     all blanks are null                       0.0
 6                                                               0.0
 7                                                               0.0
-
 */
 
     Group g;
@@ -6288,11 +6285,10 @@ This does NOT follow SQL! In particular, (null == null) == true and
     t = (price + rating == null()).count();
     CHECK_EQUAL(t, 6);
 
-    return;
-
-    t = (price + rating != null()).find();
+    t = (price + rating != null()).count();
     CHECK_EQUAL(t, 2);
 
+    return;
     // Old query syntax
     t = table->where().less(0, null()).find();
     CHECK_EQUAL(t, not_found);
@@ -6311,12 +6307,6 @@ This does NOT follow SQL! In particular, (null == null) == true and
     
     t = table->where().greater(0, 0).find();
     CHECK_EQUAL(t, 1);
-
-
-
-
-
-
 }
 
 #endif // TEST_QUERY

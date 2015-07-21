@@ -685,10 +685,15 @@ template<> inline bool NullableVector<DateTime>::is_null(size_t index) const
     return m_first[index].get_datetime() == m_null;
 }
 
-template<> inline bool NullableVector<null>::is_null(size_t index) const
+template<> inline bool NullableVector<null>::is_null(size_t) const
 {
     return true;
 }
+template<> inline void NullableVector<null>::set_null(size_t)
+{
+    return;
+}
+
 
 // Also for DateTime
 template<> inline void NullableVector<int64_t>::set_null(size_t index)
