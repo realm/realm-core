@@ -16,7 +16,7 @@
 
 ### Internals:
 
-* Added static `Array::create_array()` for creating non-empt arrays, and extend
+* Added static `Array::create_array()` for creating non-empty arrays, and extend
   `Array::create()` such that it can create non-empty arrays.
 * The creation of the free-space arrays (`Group::m_free_positions`,
   `Group::m_free_lengths`, `Group::m_free_versions`) is now always done by
