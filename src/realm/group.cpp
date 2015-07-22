@@ -105,55 +105,6 @@ void Group::open(BinaryData buffer, bool take_ownership)
 }
 
 
-void Group::reset_free_space_versions()
-{
-    REALM_ASSERT(m_top.is_attached());
-
-    if (m_free_versions.is_attached()) {
-        REALM_ASSERT_3(m_top.size(), ==, 7);
-        // If free space tracking is enabled
-        // we just have to reset it
-        m_free_versions.set_all_to_zero(); // Throws
-        return;
-    }
-
-    // Serialized files have no free space tracking at all, so we have
-    // to add the basic free lists
-    if (m_top.size() == 3) {
-        // FIXME: There is a risk that these are already allocated,
-        // and that would cause a leak. This could happen if an
-        // earlier commit attempt failed.
-        REALM_ASSERT(!m_free_positions.is_attached());
-        REALM_ASSERT(!m_free_lengths.is_attached());
-        m_free_positions.create(Array::type_Normal); // Throws
-        m_free_lengths.create(Array::type_Normal); // Throws
-        m_top.add(m_free_positions.get_ref()); // Throws
-        m_top.add(m_free_lengths.get_ref()); // Throws
-    }
-    REALM_ASSERT_3(m_top.size(), >=, 5);
-
-    // Files that have never been modified via SharedGroup do not
-    // have version tracking for the free lists
-    if (m_top.size() == 5) {
-        // FIXME: There is a risk that this one is already allocated,
-        // and that would cause a leak. This could happen if an
-        // earlier commit attempt failed.
-        REALM_ASSERT(!m_free_versions.is_attached());
-        m_free_versions.create(Array::type_Normal); // Throws
-        size_t n = m_free_positions.size();
-        for (size_t i = 0; i != n; ++i)
-            m_free_versions.add(0); // Throws
-        m_top.add(m_free_versions.get_ref()); // Throws
-        // Add a temporary "version_number" just to get the top array
-        // to the proper size. This version number is never used and cannot
-        // escape to the database during commit. The correct version number
-        // is set in GroupWriter::write().
-        m_top.add(0);
-    }
-    REALM_ASSERT_3(m_top.size(), >=, 7);
-}
-
-
 Group::~Group() REALM_NOEXCEPT
 {
     // If this group accessor is detached at this point in time, it is either
@@ -197,67 +148,38 @@ void Group::attach(ref_type top_ref)
 
     m_tables.detach();
     m_table_names.detach();
-    m_free_positions.detach();
-    m_free_lengths.detach();
-    m_free_versions.detach();
 
     bool create_empty_group = (top_ref == 0);
     if (create_empty_group) {
-        size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
-
         m_top.create(Array::type_HasRefs); // Throws
-        try {
+        _impl::DeepArrayDestroyGuard dg_top(&m_top);
+        {
             m_table_names.create(); // Throws
-            m_tables.create(Array::type_HasRefs); // Throws
-            m_free_positions.create(Array::type_Normal); // Throws
-            m_free_lengths.create(Array::type_Normal); // Throws
-
+            _impl::DestroyGuard<ArrayString> dg(&m_table_names);
             m_top.add(m_table_names.get_ref()); // Throws
+            dg.release();
+        }
+        {
+            m_tables.create(Array::type_HasRefs); // Throws
+            _impl::DestroyGuard<ArrayInteger> dg(&m_tables);
             m_top.add(m_tables.get_ref()); // Throws
-            m_top.add(1 + 2*initial_logical_file_size); // Throws
-            m_top.add(m_free_positions.get_ref()); // Throws
-            m_top.add(m_free_lengths.get_ref()); // Throws
-
-            if (m_is_shared) {
-                m_free_versions.create(Array::type_Normal); // Throws
-                m_top.add(m_free_versions.get_ref()); // Throws
-                size_t initial_database_version = 0; // A.k.a. transaction number
-                m_top.add(1 + 2*initial_database_version); // Throws
-            }
+            dg.release();
         }
-        catch (...) {
-            m_top.detach();
-            throw;
-        }
+        size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
+        m_top.add(1 + 2*initial_logical_file_size); // Throws
+        dg_top.release();
     }
     else {
         m_top.init_from_ref(top_ref);
         size_t top_size = m_top.size();
-        REALM_ASSERT_3(top_size, >=, 3);
+        REALM_ASSERT(top_size == 3 || top_size == 5 || top_size == 7);
 
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
 
-        // Note that the third slot is `1 + 2 * logical_file_size`, and the
-        // logical file size must never exceed actual file size.
+        // The 3rd slot in m_top is `1 + 2 * logical_file_size`, and the logical
+        // file size must never exceed actual file size.
         REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
-
-        // Files created by Group::write() do not have free-space
-        // tracking, and files that are accessed via a stan-along Group do
-        // not need version information for free-space tracking.
-        if (top_size > 3) {
-            REALM_ASSERT_3(top_size, >=, 5);
-            m_free_positions.init_from_parent();
-            m_free_lengths.init_from_parent();
-
-            if (m_is_shared && top_size > 5) {
-                REALM_ASSERT_3(top_size, >= , 7);
-                m_free_versions.init_from_parent();
-                // Note that the seventh slot is the database version
-                // (a.k.a. transaction count,) which is not yet used for
-                // anything.
-            }
-        }
     }
 }
 
@@ -267,9 +189,6 @@ void Group::detach() REALM_NOEXCEPT
     detach_table_accessors();
     m_table_accessors.clear();
 
-    m_free_versions.detach();
-    m_free_lengths.detach();
-    m_free_positions.detach();
     m_table_names.detach();
     m_tables.detach();
     m_top.detach(); // This marks the group accessor as detached
@@ -755,31 +674,11 @@ void Group::write(std::ostream& out, TableWriter& table_writer,
 
 void Group::commit()
 {
-    REALM_ASSERT(is_attached());
-   // REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
-
-    // GroupWriter::write_group() needs free-space tracking
-    // information, so if the attached database does not contain it,
-    // we must add it now. Empty (newly created) database files and
-    // database files created by Group::write() do not have free-space
-    // tracking information.
-    if (m_free_positions.is_attached()) {
-        REALM_ASSERT_3(m_top.size(), >=, 5);
-        if (m_top.size() > 5) {
-            REALM_ASSERT_3(m_top.size(), >=, 7);
-            // Delete free-list version information and database
-            // version (a.k.a. transaction number)
-            Array::destroy(m_top.get_as_ref(5), m_top.get_alloc());
-            m_top.erase(5, 7);
-        }
-    }
-    else {
-        REALM_ASSERT_3(m_top.size(), ==, 3);
-        m_free_positions.create(Array::type_Normal);
-        m_free_lengths.create(Array::type_Normal);
-        m_top.add(m_free_positions.get_ref());
-        m_top.add(m_free_lengths.get_ref());
-    }
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+    if (m_is_shared)
+        throw LogicError(LogicError::wrong_group_state);
+    // REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     GroupWriter out(*this); // Throws
 
@@ -834,10 +733,6 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) REALM_NOEXCEPT
 
     // Now we can update it's child arrays
     m_table_names.update_from_parent(old_baseline);
-    m_free_positions.update_from_parent(old_baseline);
-    m_free_lengths.update_from_parent(old_baseline);
-    if (m_is_shared)
-        m_free_versions.update_from_parent(old_baseline);
 
     // If m_tables has not been modfied we don't
     // need to update attached table accessors
@@ -1739,20 +1634,43 @@ void Group::Verify() const
     // Check concistency of the allocation of the immutable memory that was
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
-    if (m_free_positions.is_attached()) {
-        size_t n = m_free_positions.size();
-        REALM_ASSERT_3(n, ==, m_free_lengths.size());
-        if (m_free_versions.is_attached())
-            REALM_ASSERT_3(n, ==, m_free_versions.size());
-        for (size_t i = 0; i != n; ++i) {
-            ref_type ref  = to_ref(m_free_positions.get(i));
-            size_t size = to_size_t(m_free_lengths.get(i));
-            mem_usage_2.add_immutable(ref, size);
+    {
+        REALM_ASSERT(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7);
+        Allocator& alloc = m_top.get_alloc();
+        ArrayInteger pos(alloc), len(alloc), ver(alloc);
+        size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;
+        pos.set_parent(const_cast<Array*>(&m_top), pos_ndx);
+        len.set_parent(const_cast<Array*>(&m_top), len_ndx);
+        ver.set_parent(const_cast<Array*>(&m_top), ver_ndx);
+        if (m_top.size() > pos_ndx) {
+            if (ref_type ref = m_top.get_as_ref(pos_ndx))
+                pos.init_from_ref(ref);
         }
-        mem_usage_2.canonicalize();
-        mem_usage_1.add(mem_usage_2);
-        mem_usage_1.canonicalize();
-        mem_usage_2.clear();
+        if (m_top.size() > len_ndx) {
+            if (ref_type ref = m_top.get_as_ref(len_ndx))
+                len.init_from_ref(ref);
+        }
+        if (m_top.size() > ver_ndx) {
+            if (ref_type ref = m_top.get_as_ref(ver_ndx))
+                ver.init_from_ref(ref);
+        }
+        REALM_ASSERT(pos.is_attached() == len.is_attached());
+        REALM_ASSERT(pos.is_attached() || !ver.is_attached()); // pos.is_attached() <== ver.is_attached()
+        if (pos.is_attached()) {
+            size_t n = pos.size();
+            REALM_ASSERT_3(n, ==, len.size());
+            if (ver.is_attached())
+                REALM_ASSERT_3(n, ==, ver.size());
+            for (size_t i = 0; i != n; ++i) {
+                ref_type ref  = to_ref(pos.get(i));
+                size_t size = to_size_t(len.get(i));
+                mem_usage_2.add_immutable(ref, size);
+            }
+            mem_usage_2.canonicalize();
+            mem_usage_1.add(mem_usage_2);
+            mem_usage_1.canonicalize();
+            mem_usage_2.clear();
+        }
     }
 
     // Check the concistency of the allocation of the immutable memory that has
@@ -1816,20 +1734,39 @@ void Group::print() const
 
 void Group::print_free() const
 {
-    if (!m_free_positions.is_attached()) {
+    Allocator& alloc = m_top.get_alloc();
+    ArrayInteger pos(alloc), len(alloc), ver(alloc);
+    size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;
+    pos.set_parent(const_cast<Array*>(&m_top), pos_ndx);
+    len.set_parent(const_cast<Array*>(&m_top), len_ndx);
+    ver.set_parent(const_cast<Array*>(&m_top), ver_ndx);
+    if (m_top.size() > pos_ndx) {
+        if (ref_type ref = m_top.get_as_ref(pos_ndx))
+            pos.init_from_ref(ref);
+    }
+    if (m_top.size() > len_ndx) {
+        if (ref_type ref = m_top.get_as_ref(len_ndx))
+            len.init_from_ref(ref);
+    }
+    if (m_top.size() > ver_ndx) {
+        if (ref_type ref = m_top.get_as_ref(ver_ndx))
+            ver.init_from_ref(ref);
+    }
+
+    if (!pos.is_attached()) {
         std::cout << "none\n";
         return;
     }
-    bool has_versions = m_free_versions.is_attached();
+    bool has_versions = ver.is_attached();
 
-    size_t n = m_free_positions.size();
+    size_t n = pos.size();
     for (size_t i = 0; i != n; ++i) {
-        size_t pos  = to_size_t(m_free_positions[i]);
-        size_t size = to_size_t(m_free_lengths[i]);
-        std::cout << i << ": " << pos << " " << size;
+        size_t offset = to_size_t(pos[i]);
+        size_t size   = to_size_t(len[i]);
+        std::cout << i << ": " << offset << " " << size;
 
         if (has_versions) {
-            size_t version = to_size_t(m_free_versions[i]);
+            size_t version = to_size_t(ver[i]);
             std::cout << " " << version;
         }
         std::cout << "\n";
@@ -1877,31 +1814,5 @@ std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return std::make_pair(m_tables.get_ref(), ndx_in_parent);
 }
-
-
-/*
-void Group::zero_free_space(size_t file_size, size_t readlock_version)
-{
-    static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
-
-    if (!m_is_shared)
-        return;
-
-    File::Map<char> map(m_alloc.m_file, File::access_ReadWrite, file_size);
-
-    size_t count = m_free_positions.size();
-    for (size_t i = 0; i < count; ++i) {
-        size_t v = to_size_t(m_free_versions.get(i)); // todo, remove assizet when 64 bit
-        if (v >= m_readlock_version)
-            continue;
-
-        size_t pos = to_size_t(m_free_positions.get(i));
-        size_t len = to_size_t(m_free_lengths.get(i));
-
-        char* p = map.get_addr() + pos;
-        std::fill(p, p+len, 0);
-    }
-}
-*/
 
 #endif // REALM_DEBUG

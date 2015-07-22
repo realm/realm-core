@@ -26,6 +26,7 @@
 #include <realm/util/file.hpp>
 #include <realm/alloc.hpp>
 #include <realm/impl/array_writer.hpp>
+#include <realm/array_integer.hpp>
 
 
 namespace realm {
@@ -34,11 +35,25 @@ namespace realm {
 class Group;
 class SlabAlloc;
 
+
+/// This class is not supposed to be reused for multiple write sessions. In
+/// particular, do not reuse it in case any of the functions throw.
+///
+/// FIXME: Move this class to namespace realm::_impl and to subdir src/realm/impl.
 class GroupWriter: public _impl::ArrayWriterBase {
 public:
+    // For groups in transactional mode (Group::m_is_shared), this constructor
+    // must be called while a write transaction is in progress.
+    //
+    // The constructor adds free-space tracking information to the specified
+    // group, if it is not already present (4th and 5th entry in
+    // Group::m_top). If the specified group is in transactional mode
+    // (Group::m_is_shared), the constructor also adds version tracking
+    // information to the group, if it is not already present (6th and 7th entry
+    // in Group::m_top).
     GroupWriter(Group&);
 
-    void set_versions(uint64_t current, uint64_t read_lock);
+    void set_versions(uint64_t current, uint64_t read_lock) REALM_NOEXCEPT;
 
     /// Write all changed array nodes into free space.
     ///
@@ -70,6 +85,9 @@ public:
 private:
     Group&     m_group;
     SlabAlloc& m_alloc;
+    ArrayInteger m_free_positions; // 4th slot in Group::m_top
+    ArrayInteger m_free_lengths;   // 5th slot in Group::m_top
+    ArrayInteger m_free_versions;  // 6th slot in Group::m_top
     uint64_t   m_current_version;
     uint64_t   m_readlock_version;
     util::File::Map<char> m_file_map;
@@ -121,7 +139,7 @@ inline std::size_t GroupWriter::get_file_size() const REALM_NOEXCEPT
     return m_file_map.get_size();
 }
 
-inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock)
+inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) REALM_NOEXCEPT
 {
     REALM_ASSERT(read_lock <= current);
     m_current_version  = current;

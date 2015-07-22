@@ -112,8 +112,8 @@ public:
         column_not_nullable,
 
         /// Group::open() is called on a group accessor that is already in the
-        /// attached state, or on a group accessor that is managed by a
-        /// SharedGroup object.
+        /// attached state. Or Group::open() or Group::commit() is called on a
+        /// group accessor that is managed by a SharedGroup object.
         wrong_group_state,
 
         /// No active transaction on a particular SharedGroup object (e.g.,
