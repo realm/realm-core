@@ -1298,7 +1298,7 @@ public:
 
             while (f == not_found && m_last_indexed < m_index_size) {
                 m_index_getter->cache_next(m_last_indexed);
-                f = m_index_getter->m_leaf_ptr->FindGTE(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
+                f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
 
                 if (f >= end || f == not_found) {
                     m_last_indexed = m_index_getter->m_leaf_end;

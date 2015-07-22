@@ -541,7 +541,7 @@ public:
     /// \param start the offset at which to start searching in the array
     /// \param indirection an \c Array containing valid indices of values in this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
-    std::size_t FindGTE(const int64_t target, std::size_t start, Array const* indirection) const;
+    std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
     void Preset(int64_t min, int64_t max, std::size_t count);
     void Preset(std::size_t bitwidth, std::size_t count);
 
@@ -1010,7 +1010,7 @@ private:
     template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
-    template<size_t w> std::size_t FindGTE(const int64_t target, std::size_t start, Array const* indirection) const;
+    template<size_t w> std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
 
 protected:
     /// The total size in bytes (including the header) of a new empty

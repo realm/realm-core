@@ -693,32 +693,32 @@ void Array::set_all_to_zero()
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-std::size_t Array::FindGTE(const int64_t target, size_t start, Array const* indirection) const
+std::size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     switch (m_width) {
         case 0:
-            return FindGTE<0>(target, start, indirection);
+            return find_gte<0>(target, start, indirection);
         case 1:
-            return FindGTE<1>(target, start, indirection);
+            return find_gte<1>(target, start, indirection);
         case 2:
-            return FindGTE<2>(target, start, indirection);
+            return find_gte<2>(target, start, indirection);
         case 4:
-            return FindGTE<4>(target, start, indirection);
+            return find_gte<4>(target, start, indirection);
         case 8:
-            return FindGTE<8>(target, start, indirection);
+            return find_gte<8>(target, start, indirection);
         case 16:
-            return FindGTE<16>(target, start, indirection);
+            return find_gte<16>(target, start, indirection);
         case 32:
-            return FindGTE<32>(target, start, indirection);
+            return find_gte<32>(target, start, indirection);
         case 64:
-            return FindGTE<64>(target, start, indirection);
+            return find_gte<64>(target, start, indirection);
         default:
             return not_found;
     }
 }
 
 template<std::size_t w>
-std::size_t Array::FindGTE(const int64_t target, std::size_t start, Array const* indirection) const
+std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const* indirection) const
 {
 #if REALM_DEBUG
     // Reference implementation to illustrate and test behaviour

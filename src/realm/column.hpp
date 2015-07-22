@@ -1248,7 +1248,7 @@ std::size_t TColumn<T,N>::upper_bound_int(T value) const REALM_NOEXCEPT
 template <class T, bool N>
 std::size_t TColumn<T,N>::find_gte(T target, size_t start) const
 {
-    // fixme: slow reference implementation. See Array::FindGTE for faster version
+    // fixme: slow reference implementation. See Array::find_gte for faster version
     size_t ref = 0;
     size_t idx;
     for (idx = start; idx < size(); ++idx) {
