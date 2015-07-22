@@ -1493,6 +1493,7 @@ TEST(Array_FindGTEWithIndirection)
     lut.add(5);
     lut.add(3);
     lut.add(1);
+    lut.add(10000);
 
     // Zeroes only
     {
@@ -1507,8 +1508,7 @@ TEST(Array_FindGTEWithIndirection)
         c.add(0);
 
         CHECK_EQUAL(c.FindGTE(1, 0, &lut), not_found);
-        CHECK_EQUAL(c.FindGTE(0, 6, &lut), not_found);
-
+        CHECK_EQUAL(c.FindGTE(0, 6, &lut), not_found); // array only has 5 entries, lut has 6.
         CHECK_EQUAL(c.FindGTE(0, 4, &lut), 4);
         CHECK_EQUAL(c.FindGTE(-8000, 0, &lut), 0);
     }
@@ -1518,6 +1518,7 @@ TEST(Array_FindGTEWithIndirection)
         Array c(Allocator::get_default());
         c.create(Array::type_Normal);
 
+        // No need to be sorted, the lookup table does the sorting for us
         c.add(0);
         c.add(1);
         c.add(0);
@@ -1527,9 +1528,9 @@ TEST(Array_FindGTEWithIndirection)
 
         CHECK_EQUAL(c.FindGTE(3, 0, &lut), not_found);
         CHECK_EQUAL(c.FindGTE(0, 6, &lut), not_found);
-
         CHECK_EQUAL(c.FindGTE(0, 4, &lut), 4);
         CHECK_EQUAL(c.FindGTE(-8000, 0, &lut), 0);
     }
 }
+
 #endif // TEST_ARRAY
