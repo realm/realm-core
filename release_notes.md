@@ -38,23 +38,9 @@
 
 # 0.91.2 Release notes
 
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * Added support for building for watchOS.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
