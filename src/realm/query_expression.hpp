@@ -444,6 +444,7 @@ public:
     // Compare, right side constant
     Query operator > (R right)
     {
+        REALM_ASSERT(!(std::is_same<R, null>::value));
         return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator < (R right)

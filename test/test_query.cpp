@@ -9,6 +9,7 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
 #include <realm/query_engine.hpp>
+#include <initializer_list>
 
 #include "test.hpp"
 
@@ -6206,12 +6207,17 @@ This does NOT follow SQL! In particular, (null == null) == true and
 0   null            null                null                    1.1
 1   10              null                "foo"                   2.2
 2   20              30                  "bar"                   3.3 
-3                                                               0.0
-4                                                               0.0
-5                     all blanks are null                       0.0
-6                                                               0.0
-7                                                               0.0
 */
+
+    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes)
+    {
+        if(tv.size() != indexes.end() - indexes.begin())
+            CHECK_EQUAL(tv.size(), indexes.end() - indexes.begin()); // set breakpoint here to see caller of failing query
+        for (auto it = indexes.begin(); it != indexes.end(); ++it) {
+            if (tv.get_source_ndx(it - indexes.begin()) != *it)
+                CHECK_EQUAL(tv.get_source_ndx(it - indexes.begin()), *it); // set breakpoint here to see caller of failing query
+        }
+    };
 
     Group g;
     TableRef table = g.add_table("Inventory");
@@ -6219,7 +6225,7 @@ This does NOT follow SQL! In particular, (null == null) == true and
     table->insert_column(1, type_Int, "Shipping", true);
     table->insert_column(2, type_String, "Description", true);
     table->insert_column(3, type_Double, "Rating");
-    table->add_empty_row(8); // at least 8 to trigger Array*::get_chunk
+    table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
 
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
@@ -6241,72 +6247,69 @@ This does NOT follow SQL! In particular, (null == null) == true and
     Columns<Int> shipping = table->column<Int>(1);
     Columns<Double> rating = table->column<Double>(3);
     size_t t;
-   
-    t = (price == null()).find();
-    CHECK_EQUAL(t, 0);
+    TableView tv;
 
-    t = (price != null()).find();
-    CHECK_EQUAL(t, 1);
+    tv = (price == null()).find_all();
+    check(tv, { 0 });
+
+    tv = (price != null()).find_all();
+    check(tv, { 1, 2});
 
     // Note that this returns rows with null, which may not be wanted and differs from SQL! Todo, discuss.
-    t = (price == shipping).find();
-    CHECK_EQUAL(t, 0); // null == null
+    tv = (price == shipping).find_all();
+    check(tv, { 0 }); // null == null
 
     // If you add a != null criteria, you would probably get what most users intended, like in SQL
-    t = (price == shipping && price != null()).find();
-    CHECK_EQUAL(t, not_found);
+    tv = (price == shipping && price != null()).find_all();
+    check(tv, {});
 
-    t = (price != shipping).find();
-    CHECK_EQUAL(t, 1); // 10 != null
+    tv = (price != shipping).find_all();
+    check(tv, { 1, 2 }); // 10 != null
     
-    t = (price < 0 || price > 0 || price / 7 + 8.8 == 0).find();
-    CHECK_EQUAL(t, 1);
+    tv = (price < 0 || price > 0).find_all();
+    check(tv, { 1, 2 });
 
     // Shows that null + null == null, and 10 + null == null, and null < 100 == false
-    t = (price + shipping < 100).find();
-    CHECK_EQUAL(t, 2);
+    tv = (price + shipping < 100).find_all();
+    check(tv, { 2 });
 
     //  null < 0 == false
-    t = (price < 0).find();
-    CHECK_EQUAL(t, not_found);
+    tv = (price < 0).find_all();
+    check(tv, {});
 
     //  null > 0 == false
-    t = (price == 0).find();
-    CHECK_EQUAL(t, not_found);
+    tv = (price == 0).find_all();
+    check(tv, {});
 
     // (null == 0) == false
-    t = (price > 0).find();
-    CHECK_EQUAL(t, 1);
+    tv = (price > 0).find_all();
+    check(tv, { 1, 2 });
 
-    // (null > some non-null double constant) == false
-    t = (price > rating).find();
-    CHECK_EQUAL(t, 1);
+    // (null > double) == false
+    tv = (price > rating).find_all();
+    check(tv, { 1, 2 });
     
-    t = (price + rating == null()).count();
-    CHECK_EQUAL(t, 6);
+    tv = (price + rating == null()).find_all();
+    check(tv, { 0 });
 
-    t = (price + rating != null()).count();
-    CHECK_EQUAL(t, 2);
+    tv = (price + rating != null()).find_all();
+    check(tv, { 1, 2 });
 
-    return;
+    // Not valid syntaxes. Only == and != can be used with a null.
+//    tv = (price > null()).find_all();
+//    tv = (price + rating > null()).find_all();
+
     // Old query syntax
-    t = table->where().less(0, null()).find();
-    CHECK_EQUAL(t, not_found);
+    tv = table->where().equal(0, null()).find_all();
+    check(tv, { 0 });
 
-    t = table->where().equal(0, null()).find();
-    CHECK_EQUAL(t, not_found);
-
-    t = table->where().greater(0, null()).find();
-    CHECK_EQUAL(t, 1);
-
-    t = table->where().less(0, 0).find();
-    CHECK_EQUAL(t, not_found);
-
-    t = table->where().equal(0, 0).find();
-    CHECK_EQUAL(t, not_found);
+    tv = table->where().not_equal(0, null()).find_all();
+    check(tv, { 1, 2 });
     
-    t = table->where().greater(0, 0).find();
-    CHECK_EQUAL(t, 1);
+    // Not valid syntaxes! Only .equal() and .not_equal() can be used to search for a null
+//    tv = table->where().greater(0, null()).find_all();
+//    tv = table->where().less(0, 0).find_all();
+    
 }
 
 #endif // TEST_QUERY
