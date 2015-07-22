@@ -366,6 +366,8 @@ void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
 void ColumnLinkList::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
 {
+    ColumnLinkBase::adj_acc_insert_rows(row_ndx, num_rows_inserted);
+
     const bool fix_ndx_in_parent = false;
     adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows_inserted);
 }
@@ -373,6 +375,8 @@ void ColumnLinkList::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserte
 
 void ColumnLinkList::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 {
+    ColumnLinkBase::adj_acc_erase_row(row_ndx);
+
     const bool fix_ndx_in_parent = false;
     size_t num_rows_erased = 1;
     adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_erased);

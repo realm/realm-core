@@ -128,17 +128,16 @@ inline void ColumnLinkBase::adj_acc_insert_rows(std::size_t row_ndx,
 {
     Column::adj_acc_insert_rows(row_ndx, num_rows);
 
-    // For tables with link-type columns, the insertion point must be after all
-    // existsing rows, but since the inserted link can be non-null, the target
-    // table must still be marked dirty.
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);
 }
 
-inline void ColumnLinkBase::adj_acc_erase_row(std::size_t) REALM_NOEXCEPT
+inline void ColumnLinkBase::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 {
-    // Rows cannot be erased this way in tables with link-type columns
-    REALM_ASSERT(false);
+    Column::adj_acc_erase_row(row_ndx);
+
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_target_table);
 }
 
 inline void ColumnLinkBase::adj_acc_move_over(std::size_t from_row_ndx,
