@@ -65,7 +65,8 @@ public:
     void set(std::size_t link_ndx, std::size_t target_row_ndx);
     /// Moves the link currently at `old_link_ndx` to `new_link_ndx`,
     /// such that after the move, `get(new_link_ndx)` returns what
-    /// `get(old_link_ndx)` would have returned before the move
+    /// `get(old_link_ndx)` would have returned before the move.
+    /// The relative order of all other links in the list is preserved.
     void move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     void swap(std::size_t link1_ndx, std::size_t link2_ndx);
     void remove(std::size_t link_ndx);
