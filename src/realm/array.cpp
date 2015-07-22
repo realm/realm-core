@@ -809,15 +809,18 @@ exit:
 
 // Template specialisation when the array only contains 0s.
 // If start is greater than m_size or target is different from 0, we can immediately reply not_found.
-// However, if the user is searching for a 0, then we can simply return the indirection or start.
+// However, if the user is searching for a 0, then we can simply return `start`.
 // There is no need to check what get(foo) contains considering all == 0.
 template<> size_t Array::FindGTE<0>(const int64_t target, size_t start, Array const* indirection) const
 {
-    if (start >= m_size || target != 0) {
+    if (start >= m_size
+            || target > 0
+            || (indirection && to_size_t(indirection->get(start)) >= m_size))
+    {
         return not_found;
     }
 
-    return indirection ? indirection->get(start) : start;
+    return start;
 }
 
 size_t Array::FirstSetBit(unsigned int v) const

@@ -1424,4 +1424,114 @@ TEST(Array_Count)
     a.destroy();
 }
 
+TEST(Array_FindGTENoIndirection)
+{
+    // Zeroes only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+
+        CHECK_EQUAL(c.FindGTE(1, 0, nullptr), not_found);
+        CHECK_EQUAL(c.FindGTE(0, 0, nullptr), 0);
+        CHECK_EQUAL(c.FindGTE(0, 10, nullptr), not_found);
+        CHECK_EQUAL(c.FindGTE(0, 5, nullptr), 5);
+    }
+
+    // Booleans only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(1);
+        c.add(1);
+
+        CHECK_EQUAL(c.FindGTE(2, 0, nullptr), not_found);
+        CHECK_EQUAL(c.FindGTE(0, 0, nullptr), 0);
+        CHECK_EQUAL(c.FindGTE(0, 2, nullptr), 2);
+        CHECK_EQUAL(c.FindGTE(1, 0, nullptr), 2);
+        CHECK_EQUAL(c.FindGTE(1, 3, nullptr), 3);
+    }
+
+    // Random values
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(-10293);
+        c.add(0);
+        c.add(1);
+        c.add(11111);
+        c.add(2819283);
+
+        CHECK_EQUAL(c.FindGTE(3333333, 0, nullptr), not_found);
+        CHECK_EQUAL(c.FindGTE(10, 1, nullptr), 3);
+        CHECK_EQUAL(c.FindGTE(-20000, 0, nullptr), 0);
+        CHECK_EQUAL(c.FindGTE(-20000, 3, nullptr), 3);
+    }
+}
+
+// There are two code paths: A template specialisation on m_width == 0, and other stuff. No need to test every width
+// under the sun.
+TEST(Array_FindGTEWithIndirection)
+{
+    Array lut(Allocator::get_default());
+    lut.create(Array::type_Normal);
+
+    // This indirection needs to result in a sorted Array c (below).
+    lut.add(4);
+    lut.add(2);
+    lut.add(0);
+    lut.add(5);
+    lut.add(3);
+    lut.add(1);
+
+    // Zeroes only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+
+        CHECK_EQUAL(c.FindGTE(1, 0, &lut), not_found);
+        CHECK_EQUAL(c.FindGTE(0, 6, &lut), not_found);
+
+        CHECK_EQUAL(c.FindGTE(0, 4, &lut), 4);
+        CHECK_EQUAL(c.FindGTE(-8000, 0, &lut), 0);
+    }
+
+    // Booleans only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(1);
+        c.add(0);
+        c.add(1);
+        c.add(0);
+        c.add(1);
+
+        CHECK_EQUAL(c.FindGTE(3, 0, &lut), not_found);
+        CHECK_EQUAL(c.FindGTE(0, 6, &lut), not_found);
+
+        CHECK_EQUAL(c.FindGTE(0, 4, &lut), 4);
+        CHECK_EQUAL(c.FindGTE(-8000, 0, &lut), 0);
+    }
+}
 #endif // TEST_ARRAY
