@@ -994,12 +994,19 @@ public:
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (unordered) {
-                // FIXME: Explain what the purpose of the `num_rows_to_insert ==
-                // 0` case is (Thomas Goyne).
-                if (num_rows_to_insert == 0)
+                // FIXME: Explain what the `num_rows_to_insert == 0` case is all
+                // about (Thomas Goyne).
+                if (num_rows_to_insert == 0) {
                     tf::mark_opposite_link_tables(*m_table);
-                for (size_t i = 0; i < num_rows_to_insert; ++i)
-                    tf::adj_acc_move_over(*m_table, row_ndx + i, prior_num_rows + i);
+                }
+                else {
+                    // Unordered insertion of multiple rows is not yet supported (and not
+                    // yet needed).
+                    REALM_ASSERT(num_rows_to_insert == 1);
+                    size_t from_row_ndx = row_ndx;
+                    size_t to_row_ndx = prior_num_rows;
+                    tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
+                }
             }
             else {
                 tf::adj_acc_insert_rows(*m_table, row_ndx, num_rows_to_insert);
@@ -1012,8 +1019,8 @@ public:
                     bool unordered) REALM_NOEXCEPT
     {
         if (unordered) {
-            // unordered removal of multiple rows is not supported (and not
-            // needed) currently.
+            // Unordered removal of multiple rows is not yet supported (and not
+            // yet needed).
             REALM_ASSERT_3(num_rows_to_erase, ==, 1);
             typedef _impl::TableFriend tf;
             if (m_table) {
