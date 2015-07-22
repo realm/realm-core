@@ -36,6 +36,8 @@
 * `Group::commit()` now throws instead of aborting on an assertion if the group
   accessor is detached or if it is used in transactional mode (via
   `SharedGroup`).
+* Slight performance improvements in `Array::FindGTE()`.
+* Renamed `Array::FindGTE()` to `Array::find_gte()`.
 
 ----------------------------------------------
 
