@@ -535,7 +535,8 @@ public:
     /// Behaviour is undefined if:
     /// - a value in \a indirection is out of bounds for this \c Array;
     /// - \a indirection does not contain at least as many elements as this \c Array;
-    /// - sorting conditions are not respected.
+    /// - sorting conditions are not respected;
+    /// - \a start is greater than the number of elements in this \c Array or \a indirection (if provided).
     ///
     /// \param target the smallest value to search for
     /// \param start the offset at which to start searching in the array

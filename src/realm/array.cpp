@@ -720,6 +720,8 @@ std::size_t Array::find_gte(const int64_t target, size_t start, Array const* ind
 template<std::size_t w>
 std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const* indirection) const
 {
+    REALM_ASSERT(start < (indirection ? indirection->size() : size()));
+
 #if REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
@@ -732,8 +734,9 @@ std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const
         }
     }
 
-    if (idx == m_size)
+    if (idx == m_size) {
         ref = not_found;
+    }
 #endif
 
     size_t ret;

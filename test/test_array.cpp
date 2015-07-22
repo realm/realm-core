@@ -1442,7 +1442,6 @@ TEST(Array_FindGTE_NoIndirection)
 
         CHECK_EQUAL(c.find_gte(1, 0, nullptr), not_found);
         CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
-        CHECK_EQUAL(c.find_gte(0, 10, nullptr), not_found);
         CHECK_EQUAL(c.find_gte(0, 5, nullptr), 5);
     }
 
