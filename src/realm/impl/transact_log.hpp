@@ -1271,11 +1271,11 @@ inline bool TransactLogEncoder::insert_empty_rows(size_t row_ndx, size_t num_row
 
 inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, size_t row_ndx,
                                                             size_t num_rows_to_insert,
-                                                            size_t num_row_in_table)
+                                                            size_t prior_num_rows)
 {
     select_table(t); // Throws
     bool unordered = false;
-    m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, num_row_in_table,
+    m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows,
                                 unordered); // Throws
 }
 
