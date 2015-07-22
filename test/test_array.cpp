@@ -1481,8 +1481,6 @@ TEST(Array_FindGTENoIndirection)
     }
 }
 
-// There are two code paths: A template specialisation on m_width == 0, and other stuff. No need to test every width
-// under the sun.
 TEST(Array_FindGTEWithIndirection)
 {
     Array lut(Allocator::get_default());

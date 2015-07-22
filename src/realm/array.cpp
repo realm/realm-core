@@ -738,7 +738,15 @@ size_t Array::FindGTE(const int64_t target, size_t start, Array const* indirecti
 
     size_t ret;
 
-    if (start >= m_size) {
+    if (start >= m_size
+            || (w == 0 && target > 0)
+            || (w == 1 && target > 1)
+            || (w == 2 && target > 3)
+            || (w == 4 && target > 15)
+            || (w == 8 && target > 127)
+            || (w == 16 && target > 32767)
+            || (w == 32 && target > 2147483647))
+    {
         ret = not_found;
         goto exit;
     }
@@ -805,22 +813,6 @@ exit:
     REALM_ASSERT_DEBUG(ref == ret);
 
     return ret;
-}
-
-// Template specialisation when the array only contains 0s.
-// If start is greater than m_size or target is different from 0, we can immediately reply not_found.
-// However, if the user is searching for a 0, then we can simply return `start`.
-// There is no need to check what get(foo) contains considering all == 0.
-template<> size_t Array::FindGTE<0>(const int64_t target, size_t start, Array const* indirection) const
-{
-    if (start >= m_size
-            || target > 0
-            || (indirection && to_size_t(indirection->get(start)) >= m_size))
-    {
-        return not_found;
-    }
-
-    return start;
 }
 
 size_t Array::FirstSetBit(unsigned int v) const
