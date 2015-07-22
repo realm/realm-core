@@ -693,7 +693,7 @@ void Array::set_all_to_zero()
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-size_t Array::FindGTE(const int64_t target, size_t start, Array const* indirection) const
+std::size_t Array::FindGTE(const int64_t target, size_t start, Array const* indirection) const
 {
     switch (m_width) {
         case 0:
@@ -718,7 +718,7 @@ size_t Array::FindGTE(const int64_t target, size_t start, Array const* indirecti
 }
 
 template<std::size_t w>
-size_t Array::FindGTE(const int64_t target, size_t start, Array const* indirection) const
+std::size_t Array::FindGTE(const int64_t target, std::size_t start, Array const* indirection) const
 {
 #if REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
