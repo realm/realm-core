@@ -52,8 +52,7 @@ void ColumnLinkList::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
 
     ColumnLinkBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows); // Throws
 
-    bool is_append = (row_ndx == prior_num_rows);
-    if (!is_append) {
+    if (num_rows_moved > 0) {
         const bool fix_ndx_in_parent = true;
         adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_insert);
     }
@@ -101,11 +100,8 @@ void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     ColumnLinkBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
                                broken_reciprocal_backlinks); // Throws
 
-    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
-    if (!is_last) {
-        const bool fix_ndx_in_parent = true;
-        adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
-    }
+    const bool fix_ndx_in_parent = true;
+    adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
 }
 
 

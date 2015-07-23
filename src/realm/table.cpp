@@ -377,8 +377,8 @@ void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
     // Rows are ordered by ascending row index, but we need to remove the rows
     // by descending index to avoid changing the indexes of rows that are not
     // removed yet.
-    auto end = cascade_state.rows.rend();
-    for (auto i = cascade_state.rows.rbegin(); i != end; ++i) {
+    auto rend = cascade_state.rows.rend();
+    for (auto i = cascade_state.rows.rbegin(); i != rend; ++i) {
         typedef _impl::GroupFriend gf;
         bool is_move_last_over = (i->is_ordered_removal == 0);
         Table& table = gf::get_table(group, i->table_ndx);
