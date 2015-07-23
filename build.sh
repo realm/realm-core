@@ -220,7 +220,7 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
-        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS" || exit 1
+        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS -l$NUM_PROCESSORS" || exit 1
         export MAKEFLAGS
 
         if ! [ "$UNITTEST_THREADS" ]; then
