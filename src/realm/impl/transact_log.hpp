@@ -73,6 +73,7 @@ enum Instruction {
     instr_RowInsertComplete     = 28,
     instr_InsertEmptyRows       = 29,
     instr_EraseRows             = 30, // Remove (multiple) rows
+    instr_Swap                  = 55,                                                      // FIXME: Reenumerate
     instr_AddIntToColumn        = 31, // Add an integer value to all cells in a column
     instr_ClearTable            = 32, // Remove all rows in selected table
     instr_OptimizeTable         = 33,
@@ -150,6 +151,7 @@ public:
     // Must have table selected:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
+    bool swap(std::size_t, std::size_t) { return true; }
     bool clear_table() { return true; }
     bool insert_int(std::size_t, std::size_t, std::size_t, int_fast64_t) { return true; }
     bool insert_bool(std::size_t, std::size_t, std::size_t, bool) { return true; }
@@ -223,6 +225,7 @@ public:
                            bool unordered);
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool unordered);
+    bool swap(std::size_t row_ndx_1, std::size_t row_ndx_2);
     bool clear_table();
     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t);
     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool);
@@ -374,6 +377,7 @@ public:
     void erase_rows(const Table*, size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool is_move_last_over);
 
+    void swap(const Table*, std::size_t row_ndx_1, std::size_t row_ndx_2);
     void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
     void remove_search_index(const Table*, std::size_t col_ndx);
@@ -1298,6 +1302,18 @@ inline void TransactLogConvenientEncoder::erase_rows(const Table* t, size_t row_
     m_encoder.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, unordered); // Throws
 }
 
+inline bool TransactLogEncoder::swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    simple_cmd(instr_Swap, util::tuple(row_ndx_1, row_ndx_2));
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::swap(const Table* t, std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    select_table(t); // Throws
+    m_encoder.swap(row_ndx_1, row_ndx_2);
+}
+
 inline bool TransactLogEncoder::add_int_to_column(std::size_t col_ndx, int_fast64_t value)
 {
     simple_cmd(instr_AddIntToColumn, util::tuple(col_ndx, value)); // Throws
@@ -1797,6 +1813,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_Swap: {
+            std::size_t row_ndx_1 = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx_2 = read_int<std::size_t>(); // Throws
+            if (!handler.swap(row_ndx_1, row_ndx_2)) // Throws
+                parser_error();
+            return;
+        }
         case instr_AddIntToColumn: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             // FIXME: Don't depend on the existence of int64_t,
@@ -2289,6 +2312,13 @@ public:
         size_t prior_num_rows_2 = prior_num_rows - num_rows_to_erase;
         m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows_2,
                                     unordered); // Throws
+        append_instruction();
+        return true;
+    }
+
+    bool swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+    {
+        m_encoder.swap(row_ndx_1, row_ndx_2);
         append_instruction();
         return true;
     }

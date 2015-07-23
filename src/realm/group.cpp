@@ -1038,6 +1038,17 @@ public:
         return true;
     }
 
+    bool swap(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(row_ndx_1 >= m_table->size() || row_ndx_2 >= m_table->size()))
+            return false;
+        using tf = _impl::TableFriend;
+        tf::adj_acc_swap(*m_table, row_ndx_1, row_ndx_2);
+        return true;
+    }
+
     bool clear_table() REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;

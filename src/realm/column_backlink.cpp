@@ -282,6 +282,22 @@ void ColumnBackLink::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 }
 
 
+void ColumnBackLink::swap(size_t row_ndx_1, size_t row_ndx_2)
+{
+    bool do_destroy = false;
+
+    for_each_link(row_ndx_1, do_destroy, [=](size_t origin_row_ndx) {
+        m_origin_column->do_swap_link(origin_row_ndx, row_ndx_1, row_ndx_2);
+    });
+
+    for_each_link(row_ndx_2, do_destroy, [=](size_t origin_row_ndx) {
+        m_origin_column->do_swap_link(origin_row_ndx, row_ndx_1, row_ndx_2);
+    });
+
+    Column::swap(row_ndx_1, row_ndx_2);
+}
+
+
 void ColumnBackLink::clear(std::size_t num_rows, bool)
 {
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {

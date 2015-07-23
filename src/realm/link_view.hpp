@@ -120,6 +120,7 @@ private:
 
     void do_nullify_link(std::size_t old_target_row_ndx);
     void do_update_link(std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
+    void do_swap_link(std::size_t target_row_ndx_1, std::size_t target_row_ndx_2);
 
     void bind_ref() const REALM_NOEXCEPT;
     void unbind_ref() const REALM_NOEXCEPT;

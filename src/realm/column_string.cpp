@@ -595,6 +595,21 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     Array::erase_bptree_elem(m_array.get(), realm::npos, erase_leaf_elem); // Throws
 }
 
+void AdaptiveStringColumn::do_swap(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+
+    StringData value_1 = get(row_ndx_1);
+    StringData value_2 = get(row_ndx_2);
+    std::string buffer_1{value_1.data(), value_1.size()};
+    std::string buffer_2{value_2.data(), value_2.size()};
+    StringData copy_of_value_1{buffer_1.data(), buffer_1.size()};
+    StringData copy_of_value_2{buffer_2.data(), buffer_2.size()};
+    set(row_ndx_1, copy_of_value_2);
+    set(row_ndx_2, copy_of_value_1);
+}
+
 
 void AdaptiveStringColumn::do_clear()
 {

@@ -2147,6 +2147,18 @@ void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
 }
 
 
+void Table::do_swap(size_t row_ndx_1, size_t row_ndx_2)
+{
+    size_t num_cols = m_spec.get_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase& column = get_column_base(col_ndx);
+        column.swap(row_ndx_1, row_ndx_2);
+    }
+    adj_row_acc_swap(row_ndx_1, row_ndx_2);
+    bump_version();
+}
+
+
 void Table::clear()
 {
     REALM_ASSERT(is_attached());
@@ -4885,6 +4897,22 @@ void Table::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     }
 }
 
+void Table::adj_acc_swap(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    adj_row_acc_swap(row_ndx_1, row_ndx_2);
+
+    // Adjust subtable accessors after row swap
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->adj_acc_swap(row_ndx_1, row_ndx_2);
+    }
+}
+
 
 void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
     REALM_NOEXCEPT
@@ -4975,6 +5003,26 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     // Adjust rows in tableviews after removal of row
     for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
         (*i)->adj_row_acc_erase_row(row_ndx);
+    }
+}
+
+void Table::adj_row_acc_swap(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    // Adjust row accessors after swap
+    LockGuard lock(m_accessor_mutex);
+    RowBase* row = m_row_accessors;
+    while (row) {
+        if (row->m_row_ndx == row_ndx_1) {
+            row->m_row_ndx = row_ndx_2;
+        }
+        else if (row->m_row_ndx == row_ndx_2) {
+            row->m_row_ndx = row_ndx_1;
+        }
+        row = row->m_next;
     }
 }
 

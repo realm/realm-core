@@ -132,6 +132,9 @@ public:
     /// should ignore this argument.
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
+    /// Swap the elements at the specified indices.
+    virtual void swap(std::size_t row_ndx_1, std::size_t row_ndx_2) = 0;
+
     virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
 
     // Returns true if, and only if this column is an AdaptiveStringColumn.
@@ -222,6 +225,7 @@ public:
     /// See Table::adj_acc_move_over()
     virtual void adj_acc_move_over(std::size_t from_row_ndx,
                                    std::size_t to_row_ndx) REALM_NOEXCEPT;
+    virtual void adj_acc_swap(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT;
     virtual void adj_acc_clear_root_table() REALM_NOEXCEPT;
 
     enum {
@@ -518,6 +522,7 @@ public:
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
+    void swap(std::size_t, std::size_t) override;
     void clear(std::size_t, bool) override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
@@ -548,6 +553,7 @@ protected:
     void set_without_updating_index(std::size_t row_ndx, T value);
     void erase_without_updating_index(std::size_t row_ndx, bool is_last);
     void move_last_over_without_updating_index(std::size_t row_ndx, std::size_t last_row_ndx);
+    void swap_without_updating_index(std::size_t row_ndx_1, std::size_t row_ndx_2);
 
     /// If any element points to an array node, this function recursively
     /// destroys that array node. Note that the same is **not** true for
@@ -643,6 +649,11 @@ inline void ColumnBase::adj_acc_erase_row(std::size_t) REALM_NOEXCEPT
 }
 
 inline void ColumnBase::adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT
+{
+    // Noop
+}
+
+inline void ColumnBase::adj_acc_swap(std::size_t, std::size_t) REALM_NOEXCEPT
 {
     // Noop
 }
@@ -1183,6 +1194,32 @@ void TColumn<T,N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
     }
 
     move_last_over_without_updating_index(row_ndx, last_row_ndx);
+}
+
+template <class T, bool N>
+void TColumn<T,N>::swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <, size());
+    REALM_ASSERT_3(row_ndx_2, <, size());
+
+    if (has_search_index()) {
+        T value_1 = get(row_ndx_1);
+        T value_2 = get(row_ndx_2);
+        m_search_index->update_ref(value_1, row_ndx_1, row_ndx_2);
+        m_search_index->update_ref(value_2, row_ndx_2, row_ndx_1);
+    }
+
+    swap_without_updating_index(row_ndx_1, row_ndx_2);
+}
+
+template <class T, bool N>
+void TColumn<T,N>::swap_without_updating_index(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    // FIXME: This can be optimized with direct getters and setters.
+    T value_1 = m_tree.get(row_ndx_1);
+    T value_2 = m_tree.get(row_ndx_2);
+    m_tree.set(row_ndx_1, value_2);
+    m_tree.set(row_ndx_2, value_1);
 }
 
 template <class T, bool N>

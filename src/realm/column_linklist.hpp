@@ -95,6 +95,8 @@ private:
     void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                         std::size_t new_target_row_ndx) override;
+    void do_swap_link(std::size_t row_ndx, std::size_t target_row_ndx_1,
+                      std::size_t target_row_ndx_2) override;
 
     void unregister_linkview(const LinkView& view);
     ref_type get_row_ref(std::size_t row_ndx) const REALM_NOEXCEPT;

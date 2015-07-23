@@ -130,6 +130,11 @@ template<class T> inline void BasicColumn<T>::move_last_over(std::size_t row_ndx
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
+template<class T> inline void BasicColumn<T>::swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    do_swap(row_ndx_1, row_ndx_2);
+}
+
 template<class T> inline void BasicColumn<T>::clear()
 {
     do_clear(); // Throws
@@ -221,6 +226,18 @@ void BasicColumn<T>::do_move_last_over(std::size_t row_ndx, std::size_t last_row
 
     bool is_last = true;
     erase(last_row_ndx, is_last); // Throws
+}
+
+template<class T>
+void BasicColumn<T>::do_swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+
+    T value_1 = get(row_ndx_1);
+    T value_2 = get(row_ndx_2);
+    set(row_ndx_1, value_2);
+    set(row_ndx_2, value_1);
 }
 
 template<class T> void BasicColumn<T>::do_clear()
