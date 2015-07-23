@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* The upgraded file format version is written out to disk, eliminating
+  potential deadlocks.
 
 ### API breaking changes:
 
