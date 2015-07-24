@@ -741,14 +741,7 @@ std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const
 
     size_t ret;
 
-    if (start >= m_size
-            || (w == 0 && target > 0)
-            || (w == 1 && target > 1)
-            || (w == 2 && target > 3)
-            || (w == 4 && target > 15)
-            || (w == 8 && target > 127)
-            || (w == 16 && target > 32767)
-            || (w == 32 && target > 2147483647))
+    if (start >= m_size || target > ubound_for_width(w))
     {
         ret = not_found;
         goto exit;
