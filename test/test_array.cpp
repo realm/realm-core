@@ -1443,6 +1443,8 @@ TEST(Array_FindGTE_NoIndirection)
         CHECK_EQUAL(c.find_gte(1, 0, nullptr), not_found);
         CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
         CHECK_EQUAL(c.find_gte(0, 5, nullptr), 5);
+
+        c.destroy();
     }
 
     // Booleans only
@@ -1460,6 +1462,8 @@ TEST(Array_FindGTE_NoIndirection)
         CHECK_EQUAL(c.find_gte(0, 2, nullptr), 2);
         CHECK_EQUAL(c.find_gte(1, 0, nullptr), 2);
         CHECK_EQUAL(c.find_gte(1, 3, nullptr), 3);
+
+        c.destroy();
     }
 
     // Random values
@@ -1477,6 +1481,8 @@ TEST(Array_FindGTE_NoIndirection)
         CHECK_EQUAL(c.find_gte(10, 1, nullptr), 3);
         CHECK_EQUAL(c.find_gte(-20000, 0, nullptr), 0);
         CHECK_EQUAL(c.find_gte(-20000, 3, nullptr), 3);
+
+        c.destroy();
     }
 }
 
@@ -1510,6 +1516,8 @@ TEST(Array_FindGTE_WithIndirection)
         CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found); // array only has 5 entries, lut has 6.
         CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
         CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
+
+        c.destroy();
     }
 
     // Booleans only
@@ -1529,7 +1537,11 @@ TEST(Array_FindGTE_WithIndirection)
         CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found);
         CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
         CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
+
+        c.destroy();
     }
+
+    lut.destroy();
 }
 
 #endif // TEST_ARRAY
