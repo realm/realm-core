@@ -6185,10 +6185,10 @@ TEST(Query_64BitValues)
 }
 
 
-TEST(Query_Nulls)
+ONLY(Query_NullShowcase)
 {
 /*
-Here we test comparisons and arithmetic with null in queries. Basic rules:
+Here we show how comparisons and arithmetic with null works in queries. Basic rules:
 
 null    +, -, *, /          value   ==   null
 null    +, -, *, /          null    ==   null
@@ -6200,13 +6200,13 @@ null    ==, >=, <=, >, <    value   ==   false
 null    !=                  value   ==   true
 
 This does NOT follow SQL! In particular, (null == null) == true and
-(null != value) == true and (null != null) == false.
+(null != value) == true.
 
-    Price<int>      Shipping<int>       Description<String>     Rating<double>
-    --------------------------------------------------------------------------
-0   null            null                null                    1.1
-1   10              null                "foo"                   2.2
-2   20              30                  "bar"                   3.3 
+    Price<int>      Shipping<int>       Description<String>     Rating<double>      Stock<bool>
+    -----------------------------------------------------------------------------------------------
+0   null            null                null                    1.1                 true
+1   10              null                "foo"                   2.2                 null
+2   20              30                  "bar"                   3.3                 false
 */
 
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes)
@@ -6225,6 +6225,7 @@ This does NOT follow SQL! In particular, (null == null) == true and
     table->insert_column(1, type_Int, "Shipping", true);
     table->insert_column(2, type_String, "Description", true);
     table->insert_column(3, type_Double, "Rating");
+    table->insert_column(4, type_Bool , "In Stock", true);
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
 
     table->set_null(0, 0);
@@ -6243,9 +6244,15 @@ This does NOT follow SQL! In particular, (null == null) == true and
     table->set_double(3, 1, 2.2);
     table->set_double(3, 2, 3.3);
 
+    table->set_bool(4, 0, true);
+    table->set_bool(4, 1, false);
+    //    table->set_null(4, 1);
+    table->set_bool(4, 2, false);
+
     Columns<Int> price = table->column<Int>(0);
     Columns<Int> shipping = table->column<Int>(1);
     Columns<Double> rating = table->column<Double>(3);
+    Columns<Bool> stock = table->column<Bool>(4);
     size_t t;
     TableView tv;
 
@@ -6294,6 +6301,17 @@ This does NOT follow SQL! In particular, (null == null) == true and
 
     tv = (price + rating != null()).find_all();
     check(tv, { 1, 2 });
+
+    // Booleans
+    tv = (stock == true).find_all();
+    check(tv, { 0 });
+    tv = (stock == false).find_all();
+    check(tv, { 1, 2 });
+
+//    tv = (stock != null()).find_all();
+//    check(tv, { 0, 2 });
+
+
 
     // Not valid syntaxes. Only == and != can be used with a null.
 //    tv = (price > null()).find_all();

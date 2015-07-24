@@ -130,7 +130,7 @@ Caveats, notes and todos
 #include <cmath>
 #include <cfloat>
 
-#define REALM_OLDQUERY_FALLBACK
+//#define REALM_OLDQUERY_FALLBACK
 
 // namespace realm {
 
@@ -632,7 +632,7 @@ template <class T, size_t prealloc = 8> struct NullableVector
         m_size = size;
         if (m_size > 0) {
             if (m_size > prealloc)
-                m_first = new T[m_size];
+                m_first = reinterpret_cast<t_storage*>(new T[m_size]);
             else
                 m_first = m_cache;
 
@@ -668,8 +668,11 @@ template <class T, size_t prealloc = 8> struct NullableVector
         m_first[index] = std::numeric_limits<T>::quiet_NaN();
     } // float, double
 
-    T m_cache[prealloc];
-    T* m_first = &m_cache[0];
+
+    typedef typename std::conditional<std::is_same<T, bool>::value, int64_t, T>::type t_storage;
+
+    t_storage m_cache[prealloc];
+    t_storage* m_first = &m_cache[0];
     size_t m_size = 0;
 
     int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
@@ -677,6 +680,10 @@ template <class T, size_t prealloc = 8> struct NullableVector
 
 
 template<> inline bool NullableVector<int64_t>::is_null(size_t index) const
+{
+    return m_first[index] == m_null;
+}
+template<> inline bool NullableVector<bool>::is_null(size_t index) const
 {
     return m_first[index] == m_null;
 }
@@ -698,6 +705,10 @@ template<> inline void NullableVector<null>::set_null(size_t)
 
 // Also for DateTime
 template<> inline void NullableVector<int64_t>::set_null(size_t index)
+{
+    m_first[index] = m_null;
+}
+template<> inline void NullableVector<bool>::set_null(size_t index)
 {
     m_first[index] = m_null;
 }
@@ -795,10 +806,15 @@ public:
         // both T and D into StringData if just one of them are
         typedef typename EitherIsString <D, T>::type dst_t;
         typedef typename EitherIsString <T, D>::type src_t;
+
         Value<dst_t>& d = static_cast<Value<dst_t>&>(destination);
         d.init(ValueBase::from_link, ValueBase::m_values, 0);
         for (size_t t = 0; t < ValueBase::m_values; t++) {
-            src_t* source = reinterpret_cast<src_t*>(m_storage.m_first);
+
+            // Values from a NullableVector<bool> must be read through an int64_t*, hence this type translation stuff
+            typedef typename NullableVector<src_t>::t_storage t_storage;
+            t_storage* source = reinterpret_cast<t_storage*>(m_storage.m_first);
+
             if (m_storage.is_null(t))
                 d.m_storage.set_null(t);
             else
@@ -843,13 +859,12 @@ public:
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
-        else if (std::is_same<T, bool>::value)
-            source.export_bool(*this);
+        else if (std::is_same<T, bool>::value)            source.export_bool(*this);
         else if (std::is_same<T, float>::value)
             source.export_float(*this);
         else if (std::is_same<T, double>::value)
             source.export_double(*this);
-        else if (std::is_same<T, int64_t>::value || std::is_same<T, DateTime>::value)
+        else if (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value ||  std::is_same<T, DateTime>::value)
             source.export_int64_t(*this);
         else if (std::is_same<T, StringData>::value)
             source.export_StringData(*this);
