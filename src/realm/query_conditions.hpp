@@ -76,7 +76,7 @@ struct EndsWith : public HackClass {
 
 struct Equal {
     static const int avx = 0x00; // _CMP_EQ_OQ
-    bool operator()(const bool v1, const bool v2, bool = false, bool = false) const { return v1 == v2; }
+//    bool operator()(const bool v1, const bool v2, bool v1null = false, bool v2null = false) const { return v1 == v2; }
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const 
     { 
         return v1 == v2; 
@@ -95,7 +95,7 @@ struct Equal {
 struct NotEqual {
     static const int avx = 0x0B; // _CMP_FALSE_OQ
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const { return v1 != v2; }
-    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v1 != v2; }
+   // bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v1 != v2; }
 
     template<class T> bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const 
     { 

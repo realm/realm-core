@@ -115,6 +115,12 @@ Caveats, notes and todos
       ColumnAccessor<> extending Columns. So m_table is redundant, but this is in order to keep class dependencies and
       entanglement low so that the design is flexible (if you perhaps later want a Columns class that is not dependent
       on ColumnAccessor)
+
+Nulls in Integer columns
+---------------------------------------------------------------------------------------------------------------------- -
+
+
+
 */
 
 
@@ -126,6 +132,8 @@ Caveats, notes and todos
 // unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
+
+#define REALM_OLDQUERY_FALLBACK
 
 #include <cmath>
 #include <cfloat>
@@ -168,10 +176,9 @@ template<class T, class U> T only_numeric(U in)
     return static_cast<T>(in);
 }
 
-template<class T> int only_numeric(const StringData& in)
+template<class T> int only_numeric(const StringData&)
 {
     REALM_ASSERT(false);
-    static_cast<void>(in);
     return 0;
 }
 
@@ -595,10 +602,16 @@ public:
 
 
 
+/* This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
+to be null too. It's used by the Value class for internal storage.
 
 
+
+*/
 template <class T, size_t prealloc = 8> struct NullableVector
 {
+    typedef typename std::conditional<std::is_same<T, bool>::value, int64_t, T>::type t_storage;
+
     NullableVector() {};
 
     NullableVector(const NullableVector<T, prealloc>& other)
@@ -620,7 +633,7 @@ template <class T, size_t prealloc = 8> struct NullableVector
         return m_first[index];
     }
 
-    inline void set(size_t index, T value)
+    inline void set(size_t index, t_storage value)
     {
         REALM_ASSERT_3(index, < , m_size);
         m_first[index] = value;
@@ -643,9 +656,6 @@ template <class T, size_t prealloc = 8> struct NullableVector
                 else
                     set(t, values);
             }
-//            std::fill(m_first, m_first + m_size, values);
-
-
         }
     }
 
@@ -667,9 +677,6 @@ template <class T, size_t prealloc = 8> struct NullableVector
     {
         m_first[index] = std::numeric_limits<T>::quiet_NaN();
     } // float, double
-
-
-    typedef typename std::conditional<std::is_same<T, bool>::value, int64_t, T>::type t_storage;
 
     t_storage m_cache[prealloc];
     t_storage* m_first = &m_cache[0];
@@ -1613,8 +1620,8 @@ public:
                     v.m_storage.set(t, sgc->get_next(index + t));
                 }
 
-                if (std::is_same<T, int64_t>::value && m_nullable)
-                    v.m_storage.m_null = ((ArrayIntNull*)(sgc->m_leaf_ptr))->null_value();
+                if (m_nullable && (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value || std::is_same<T, realm::DateTime>::value))
+                    v.m_storage.m_null = reinterpret_cast<const ArrayIntNull*>(sgc->m_leaf_ptr)->null_value();
 
                 destination.import(v);
             }

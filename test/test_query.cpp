@@ -6185,7 +6185,7 @@ TEST(Query_64BitValues)
 }
 
 
-ONLY(Query_NullShowcase)
+TEST(Query_NullShowcase)
 {
 /*
 Here we show how comparisons and arithmetic with null works in queries. Basic rules:
@@ -6202,21 +6202,20 @@ null    !=                  value   ==   true
 This does NOT follow SQL! In particular, (null == null) == true and
 (null != value) == true.
 
-    Price<int>      Shipping<int>       Description<String>     Rating<double>      Stock<bool>
-    -----------------------------------------------------------------------------------------------
-0   null            null                null                    1.1                 true
-1   10              null                "foo"                   2.2                 null
-2   20              30                  "bar"                   3.3                 false
+NOTE NOTE: There is currently only very little syntax checking.
+
+    Price<int>      Shipping<int>       Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    ----------------------------------------------------------------------------------------------------------------
+0   null            null                null                    1.1                 true          2016-2-2
+1   10              null                "foo"                   2.2                 null          null
+2   20              30                  "bar"                   3.3                 false         2016-6-6
 */
 
-    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes)
+    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
     {
-        if(tv.size() != indexes.end() - indexes.begin())
-            CHECK_EQUAL(tv.size(), indexes.end() - indexes.begin()); // set breakpoint here to see caller of failing query
-        for (auto it = indexes.begin(); it != indexes.end(); ++it) {
-            if (tv.get_source_ndx(it - indexes.begin()) != *it)
-                CHECK_EQUAL(tv.get_source_ndx(it - indexes.begin()), *it); // set breakpoint here to see caller of failing query
-        }
+        test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
+        for (auto it = indexes.begin(); it != indexes.end(); ++it)
+            test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
     };
 
     Group g;
@@ -6224,8 +6223,9 @@ This does NOT follow SQL! In particular, (null == null) == true and
     table->insert_column(0, type_Int, "Price", true);
     table->insert_column(1, type_Int, "Shipping", true);
     table->insert_column(2, type_String, "Description", true);
-    table->insert_column(3, type_Double, "Rating");
-    table->insert_column(4, type_Bool , "In Stock", true);
+    table->insert_column(3, type_Double, "Rating"); // not yet null support
+    table->insert_column(4, type_Bool, "In Stock", true);
+    table->insert_column(5, type_DateTime, "Est delivery date", true);
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
 
     table->set_null(0, 0);
@@ -6245,86 +6245,108 @@ This does NOT follow SQL! In particular, (null == null) == true and
     table->set_double(3, 2, 3.3);
 
     table->set_bool(4, 0, true);
-    table->set_bool(4, 1, false);
-    //    table->set_null(4, 1);
+    table->set_null(4, 1);
     table->set_bool(4, 2, false);
+
+    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_null(5, 1);
+    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+
 
     Columns<Int> price = table->column<Int>(0);
     Columns<Int> shipping = table->column<Int>(1);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
+    Columns<DateTime> delivery = table->column<DateTime>(5);
     size_t t;
     TableView tv;
 
+
     tv = (price == null()).find_all();
-    check(tv, { 0 });
+    check(tv, { 0 }, __LINE__);
 
     tv = (price != null()).find_all();
-    check(tv, { 1, 2});
+    check(tv, { 1, 2}, __LINE__);
 
     // Note that this returns rows with null, which may not be wanted and differs from SQL! Todo, discuss.
     tv = (price == shipping).find_all();
-    check(tv, { 0 }); // null == null
+    check(tv, { 0 }, __LINE__); // null == null
 
     // If you add a != null criteria, you would probably get what most users intended, like in SQL
     tv = (price == shipping && price != null()).find_all();
-    check(tv, {});
+    check(tv, {}, __LINE__);
 
     tv = (price != shipping).find_all();
-    check(tv, { 1, 2 }); // 10 != null
+    check(tv, { 1, 2 }, __LINE__); // 10 != null
     
     tv = (price < 0 || price > 0).find_all();
-    check(tv, { 1, 2 });
+    check(tv, { 1, 2 }, __LINE__);
 
     // Shows that null + null == null, and 10 + null == null, and null < 100 == false
     tv = (price + shipping < 100).find_all();
-    check(tv, { 2 });
+    check(tv, { 2 }, __LINE__);
 
     //  null < 0 == false
     tv = (price < 0).find_all();
-    check(tv, {});
+    check(tv, {}, __LINE__);
 
     //  null > 0 == false
     tv = (price == 0).find_all();
-    check(tv, {});
+    check(tv, {}, __LINE__);
 
     // (null == 0) == false
     tv = (price > 0).find_all();
-    check(tv, { 1, 2 });
+    check(tv, { 1, 2 }, __LINE__);
 
     // (null > double) == false
     tv = (price > rating).find_all();
-    check(tv, { 1, 2 });
+    check(tv, { 1, 2 }, __LINE__);
     
     tv = (price + rating == null()).find_all();
-    check(tv, { 0 });
+    check(tv, { 0 }, __LINE__);
 
     tv = (price + rating != null()).find_all();
-    check(tv, { 1, 2 });
+    check(tv, { 1, 2 }, __LINE__);
 
     // Booleans
     tv = (stock == true).find_all();
-    check(tv, { 0 });
+    check(tv, { 0 }, __LINE__);
+
     tv = (stock == false).find_all();
-    check(tv, { 1, 2 });
+    check(tv, { 2 }, __LINE__);
 
-//    tv = (stock != null()).find_all();
-//    check(tv, { 0, 2 });
+    tv = (stock == null()).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = (stock != null()).find_all();
+    check(tv, { 0, 2 }, __LINE__);
+
+    // Dates
+    tv = (delivery == DateTime(2016, 6, 6)).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = (delivery != DateTime(2016, 6, 6)).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = (delivery == null()).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = (delivery != null()).find_all();
+    check(tv, { 0, 2 }, __LINE__);
 
 
-
-    // Not valid syntaxes. Only == and != can be used with a null.
+    // Not valid syntaxes. Only == and != can be used with user-given null argument.
 //    tv = (price > null()).find_all();
 //    tv = (price + rating > null()).find_all();
 
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
-    check(tv, { 0 });
+    check(tv, { 0 }, __LINE__);
 
     tv = table->where().not_equal(0, null()).find_all();
-    check(tv, { 1, 2 });
+    check(tv, { 1, 2 }, __LINE__);
     
-    // Not valid syntaxes! Only .equal() and .not_equal() can be used to search for a null
+    // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
 //    tv = table->where().greater(0, null()).find_all();
 //    tv = table->where().less(0, 0).find_all();
     
