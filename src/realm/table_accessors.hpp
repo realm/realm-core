@@ -872,12 +872,6 @@ public:
         return Base::m_table->get_impl()->average_int(col_idx);
     }
 
-    const ColumnAccessor& operator+=(int64_t value) const
-    {
-        Base::m_table->get_impl()->add_int(col_idx, value);
-        return *this;
-    }
-
     std::size_t lower_bound(int64_t value) const REALM_NOEXCEPT
     {
         return Base::m_table->lower_bound_int(col_idx, value);

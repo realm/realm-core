@@ -456,7 +456,6 @@ public:
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void set_subtable(size_t column_ndx,size_t row_ndx, const Table* table);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-    void add_int(size_t column_ndx, int64_t value);
 
     // Subtables
     TableRef      get_subtable(size_t column_ndx, size_t row_ndx);
@@ -1502,12 +1501,6 @@ inline void TableView::nullify_link(std::size_t column_ndx, std::size_t row_ndx)
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     REALM_ASSERT(real_ndx != detached_ref);
     m_table->nullify_link(column_ndx, real_ndx);
-}
-
-
-inline void TableView::add_int(size_t column_ndx, int64_t value)
-{
-    m_table->add_int(column_ndx, value);
 }
 
 } // namespace realm

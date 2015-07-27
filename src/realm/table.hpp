@@ -403,38 +403,6 @@ public:
 
     //@}
 
-
-    //@{
-
-    /// Insert row
-    ///
-    /// NOTE: You have to insert values in ALL columns followed by
-    /// insert_done(). The values must be inserted in column index order.
-    ///
-    /// Restrictions apply to strings and binary data values. See set_string(),
-    /// set_binary(), and set_mixed() for more.
-    ///
-    /// It is an error to insert a value into a column that is part of a primary
-    /// key, if that would result in a violation the implied *unique constraint*
-    /// of the primary key. The consequenses of doing so are unspecified.
-
-    void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
-    void insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
-    void insert_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
-    template<class E> void insert_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
-    void insert_float(std::size_t column_ndx, std::size_t row_ndx, float value);
-    void insert_double(std::size_t column_ndx, std::size_t row_ndx, double value);
-    void insert_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
-    void insert_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
-    void insert_subtable(std::size_t column_ndx, std::size_t row_ndx); // Insert empty table
-    void insert_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
-    void insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-    void insert_linklist(std::size_t column_ndx, std::size_t row_ndx); // Insert empty link list
-    void insert_null(std::size_t column_ndx, std::size_t row_ndx);
-    void insert_done();
-
-    //@}
-
     // Get cell values
     int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
     bool        get_bool(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
@@ -491,20 +459,12 @@ public:
 
     //@}
 
-    void add_int(std::size_t column_ndx, int64_t value);
-
     /// Assumes that the specified column is a subtable column (in
     /// particular, not a mixed column) and that the specified table
     /// has a spec that is compatible with that column, that is, the
     /// number of columns must be the same, and corresponding columns
     /// must have identical data types (as returned by
     /// get_column_type()).
-    void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-    void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-
-    /// Like insert_subtable(std::size_t, std::size_t, const Table*)
-    /// but overwrites the specified cell rather than inserting a new
-    /// one.
     void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
     void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
@@ -808,8 +768,6 @@ protected:
     /// have the same number of columns, and the same data type at each column
     /// index (as expressed through the DataType enum).
     bool compare_rows(const Table&) const;
-
-    void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
@@ -1723,27 +1681,6 @@ inline const Table* Table::get_subtable_ptr(std::size_t col_ndx, std::size_t row
     return const_cast<Table*>(this)->get_subtable_ptr(col_ndx, row_ndx); // Throws
 }
 
-inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value)
-{
-    insert_int(column_ndx, row_ndx, value);
-}
-
-inline void Table::insert_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value)
-{
-    insert_int(column_ndx, row_ndx, value.get_datetime());
-}
-
-template<class E>
-inline void Table::insert_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
-{
-    insert_int(column_ndx, row_ndx, value);
-}
-
-inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
-{
-    insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
-}
-
 inline bool Table::is_null_link(std::size_t col_ndx, std::size_t row_ndx) const REALM_NOEXCEPT
 {
     return get_link(col_ndx, row_ndx) == realm::npos;
@@ -1841,14 +1778,9 @@ inline bool Table::is_degenerate() const REALM_NOEXCEPT
     return !m_columns.is_attached();
 }
 
-inline void Table::insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
-{
-    parent->insert_subtable(col_ndx, row_ndx, this);
-}
-
 inline void Table::set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
 {
-    parent->insert_mixed_subtable(col_ndx, row_ndx, this);
+    parent->set_mixed_subtable(col_ndx, row_ndx, this);
 }
 
 inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) REALM_NOEXCEPT
