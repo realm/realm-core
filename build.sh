@@ -220,7 +220,7 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
-        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS" || exit 1
+        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS -l$NUM_PROCESSORS" || exit 1
         export MAKEFLAGS
 
         if ! [ "$UNITTEST_THREADS" ]; then
@@ -2856,7 +2856,7 @@ EOF
         sh build.sh build-iphone || exit 1
         sh build.sh build-android || exit 1
         sh build.sh build || exit 1
-        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
+        UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
         sh build.sh install || exit 1
         sh build.sh check-doc-examples || exit 1
         (
@@ -2880,7 +2880,7 @@ EOF
             exit 1
         fi
         REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
-        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
+        UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
         exit 0
         ;;
 
