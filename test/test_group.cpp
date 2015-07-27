@@ -1004,7 +1004,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), t->get_datetime(2, 0));
+    CHECK_EQUAL(12345, t->get_datetime(2, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
@@ -1046,7 +1046,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
+    CHECK_EQUAL(12345, table->get_datetime(2, 0));
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -1067,7 +1067,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
+    CHECK_EQUAL(12345, table->get_datetime(2, 0));
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());

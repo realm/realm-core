@@ -566,8 +566,8 @@ void Table::init(ConstSubspecRef shared_spec, ArrayParent* parent_column, size_t
 
 
 struct Table::InsertSubtableColumns: SubtableUpdater {
-    InsertSubtableColumns(size_t i, DataType t):
-        m_column_ndx(i), m_type(t)
+    InsertSubtableColumns(size_t i, DataType t, bool nullable):
+        m_column_ndx(i), m_type(t), m_nullable(nullable)
     {
     }
     void update(const ColumnTable& subtables, Array& subcolumns) override
@@ -575,7 +575,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
         size_t row_ndx = subcolumns.get_ndx_in_parent();
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
         Allocator& alloc = subcolumns.get_alloc();
-        ref_type column_ref = create_column(ColumnType(m_type), subtable_size, alloc); // Throws
+        ref_type column_ref = create_column(ColumnType(m_type), subtable_size, m_nullable, alloc); // Throws
         _impl::DeepArrayRefDestroyGuard dg(column_ref, alloc);
         subcolumns.insert(m_column_ndx, column_ref); // Throws
         dg.release();
@@ -590,6 +590,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
 private:
     const size_t m_column_ndx;
     const DataType m_type;
+    bool m_nullable;
 };
 
 
@@ -649,7 +650,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
         spec.insert_column(col_ndx, ColumnType(type), name); // Throws
         if (!root_table.is_empty()) {
             root_table.m_top.get_alloc().bump_global_version();
-            InsertSubtableColumns updater(col_ndx, type);
+            InsertSubtableColumns updater(col_ndx, type, nullable);
             update_subtables(desc, &updater); // Throws
         }
     }
@@ -798,7 +799,7 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
 
     Spec::ColumnInfo info = m_spec.get_column_info(ndx);
     size_t ndx_in_parent = info.m_column_ref_ndx;
-    ref_type col_ref = create_column(type, m_size, m_columns.get_alloc()); // Throws
+    ref_type col_ref = create_column(type, m_size, nullable, m_columns.get_alloc()); // Throws
     m_columns.insert(ndx_in_parent, col_ref); // Throws
 }
 
@@ -1074,8 +1075,9 @@ void Table::create_degen_subtab_columns()
     size_t num_cols = m_spec.get_column_count();
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = m_spec.get_column_type(i);
+        bool nullable = (m_spec.get_column_attr(i) & col_attr_Nullable) != 0;
         size_t size = 0;
-        ref_type ref = create_column(type, size, alloc); // Throws
+        ref_type ref = create_column(type, size, nullable, alloc); // Throws
         m_columns.add(int_fast64_t(ref)); // Throws
 
         // So far, only root tables can have search indexes, and this is not a
@@ -1140,7 +1142,9 @@ void Table::move_registered_view(const TableViewBase* old_addr,
     iter end = m_views.end();
     for (iter i = m_views.begin(); i != end; ++i) {
         if (*i == old_addr) {
-            *i = new_addr;
+            // casting away constness here... all operations on members
+            // of  m_views are preserving logical constness on the table views.
+            *i = const_cast<TableViewBase*>(new_addr);
             return;
         }
     }
@@ -1205,13 +1209,21 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
 
     REALM_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
                                   col_type != col_type_StringEnum &&
-                                  col_type != col_type_Binary)));
+                                  col_type != col_type_Binary &&
+                                  col_type != col_type_Int &&
+                                  col_type != col_type_DateTime &&
+                                  col_type != col_type_Bool)));
 
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
         case col_type_DateTime:
-            col = new Column(alloc, ref); // Throws
+            if (nullable) {
+                col = new ColumnIntNull(alloc, ref); // Throws
+            }
+            else {
+                col = new Column(alloc, ref); // Throws
+            }
             break;
         case col_type_Float:
             col = new ColumnFloat(alloc, ref); // Throws
@@ -1243,7 +1255,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_Link:
             // Target table will be set by group after entire table has been created
-            col = new ColumnLink(alloc, ref); // Throws
+            col = new ColumnLink(alloc, ref, this, col_ndx); // Throws
             break;
         case col_type_LinkList:
             // Target table will be set by group after entire table has been created
@@ -1658,6 +1670,16 @@ Column& Table::get_column(size_t ndx)
     return get_column<Column, col_type_Int>(ndx);
 }
 
+const ColumnIntNull& Table::get_column_int_null(size_t ndx) const REALM_NOEXCEPT
+{
+    return get_column<ColumnIntNull, col_type_Int>(ndx);
+}
+
+ColumnIntNull& Table::get_column_int_null(size_t ndx)
+{
+    return get_column<ColumnIntNull, col_type_Int>(ndx);
+}
+
 const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const REALM_NOEXCEPT
 {
     return get_column<AdaptiveStringColumn, col_type_String>(ndx);
@@ -1835,13 +1857,18 @@ ref_type Table::create_empty_table(Allocator& alloc)
 }
 
 
-ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc)
+ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, Allocator& alloc)
 {
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
         case col_type_DateTime:
-            return Column::create(alloc, Array::type_Normal, size); // Throws
+            if (nullable) {
+                return ColumnIntNull::create(alloc, Array::type_Normal, size); // Throws
+            }
+            else {
+                return Column::create(alloc, Array::type_Normal, size); // Throws
+            }
         case col_type_Float:
             return ColumnFloat::create(alloc, size); // Throws
         case col_type_Double:
@@ -2355,8 +2382,15 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const Column& column = get_column(col_ndx);
-    return column.get(ndx);
+    if (is_nullable(col_ndx)) {
+        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        return column.get(ndx);
+    }
+    else {
+        const Column& column = get_column(col_ndx);
+        return column.get(ndx);
+    }
+
 }
 
 void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
@@ -2364,9 +2398,15 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
-
-    Column& column = get_column(col_ndx);
-    column.set(ndx, value);
+    
+    if (is_nullable(col_ndx)) {
+        auto& col = get_column_int_null(col_ndx);
+        col.set(ndx, value);
+    }
+    else {
+        auto& col = get_column(col_ndx);
+        col.set(ndx, value);
+    }
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -2381,8 +2421,14 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const Column& column = get_column(col_ndx);
-    return column.get(ndx) != 0;
+    if (is_nullable(col_ndx)) {
+        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        return column.get(ndx) != 0;
+    }
+    else {
+        const Column& column = get_column(col_ndx);
+        return column.get(ndx) != 0;
+    }
 }
 
 void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
@@ -2392,8 +2438,14 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    Column& column = get_column(col_ndx);
-    column.set(ndx, value ? 1 : 0);
+    if (is_nullable(col_ndx)) {
+        ColumnIntNull& column = get_column_int_null(col_ndx);
+        column.set(ndx, value ? 1 : 0);
+    }
+    else {
+        Column& column = get_column(col_ndx);
+        column.set(ndx, value ? 1 : 0);
+    }
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -2407,8 +2459,14 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const Column& column = get_column(col_ndx);
-    return time_t(column.get(ndx));
+    if (is_nullable(col_ndx)) {
+        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        return column.get(ndx);
+    }
+    else {
+        const Column& column = get_column(col_ndx);
+        return column.get(ndx);
+    }
 }
 
 void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
@@ -2418,8 +2476,14 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    Column& column = get_column(col_ndx);
-    column.set(ndx, int64_t(value.get_datetime()));
+    if (is_nullable(col_ndx)) {
+        ColumnIntNull& column = get_column_int_null(col_ndx);
+        column.set(ndx, value.get_datetime());
+    }
+    else {
+        Column& column = get_column(col_ndx);
+        column.set(ndx, value.get_datetime());
+    }
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -2743,6 +2807,24 @@ size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEP
     return column.get_link_count(row_ndx);
 }
 
+bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
+{
+    auto& col = get_column_base(col_ndx);
+    return col.is_null(row_ndx);
+}
+
+void Table::set_null(size_t col_ndx, size_t row_ndx)
+{
+    auto& col = get_column_base(col_ndx);
+    REALM_ASSERT(col.is_nullable());
+    col.set_null(row_ndx);
+
+#ifdef REALM_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->set_null(this, col_ndx, row_ndx); // Throws
+#endif
+}
+
 
 // count ----------------------------------------------
 
@@ -2905,8 +2987,15 @@ int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
         return 0;
 
 #if USE_COLUMN_AGGREGATE
-    const Column& column = get_column<Column, col_type_Int>(col_ndx);
-    return column.maximum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
+    else {
+        const Column& column = get_column(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
+
 #else
     if (is_empty())
         return 0;
@@ -3080,6 +3169,10 @@ size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
     return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
 }
 
+size_t Table::find_first_null(size_t column_ndx) const
+{
+    return where().equal(column_ndx, null{}).find();
+}
 
 template <class T> TableView Table::find_all(size_t col_ndx, T value)
 {
@@ -3169,6 +3262,16 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
     throw std::runtime_error("Not implemented");
+}
+
+TableView Table::find_all_null(size_t col_ndx)
+{
+    return where().equal(col_ndx, null{}).find_all();
+}
+
+ConstTableView Table::find_all_null(size_t col_ndx) const
+{
+    return const_cast<Table*>(this)->find_all_null(col_ndx);
 }
 
 TableView Table::get_distinct_view(size_t col_ndx)
@@ -4236,6 +4339,11 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
     for (size_t col = 0; col < column_count; ++col) {
         out << "  "; // spacing
         out.width(widths[col+1]);
+        
+        if (is_nullable(col) && is_null(col, row_ndx)) {
+            out << "(null)";
+            continue;
+        }
 
         DataType type = get_column_type(col);
         switch (type) {
@@ -4334,18 +4442,29 @@ bool Table::compare_rows(const Table& t) const
     REALM_ASSERT_3(t.get_column_count(), ==, n);
     for (size_t i = 0; i != n; ++i) {
         ColumnType type = get_real_column_type(i);
-        REALM_ASSERT(type == col_type_String     ||
+        bool nullable = is_nullable(i);
+        REALM_ASSERT((type == col_type_String     ||
                        type == col_type_StringEnum ||
-                       type == t.get_real_column_type(i));
+                       type == t.get_real_column_type(i)) &&
+                     nullable == t.is_nullable(i));
 
         switch (type) {
             case col_type_Int:
             case col_type_Bool:
             case col_type_DateTime: {
-                const Column& c1 = get_column(i);
-                const Column& c2 = t.get_column(i);
-                if (!c1.compare_int(c2))
-                    return false;
+                if (nullable) {
+                    const ColumnIntNull& c1 = get_column_int_null(i);
+                    const ColumnIntNull& c2 = t.get_column_int_null(i);
+                    if (!c1.compare_int(c2)) {
+                        return false;
+                    }
+                }
+                else {
+                    const Column& c1 = get_column(i);
+                    const Column& c2 = t.get_column(i);
+                    if (!c1.compare_int(c2))
+                        return false;
+                }
                 continue;
             }
             case col_type_Float: {
@@ -4549,6 +4668,11 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXC
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
     }
+
+    // Adjust rows in tableviews after insertion of new rows
+    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
+        (*i)->adj_row_acc_insert_rows(row_ndx, num_rows);
+    }
 }
 
 
@@ -4572,6 +4696,11 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
         }
         row = next;
     }
+
+    // Adjust rows in tableviews after removal of row
+    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
+        (*i)->adj_row_acc_erase_row(row_ndx);
+    }
 }
 
 
@@ -4593,6 +4722,11 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
             row->m_row_ndx = to_row_ndx;
         }
         row = next;
+    }
+
+    // Adjust rows in tableviews after move over of new row
+    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
+        (*i)->adj_row_acc_move_over(from_row_ndx, to_row_ndx);
     }
 }
 

@@ -7,6 +7,7 @@
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
+#include "util/random.hpp"
 
 using namespace realm;
 using namespace util;
@@ -808,6 +809,60 @@ TEST(StringIndex_FuzzyTest_Int)
     col.destroy();
 }
 
+#if REALM_NULL_STRINGS == 1
+namespace {
+
+// Generate string where the bit pattern in bits is converted to NUL bytes. E.g. (length=2):
+// bits=0 -> "\0\0", bits=1 -> "\x\0", bits=2 -> "\0\x", bits=3 -> "\x\x", where x is a random byte
+StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random) {
+    for (size_t i = 0; i < length; ++i) {
+        tmp[i] = (bits & (1 << i)) == 0 ? '\0' : static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
+    }
+    return StringData(tmp, length);
+}
+
+} // anonymous namespace
+
+
+// Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
+TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // String index
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    const size_t MAX_LENGTH = 16; // Test medium
+    char tmp[MAX_LENGTH]; // this is a bit of a hack, that relies on the string being copied in column.add()
+
+    for (size_t length = 1; length <= MAX_LENGTH; ++length) {
+        Random random(42);
+        const size_t combinations = 1 << length;
+        for (size_t i = 0; i < combinations; ++i) {
+            StringData str = create_string_with_nuls(i, length, tmp, random);
+            col.add(str);
+        }
+
+        // check index up to this length
+        size_t expected_index = 0;
+        for (size_t l = 1; l <= length; ++l) {
+            Random random(42);
+            const size_t combinations = 1 << l;
+            for (size_t i = 0; i < combinations; ++i) {
+                StringData needle = create_string_with_nuls(i, l, tmp, random);
+                CHECK_EQUAL(ndx.find_first(needle), expected_index);
+                CHECK(strncmp(col.get(expected_index).data(), needle.data(), l) == 0);
+                CHECK_EQUAL(col.get(expected_index).size(), needle.size());
+                expected_index++;
+            }
+        }
+    }
+
+    col.destroy();
+}
+#endif
 
 // Tests for a bug with strings containing zeroes
 TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)

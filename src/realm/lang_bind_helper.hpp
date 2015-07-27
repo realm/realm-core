@@ -110,18 +110,81 @@ public:
 
 #ifdef REALM_ENABLE_REPLICATION
 
+    //@{
+
+    /// Continuous transactions.
+    ///
+    /// advance_read() is equivalent to terminating the current read transaction
+    /// (SharedGroup::end_read()), and initiating a new one
+    /// (SharedGroup::begin_read()), except that all subordinate accessors
+    /// (Table, Row, Descriptor) will remain attached to the underlying objects,
+    /// unless those objects were removed in the target snapshot. By default,
+    /// the read transaction is advanced to the latest available snapshot, but
+    /// see SharedGroup::begin_read() for information about \a version.
+    ///
+    /// promote_to_write() is equivalent to terminating the current read
+    /// transaction (SharedGroup::end_read()), and initiating a new write
+    /// transaction (SharedGroup::begin_write()), except that all subordinate
+    /// accessors (Table, Row, Descriptor) will remain attached to the
+    /// underlying objects, unless those objects were removed in the target
+    /// snapshot.
+    ///
+    /// commit_and_continue_as_read() is equivalent to committing the current
+    /// write transaction (SharedGroup::commit()) and initiating a new read
+    /// transaction, which is bound to the snapshot produced by the write
+    /// transaction (SharedGroup::begin_read()), except that all subordinate
+    /// accessors (Table, Row, Descriptor) will remain attached to the
+    /// underlying objects.
+    ///
+    /// rollback_and_continue_as_read() is equivalent to rolling back the
+    /// current write transaction (SharedGroup::rollback()) and initiating a new
+    /// read transaction, which is bound to the snapshot, that the write
+    /// transaction was based on (SharedGroup::begin_read()), except that all
+    /// subordinate accessors (Table, Row, Descriptor) will remain attached to
+    /// the underlying objects, unless they were attached to object that were
+    /// added during the rolled back transaction.
+    ///
+    /// If advance_read(), promote_to_write(), commit_and_continue_as_read(), or
+    /// rollback_and_continue_as_read() throws, the associated group accessor
+    /// and all of its subordinate accessors are left in a state that may not be
+    /// fully consistent. Only minimal consistency is guaranteed (see
+    /// AccessorConsistencyLevels). In this case, the application is required to
+    /// either destroy the SharedGroup object, forcing all associated accessors
+    /// to become detached, or take some other equivalent action that involves a
+    /// complete accessor detachment, such as terminating the transaction in
+    /// progress. Until then it is an error, and unsafe if the application
+    /// attempts to access any of those accessors.
+    ///
+    /// The application must use SharedGroup::end_read() if it wants to
+    /// terminate the transaction after advance_read() or promote_to_write() has
+    /// thrown an exception. Likewise, it must use SharedGroup::rollback() if it
+    /// wants to terminate the transaction after commit_and_continue_as_read()
+    /// or rollback_and_continue_as_read() has thrown an exception.
+    ///
+    /// \param history The modification history accessor associated with the
+    /// specified SharedGroup object.
+    ///
+    /// \param observer An optional custom replication instruction handler. The
+    /// application may pass such a handler to observe the sequence of
+    /// modifications that advances (or rolls back) the state of the Realm.
+    ///
+    /// \throw SharedGroup::BadVersion Thrown by advance_read() if the specified
+    /// version does not correspond to a bound (or tethered) snapshot.
+
     static void advance_read(SharedGroup&, History&,
-                             SharedGroup::VersionID = SharedGroup::VersionID());
-    template<typename Handler>
-    static void advance_read(SharedGroup&, History&, Handler&&,
-                             SharedGroup::VersionID = SharedGroup::VersionID());
+                             SharedGroup::VersionID version = SharedGroup::VersionID());
+    template<class O>
+    static void advance_read(SharedGroup&, History&, O&& observer,
+                             SharedGroup::VersionID version = SharedGroup::VersionID());
     static void promote_to_write(SharedGroup&, History&);
-    template<typename Handler>
-    static void promote_to_write(SharedGroup&, History&, Handler&&);
+    template<class O>
+    static void promote_to_write(SharedGroup&, History&, O&& observer);
     static void commit_and_continue_as_read(SharedGroup&);
     static void rollback_and_continue_as_read(SharedGroup&, History&);
-    template<typename Handler>
-    static void rollback_and_continue_as_read(SharedGroup&, History&, Handler&&);
+    template<class O>
+    static void rollback_and_continue_as_read(SharedGroup&, History&, O&& observer);
+
+    //@}
 
     static Replication::version_type get_current_version(SharedGroup& sg)
     {
@@ -289,32 +352,34 @@ inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
    link_view->unbind_ref();
 }
 
-#ifdef REALM_ENABLE_REPLICATION
-
 inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,
                                          SharedGroup::VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::advance_read(sg, history, version);
+    _impl::NullInstructionObserver* observer = 0;
+    sgf::advance_read(sg, history, observer, version);
 }
 
-template<typename Handler>
-inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, Handler&& handler,
+template<class O>
+inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, O&& observer,
                                          SharedGroup::VersionID version)
 {
-    sg.advance_read(history, handler, version);
+    using sgf = _impl::SharedGroupFriend;
+    sgf::advance_read(sg, history, &observer, version);
 }
 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::promote_to_write(sg, history);
+    _impl::NullInstructionObserver* observer = 0;
+    sgf::promote_to_write(sg, history, observer);
 }
 
-template<typename Handler>
-inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history, Handler&& handler)
+template<class O>
+inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history, O&& observer)
 {
-    sg.promote_to_write(history, handler);
+    using sgf = _impl::SharedGroupFriend;
+    sgf::promote_to_write(sg, history, &observer);
 }
 
 inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
@@ -326,26 +391,17 @@ inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::rollback_and_continue_as_read(sg, history);
+    _impl::NullInstructionObserver* observer = 0;
+    sgf::rollback_and_continue_as_read(sg, history, observer);
 }
 
-template<typename Handler>
+template<class O>
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history,
-                                                          Handler&& handler)
+                                                          O&& observer)
 {
-    BinaryData buffer = history.get_uncommitted_changes();
-    _impl::MultiLogNoCopyInputStream in(&buffer, (&buffer)+1);
-    _impl::TransactLogParser parser;
-    _impl::TransactReverser reverser;
-    parser.parse(in, reverser);
-    reverser.execute(handler);
-    handler.parse_complete();
     using sgf = _impl::SharedGroupFriend;
-    sgf::rollback_and_continue_as_read(sg, history);
+    sgf::rollback_and_continue_as_read(sg, history, &observer);
 }
-
-
-#endif
 
 } // namespace realm
 

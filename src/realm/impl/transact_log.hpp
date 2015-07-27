@@ -57,29 +57,33 @@ enum Instruction {
     instr_SetTable              = 12,
     instr_SetMixed              = 13,
     instr_SetLink               = 14,
-    instr_InsertEmptyRows       = 27,
-    instr_EraseRows             = 28, // Remove (multiple) rows
-    instr_ClearTable            = 30, // Remove all rows in selected table
-    instr_OptimizeTable         = 31,
-    instr_SelectDescriptor      = 32, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 33, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 34, // do, but for a link-type column
-    instr_EraseColumn           = 35, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 37, // Rename column in selected descriptor
-    instr_AddSearchIndex        = 38, // Add a search index to a column
-    instr_RemoveSearchIndex     = 39, // Remove a search index from a column
-    instr_AddPrimaryKey         = 40, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 41, // Remove primary key from a table
-    instr_SetLinkType           = 42, // Strong/weak
-    instr_SelectLinkList        = 43,
-    instr_LinkListSet           = 44, // Assign to link list entry
-    instr_LinkListInsert        = 45, // Insert entry into link list
-    instr_LinkListMove          = 46, // Move an entry within a link list
-    instr_LinkListErase         = 47, // Remove an entry from a link list
-    instr_LinkListClear         = 48, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 49, // Assign to link list entry
-    instr_InsertNullableColumn = 50   // Insert nullable column  
+    instr_NullifyLink           = 15, // Set link to null due to target being erased
+    instr_SetNull               = 16,
+    instr_InsertEmptyRows       = 29,
+    instr_EraseRows             = 30, // Remove (multiple) rows
+    instr_ClearTable            = 32, // Remove all rows in selected table
+    instr_OptimizeTable         = 33,
+    instr_SelectDescriptor      = 34, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 35, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 36, // do, but for a link-type column
+    instr_InsertNullableColumn  = 37, // Insert nullable column
+    instr_EraseColumn           = 38, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 39, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 40, // Rename column in selected descriptor
+    instr_AddSearchIndex        = 41, // Add a search index to a column
+    instr_RemoveSearchIndex     = 42, // Remove a search index from a column
+    instr_AddPrimaryKey         = 43, // Add a primary key to a table
+    instr_RemovePrimaryKey      = 44, // Remove primary key from a table
+    instr_SetLinkType           = 45, // Strong/weak
+    instr_SelectLinkList        = 46,
+    instr_LinkListSet           = 47, // Assign to link list entry
+    instr_LinkListInsert        = 48, // Insert entry into link list
+    instr_LinkListMove          = 49, // Move an entry within a link list
+    instr_LinkListSwap          = 50, // Swap two entries within a link list
+    instr_LinkListErase         = 51, // Remove an entry from a link list
+    instr_LinkListNullify       = 52, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 53, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 54, // Assign to link list entry
 };
 
 
@@ -117,6 +121,75 @@ public:
 };
 
 
+class NullInstructionObserver {
+public:
+    /// The following methods are also those that TransactLogParser expects
+    /// to find on the `InstructionHandler`.
+
+    // No selection needed:
+    bool select_table(std::size_t, std::size_t, const std::size_t*) { return true; }
+    bool select_descriptor(std::size_t, const std::size_t*) { return true; }
+    bool select_link_list(std::size_t, std::size_t) { return true; }
+    bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
+    bool erase_group_level_table(std::size_t, std::size_t) { return true; }
+    bool rename_group_level_table(std::size_t, StringData) { return true; }
+
+    // Must have table selected:
+    bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool) { return true; }
+    bool erase_rows(std::size_t, std::size_t, std::size_t, bool) { return true; }
+    bool clear_table() { return true; }
+    bool insert_int(std::size_t, std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool insert_bool(std::size_t, std::size_t, std::size_t, bool) { return true; }
+    bool insert_float(std::size_t, std::size_t, std::size_t, float) { return true; }
+    bool insert_double(std::size_t, std::size_t, std::size_t, double) { return true; }
+    bool insert_string(std::size_t, std::size_t, std::size_t, StringData) { return true; }
+    bool insert_binary(std::size_t, std::size_t, std::size_t, BinaryData) { return true; }
+    bool insert_date_time(std::size_t, std::size_t, std::size_t, DateTime) { return true; }
+    bool insert_table(std::size_t, std::size_t, std::size_t) { return true; }
+    bool insert_mixed(std::size_t, std::size_t, std::size_t, const Mixed&) { return true; }
+    bool insert_link(std::size_t, std::size_t, std::size_t, std::size_t) { return true; }
+    bool insert_link_list(std::size_t, std::size_t, std::size_t) { return true; }
+    bool row_insert_complete() { return true; }
+    bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool set_bool(std::size_t, std::size_t, bool) { return true; }
+    bool set_float(std::size_t, std::size_t, float) { return true; }
+    bool set_double(std::size_t, std::size_t, double) { return true; }
+    bool set_string(std::size_t, std::size_t, StringData) { return true; }
+    bool set_binary(std::size_t, std::size_t, BinaryData) { return true; }
+    bool set_date_time(std::size_t, std::size_t, DateTime) { return true; }
+    bool set_table(std::size_t, std::size_t) { return true; }
+    bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
+    bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
+    bool set_null(std::size_t, std::size_t) { return true; }
+    bool nullify_link(std::size_t, std::size_t) { return true; }
+    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
+    bool optimize_table() { return true; };
+
+    // Must have descriptor selected:
+    bool insert_link_column(std::size_t, DataType, StringData, std::size_t, std::size_t) { return true; }
+    bool insert_column(std::size_t, DataType, StringData, bool) { return true; }
+    bool erase_link_column(std::size_t, std::size_t, std::size_t) { return true; }
+    bool erase_column(std::size_t) { return true; }
+    bool rename_column(std::size_t, StringData) { return true; }
+    bool add_search_index(std::size_t) { return true; }
+    bool remove_search_index(std::size_t) { return true; }
+    bool add_primary_key(std::size_t) { return true; }
+    bool remove_primary_key() { return true; }
+    bool set_link_type(std::size_t, LinkType) { return true; }
+
+    // Must have linklist selected:
+    bool link_list_set(std::size_t, std::size_t) { return true; }
+    bool link_list_insert(std::size_t, std::size_t) { return true; }
+    bool link_list_move(std::size_t, std::size_t) { return true; }
+    bool link_list_swap(std::size_t, std::size_t) { return true; }
+    bool link_list_erase(std::size_t) { return true; }
+    bool link_list_nullify(std::size_t) { return true; }
+    bool link_list_clear(std::size_t) { return true; }
+
+    void parse_complete() {}
+};
+
+
 class TransactLogEncoder {
 public:
     /// The following methods are also those that TransactLogParser expects
@@ -144,6 +217,8 @@ public:
     bool set_table(std::size_t col_ndx, std::size_t row_ndx);
     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&);
     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t);
+    bool set_null(std::size_t col_ndx, std::size_t row_ndx);
+    bool nullify_link(std::size_t col_ndx, std::size_t row_ndx);
     bool optimize_table();
 
     // Must have descriptor selected:
@@ -163,8 +238,10 @@ public:
     bool link_list_set_all(const Column& values);
     bool link_list_insert(std::size_t link_ndx, std::size_t value);
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
+    bool link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx);
     bool link_list_erase(std::size_t link_ndx);
-    bool link_list_clear();
+    bool link_list_nullify(std::size_t link_ndx);
+    bool link_list_clear(std::size_t old_list_size);
 
     /// End of methods expected by parser.
 
@@ -241,7 +318,10 @@ public:
     void set_table(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
     void set_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
+    void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_link_list(const LinkView&, const Column& values);
+
+    void nullify_link(const Table*, std::size_t col_ndx, std::size_t ndx);
 
     void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
     void erase_row(const Table*, std::size_t row_ndx, bool move_last_over);
@@ -257,7 +337,9 @@ public:
     void link_list_set(const LinkView&, std::size_t link_ndx, std::size_t value);
     void link_list_insert(const LinkView&, std::size_t link_ndx, std::size_t value);
     void link_list_move(const LinkView&, std::size_t old_link_ndx, std::size_t new_link_ndx);
+    void link_list_swap(const LinkView&, std::size_t link1_ndx, std::size_t link2_ndx);
     void link_list_erase(const LinkView&, std::size_t link_ndx);
+    void link_list_nullify(const LinkView&, std::size_t link_ndx);
     void link_list_clear(const LinkView&);
 
     void on_table_destroyed(const Table*) REALM_NOEXCEPT;
@@ -604,11 +686,8 @@ void TransactLogEncoder::string_cmd(Instruction instr, std::size_t col_ndx,
 inline
 void TransactLogEncoder::string_value(const char* data, std::size_t size)
 {
-    if (!data)
-        size = static_cast<size_t>(-1);
-
     char* buf = reserve(max_required_bytes_for_string_value(size));
-    buf = encode_int(buf, uint64_t(size));
+    buf = encode_int(buf, size);
     buf = std::copy(data, data + (data ? size : 0), buf);
     advance(buf);
 }
@@ -847,7 +926,12 @@ inline void TransactLogConvenientEncoder::set_double(const Table* t, std::size_t
 
 inline bool TransactLogEncoder::set_string(std::size_t col_ndx, std::size_t ndx, StringData value)
 {
-    string_cmd(instr_SetString, col_ndx, ndx, value.data(), value.size()); // Throws
+    if (value.is_null()) {
+        set_null(col_ndx, ndx); // Throws
+    }
+    else {
+        string_cmd(instr_SetString, col_ndx, ndx, value.data(), value.size()); // Throws
+    }
     return true;
 }
 
@@ -860,7 +944,12 @@ inline void TransactLogConvenientEncoder::set_string(const Table* t, std::size_t
 
 inline bool TransactLogEncoder::set_binary(std::size_t col_ndx, std::size_t ndx, BinaryData value)
 {
-    string_cmd(instr_SetBinary, col_ndx, ndx, value.data(), value.size()); // Throws
+    if (value.is_null()) {
+        set_null(col_ndx, ndx); // Throws
+    }
+    else {
+        string_cmd(instr_SetBinary, col_ndx, ndx, value.data(), value.size()); // Throws
+    }
     return true;
 }
 
@@ -924,6 +1013,31 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, std::size_t c
 {
     select_table(t); // Throws
     m_encoder.set_link(col_ndx, ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::set_null(std::size_t col_ndx, std::size_t ndx)
+{
+    simple_cmd(instr_SetNull, util::tuple(col_ndx, ndx));
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_null(const Table* t, std::size_t col_ndx,
+                                                   std::size_t row_ndx)
+{
+    select_table(t); // Throws
+    m_encoder.set_null(col_ndx, row_ndx); // Throws
+}
+
+inline bool TransactLogEncoder::nullify_link(std::size_t col_ndx, std::size_t ndx)
+{
+    simple_cmd(instr_NullifyLink, util::tuple(col_ndx, ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::nullify_link(const Table* t, std::size_t col_ndx, std::size_t ndx)
+{
+    select_table(t); // Throws
+    m_encoder.nullify_link(col_ndx, ndx); // Throws
 }
 
 
@@ -1060,6 +1174,18 @@ inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, st
     m_encoder.link_list_set(link_ndx, value); // Throws
 }
 
+inline bool TransactLogEncoder::link_list_nullify(std::size_t link_ndx)
+{
+    simple_cmd(instr_LinkListNullify, util::tuple(link_ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, std::size_t link_ndx)
+{
+    select_link_list(list); // Throws
+    m_encoder.link_list_nullify(link_ndx); // Throws
+}
+
 inline bool TransactLogEncoder::link_list_set_all(const Column& values)
 {
     simple_cmd(instr_LinkListSetAll, util::tuple(values.size())); // Throws
@@ -1100,6 +1226,19 @@ inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, s
     m_encoder.link_list_move(old_link_ndx, new_link_ndx); // Throws
 }
 
+inline bool TransactLogEncoder::link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx)
+{
+    simple_cmd(instr_LinkListSwap, util::tuple(link1_ndx, link2_ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::link_list_swap(const LinkView& list, std::size_t link1_ndx,
+                                                         std::size_t link2_ndx)
+{
+    select_link_list(list); // Throws
+    m_encoder.link_list_swap(link1_ndx, link2_ndx); // Throws
+}
+
 inline bool TransactLogEncoder::link_list_erase(std::size_t link_ndx)
 {
     simple_cmd(instr_LinkListErase, util::tuple(link_ndx)); // Throws
@@ -1112,16 +1251,10 @@ inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, 
     m_encoder.link_list_erase(link_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_clear()
+inline bool TransactLogEncoder::link_list_clear(std::size_t old_list_size)
 {
-    simple_cmd(instr_LinkListClear, util::tuple()); // Throws
+    simple_cmd(instr_LinkListClear, util::tuple(old_list_size)); // Throws
     return true;
-}
-
-inline void TransactLogConvenientEncoder::link_list_clear(const LinkView& list)
-{
-    select_link_list(list); // Throws
-    m_encoder.link_list_clear(); // Throws
 }
 
 inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) REALM_NOEXCEPT
@@ -1198,7 +1331,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     char instr;
     if (!read_char(instr))
         parser_error();
-
 //    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << "\n";
     switch (Instruction(instr)) {
         case instr_SetInt: {
@@ -1255,7 +1387,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetDateTime: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::time_t value = read_int<std::time_t>(); // Throws
+            int_fast64_t value = read_int<int_fast64_t>(); // Throws
             if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
@@ -1279,8 +1411,23 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetLink: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t value = read_int<std::size_t>(); // Throws
+            // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
+            std::size_t value = read_int<std::size_t>() - 1; // Throws
             if (!handler.set_link(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetNull: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.set_null(col_ndx, row_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_NullifyLink: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.nullify_link(col_ndx, row_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -1296,9 +1443,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_EraseRows: {
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t num_rows = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            std::size_t last_row_ndx = read_int<std::size_t>(); // Throws
             bool unordered = read_int<bool>(); // Throws
-            if (!handler.erase_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
+            if (!handler.erase_rows(row_ndx, num_rows, last_row_ndx, unordered)) // Throws
                 parser_error();
             return;
         }
@@ -1355,14 +1502,28 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_LinkListSwap: {
+            std::size_t link1_ndx = read_int<std::size_t>(); // Throws
+            std::size_t link2_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_swap(link1_ndx, link2_ndx)) // Throws
+                parser_error();
+            return;
+        }
         case instr_LinkListErase: {
             std::size_t link_ndx = read_int<std::size_t>(); // Throws
             if (!handler.link_list_erase(link_ndx)) // Throws
                 parser_error();
             return;
         }
+        case instr_LinkListNullify: {
+            std::size_t link_ndx = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_nullify(link_ndx)) // Throws
+                parser_error();
+            return;
+        }
         case instr_LinkListClear: {
-            if (!handler.link_list_clear()) // Throws
+            std::size_t old_list_size = read_int<std::size_t>(); // Throws
+            if (!handler.link_list_clear(old_list_size)) // Throws
                 parser_error();
             return;
         }
@@ -1580,21 +1741,15 @@ inline double TransactLogParser::read_double()
 
 inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
-    std::size_t size = read_int<std::size_t>(); // Throws
-
-    if (size == static_cast<size_t>(-1))
-        return StringData(nullptr, 0);
+    size_t size = read_int<size_t>(); // Throws
 
     const std::size_t avail = m_input_end - m_input_begin;
-    if (avail >= size) {
+    if (avail >= std::size_t(size)) {
         m_input_begin += size;
         return StringData(m_input_begin - size, size);
     }
 
     buf.clear();
-    if (size == static_cast<size_t>(-1)) {
-        return StringData(nullptr, 0); // null        
-    }
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);
     return StringData(buf.data(), size);
@@ -1636,7 +1791,7 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
             return;
         }
         case type_DateTime: {
-            std::time_t value = read_int<std::time_t>(); // Throws
+            int_fast64_t value = read_int<int_fast64_t>(); // Throws
             mixed->set_datetime(value);
             return;
         }
@@ -1715,6 +1870,7 @@ inline bool TransactLogParser::is_valid_link_type(int type)
     return false;
 }
 
+
 class TransactReverser {
 public:
     bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
@@ -1764,9 +1920,9 @@ public:
         return true;
     }
 
-    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t last_row_ndx, bool unordered)
     {
-        m_encoder.insert_empty_rows(idx, num_rows, tbl_sz, unordered);
+        m_encoder.insert_empty_rows(idx, num_rows, last_row_ndx + 1, unordered);
         append_instruction();
         return true;
     }
@@ -1830,6 +1986,13 @@ public:
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
     {
         m_encoder.set_mixed(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_null(size_t col_ndx, size_t row_ndx)
+    {
+        m_encoder.set_null(col_ndx, row_ndx);
         append_instruction();
         return true;
     }
@@ -1937,6 +2100,13 @@ public:
         return true;
     }
 
+    bool link_list_swap(size_t link1_ndx, size_t link2_ndx)
+    {
+        m_encoder.link_list_swap(link1_ndx, link2_ndx);
+        append_instruction();
+        return true;
+    }
+
     bool link_list_erase(size_t link_ndx)
     {
         m_encoder.link_list_insert(link_ndx, 0);
@@ -1944,21 +2114,30 @@ public:
         return true;
     }
 
-    bool link_list_clear()
+    bool link_list_clear(size_t old_list_size)
     {
-        return true; // No-op
+        // Append in reverse order because the reversed log is itself applied
+        // in reverse, and this way it generates all back-insertions rather than
+        // all front-insertions
+        for (std::size_t i = old_list_size; i > 0; --i) {
+            m_encoder.link_list_insert(i - 1, 0);
+            append_instruction();
+        }
+        return true;
     }
 
-    template<typename Handler>
-    void execute(Handler&& handler)
+    bool nullify_link(size_t col_ndx, size_t row_ndx)
     {
-        // push any pending select_table or select_descriptor into the buffer:
-        sync_table();
+        m_encoder.set_link(col_ndx, row_ndx, 0);
+        append_instruction();
+        return true;
+    }
 
-        // then execute the instructions in the transformed order
-        ReversedNoCopyInputStream reversed_log(m_buffer.transact_log_data(), m_instructions);
-        TransactLogParser parser;
-        parser.parse(reversed_log, std::forward<Handler&&>(handler));
+    bool link_list_nullify(size_t link_ndx)
+    {
+        m_encoder.link_list_insert(link_ndx, 0);
+        append_instruction();
+        return true;
     }
 
 private:
@@ -1971,7 +2150,8 @@ private:
     Instr m_pending_ds_instr{0, 0};
     Instr m_pending_lv_instr{0, 0};
 
-    Instr get_inst() {
+    Instr get_inst()
+    {
         Instr instr;
         instr.begin = current_instr_start;
         current_instr_start = transact_log_size();
@@ -1985,63 +2165,75 @@ private:
         return m_encoder.write_position() - m_buffer.transact_log_data();
     }
 
-    void append_instruction() {
+    void append_instruction()
+    {
         m_instructions.push_back(get_inst());
     }
 
-    void append_instruction(Instr instr) {
+    void append_instruction(Instr instr)
+    {
         m_instructions.push_back(instr);
     }
 
-    void sync_select(Instr& pending_instr) {
+    void sync_select(Instr& pending_instr)
+    {
         if (pending_instr.begin != pending_instr.end) {
             append_instruction(pending_instr);
             pending_instr = {0, 0};
         }
     }
 
-    void sync_linkview() {
+    void sync_linkview()
+    {
         sync_select(m_pending_lv_instr);
     }
 
-    void sync_descriptor() {
+    void sync_descriptor()
+    {
         sync_linkview();
         sync_select(m_pending_ds_instr);
     }
 
-    void sync_table() {
+    void sync_table()
+    {
         sync_descriptor();
         sync_select(m_pending_ts_instr);
     }
 
-    class ReversedNoCopyInputStream: public NoCopyInputStream {
-    public:
-        ReversedNoCopyInputStream(const char* buffer, std::vector<Instr>& instr_order):
-            m_buffer(buffer),
-            m_instr_order(instr_order)
-        {
-            m_current = m_instr_order.size();
-        }
-
-        size_t next_block(const char*& begin, const char*& end) override
-        {
-            if (m_current != 0) {
-                m_current--;
-                begin = m_buffer + m_instr_order[m_current].begin;
-                end   = m_buffer + m_instr_order[m_current].end;
-                return end-begin;
-            }
-            return 0;
-        }
-
-    private:
-        const char* m_buffer;
-        std::vector<Instr>& m_instr_order;
-        size_t m_current;
-    };
+    friend class ReversedNoCopyInputStream;
 };
 
-}
-}
+
+class ReversedNoCopyInputStream: public NoCopyInputStream {
+public:
+    ReversedNoCopyInputStream(TransactReverser& reverser):
+        m_instr_order(reverser.m_instructions)
+    {
+        // push any pending select_table or select_descriptor into the buffer
+        reverser.sync_table();
+
+        m_buffer = reverser.m_buffer.transact_log_data();
+        m_current = m_instr_order.size();
+    }
+
+    size_t next_block(const char*& begin, const char*& end) override
+    {
+        if (m_current != 0) {
+            m_current--;
+            begin = m_buffer + m_instr_order[m_current].begin;
+            end   = m_buffer + m_instr_order[m_current].end;
+            return end-begin;
+        }
+        return 0;
+    }
+
+private:
+    const char* m_buffer;
+    std::vector<TransactReverser::Instr>& m_instr_order;
+    size_t m_current;
+};
+
+} // namespace _impl
+} // namespace realm
 
 #endif // REALM_IMPL_TRANSACT_LOG_HPP

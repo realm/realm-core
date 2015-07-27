@@ -1264,7 +1264,7 @@ TEST(LinkList_QueryOnLinkList)
 
     // q.m_table = table1
     // q.m_view = lvr
-    Query q = table1->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
+    Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
 
     // tv.m_table == table1
     tv = q.find_all(); // tv = { 0, 2 }
@@ -1330,18 +1330,18 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     lvr->add(0);
     lvr->add(1);
 
-    CHECK_EQUAL(0, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find());
-    CHECK_EQUAL(1, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find());
-    CHECK_EQUAL(not_found, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find());
+    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 
     // Test with LinkList being the reverse of Table order
     lvr->clear();
     lvr->add(1);
     lvr->add(0);
 
-    CHECK_EQUAL(1, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find());
-    CHECK_EQUAL(0, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find());
-    CHECK_EQUAL(not_found, data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find());
+    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
@@ -1372,22 +1372,22 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
         lvr->add(i);
 
     // in table and linkview
-    TableView tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find_all();
+    TableView tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find_all();
     CHECK_EQUAL(count / 4, tv.size());
     CHECK_EQUAL(0, tv[0].get_index());
     CHECK_EQUAL(4, tv[1].get_index());
 
-    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find_all();
     CHECK_EQUAL(count / 4, tv.size());
     CHECK_EQUAL(2, tv[0].get_index());
     CHECK_EQUAL(6, tv[1].get_index());
 
     // in table, not in linkview
-    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find_all();
     CHECK_EQUAL(0, tv.size());
 
     // not in table
-    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "A").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "A").find_all();
     CHECK_EQUAL(0, tv.size());
 
     // Add every other row to the LinkList in the opposite order as the table
@@ -1396,22 +1396,22 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
         lvr->add(i - 2);
 
     // in table and linkview
-    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "a").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find_all();
     CHECK_EQUAL(count / 4, tv.size());
     CHECK_EQUAL(count - 4, tv[0].get_index());
     CHECK_EQUAL(count - 8, tv[1].get_index());
 
-    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "c").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find_all();
     CHECK_EQUAL(count / 4, tv.size());
     CHECK_EQUAL(count - 2, tv[0].get_index());
     CHECK_EQUAL(count - 6, tv[1].get_index());
 
     // in table, not in linkview
-    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "b").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find_all();
     CHECK_EQUAL(0, tv.size());
 
     // not in table
-    tv = data_table->where(lvr.get()).and_query(data_table->column<String>(0) == "A").find_all();
+    tv = data_table->where(lvr).and_query(data_table->column<String>(0) == "A").find_all();
     CHECK_EQUAL(0, tv.size());
 }
 

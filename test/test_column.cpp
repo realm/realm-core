@@ -1,3 +1,4 @@
+
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN
 
@@ -44,10 +45,10 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(Column_Basic)
+TEST_TYPES(Column_Basic, Column, ColumnIntNull)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
 
     // TEST(Column_IsEmpty)
 
@@ -423,7 +424,7 @@ TEST(Column_Basic)
 
     // TEST(Column_HeaderParse)
 
-    Column column(Allocator::get_default(), c.get_ref());
+    TEST_TYPE column(Allocator::get_default(), c.get_ref());
     bool is_equal = c.compare_int(column);
     CHECK(is_equal);
 
@@ -433,10 +434,27 @@ TEST(Column_Basic)
     c.destroy();
 }
 
+TEST_TYPES(Column_IsNullAlwaysFalse, Column, ColumnIntNull)
+{
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
+    c.add(123);
+    CHECK(!c.is_null(0));
+    c.destroy();
+}
 
-TEST(Column_FindLeafs)
+TEST(Column_SetNullThrows)
 {
     ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
+    c.add(123);
+    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
+    c.destroy();
+}
+
+TEST_TYPES(Column_FindLeafs, Column, ColumnIntNull)
+{
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
     Column a(Allocator::get_default(), ref);
 
     // Create values that span multible leaves
@@ -484,7 +502,7 @@ TEST(Column_FindLeafs)
 
 
 /*
-TEST(Column_Sort)
+TEST_TYPES(Column_Sort, Column, ColumnIntNull)
 {
     // Create Column with random values
     Column a;
@@ -521,11 +539,11 @@ TEST(Column_Sort)
  *
  */
 
-TEST(Column_FindAllIntMin)
+TEST_TYPES(Column_FindAllIntMin, Column, ColumnIntNull)
 {
-    ref_type ref_c = Column::create(Allocator::get_default());
+    ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
     ref_type ref_r = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref_c);
+    TEST_TYPE c(Allocator::get_default(), ref_c);
     Column r(Allocator::get_default(), ref_r);
 
     const int value = 0;
@@ -550,11 +568,11 @@ TEST(Column_FindAllIntMin)
     r.destroy();
 }
 
-TEST(Column_FindAllIntMax)
+TEST_TYPES(Column_FindAllIntMax, Column, ColumnIntNull)
 {
-    ref_type ref_c = Column::create(Allocator::get_default());
+    ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
     ref_type ref_r = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref_c);
+    TEST_TYPE c(Allocator::get_default(), ref_c);
     Column r(Allocator::get_default(), ref_r);
 
     const int64_t value = 4300000003ULL;
@@ -623,10 +641,10 @@ TEST(Column_LowerUpperBound)
 }
 
 
-TEST(Column_Average)
+TEST_TYPES(Column_Average, Column, ColumnIntNull)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
     c.add(10);
     CHECK_EQUAL(10, c.average());
 
@@ -640,10 +658,10 @@ TEST(Column_Average)
     c.destroy();
 }
 
-TEST(Column_SumAverage)
+TEST_TYPES(Column_SumAverage, Column, ColumnIntNull)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
     int64_t sum = 0;
 
     // Sum of 0 elements
@@ -699,10 +717,10 @@ TEST(Column_SumAverage)
 }
 
 
-TEST(Column_Max)
+TEST_TYPES(Column_Max, Column, ColumnIntNull)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
     int64_t t = c.maximum();
 //    CHECK_EQUAL(0, t); // max on empty range returns zero // edit: is undefined!
 
@@ -714,10 +732,10 @@ TEST(Column_Max)
 }
 
 
-TEST(Column_Max2)
+TEST_TYPES(Column_Max2, Column, ColumnIntNull)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
 
     for (int i = 0; i < 100; i++)
         c.add(10);
@@ -732,10 +750,10 @@ TEST(Column_Max2)
     c.destroy();
 }
 
-TEST(Column_Min)
+TEST_TYPES(Column_Min, Column, ColumnIntNull)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
     int64_t t = c.minimum();
 //    CHECK_EQUAL(0, t); // min on empty range returns zero // update: is undefined
 
@@ -747,10 +765,10 @@ TEST(Column_Min)
 }
 
 
-TEST(Column_Min2)
+TEST_TYPES(Column_Min2, Column, ColumnIntNull)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE c(Allocator::get_default(), ref);
 
     for (int i = 0; i < 100; i++)
         c.add(10);
@@ -767,9 +785,9 @@ TEST(Column_Min2)
 
 
 /*
-TEST(Column_Sort2)
+TEST_TYPES(Column_Sort2, Column, ColumnIntNull)
 {
-    Column c;
+    TEST_TYPE c;
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (size_t t = 0; t < 9*REALM_MAX_BPNODE_SIZE; t++)
@@ -798,6 +816,178 @@ TEST_IF(Column_PrependMany, TEST_DURATION >= 1)
         a.insert(items, 444);
     }
     a.destroy();
+}
+
+
+TEST_IF(ColumnIntNull_PrependMany, TEST_DURATION >= 1)
+{
+    // Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
+    ref_type ref = ColumnIntNull::create(Allocator::get_default());
+    ColumnIntNull a(Allocator::get_default(), ref);
+
+    for (size_t items = 0; items < 3000; ++items) {
+        a.clear();
+        for (size_t j = 0; j < items + 1; ++j)
+            a.insert(0, j);
+        a.insert(items, 444);
+    }
+    a.destroy();
+}
+
+TEST(ColumnIntNull_Null)
+{
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(0);
+        size_t t = a.find_first(0);
+        CHECK_EQUAL(t, 0);
+
+        a.destroy();
+    }
+
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(123);
+        a.add(0);
+        a.add(realm::null());
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK(a.get(0) == 123);
+
+        // Test set
+        a.set_null(0);
+        a.set_null(1);
+        a.set_null(2);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(2), true);
+
+        a.destroy();
+    }
+
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(realm::null());
+        a.add(0);
+        a.add(123);
+
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == 123);
+
+        // Test insert
+        a.insert(0, realm::null());
+        a.insert(2, realm::null());
+        a.insert(4, realm::null());
+
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK_EQUAL(a.is_null(3), false);
+        CHECK_EQUAL(a.is_null(4), true);
+        CHECK_EQUAL(a.is_null(5), false);
+
+        a.destroy();
+    }
+
+    {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        a.add(0);
+        a.add(realm::null());
+        a.add(123);
+
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == 123);
+
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), false);
+
+        a.destroy();
+    }
+
+    Random random(random_int<unsigned long>());
+
+    for (size_t t = 0; t < 50; t++) {
+        ref_type ref = ColumnIntNull::create(Allocator::get_default());
+        ColumnIntNull a(Allocator::get_default(), ref);
+
+        // vector that is kept in sync with the ArrayIntNull so that we can compare with it
+        std::vector<int64_t> v;
+
+        // ArrayString capacity starts at 128 bytes, so we need lots of elements
+        // to test if relocation works
+        for (size_t i = 0; i < 100; i++) {
+            unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+
+            // Add more often than removing, so that we grow
+            if (rnd < 80 && a.size() > 0) {
+                size_t del = rnd % a.size();
+                a.erase(del);
+                v.erase(v.begin() + del);
+            }
+            else {
+                int number = random.draw_int<int>();
+                bool null = false;
+
+                if (random.draw_int<int>() > 100) {
+                    null = true;
+                    a.add(realm::null());
+                    v.push_back(int64_t(INT_MAX) + 1);
+                }
+
+                if (random.draw_int<int>() > 100) {
+                    if (null) {
+                        a.add(realm::null());
+                        v.push_back(int64_t(INT_MAX) + 1);
+                    }
+                    else {
+                        a.add(number);
+                        v.push_back(number);
+                    }
+                }
+                else if (a.size() > 0) {
+                    size_t pos = rnd % a.size();
+                    if (null) {
+                        a.insert(pos, realm::null());
+                        v.insert(v.begin() + pos, int64_t(INT_MAX) + 1);
+                    }
+                    else {
+                        a.insert(pos, number);
+                        v.insert(v.begin() + pos, number);
+                    }
+                }
+
+                CHECK_EQUAL(a.size(), v.size());
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (v[i] == int64_t(INT_MAX) + 1) {
+                        CHECK(a.is_null(i));
+                    }
+                    else {
+                        CHECK(a.get(i) == v[i]);
+                    }
+                }
+            }
+        }
+        a.destroy();
+    }
+
 }
 
 #endif // TEST_COLUMN

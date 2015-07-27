@@ -419,6 +419,7 @@ public:
     ConstLinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx) const;
     std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
     bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
 
     TableRef get_link_target(std::size_t column_ndx) REALM_NOEXCEPT;
     ConstTableRef get_link_target(std::size_t column_ndx) const REALM_NOEXCEPT;
@@ -454,6 +455,7 @@ public:
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
+    void set_null(std::size_t column_ndx, std::size_t row_ndx);
 
     //@}
 
@@ -547,6 +549,7 @@ public:
     std::size_t    find_first_double(std::size_t column_ndx, double value) const;
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
     std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
+    std::size_t    find_first_null(std::size_t column_ndx) const;
 
     TableView      find_all_link(size_t target_row_index);
     ConstTableView find_all_link(size_t target_row_index) const;
@@ -564,6 +567,8 @@ public:
     ConstTableView find_all_string(std::size_t column_ndx, StringData value) const;
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
+    TableView      find_all_null(std::size_t column_ndx);
+    ConstTableView find_all_null(std::size_t column_ndx) const;
 
     /// The following column types are supported: String, Integer, DateTime, Bool
     TableView      get_distinct_view(std::size_t column_ndx);
@@ -659,10 +664,10 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(RowIndexes* tv = nullptr) { return Query(*this, tv); }
+    Query where(TableViewBase* tv = nullptr) { return Query(*this, tv); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where(RowIndexes* tv = nullptr) const { return Query(*this, tv); }
+    Query where(TableViewBase* tv = nullptr) const { return Query(*this, tv); }
 
     // Perform queries on a LinkView. The returned Query holds a reference to lv.
     Query where(const LinkViewRef& lv) { return Query(*this, lv); }
@@ -830,7 +835,7 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
-    typedef std::vector<const TableViewBase*> views;
+    typedef std::vector<TableViewBase*> views;
     mutable views m_views;
 
     // Points to first bound row accessor, or is null if there are none.
@@ -1024,6 +1029,8 @@ private:
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
     Column& get_column(std::size_t column_ndx);
     const Column& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
+    ColumnIntNull& get_column_int_null(std::size_t column_ndx);
+    const ColumnIntNull& get_column_int_null(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnFloat& get_column_float(std::size_t column_ndx);
     const ColumnFloat& get_column_float(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnDouble& get_column_double(std::size_t column_ndx);
@@ -1065,7 +1072,7 @@ private:
     /// Create a column of the specified type, fill it with the
     /// specified number of default values, and return just the
     /// reference to the underlying memory.
-    static ref_type create_column(ColumnType column_type, size_t num_default_values, Allocator&);
+    static ref_type create_column(ColumnType column_type, size_t num_default_values, bool nullable, Allocator&);
 
     /// Construct a copy of the columns array of this table using the
     /// specified allocator and return just the ref to that array.
@@ -1166,8 +1173,7 @@ private:
 
     //@}
 
-    /// Remove the specified row by the 'move last over' method, and submit the
-    /// operation to the replication subsystem.
+    /// Remove the specified row by the 'move last over' method.
     void do_move_last_over(std::size_t row_ndx);
 
     // Precondition: 1 <= end - begin
@@ -1402,7 +1408,10 @@ inline void Table::remove_last()
 
 inline void Table::register_view(const TableViewBase* view)
 {
-    m_views.push_back(view);
+    // Casting away constness here - operations done on tableviews
+    // through m_views are all internal and preserving "some" kind
+    // of logical constness.
+    m_views.push_back(const_cast<TableViewBase*>(view));
 }
 
 inline bool Table::is_attached() const REALM_NOEXCEPT

@@ -2,9 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by updating Value::import to work with DateTime
-* Fix incorrect results when querying for < or <= on ints which requires 64
-  bits to represent with a CPU that supports SSE 4.2.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -15,12 +13,107 @@
 
 ### Enhancements:
 
-* Generic networking API added.
-* Support for non-end row insertion in tables with link and link list columns.
+* Lorem ipsum.
+
+-----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Added static `Array::create_array()` for creating non-empty arrays, and extend
+  `Array::create()` such that it can create non-empty arrays.
+* The creation of the free-space arrays (`Group::m_free_positions`,
+  `Group::m_free_lengths`, `Group::m_free_versions`) is now always done by
+  `GroupWriter::write_group()`. Previously it was done in various places
+  (`Group::attach()`, `Group::commit()`, `Group::reset_free_space_versions()`).
+* `Group::reset_free_space_versions()` has been eliminated. These days the Realm
+  version is persisted across sessions, so there is no longer any cases where
+  version tracking on free-space chunks needs to be reset.
+* Free-space arrays (`Group::m_free_positions`, `Group::m_free_lengths`,
+  `Group::m_free_versions`) was moved to `GroupWriter`, as they are now only
+  needed during `GroupWriter::write_Group()`. This significantly reduces the
+  "shallow" memory footprint of `Group`.
+* Improved exception safety in `Group::attach()`.
+* `Group::commit()` now throws instead of aborting on an assertion if the group
+  accessor is detached or if it is used in transactional mode (via
+  `SharedGroup`).
+
+----------------------------------------------
+
+# 0.91.2 Release notes
+
+### Enhancements:
+
+* Added support for building for watchOS.
+
+----------------------------------------------
+
+# 0.91.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug in SharedGroup::grab_specific_readlock() which would fail to
+  grab the specified readlock even though the requested version was available
+  in the case where a concurrent cleanup operation had a conflicting request
+  for the same (oldest) entry in the ringbuffer.
+* Fixed a performance regression in TableView::clear().
+
+### API breaking changes:
+
+* Argument `is_backend` removed from from the public version of
+  `SharedGroup::open()`. Fortunately, bindings are not currently calling
+  `SharedGroup::open()`.
+* `File::resize()` no longer calls `fcntl()` with `F_FULLFSYNC`. This feature
+  has been moved to `File::sync()`.
+
+### Enhancements:
+
+* New feature added to disable all forms of 'sync to disk'. This is supposed to
+  be used only during unit testing. See header `disable_sync_to_disk.hpp`.
+* Added `LinkList.swap()` to swap two members of a link list.
+* Added a Query constructor that takes ownership of a TableView.
+
+### Internals:
+
+* On Linux we now call 'sync to disk' after Realm file resizes. Previusly, this
+  was only done on Apple platforms.
+
+----------------------------------------------
+
+# 0.91.0 Release notes
+
+### Bugfixes:
+
+* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by
+  updating Value::import to work with DateTime
+* Fix incorrect results when querying for < or <= on ints which requires 64 bits
+  to represent with a CPU that supports SSE 4.2.
+
+### API breaking changes:
+
+* Named exception UnreachableVersion replaced by "unspecified" LogicError
+  exception.
+
+### Enhancements:
+
+* Generic networking API added.
+* Support for transfer/handover of TableViews, Queries, ListViews and Rows
+  between SharedGroups in different threads.  Cooperative handover (where boths
+  threads participate) is supported for arbitrarily nested TableViews and
+  Queries.  Restrictions apply for non-cooperative handover (aka stealing): user
+  must ensure that the producing thread does not trigger a modifying operation
+  on any of the involved TableViews.  For TableViews the handover can be one of
+  *moving*, *copying* or *staying*, reflecting how the actual payload is
+  treated.
+* Support for non-end row insertion in tables with link and link list columns.
+* Improved documentation of functions concerning the initiation and termination
+  of transactions.
+* Improved exception safety in connection with the initiation and termination of
+  transactions.
+* Add support for systems where mremap() exists but fails with ENOTSUP.
+
+### Internals:
+
+* New facility for simulating failures, such as system call failures.
 
 ----------------------------------------------
 
@@ -43,7 +136,9 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 
 ### Bugfixes:
 
-* Fixed durability issue in case of power / system failures on Apple platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to stable storage when the file is extended.
+* Fixed durability issue in case of power / system failures on Apple
+  platforms. We now use a stronger synchronization (`fcntl(fd, F_FULLFSYNC)`) to
+  stable storage when the file is extended.
 
 ----------------------------------------------
 
@@ -94,7 +189,9 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 
 ### Bugfixes:
 
-* Fixed bug in "index rebuilding" (would delete the wrong column, causing crash). See https://github.com/realm/realm-core/pull/798 ;  "Remove the correct column when removing search indexes #798"
+* Fixed bug in "index rebuilding" (would delete the wrong column, causing
+  crash). See https://github.com/realm/realm-core/pull/798 ; "Remove the correct
+  column when removing search indexes #798"
 
 ----------------------------------------------
 

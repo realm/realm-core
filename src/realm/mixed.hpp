@@ -151,9 +151,9 @@ private:
         float        m_float;
         double       m_double;
         const char*  m_data;
-        std::time_t  m_date;
+        int_fast64_t m_date;
     };
-    std::size_t m_size;
+    std::size_t m_size = 0;
 };
 
 // Note: We cannot compare two mixed values, since when the type of

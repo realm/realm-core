@@ -3,11 +3,14 @@
 
 #include <realm/column.hpp>
 #include <realm/column_string_enum.hpp>
+#include <realm/handover_defs.hpp>
 #include <realm/index_string.hpp>
 
 namespace realm {
 
-// This class is for common functionality of ListView and LinkView which inherit from it. Currently it only 
+const std::size_t detached_ref = std::size_t(-1);
+
+// This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
 class RowIndexes
 {
@@ -16,17 +19,20 @@ public:
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected), 
 #endif
-        m_row_indexes(urt, alloc), m_auto_sort(false) 
+        m_row_indexes(urt, alloc)
     {}
 
     RowIndexes(Column&& col) : 
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected),
-#endif      
-        m_row_indexes(std::move(col)), m_auto_sort(false) 
+#endif
+        m_row_indexes(std::move(col)) 
     {}
 
-    virtual ~RowIndexes() 
+    RowIndexes(const RowIndexes& source, ConstSourcePayload mode);
+    RowIndexes(RowIndexes& source, MutableSourcePayload mode);
+
+    virtual ~RowIndexes()
     {
 #ifdef REALM_COOKIE_CHECK
         cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
@@ -97,14 +103,7 @@ public:
         std::vector<const ColumnStringEnum*> m_string_enum_columns;
     };
 
-    // Sort m_row_indexes according to one column
-    void sort(size_t column, bool ascending = true);
-
-    // Sort m_row_indexes according to multiple columns
-    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
-
-    // Re-sort view according to last used criterias
-    void re_sort();
+    void sort(Sorter& sorting_predicate);
 
 #ifdef REALM_COOKIE_CHECK
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
@@ -112,8 +111,6 @@ public:
 #endif
 
     Column m_row_indexes;
-    Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
-    bool m_auto_sort;
 };
 
 } // namespace realm

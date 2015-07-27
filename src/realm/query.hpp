@@ -39,6 +39,7 @@
 #include <realm/table_ref.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/datetime.hpp>
+#include <realm/handover_defs.hpp>
 
 namespace realm {
 
@@ -52,16 +53,18 @@ class ConstTableView;
 class Array;
 class Expression;
 class SequentialGetterBase;
+class Group;
 
 class Query {
 public:
-    Query(const Table& table, RowIndexes* tv = nullptr);
+    Query(const Table& table, TableViewBase* tv = nullptr);
+    Query(const Table& table, std::unique_ptr<TableViewBase>);
     Query(const Table& table, const LinkViewRef& lv);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
-    ~Query() REALM_NOEXCEPT;
+    virtual ~Query() REALM_NOEXCEPT;
     void move_assign(Query& query);
 
     Query& operator = (const Query& source);
@@ -250,7 +253,7 @@ public:
     mutable bool do_delete;
 
 protected:
-    Query(Table& table, RowIndexes* tv = nullptr);
+    Query(Table& table, TableViewBase* tv = nullptr);
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
@@ -270,11 +273,44 @@ public:
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
-    
-    RowIndexes* m_view;
-    std::vector<bool> pending_not;
 
+    // points to the base class of the restricting view. If the restricting
+    // view is a link view, m_source_link_view is non-zero. If it is a table view,
+    // m_source_table_view is non-zero.
+    RowIndexes* m_view;
+
+    std::vector<bool> pending_not;
+    typedef Query_Handover_patch Handover_patch;
+
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+                                                      ConstSourcePayload mode) const
+    {
+        patch.reset(new Handover_patch);
+        std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
+        return retval;
+    }
+
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+                                                      MutableSourcePayload mode)
+    {
+        patch.reset(new Handover_patch);
+        std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
+        return retval;
+    }
+
+    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        patch.reset();
+    }
+
+    void apply_patch(Handover_patch& patch, Group& group);
+    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode);
+    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode);
 private:
+    struct PartialCopyTag {};
+    Query(const Query& src, PartialCopyTag);
+    void copy_nodes(const Query& source);
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
@@ -299,6 +335,8 @@ private:
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() REALM_NOEXCEPT;
 
+    void set_table(TableRef tr) { m_table = tr; }
+    bool supports_export_for_handover() { return m_view == 0; };
     std::string error_code;
 
     friend class Table;
@@ -307,7 +345,10 @@ private:
     friend class XQueryAccessorString;
     friend class TableViewBase;
 
-    LinkViewRef m_source_link_view;
+    // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
+    LinkViewRef m_source_link_view; // link views are refcounted and shared.
+    TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
+    bool m_owns_source_table_view; // <--- except when indicated here
 };
 
 // Implementation:

@@ -29,6 +29,7 @@
 #include <realm/replication.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 #ifdef REALM_ENABLE_REPLICATION
 
@@ -82,9 +83,11 @@ public:
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
     ~WriteLogCollector() REALM_NOEXCEPT;
     std::string do_get_database_path() override { return m_database_name; }
-    void do_begin_write_transact(SharedGroup& sg) override;
-    version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version)
+    void do_initiate_transact(SharedGroup&, version_type) override;
+    version_type do_prepare_commit(SharedGroup& sg, version_type orig_version)
         override;
+    void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT override;
+    void do_abort_transact(SharedGroup&) REALM_NOEXCEPT override;
     BinaryData get_uncommitted_changes() REALM_NOEXCEPT override;
     void do_interrupt() REALM_NOEXCEPT override {};
     void do_clear_interrupt() REALM_NOEXCEPT override {};
@@ -371,7 +374,10 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     log.file.close();
     File::try_remove(log.name);
     log.file.open(log.name, File::mode_Write);
-    log.file.resize(minimal_pages * page_size);
+    log.file.resize(minimal_pages * page_size); // Throws
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        log.file.sync(); // Throws
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
     log.last_seen_size = minimal_pages * page_size;
 }
@@ -382,7 +388,10 @@ void WriteLogCollector::reset_header()
     File::try_remove(m_header_name);
 
     File header_file(m_header_name, File::mode_Write);
-    header_file.resize(sizeof (CommitLogHeader));
+    header_file.resize(sizeof (CommitLogHeader)); // Throws
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
 }
 
@@ -416,7 +425,10 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
             size -= size/4;
             size *= page_size * minimal_pages;
             active_log->map.unmap();
-            active_log->file.resize(size);
+            active_log->file.resize(size); // Throws
+            bool disable_sync = get_disable_sync_to_disk();
+            if (!disable_sync)
+                active_log->file.sync(); // Throws
         }
     }
 }
@@ -439,8 +451,12 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     File::SizeType size_needed =
         aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
     size_needed = aligned_to(page_size, size_needed);
-    if (size_needed > active_log->file.get_size())
-        active_log->file.resize(size_needed);
+    if (size_needed > active_log->file.get_size()) {
+        active_log->file.resize(size_needed); // Throws
+        bool disable_sync = get_disable_sync_to_disk();
+        if (!disable_sync)
+            active_log->file.sync(); // Throws
+    }
 
     // create/update mapping so that we are sure it covers the file we are about
     // write:
@@ -453,7 +469,9 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
     write_ptr += sizeof(EntryHeader);
     std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr);
-    active_log->map.sync();
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        active_log->map.sync(); // Throws
 
     // update metadata to reflect the added commit log
     preamble->write_offset += aligned_to(sizeof (uint64_t), entry.changeset.size() + sizeof(EntryHeader));
@@ -488,7 +506,9 @@ void WriteLogCollector::reset_log_management(version_type last_version)
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
     new (& m_header.get_addr()->lock) RobustMutex;
-    m_header.sync();
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        m_header.sync(); // Throws
 }
 
 
@@ -602,10 +622,22 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
 }
 
 
-WriteLogCollector::version_type
-WriteLogCollector::do_commit_write_transact(SharedGroup&,
-                                            WriteLogCollector::version_type orig_version)
+void WriteLogCollector::do_initiate_transact(SharedGroup&, version_type)
 {
+    char* buffer = m_transact_log_buffer.data();
+    set_buffer(buffer, buffer + m_transact_log_buffer.size());
+}
+
+
+WriteLogCollector::version_type
+WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_type orig_version)
+{
+    // Note: This function does not utilize the two-phase changeset submission
+    // scheme, nor does it utilize the ability to discard a submitted changeset
+    // during a subsequent call to do_initiate_transact() in case the transaction
+    // ultimately fails. This means, unfortunately, that an application will
+    // encounter an inconsistent state (and likely crash) it it attempts to
+    // initiate a new transaction after a failed commit.
     char* data = m_transact_log_buffer.data();
     size_t size = write_position() - data;
     HistoryEntry entry;
@@ -618,10 +650,15 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 }
 
 
-void WriteLogCollector::do_begin_write_transact(SharedGroup&)
+void WriteLogCollector::do_finalize_commit(SharedGroup&) REALM_NOEXCEPT
 {
-    char* buffer = m_transact_log_buffer.data();
-    set_buffer(buffer, buffer + m_transact_log_buffer.size());
+    // See note in do_prepare_commit().
+}
+
+
+void WriteLogCollector::do_abort_transact(SharedGroup&) REALM_NOEXCEPT
+{
+    // See note in do_prepare_commit().
 }
 
 

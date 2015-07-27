@@ -550,6 +550,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         table.add_column(type_Binary,   "binary");           //  9
         table.add_column(type_Table,    "tables", &sub1);    // 10
         table.add_column(type_Mixed,    "mixed");            // 11
+        table.add_column(type_Int,      "int_null", true);   // 12
         sub1->add_column(type_Int,        "sub_first");
         sub1->add_column(type_String,     "sub_second");
     }
@@ -559,6 +560,13 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_int(0, i, int64_t(i*sign));
+        
+        if (i % 4 == 0) {
+            table.set_null(12, i);
+        }
+        else {
+            table.set_int(12, i, int64_t(i*sign));
+        }
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
@@ -811,6 +819,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
         sub_1->add_column(type_Binary,   "binary");        // 6
         sub_1->add_column(type_Table,    "table", &sub_2); // 7
         sub_1->add_column(type_Mixed,    "mixed");         // 8
+        sub_1->add_column(type_Int,      "int_null", nullptr, true); // 9
         sub_2->add_column(type_Int,        "i");
     }
 
@@ -819,7 +828,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     ConstTableRef degen_child = parent.get_subtable(0,0); // NOTE: Constness is essential here!!!
 
     CHECK_EQUAL(0, degen_child->size());
-    CHECK_EQUAL(9, degen_child->get_column_count());
+    CHECK_EQUAL(10, degen_child->get_column_count());
 
     // Searching:
 
@@ -981,7 +990,7 @@ TEST(Table_ToString)
     std::string file_name = get_test_resource_path();
     file_name += "expect_string.txt";
 #if GENERATE   // enable to generate testfile - check it manually
-    std::ofstream test_file(file_name.c_str(), ios::out);
+    std::ofstream test_file(file_name.c_str(), std::ios::out);
     test_file << result;
     std::cerr << "to_string() test:\n" << result << std::endl;
 #else
@@ -2739,7 +2748,7 @@ TEST(Table_Mixed2)
 
     CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
-    CHECK_EQUAL(time_t(1234), table[2].first.get_datetime());
+    CHECK_EQUAL(1234,         table[2].first.get_datetime());
     CHECK_EQUAL("test",       table[3].first.get_string());
 }
 
@@ -3080,15 +3089,27 @@ REALM_TABLE_2(TableDateAndBinary,
 
 TEST(Table_DateAndBinary)
 {
-    TableDateAndBinary t;
+    {
+        TableDateAndBinary t;
 
-    const size_t size = 10;
-    char data[size];
-    for (size_t i=0; i<size; ++i) data[i] = (char)i;
-    t.add(8, BinaryData(data, size));
-    CHECK_EQUAL(t[0].date, 8);
-    CHECK_EQUAL(t[0].bin.size(), size);
-    CHECK(std::equal(t[0].bin.data(), t[0].bin.data()+size, data));
+        const size_t size = 10;
+        char data[size];
+        for (size_t i=0; i<size; ++i) data[i] = (char)i;
+        t.add(8, BinaryData(data, size));
+        CHECK_EQUAL(t[0].date, 8);
+        CHECK_EQUAL(t[0].bin.size(), size);
+        CHECK(std::equal(t[0].bin.data(), t[0].bin.data()+size, data));
+    }
+
+    // Test that 64-bit dates are preserved
+    {
+        TableDateAndBinary t;
+
+        int64_t date = std::numeric_limits<int64_t>::max() - 400;
+
+        t.add(date, BinaryData(""));
+        CHECK_EQUAL(t[0].date.get().get_datetime(), date);
+    }
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
@@ -3449,7 +3470,7 @@ TEST(Table_Pivot)
 
         Table result_avg;
         table.aggregate(0, 1, Table::aggr_avg, result_avg);
-        if (false) {
+        if ((false)) {
             std::ostringstream ss;
             result_avg.to_string(ss);
             std::cerr << "\nMax:\n" << ss.str();
@@ -5903,6 +5924,35 @@ TEST(Table_Nulls)
         tv = t.find_all_string(0, realm::null());
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(2, tv.get_source_ndx(0));
+    }
+
+    {
+        Table t;
+        t.add_column(type_Int, "int", true);
+        t.add_column(type_Bool, "bool", true);
+        t.add_column(type_DateTime, "bool", true);
+
+        t.add_empty_row(2);
+
+        t.set_int(0, 0, 65);
+        t.set_bool(1, 0, false);
+        t.set_datetime(2, 0, DateTime(3));
+
+        CHECK_EQUAL(65, t.get_int(0, 0));
+        CHECK_EQUAL(false, t.get_bool(1, 0));
+        CHECK_EQUAL(DateTime(3), t.get_datetime(2, 0));
+
+        CHECK(!t.is_null(0, 0));
+        CHECK(!t.is_null(1, 0));
+        CHECK(!t.is_null(2, 0));
+
+        t.set_null(0, 1);
+        t.set_null(1, 1);
+        t.set_null(2, 1);
+
+        CHECK(t.is_null(0, 1));
+        CHECK(t.is_null(1, 1));
+        CHECK(t.is_null(2, 1));
     }
 }
 #endif 

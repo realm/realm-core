@@ -371,15 +371,8 @@ ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
     }
 
     // Write new top array
-    {
-        bool recurse = false;
-        size_t pos = top.write(out, recurse);
-        ref_type ref = pos;
-        return ref;
-    }
-
-    dg.release();
-    return top.get_ref();
+    bool recurse = false;
+    return top.write(out, recurse);
 }
 
 

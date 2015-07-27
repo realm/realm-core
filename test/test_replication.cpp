@@ -55,38 +55,42 @@ namespace {
 
 class MyTrivialReplication: public TrivialReplication {
 public:
-    MyTrivialReplication(std::string path): TrivialReplication(path) {}
+    MyTrivialReplication(const std::string& path):
+        TrivialReplication(path)
+    {
+    }
 
     ~MyTrivialReplication() REALM_NOEXCEPT
     {
-        typedef TransactLogs::const_iterator iter;
-        iter end = m_transact_logs.end();
-        for (iter i = m_transact_logs.begin(); i != end; ++i)
-            delete[] i->data();
     }
 
     void replay_transacts(SharedGroup& target, std::ostream* replay_log = 0)
     {
-        typedef TransactLogs::const_iterator iter;
-        iter end = m_transact_logs.end();
-        for (iter i = m_transact_logs.begin(); i != end; ++i)
-            apply_changeset(i->data(), i->size(), target, replay_log);
-        for (iter i = m_transact_logs.begin(); i != end; ++i)
-            delete[] i->data();
-        m_transact_logs.clear();
+        for (const Buffer<char>& changeset: m_changesets)
+            apply_changeset(changeset.data(), changeset.size(), target, replay_log);
+        m_changesets.clear();
     }
 
 private:
-    void handle_transact_log(const char* data, size_t size, version_type) override
+    void prepare_changeset(const char* data, size_t size, version_type) override
     {
-        std::unique_ptr<char[]> log(new char[size]); // Throws
-        std::copy(data, data+size, log.get());
-        m_transact_logs.push_back(BinaryData(log.get(), size)); // Throws
-        log.release();
+        m_incoming_changeset = Buffer<char>(size); // Throws
+        std::copy(data, data+size, m_incoming_changeset.data());
+        // Make space for the new changeset in m_changesets such that we can be
+        // sure no exception will be thrown whan adding the changeset in
+        // finalize_changeset().
+        m_changesets.reserve(m_changesets.size() + 1); // Throws
     }
 
-    typedef std::vector<BinaryData> TransactLogs;
-    TransactLogs m_transact_logs;
+    void finalize_changeset() REALM_NOEXCEPT override
+    {
+        // The following operation will not throw due to the space reservation
+        // carried out in prepare_new_changeset().
+        m_changesets.push_back(std::move(m_incoming_changeset));
+    }
+
+    Buffer<char> m_incoming_changeset;
+    std::vector<Buffer<char>> m_changesets;
 };
 
 REALM_TABLE_1(MySubsubsubtable,
@@ -761,6 +765,44 @@ TEST(Replication_NullStrings)
         CHECK(table2->get_binary(1, 2).is_null());
     }
 }
+
+TEST(Replication_NullInteger)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::ostream* replay_log = 0;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1", true);
+        table1->add_empty_row(3);                   // default value is null
+
+        table1->set_int(0, 1, 0);
+        table1->set_null(0, 2);
+
+        CHECK(table1->is_null(0, 0));
+        CHECK(!table1->is_null(0, 1));
+        CHECK(table1->is_null(0, 2));
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_log);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK(table2->is_null(0, 0));
+        CHECK(!table2->is_null(0, 1));
+        CHECK(table2->is_null(0, 2));
+    }
+}
+
 
 } // anonymous namespace
 

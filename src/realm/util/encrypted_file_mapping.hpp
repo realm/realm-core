@@ -31,8 +31,8 @@
 #include <CommonCrypto/CommonCrypto.h>
 #elif defined(REALM_ANDROID)
 // OpenSSL headers aren't part of the NDK, so declare the bits we need manually
-#define AES_ENCRYPT	1
-#define AES_DECRYPT	0
+#define AES_ENCRYPT    1
+#define AES_DECRYPT    0
 #define SHA224_DIGEST_LENGTH 28
 
 typedef struct aes_key_st {
@@ -51,8 +51,6 @@ typedef struct SHA256state_st {
 
 namespace realm {
 namespace util {
-
-size_t page_size();
 
 struct iv_table;
 

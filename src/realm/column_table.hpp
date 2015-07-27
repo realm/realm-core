@@ -31,6 +31,7 @@ namespace realm {
 
 
 /// Base class for any type of column that can contain subtables.
+// FIXME: Don't derive from Column, but define a BpTree<ref_type> specialization.
 class ColumnSubtableParent: public Column, public Table::Parent {
 public:
     void discard_child_accessors() REALM_NOEXCEPT;

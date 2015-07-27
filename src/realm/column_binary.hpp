@@ -39,12 +39,15 @@ public:
 
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+    bool is_nullable() const REALM_NOEXCEPT override;
 
     BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t ndx) const REALM_NOEXCEPT override;
     StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT final;
 
     void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    void set_null(std::size_t ndx) override;
     void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
@@ -147,6 +150,11 @@ inline std::size_t ColumnBinary::size() const  REALM_NOEXCEPT
     // Non-leaf root
     return m_array->get_bptree_size();
 }
+    
+inline bool ColumnBinary::is_nullable() const REALM_NOEXCEPT
+{
+    return m_nullable;
+}
 
 inline void ColumnBinary::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
 {
@@ -196,6 +204,11 @@ inline BinaryData ColumnBinary::get(std::size_t ndx) const REALM_NOEXCEPT
     return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, alloc);
 }
 
+inline bool ColumnBinary::is_null(std::size_t ndx) const REALM_NOEXCEPT
+{
+    return get(ndx).is_null();
+}
+
 inline StringData ColumnBinary::get_string(std::size_t ndx) const REALM_NOEXCEPT
 {
     BinaryData bin = get(ndx);
@@ -235,6 +248,11 @@ inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
     bool add_zero_term = false;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
+}
+
+inline void ColumnBinary::set_null(std::size_t row_ndx)
+{
+    set(row_ndx, BinaryData{});
 }
 
 inline size_t ColumnBinary::find_first(BinaryData value) const

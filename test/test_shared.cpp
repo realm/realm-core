@@ -23,6 +23,8 @@
 #include <realm/util/terminate.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/impl/simulated_failure.hpp>
+
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
@@ -235,8 +237,7 @@ TEST(Shared_CompactingOnTheFly)
         {
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            for (int i = 0; i < 100; ++i)
-            {
+            for (int i = 0; i < 100; ++i) {
                 t1->add(0, i, false, "test");
             }
             wt.commit();
@@ -2229,7 +2230,9 @@ TEST(Shared_MixedWithNonShared)
     {
         // Create non-empty file without free-space tracking
         Group g;
+        g.Verify();
         g.add_table("x");
+        g.Verify();
         g.write(path, crypt_key());
     }
     {
@@ -2244,6 +2247,7 @@ TEST(Shared_MixedWithNonShared)
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             wt.add_table("foo"); // Add table "foo"
+            wt.get_group().Verify();
             wt.commit();
         }
     }
@@ -2258,13 +2262,18 @@ TEST(Shared_MixedWithNonShared)
     {
         // Access using non-shared group
         Group g(path, crypt_key(), Group::mode_ReadWrite);
+        g.Verify();
         g.commit();
+        g.Verify();
     }
     {
         // Modify using non-shared group
         Group g(path, crypt_key(), Group::mode_ReadWrite);
+        g.Verify();
         g.add_table("bar"); // Add table "bar"
+        g.Verify();
         g.commit();
+        g.Verify();
     }
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
@@ -2725,5 +2734,17 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
         wt.commit();
     }
 }
+
+
+#ifdef REALM_DEBUG
+TEST(Shared_BeginReadFailure)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    using SimulatedFailure = _impl::SimulatedFailure;
+    SimulatedFailure::PrimeGuard pg(SimulatedFailure::shared_group__grow_reader_mapping);
+    CHECK_THROW(sg.begin_read(), SimulatedFailure);
+}
+#endif // REALM_DEBUG
 
 #endif // TEST_SHARED

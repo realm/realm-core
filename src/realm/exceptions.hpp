@@ -72,7 +72,7 @@ public:
         table_index_out_of_range,
         row_index_out_of_range,
         column_index_out_of_range,
-        bad_version_number,
+        bad_version,
 
         /// Indicates that an argument has a value that is illegal in combination
         /// with another argument, or with the state of an involved object.
@@ -109,8 +109,19 @@ public:
         unique_constraint_violation,
 
         /// User attempted to insert null in non-nullable column
-        column_not_nullable
+        column_not_nullable,
 
+        /// Group::open() is called on a group accessor that is already in the
+        /// attached state. Or Group::open() or Group::commit() is called on a
+        /// group accessor that is managed by a SharedGroup object.
+        wrong_group_state,
+
+        /// No active transaction on a particular SharedGroup object (e.g.,
+        /// SharedGroup::commit()), or the active transaction on the SharedGroup
+        /// object is of the wrong type (read/write), or an attampt was made to
+        /// initiate a new transaction while one is already in progress on the
+        /// same SharedGroup object.
+        wrong_transact_state
     };
 
     LogicError(ErrorKind message);
@@ -120,6 +131,8 @@ public:
 private:
     ErrorKind m_kind;
 };
+
+
 
 
 // Implementation:
