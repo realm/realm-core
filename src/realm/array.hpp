@@ -525,7 +525,29 @@ public:
     std::size_t upper_bound_int(int64_t value) const REALM_NOEXCEPT;
     //@}
 
-    std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
+    /// \brief Search the \c Array for a value greater or equal than \a target,
+    /// starting the search at the \a start index. If \a indirection is
+    /// provided, use it as a look-up table to iterate over the \c Array.
+    ///
+    /// If \a indirection is not provided, then the \c Array must be sorted in
+    /// ascending order. If \a indirection is provided, then its values should
+    /// point to indices in this \c Array in such a way that iteration happens
+    /// in ascending order.
+    ///
+    /// Behaviour is undefined if:
+    /// - a value in \a indirection is out of bounds for this \c Array;
+    /// - \a indirection does not contain at least as many elements as this \c
+    ///   Array;
+    /// - sorting conditions are not respected;
+    /// - \a start is greater than the number of elements in this \c Array or
+    ///   \a indirection (if provided).
+    ///
+    /// \param target the smallest value to search for
+    /// \param start the offset at which to start searching in the array
+    /// \param indirection an \c Array containing valid indices of values in
+    ///        this \c Array, sorted in ascending order
+    /// \return the index of the value if found, or realm::not_found otherwise
+    std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
     void Preset(int64_t min, int64_t max, std::size_t count);
     void Preset(std::size_t bitwidth, std::size_t count);
 
@@ -994,6 +1016,7 @@ private:
     template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
+    template<size_t w> std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
 
 protected:
     /// The total size in bytes (including the header) of a new empty
@@ -1087,7 +1110,6 @@ protected:
     friend class GroupWriter;
     friend class AdaptiveStringColumn;
 };
-
 
 
 class Array::NodeInfo {

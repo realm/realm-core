@@ -152,6 +152,9 @@ template<class T> inline T Random::draw_float() REALM_NOEXCEPT
 
 template<class T> inline T Random::draw_int(T min, T max) REALM_NOEXCEPT
 {
+    // Since the standard does not require that
+    // `std::uniform_int_distribution<>` can handle character types, we need
+    // special treatment of those.
     using U = decltype(T() + 0); // Convert character to interger type
     U value = std::uniform_int_distribution<U>(min, max)(m_engine);
     return T(value);

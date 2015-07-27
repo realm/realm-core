@@ -59,44 +59,31 @@ enum Instruction {
     instr_SetLink               = 14,
     instr_NullifyLink           = 15, // Set link to null due to target being erased
     instr_SetNull               = 16,
-    instr_InsertInt             = 17,
-    instr_InsertBool            = 18,
-    instr_InsertFloat           = 19,
-    instr_InsertDouble          = 20,
-    instr_InsertString          = 21,
-    instr_InsertBinary          = 22,
-    instr_InsertDateTime        = 23,
-    instr_InsertTable           = 24,
-    instr_InsertMixed           = 25,
-    instr_InsertLink            = 26,
-    instr_InsertLinkList        = 27,
-    instr_RowInsertComplete     = 28,
-    instr_InsertEmptyRows       = 29,
-    instr_EraseRows             = 30, // Remove (multiple) rows
-    instr_AddIntToColumn        = 31, // Add an integer value to all cells in a column
-    instr_ClearTable            = 32, // Remove all rows in selected table
-    instr_OptimizeTable         = 33,
-    instr_SelectDescriptor      = 34, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 35, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 36, // do, but for a link-type column
-    instr_InsertNullableColumn  = 37, // Insert nullable column
-    instr_EraseColumn           = 38, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 39, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 40, // Rename column in selected descriptor
-    instr_AddSearchIndex        = 41, // Add a search index to a column
-    instr_RemoveSearchIndex     = 42, // Remove a search index from a column
-    instr_AddPrimaryKey         = 43, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 44, // Remove primary key from a table
-    instr_SetLinkType           = 45, // Strong/weak
-    instr_SelectLinkList        = 46,
-    instr_LinkListSet           = 47, // Assign to link list entry
-    instr_LinkListInsert        = 48, // Insert entry into link list
-    instr_LinkListMove          = 49, // Move an entry within a link list
-    instr_LinkListSwap          = 50, // Swap two entries within a link list
-    instr_LinkListErase         = 51, // Remove an entry from a link list
-    instr_LinkListNullify       = 52, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear         = 53, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 54, // Assign to link list entry
+    instr_InsertEmptyRows       = 17,
+    instr_EraseRows             = 18, // Remove (multiple) rows
+    instr_ClearTable            = 19, // Remove all rows in selected table
+    instr_OptimizeTable         = 20,
+    instr_SelectDescriptor      = 21, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 22, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 23, // do, but for a link-type column
+    instr_InsertNullableColumn  = 24, // Insert nullable column
+    instr_EraseColumn           = 25, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 26, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 27, // Rename column in selected descriptor
+    instr_AddSearchIndex        = 28, // Add a search index to a column
+    instr_RemoveSearchIndex     = 29, // Remove a search index from a column
+    instr_AddPrimaryKey         = 30, // Add a primary key to a table
+    instr_RemovePrimaryKey      = 31, // Remove primary key from a table
+    instr_SetLinkType           = 32, // Strong/weak
+    instr_SelectLinkList        = 33,
+    instr_LinkListSet           = 34, // Assign to link list entry
+    instr_LinkListInsert        = 35, // Insert entry into link list
+    instr_LinkListMove          = 36, // Move an entry within a link list
+    instr_LinkListSwap          = 37, // Swap two entries within a link list
+    instr_LinkListErase         = 38, // Remove an entry from a link list
+    instr_LinkListNullify       = 39, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 40, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 41, // Assign to link list entry
 };
 
 
@@ -151,18 +138,6 @@ public:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
     bool clear_table() { return true; }
-    bool insert_int(std::size_t, std::size_t, std::size_t, int_fast64_t) { return true; }
-    bool insert_bool(std::size_t, std::size_t, std::size_t, bool) { return true; }
-    bool insert_float(std::size_t, std::size_t, std::size_t, float) { return true; }
-    bool insert_double(std::size_t, std::size_t, std::size_t, double) { return true; }
-    bool insert_string(std::size_t, std::size_t, std::size_t, StringData) { return true; }
-    bool insert_binary(std::size_t, std::size_t, std::size_t, BinaryData) { return true; }
-    bool insert_date_time(std::size_t, std::size_t, std::size_t, DateTime) { return true; }
-    bool insert_table(std::size_t, std::size_t, std::size_t) { return true; }
-    bool insert_mixed(std::size_t, std::size_t, std::size_t, const Mixed&) { return true; }
-    bool insert_link(std::size_t, std::size_t, std::size_t, std::size_t) { return true; }
-    bool insert_link_list(std::size_t, std::size_t, std::size_t) { return true; }
-    bool row_insert_complete() { return true; }
     bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
     bool set_bool(std::size_t, std::size_t, bool) { return true; }
     bool set_float(std::size_t, std::size_t, float) { return true; }
@@ -175,7 +150,6 @@ public:
     bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
     bool set_null(std::size_t, std::size_t) { return true; }
     bool nullify_link(std::size_t, std::size_t) { return true; }
-    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
     bool optimize_table() { return true; };
 
     // Must have descriptor selected:
@@ -224,18 +198,6 @@ public:
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool unordered);
     bool clear_table();
-    bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t);
-    bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool);
-    bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, float);
-    bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, double);
-    bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, StringData);
-    bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, BinaryData);
-    bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, DateTime);
-    bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz);
-    bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, const Mixed&);
-    bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, std::size_t);
-    bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz);
-    bool row_insert_complete();
     bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t);
     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool);
     bool set_float(std::size_t col_ndx, std::size_t row_ndx, float);
@@ -248,7 +210,6 @@ public:
     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t);
     bool set_null(std::size_t col_ndx, std::size_t row_ndx);
     bool nullify_link(std::size_t col_ndx, std::size_t row_ndx);
-    bool add_int_to_column(std::size_t col_ndx, int_fast64_t value);
     bool optimize_table();
 
     // Must have descriptor selected:
@@ -351,19 +312,6 @@ public:
     void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_link_list(const LinkView&, const Column& values);
 
-    void insert_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
-    void insert_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
-    void insert_float(const Table*, std::size_t col_ndx, std::size_t ndx, float value);
-    void insert_double(const Table*, std::size_t col_ndx, std::size_t ndx, double value);
-    void insert_string(const Table*, std::size_t col_ndx, std::size_t ndx, StringData value);
-    void insert_binary(const Table*, std::size_t col_ndx, std::size_t ndx, BinaryData value);
-    void insert_date_time(const Table*, std::size_t col_ndx, std::size_t ndx, DateTime value);
-    void insert_table(const Table*, std::size_t col_ndx, std::size_t ndx);
-    void insert_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
-    void insert_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
-    void insert_link_list(const Table*, std::size_t col_ndx, std::size_t ndx);
-    void row_insert_complete(const Table*);
-
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
     void insert_empty_rows(const Table*, size_t row_ndx, size_t num_rows_to_insert,
@@ -374,7 +322,6 @@ public:
     void erase_rows(const Table*, size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool is_move_last_over);
 
-    void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
     void remove_search_index(const Table*, std::size_t col_ndx);
     void add_primary_key(const Table*, std::size_t col_ndx);
@@ -1102,165 +1049,6 @@ inline void TransactLogConvenientEncoder::nullify_link(const Table* t, std::size
     m_encoder.nullify_link(col_ndx, ndx); // Throws
 }
 
-
-inline bool TransactLogEncoder::insert_int(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, int_fast64_t value)
-{
-    simple_cmd(instr_InsertInt, util::tuple(col_ndx, ndx, tbl_sz, value)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_int(const Table* t, std::size_t col_ndx,
-                                    std::size_t ndx, int_fast64_t value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_int(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_bool(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, bool value)
-{
-    simple_cmd(instr_InsertBool, util::tuple(col_ndx, ndx, tbl_sz, value)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_bool(const Table* t, std::size_t col_ndx,
-                                     std::size_t ndx, bool value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_bool(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_float(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, float value)
-{
-    simple_cmd(instr_InsertFloat, util::tuple(col_ndx, ndx, tbl_sz, value)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_float(const Table* t, std::size_t col_ndx,
-                                      std::size_t ndx, float value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_float(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_double(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, double value)
-{
-    simple_cmd(instr_InsertDouble, util::tuple(col_ndx, ndx, tbl_sz, value)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_double(const Table* t, std::size_t col_ndx,
-                                       std::size_t ndx, double value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_double(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_string(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, StringData value)
-{
-    simple_cmd(instr_InsertString, util::tuple(col_ndx, ndx, tbl_sz));
-    string_value(value.data(), value.size());
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_string(const Table* t, std::size_t col_ndx,
-                                       std::size_t ndx, StringData value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_string(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_binary(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, BinaryData value)
-{
-    simple_cmd(instr_InsertBinary, util::tuple(col_ndx, ndx, tbl_sz));
-    string_value(value.data(), value.size());
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_binary(const Table* t, std::size_t col_ndx,
-                                       std::size_t ndx, BinaryData value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_binary(col_ndx, ndx, t->size(), value);
-}
-
-inline bool TransactLogEncoder::insert_date_time(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, DateTime value)
-{
-    simple_cmd(instr_InsertDateTime, util::tuple(col_ndx, ndx, tbl_sz, value.get_datetime())); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_date_time(const Table* t, std::size_t col_ndx,
-                                          std::size_t ndx, DateTime value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_date_time(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_table(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz)
-{
-    simple_cmd(instr_InsertTable, util::tuple(col_ndx, ndx, tbl_sz)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_table(const Table* t, std::size_t col_ndx,
-                                      std::size_t ndx)
-{
-    select_table(t); // Throws
-    m_encoder.insert_table(col_ndx, ndx, t->size()); // Throws
-}
-
-inline bool TransactLogEncoder::insert_mixed(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, const Mixed& value)
-{
-    simple_cmd(instr_InsertMixed, util::tuple(col_ndx, ndx, tbl_sz));
-    mixed_value(value); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_mixed(const Table* t, std::size_t col_ndx,
-                                      std::size_t ndx, const Mixed& value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_mixed(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_link(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz, std::size_t value)
-{
-    // FIXME: Should the value be transformed in the same was as in `set_link`?
-    simple_cmd(instr_InsertLink, util::tuple(col_ndx, ndx, tbl_sz, value)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_link(const Table* t, std::size_t col_ndx,
-                                     std::size_t ndx, std::size_t value)
-{
-    select_table(t); // Throws
-    m_encoder.insert_link(col_ndx, ndx, t->size(), value); // Throws
-}
-
-inline bool TransactLogEncoder::insert_link_list(std::size_t col_ndx, std::size_t ndx, std::size_t tbl_sz)
-{
-    simple_cmd(instr_InsertLinkList, util::tuple(col_ndx, ndx, tbl_sz)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::insert_link_list(const Table* t, std::size_t col_ndx, std::size_t ndx)
-{
-    select_table(t); // Throws
-    m_encoder.insert_link_list(col_ndx, ndx, t->size()); // Throws
-}
-
-inline bool TransactLogEncoder::row_insert_complete()
-{
-    simple_cmd(instr_RowInsertComplete, util::tuple()); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::row_insert_complete(const Table* t)
-{
-    select_table(t); // Throws
-    m_encoder.row_insert_complete(); // Throws
-}
-
 inline bool TransactLogEncoder::insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
                                                   size_t prior_num_rows, bool unordered)
 {
@@ -1297,19 +1085,6 @@ inline void TransactLogConvenientEncoder::erase_rows(const Table* t, size_t row_
     bool unordered = is_move_last_over;
     m_encoder.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, unordered); // Throws
 }
-
-inline bool TransactLogEncoder::add_int_to_column(std::size_t col_ndx, int_fast64_t value)
-{
-    simple_cmd(instr_AddIntToColumn, util::tuple(col_ndx, value)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::add_int_to_column(const Table* t, std::size_t col_ndx, int_fast64_t value)
-{
-    select_table(t); // Throws
-    m_encoder.add_int_to_column(col_ndx, value); // Throws
-}
-
 
 inline bool TransactLogEncoder::add_search_index(std::size_t col_ndx)
 {
@@ -1671,112 +1446,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_InsertInt: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            // FIXME: Don't depend on the existence of int64_t,
-            // but don't allow values to use more than 64 bits
-            // either.
-            int_fast64_t value = read_int<int64_t>(); // Throws
-            if (!handler.insert_int(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertBool: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool value = read_int<bool>(); // Throws
-            if (!handler.insert_bool(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertFloat: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            float value = read_float(); // Throws
-            if (!handler.insert_float(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertDouble: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            double value = read_double(); // Throws
-            if (!handler.insert_double(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertString: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            StringData value = read_string(m_string_buffer); // Throws
-            if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertBinary: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            BinaryData value = read_binary(m_string_buffer); // Throws
-            if (!handler.insert_binary(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertDateTime: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            int_fast64_t value = read_int<int_fast64_t>(); // Throws
-            if (!handler.insert_date_time(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertTable: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            if (!handler.insert_table(col_ndx, row_ndx, tbl_sz)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertMixed: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            Mixed value;
-            read_mixed(&value); // Throws
-            if (!handler.insert_mixed(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertLink: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            std::size_t value = read_int<std::size_t>(); // Throws
-            if (!handler.insert_link(col_ndx, row_ndx, tbl_sz, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_InsertLinkList: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            if (!handler.insert_link_list(col_ndx, row_ndx, tbl_sz)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_RowInsertComplete: {
-            if (!handler.row_insert_complete()) // Throws
-                parser_error();
-            return;
-        }
         case instr_InsertEmptyRows: {
             size_t row_ndx = read_int<size_t>(); // Throws
             size_t num_rows_to_insert = read_int<size_t>(); // Throws
@@ -1794,16 +1463,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             bool unordered = read_int<bool>(); // Throws
             if (!handler.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
                                     unordered)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_AddIntToColumn: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            // FIXME: Don't depend on the existence of int64_t,
-            // but don't allow values to use more than 64 bits
-            // either.
-            int_fast64_t value = read_int<int64_t>(); // Throws
-            if (!handler.add_int_to_column(col_ndx, value)) // Throws
                 parser_error();
             return;
         }
@@ -2291,85 +1950,6 @@ public:
                                     unordered); // Throws
         append_instruction();
         return true;
-    }
-
-    bool add_int_to_column(size_t col_ndx, int_fast64_t value)
-    {
-        m_encoder.add_int_to_column(col_ndx, -value);
-        append_instruction();
-        return true;
-    }
-
-    // helper function, shared by insert_xxx
-    bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
-    {
-        if (col_idx == 0) {
-            size_t num_rows_to_erase = 1;
-            size_t prior_num_rows = tbl_sz;
-            bool unordered = false;
-            m_encoder.erase_rows(row_idx, num_rows_to_erase, prior_num_rows, unordered); // Throws
-            append_instruction();
-        }
-        return true;
-    }
-    bool insert_int(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, int_fast64_t)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_bool(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_float(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, float)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_double(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, double)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_string(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, StringData)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_binary(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, BinaryData)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, DateTime)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_table(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, const Mixed&)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, std::size_t)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool insert_link_list(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
-    {
-        return insert(col_idx, row_idx, tbl_sz);
-    }
-
-    bool row_insert_complete()
-    {
-        return true; // No-op
     }
 
     bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
