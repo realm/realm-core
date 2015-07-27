@@ -128,10 +128,7 @@ private:
 
     friend class ColumnBackLink;
     friend class LinkView;
-
-#ifdef REALM_ENABLE_REPLICATION
     friend class _impl::TransactLogConvenientEncoder;
-#endif
 };
 
 

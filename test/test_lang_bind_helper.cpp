@@ -9,10 +9,9 @@
 #include <realm/table_macros.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#  include <realm/commit_log.hpp>
-#endif
+#include <realm/replication.hpp>
+#include <realm/commit_log.hpp>
+
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
 #  include <unistd.h>
@@ -110,8 +109,6 @@ TEST(LangBindHelper_LinkView)
     CHECK_EQUAL(1, origin->get_link_count(0,0));
 }
 
-
-#ifdef REALM_ENABLE_REPLICATION
 
 namespace {
 
@@ -8889,7 +8886,5 @@ TEST(LangBindHelper_RollbackToInitialState2)
     sg_w.begin_write();
     sg_w.rollback();
 }
-
-#endif // REALM_ENABLE_REPLICATION
 
 #endif

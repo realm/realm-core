@@ -22,9 +22,7 @@
 
 #include <realm/link_view.hpp>
 #include <realm/column_linklist.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 
 using namespace realm;
@@ -77,10 +75,8 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     m_row_indexes.insert(link_ndx, target_row_ndx); // Throws
     m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_insert(*this, link_ndx, target_row_ndx); // Throws
-#endif
 }
 
 
@@ -90,10 +86,8 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_set(*this, link_ndx, target_row_ndx); // Throws
-#endif
 
     size_t old_target_row_ndx = do_set(link_ndx, target_row_ndx); // Throws
     if (m_origin_column.m_weak_links)
@@ -147,10 +141,8 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
     m_row_indexes.erase(old_link_ndx);
     m_row_indexes.insert(link_ndx, target_row_ndx);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_move(*this, old_link_ndx, new_link_ndx); // Throws
-#endif
 }
 
 void LinkView::swap(size_t link1_ndx, size_t link2_ndx)
@@ -169,10 +161,8 @@ void LinkView::swap(size_t link1_ndx, size_t link2_ndx)
     m_row_indexes.set(link1_ndx, m_row_indexes.get(link2_ndx));
     m_row_indexes.set(link2_ndx, target_row_ndx);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_swap(*this, link1_ndx, link2_ndx); // Throws
-#endif
 }
 
 
@@ -181,10 +171,8 @@ void LinkView::remove(size_t link_ndx)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_erase(*this, link_ndx); // Throws
-#endif
 
     size_t target_row_ndx = do_remove(link_ndx); // Throws
     if (m_origin_column.m_weak_links)
@@ -227,10 +215,8 @@ void LinkView::clear()
     if (!m_row_indexes.is_attached())
         return;
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_clear(*this); // Throws
-#endif
 
     if (m_origin_column.m_weak_links) {
         bool broken_reciprocal_backlinks = false;
@@ -301,12 +287,10 @@ void LinkView::sort(size_t column, bool ascending)
 
 void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
 {
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl()) {
         // todo, write to the replication log that we're doing a sort
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
-#endif
     Sorter predicate(columns, ascending);
     RowIndexes::sort(predicate);
 }
@@ -369,10 +353,8 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
     REALM_ASSERT_3(pos, !=, realm::not_found);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_origin_table->get_repl())
         repl->link_list_nullify(*this, pos);
-#endif
 
     m_row_indexes.erase(pos);
 
@@ -401,15 +383,11 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
 }
 
 
-#ifdef REALM_ENABLE_REPLICATION
-
 void LinkView::repl_unselect() REALM_NOEXCEPT
 {
     if (Replication* repl = get_repl())
         repl->on_link_list_destroyed(*this);
 }
-
-#endif // REALM_ENABLE_REPLICATION
 
 
 #ifdef REALM_DEBUG

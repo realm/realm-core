@@ -52,13 +52,6 @@ install_libexecdir_escaped="$(cstring_escape "$install_libexecdir")" || exit 1
 max_bpnode_size="$(get_config_param "MAX_BPNODE_SIZE")" || exit 1
 max_bpnode_size_debug="$(get_config_param "MAX_BPNODE_SIZE_DEBUG")" || exit 1
 
-enable_replication="$(get_config_param "ENABLE_REPLICATION")" || exit 1
-if [ "$enable_replication" = "yes" ]; then
-    enable_replication="1"
-else
-    enable_replication="0"
-fi
-
 enable_alloc_set_zero="$(get_config_param "ENABLE_ALLOC_SET_ZERO")" || exit 1
 if [ "$enable_alloc_set_zero" = "yes" ]; then
     enable_alloc_set_zero="1"
@@ -102,10 +95,6 @@ cat >"$target" <<EOF
 #  define REALM_MAX_BPNODE_SIZE $max_bpnode_size_debug
 #else
 #  define REALM_MAX_BPNODE_SIZE $max_bpnode_size
-#endif
-
-#if $enable_replication
-#  define REALM_ENABLE_REPLICATION 1
 #endif
 
 #if $enable_alloc_set_zero
