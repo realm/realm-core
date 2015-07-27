@@ -76,7 +76,7 @@ public:
 
     /// Draw a uniformly distributed floating point value from the half-open
     /// interval [`a`, `b`). It is an error if `b` is less than, or equal to
-    /// `b`.
+    /// `a`.
     ///
     /// \tparam T One of the fundamental floating point types.
     template<class T> T draw_float(T a, T b) REALM_NOEXCEPT;
@@ -87,7 +87,8 @@ public:
     /// Draw a uniformly distributed integer from the specified range. It is an
     /// error if `min` is greater than `max`.
     ///
-    /// \tparam T One of the fundamental integer types.
+    /// \tparam T One of the fundamental integer types. All character types are
+    /// supported.
     template<class T> T draw_int(T min, T max) REALM_NOEXCEPT;
 
     /// Same as `draw_int(lim::min(), lim::max())` where `lim` is
@@ -151,7 +152,12 @@ template<class T> inline T Random::draw_float() REALM_NOEXCEPT
 
 template<class T> inline T Random::draw_int(T min, T max) REALM_NOEXCEPT
 {
-    return std::uniform_int_distribution<T>(min, max)(m_engine);
+    // Since the standard does not require that
+    // `std::uniform_int_distribution<>` can handle character types, we need
+    // special treatment of those.
+    using U = decltype(T() + 0); // Convert character to interger type
+    U value = std::uniform_int_distribution<U>(min, max)(m_engine);
+    return T(value);
 }
 
 template<class T> inline T Random::draw_int() REALM_NOEXCEPT

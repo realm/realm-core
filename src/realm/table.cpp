@@ -2209,23 +2209,6 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
 }
 
 
-void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
-    REALM_ASSERT_3(row_ndx, <=, m_size);
-
-    ColumnTable& subtables = get_column_table(col_ndx);
-    subtables.insert(row_ndx, table);
-
-    // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_table(this, col_ndx, row_ndx); // Throws
-#endif
-}
-
-
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2240,23 +2223,6 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_table(this, col_ndx, row_ndx); // Throws
-#endif
-}
-
-
-void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Mixed);
-    REALM_ASSERT_3(row_ndx, <=, m_size);
-
-    ColumnMixed& mixed_col = get_column_mixed(col_ndx);
-    mixed_col.insert_subtable(row_ndx, t);
-
-    // FIXME: Replication is not yet able to handle copuing insertion of non-empty tables.
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
 #endif
 }
 
@@ -2469,12 +2435,13 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 
 }
 
+
 void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
-    
+
     if (is_nullable(col_ndx)) {
         auto& col = get_column_int_null(col_ndx);
         col.set(ndx, value);
@@ -2490,18 +2457,6 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 #endif
 }
 
-void Table::add_int(size_t col_ndx, int64_t value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Int);
-    bump_version();
-    get_column(col_ndx).adjust(value);
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->add_int_to_column(this, col_ndx, value); // Throws
-#endif
-}
 
 bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
@@ -2518,6 +2473,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
         return column.get(ndx) != 0;
     }
 }
+
 
 void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
 {
@@ -2541,6 +2497,7 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
 #endif
 }
 
+
 DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2556,6 +2513,7 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
         return column.get(ndx);
     }
 }
+
 
 void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 {
@@ -2579,20 +2537,6 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 #endif
 }
 
-void Table::insert_int(size_t col_ndx, size_t ndx, int64_t value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <= , m_size);
-
-    Column& column = get_column(col_ndx);
-    column.insert(ndx, value);
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_int(this, col_ndx, ndx, value); // Throws
-#endif
-}
-
 
 float Table::get_float(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
@@ -2602,6 +2546,7 @@ float Table::get_float(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     const ColumnFloat& column = get_column_float(col_ndx);
     return column.get(ndx);
 }
+
 
 void Table::set_float(size_t col_ndx, size_t ndx, float value)
 {
@@ -2618,20 +2563,6 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value)
 #endif
 }
 
-void Table::insert_float(size_t col_ndx, size_t ndx, float value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <=, m_size);
-
-    ColumnFloat& column = get_column_float(col_ndx);
-    column.insert(ndx, value);
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_float(this, col_ndx, ndx, value); // Throws
-#endif
-}
-
 
 double Table::get_double(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
@@ -2641,6 +2572,7 @@ double Table::get_double(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     const ColumnDouble& column = get_column_double(col_ndx);
     return column.get(ndx);
 }
+
 
 void Table::set_double(size_t col_ndx, size_t ndx, double value)
 {
@@ -2654,20 +2586,6 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value)
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_double(this, col_ndx, ndx, value); // Throws
-#endif
-}
-
-void Table::insert_double(size_t col_ndx, size_t ndx, double value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <= , m_size);
-
-    ColumnDouble& column = get_column_double(col_ndx);
-    column.insert(ndx, value);
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_double(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -2690,6 +2608,7 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
     return sd;
 }
+
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 {
@@ -2719,33 +2638,6 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 #endif
 }
 
-void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
-{
-    if (REALM_UNLIKELY(value.size() > max_string_size))
-        throw LogicError(LogicError::string_too_big);
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <=, m_size);
-
-    if (!is_nullable(col_ndx) && value.is_null())
-        throw LogicError(LogicError::column_not_nullable);
-
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        AdaptiveStringColumn& column = get_column_string(col_ndx);
-        column.insert(ndx, value);
-    }
-    else {
-        REALM_ASSERT_3(type, ==, col_type_StringEnum);
-        ColumnStringEnum& column = get_column_string_enum(col_ndx);
-        column.insert(ndx, value);
-    }
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_string(this, col_ndx, ndx, value); // Throws
-#endif
-}
-
 
 BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
@@ -2755,6 +2647,7 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     const ColumnBinary& column = get_column_binary(col_ndx);
     return column.get(ndx);
 }
+
 
 void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 {
@@ -2772,22 +2665,6 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_binary(this, col_ndx, ndx, value); // Throws
-#endif
-}
-
-void Table::insert_binary(size_t col_ndx, size_t ndx, BinaryData value)
-{
-    if (REALM_UNLIKELY(value.size() > max_binary_size))
-        throw LogicError(LogicError::binary_too_big);
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <=, m_size);
-
-    ColumnBinary& column = get_column_binary(col_ndx);
-    column.insert(ndx, value);
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_binary(this, col_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -2826,6 +2703,7 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     return Mixed(int64_t(0));
 }
 
+
 DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
@@ -2834,6 +2712,7 @@ DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     const ColumnMixed& column = get_column_mixed(col_ndx);
     return column.get_type(ndx);
 }
+
 
 void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 {
@@ -2886,56 +2765,6 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 #endif
 }
 
-void Table::insert_mixed(size_t col_ndx, size_t ndx, Mixed value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <=, m_size);
-
-    ColumnMixed& column = get_column_mixed(col_ndx);
-    DataType type = value.get_type();
-
-    switch (type) {
-        case type_Int:
-            column.insert_int(ndx, value.get_int());
-            break;
-        case type_Bool:
-            column.insert_bool(ndx, value.get_bool());
-            break;
-        case type_DateTime:
-            column.insert_datetime(ndx, value.get_datetime());
-            break;
-        case type_Float:
-            column.insert_float(ndx, value.get_float());
-            break;
-        case type_Double:
-            column.insert_double(ndx, value.get_double());
-            break;
-        case type_String:
-            if (REALM_UNLIKELY(value.get_string().size() > max_string_size))
-                throw LogicError(LogicError::string_too_big);
-            column.insert_string(ndx, value.get_string());
-            break;
-        case type_Binary:
-            if (REALM_UNLIKELY(value.get_binary().size() > max_binary_size))
-                throw LogicError(LogicError::binary_too_big);
-            column.insert_binary(ndx, value.get_binary());
-            break;
-        case type_Table:
-            column.insert_subtable(ndx, 0);
-            break;
-        case type_Mixed:
-        case type_Link:
-        case type_LinkList:
-            REALM_ASSERT(false);
-            break;
-    }
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_mixed(this, col_ndx, ndx, value); // Throws
-#endif
-}
-
 
 size_t Table::get_link(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
@@ -2944,11 +2773,13 @@ size_t Table::get_link(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
     return column.get_link(row_ndx);
 }
 
+
 TableRef Table::get_link_target(size_t col_ndx) REALM_NOEXCEPT
 {
     ColumnLinkBase& column = get_column_link_base(col_ndx);
     return column.get_target_table().get_table_ref();
 }
+
 
 void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
@@ -3002,43 +2833,13 @@ size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 }
 
 
-void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
-{
-    REALM_ASSERT_3(row_ndx, ==, m_size); // can only append to unorded tables
-
-    ColumnLink& column = get_column_link(col_ndx);
-    column.insert_link(row_ndx, target_row_ndx);
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl()) {
-        size_t link = 1 + target_row_ndx;
-        repl->insert_link(this, col_ndx, row_ndx, link); // Throws
-    }
-#endif
-}
-
-
-void Table::insert_linklist(size_t col_ndx, size_t row_ndx)
-{
-    REALM_ASSERT_3(row_ndx, ==, m_size); // can only append to unorded tables
-
-    ColumnLinkList& column = get_column_link_list(col_ndx);
-    int_fast64_t value = 0; // Null ref means empty list
-    size_t num_rows_to_insert = 1;
-    column.insert(row_ndx, value, num_rows_to_insert);
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_link_list(this, col_ndx, row_ndx); // Throws
-#endif
-}
-
 ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
     const ColumnLinkList& column = get_column_link_list(col_ndx);
     return column.get(row_ndx);
 }
+
 
 LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 {
@@ -3049,12 +2850,14 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
     return column.get(row_ndx);
 }
 
+
 bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
     const ColumnLinkList& column = get_column_link_list(col_ndx);
     return !column.has_links(row_ndx);
 }
+
 
 size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
@@ -3063,11 +2866,13 @@ size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEP
     return column.get_link_count(row_ndx);
 }
 
+
 bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
     auto& col = get_column_base(col_ndx);
     return col.is_null(row_ndx);
 }
+
 
 void Table::set_null(size_t col_ndx, size_t row_ndx)
 {
@@ -3078,37 +2883,6 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_null(this, col_ndx, row_ndx); // Throws
-#endif
-}
-
-
-void Table::insert_done()
-{
-    bump_version();
-
-    size_t row_ndx = m_size;
-    size_t num_rows = 1;
-    adj_row_acc_insert_rows(row_ndx, num_rows);
-
-    ++m_size;
-
-    // If the table has backlinks, the columns containing them will
-    // not be exposed to the users. So we have to manually extend them
-    // after inserts. Note that you can only have backlinks on unordered
-    // tables, so inserts will only be used for appends.
-    if (m_spec.has_backlinks()) {
-        size_t backlinks_start = m_spec.get_public_column_count();
-        size_t column_count = m_spec.get_column_count();
-
-        for (size_t i = backlinks_start; i < column_count; ++i) {
-            ColumnBackLink& column = get_column_backlink(i);
-            column.add_row();
-        }
-    }
-
-#ifdef REALM_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->row_insert_complete(this); // Throws
 #endif
 }
 

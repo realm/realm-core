@@ -6,7 +6,10 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Support for the following deprecated operations on Table has been removed:
+  insert_int, insert_string, etc., insert_done, and add_int. To insert a value,
+  one must now call insert_empty_row, then set the appropriate values for each
+  column.
 
 ### Enhancements:
 
@@ -58,28 +61,16 @@
 * On some subclasses of `ColumnBase` a new non-virtual `erase(row_ndx, is_last)`
   was added for practical reasons; an intended overload of `erase(row_ndx)` for
   when you know whether the specified row index is the last one.
+* Slight performance improvements in `Array::FindGTE()`.
+* Renamed `Array::FindGTE()` to `Array::find_gte()`.
 
 ----------------------------------------------
 
 # 0.91.2 Release notes
 
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * Added support for building for watchOS.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 

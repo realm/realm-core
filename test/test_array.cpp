@@ -1424,4 +1424,124 @@ TEST(Array_Count)
     a.destroy();
 }
 
+TEST(Array_FindGTE_NoIndirection)
+{
+    // Zeroes only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+
+        CHECK_EQUAL(c.find_gte(1, 0, nullptr), not_found);
+        CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
+        CHECK_EQUAL(c.find_gte(0, 5, nullptr), 5);
+
+        c.destroy();
+    }
+
+    // Booleans only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(1);
+        c.add(1);
+
+        CHECK_EQUAL(c.find_gte(2, 0, nullptr), not_found);
+        CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
+        CHECK_EQUAL(c.find_gte(0, 2, nullptr), 2);
+        CHECK_EQUAL(c.find_gte(1, 0, nullptr), 2);
+        CHECK_EQUAL(c.find_gte(1, 3, nullptr), 3);
+
+        c.destroy();
+    }
+
+    // Random values
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(-10293);
+        c.add(0);
+        c.add(1);
+        c.add(11111);
+        c.add(2819283);
+
+        CHECK_EQUAL(c.find_gte(3333333, 0, nullptr), not_found);
+        CHECK_EQUAL(c.find_gte(10, 1, nullptr), 3);
+        CHECK_EQUAL(c.find_gte(-20000, 0, nullptr), 0);
+        CHECK_EQUAL(c.find_gte(-20000, 3, nullptr), 3);
+
+        c.destroy();
+    }
+}
+
+TEST(Array_FindGTE_WithIndirection)
+{
+    Array lut(Allocator::get_default());
+    lut.create(Array::type_Normal);
+
+    // This indirection needs to result in a sorted Array c (below).
+    lut.add(4);
+    lut.add(2);
+    lut.add(0);
+    lut.add(5);
+    lut.add(3);
+    lut.add(1);
+    lut.add(10000);
+
+    // Zeroes only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+
+        CHECK_EQUAL(c.find_gte(1, 0, &lut), not_found);
+        CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found); // array only has 5 entries, lut has 6.
+        CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
+        CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
+
+        c.destroy();
+    }
+
+    // Booleans only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        // No need to be sorted, the lookup table does the sorting for us
+        c.add(0);
+        c.add(1);
+        c.add(0);
+        c.add(1);
+        c.add(0);
+        c.add(1);
+
+        CHECK_EQUAL(c.find_gte(3, 0, &lut), not_found);
+        CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found);
+        CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
+        CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
+
+        c.destroy();
+    }
+
+    lut.destroy();
+}
+
 #endif // TEST_ARRAY

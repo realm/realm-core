@@ -843,6 +843,17 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
     }
 }
 
+namespace {
+
+void add_int(Table& table, size_t col_ndx, int_fast64_t diff)
+{
+    for (size_t i = 0; i < table.size(); ++i) {
+        table.set_int(col_ndx, i, table.get_int(col_ndx, i) + diff);
+    }
+}
+
+} // anonymous namespace
+
 
 TEST(Shared_ManyReaders)
 {
@@ -886,8 +897,8 @@ TEST(Shared_ManyReaders)
             wt.get_group().Verify();
             TableRef test_1 = wt.get_or_add_table("test_1");
             test_1->add_column(type_Int, "i");
-            test_1->insert_int(0,0,0);
-            test_1->insert_done();
+            test_1->insert_empty_row(0);
+            test_1->set_int(0,0,0);
             TableRef test_2 = wt.get_or_add_table("test_2");
             test_2->add_column(type_Binary, "b");
             wt.commit();
@@ -919,10 +930,10 @@ TEST(Shared_ManyReaders)
                 WriteTransaction wt(root_sg);
                 wt.get_group().Verify();
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,1);
+                add_int(*test_1, 0, 1);
                 TableRef test_2 = wt.get_table("test_2");
-                test_2->insert_binary(0, 0, BinaryData(chunk_1));
-                test_2->insert_done();
+                test_2->insert_empty_row(0);
+                test_2->set_binary(0, 0, BinaryData(chunk_1));
                 wt.commit();
             }
             {
@@ -930,8 +941,8 @@ TEST(Shared_ManyReaders)
                 wt.get_group().Verify();
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
-                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
-                    test_2->insert_done();
+                    test_2->insert_empty_row(test_2->size());
+                    test_2->set_binary(0, test_2->size() - 1, BinaryData(chunk_2));
                 }
                 wt.commit();
             }
@@ -961,7 +972,7 @@ TEST(Shared_ManyReaders)
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,2);
+                add_int(*test_1, 0, 2);
                 wt.commit();
             }
             {
@@ -1006,10 +1017,10 @@ TEST(Shared_ManyReaders)
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,1);
+                add_int(*test_1, 0, 1);
                 TableRef test_2 = wt.get_table("test_2");
-                test_2->insert_binary(0, 0, BinaryData(chunk_1));
-                test_2->insert_done();
+                test_2->insert_empty_row(0);
+                test_2->set_binary(0, 0, BinaryData(chunk_1));
                 wt.commit();
             }
             {
@@ -1019,8 +1030,8 @@ TEST(Shared_ManyReaders)
 #endif
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
-                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
-                    test_2->insert_done();
+                    test_2->insert_empty_row(test_2->size());
+                    test_2->set_binary(0, test_2->size() - 1, BinaryData(chunk_2));
                 }
                 wt.commit();
             }
@@ -1034,7 +1045,7 @@ TEST(Shared_ManyReaders)
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,2);
+                add_int(*test_1, 0, 2);
                 wt.commit();
             }
             {
@@ -1284,10 +1295,10 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             TableRef table = wt.add_table("beta");
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
-                table->insert_int(0,0,0);
-                table->insert_done();
+                table->insert_empty_row(0);
+                table->set_int(0,0,0);
             }
-            table->add_int(0,1);
+            add_int(*table, 0, 1);
             wt.commit();
         }
     }
@@ -1363,9 +1374,8 @@ TEST(Shared_FormerErrorCase1)
         {
             TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
-            table2->insert_int(0, 0, 0);
-            table2->insert_subtable(1, 0);
-            table2->insert_done();
+            table2->insert_empty_row(0);
+            table2->set_int(0, 0, 0);
         }
         {
             TableRef table = wt.get_table("my_table");

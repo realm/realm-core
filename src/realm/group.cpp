@@ -1229,11 +1229,6 @@ public:
         return true;
     }
 
-    bool add_int_to_column(size_t, int_fast64_t) REALM_NOEXCEPT
-    {
-        return true; // No-op
-    }
-
     bool optimize_table() REALM_NOEXCEPT
     {
         return true; // No-op
