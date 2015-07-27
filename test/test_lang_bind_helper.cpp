@@ -6411,7 +6411,7 @@ public:
     bool set_link_type(size_t, LinkType) { return false; }
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
     bool erase_rows(size_t, size_t, size_t, bool) { return false; }
-    bool swap(size_t, size_t) { return false; }
+    bool swap_rows(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }

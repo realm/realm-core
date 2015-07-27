@@ -68,7 +68,7 @@ public:
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
-    void swap(std::size_t row_ndx_1, std::size_t row_ndx_2) override;
+    void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) override;
     void clear();
 
     std::size_t count(StringData value) const;
@@ -187,7 +187,7 @@ private:
 
     void do_erase(std::size_t row_ndx, bool is_last);
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
-    void do_swap(std::size_t row_ndx_1, std::size_t row_ndx_2);
+    void do_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2);
     void do_clear();
 
     /// Root must be a leaf. Upgrades the root leaf as
@@ -276,9 +276,9 @@ inline void AdaptiveStringColumn::move_last_over(std::size_t row_ndx)
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
-inline void AdaptiveStringColumn::swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+inline void AdaptiveStringColumn::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
 {
-    do_swap(row_ndx_1, row_ndx_2); // Throws
+    do_swap_rows(row_ndx_1, row_ndx_2); // Throws
 }
 
 inline void AdaptiveStringColumn::clear()

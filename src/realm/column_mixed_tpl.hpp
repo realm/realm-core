@@ -377,9 +377,9 @@ inline void ColumnMixed::move_last_over(std::size_t row_ndx)
     do_move_last_over(row_ndx, prior_num_rows); // Throws
 }
 
-inline void ColumnMixed::swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+inline void ColumnMixed::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
 {
-    do_swap(row_ndx_1, row_ndx_2);
+    do_swap_rows(row_ndx_1, row_ndx_2);
 }
 
 inline void ColumnMixed::clear()

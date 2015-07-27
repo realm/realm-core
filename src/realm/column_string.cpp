@@ -595,7 +595,7 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     Array::erase_bptree_elem(m_array.get(), realm::npos, erase_leaf_elem); // Throws
 }
 
-void AdaptiveStringColumn::do_swap(size_t row_ndx_1, size_t row_ndx_2)
+void AdaptiveStringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     REALM_ASSERT_3(row_ndx_1, <=, size());
     REALM_ASSERT_3(row_ndx_2, <=, size());

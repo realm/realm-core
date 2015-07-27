@@ -133,7 +133,7 @@ public:
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
     /// Swap the elements at the specified indices.
-    virtual void swap(std::size_t row_ndx_1, std::size_t row_ndx_2) = 0;
+    virtual void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) = 0;
 
     virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
 
@@ -225,7 +225,7 @@ public:
     /// See Table::adj_acc_move_over()
     virtual void adj_acc_move_over(std::size_t from_row_ndx,
                                    std::size_t to_row_ndx) REALM_NOEXCEPT;
-    virtual void adj_acc_swap(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT;
+    virtual void adj_acc_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT;
     virtual void adj_acc_clear_root_table() REALM_NOEXCEPT;
 
     enum {
@@ -522,7 +522,7 @@ public:
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
-    void swap(std::size_t, std::size_t) override;
+    void swap_rows(std::size_t, std::size_t) override;
     void clear(std::size_t, bool) override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
@@ -653,7 +653,7 @@ inline void ColumnBase::adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCE
     // Noop
 }
 
-inline void ColumnBase::adj_acc_swap(std::size_t, std::size_t) REALM_NOEXCEPT
+inline void ColumnBase::adj_acc_swap_rows(std::size_t, std::size_t) REALM_NOEXCEPT
 {
     // Noop
 }
@@ -1197,7 +1197,7 @@ void TColumn<T,N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 }
 
 template <class T, bool N>
-void TColumn<T,N>::swap(std::size_t row_ndx_1, std::size_t row_ndx_2)
+void TColumn<T,N>::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
 {
     REALM_ASSERT_3(row_ndx_1, <, size());
     REALM_ASSERT_3(row_ndx_2, <, size());

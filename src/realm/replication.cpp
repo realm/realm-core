@@ -243,14 +243,14 @@ public:
         return true;
     }
 
-    bool swap(size_t row_ndx_1, size_t row_ndx_2)
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
         if (REALM_UNLIKELY(row_ndx_1 >= m_table->size() || row_ndx_2 >= m_table->size()))
             return false;
         using tf = _impl::TableFriend;
-        tf::do_swap(*m_table, row_ndx_1, row_ndx_2);
+        tf::do_swap_rows(*m_table, row_ndx_1, row_ndx_2);
         return true;
     }
 

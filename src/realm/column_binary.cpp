@@ -324,7 +324,7 @@ void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     erase(last_row_ndx, is_last); // Throws
 }
 
-void ColumnBinary::swap(size_t row_ndx_1, size_t row_ndx_2)
+void ColumnBinary::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     REALM_ASSERT_3(row_ndx_1, <=, size());
     REALM_ASSERT_3(row_ndx_2, <=, size());

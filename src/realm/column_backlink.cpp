@@ -282,7 +282,7 @@ void ColumnBackLink::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 }
 
 
-void ColumnBackLink::swap(size_t row_ndx_1, size_t row_ndx_2)
+void ColumnBackLink::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     bool do_destroy = false;
 
@@ -294,7 +294,7 @@ void ColumnBackLink::swap(size_t row_ndx_1, size_t row_ndx_2)
         m_origin_column->do_swap_link(origin_row_ndx, row_ndx_1, row_ndx_2);
     });
 
-    Column::swap(row_ndx_1, row_ndx_2);
+    Column::swap_rows(row_ndx_1, row_ndx_2);
 }
 
 

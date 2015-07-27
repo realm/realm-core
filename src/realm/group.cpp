@@ -1038,14 +1038,14 @@ public:
         return true;
     }
 
-    bool swap(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
         if (REALM_UNLIKELY(row_ndx_1 >= m_table->size() || row_ndx_2 >= m_table->size()))
             return false;
         using tf = _impl::TableFriend;
-        tf::adj_acc_swap(*m_table, row_ndx_1, row_ndx_2);
+        tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);
         return true;
     }
 
