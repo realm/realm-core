@@ -175,7 +175,7 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t target_row_ndx)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef REALM_DEBUG
@@ -195,28 +195,35 @@ public:
         return false;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows, std::size_t, bool)
-    {
-        if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(row_ndx <= m_table->size())) {
-#ifdef REALM_DEBUG
-                if (m_log)
-                    *m_log << "table->insert_empty_row("<<row_ndx<<", "<<num_rows<<")\n";
-#endif
-                m_table->insert_empty_row(row_ndx, num_rows); // Throws
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool erase_rows(size_t row_ndx, size_t num_rows, std::size_t last_row_ndx, bool unordered)
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+                           bool unordered)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
-        if (REALM_UNLIKELY(row_ndx > last_row_ndx || last_row_ndx+1 != m_table->size()))
+        if (REALM_UNLIKELY(row_ndx > prior_num_rows))
             return false;
-        if (REALM_UNLIKELY(num_rows != 1))
+        if (REALM_UNLIKELY(prior_num_rows != m_table->size()))
+            return false;
+        if (REALM_UNLIKELY(unordered && row_ndx != prior_num_rows))
+            return false;
+#ifdef REALM_DEBUG
+        if (m_log)
+            *m_log << "table->insert_empty_row("<<row_ndx<<", "<<num_rows_to_insert<<")\n";
+#endif
+        m_table->insert_empty_row(row_ndx, num_rows_to_insert); // Throws
+        return true;
+    }
+
+    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                    bool unordered)
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(row_ndx >= prior_num_rows))
+            return false;
+        if (REALM_UNLIKELY(num_rows_to_erase != 1))
+            return false;
+        if (REALM_UNLIKELY(prior_num_rows != m_table->size()))
             return false;
         typedef _impl::TableFriend tf;
         if (unordered) {

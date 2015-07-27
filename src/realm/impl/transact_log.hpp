@@ -59,31 +59,31 @@ enum Instruction {
     instr_SetLink               = 14,
     instr_NullifyLink           = 15, // Set link to null due to target being erased
     instr_SetNull               = 16,
-    instr_InsertEmptyRows       = 29,
-    instr_EraseRows             = 30, // Remove (multiple) rows
-    instr_ClearTable            = 32, // Remove all rows in selected table
-    instr_OptimizeTable         = 33,
-    instr_SelectDescriptor      = 34, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 35, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 36, // do, but for a link-type column
-    instr_InsertNullableColumn  = 37, // Insert nullable column
-    instr_EraseColumn           = 38, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 39, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 40, // Rename column in selected descriptor
-    instr_AddSearchIndex        = 41, // Add a search index to a column
-    instr_RemoveSearchIndex     = 42, // Remove a search index from a column
-    instr_AddPrimaryKey         = 43, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 44, // Remove primary key from a table
-    instr_SetLinkType           = 45, // Strong/weak
-    instr_SelectLinkList        = 46,
-    instr_LinkListSet           = 47, // Assign to link list entry
-    instr_LinkListInsert        = 48, // Insert entry into link list
-    instr_LinkListMove          = 49, // Move an entry within a link list
-    instr_LinkListSwap          = 50, // Swap two entries within a link list
-    instr_LinkListErase         = 51, // Remove an entry from a link list
-    instr_LinkListNullify       = 52, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear         = 53, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 54, // Assign to link list entry
+    instr_InsertEmptyRows       = 17,
+    instr_EraseRows             = 18, // Remove (multiple) rows
+    instr_ClearTable            = 19, // Remove all rows in selected table
+    instr_OptimizeTable         = 20,
+    instr_SelectDescriptor      = 21, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 22, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 23, // do, but for a link-type column
+    instr_InsertNullableColumn  = 24, // Insert nullable column
+    instr_EraseColumn           = 25, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 26, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 27, // Rename column in selected descriptor
+    instr_AddSearchIndex        = 28, // Add a search index to a column
+    instr_RemoveSearchIndex     = 29, // Remove a search index from a column
+    instr_AddPrimaryKey         = 30, // Add a primary key to a table
+    instr_RemovePrimaryKey      = 31, // Remove primary key from a table
+    instr_SetLinkType           = 32, // Strong/weak
+    instr_SelectLinkList        = 33,
+    instr_LinkListSet           = 34, // Assign to link list entry
+    instr_LinkListInsert        = 35, // Insert entry into link list
+    instr_LinkListMove          = 36, // Move an entry within a link list
+    instr_LinkListSwap          = 37, // Swap two entries within a link list
+    instr_LinkListErase         = 38, // Remove an entry from a link list
+    instr_LinkListNullify       = 39, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 40, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 41, // Assign to link list entry
 };
 
 
@@ -135,21 +135,9 @@ public:
     bool rename_group_level_table(std::size_t, StringData) { return true; }
 
     // Must have table selected:
-    bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool) { return true; }
-    bool erase_rows(std::size_t, std::size_t, std::size_t, bool) { return true; }
+    bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
+    bool erase_rows(size_t, size_t, size_t, bool) { return true; }
     bool clear_table() { return true; }
-    bool insert_int(std::size_t, std::size_t, std::size_t, int_fast64_t) { return true; }
-    bool insert_bool(std::size_t, std::size_t, std::size_t, bool) { return true; }
-    bool insert_float(std::size_t, std::size_t, std::size_t, float) { return true; }
-    bool insert_double(std::size_t, std::size_t, std::size_t, double) { return true; }
-    bool insert_string(std::size_t, std::size_t, std::size_t, StringData) { return true; }
-    bool insert_binary(std::size_t, std::size_t, std::size_t, BinaryData) { return true; }
-    bool insert_date_time(std::size_t, std::size_t, std::size_t, DateTime) { return true; }
-    bool insert_table(std::size_t, std::size_t, std::size_t) { return true; }
-    bool insert_mixed(std::size_t, std::size_t, std::size_t, const Mixed&) { return true; }
-    bool insert_link(std::size_t, std::size_t, std::size_t, std::size_t) { return true; }
-    bool insert_link_list(std::size_t, std::size_t, std::size_t) { return true; }
-    bool row_insert_complete() { return true; }
     bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
     bool set_bool(std::size_t, std::size_t, bool) { return true; }
     bool set_float(std::size_t, std::size_t, float) { return true; }
@@ -162,7 +150,6 @@ public:
     bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
     bool set_null(std::size_t, std::size_t) { return true; }
     bool nullify_link(std::size_t, std::size_t) { return true; }
-    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
     bool optimize_table() { return true; };
 
     // Must have descriptor selected:
@@ -190,6 +177,8 @@ public:
 };
 
 
+/// See TransactLogConvenientEncoder for information about the meaning of the
+/// arguments of each of the functions in this class.
 class TransactLogEncoder {
 public:
     /// The following methods are also those that TransactLogParser expects
@@ -203,9 +192,11 @@ public:
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables);
     bool rename_group_level_table(std::size_t table_ndx, StringData new_name);
 
-    // Must have table selected:
-    bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered);
-    bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered);
+    /// Must have table selected.
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+                           bool unordered);
+    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                    bool unordered);
     bool clear_table();
     bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t);
     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool);
@@ -321,11 +312,16 @@ public:
     void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_link_list(const LinkView&, const Column& values);
 
-    void nullify_link(const Table*, std::size_t col_ndx, std::size_t ndx);
+    /// \param prior_num_rows The number of rows in the table prior to the
+    /// modification.
+    void insert_empty_rows(const Table*, size_t row_ndx, size_t num_rows_to_insert,
+                           size_t prior_num_rows);
 
-    void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
-    void erase_row(const Table*, std::size_t row_ndx, bool move_last_over);
-    void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
+    /// \param prior_num_rows The number of rows in the table prior to the
+    /// modification.
+    void erase_rows(const Table*, size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                    bool is_move_last_over);
+
     void add_search_index(const Table*, std::size_t col_ndx);
     void remove_search_index(const Table*, std::size_t col_ndx);
     void add_primary_key(const Table*, std::size_t col_ndx);
@@ -337,10 +333,23 @@ public:
     void link_list_set(const LinkView&, std::size_t link_ndx, std::size_t value);
     void link_list_insert(const LinkView&, std::size_t link_ndx, std::size_t value);
     void link_list_move(const LinkView&, std::size_t old_link_ndx, std::size_t new_link_ndx);
-    void link_list_swap(const LinkView&, std::size_t link1_ndx, std::size_t link2_ndx);
+    void link_list_swap(const LinkView&, std::size_t link_ndx_1, std::size_t link_ndx_2);
     void link_list_erase(const LinkView&, std::size_t link_ndx);
-    void link_list_nullify(const LinkView&, std::size_t link_ndx);
     void link_list_clear(const LinkView&);
+
+    //@{
+
+    /// Implicit nullifications due to removal of target row. This is redundant
+    /// information from the point of view of replication, as the removal of the
+    /// target row will reproduce the implicit nullifications in the target
+    /// Realm anyway. The purpose of this instruction is to allow observers
+    /// (reactor pattern) to be explicitly notified about the implicit
+    /// nullifications.
+
+    void nullify_link(const Table*, std::size_t col_ndx, std::size_t ndx);
+    void link_list_nullify(const LinkView&, std::size_t link_ndx);
+
+    //@}
 
     void on_table_destroyed(const Table*) REALM_NOEXCEPT;
     void on_spec_destroyed(const Spec*) REALM_NOEXCEPT;
@@ -1040,36 +1049,41 @@ inline void TransactLogConvenientEncoder::nullify_link(const Table* t, std::size
     m_encoder.nullify_link(col_ndx, ndx); // Throws
 }
 
-
-inline bool TransactLogEncoder::insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+inline bool TransactLogEncoder::insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
+                                                  size_t prior_num_rows, bool unordered)
 {
-    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows, tbl_sz, unordered)); // Throws
+    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows_to_insert, prior_num_rows,
+                                                  unordered)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, size_t row_ndx,
+                                                            size_t num_rows_to_insert,
+                                                            size_t prior_num_rows)
+{
+    select_table(t); // Throws
+    bool unordered = false;
+    m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows,
+                                unordered); // Throws
+}
+
+inline bool TransactLogEncoder::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+                                           size_t prior_num_rows, bool unordered)
+{
+    simple_cmd(instr_EraseRows, util::tuple(row_ndx, num_rows_to_erase, prior_num_rows,
+                                            unordered)); // Throws
     return true;
 }
 
 
-inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, std::size_t row_ndx,
-                                           std::size_t num_rows)
+inline void TransactLogConvenientEncoder::erase_rows(const Table* t, size_t row_ndx,
+                                                     size_t num_rows_to_erase,
+                                                     size_t prior_num_rows,
+                                                     bool is_move_last_over)
 {
     select_table(t); // Throws
-    // default to unordered, if we are inserting at the end:
-    bool unordered = row_ndx == t->size()-num_rows;
-    m_encoder.insert_empty_rows(row_ndx, num_rows, t->size(), unordered); // Throws
-}
-
-inline bool TransactLogEncoder::erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
-{
-    std::size_t last_row_ndx = tbl_sz - 1;
-    simple_cmd(instr_EraseRows, util::tuple(row_ndx, num_rows, last_row_ndx, unordered));
-    return true;
-}
-
-
-inline void TransactLogConvenientEncoder::erase_row(const Table* t, std::size_t row_ndx, bool move_last_over)
-{
-    select_table(t); // Throws
-    std::size_t num_rows = 1; // FIXME: might want to make this parameter externally visible?
-    m_encoder.erase_rows(row_ndx, num_rows, t->size(), move_last_over); // Throws
+    bool unordered = is_move_last_over;
+    m_encoder.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, unordered); // Throws
 }
 
 inline bool TransactLogEncoder::add_search_index(std::size_t col_ndx)
@@ -1411,9 +1425,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetLink: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t value = read_int<std::size_t>(); // Throws
             // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
-            std::size_t value = read_int<std::size_t>() - 1; // Throws
-            if (!handler.set_link(col_ndx, row_ndx, value)) // Throws
+            std::size_t target_row_ndx = size_t(value - 1);
+            if (!handler.set_link(col_ndx, row_ndx, target_row_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -1432,20 +1447,22 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_InsertEmptyRows: {
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t num_rows = read_int<std::size_t>(); // Throws
-            std::size_t tbl_sz = read_int<std::size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t num_rows_to_insert = read_int<size_t>(); // Throws
+            size_t prior_num_rows = read_int<size_t>(); // Throws
             bool unordered = read_int<bool>(); // Throws
-            if (!handler.insert_empty_rows(row_ndx, num_rows, tbl_sz, unordered)) // Throws
+            if (!handler.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows,
+                                           unordered)) // Throws
                 parser_error();
             return;
         }
         case instr_EraseRows: {
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t num_rows = read_int<std::size_t>(); // Throws
-            std::size_t last_row_ndx = read_int<std::size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t num_rows_to_erase = read_int<size_t>(); // Throws
+            size_t prior_num_rows = read_int<size_t>(); // Throws
             bool unordered = read_int<bool>(); // Throws
-            if (!handler.erase_rows(row_ndx, num_rows, last_row_ndx, unordered)) // Throws
+            if (!handler.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+                                    unordered)) // Throws
                 parser_error();
             return;
         }
@@ -1913,16 +1930,24 @@ public:
         return true; // No-op
     }
 
-    bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+                           bool unordered)
     {
-        m_encoder.erase_rows(idx, num_rows, tbl_sz, unordered);
+        size_t num_rows_to_erase = num_rows_to_insert;
+        size_t prior_num_rows_2 = prior_num_rows + num_rows_to_insert;
+        m_encoder.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows_2, unordered); // Throws
         append_instruction();
         return true;
     }
 
-    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t last_row_ndx, bool unordered)
+    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                    bool unordered)
     {
-        m_encoder.insert_empty_rows(idx, num_rows, last_row_ndx + 1, unordered);
+        size_t num_rows_to_insert = num_rows_to_erase;
+        // Number of rows in table after removal, but before inverse insertion
+        size_t prior_num_rows_2 = prior_num_rows - num_rows_to_erase;
+        m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows_2,
+                                    unordered); // Throws
         append_instruction();
         return true;
     }
@@ -2006,7 +2031,7 @@ public:
 
     bool clear_table()
     {
-        m_encoder.insert_empty_rows(0, 0, 0, true);
+        m_encoder.insert_empty_rows(0, 0, 0, true); // FIXME: Explain what is going on here (Finn).
         append_instruction();
         return true;
     }
@@ -2128,7 +2153,8 @@ public:
 
     bool nullify_link(size_t col_ndx, size_t row_ndx)
     {
-        m_encoder.set_link(col_ndx, row_ndx, 0);
+        size_t value = 0;
+        m_encoder.set_link(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }

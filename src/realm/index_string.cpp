@@ -622,10 +622,11 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
                 sub.set_parent(m_array.get(), pos_refs);
                 size_t r = sub.find_first(row_ndx);
                 REALM_ASSERT(r != not_found);
-                bool is_last = r == sub.size() - 1;
+                size_t sub_size = sub.size(); // Slow
+                bool is_last = r == sub_size - 1;
                 sub.erase(r, is_last);
 
-                if (sub.size() == 0) {
+                if (sub_size == 1) {
                     values.erase(pos);
                     m_array->erase(pos_refs);
                     sub.destroy();

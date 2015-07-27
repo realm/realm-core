@@ -133,9 +133,9 @@ public:
 
     bool is_string_col() const REALM_NOEXCEPT override;
 
-    void insert(std::size_t, std::size_t, bool) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
@@ -345,22 +345,39 @@ inline bool AdaptiveStringColumn::is_string_col() const REALM_NOEXCEPT
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+inline void AdaptiveStringColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
+                                              size_t prior_num_rows)
 {
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx <= prior_num_rows);
+
     StringData value = m_nullable ? realm::null() : StringData("");
-    do_insert(row_ndx, value, num_rows, is_append); // Throws
+    bool is_append = (row_ndx == prior_num_rows);
+    do_insert(row_ndx, value, num_rows_to_insert, is_append); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void AdaptiveStringColumn::erase(std::size_t row_ndx, bool is_last)
+inline void AdaptiveStringColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+                                             size_t prior_num_rows, bool)
 {
-    do_erase(row_ndx, is_last); // Throws
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+
+    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    for (size_t i = num_rows_to_erase; i > 0; --i) {
+        size_t row_ndx_2 = row_ndx + i - 1;
+        do_erase(row_ndx_2, is_last); // Throws
+    }
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void AdaptiveStringColumn::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
-                                                 bool)
+inline void AdaptiveStringColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
 {
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx < prior_num_rows);
+
+    size_t last_row_ndx = prior_num_rows - 1;
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 

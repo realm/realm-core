@@ -278,7 +278,7 @@ void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values
     CHECK_EQUAL(values[4], c.get(4));
 
     // Delete first
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(4, c.size());
     CHECK_EQUAL(values[1], c.get(0));
     CHECK_EQUAL(values[2], c.get(1));
@@ -286,25 +286,25 @@ void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values
     CHECK_EQUAL(values[4], c.get(3));
 
     // Delete middle
-    c.erase(2, 2 == c.size()-1);
+    c.erase(2);
     CHECK_EQUAL(3, c.size());
     CHECK_EQUAL(values[1], c.get(0));
     CHECK_EQUAL(values[2], c.get(1));
     CHECK_EQUAL(values[4], c.get(2));
 
     // Delete last
-    c.erase(2, 2 == c.size()-1);
+    c.erase(2);
     CHECK_EQUAL(2, c.size());
     CHECK_EQUAL(values[1], c.get(0));
     CHECK_EQUAL(values[2], c.get(1));
 
     // Delete single
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(1, c.size());
     CHECK_EQUAL(values[2], c.get(0));
 
     // Delete all
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
     CHECK_EQUAL(0, c.size());
 
     c.destroy();

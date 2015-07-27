@@ -994,7 +994,7 @@ TEST(Shared_ManyReaders)
         // Initiate 6*N extra read transactionss with further progressive changes
         for (int i = 2*N; i < 8*N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
             read_transactions[i]->get_group().Verify();
 #endif
             {
@@ -1013,7 +1013,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
@@ -1025,7 +1025,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 wt.get_group().Verify();
 #endif
                 TableRef test_2 = wt.get_table("test_2");
@@ -1041,7 +1041,7 @@ TEST(Shared_ManyReaders)
         for (int i = 1*N; i < 8*N; ++i) {
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
@@ -1069,7 +1069,7 @@ TEST(Shared_ManyReaders)
         for (int i=0; i<8*N; ++i) {
             {
                 ReadTransaction rt(*shared_groups[i]);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 rt.get_group().Verify();
 #endif
                 ConstTableRef test_1 = rt.get_table("test_1");
@@ -1091,7 +1091,7 @@ TEST(Shared_ManyReaders)
         {
             SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
             ReadTransaction rt(sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
             rt.get_group().Verify();
 #endif
             ConstTableRef test_1 = rt.get_table("test_1");

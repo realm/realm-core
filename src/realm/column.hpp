@@ -95,10 +95,33 @@ public:
     /// \throw LogicError Thrown if this column is not nullable.
     virtual void set_null(std::size_t row_ndx);
 
-    /// Insert the specified number of default values into this column starting
-    /// at the specified row index. Set `is_append` to true if, and only if
-    /// `row_ndx` is equal to the size of the column (before insertion).
-    virtual void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) = 0;
+    //@{
+
+    /// `insert_rows()` inserts the specified number of elements into this column
+    /// starting at the specified row index. The new elements will have the
+    /// default value for the column type.
+    ///
+    /// `erase_rows()` removes the specified number of consecutive elements from
+    /// this column, starting at the specified row index.
+    ///
+    /// `move_last_row_over()` removes the element at the specified row index by
+    /// moving the element at the last row index over it. This reduces the
+    /// number of elements by one.
+    ///
+    /// \param prior_num_rows The number of elements in this column prior to the
+    /// modification.
+    ///
+    /// \param broken_reciprocal_backlinks If true, link columns must assume
+    /// that reciprocal backlinks have already been removed. Non-link columns
+    /// should ignore this argument.
+
+    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows) = 0;
+    virtual void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                            bool broken_reciprocal_backlinks) = 0;
+    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+                                    bool broken_reciprocal_backlinks) = 0;
+
+    //@}
 
     /// Remove all elements from this column.
     ///
@@ -108,22 +131,6 @@ public:
     /// that reciprocal backlinks have already been removed. Non-link columns
     /// should ignore this argument.
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
-
-    /// Remove the specified entry from this column. Set \a is_last to
-    /// true when deleting the last element. This is important to
-    /// avoid conversion to to general form of inner nodes of the
-    /// B+-tree.
-    virtual void erase(std::size_t row_ndx, bool is_last) = 0;
-
-    /// Remove the specified row by moving the last row over it. This reduces the
-    /// number of elements by one. The specified last row index must always be
-    /// one less than the number of rows in the column.
-    ///
-    /// \param broken_reciprocal_backlinks If true, link columns must assume
-    /// that reciprocal backlinks have already been removed. Non-link columns
-    /// should ignore this argument.
-    virtual void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
-                                bool broken_reciprocal_backlinks) = 0;
 
     virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
 
@@ -442,8 +449,9 @@ public:
     void add(null);
     void insert(std::size_t ndx, T value = T{}, std::size_t num_rows = 1);
     void insert(std::size_t ndx, null, std::size_t num_rows = 1);
-    void erase(std::size_t ndx);
-    void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void erase(size_t row_ndx);
+    void erase(size_t row_ndx, bool is_last);
+    void move_last_over(size_t row_ndx, size_t last_row_ndx);
     void clear();
 
     // Index support
@@ -507,9 +515,9 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const override;
 
-    void insert(std::size_t, std::size_t, bool) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
@@ -565,6 +573,8 @@ private:
     friend class StringIndex;
 
     BpTree<T, Nullable> m_tree;
+
+    void do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last);
 };
 
 
@@ -1133,11 +1143,19 @@ void TColumn<T,N>::erase_without_updating_index(std::size_t row_ndx, bool is_las
 }
 
 template <class T, bool N>
-void TColumn<T,N>::erase(std::size_t row_ndx)
+void TColumn<T,N>::erase(size_t row_ndx)
 {
-    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
-    bool is_last = row_ndx == last_row_ndx;
-    erase(row_ndx, is_last);
+    REALM_ASSERT(size() >= 1);
+    size_t last_row_ndx = size() - 1; // Note that size() is slow
+    bool is_last = (row_ndx == last_row_ndx);
+    erase(row_ndx, is_last); // Throws
+}
+
+template <class T, bool N>
+void TColumn<T,N>::erase(size_t row_ndx, bool is_last)
+{
+    size_t num_rows_to_erase = 1;
+    do_erase(row_ndx, num_rows_to_erase, is_last); // Throws
 }
 
 template <class T, bool N>
@@ -1184,16 +1202,19 @@ void TColumn<T,N>::clear()
 
 // Implementing pure virtual method of ColumnBase.
 template <class T, bool N>
-void TColumn<T,N>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+void TColumn<T,N>::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
 {
-    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx <= prior_num_rows);
+
+    size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     T value{};
-    insert(row_ndx_2, value, num_rows); // Throws
+    insert(row_ndx_2, value, num_rows_to_insert); // Throws
 
     if (N) {
         // Default value for nullable columns is NULL.
         // FIXME: Make faster with an insert_null method.
-        for (size_t i = 0; i < num_rows; ++i) {
+        for (size_t i = 0; i < num_rows_to_insert; ++i) {
             set_null(row_ndx + i);
         }
     }
@@ -1201,18 +1222,25 @@ void TColumn<T,N>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_app
 
 // Implementing pure virtual method of ColumnBase.
 template <class T, bool N>
-void TColumn<T,N>::erase(std::size_t row_ndx, bool is_last)
+void TColumn<T,N>::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                              bool)
 {
-    if (has_search_index()) {
-        m_search_index->erase<T>(row_ndx, is_last); // Throws
-    }
-    erase_without_updating_index(row_ndx, is_last); // Throws
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+
+    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    do_erase(row_ndx, num_rows_to_erase, is_last); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
 template <class T, bool N>
-void TColumn<T,N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+void TColumn<T,N>::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
 {
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx < prior_num_rows);
+
+    size_t last_row_ndx = prior_num_rows - 1;
     move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
@@ -1314,7 +1342,23 @@ void TColumn<T,N>::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
     ColumnBaseWithIndex::refresh_accessor_tree(new_col_ndx, spec);
 }
 
-#if defined(REALM_DEBUG)
+template <class T, bool N>
+void TColumn<T,N>::do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last)
+{
+    if (has_search_index()) {
+        for (size_t i = num_rows_to_erase; i > 0; --i) {
+            size_t row_ndx_2 = row_ndx + i - 1;
+            m_search_index->erase<T>(row_ndx_2, is_last); // Throws
+        }
+    }
+    for (size_t i = num_rows_to_erase; i > 0; --i) {
+        size_t row_ndx_2 = row_ndx + i - 1;
+        erase_without_updating_index(row_ndx_2, is_last); // Throws
+    }
+}
+
+#ifdef REALM_DEBUG
+
 template <class T, bool N>
 void TColumn<T,N>::Verify() const
 {
@@ -1371,6 +1415,7 @@ void TColumn<T,N>::dump_node_structure(const Array& root, std::ostream& out, int
 {
     root.dump_bptree_structure(out, level, &_impl::leaf_dumper);
 }
+
 #endif // REALM_DEBUG
 
 

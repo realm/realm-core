@@ -40,29 +40,6 @@ void ColumnLink::remove_backlinks(size_t row_ndx)
 }
 
 
-void ColumnLink::move_last_over(size_t row_ndx, size_t last_row_ndx,
-                                bool broken_reciprocal_backlinks)
-{
-    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
-    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
-
-    // Remove backlinks to deleted row
-    if (!broken_reciprocal_backlinks)
-        remove_backlinks(row_ndx);
-
-    // Update backlinks to last row to point to its new position
-    if (row_ndx != last_row_ndx) {
-        int_fast64_t value = ColumnLinkBase::get(last_row_ndx);
-        if (value != 0) {
-            size_t target_row_ndx = to_size_t(value - 1);
-            m_backlink_column->update_backlink(target_row_ndx, last_row_ndx, row_ndx);
-        }
-    }
-
-    Column::move_last_over(row_ndx, last_row_ndx);
-}
-
-
 void ColumnLink::clear(size_t, bool broken_reciprocal_backlinks)
 {
     if (!broken_reciprocal_backlinks) {
@@ -74,26 +51,81 @@ void ColumnLink::clear(size_t, bool broken_reciprocal_backlinks)
 }
 
 
-void ColumnLink::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+void ColumnLink::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
 {
-    ColumnLinkBase::insert(row_ndx, num_rows, is_append); // Throws
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx <= prior_num_rows);
 
-    if (is_append)
-        return;
-
-    // Update backlinks to moved rows
-    size_t new_total_num_rows = size(); // FIXME: Expensive to compute the number of rows this way. The number of rows should probably be passed as an extra argument.
-    size_t old_total_num_rows = new_total_num_rows - num_rows;
-    for (size_t i = old_total_num_rows; i > row_ndx; --i) {
-        size_t old_source_row_ndx = i - 1;
-        size_t new_source_row_ndx = old_source_row_ndx + num_rows;
-        uint_fast64_t value = ColumnLinkBase::get_uint(new_source_row_ndx);
+    // Update backlinks to the moved origin rows
+    size_t num_rows_moved = prior_num_rows - row_ndx;
+    for (size_t i = num_rows_moved; i > 0; --i) {
+        size_t old_origin_row_ndx = row_ndx + i - 1;
+        size_t new_origin_row_ndx = row_ndx + num_rows_to_insert + i - 1;
+        uint_fast64_t value = ColumnLinkBase::get_uint(old_origin_row_ndx);
         if (value != 0) { // Zero means null
             size_t target_row_ndx = to_size_t(value - 1);
-            m_backlink_column->update_backlink(target_row_ndx, old_source_row_ndx,
-                                               new_source_row_ndx); // Throws
+            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
+                                               new_origin_row_ndx); // Throws
         }
     }
+
+    ColumnLinkBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows); // Throws
+}
+
+
+void ColumnLink::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                            bool broken_reciprocal_backlinks)
+{
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+
+    // Remove backlinks to the removed origin rows
+    if (!broken_reciprocal_backlinks) {
+        for (size_t i = 0; i < num_rows_to_erase; ++i)
+            remove_backlinks(row_ndx+i);
+    }
+
+    // Update backlinks to the moved origin rows
+    size_t num_rows_moved = prior_num_rows - (row_ndx + num_rows_to_erase);
+    for (size_t i = 0; i < num_rows_moved; ++i) {
+        size_t old_origin_row_ndx = row_ndx + num_rows_to_erase + i;
+        size_t new_origin_row_ndx = row_ndx + i;
+        uint_fast64_t value = ColumnLinkBase::get_uint(old_origin_row_ndx);
+        if (value != 0) { // Zero means null
+            size_t target_row_ndx = to_size_t(value - 1);
+            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
+                                               new_origin_row_ndx); // Throws
+        }
+    }
+
+    ColumnLinkBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+                               broken_reciprocal_backlinks); // Throws
+}
+
+
+void ColumnLink::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+                                    bool broken_reciprocal_backlinks)
+{
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx <= prior_num_rows);
+
+    // Remove backlinks to the removed origin row
+    if (!broken_reciprocal_backlinks)
+        remove_backlinks(row_ndx);
+
+    // Update backlinks to the moved origin row
+    size_t last_row_ndx = prior_num_rows - 1;
+    if (row_ndx != last_row_ndx) {
+        int_fast64_t value = ColumnLinkBase::get(last_row_ndx);
+        if (value != 0) {
+            size_t target_row_ndx = to_size_t(value - 1);
+            m_backlink_column->update_backlink(target_row_ndx, last_row_ndx, row_ndx);
+        }
+    }
+
+    ColumnLinkBase::move_last_row_over(row_ndx, prior_num_rows,
+                                       broken_reciprocal_backlinks); // Throws
 }
 
 

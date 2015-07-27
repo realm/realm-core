@@ -1723,7 +1723,7 @@ TEST(Group_Commit_Update_Integer_Index)
 
     g.commit();
 
-    // This would fail (sometimes return not_found, sometimes crash) 
+    // This would fail (sometimes return not_found, sometimes crash)
     CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
 }
 
@@ -1739,14 +1739,12 @@ TEST(Group_CascadeNotify_Simple)
     // Add some extra rows so that the indexes being tested aren't all 0
     t->add_empty_row(100);
 
-    // remove() does not send a notification as it can't be used on tables with
-    // links, so it can never cause a cascade
     bool called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification&) {
         called = true;
     });
     t->remove(5);
-    CHECK(!called);
+    CHECK(called);
 
     // move_last_over() on a table with no (back)links just sends that single
     // row in the notification

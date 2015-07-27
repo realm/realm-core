@@ -281,7 +281,7 @@ TEST_TYPES(Column_Basic, Column, ColumnIntNull)
     // TEST(Column_Delete1)
 
     // Delete from middle
-    c.erase(3, 3 == c.size()-1);
+    c.erase(3);
 
     CHECK_EQUAL(6U, c.size());
     CHECK_EQUAL(256,   c.get(0));
@@ -295,7 +295,7 @@ TEST_TYPES(Column_Basic, Column, ColumnIntNull)
     // TEST(Column_Delete2)
 
     // Delete from top
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
 
     CHECK_EQUAL(5U, c.size());
     CHECK_EQUAL(0,     c.get(0));
@@ -308,7 +308,7 @@ TEST_TYPES(Column_Basic, Column, ColumnIntNull)
     // TEST(Column_Delete3)
 
     // Delete from bottom
-    c.erase(4, 4 == c.size()-1);
+    c.erase(4);
 
     CHECK_EQUAL(4U, c.size());
     CHECK_EQUAL(0, c.get(0));
@@ -320,10 +320,10 @@ TEST_TYPES(Column_Basic, Column, ColumnIntNull)
     // TEST(Column_DeleteAll)
 
     // Delete all items one at a time
-    c.erase(0, 0 == c.size()-1);
-    c.erase(0, 0 == c.size()-1);
-    c.erase(0, 0 == c.size()-1);
-    c.erase(0, 0 == c.size()-1);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0U, c.size());

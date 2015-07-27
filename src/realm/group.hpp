@@ -411,8 +411,22 @@ public:
     /// LinkLists).
     struct CascadeNotification {
         struct row {
-            std::size_t table_ndx; ///< Index within group of a group-level table.
-            std::size_t row_ndx; ///< Row index which will be removed.
+            /// Non-zero iff the removal of this row is ordered
+            /// (Table::remove()), as opposed to ordered
+            /// (Table::move_last_over()). Implicit removals are always
+            /// unordered.
+            ///
+            /// This flag does not take part in comparisons (operator==() and
+            /// operator<()).
+            size_t is_ordered_removal : 1;
+
+            /// Index within group of a group-level table.
+            size_t table_ndx : std::numeric_limits<size_t>::digits - 1;
+
+            /// Row index which will be removed.
+            size_t row_ndx;
+
+            row(): is_ordered_removal(0) {}
 
             bool operator==(const row&) const REALM_NOEXCEPT;
             bool operator!=(const row&) const REALM_NOEXCEPT;

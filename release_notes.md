@@ -13,7 +13,12 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Support for ordered row removal in tables with links. This was done for
+  completeness, and because an ordered insertion in tables with links, when
+  reversed, becomes an ordered removal. Support for ordered insertion in tables
+  with links was added recently because the sync mechanism can produce
+  them. Also added a few missing pieces of support for ordered insertion in
+  tables with links.
 
 -----------
 
@@ -36,6 +41,26 @@
 * `Group::commit()` now throws instead of aborting on an assertion if the group
   accessor is detached or if it is used in transactional mode (via
   `SharedGroup`).
+* Instruction encoding changed for `InsertEmptyRows` and `EraseRows` (also used
+  for `move_last_over()`). The third operand is now `prior_num_rows` (the number
+  of rows prior to modification) in all cases. Previously there was a serious
+  confusion about this.
+* Cleaned up the batch removal of rows used by `TableView`.
+* Optimize row removal by skipping cascade mechanism when table has no forward
+  link columns.
+* Virtual `ColumnBase::insert(row_ndx, num_rows, is_append)` was changed to
+  `ColumnBase::insert_rows(row_ndx, num_rows_to_insert,
+  prior_num_rows)`. Virtual `ColumnBase::erase(row_ndx, is_last)` was changed to
+  `ColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows)`. Virtual
+  `ColumnBase::move_last_over(row_ndx, last_row_ndx)` was changed to
+  `ColumnBase::move_last_row_over(row_ndx, prior_num_rows)`. Function names were
+  changed to avoid confusing similarity to the various non-virtual operations of
+  the same name on subclasses of `ColumnBase`. `prior_num_rows` is passed
+  because if carries more useful information than
+  `is_append`/`is_last`. `num_rows_to_erase` was added for consistency.
+* On some subclasses of `ColumnBase` a new non-virtual `erase(row_ndx, is_last)`
+  was added for practical reasons; an intended overload of `erase(row_ndx)` for
+  when you know whether the specified row index is the last one.
 * Slight performance improvements in `Array::FindGTE()`.
 * Renamed `Array::FindGTE()` to `Array::find_gte()`.
 

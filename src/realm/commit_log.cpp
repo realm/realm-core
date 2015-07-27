@@ -26,7 +26,6 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>
-#include <realm/replication.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/commit_log.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -45,7 +44,6 @@ public:
 } // anonymous namespace
 
 namespace realm {
-
 namespace _impl {
 
 
@@ -137,7 +135,7 @@ protected:
         CommitLogPreamble(uint_fast64_t version)
         {
             active_file_is_log_a = true;
-            // The first commit will be from state 1 -> state 2, so we must set 1 initially
+            // The first commit will be from version 1 -> 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = version;
             write_offset = 0;
@@ -702,7 +700,6 @@ WriteLogCollector::WriteLogCollector(const std::string& database_name,
 }
 
 } // end _impl
-
 
 
 std::unique_ptr<ClientHistory> make_client_history(const std::string& database_name,

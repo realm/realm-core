@@ -78,7 +78,8 @@ public:
     void add(T value = T());
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value = T());
-    void erase(std::size_t row_ndx);
+    void erase(size_t row_ndx);
+    void erase(size_t row_ndx, bool is_last);
     void move_last_over(std::size_t row_ndx);
     void clear();
 
@@ -117,9 +118,9 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const override;
 
-    void insert(std::size_t, std::size_t, bool) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
@@ -146,7 +147,6 @@ private:
     class CreateHandler;
     class SliceHandler;
 
-    void do_erase(std::size_t row_ndx, bool is_last);
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void do_clear();
 

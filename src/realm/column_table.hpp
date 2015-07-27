@@ -42,9 +42,9 @@ public:
 
     Table* get_subtable_accessor(std::size_t) const REALM_NOEXCEPT override;
 
-    void insert(std::size_t, std::size_t, bool) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void discard_subtable_accessor(std::size_t) REALM_NOEXCEPT override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
@@ -85,10 +85,11 @@ protected:
         bool remove(Table*) REALM_NOEXCEPT;
         void update_from_parent(std::size_t old_baseline) const REALM_NOEXCEPT;
         template<bool fix_ndx_in_parent>
-        void adj_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
+        void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
-        template<bool fix_ndx_in_parent> bool adj_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
+        template<bool fix_ndx_in_parent>
+        bool adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
@@ -210,8 +211,8 @@ public:
 
     using ColumnSubtableParent::insert;
 
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
@@ -241,30 +242,41 @@ private:
 // Implementation
 
 // Overriding virtual method of Column.
-inline void ColumnSubtableParent::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+inline void ColumnSubtableParent::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
+                                              size_t prior_num_rows)
 {
-    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx <= prior_num_rows);
+
+    size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     int_fast64_t value = 0;
-    do_insert(row_ndx_2, value, num_rows); // Throws
+    do_insert(row_ndx_2, value, num_rows_to_insert); // Throws
 }
 
-inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last)
+// Overriding virtual method of Column.
+inline void ColumnSubtableParent::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+                                             size_t prior_num_rows,
+                                             bool broken_reciprocal_backlinks)
 {
-    Column::erase(row_ndx, is_last); // Throws
+    Column::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+                       broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
-    bool last_entry_removed = m_subtable_map.adj_erase_row<fix_ndx_in_parent>(row_ndx);
+    bool last_entry_removed =
+        m_subtable_map.adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
-                                                 bool)
+// Overriding virtual method of Column.
+inline void ColumnSubtableParent::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+                                                     bool broken_reciprocal_backlinks)
 {
-    Column::move_last_over(row_ndx, last_row_ndx); // Throws
+    Column::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
+    size_t last_row_ndx = prior_num_rows - 1;
     bool last_entry_removed =
         m_subtable_map.adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
     typedef _impl::TableFriend tf;
@@ -311,7 +323,9 @@ inline void ColumnSubtableParent::adj_acc_erase_row(std::size_t row_ndx) REALM_N
     // underlying node structure. See AccessorConsistencyLevels.
 
     const bool fix_ndx_in_parent = false;
-    bool last_entry_removed = m_subtable_map.adj_erase_row<fix_ndx_in_parent>(row_ndx);
+    size_t num_rows_erased = 1;
+    bool last_entry_removed =
+        m_subtable_map.adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_erased);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);
@@ -374,14 +388,14 @@ inline void ColumnSubtableParent::SubtableMap::add(std::size_t subtable_ndx, Tab
 }
 
 template<bool fix_ndx_in_parent>
-void ColumnSubtableParent::SubtableMap::adj_insert_rows(std::size_t row_ndx, std::size_t num_rows)
+void ColumnSubtableParent::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted)
     REALM_NOEXCEPT
 {
     typedef entries::iterator iter;
     iter end = m_entries.end();
     for (iter i = m_entries.begin(); i != end; ++i) {
         if (i->m_subtable_ndx >= row_ndx) {
-            i->m_subtable_ndx += num_rows;
+            i->m_subtable_ndx += num_rows_inserted;
             typedef _impl::TableFriend tf;
             if (fix_ndx_in_parent)
                 tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
@@ -390,32 +404,32 @@ void ColumnSubtableParent::SubtableMap::adj_insert_rows(std::size_t row_ndx, std
 }
 
 template<bool fix_ndx_in_parent>
-bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
+bool ColumnSubtableParent::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased)
+    REALM_NOEXCEPT
 {
+    if (m_entries.empty())
+        return false;
     typedef _impl::TableFriend tf;
-    typedef entries::iterator iter;
-    iter end = m_entries.end();
-    iter erase = end;
-    for (iter i = m_entries.begin(); i != end; ++i) {
-        if (i->m_subtable_ndx > row_ndx) {
-            --i->m_subtable_ndx;
+    auto end = m_entries.end();
+    auto i = m_entries.begin();
+    do {
+        if (i->m_subtable_ndx >= row_ndx + num_rows_erased) {
+            i->m_subtable_ndx -= num_rows_erased;
             if (fix_ndx_in_parent)
                 tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
         }
-        else if (i->m_subtable_ndx == row_ndx) {
-            REALM_ASSERT(erase == end); // Subtable accessors are unique
-            erase = i;
+        else if (i->m_subtable_ndx >= row_ndx) {
+            // Must hold a counted reference while detaching
+            TableRef table(i->m_table);
+            tf::detach(*table);
+            // Move last over
+            *i = *--end;
+            continue;
         }
+        ++i;
     }
-    if (erase == end)
-        return false; // Not found, so nothing changed
-
-    // Must hold a counted reference while detaching
-    TableRef table(erase->m_table);
-    tf::detach(*table);
-
-    *erase = *--end; // Move last over
-    m_entries.pop_back();
+    while (i != end);
+    m_entries.erase(end, m_entries.end());
     return m_entries.empty();
 }
 
