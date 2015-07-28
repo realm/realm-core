@@ -24,6 +24,7 @@
 
 namespace realm {
 
+// Regular classes
 class ColumnBase;
 class AdaptiveStringColumn;
 class ColumnStringEnum;
@@ -32,9 +33,12 @@ class ColumnTable;
 class ColumnMixed;
 class ColumnLink;
 class ColumnLinkList;
+
+// Templated classes
 template <class T, bool Nullable = false> class TColumn;
 template<class T> class BasicColumn;
 
+// Shortcuts, aka typedefs.
 /// FIXME: Rename Column to IntegerColumn.
 using Column = TColumn<std::int64_t>;
 using ColumnIntNull = TColumn<std::int64_t, true>;
