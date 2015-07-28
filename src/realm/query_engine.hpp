@@ -418,8 +418,8 @@ public:
 
 
 protected:
-    typedef bool (ParentNode::* TColumn_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
-    TColumn_action_specialized m_column_action_specializer;
+    typedef bool (ParentNode::* Column_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
+    Column_action_specialized m_column_action_specializer;
     const Table* m_table;
     std::string error_code;
 

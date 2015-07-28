@@ -74,8 +74,8 @@ struct FindInLeaf {
 };
 
 template <bool Nullable>
-struct FindInLeaf<TColumn<int64_t, Nullable>> {
-    using LeafType = typename TColumn<int64_t, Nullable>::LeafType;
+struct FindInLeaf<Column<int64_t, Nullable>> {
+    using LeafType = typename Column<int64_t, Nullable>::LeafType;
 
     template <Action action, class Condition, class T, class R>
     static bool find(const LeafType& leaf, T target, std::size_t local_start, std::size_t local_end, std::size_t leaf_start, QueryState<R>& state)

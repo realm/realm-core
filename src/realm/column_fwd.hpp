@@ -35,12 +35,12 @@ class ColumnLink;
 class ColumnLinkList;
 
 // Templated classes
-template <class T, bool Nullable = false> class TColumn;
+template <class T, bool Nullable = false> class Column;
 template<class T> class BasicColumn;
 
 // Shortcuts, aka typedefs.
-using IntegerColumn = TColumn<std::int64_t, false>;
-using ColumnIntNull = TColumn<std::int64_t, true>;
+using IntegerColumn = Column<std::int64_t, false>;
+using ColumnIntNull = Column<std::int64_t, true>;
 using ColumnDouble = BasicColumn<double>;
 using ColumnFloat = BasicColumn<float>;
 
