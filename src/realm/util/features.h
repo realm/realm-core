@@ -41,7 +41,9 @@
 // automatically the first time you open it. Hence, it must be opened with write access (through SharedGroup).
 // If you open it for read access (through Group) it will throw an exception (with a descriptive user friendly
 // error message).
-#define REALM_NULL_STRINGS 1
+#ifndef REALM_NULL_STRINGS
+#  define REALM_NULL_STRINGS 1
+#endif
 
 /* The maximum number of elements in a B+-tree node. Applies to inner nodes and
  * to leaves. The minimum allowable value is 2.
