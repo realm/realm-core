@@ -3186,7 +3186,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         LinkViewRef link_list_1_2_w = origin_1_w->get_linklist(4,2);
         LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
         link_list_1_2_w->clear(); // Remove  O_1_LL_1[2] -> T_1[1]
-        link_list_2_2_w->move(0,2); // [ 0, 1 ] -> [ 1, 0 ]
+        link_list_2_2_w->move(0,1); // [ 0, 1 ] -> [ 1, 0 ]
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);

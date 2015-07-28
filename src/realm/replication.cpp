@@ -599,7 +599,7 @@ public:
         size_t num_links = m_link_list->size();
         if (REALM_UNLIKELY(old_link_ndx >= num_links))
             return false;
-        if (REALM_UNLIKELY(new_link_ndx > num_links))
+        if (REALM_UNLIKELY(new_link_ndx >= num_links))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
