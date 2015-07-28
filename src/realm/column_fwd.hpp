@@ -20,6 +20,8 @@
 #ifndef REALM_COLUMN_FWD_HPP
 #define REALM_COLUMN_FWD_HPP
 
+#include <cstdint>
+
 namespace realm {
 
 class ColumnBase;
@@ -34,8 +36,8 @@ template <class T, bool Nullable = false> class TColumn;
 template<class T> class BasicColumn;
 
 /// FIXME: Rename Column to IntegerColumn.
-using Column = TColumn<int64_t>;
-using ColumnIntNull = TColumn<int64_t, true>;
+using Column = TColumn<std::int64_t>;
+using ColumnIntNull = TColumn<std::int64_t, true>;
 using ColumnDouble = BasicColumn<double>;
 using ColumnFloat = BasicColumn<float>;
 
