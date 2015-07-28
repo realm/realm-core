@@ -691,7 +691,6 @@ EOF
         ;;
 
     "build-osx")
-        export REALM_DISABLE_NULL_STRINGS="1"
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
         (
@@ -704,7 +703,6 @@ EOF
         ;;
 
     "build-iphone")
-        export REALM_DISABLE_NULL_STRINGS="1"
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
         iphone_sdks_avail="$(get_config_param "IPHONE_SDKS_AVAIL")" || exit 1
@@ -760,7 +758,6 @@ EOF
         ;;
 
     "build-watchos")
-        export REALM_DISABLE_NULL_STRINGS="1"
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
         watchos_sdks_avail="$(get_config_param "WATCHOS_SDKS_AVAIL")" || exit 1
