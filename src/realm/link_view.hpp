@@ -156,7 +156,7 @@ private:
 // Implementation
 
 inline LinkView::LinkView(Table* origin_table, ColumnLinkList& column, std::size_t row_ndx):
-    RowIndexes(Column::unattached_root_tag(), column.get_alloc()), // Throws
+    RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()), // Throws
     m_origin_table(origin_table->get_table_ref()),
     m_origin_column(column),
     m_ref_count(0)

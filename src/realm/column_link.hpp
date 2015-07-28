@@ -86,7 +86,7 @@ inline ColumnLink::~ColumnLink() REALM_NOEXCEPT
 
 inline ref_type ColumnLink::create(Allocator& alloc, std::size_t size)
 {
-    return Column::create(alloc, Array::type_Normal, size); // Throws
+    return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
 }
 
 inline std::size_t ColumnLink::get_link(std::size_t row_ndx) const REALM_NOEXCEPT

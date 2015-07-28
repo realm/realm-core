@@ -605,7 +605,7 @@ public:
     };
 
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
-    void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Column* viewrefs = nullptr) const;
+    void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const IntegerColumn* viewrefs = nullptr) const;
 
 
 private:
@@ -850,7 +850,7 @@ private:
 #endif
 
     void erase_row(size_t row_ndx, bool is_move_last_over);
-    void batch_erase_rows(const Column& row_indexes, bool is_move_last_over);
+    void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_clear(bool broken_reciprocal_backlinks);
@@ -1023,8 +1023,8 @@ private:
     ColumnBase& get_column_base(std::size_t column_ndx);
     template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
-    Column& get_column(std::size_t column_ndx);
-    const Column& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
+    IntegerColumn& get_column(std::size_t column_ndx);
+    const IntegerColumn& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnIntNull& get_column_int_null(std::size_t column_ndx);
     const ColumnIntNull& get_column_int_null(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnFloat& get_column_float(std::size_t column_ndx);

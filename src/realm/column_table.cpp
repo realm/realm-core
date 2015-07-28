@@ -8,7 +8,7 @@ using namespace realm::util;
 
 void ColumnSubtableParent::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    Column::update_from_parent(old_baseline);
+    IntegerColumn::update_from_parent(old_baseline);
     m_subtable_map.update_from_parent(old_baseline);
 }
 
@@ -31,7 +31,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 void ColumnSubtableParent::Verify() const
 {
     if (root_is_leaf()) {
-        Column::Verify();
+        IntegerColumn::Verify();
         REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
@@ -41,7 +41,7 @@ void ColumnSubtableParent::Verify() const
 
 void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
 {
-    Column::Verify(table, col_ndx);
+    IntegerColumn::Verify(table, col_ndx);
 
     REALM_ASSERT(m_table == &table);
     REALM_ASSERT_3(m_column_ndx, ==, col_ndx);
@@ -315,7 +315,7 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
         columns_ref = clone_table_columns(subtable); // Throws
 
     int_fast64_t value = int_fast64_t(columns_ref);
-    Column::set(row_ndx, value); // Throws
+    IntegerColumn::set(row_ndx, value); // Throws
 
     // Refresh the accessors, if present
     if (Table* table = m_subtable_map.find(row_ndx)) {

@@ -388,7 +388,7 @@ inline std::size_t ColumnMixed::get_size_from_ref(ref_type root_ref,
 {
     const char* root_header = alloc.translate(root_ref);
     ref_type types_ref = to_ref(Array::get(root_header, 0));
-    return Column::get_size_from_ref(types_ref, alloc);
+    return IntegerColumn::get_size_from_ref(types_ref, alloc);
 }
 
 inline void ColumnMixed::clear_value_and_discard_subtab_acc(std::size_t row_ndx,

@@ -253,12 +253,12 @@ template<class T> struct ColumnTypeTraits3;
 template<> struct ColumnTypeTraits3<int64_t> {
     const static ColumnType ct_id = col_type_Int;
     const static ColumnType ct_id_real = col_type_Int;
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
 };
 template<> struct ColumnTypeTraits3<bool> {
     const static ColumnType ct_id = col_type_Bool;
     const static ColumnType ct_id_real = col_type_Bool;
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
 };
 template<> struct ColumnTypeTraits3<float> {
     const static ColumnType ct_id = col_type_Float;
@@ -273,7 +273,7 @@ template<> struct ColumnTypeTraits3<double> {
 template<> struct ColumnTypeTraits3<DateTime> {
     const static ColumnType ct_id = col_type_DateTime;
     const static ColumnType ct_id_real = col_type_Int;
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
 };
 template<> struct ColumnTypeTraits3<BinaryData> {
     const static ColumnType ct_id = col_type_Binary;
@@ -1230,7 +1230,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                 col = new ColumnIntNull(alloc, ref); // Throws
             }
             else {
-                col = new Column(alloc, ref); // Throws
+                col = new IntegerColumn(alloc, ref); // Throws
             }
             break;
         case col_type_Float:
@@ -1386,7 +1386,7 @@ void Table::upgrade_file_format()
             }
             else if (get_real_column_type(c) == col_type_Int) {
                 ColumnBase& col = get_column_base(c);
-                Column& c = static_cast<Column&>(col);
+                IntegerColumn& c = static_cast<IntegerColumn&>(col);
                 c.get_search_index()->clear();
                 c.populate_search_index();
             }
@@ -1535,7 +1535,7 @@ bool Table::try_add_primary_key(size_t col_ndx)
         index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_Int) {
-        Column& col_2 = static_cast<Column&>(col);
+        IntegerColumn& col_2 = static_cast<IntegerColumn&>(col);
         StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
@@ -1668,14 +1668,14 @@ ColumnBase& Table::get_column_base(size_t ndx)
 }
 
 
-const Column& Table::get_column(size_t ndx) const REALM_NOEXCEPT
+const IntegerColumn& Table::get_column(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<Column, col_type_Int>(ndx);
+    return get_column<IntegerColumn, col_type_Int>(ndx);
 }
 
-Column& Table::get_column(size_t ndx)
+IntegerColumn& Table::get_column(size_t ndx)
 {
-    return get_column<Column, col_type_Int>(ndx);
+    return get_column<IntegerColumn, col_type_Int>(ndx);
 }
 
 const ColumnIntNull& Table::get_column_int_null(size_t ndx) const REALM_NOEXCEPT
@@ -1875,7 +1875,7 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
                 return ColumnIntNull::create(alloc, Array::type_Normal, size); // Throws
             }
             else {
-                return Column::create(alloc, Array::type_Normal, size); // Throws
+                return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
         case col_type_Float:
             return ColumnFloat::create(alloc, size); // Throws
@@ -2032,7 +2032,7 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
 }
 
 
-void Table::batch_erase_rows(const Column& row_indexes, bool is_move_last_over)
+void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
 {
     REALM_ASSERT(is_attached());
 
@@ -2417,7 +2417,7 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
         return column.get(ndx);
     }
     else {
-        const Column& column = get_column(col_ndx);
+        const IntegerColumn& column = get_column(col_ndx);
         return column.get(ndx);
     }
 
@@ -2457,7 +2457,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
         return column.get(ndx) != 0;
     }
     else {
-        const Column& column = get_column(col_ndx);
+        const IntegerColumn& column = get_column(col_ndx);
         return column.get(ndx) != 0;
     }
 }
@@ -2475,7 +2475,7 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
         column.set(ndx, value ? 1 : 0);
     }
     else {
-        Column& column = get_column(col_ndx);
+        IntegerColumn& column = get_column(col_ndx);
         column.set(ndx, value ? 1 : 0);
     }
 
@@ -2497,7 +2497,7 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
         return column.get(ndx);
     }
     else {
-        const Column& column = get_column(col_ndx);
+        const IntegerColumn& column = get_column(col_ndx);
         return column.get(ndx);
     }
 }
@@ -2515,7 +2515,7 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
         column.set(ndx, value.get_datetime());
     }
     else {
-        Column& column = get_column(col_ndx);
+        IntegerColumn& column = get_column(col_ndx);
         column.set(ndx, value.get_datetime());
     }
 
@@ -2882,7 +2882,7 @@ size_t Table::count_int(size_t col_ndx, int64_t value) const
     if (!m_columns.is_attached())
         return 0;
 
-    const Column& column = get_column<Column, col_type_Int>(col_ndx);
+    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
     return column.count(value);
 }
 size_t Table::count_float(size_t col_ndx, float value) const
@@ -2927,7 +2927,7 @@ int64_t Table::sum_int(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0;
 
-    const Column& column = get_column<Column, col_type_Int>(col_ndx);
+    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
     return column.sum();
 }
 double Table::sum_float(size_t col_ndx) const
@@ -2954,7 +2954,7 @@ double Table::average_int(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0;
 
-    const Column& column = get_column<Column, col_type_Int>(col_ndx);
+    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
     return column.average();
 }
 double Table::average_float(size_t col_ndx) const
@@ -2984,7 +2984,7 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
         return 0;
 
 #if USE_COLUMN_AGGREGATE
-    const Column& column = get_column<Column, col_type_Int>(col_ndx);
+    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 #else
     if (is_empty())
@@ -3024,7 +3024,7 @@ DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
+    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 }
 
@@ -3041,7 +3041,7 @@ int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
         return column.maximum(0, npos, npos, return_ndx);
     }
     else {
-        const Column& column = get_column(col_ndx);
+        const IntegerColumn& column = get_column(col_ndx);
         return column.maximum(0, npos, npos, return_ndx);
     }
 
@@ -3083,7 +3083,7 @@ DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
+    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
 
@@ -3182,7 +3182,7 @@ size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
     if (!m_columns.is_attached())
         return not_found;
 
-    const Column& column = get_column(col_ndx);
+    const IntegerColumn& column = get_column(col_ndx);
 
     return column.find_first(int64_t(value.get_datetime()));
 }
@@ -3400,8 +3400,8 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
         std::size_t ndx_in_leaf;
-        Column::LeafInfo leaf { &state.block, &state.cache };
-        state.enums->Column::get_leaf(i, ndx_in_leaf, leaf);
+        IntegerColumn::LeafInfo leaf { &state.block, &state.cache };
+        state.enums->IntegerColumn::get_leaf(i, ndx_in_leaf, leaf);
         state.offset = i - ndx_in_leaf;
         state.block_end = state.offset + state.block->size();
     }
@@ -3428,7 +3428,7 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
 void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result,
-                      const Column* viewrefs) const
+                      const IntegerColumn* viewrefs) const
 {
     REALM_ASSERT(result.is_empty() && result.get_column_count() == 0);
     REALM_ASSERT_3(group_by_column, <, m_columns.size());
@@ -3446,8 +3446,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         result.add_column(type_Int, get_column_name(aggr_column));
 
     // Cache columms
-    const Column& src_column = get_column(aggr_column);
-    Column& dst_column = result.get_column(1);
+    const IntegerColumn& src_column = get_column(aggr_column);
+    IntegerColumn& dst_column = result.get_column(1);
 
     AggrState state(*this);
     get_group_fnc get_group_ndx_fnc = nullptr;
@@ -3464,8 +3464,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.keys.assign(key_count, 0);
 
         std::size_t ndx_in_leaf;
-        Column::LeafInfo leaf { &state.block, &state.cache };
-        enums.Column::get_leaf(0, ndx_in_leaf, leaf);
+        IntegerColumn::LeafInfo leaf { &state.block, &state.cache };
+        enums.IntegerColumn::get_leaf(0, ndx_in_leaf, leaf);
         state.offset = 0 - ndx_in_leaf;
         state.block_end = state.offset + state.block->size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
@@ -3509,7 +3509,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
             {
                 // Add temporary column for counts
                 result.add_column(type_Int, "count");
-                Column& cnt_column = result.get_column(2);
+                IntegerColumn& cnt_column = result.get_column(2);
 
                 for (size_t r = 0; r < count; ++r) {
                     size_t i = viewrefs->get(r);
@@ -3602,7 +3602,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
             {
                 // Add temporary column for counts
                 result.add_column(type_Int, "count");
-                Column& cnt_column = result.get_column(2);
+                IntegerColumn& cnt_column = result.get_column(2);
 
                 for (size_t i = 0; i < count; ++i) {
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
@@ -3674,7 +3674,7 @@ TableView Table::get_range_view(size_t begin, size_t end)
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
-        Column& refs = ctv.m_row_indexes;
+        IntegerColumn& refs = ctv.m_row_indexes;
         for (size_t i = begin; i < end; ++i)
             refs.add(i);
     }
@@ -4509,8 +4509,8 @@ bool Table::compare_rows(const Table& t) const
                     }
                 }
                 else {
-                    const Column& c1 = get_column(i);
-                    const Column& c2 = t.get_column(i);
+                    const IntegerColumn& c1 = get_column(i);
+                    const IntegerColumn& c2 = t.get_column(i);
                     if (!c1.compare_int(c2))
                         return false;
                 }
@@ -5143,7 +5143,7 @@ void Table::print() const
             ColumnType type = get_real_column_type(n);
             switch (type) {
                 case type_Int: {
-                    const Column& column = get_column(n);
+                    const IntegerColumn& column = get_column(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
@@ -5158,7 +5158,7 @@ void Table::print() const
                     break;
                 }
                 case type_Bool: {
-                    const Column& column = get_column(n);
+                    const IntegerColumn& column = get_column(n);
                     std::cout << (column.get(i) == 0 ? "     false " : "      true ");
                     break;
                 }

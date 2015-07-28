@@ -14,7 +14,7 @@ using namespace realm;
 using namespace realm::util;
 
 ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable):
-    Column(alloc, ref), // Throws
+    IntegerColumn(alloc, ref), // Throws
     m_keys(alloc, keys_ref, nullable), // Throws
     m_nullable(nullable)
 {
@@ -27,7 +27,7 @@ ColumnStringEnum::~ColumnStringEnum() REALM_NOEXCEPT
 void ColumnStringEnum::destroy() REALM_NOEXCEPT
 {
     m_keys.destroy();
-    Column::destroy();
+    IntegerColumn::destroy();
     if (m_search_index)
         m_search_index->destroy();
 }
@@ -52,7 +52,7 @@ void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT
 
 void ColumnStringEnum::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    Column::update_from_parent(old_baseline);
+    IntegerColumn::update_from_parent(old_baseline);
     m_keys.update_from_parent(old_baseline);
 }
 
@@ -63,7 +63,7 @@ bool ColumnStringEnum::is_nullable() const REALM_NOEXCEPT
 
 void ColumnStringEnum::set(size_t ndx, StringData value)
 {
-    REALM_ASSERT_3(ndx, <, Column::size());
+    REALM_ASSERT_3(ndx, <, IntegerColumn::size());
 
     if (!is_nullable() && value.is_null()) {
         throw LogicError{LogicError::column_not_nullable};
@@ -110,7 +110,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
 
 void ColumnStringEnum::do_erase(size_t ndx, bool is_last)
 {
-    REALM_ASSERT_3(ndx, <, Column::size());
+    REALM_ASSERT_3(ndx, <, IntegerColumn::size());
 
     // Update search index
     // (it is important here that we do it before actually setting
@@ -156,7 +156,7 @@ void ColumnStringEnum::do_clear()
 
 size_t ColumnStringEnum::count(size_t key_ndx) const
 {
-    return Column::count(key_ndx);
+    return IntegerColumn::count(key_ndx);
 }
 
 size_t ColumnStringEnum::count(StringData value) const
@@ -167,11 +167,11 @@ size_t ColumnStringEnum::count(StringData value) const
     size_t key_ndx = m_keys.find_first(value);
     if (key_ndx == not_found)
         return 0;
-    return Column::count(key_ndx);
+    return IntegerColumn::count(key_ndx);
 }
 
 
-void ColumnStringEnum::find_all(Column& res, StringData value, size_t begin, size_t end) const
+void ColumnStringEnum::find_all(IntegerColumn& res, StringData value, size_t begin, size_t end) const
 {
     if (m_search_index && begin == 0 && end == size_t(-1))
         return m_search_index->find_all(res, value);
@@ -179,14 +179,14 @@ void ColumnStringEnum::find_all(Column& res, StringData value, size_t begin, siz
     size_t key_ndx = m_keys.find_first(value);
     if (key_ndx == size_t(-1))
         return;
-    Column::find_all(res, key_ndx, begin, end);
+    IntegerColumn::find_all(res, key_ndx, begin, end);
 }
 
-void ColumnStringEnum::find_all(Column& res, size_t key_ndx, size_t begin, size_t end) const
+void ColumnStringEnum::find_all(IntegerColumn& res, size_t key_ndx, size_t begin, size_t end) const
 {
     if (key_ndx == size_t(-1))
         return;
-    Column::find_all(res, key_ndx, begin, end);
+    IntegerColumn::find_all(res, key_ndx, begin, end);
 }
 
 FindRes ColumnStringEnum::find_all_indexref(StringData value, size_t& dst) const
@@ -203,7 +203,7 @@ size_t ColumnStringEnum::find_first(size_t key_ndx, size_t begin, size_t end) co
     if (key_ndx == size_t(-1))
         return size_t(-1);
 
-    return Column::find_first(key_ndx, begin, end);
+    return IntegerColumn::find_first(key_ndx, begin, end);
 }
 
 size_t ColumnStringEnum::find_first(StringData value, size_t begin, size_t end) const
@@ -216,7 +216,7 @@ size_t ColumnStringEnum::find_first(StringData value, size_t begin, size_t end) 
     if (key_ndx == size_t(-1))
         return size_t(-1);
 
-    return Column::find_first(key_ndx, begin, end);
+    return IntegerColumn::find_first(key_ndx, begin, end);
 }
 
 size_t ColumnStringEnum::GetKeyNdx(StringData value) const
@@ -310,7 +310,7 @@ void ColumnStringEnum::install_search_index(std::unique_ptr<StringIndex> index) 
 
 void ColumnStringEnum::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
-    Column::refresh_accessor_tree(col_ndx, spec);
+    IntegerColumn::refresh_accessor_tree(col_ndx, spec);
     size_t ndx_is_spec_enumkeys = spec.get_enumkeys_ndx(col_ndx);
     m_keys.get_root_array()->set_ndx_in_parent(ndx_is_spec_enumkeys);
     m_keys.refresh_accessor_tree(0, spec);
@@ -329,7 +329,7 @@ void ColumnStringEnum::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 void ColumnStringEnum::Verify() const
 {
     m_keys.Verify();
-    Column::Verify();
+    IntegerColumn::Verify();
 
     if (m_search_index) {
         m_search_index->Verify();
@@ -345,7 +345,7 @@ void ColumnStringEnum::Verify(const Table& table, size_t col_ndx) const
     const Spec& spec = tf::get_spec(table);
     REALM_ASSERT_3(m_keys.get_root_array()->get_ndx_in_parent(), ==, spec.get_enumkeys_ndx(col_ndx));
 
-    Column::Verify(table, col_ndx);
+    IntegerColumn::Verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     bool has_search_index = (attr & col_attr_Indexed) != 0;
@@ -367,7 +367,7 @@ void ColumnStringEnum::to_dot(std::ostream& out, StringData title) const
     out << "\";" << std::endl;
 
     m_keys.to_dot(out, "keys");
-    Column::to_dot(out, "values");
+    IntegerColumn::to_dot(out, "values");
 
     out << "}" << std::endl;
 }

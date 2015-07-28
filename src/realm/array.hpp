@@ -365,8 +365,8 @@ public:
     bool is_empty() const REALM_NOEXCEPT;
     Type get_type() const REALM_NOEXCEPT;
 
-    // Exists for find_all() because array.hpp cannot append results directly to a Column type (incomplete class)
-    static void add_to_column(Column* column, int64_t value);
+    // Exists for find_all() because array.hpp cannot append results directly to a IntegerColumn type (incomplete class)
+    static void add_to_column(IntegerColumn* column, int64_t value);
 
     void insert(std::size_t ndx, int_fast64_t value);
     void add(int_fast64_t value);
@@ -461,7 +461,7 @@ public:
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, ColumnBase* column) const;
-    void   IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const;
+    void   IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBase* column) const;
     size_t IndexStringCount(StringData value, ColumnBase* column) const;
     FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, ColumnBase* column) const;
 
@@ -657,7 +657,7 @@ public:
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = std::size_t(-1)) const;
 
-    void find_all(Column* result, int64_t value, std::size_t col_offset = 0,
+    void find_all(IntegerColumn* result, int64_t value, std::size_t col_offset = 0,
                   std::size_t begin = 0, std::size_t end = std::size_t(-1)) const;
 
     std::size_t find_first(int64_t value, std::size_t begin = 0,
@@ -952,7 +952,7 @@ protected:
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
     template <IndexMethod method, class T>
-    std::size_t index_string(StringData value, Column& result, ref_type& result_ref,
+    std::size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                              ColumnBase* column) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
@@ -1192,7 +1192,7 @@ public:
             return false;
     }
 
-    void init(Action action, Column* akku, size_t limit)
+    void init(Action action, IntegerColumn* akku, size_t limit)
     {
         m_match_count = 0;
         m_limit = limit;
@@ -1256,7 +1256,7 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            Array::add_to_column(reinterpret_cast<Column*>(m_state), index);
+            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
         }
         else if (action == act_ReturnFirst) {
             m_state = index;

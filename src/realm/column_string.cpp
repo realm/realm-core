@@ -787,7 +787,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 }
 
 
-void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t begin, size_t end) const
+void AdaptiveStringColumn::find_all(IntegerColumn& result, StringData value, size_t begin, size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -971,8 +971,8 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     }
 
     // Generate enumerated list of entries
-    ref_type values_ref_2 = Column::create(alloc); // Throws
-    Column values(alloc, values_ref_2); // Throws
+    ref_type values_ref_2 = IntegerColumn::create(alloc); // Throws
+    IntegerColumn values(alloc, values_ref_2); // Throws
     for (size_t i = 0; i != n; ++i) {
         StringData v = get(i);
         size_t pos = keys.lower_bound_string(v);

@@ -32,7 +32,7 @@ namespace realm {
 class Spec;
 
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
-// by making Column convert its integers to strings by calling to_str().
+// by making IntegerColumn convert its integers to strings by calling to_str().
 template <class T> inline StringData to_str(const T& value)
 {
     REALM_STATIC_ASSERT((std::is_same<T, int64_t>::value), "");
@@ -90,7 +90,7 @@ public:
         return m_array->IndexStringFindFirst(to_str(value), m_target_column);
     }
 
-    template <class T> void find_all(Column& result, T value) const
+    template <class T> void find_all(IntegerColumn& result, T value) const
     {
         // Use direct access method
         return m_array->IndexStringFindAll(result, to_str(value), m_target_column);
@@ -115,7 +115,7 @@ public:
 
     void clear();
 
-    void distinct(Column& result) const;
+    void distinct(IntegerColumn& result) const;
     bool has_duplicate_values() const REALM_NOEXCEPT;
 
     /// By default, duplicate values are allowed.

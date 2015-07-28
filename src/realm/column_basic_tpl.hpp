@@ -496,7 +496,7 @@ std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t e
 }
 
 template<class T>
-void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::size_t end) const
+void BasicColumn<T>::find_all(IntegerColumn &result, T value, std::size_t begin, std::size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));

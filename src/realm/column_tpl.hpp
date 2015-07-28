@@ -35,11 +35,11 @@ template<class T> class SequentialGetter;
 template<class cond, class T> struct ColumnTypeTraits2;
 
 template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, bool> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {

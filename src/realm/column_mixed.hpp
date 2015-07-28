@@ -176,7 +176,7 @@ private:
     /// Stores the MixedColType of each value at the given index. For
     /// values that uses all 64 bits, the type also encodes the sign
     /// bit by having distinct types for positive negative values.
-    std::unique_ptr<Column> m_types;
+    std::unique_ptr<IntegerColumn> m_types;
 
     /// Stores the data for each entry. For a subtable, the stored
     /// value is the ref of the subtable. For string and binary data,

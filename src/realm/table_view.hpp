@@ -694,19 +694,19 @@ inline std::size_t TableViewBase::find_by_source_ndx(std::size_t source_ndx) con
 }
 
 inline TableViewBase::TableViewBase():
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), // Throws
     m_distinct_column_source(npos)
 {
 #ifdef REALM_ENABLE_REPLICATION
     m_last_seen_version = 0;
     m_auto_sort = false;
 #endif
-    ref_type ref = Column::create(m_row_indexes.get_alloc()); // Throws
+    ref_type ref = IntegerColumn::create(m_row_indexes.get_alloc()); // Throws
     m_row_indexes.get_root_array()->init_from_ref(ref);
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), 
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), 
     m_table(parent->get_table_ref()), // Throws
     m_distinct_column_source(npos)
     {
@@ -714,18 +714,18 @@ inline TableViewBase::TableViewBase(Table* parent):
     m_last_seen_version = m_table ? m_table->m_version : 0;
     m_auto_sort = false;
 #endif
-    // FIXME: This code is unreasonably complicated because it uses `Column` as
-    // a free-standing container, and beause `Column` does not conform to the
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
     // RAII idiom (nor should it).
     Allocator& alloc = m_row_indexes.get_alloc();
     _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(Column::create(alloc)); // Throws
+    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
     parent->register_view(this); // Throws
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), // Throws
     m_table(parent->get_table_ref()),
     m_distinct_column_source(npos),
     m_query(query, Query::TCopyExpressionTag())
@@ -737,18 +737,18 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_start = start;
     m_end = end;
     m_limit = limit;
-    // FIXME: This code is unreasonably complicated because it uses `Column` as
-    // a free-standing container, and beause `Column` does not conform to the
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
     // RAII idiom (nor should it).
     Allocator& alloc = m_row_indexes.get_alloc();
     _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(Column::create(alloc)); // Throws
+    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
     parent->register_view(this); // Throws
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()),
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
     m_distinct_column_source(tv.m_distinct_column_source),
     m_query(tv.m_query, Query::TCopyExpressionTag()), 
@@ -763,8 +763,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_linkview_source = tv.m_linkview_source;
     m_sorting_predicate = tv.m_sorting_predicate;
 #endif
-    // FIXME: This code is unreasonably complicated because it uses `Column` as
-    // a free-standing container, and beause `Column` does not conform to the
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
     // RAII idiom (nor should it).
     Allocator& alloc = m_row_indexes.get_alloc();
     MemRef mem = tv.m_row_indexes.get_root_array()->clone_deep(alloc); // Throws

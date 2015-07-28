@@ -147,7 +147,7 @@ inline ColumnLinkList::~ColumnLinkList() REALM_NOEXCEPT
 
 inline ref_type ColumnLinkList::create(Allocator& alloc, std::size_t size)
 {
-    return Column::create(alloc, Array::type_HasRefs, size); // Throws
+    return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
 inline bool ColumnLinkList::has_links(std::size_t row_ndx) const REALM_NOEXCEPT

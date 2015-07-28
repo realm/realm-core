@@ -551,7 +551,7 @@ protected:
 
     /// If any element points to an array node, this function recursively
     /// destroys that array node. Note that the same is **not** true for
-    /// Column::do_erase() and Column::do_move_last_over().
+    /// IntegerColumn::do_erase() and IntegerColumn::do_move_last_over().
     ///
     /// FIXME: Be careful, clear_without_updating_index() currently forgets
     /// if the leaf type is Array::type_HasRefs.
@@ -852,7 +852,7 @@ std::size_t TColumn<T,N>::find_first(T value, std::size_t begin, std::size_t end
 }
 
 template <class T, bool N>
-void TColumn<T,N>::find_all(Column& result, T value, size_t begin, size_t end) const
+void TColumn<T,N>::find_all(IntegerColumn& result, T value, size_t begin, size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));

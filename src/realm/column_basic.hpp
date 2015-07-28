@@ -100,7 +100,7 @@ public:
 
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
 
-    void find_all(Column& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
+    void find_all(IntegerColumn& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming

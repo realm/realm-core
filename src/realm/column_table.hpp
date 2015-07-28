@@ -31,8 +31,8 @@ namespace realm {
 
 
 /// Base class for any type of column that can contain subtables.
-// FIXME: Don't derive from Column, but define a BpTree<ref_type> specialization.
-class ColumnSubtableParent: public Column, public Table::Parent {
+// FIXME: Don't derive from IntegerColumn, but define a BpTree<ref_type> specialization.
+class ColumnSubtableParent: public IntegerColumn, public Table::Parent {
 public:
     void discard_child_accessors() REALM_NOEXCEPT;
 
@@ -258,7 +258,7 @@ inline void ColumnSubtableParent::erase_rows(size_t row_ndx, size_t num_rows_to_
                                              size_t prior_num_rows,
                                              bool broken_reciprocal_backlinks)
 {
-    Column::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+    IntegerColumn::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
                        broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
@@ -273,7 +273,7 @@ inline void ColumnSubtableParent::erase_rows(size_t row_ndx, size_t num_rows_to_
 inline void ColumnSubtableParent::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
                                                      bool broken_reciprocal_backlinks)
 {
-    Column::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
+    IntegerColumn::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
     size_t last_row_ndx = prior_num_rows - 1;
@@ -288,7 +288,8 @@ inline void ColumnSubtableParent::clear(std::size_t, bool)
 {
     discard_child_accessors();
     clear_without_updating_index(); // Throws
-    // FIXME: This one is needed because Column::clear_without_updating_index() forgets about the
+    // FIXME: This one is needed because
+    // IntegerColumn::clear_without_updating_index() forgets about the
     // leaf type. A better solution should probably be sought after.
     get_root_array()->set_type(Array::type_HasRefs);
 }
@@ -301,7 +302,7 @@ inline void ColumnSubtableParent::mark(int type) REALM_NOEXCEPT
 
 inline void ColumnSubtableParent::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
 {
-    Column::refresh_accessor_tree(col_ndx, spec); // Throws
+    IntegerColumn::refresh_accessor_tree(col_ndx, spec); // Throws
     m_column_ndx = col_ndx;
 }
 
@@ -352,7 +353,7 @@ inline void ColumnSubtableParent::adj_acc_clear_root_table() REALM_NOEXCEPT
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    Column::adj_acc_clear_root_table();
+    IntegerColumn::adj_acc_clear_root_table();
     discard_child_accessors();
 }
 
@@ -473,7 +474,7 @@ bool ColumnSubtableParent::SubtableMap::adj_move_over(std::size_t from_row_ndx,
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc, ref_type ref,
                                                   Table* table, std::size_t column_ndx):
-    Column(alloc, ref), // Throws
+    IntegerColumn(alloc, ref), // Throws
     m_table(table),
     m_column_ndx(column_ndx)
 {
@@ -513,7 +514,7 @@ inline ref_type ColumnSubtableParent::clone_table_columns(const Table* t)
 
 inline ref_type ColumnSubtableParent::create(Allocator& alloc, std::size_t size)
 {
-    return Column::create(alloc, Array::type_HasRefs, size); // Throws
+    return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
 inline std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
@@ -541,7 +542,7 @@ update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col
 inline void ColumnSubtableParent::do_insert(std::size_t row_ndx, int_fast64_t value,
                                             std::size_t num_rows)
 {
-    Column::insert_without_updating_index(row_ndx, value, num_rows); // Throws
+    IntegerColumn::insert_without_updating_index(row_ndx, value, num_rows); // Throws
     bool is_append = row_ndx == realm::npos;
     if (!is_append) {
         const bool fix_ndx_in_parent = true;

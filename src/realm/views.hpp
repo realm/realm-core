@@ -15,14 +15,14 @@ const std::size_t detached_ref = std::size_t(-1);
 class RowIndexes
 {
 public:
-    RowIndexes(Column::unattached_root_tag urt, realm::Allocator& alloc) : 
+    RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected), 
 #endif
         m_row_indexes(urt, alloc)
     {}
 
-    RowIndexes(Column&& col) : 
+    RowIndexes(IntegerColumn&& col) :
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected),
 #endif
@@ -110,7 +110,7 @@ public:
     uint64_t cookie;
 #endif
 
-    Column m_row_indexes;
+    IntegerColumn m_row_indexes;
 };
 
 } // namespace realm

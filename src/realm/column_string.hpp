@@ -73,7 +73,7 @@ public:
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0,
                            std::size_t end = npos) const;
-    void find_all(Column& result, StringData value, std::size_t begin = 0,
+    void find_all(IntegerColumn& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
 
     int compare_values(std::size_t, std::size_t) const override;

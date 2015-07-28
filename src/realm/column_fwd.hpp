@@ -39,8 +39,7 @@ template <class T, bool Nullable = false> class TColumn;
 template<class T> class BasicColumn;
 
 // Shortcuts, aka typedefs.
-/// FIXME: Rename Column to IntegerColumn.
-using Column = TColumn<std::int64_t>;
+using IntegerColumn = TColumn<std::int64_t, false>;
 using ColumnIntNull = TColumn<std::int64_t, true>;
 using ColumnDouble = BasicColumn<double>;
 using ColumnFloat = BasicColumn<float>;

@@ -49,7 +49,7 @@ class StringIndex;
 /// search index. If it is, then the root ref of the index is stored
 /// in Table::m_columns immediately after the root ref of the
 /// enumerated strings column.
-class ColumnStringEnum: public Column {
+class ColumnStringEnum: public IntegerColumn {
 public:
     typedef StringData value_type;
 
@@ -91,13 +91,13 @@ public:
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
-    void find_all(Column& res, StringData value,
+    void find_all(IntegerColumn& res, StringData value,
                   std::size_t begin = 0, std::size_t end = npos) const;
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     std::size_t count(std::size_t key_index) const;
     std::size_t find_first(std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
-    void find_all(Column& res, std::size_t key_index, std::size_t begin = 0, std::size_t end = -1) const;
+    void find_all(IntegerColumn& res, std::size_t key_index, std::size_t begin = 0, std::size_t end = -1) const;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -175,8 +175,8 @@ private:
 
 inline StringData ColumnStringEnum::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, Column::size());
-    std::size_t key_ndx = to_size_t(Column::get(ndx));
+    REALM_ASSERT_3(ndx, <, IntegerColumn::size());
+    std::size_t key_ndx = to_size_t(IntegerColumn::get(ndx));
     StringData sd = m_keys.get(key_ndx);
     REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd;

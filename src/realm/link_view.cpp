@@ -69,7 +69,7 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     // if there are no links yet, we have to create list
     if (!m_row_indexes.is_attached()) {
         REALM_ASSERT_3(link_ndx, ==, 0);
-        ref_type ref = Column::create(m_origin_column.get_alloc()); // Throws
+        ref_type ref = IntegerColumn::create(m_origin_column.get_alloc()); // Throws
         m_origin_column.set_row_ref(origin_row_ndx, ref); // Throws
         m_row_indexes.init_from_parent(); // re-attach
     }

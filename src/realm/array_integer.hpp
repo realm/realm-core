@@ -160,7 +160,7 @@ public:
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = npos) const;
 
-    void find_all(Column* result, int64_t value, std::size_t col_offset = 0,
+    void find_all(IntegerColumn* result, int64_t value, std::size_t col_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     std::size_t find_first(int64_t value, std::size_t begin = 0,

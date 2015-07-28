@@ -249,7 +249,7 @@ inline std::size_t BasicArray<T>::find_first(T value, std::size_t begin, std::si
 }
 
 template<class T>
-void BasicArray<T>::find_all(Column* result, T value, std::size_t add_offset,
+void BasicArray<T>::find_all(IntegerColumn* result, T value, std::size_t add_offset,
                              std::size_t begin, std::size_t end) const
 {
     std::size_t first = begin - 1;

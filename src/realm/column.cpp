@@ -131,7 +131,7 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_Bool:
         case col_type_DateTime:
         case col_type_Link:
-            op.template call<Column>();
+            op.template call<IntegerColumn>();
             return;
         case col_type_String:
             op.template call<AdaptiveStringColumn>();
@@ -519,12 +519,12 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 
 /*
 // TODO: Set owner of created arrays and destroy/delete them if created by merge_references()
-void Column::ReferenceSort(size_t start, size_t end, Column& ref)
+void IntegerColumn::ReferenceSort(size_t start, size_t end, Column& ref)
 {
     Array values; // pointers to non-instantiated arrays of values
     Array indexes; // pointers to instantiated arrays of index pointers
     Array all_values;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, &values);
+    TreeVisitLeafs<Array, IntegerColumn>(start, end, 0, callme_arrays, &values);
 
     size_t offset = 0;
     for (size_t t = 0; t < values.size(); t++) {

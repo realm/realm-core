@@ -148,13 +148,13 @@ typedef bool (*CallbackDummy)(int64_t);
 template<class T> struct ColumnTypeTraits;
 
 template<> struct ColumnTypeTraits<int64_t> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
 template<> struct ColumnTypeTraits<bool> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Bool;
@@ -172,14 +172,14 @@ template<> struct ColumnTypeTraits<double> {
     static const DataType id = type_Double;
 };
 template<> struct ColumnTypeTraits<DateTime> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_DateTime;
 };
 
 template<> struct ColumnTypeTraits<StringData> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_String;
@@ -359,7 +359,7 @@ public:
                                                         !std::is_same<TResult, double>::value)), "");
 
         TSourceValue av{};
-        // uses_val test because compiler cannot see that Column::get has no side effect and result is discarded
+        // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
             REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
@@ -611,7 +611,7 @@ public:
         }
 
         bool b;
-        if (state->template uses_val<TAction>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded
+        if (state->template uses_val<TAction>())    { // Compiler cannot see that IntegerColumn::Get has no side effect and result is discarded
             TSourceValue av = source_column->get_next(i);
             b = state->template match<TAction, false>(i, 0, av);
         }
@@ -662,10 +662,10 @@ public:
     QueryStateBase* m_state;
     SequentialGetterBase* m_source_column; // Column of values used in aggregate (act_FindAll, act_ReturnFirst, act_Sum, etc)
 
-    void get_leaf(const Column& col, std::size_t ndx)
+    void get_leaf(const IntegerColumn& col, std::size_t ndx)
     {
         std::size_t ndx_in_leaf;
-        Column::LeafInfo leaf_info{&m_leaf_ptr, m_array_ptr.get()};
+        IntegerColumn::LeafInfo leaf_info{&m_leaf_ptr, m_array_ptr.get()};
         col.get_leaf(ndx, ndx_in_leaf, leaf_info);
         m_leaf_start = ndx - ndx_in_leaf;
         m_leaf_end = m_leaf_start + m_leaf_ptr->size();
@@ -708,37 +708,37 @@ public:
         m_TAction = TAction;
 
         if (TAction == act_ReturnFirst)
-            m_find_callback_specialized = &ThisType::template find_callback_specialization<act_ReturnFirst, Column>;
+            m_find_callback_specialized = &ThisType::template find_callback_specialization<act_ReturnFirst, IntegerColumn>;
 
         else if (TAction == act_Count)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Count, Column>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Count, IntegerColumn>;
 
         else if (TAction == act_Sum && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, Column>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, IntegerColumn>;
         else if (TAction == act_Sum && col_id == type_Float)
             m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, BasicColumn<float>>;
         else if (TAction == act_Sum && col_id == type_Double)
             m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, BasicColumn<double>>;
 
         else if (TAction == act_Max && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, Column>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, IntegerColumn>;
         else if (TAction == act_Max && col_id == type_Float)
             m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, BasicColumn<float>>;
         else if (TAction == act_Max && col_id == type_Double)
             m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, BasicColumn<double>>;
 
         else if (TAction == act_Min && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, Column>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, IntegerColumn>;
         else if (TAction == act_Min && col_id == type_Float)
             m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, BasicColumn<float>>;
         else if (TAction == act_Min && col_id == type_Double)
             m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, BasicColumn<double>>;
 
         else if (TAction == act_FindAll)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_FindAll, Column>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_FindAll, IntegerColumn>;
 
         else if (TAction == act_CallbackIdx)
-            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_CallbackIdx, Column>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_CallbackIdx, IntegerColumn>;
 
         else {
             REALM_ASSERT(false);
@@ -938,7 +938,7 @@ protected:
 
 template <class TConditionFunction> class BinaryNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     BinaryNode(BinaryData v, size_t column)
     {
@@ -1009,7 +1009,7 @@ protected:
 class StringNodeBase : public ParentNode {
 public:
     template <Action TAction>
-    int64_t find_all(Column*, size_t, size_t, size_t, size_t)
+    int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1246,7 +1246,7 @@ public:
 
             switch (fr) {
                 case FindRes_single:
-                    m_index_matches.reset(new Column(Column::unattached_root_tag(), Allocator::get_default())); // Throws
+                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
                     m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
                     m_index_matches->add(index_ref);
                     m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
@@ -1255,7 +1255,7 @@ public:
                 case FindRes_column:
                     // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
                     // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-                    m_index_matches.reset(new Column(Column::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
+                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
                     m_index_matches->get_root_array()->init_from_ref(index_ref);
                     break;
 
@@ -1267,7 +1267,7 @@ public:
             }
 
             if (m_index_matches) {
-                m_index_getter.reset(new SequentialGetter<Column>(m_index_matches.get()));
+                m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
                 m_index_size = m_index_getter->m_column->size();
             }
 
@@ -1391,9 +1391,9 @@ private:
     SequentialGetter<ColumnStringEnum> m_cse;
 
     // Used for index lookup
-    std::unique_ptr<Column> m_index_matches;
+    std::unique_ptr<IntegerColumn> m_index_matches;
     bool m_index_matches_destroy = false;
-    std::unique_ptr<SequentialGetter<Column>> m_index_getter;
+    std::unique_ptr<SequentialGetter<IntegerColumn>> m_index_getter;
     size_t m_index_size;
     size_t m_last_start;
 };
@@ -1407,7 +1407,7 @@ private:
 // also set to next AND condition (if any exists) following the OR.
 class OrNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(Column*, size_t, size_t, size_t, size_t)
+    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1529,7 +1529,7 @@ private:
 
 class NotNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(Column*, size_t, size_t, size_t, size_t)
+    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1623,7 +1623,7 @@ template <class ColType, class TConditionFunction> class TwoColumnsNode: public 
 public:
     using TConditionValue = typename ColType::value_type;
 
-    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     TwoColumnsNode(size_t column1, size_t column2)
     {

@@ -238,7 +238,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0);
+    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
@@ -253,7 +253,7 @@ double TableViewBase::sum_double(size_t column_ndx) const
 
 int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
 {
@@ -265,14 +265,14 @@ double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) cons
 }
 DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 
 // Minimum
 
 int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
 {
@@ -284,14 +284,14 @@ double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) cons
 }
 DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
 // Average
 
 double TableViewBase::average_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
+    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
@@ -307,7 +307,7 @@ double TableViewBase::average_double(size_t column_ndx) const
 // Count
 size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
 {
-    return aggregate<act_Count, int64_t, size_t, Column>(nullptr, column_ndx, target);
+    return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_float(size_t column_ndx, float target) const
 {
@@ -626,7 +626,7 @@ void TableViewBase::do_sync()
             m_row_indexes.clear();
         else
             m_row_indexes.init_from_ref(Allocator::get_default(), 
-                                        Column::create(Allocator::get_default()));
+                                        IntegerColumn::create(Allocator::get_default()));
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();

@@ -39,7 +39,7 @@ void ColumnLinkList::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
         size_t old_origin_row_ndx = row_ndx + i - 1;
         size_t new_origin_row_ndx = row_ndx + num_rows_to_insert + i - 1;
         if (ref_type ref = get_as_ref(old_origin_row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
@@ -70,7 +70,7 @@ void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     if (!broken_reciprocal_backlinks) {
         for (size_t i = 0; i < num_rows_to_erase; ++i) {
             if (ref_type ref = get_as_ref(row_ndx+1)) {
-                Column link_list(get_alloc(), ref);
+                IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
                     size_t target_row_ndx = to_size_t(link_list.get(j));
@@ -86,7 +86,7 @@ void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
         size_t old_origin_row_ndx = row_ndx + num_rows_to_erase + i;
         size_t new_origin_row_ndx = row_ndx + i;
         if (ref_type ref = get_as_ref(old_origin_row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
@@ -114,7 +114,7 @@ void ColumnLinkList::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     // Remove backlinks to the removed origin row
     if (!broken_reciprocal_backlinks) {
         if (ref_type ref = get_as_ref(row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
                 size_t target_row_ndx = to_size_t(link_list.get(i));
@@ -127,7 +127,7 @@ void ColumnLinkList::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     size_t last_row_ndx = prior_num_rows - 1;
     if (row_ndx != last_row_ndx) {
         if (ref_type ref = get_as_ref(last_row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
                 size_t target_row_ndx = to_size_t(link_list.get(i));
@@ -156,8 +156,9 @@ void ColumnLinkList::clear(size_t, bool broken_reciprocal_backlinks)
 
     // Do the actual deletion
     clear_without_updating_index(); // Throws
-    // FIXME: This one is needed because Column::clear_without_updating_index() forgets about the
-    // leaf type. A better solution should probably be sought after.
+    // FIXME: This one is needed because
+    // IntegerColumn::clear_without_updating_index() forgets about the leaf
+    // type. A better solution should probably be sought after.
     get_root_array()->set_type(Array::type_HasRefs); // Throws
 
     discard_child_accessors();
@@ -169,8 +170,8 @@ void ColumnLinkList::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
     if (row_ndx == state.stop_on_link_list_row_ndx && this == state.stop_on_link_list_column)
         return;
 
-    // Avoid the construction of both a LinkView and a Column instance, since
-    // both would involve heap allocations.
+    // Avoid the construction of both a LinkView and a IntegerColumn instance,
+    // since both would involve heap allocations.
     ref_type ref = get_as_ref(row_ndx);
     if (ref == 0)
         return;
@@ -228,8 +229,8 @@ void ColumnLinkList::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
     if (m_target_table == state.stop_on_table)
         return;
 
-    // Avoid the construction of both a LinkView and a Column instance, since
-    // both would involve heap allocations.
+    // Avoid the construction of both a LinkView and a IntegerColumn instance,
+    // since both would involve heap allocations.
     Array root(get_alloc()), leaf(get_alloc());
     for (size_t i = 0; i < num_rows; ++i) {
         ref_type ref = get_as_ref(i);

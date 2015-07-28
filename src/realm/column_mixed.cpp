@@ -27,7 +27,7 @@ void ColumnMixed::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
 {
     std::unique_ptr<Array> top;
-    std::unique_ptr<Column> types;
+    std::unique_ptr<IntegerColumn> types;
     std::unique_ptr<RefsColumn> data;
     std::unique_ptr<ColumnBinary> binary_data;
     top.reset(new Array(alloc)); // Throws
@@ -35,7 +35,7 @@ void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     REALM_ASSERT(top->size() == 2 || top->size() == 3);
     ref_type types_ref = top->get_as_ref(0);
     ref_type data_ref  = top->get_as_ref(1);
-    types.reset(new Column(alloc, types_ref)); // Throws
+    types.reset(new IntegerColumn(alloc, types_ref)); // Throws
     types->set_parent(&*top, 0);
     data.reset(new RefsColumn(alloc, data_ref, table, column_ndx)); // Throws
     data->set_parent(&*top, 1);
@@ -310,13 +310,13 @@ ref_type ColumnMixed::create(Allocator& alloc, size_t size)
 
     {
         int_fast64_t v = mixcol_Int;
-        ref_type ref = Column::create(alloc, Array::type_Normal, size, v); // Throws
+        ref_type ref = IntegerColumn::create(alloc, Array::type_Normal, size, v); // Throws
         v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
     }
     {
         int_fast64_t v = 1; // 1 + 2*value where value is 0
-        ref_type ref = Column::create(alloc, Array::type_HasRefs, size, v); // Throws
+        ref_type ref = IntegerColumn::create(alloc, Array::type_HasRefs, size, v); // Throws
         v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
     }

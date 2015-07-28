@@ -35,7 +35,7 @@ namespace realm {
 /// The individual values in the column are either refs to Columns containing
 /// the row indexes in the origin table that links to it, or in the case where
 /// there is a single link, a tagged ref encoding the origin row position.
-class ColumnBackLink: public Column, public ArrayParent {
+class ColumnBackLink: public IntegerColumn, public ArrayParent {
 public:
     ColumnBackLink(Allocator&, ref_type);
     ~ColumnBackLink() REALM_NOEXCEPT override {}
@@ -109,18 +109,18 @@ private:
 // Implementation
 
 inline ColumnBackLink::ColumnBackLink(Allocator& alloc, ref_type ref):
-    Column(alloc, ref) // Throws
+    IntegerColumn(alloc, ref) // Throws
 {
 }
 
 inline ref_type ColumnBackLink::create(Allocator& alloc, std::size_t size)
 {
-    return Column::create(alloc, Array::type_HasRefs, size); // Throws
+    return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
 inline bool ColumnBackLink::has_backlinks(std::size_t ndx) const REALM_NOEXCEPT
 {
-    return Column::get(ndx) != 0;
+    return IntegerColumn::get(ndx) != 0;
 }
 
 inline Table& ColumnBackLink::get_origin_table() const REALM_NOEXCEPT
@@ -147,13 +147,13 @@ inline void ColumnBackLink::set_origin_column(ColumnLinkBase& column, std::size_
 
 inline void ColumnBackLink::add_row()
 {
-    Column::add(0);
+    IntegerColumn::add(0);
 }
 
 inline void ColumnBackLink::adj_acc_insert_rows(std::size_t row_ndx,
                                                 std::size_t num_rows) REALM_NOEXCEPT
 {
-    Column::adj_acc_insert_rows(row_ndx, num_rows);
+    IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);
@@ -161,7 +161,7 @@ inline void ColumnBackLink::adj_acc_insert_rows(std::size_t row_ndx,
 
 inline void ColumnBackLink::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 {
-    Column::adj_acc_erase_row(row_ndx);
+    IntegerColumn::adj_acc_erase_row(row_ndx);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);
@@ -170,7 +170,7 @@ inline void ColumnBackLink::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 inline void ColumnBackLink::adj_acc_move_over(std::size_t from_row_ndx,
                                               std::size_t to_row_ndx) REALM_NOEXCEPT
 {
-    Column::adj_acc_move_over(from_row_ndx, to_row_ndx);
+    IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);
@@ -178,7 +178,7 @@ inline void ColumnBackLink::adj_acc_move_over(std::size_t from_row_ndx,
 
 inline void ColumnBackLink::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
-    Column::adj_acc_clear_root_table();
+    IntegerColumn::adj_acc_clear_root_table();
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);

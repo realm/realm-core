@@ -137,7 +137,7 @@ public:
     T back() const REALM_NOEXCEPT;
 
     std::size_t find_first(T value, std::size_t begin = 0, std::size_t end = npos) const;
-    void find_all(Column& out_indices, T value,
+    void find_all(IntegerColumn& out_indices, T value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     static MemRef create_leaf(Array::Type, std::size_t size, T value, Allocator&);
@@ -841,7 +841,7 @@ std::size_t BpTree<T, N>::find_first(T value, std::size_t begin, std::size_t end
 }
 
 template <class T, bool N>
-void BpTree<T,N>::find_all(Column& result, T value, std::size_t begin, std::size_t end) const
+void BpTree<T,N>::find_all(IntegerColumn& result, T value, std::size_t begin, std::size_t end) const
 {
     if (root_is_leaf()) {
         root_as_leaf().find_all(&result, value, 0, begin, end); // Throws
