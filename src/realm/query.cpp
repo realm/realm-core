@@ -272,41 +272,41 @@ Query& Query::add_condition(size_t column_ndx, T value)
 }
 
 
-template <class TColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<TColumnType, Equal>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
 
 // Two column methods, any type
-template <class TColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<TColumnType, Less>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-template <class TColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<TColumnType, LessEqual>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-template <class TColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<TColumnType, Greater>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-template <class TColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<TColumnType, GreaterEqual>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-template <class TColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<TColumnType, NotEqual>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
