@@ -1,9 +1,9 @@
-# NEXT RELEASE
+# 0.92.0 Release notes
 
 ### Bugfixes:
 
-* The upgraded file format version is written out to disk, eliminating
-  potential deadlocks.
+* The upgraded file format version is written out to disk, eliminating potential
+  deadlocks.
 
 ### API breaking changes:
 
