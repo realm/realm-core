@@ -641,7 +641,7 @@ TEST(Upgrade_Database_Binary)
 
 
 // Test upgrading a database with single column containing strings with embedded NULs
-TEST(Upgrade_Database_Strings_With_NUL)
+TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_NULL_STRINGS)
 {
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
 
