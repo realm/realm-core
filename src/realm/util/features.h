@@ -263,10 +263,14 @@
 /* Device (iPhone or iPad) or simulator. */
 #    define REALM_IOS 1
 #  endif
+#  if TARGET_OS_WATCH == 1
+/* Device (Apple Watch) or simulator. */
+#    define REALM_WATCHOS 1
+#  endif
 #endif
 
 
-#if REALM_ANDROID || REALM_IOS
+#if REALM_ANDROID || REALM_IOS || REALM_WATCHOS
 #  define REALM_MOBILE 1
 #endif
 
