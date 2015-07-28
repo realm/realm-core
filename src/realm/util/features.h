@@ -266,6 +266,8 @@
 #  if TARGET_OS_WATCH == 1
 /* Device (Apple Watch) or simulator. */
 #    define REALM_WATCHOS 1
+/* The necessary signal handling / mach exception APIs are all unavailable */
+#    undef REALM_ENABLE_ENCRYPTION
 #  endif
 #endif
 
