@@ -1,26 +1,3 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Changed `LinkView::move` so that the `new_link_ndx` will be the index at which
-  the moved link can be found after the move is completed.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
-
-----------------------------------------------
-
 # 0.92.0 Release notes
 
 ### Bugfixes:
@@ -34,6 +11,8 @@
   insert_int, insert_string, etc., insert_done, and add_int. To insert a value,
   one must now call insert_empty_row, then set the appropriate values for each
   column.
+* Changed `LinkView::move` so that the `new_link_ndx` will be the index at which
+  the moved link can be found after the move is completed.
 
 ### Enhancements:
 
