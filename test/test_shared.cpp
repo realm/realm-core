@@ -2065,6 +2065,10 @@ void waiter(std::string path, int i)
 }
 
 // This test will hang infinitely instead of failing!!!
+
+// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
+/*
+
 TEST(Shared_WaitForChange)
 {
     muu = new Mutex;
@@ -2136,6 +2140,8 @@ TEST(Shared_WaitForChange)
     }
     delete muu;
 }
+
+*/
 
 #endif // endif not on windows (or apple)
 
