@@ -59,9 +59,23 @@ public:
 };
 
 
-/// Reports errors that are a consequence of faulty logic within the program,
-/// such as violating logical preconditions or class invariants, and can be
-/// easily predicted.
+/// This exception class is intended to be thrown only when applications (or
+/// bindings) violate rules that are stated (or aught to have been stated) in
+/// the documentation of the public API, and only in cases where the violation
+/// could have been easily and efficiently predicted by the application. In
+/// other words, this exception class is for the cases where the error is due to
+/// incorrect use of the public API.
+///
+/// This class is not supposed to be caught by applications. It is not even
+/// supposed to be considered part of the public API, and therefore the
+/// documentation of the public API should **not** mention this exception class
+/// by name. Note how this contrasts with other exception classes, such as
+/// NoSuchTable, which are part of the public API, and are supposed to be
+/// mentioned in the documentation by name.
+///
+/// A special macro `CHECK_LOGIC_ERROR()` is provided as a test framework plugin
+/// to allow unit tests to check that the functions in the public API do throw
+/// when rules are violated.
 class LogicError: public std::exception {
 public:
     enum ErrorKind {
