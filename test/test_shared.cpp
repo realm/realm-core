@@ -2014,6 +2014,10 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #if !defined(_WIN32) && !defined(__APPLE__)
 
+
+// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
+/*
+
 namespace {
 
 const int num_threads = 3;
@@ -2062,13 +2066,10 @@ void waiter(std::string path, int i)
         shared_state[i] = 6;
     }
 }
-}
+
+} // anonymous namespace
 
 // This test will hang infinitely instead of failing!!!
-
-// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
-/*
-
 TEST(Shared_WaitForChange)
 {
     muu = new Mutex;
