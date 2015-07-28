@@ -46,7 +46,7 @@ public:
     void erase(std::size_t ndx);
     void clear();
     std::size_t find_first(StringData value);
-    void find_all(Column& c, StringData value, std::size_t start = 0, std::size_t end = -1);
+    void find_all(IntegerColumn& c, StringData value, std::size_t start = 0, std::size_t end = -1);
     std::size_t size();
     bool Verify();
     bool conditional_verify();

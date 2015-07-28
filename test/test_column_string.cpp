@@ -364,8 +364,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = Column::create(Allocator::get_default());
-        Column col(Allocator::get_default(), col_ref);
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
 
         c.add("foobar");
         c.add("bar abc");
@@ -389,8 +389,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = Column::create(Allocator::get_default());
-        Column col(Allocator::get_default(), col_ref);
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
 
         c.add("foobar");
         c.add("bar abc");
@@ -415,8 +415,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = Column::create(Allocator::get_default());
-        Column col(Allocator::get_default(), col_ref);
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
 
         c.add("40 chars  40 chars  40 chars  40 chars  ");
         c.add("baz");
@@ -436,8 +436,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = Column::create(Allocator::get_default());
-        Column col(Allocator::get_default(), col_ref);
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
 
         c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         c.add("baz");
@@ -594,8 +594,8 @@ TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
     size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
-    ref_type results_ref = Column::create(Allocator::get_default());
-    Column results(Allocator::get_default(), results_ref);
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
     e.find_all(results, "nonexist");
     CHECK(results.is_empty());
 
@@ -908,8 +908,8 @@ TEST_TYPES(ColumnString_FindAllExpand, non_nullable, nullable)
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
-    ref_type col_ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), col_ref);
+    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), col_ref);
 
     asc.add("HEJ");
     asc.add("sdfsd");
@@ -957,8 +957,8 @@ TEST_TYPES(ColumnString_FindAllRangesLong, non_nullable, nullable)
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
-    ref_type col_ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), col_ref);
+    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), col_ref);
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -1016,8 +1016,8 @@ TEST_TYPES(ColumnString_FindAllRanges, non_nullable, nullable)
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
-    ref_type col_ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), col_ref);
+    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), col_ref);
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -1082,8 +1082,8 @@ TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, non_nullable, nullable)
 
     col.create_search_index();
 
-    ref_type col_ref = Column::create(Allocator::get_default());
-    Column res(Allocator::get_default(), col_ref);
+    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn res(Allocator::get_default(), col_ref);
     col.find_all(res, "a", 0, npos);
 
     CHECK_EQUAL(1, res.size());

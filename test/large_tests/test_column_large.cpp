@@ -84,8 +84,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
         // before and after)
         size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
-        ref_type accu_ref = Column::create(Allocator::get_default());
-        Column accu(Allocator::get_default(), accu_ref);
+        ref_type accu_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn accu(Allocator::get_default(), accu_ref);
         QueryState<int64_t> state;
         state.m_state = int64_t(&accu);
 
@@ -269,8 +269,8 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
 
     Random random(seed);
     VerifiedInteger a(random);
-    ref_type res_ref = Column::create(Allocator::get_default());
-    Column res(Allocator::get_default(), res_ref);
+    ref_type res_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn res(Allocator::get_default(), res_ref);
 
     int trend = 5;
 

@@ -418,8 +418,8 @@ void BasicArray_Find(TestResults& test_results)
     CHECK_EQUAL(4,          f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
 
     // Find all
-    ref_type results_ref = Column::create(Allocator::get_default());
-    Column results(Allocator::get_default(), results_ref);
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
     f.find_all(&results, T(1.1), 0);
     CHECK_EQUAL(2, results.size());
     CHECK_EQUAL(0, results.get(0));

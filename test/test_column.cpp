@@ -45,7 +45,7 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST_TYPES(Column_Basic, Column, ColumnIntNull)
+TEST_TYPES(Column_Basic, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -263,7 +263,7 @@ TEST_TYPES(Column_Basic, Column, ColumnIntNull)
     // TEST(Column_Index1)
 
     // Create index
-    Column index;
+    IntegerColumn index;
     c.BuildIndex(index);
 
     CHECK_EQUAL(0, c.FindWithIndex(256));
@@ -434,7 +434,7 @@ TEST_TYPES(Column_Basic, Column, ColumnIntNull)
     c.destroy();
 }
 
-TEST_TYPES(Column_IsNullAlwaysFalse, Column, ColumnIntNull)
+TEST_TYPES(Column_IsNullAlwaysFalse, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -445,17 +445,17 @@ TEST_TYPES(Column_IsNullAlwaysFalse, Column, ColumnIntNull)
 
 TEST(Column_SetNullThrows)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column c(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), ref);
     c.add(123);
     CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
     c.destroy();
 }
 
-TEST_TYPES(Column_FindLeafs, Column, ColumnIntNull)
+TEST_TYPES(Column_FindLeafs, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    Column a(Allocator::get_default(), ref);
+    IntegerColumn a(Allocator::get_default(), ref);
 
     // Create values that span multible leaves
     // we use 5 to ensure that we get two levels
@@ -502,10 +502,10 @@ TEST_TYPES(Column_FindLeafs, Column, ColumnIntNull)
 
 
 /*
-TEST_TYPES(Column_Sort, Column, ColumnIntNull)
+TEST_TYPES(Column_Sort, IntegerColumn, ColumnIntNull)
 {
-    // Create Column with random values
-    Column a;
+    // Create IntegerColumn with random values
+    IntegerColumn a;
     a.add(25);
     a.add(12);
     a.add(50);
@@ -539,12 +539,12 @@ TEST_TYPES(Column_Sort, Column, ColumnIntNull)
  *
  */
 
-TEST_TYPES(Column_FindAllIntMin, Column, ColumnIntNull)
+TEST_TYPES(Column_FindAllIntMin, IntegerColumn, ColumnIntNull)
 {
     ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
-    ref_type ref_r = Column::create(Allocator::get_default());
+    ref_type ref_r = IntegerColumn::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref_c);
-    Column r(Allocator::get_default(), ref_r);
+    IntegerColumn r(Allocator::get_default(), ref_r);
 
     const int value = 0;
     const int reps = 5;
@@ -568,12 +568,12 @@ TEST_TYPES(Column_FindAllIntMin, Column, ColumnIntNull)
     r.destroy();
 }
 
-TEST_TYPES(Column_FindAllIntMax, Column, ColumnIntNull)
+TEST_TYPES(Column_FindAllIntMax, IntegerColumn, ColumnIntNull)
 {
     ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
-    ref_type ref_r = Column::create(Allocator::get_default());
+    ref_type ref_r = IntegerColumn::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref_c);
-    Column r(Allocator::get_default(), ref_r);
+    IntegerColumn r(Allocator::get_default(), ref_r);
 
     const int64_t value = 4300000003ULL;
     const int reps = 5;
@@ -606,8 +606,8 @@ TEST_TYPES(Column_FindAllIntMax, Column, ColumnIntNull)
 TEST(Column_LowerUpperBound)
 {
     // Create column with sorted members
-    ref_type ref = Column::create(Allocator::get_default());
-    Column col(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn col(Allocator::get_default(), ref);
     col.add(5);
     for (size_t i = 5; i < 100; i += 5)
         col.add(i);
@@ -641,7 +641,7 @@ TEST(Column_LowerUpperBound)
 }
 
 
-TEST_TYPES(Column_Average, Column, ColumnIntNull)
+TEST_TYPES(Column_Average, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -658,7 +658,7 @@ TEST_TYPES(Column_Average, Column, ColumnIntNull)
     c.destroy();
 }
 
-TEST_TYPES(Column_SumAverage, Column, ColumnIntNull)
+TEST_TYPES(Column_SumAverage, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -717,7 +717,7 @@ TEST_TYPES(Column_SumAverage, Column, ColumnIntNull)
 }
 
 
-TEST_TYPES(Column_Max, Column, ColumnIntNull)
+TEST_TYPES(Column_Max, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -732,7 +732,7 @@ TEST_TYPES(Column_Max, Column, ColumnIntNull)
 }
 
 
-TEST_TYPES(Column_Max2, Column, ColumnIntNull)
+TEST_TYPES(Column_Max2, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -750,7 +750,7 @@ TEST_TYPES(Column_Max2, Column, ColumnIntNull)
     c.destroy();
 }
 
-TEST_TYPES(Column_Min, Column, ColumnIntNull)
+TEST_TYPES(Column_Min, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -765,7 +765,7 @@ TEST_TYPES(Column_Min, Column, ColumnIntNull)
 }
 
 
-TEST_TYPES(Column_Min2, Column, ColumnIntNull)
+TEST_TYPES(Column_Min2, IntegerColumn, ColumnIntNull)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -785,7 +785,7 @@ TEST_TYPES(Column_Min2, Column, ColumnIntNull)
 
 
 /*
-TEST_TYPES(Column_Sort2, Column, ColumnIntNull)
+TEST_TYPES(Column_Sort2, IntegerColumn, ColumnIntNull)
 {
     TEST_TYPE c;
 
@@ -806,8 +806,8 @@ TEST_TYPES(Column_Sort2, Column, ColumnIntNull)
 TEST_IF(Column_PrependMany, TEST_DURATION >= 1)
 {
     // Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
-    ref_type ref = Column::create(Allocator::get_default());
-    Column a(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn a(Allocator::get_default(), ref);
 
     for (size_t items = 0; items < 3000; ++items) {
         a.clear();
