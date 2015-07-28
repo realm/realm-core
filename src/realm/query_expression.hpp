@@ -601,16 +601,12 @@ public:
 };
 
 
-
-/* This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
-to be null too. It's used by the Value class for internal storage.
-
-
-
-*/
+// This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
+// to be null too. It's used by the Value class for internal storage.
 template <class T, size_t prealloc = 8> struct NullableVector
 {
-    typedef typename std::conditional<std::is_same<T, bool>::value, int64_t, T>::type t_storage;
+    typedef typename std::conditional<std::is_same<T, bool>::value 
+        || std::is_same<T, int>::value, int64_t, T>::type t_storage;
 
     NullableVector() {};
 
@@ -633,14 +629,49 @@ template <class T, size_t prealloc = 8> struct NullableVector
         return m_first[index];
     }
 
+
+    inline bool is_null(size_t index) const
+    {
+        REALM_ASSERT((std::is_same<T, bool>::value || std::is_same<T, int64_t>::value || std::is_same<T, int>::value));
+        return m_first[index] == m_null;
+    }
+
+    inline void set_null(size_t index)
+    {
+        REALM_ASSERT((std::is_same<T, bool>::value || std::is_same<T, int64_t>::value || std::is_same<T, int>::value));
+        m_first[index] = m_null;
+    }
+
     inline void set(size_t index, t_storage value)
     {
-        REALM_ASSERT_3(index, < , m_size);
+        REALM_ASSERT((std::is_same<T, bool>::value || std::is_same<T, int64_t>::value || std::is_same<T, int>::value));
+
+        // If value collides with magic null value, then switch to a new unique representation for null
+        if (REALM_UNLIKELY(value == m_null)) {
+            int64_t cand = m_null + 0xfffffffbULL; // adding a prime will generate 2^64 unique values
+            while (std::find(m_first, m_first + m_size, cand) != m_first + m_size)
+                cand += 0xfffffffbULL;
+            std::replace_if(m_first, m_first + m_size, [&](int64_t v) { return v == m_null; }, cand);
+        }
         m_first[index] = value;
     }
 
-    void init(size_t size, T values)
+
+    void fill(T value) 
     {
+        for (size_t t = 0; t < m_size; t++) {
+            if (std::is_same<T, null>::value)
+                set_null(t);
+            else
+                set(t, value);
+        }
+    }
+
+    void init(size_t size)
+    {
+        if (size == m_size)
+            return;
+
         dealloc();
         m_size = size;
         if (m_size > 0) {
@@ -648,15 +679,13 @@ template <class T, size_t prealloc = 8> struct NullableVector
                 m_first = reinterpret_cast<t_storage*>(new T[m_size]);
             else
                 m_first = m_cache;
-
-
-            for (size_t t = 0; t < size; t++) {
-                if (std::is_same<T, null>::value)
-                    set_null(t);
-                else
-                    set(t, values);
-            }
         }
+    }
+
+    void init(size_t size, T values)
+    {
+        init(size);
+        fill(values);
     }
 
     void dealloc()
@@ -668,16 +697,6 @@ template <class T, size_t prealloc = 8> struct NullableVector
         }
     }
 
-    inline bool is_null(size_t index) const // float, double
-    {
-        return std::isnan((double)m_first[index]);
-    }
-
-    inline void set_null(size_t index) 
-    {
-        m_first[index] = std::numeric_limits<T>::quiet_NaN();
-    } // float, double
-
     t_storage m_cache[prealloc];
     t_storage* m_first = &m_cache[0];
     size_t m_size = 0;
@@ -686,14 +705,36 @@ template <class T, size_t prealloc = 8> struct NullableVector
 };
 
 
-template<> inline bool NullableVector<int64_t>::is_null(size_t index) const
+inline void NullableVector<double>::set(size_t index, double value)
 {
-    return m_first[index] == m_null;
+    m_first[index] = value;
 }
-template<> inline bool NullableVector<bool>::is_null(size_t index) const
+
+inline bool NullableVector<double>::is_null(size_t index) const
 {
-    return m_first[index] == m_null;
+    return std::isnan(m_first[index]);
 }
+
+inline void NullableVector<double>::set_null(size_t index)
+{
+    m_first[index] = std::numeric_limits<double>::quiet_NaN();
+} 
+
+inline bool NullableVector<float>::is_null(size_t index) const
+{
+    return std::isnan(m_first[index]);
+}
+
+inline void NullableVector<float>::set_null(size_t index)
+{
+    m_first[index] = std::numeric_limits<float>::quiet_NaN();
+}
+
+inline void NullableVector<float>::set(size_t index, float value)
+{
+    m_first[index] = value;
+}
+
 
 template<> inline bool NullableVector<DateTime>::is_null(size_t index) const
 {
@@ -704,44 +745,43 @@ template<> inline bool NullableVector<null>::is_null(size_t) const
 {
     return true;
 }
+inline void NullableVector<null>::set(size_t index, null)
+{
+}
+
+inline void NullableVector<DateTime>::set(size_t index, DateTime value)
+{
+    m_first[index] = value;
+}
+
+template<> inline void NullableVector<DateTime>::set_null(size_t index)
+{
+    m_first[index] = m_null;
+}
+
+
 template<> inline void NullableVector<null>::set_null(size_t)
 {
     return;
 }
 
-
-// Also for DateTime
-template<> inline void NullableVector<int64_t>::set_null(size_t index)
+inline void NullableVector<StringData>::set(size_t index, StringData value)
 {
-    m_first[index] = m_null;
-}
-template<> inline void NullableVector<bool>::set_null(size_t index)
-{
-    m_first[index] = m_null;
-}
-
-template<> inline void NullableVector<int64_t>::set(size_t index, int64_t value)
-{
-    // If value collides with magic null value, then switch to a new unique representation for null
-    if(REALM_UNLIKELY(value == m_null)) {
-        int64_t cand = m_null + 0xfffffffbULL; // adding a prime will generate 2^64 unique values
-        while (std::find(m_first, m_first + m_size, cand) != m_first + m_size)
-            cand += 0xfffffffbULL;
-        std::replace_if(m_first, m_first + m_size, [&](int64_t v) { return v == m_null; }, cand);
-    }
     m_first[index] = value;
 }
-
+template<> inline bool NullableVector<StringData>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
 
 template<> inline void NullableVector<StringData>::set_null(size_t index)
 {
     m_first[index] = StringData();
 }
 
-template<> inline bool NullableVector<StringData>::is_null(size_t index) const
-{
-    return m_first[index].is_null();
-}
+
+
+
 
 
 
@@ -769,6 +809,12 @@ public:
 
     void init(bool link, size_t values, T v) {
         m_storage.init(values, v);
+        ValueBase::from_link = link;
+        ValueBase::m_values = values;
+    }
+
+    void init(bool link, size_t values) {
+        m_storage.init(values);
         ValueBase::from_link = link;
         ValueBase::m_values = values;
     }
@@ -866,7 +912,8 @@ public:
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
-        else if (std::is_same<T, bool>::value)            source.export_bool(*this);
+        else if (std::is_same<T, bool>::value)            
+            source.export_bool(*this);
         else if (std::is_same<T, float>::value)
             source.export_float(*this);
         else if (std::is_same<T, double>::value)

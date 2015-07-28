@@ -6258,7 +6258,6 @@ NOTE NOTE: There is currently only very little syntax checking.
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
-    size_t t;
     TableView tv;
 
 
