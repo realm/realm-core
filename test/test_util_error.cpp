@@ -72,7 +72,7 @@ TEST(BasicSystemErrors_Messages)
     // magic number below.
     {
         std::error_code err = make_error_code(static_cast<error::basic_system_errors>(64532));
-        CHECK_EQUAL(err.message(), "Unknown error");
+        CHECK_EQUAL(err.message(), "Unknown error 64532");
     }
 }
 
