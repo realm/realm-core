@@ -16,7 +16,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Renamed `Column` to `IntegerColumn` and `TColumn` to `Column`.
 
 ----------------------------------------------
 
