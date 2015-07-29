@@ -365,7 +365,6 @@ public:
     bool is_empty() const REALM_NOEXCEPT;
     Type get_type() const REALM_NOEXCEPT;
 
-    // Exists for find_all() because array.hpp cannot append results directly to a IntegerColumn type (incomplete class)
     static void add_to_column(IntegerColumn* column, int64_t value);
 
     void insert(std::size_t ndx, int_fast64_t value);
