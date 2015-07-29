@@ -3557,6 +3557,30 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
 
+Table* Table::get_link_chain_target(std::vector<size_t> link_chain)
+{
+    Table* table = this;
+    for (size_t t = 0; t < m_link_chain.size(); t++) {
+        // Link column can be either LinkList or single Link
+        ColumnType type = table->get_real_column_type(m_link_chain[t]);
+        if (type == col_type_LinkList) {
+            ColumnLinkList& cll = table->get_column_link_list(m_link_chain[t]);
+            table = &cll.get_target_table();
+        }
+        else if (type == col_type_Link) {
+            ColumnLink& cl = table->get_column_link(m_link_chain[t]);
+            table = &cl.get_target_table();
+        }
+        else {
+            // Only last column in link chain is allowed to be non-link
+            if (t + 1 != m_link_chain.size())
+                throw(LogicError::type_mismatch);
+        }
+    }
+    return table;
+}
+
+
 
 namespace {
 
