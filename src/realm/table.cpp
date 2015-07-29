@@ -1211,6 +1211,8 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                                   col_type != col_type_StringEnum &&
                                   col_type != col_type_Binary &&
                                   col_type != col_type_Int &&
+                                  col_type != col_type_Float &&
+                                  col_type != col_type_Double &&
                                   col_type != col_type_DateTime &&
                                   col_type != col_type_Bool)));
 

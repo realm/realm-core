@@ -999,9 +999,10 @@ public:
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    FloatDoubleNode(null, size_t)
+    FloatDoubleNode(null, size_t column_ndx) : m_value(std::numeric_limits<float>::quiet_NaN())
     {
-        REALM_ASSERT(false); // null is not supported on float columns yet.
+        m_condition_column_idx = column_ndx;
+        m_dT = 1.0;
     }
     ~FloatDoubleNode() REALM_NOEXCEPT override {}
 
@@ -1018,15 +1019,25 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
+        
+        auto find = [&](bool nullability)
+        {
+            bool m_value_nan = nullability ? isnan(m_value) : false;
+            for (size_t s = start; s < end; ++s) {
+                TConditionValue v = m_condition_column.get_next(s);
+                REALM_ASSERT(!(std::isnan(v) && !nullability));
+                if (cond(v, m_value, nullability ? std::isnan(v) : false, m_value_nan))
+                    return s;
+            }
+            return not_found;
+        };
 
-        for (size_t s = start; s < end; ++s) {
-            TConditionValue v = m_condition_column.get_next(s);
-            if (cond(v, m_value))
-                return s;
-        }
-        return not_found;
+        // This will inline the second case but no the first. Todo, use templated lambda when switching to c++14
+        if(m_table->is_nullable(m_condition_column_idx))
+            return find(true);
+        else
+            return find(false);
     }
-
 
     ParentNode* clone() override
     {

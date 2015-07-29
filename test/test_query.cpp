@@ -6226,7 +6226,8 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->insert_column(3, type_Double, "RatingD"); // not yet null support
     table->insert_column(4, type_Bool, "In Stock", true);
     table->insert_column(5, type_DateTime, "Est delivery date", true);
-    table->insert_column(6, type_Float, "RatingF"); // not yet null support
+    table->insert_column(6, type_Float, "RatingF"); 
+    table->insert_column(7, type_Float, "Nullable Float", true);
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
 
     table->set_null(0, 0);
@@ -6257,6 +6258,9 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->set_float(6, 1, 2.2f);
     table->set_float(6, 2, 3.3f);
 
+    table->set_float(7, 0, 1.1f);
+    table->set_null(7, 1);
+    table->set_float(7, 2, 3.3f);
 
     Columns<Int> price = table->column<Int>(0);
     Columns<Int> shipping = table->column<Int>(1);
@@ -6264,9 +6268,10 @@ NOTE NOTE: There is currently only very little syntax checking.
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
     Columns<Float> float_rating = table->column<Float>(6);
+    Columns<Float> nfloat = table->column<Float>(7);
     TableView tv;
 
-
+    
     tv = (price == null()).find_all();
     check(tv, { 0 }, __LINE__);
 
@@ -6303,6 +6308,7 @@ NOTE NOTE: There is currently only very little syntax checking.
     tv = (price > 0).find_all();
     check(tv, { 1, 2 }, __LINE__);
 
+
     // Doubles
     // (null > double) == false
     tv = (price > rating).find_all();
@@ -6314,7 +6320,8 @@ NOTE NOTE: There is currently only very little syntax checking.
     tv = (price + rating != null()).find_all();
     check(tv, { 1, 2 }, __LINE__);
 
-    // Floats
+
+    // Non-nullable floats
     // (null > float) == false
     tv = (price > float_rating).find_all();
     check(tv, { 1, 2 }, __LINE__);
@@ -6324,6 +6331,20 @@ NOTE NOTE: There is currently only very little syntax checking.
 
     tv = (price + float_rating != null()).find_all();
     check(tv, { 1, 2 }, __LINE__);
+    
+
+    // Nullable floats
+    tv = (nfloat == null()).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = (nfloat != null()).find_all();
+    check(tv, { 0, 2 }, __LINE__);
+
+    tv = (nfloat > 2.0).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = (nfloat < 2.0).find_all();
+    check(tv, { 0 }, __LINE__);
 
 
     // Booleans
@@ -6367,7 +6388,27 @@ NOTE NOTE: There is currently only very little syntax checking.
     // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
 //    tv = table->where().greater(0, null()).find_all();
 //    tv = table->where().less(0, 0).find_all();
-    
+
+    // Nullable floats in old syntax
+    tv = table->where().equal(7, null()).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = table->where().not_equal(7, null()).find_all();
+    check(tv, { 0, 2 }, __LINE__);
+
+    tv = table->where().greater(7, 2.0f).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().less(7, 2.0f).find_all();
+    check(tv, { 0 }, __LINE__);
+
+
+    tv = table->where().greater(6, 2.0f).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+
+    tv = table->where().less(6, 2.0f).find_all();
+    check(tv, { 0 }, __LINE__);
+
 }
 
 #endif // TEST_QUERY

@@ -66,6 +66,20 @@ public:
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
+    bool is_nullable() const REALM_NOEXCEPT
+    {
+        return true;
+    }
+    bool is_null(size_t index) const REALM_NOEXCEPT
+    {
+        return std::isnan((float)get(index));
+    }
+
+    void set_null(size_t index)
+    {
+        set(index, std::numeric_limits<T>::quiet_NaN());
+    }
+
     struct LeafInfo {
         const BasicArray<T>** out_leaf_ptr;
         BasicArray<T>* in_fallback;
