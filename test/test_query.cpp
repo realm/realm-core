@@ -6223,9 +6223,10 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->insert_column(0, type_Int, "Price", true);
     table->insert_column(1, type_Int, "Shipping", true);
     table->insert_column(2, type_String, "Description", true);
-    table->insert_column(3, type_Double, "Rating"); // not yet null support
+    table->insert_column(3, type_Double, "RatingD"); // not yet null support
     table->insert_column(4, type_Bool, "In Stock", true);
     table->insert_column(5, type_DateTime, "Est delivery date", true);
+    table->insert_column(6, type_Float, "RatingF"); // not yet null support
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
 
     table->set_null(0, 0);
@@ -6252,12 +6253,17 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->set_null(5, 1);
     table->set_datetime(5, 2, DateTime(2016, 6, 6));
 
+    table->set_float(6, 0, 1.1f);
+    table->set_float(6, 1, 2.2f);
+    table->set_float(6, 2, 3.3f);
+
 
     Columns<Int> price = table->column<Int>(0);
     Columns<Int> shipping = table->column<Int>(1);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<Float> float_rating = table->column<Float>(6);
     TableView tv;
 
 
@@ -6297,6 +6303,7 @@ NOTE NOTE: There is currently only very little syntax checking.
     tv = (price > 0).find_all();
     check(tv, { 1, 2 }, __LINE__);
 
+    // Doubles
     // (null > double) == false
     tv = (price > rating).find_all();
     check(tv, { 1, 2 }, __LINE__);
@@ -6306,6 +6313,18 @@ NOTE NOTE: There is currently only very little syntax checking.
 
     tv = (price + rating != null()).find_all();
     check(tv, { 1, 2 }, __LINE__);
+
+    // Floats
+    // (null > float) == false
+    tv = (price > float_rating).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+
+    tv = (price + float_rating == null()).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = (price + float_rating != null()).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+
 
     // Booleans
     tv = (stock == true).find_all();

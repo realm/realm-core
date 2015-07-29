@@ -2612,6 +2612,7 @@ void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t be
     return;
 }
 
+/*
 bool Array::find(int cond, Action action, null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
     if (cond == cond_Equal) {
@@ -2620,7 +2621,7 @@ bool Array::find(int cond, Action action, null, size_t start, size_t end, size_t
         }
     }
 }
-
+*/
 
 bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool array_nullable, bool value_null) const
 {

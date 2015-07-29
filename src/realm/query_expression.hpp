@@ -705,51 +705,58 @@ template <class T, size_t prealloc = 8> struct NullableVector
 };
 
 
-inline void NullableVector<double>::set(size_t index, double value)
+
+template<> inline void NullableVector<double>::set(size_t index, double value)
 {
     m_first[index] = value;
 }
 
-inline bool NullableVector<double>::is_null(size_t index) const
+template<> inline bool NullableVector<double>::is_null(size_t index) const
 {
     return std::isnan(m_first[index]);
 }
 
-inline void NullableVector<double>::set_null(size_t index)
+template<> inline void NullableVector<double>::set_null(size_t index)
 {
     m_first[index] = std::numeric_limits<double>::quiet_NaN();
 } 
 
-inline bool NullableVector<float>::is_null(size_t index) const
+
+template<> inline bool NullableVector<float>::is_null(size_t index) const
 {
     return std::isnan(m_first[index]);
 }
 
-inline void NullableVector<float>::set_null(size_t index)
+template<> inline void NullableVector<float>::set_null(size_t index)
 {
     m_first[index] = std::numeric_limits<float>::quiet_NaN();
 }
 
-inline void NullableVector<float>::set(size_t index, float value)
+template<> inline void NullableVector<float>::set(size_t index, float value)
 {
     m_first[index] = value;
 }
 
+
+
+template<> inline void NullableVector<null>::set_null(size_t)
+{
+    return;
+}
+template<> inline bool NullableVector<null>::is_null(size_t) const
+{
+    return true;
+}
+template<> inline void NullableVector<null>::set(size_t index, null)
+{
+}
 
 template<> inline bool NullableVector<DateTime>::is_null(size_t index) const
 {
     return m_first[index].get_datetime() == m_null;
 }
 
-template<> inline bool NullableVector<null>::is_null(size_t) const
-{
-    return true;
-}
-inline void NullableVector<null>::set(size_t index, null)
-{
-}
-
-inline void NullableVector<DateTime>::set(size_t index, DateTime value)
+template<> inline void NullableVector<DateTime>::set(size_t index, DateTime value)
 {
     m_first[index] = value;
 }
@@ -760,12 +767,9 @@ template<> inline void NullableVector<DateTime>::set_null(size_t index)
 }
 
 
-template<> inline void NullableVector<null>::set_null(size_t)
-{
-    return;
-}
 
-inline void NullableVector<StringData>::set(size_t index, StringData value)
+
+template<> inline void NullableVector<StringData>::set(size_t index, StringData value)
 {
     m_first[index] = value;
 }

@@ -597,8 +597,11 @@ public:
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, bool nullable_array = false, bool value_null = false) const;
+
+/*
     bool find(int cond, Action action, null, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
+*/
 
     template<class cond, Action action, size_t bitwidth, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
@@ -613,9 +616,11 @@ public:
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                  Callback callback, bool array_nullable = false, bool value_null = false) const;
 
+/*
     template<class cond, Action action, class Callback>
     bool find(null, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
+*/
 
     // Optimized implementation for release mode
     template<class cond2, Action action, size_t bitwidth, class Callback>
@@ -2823,12 +2828,14 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
     REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback, array_nullable, value_null));
 }
 
+/*
 template<class cond, Action action, class Callback>
 bool Array::find(null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                  Callback callback) const
 {
     return find<cond, action>(null{}, start, end, baseindex, state, std::forward<Callback>(callback));
 }
+*/
 
 template<class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
