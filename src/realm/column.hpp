@@ -553,7 +553,7 @@ protected:
     void set_without_updating_index(std::size_t row_ndx, T value);
     void erase_without_updating_index(std::size_t row_ndx, bool is_last);
     void move_last_over_without_updating_index(std::size_t row_ndx, std::size_t last_row_ndx);
-    void swap_without_updating_index(std::size_t row_ndx_1, std::size_t row_ndx_2);
+    void swap_rows_without_updating_index(std::size_t row_ndx_1, std::size_t row_ndx_2);
 
     /// If any element points to an array node, this function recursively
     /// destroys that array node. Note that the same is **not** true for
@@ -1209,11 +1209,11 @@ void TColumn<T,N>::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
         m_search_index->update_ref(value_2, row_ndx_2, row_ndx_1);
     }
 
-    swap_without_updating_index(row_ndx_1, row_ndx_2);
+    swap_rows_without_updating_index(row_ndx_1, row_ndx_2);
 }
 
 template <class T, bool N>
-void TColumn<T,N>::swap_without_updating_index(std::size_t row_ndx_1, std::size_t row_ndx_2)
+void TColumn<T,N>::swap_rows_without_updating_index(std::size_t row_ndx_1, std::size_t row_ndx_2)
 {
     // FIXME: This can be optimized with direct getters and setters.
     T value_1 = m_tree.get(row_ndx_1);
