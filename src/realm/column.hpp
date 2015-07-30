@@ -1216,6 +1216,7 @@ void TColumn<T,N>::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
 {
     REALM_ASSERT_3(row_ndx_1, <, size());
     REALM_ASSERT_3(row_ndx_2, <, size());
+    REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
 
     if (has_search_index()) {
         T value_1 = get(row_ndx_1);
