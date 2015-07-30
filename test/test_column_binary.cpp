@@ -353,4 +353,76 @@ TEST(ColumnBinary_Nulls)
     c.destroy();
 }
 
+TEST(ColumnBinary_SwapRows)
+{
+    // Normal case
+    {
+        ref_type ref = ColumnBinary::create(Allocator::get_default());
+        ColumnBinary c(Allocator::get_default(), ref, true);
+
+        c.add(BinaryData("foo"));
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        CHECK_EQUAL(c.get(1), BinaryData("bar"));
+        CHECK_EQUAL(c.get(2), BinaryData("baz"));
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), BinaryData("baz"));
+        CHECK_EQUAL(c.get(2), BinaryData("bar"));
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type ref = ColumnBinary::create(Allocator::get_default());
+        ColumnBinary c(Allocator::get_default(), ref, true);
+
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        c.swap_rows(0, 1);
+
+        CHECK_EQUAL(c.get(0), BinaryData("baz"));
+        CHECK_EQUAL(c.get(1), BinaryData("bar"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type ref = ColumnBinary::create(Allocator::get_default());
+        ColumnBinary c(Allocator::get_default(), ref, true);
+
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), BinaryData("quux"));
+        CHECK_EQUAL(c.get(2), BinaryData("baz"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = ColumnBinary::create(Allocator::get_default());
+        ColumnBinary c(Allocator::get_default(), ref, true);
+
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        c.swap_rows(2, 1);
+
+        CHECK_EQUAL(c.get(1), BinaryData("quux"));
+        CHECK_EQUAL(c.get(2), BinaryData("baz"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
+
 #endif // TEST_COLUMN_BINARY
