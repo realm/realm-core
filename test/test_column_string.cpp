@@ -58,8 +58,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn c(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref, nullable);
 
     // TEST(ColumnString_MultiEmpty)
 
@@ -110,7 +110,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
     c.add();
 
-    // for AdaptiveStringColumn the default value is dependent on nullability
+    // for StringColumn the default value is dependent on nullability
     StringData default_string_value = nullable ? realm::null() : StringData("");
 
     CHECK_EQUAL(default_string_value, c.get(0));
@@ -462,8 +462,8 @@ TEST_TYPES(ColumnString_Find1, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn c(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref, nullable);
 
     c.add("a");
     c.add("bc");
@@ -488,8 +488,8 @@ TEST_TYPES(ColumnString_Find2, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn c(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref, nullable);
 
     c.add("a");
     c.add("bc");
@@ -520,8 +520,8 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn c(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref, nullable);
 
     // Add duplicate values
     for (size_t i = 0; i < 5; ++i) {
@@ -537,7 +537,7 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
+    StringEnumColumn e(Allocator::get_default(), values, keys, false);
 
     // Verify that all entries match source
     CHECK_EQUAL(c.size(), e.size());
@@ -567,8 +567,8 @@ TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn c(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref, nullable);
 
     // Add duplicate values
     for (size_t i = 0; i < 5; ++i) {
@@ -584,7 +584,7 @@ TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
+    StringEnumColumn e(Allocator::get_default(), values, keys, false);
 
     // Set index
     e.create_search_index();
@@ -671,8 +671,8 @@ TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn c(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref, nullable);
 
     // Add duplicate values
     for (size_t i = 0; i < 5; ++i) {
@@ -692,7 +692,7 @@ TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
+    StringEnumColumn e(Allocator::get_default(), values, keys, false);
 
     // Reuse the index from original column
     e.install_search_index(c.release_search_index());
@@ -718,8 +718,8 @@ TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
 TEST(ColumnString_Null)
 {
     {
-        ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn a(Allocator::get_default(), ref, true);
 
         a.add("");
         size_t t = a.find_first("");
@@ -729,8 +729,8 @@ TEST(ColumnString_Null)
     }
 
     {
-        ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn a(Allocator::get_default(), ref, true);
 
         a.add("foo");
         a.add("");
@@ -744,7 +744,7 @@ TEST(ColumnString_Null)
         size_t keys, values;
         bool res = a.auto_enumerate(keys, values, true);
         CHECK(res);
-        ColumnStringEnum e{Allocator::get_default(), values, keys, true};
+        StringEnumColumn e{Allocator::get_default(), values, keys, true};
         CHECK_EQUAL(e.is_null(0), false);
         CHECK_EQUAL(e.is_null(1), false);
         CHECK_EQUAL(e.is_null(2), true);
@@ -764,8 +764,8 @@ TEST(ColumnString_Null)
     }
 
     {
-        ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn a(Allocator::get_default(), ref, true);
 
         a.add(realm::null());
         a.add("");
@@ -792,8 +792,8 @@ TEST(ColumnString_Null)
     }
 
     {
-        ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn a(Allocator::get_default(), ref, true);
 
         a.add("");
         a.add(realm::null());
@@ -817,8 +817,8 @@ TEST(ColumnString_Null)
     Random random(random_int<unsigned long>());
 
     for (size_t t = 0; t < 50; t++) {
-        ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn a(Allocator::get_default(), ref, true);
 
         // vector that is kept in sync with the ArrayString so that we can compare with it
         std::vector<std::string> v;
@@ -838,7 +838,7 @@ TEST(ColumnString_Null)
                 // Generate string with good probability of being empty or realm::null()
                 static const char str[] = "This string must be longer than 64 bytes in order to test the BinaryBlob type of strings";
                 size_t len;
-                 
+
                 if (random.draw_int<int>() > 100)
                     len = rnd % sizeof(str);
                 else
@@ -885,15 +885,15 @@ TEST(ColumnString_Null)
 
 TEST(ColumnString_SetNullThrowsUnlessNullable)
 {
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn c(Allocator::get_default(), ref, false);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref, false);
     c.add("Hello, World!");
     CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
 
     size_t keys, values;
     bool res = c.auto_enumerate(keys, values, true);
     CHECK(res);
-    ColumnStringEnum e{Allocator::get_default(), values, keys, false};
+    StringEnumColumn e{Allocator::get_default(), values, keys, false};
     CHECK_LOGIC_ERROR(e.set_null(0), LogicError::column_not_nullable);
 
     c.destroy();
@@ -905,8 +905,8 @@ TEST_TYPES(ColumnString_FindAllExpand, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    ref_type asc_ref = StringColumn::create(Allocator::get_default());
+    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
     ref_type col_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), col_ref);
@@ -954,8 +954,8 @@ TEST_TYPES(ColumnString_FindAllRangesLong, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    ref_type asc_ref = StringColumn::create(Allocator::get_default());
+    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
     ref_type col_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), col_ref);
@@ -1013,8 +1013,8 @@ TEST_TYPES(ColumnString_FindAllRanges, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    ref_type asc_ref = StringColumn::create(Allocator::get_default());
+    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
     ref_type col_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), col_ref);
@@ -1072,8 +1072,8 @@ TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create column *without* duplicate values.
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add("a");
     col.add("b");
@@ -1097,8 +1097,8 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    ref_type asc_ref = StringColumn::create(Allocator::get_default());
+    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -1125,7 +1125,7 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
     size_t keys;
     size_t values;
     CHECK(asc.auto_enumerate(keys, values));
-    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
+    StringEnumColumn e(Allocator::get_default(), values, keys, false);
 
     // Check that enumerated column return same result
     CHECK_EQUAL(9, e.count("HEJSA"));
@@ -1142,8 +1142,8 @@ TEST_TYPES(ColumnString_Index, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    ref_type asc_ref = StringColumn::create(Allocator::get_default());
+    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0

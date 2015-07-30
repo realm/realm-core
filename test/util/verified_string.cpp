@@ -7,7 +7,7 @@ using namespace realm::test_util;
 
 
 VerifiedString::VerifiedString():
-    u(Allocator::get_default(), AdaptiveStringColumn::create(Allocator::get_default()))
+    u(Allocator::get_default(), StringColumn::create(Allocator::get_default()))
 {
 }
 

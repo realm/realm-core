@@ -425,14 +425,14 @@ void Group::remove_table(size_t table_ndx)
             ColumnType type = last_spec.get_column_type(i);
             if (tf::is_link_type(type)) {
                 ColumnBase& col = tf::get_column(*last_table, i);
-                REALM_ASSERT(dynamic_cast<ColumnLinkBase*>(&col));
-                ColumnLinkBase& link_col = static_cast<ColumnLinkBase&>(col);
+                REALM_ASSERT(dynamic_cast<LinkColumnBase*>(&col));
+                LinkColumnBase& link_col = static_cast<LinkColumnBase&>(col);
                 opposite_table = &link_col.get_target_table();
             }
             else if (type == col_type_BackLink) {
                 ColumnBase& col = tf::get_column(*last_table, i);
-                REALM_ASSERT(dynamic_cast<ColumnBackLink*>(&col));
-                ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(col);
+                REALM_ASSERT(dynamic_cast<BacklinkColumn*>(&col));
+                BacklinkColumn& backlink_col = static_cast<BacklinkColumn&>(col);
                 opposite_table = &backlink_col.get_origin_table();
             }
             else {

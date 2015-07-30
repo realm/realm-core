@@ -47,10 +47,10 @@ class TableViewBase;
 class ConstTableView;
 class StringIndex;
 class Group;
-class ColumnLinkBase;
-class ColumnLink;
-class ColumnLinkList;
-class ColumnBackLink;
+class LinkColumnBase;
+class LinkColumn;
+class LinkListColumn;
+class BacklinkColumn;
 template<class> class Columns;
 
 struct Link {};
@@ -927,7 +927,7 @@ private:
     void update_link_target_tables(std::size_t old_col_ndx_begin, std::size_t new_col_ndx_begin);
 
     struct SubtableUpdater {
-        virtual void update(const ColumnTable&, Array& subcolumns) = 0;
+        virtual void update(const SubtableColumn&, Array& subcolumns) = 0;
         virtual void update_accessor(Table&) = 0;
         virtual ~SubtableUpdater() {}
     };
@@ -1025,30 +1025,30 @@ private:
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
     IntegerColumn& get_column(std::size_t column_ndx);
     const IntegerColumn& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnIntNull& get_column_int_null(std::size_t column_ndx);
-    const ColumnIntNull& get_column_int_null(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnFloat& get_column_float(std::size_t column_ndx);
-    const ColumnFloat& get_column_float(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnDouble& get_column_double(std::size_t column_ndx);
-    const ColumnDouble& get_column_double(std::size_t column_ndx) const REALM_NOEXCEPT;
-    AdaptiveStringColumn& get_column_string(std::size_t column_ndx);
-    const AdaptiveStringColumn& get_column_string(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnBinary& get_column_binary(std::size_t column_ndx);
-    const ColumnBinary& get_column_binary(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnStringEnum& get_column_string_enum(std::size_t column_ndx);
-    const ColumnStringEnum& get_column_string_enum(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnTable& get_column_table(std::size_t column_ndx);
-    const ColumnTable& get_column_table(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnMixed& get_column_mixed(std::size_t column_ndx);
-    const ColumnMixed& get_column_mixed(std::size_t column_ndx) const REALM_NOEXCEPT;
-    const ColumnLinkBase& get_column_link_base(std::size_t ndx) const REALM_NOEXCEPT;
-    ColumnLinkBase& get_column_link_base(std::size_t ndx);
-    const ColumnLink& get_column_link(std::size_t ndx) const REALM_NOEXCEPT;
-    ColumnLink& get_column_link(std::size_t ndx);
-    const ColumnLinkList& get_column_link_list(std::size_t ndx) const REALM_NOEXCEPT;
-    ColumnLinkList& get_column_link_list(std::size_t ndx);
-    const ColumnBackLink& get_column_backlink(std::size_t ndx) const REALM_NOEXCEPT;
-    ColumnBackLink& get_column_backlink(std::size_t ndx);
+    IntNullColumn& get_column_int_null(std::size_t column_ndx);
+    const IntNullColumn& get_column_int_null(std::size_t column_ndx) const REALM_NOEXCEPT;
+    FloatColumn& get_column_float(std::size_t column_ndx);
+    const FloatColumn& get_column_float(std::size_t column_ndx) const REALM_NOEXCEPT;
+    DoubleColumn& get_column_double(std::size_t column_ndx);
+    const DoubleColumn& get_column_double(std::size_t column_ndx) const REALM_NOEXCEPT;
+    StringColumn& get_column_string(std::size_t column_ndx);
+    const StringColumn& get_column_string(std::size_t column_ndx) const REALM_NOEXCEPT;
+    BinaryColumn& get_column_binary(std::size_t column_ndx);
+    const BinaryColumn& get_column_binary(std::size_t column_ndx) const REALM_NOEXCEPT;
+    StringEnumColumn& get_column_string_enum(std::size_t column_ndx);
+    const StringEnumColumn& get_column_string_enum(std::size_t column_ndx) const REALM_NOEXCEPT;
+    SubtableColumn& get_column_table(std::size_t column_ndx);
+    const SubtableColumn& get_column_table(std::size_t column_ndx) const REALM_NOEXCEPT;
+    MixedColumn& get_column_mixed(std::size_t column_ndx);
+    const MixedColumn& get_column_mixed(std::size_t column_ndx) const REALM_NOEXCEPT;
+    const LinkColumnBase& get_column_link_base(std::size_t ndx) const REALM_NOEXCEPT;
+    LinkColumnBase& get_column_link_base(std::size_t ndx);
+    const LinkColumn& get_column_link(std::size_t ndx) const REALM_NOEXCEPT;
+    LinkColumn& get_column_link(std::size_t ndx);
+    const LinkListColumn& get_column_link_list(std::size_t ndx) const REALM_NOEXCEPT;
+    LinkListColumn& get_column_link_list(std::size_t ndx);
+    const BacklinkColumn& get_column_backlink(std::size_t ndx) const REALM_NOEXCEPT;
+    BacklinkColumn& get_column_backlink(std::size_t ndx);
 
     void instantiate_before_change();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type,

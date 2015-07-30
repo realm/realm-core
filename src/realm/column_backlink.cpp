@@ -28,7 +28,7 @@
 using namespace realm;
 
 
-void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
+void BacklinkColumn::add_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
 
@@ -58,7 +58,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
 }
 
 
-size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const REALM_NOEXCEPT
+size_t BacklinkColumn::get_backlink_count(size_t row_ndx) const REALM_NOEXCEPT
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
 
@@ -74,7 +74,7 @@ size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const REALM_NOEXCEPT
 }
 
 
-size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const REALM_NOEXCEPT
+size_t BacklinkColumn::get_backlink(size_t row_ndx, size_t backlink_ndx) const REALM_NOEXCEPT
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
     REALM_ASSERT_3(value, !=, 0);
@@ -97,7 +97,7 @@ size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const R
 }
 
 
-void ColumnBackLink::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
+void BacklinkColumn::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
     REALM_ASSERT_3(value, !=, 0);
@@ -131,7 +131,7 @@ void ColumnBackLink::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
 }
 
 
-void ColumnBackLink::remove_all_backlinks(size_t num_rows)
+void BacklinkColumn::remove_all_backlinks(size_t num_rows)
 {
     Allocator& alloc = get_alloc();
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
@@ -147,7 +147,7 @@ void ColumnBackLink::remove_all_backlinks(size_t num_rows)
 }
 
 
-void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
+void BacklinkColumn::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
                                      size_t new_origin_row_ndx)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
@@ -173,7 +173,7 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
 
 
 template<typename Func>
-std::size_t ColumnBackLink::for_each_link(std::size_t row_ndx, bool do_destroy, Func&& func)
+std::size_t BacklinkColumn::for_each_link(std::size_t row_ndx, bool do_destroy, Func&& func)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
     if (value != 0) {
@@ -200,7 +200,7 @@ std::size_t ColumnBackLink::for_each_link(std::size_t row_ndx, bool do_destroy, 
 }
 
 
-void ColumnBackLink::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
+void BacklinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
@@ -222,7 +222,7 @@ void ColumnBackLink::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
 }
 
 
-void ColumnBackLink::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+void BacklinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                                 bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
@@ -256,7 +256,7 @@ void ColumnBackLink::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 }
 
 
-void ColumnBackLink::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+void BacklinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
                                         bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
@@ -282,7 +282,7 @@ void ColumnBackLink::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 }
 
 
-void ColumnBackLink::clear(std::size_t num_rows, bool)
+void BacklinkColumn::clear(std::size_t num_rows, bool)
 {
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
         // IntegerColumn::clear() handles the destruction of subtrees
@@ -300,18 +300,18 @@ void ColumnBackLink::clear(std::size_t num_rows, bool)
 }
 
 
-void ColumnBackLink::update_child_ref(size_t child_ndx, ref_type new_ref)
+void BacklinkColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
     IntegerColumn::set(child_ndx, new_ref); // Throws
 }
 
 
-ref_type ColumnBackLink::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
+ref_type BacklinkColumn::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
 {
     return IntegerColumn::get_as_ref(child_ndx);
 }
 
-void ColumnBackLink::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
+void BacklinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 {
     if (state.track_link_nullifications) {
         bool do_destroy = false;
@@ -321,7 +321,7 @@ void ColumnBackLink::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
     }
 }
 
-void ColumnBackLink::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
+void BacklinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
 {
     if (state.track_link_nullifications) {
         for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
@@ -350,7 +350,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
-void ColumnBackLink::Verify() const
+void BacklinkColumn::Verify() const
 {
     if (root_is_leaf()) {
         get_root_array()->Verify();
@@ -361,7 +361,7 @@ void ColumnBackLink::Verify() const
     get_root_array()->verify_bptree(&verify_leaf);
 }
 
-void ColumnBackLink::Verify(const Table& table, size_t col_ndx) const
+void BacklinkColumn::Verify(const Table& table, size_t col_ndx) const
 {
     IntegerColumn::Verify(table, col_ndx);
 
@@ -377,7 +377,7 @@ void ColumnBackLink::Verify(const Table& table, size_t col_ndx) const
 }
 
 
-void ColumnBackLink::get_backlinks(std::vector<VerifyPair>& pairs)
+void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
 {
     VerifyPair pair;
     size_t n = size();
@@ -393,7 +393,7 @@ void ColumnBackLink::get_backlinks(std::vector<VerifyPair>& pairs)
 }
 
 
-std::pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> BacklinkColumn::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
     return std::make_pair(p.first.m_ref, p.second);

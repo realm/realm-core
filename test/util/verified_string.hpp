@@ -54,7 +54,7 @@ public:
 
 private:
     std::vector<std::string> v;
-    AdaptiveStringColumn u;
+    StringColumn u;
 };
 
 

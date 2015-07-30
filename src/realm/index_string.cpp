@@ -792,7 +792,7 @@ void StringIndex::Verify() const
 }
 
 
-void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
+void StringIndex::verify_entries(const StringColumn& column) const
 {
     Allocator& alloc = Allocator::get_default();
     ref_type results_ref = IntegerColumn::create(alloc); // Throws

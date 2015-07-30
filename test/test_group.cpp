@@ -2078,7 +2078,7 @@ TEST(Group_ToDot)
     s.add_column(type_DateTime, "date");
     s.add_column(type_String,   "string");
     s.add_column(type_String,   "string_long");
-    s.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
+    s.add_column(type_String,   "string_enum"); // becomes StringEnumColumn
     s.add_column(type_Binary,   "binary");
     s.add_column(type_Mixed,    "mixed");
     s.add_column(type_Table,    "tables", &subdesc);
@@ -2150,7 +2150,7 @@ TEST(Group_ToDot)
         }
     }
 
-    // We also want ColumnStringEnum's
+    // We also want StringEnumColumn's
     table->optimize();
 
 #if 1

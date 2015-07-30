@@ -26,13 +26,13 @@ namespace realm {
 
 // Regular classes
 class ColumnBase;
-class AdaptiveStringColumn;
-class ColumnStringEnum;
-class ColumnBinary;
-class ColumnTable;
-class ColumnMixed;
-class ColumnLink;
-class ColumnLinkList;
+class StringColumn;
+class StringEnumColumn;
+class BinaryColumn;
+class SubtableColumn;
+class MixedColumn;
+class LinkColumn;
+class LinkListColumn;
 
 // Templated classes
 template <class T, bool Nullable = false> class Column;
@@ -40,9 +40,9 @@ template<class T> class BasicColumn;
 
 // Shortcuts, aka typedefs.
 using IntegerColumn = Column<std::int64_t, false>;
-using ColumnIntNull = Column<std::int64_t, true>;
-using ColumnDouble = BasicColumn<double>;
-using ColumnFloat = BasicColumn<float>;
+using IntNullColumn = Column<std::int64_t, true>;
+using DoubleColumn = BasicColumn<double>;
+using FloatColumn = BasicColumn<float>;
 
 } // namespace realm
 

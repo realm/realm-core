@@ -146,7 +146,7 @@ const std::size_t not_found = npos;
 
 // Pre-definitions
 class Array;
-class AdaptiveStringColumn;
+class StringColumn;
 class GroupWriter;
 template<class T> class QueryState;
 namespace _impl { class ArrayWriterBase; }
@@ -1107,7 +1107,7 @@ protected:
 
     friend class SlabAlloc;
     friend class GroupWriter;
-    friend class AdaptiveStringColumn;
+    friend class StringColumn;
 };
 
 
