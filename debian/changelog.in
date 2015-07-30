@@ -1,3 +1,10 @@
+librealm (0.92.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kristian Spangsege <kristian.spangsege@gmail.com>  Tue, 28 Jul 2015 15:09:27 +0200
+
+
 librealm (0.91.2~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

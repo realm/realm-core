@@ -6,10 +6,35 @@
 
 ### API breaking changes:
 
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.92.0 Release notes
+
+### Bugfixes:
+
+* The upgraded file format version is written out to disk, eliminating potential
+  deadlocks.
+
+### API breaking changes:
+
 * Support for the following deprecated operations on Table has been removed:
   insert_int, insert_string, etc., insert_done, and add_int. To insert a value,
   one must now call insert_empty_row, then set the appropriate values for each
   column.
+* Changed `LinkView::move` so that the `new_link_ndx` will be the index at which
+  the moved link can be found after the move is completed.
 
 ### Enhancements:
 

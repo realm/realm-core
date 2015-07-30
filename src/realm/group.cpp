@@ -678,7 +678,7 @@ void Group::commit()
         throw LogicError(LogicError::detached_accessor);
     if (m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
-    // REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
+     REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     GroupWriter out(*this); // Throws
 

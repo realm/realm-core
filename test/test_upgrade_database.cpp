@@ -641,7 +641,7 @@ TEST(Upgrade_Database_Binary)
 
 
 // Test upgrading a database with single column containing strings with embedded NULs
-TEST(Upgrade_Database_Strings_With_NUL)
+TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_NULL_STRINGS)
 {
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
 
@@ -713,6 +713,22 @@ TEST(Upgrade_Database_Strings_With_NUL)
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+
+#if TEST_READ_UPGRADE_MODE
+TEST(Upgrade_Database_2_3_Writes_New_File_Format) {
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    SharedGroup sg1(temp_copy);
+    WriteTransaction wt1(sg1);
+    SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
+    ReadTransaction rt2(sg2);
+    Group const& g1 = wt1.get_group();
+    Group const& g2 = rt2.get_group();
+    CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
+}
+#endif
 
 
 

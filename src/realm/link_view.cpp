@@ -135,17 +135,16 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
     REALM_ASSERT(is_attached());
     REALM_ASSERT(m_row_indexes.is_attached());
     REALM_ASSERT_3(old_link_ndx, <, m_row_indexes.size());
-    REALM_ASSERT_3(new_link_ndx, <=, m_row_indexes.size());
+    REALM_ASSERT_3(new_link_ndx, <, m_row_indexes.size());
 
     if (old_link_ndx == new_link_ndx)
         return;
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
-    size_t link_ndx = (new_link_ndx <= old_link_ndx) ? new_link_ndx : new_link_ndx-1;
     size_t target_row_ndx = m_row_indexes.get(old_link_ndx);
     m_row_indexes.erase(old_link_ndx);
-    m_row_indexes.insert(link_ndx, target_row_ndx);
+    m_row_indexes.insert(new_link_ndx, target_row_ndx);
 
 #ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
