@@ -132,7 +132,12 @@ public:
     /// should ignore this argument.
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
-    /// Swap the elements at the specified indices.
+    /// \brief Swap the elements at the specified indices.
+    ///
+    /// Behaviour is undefined if:
+    /// - \a row_ndx_1 or \a row_ndx_2 point to an invalid element (out-of
+    /// bounds)
+    /// - \a row_ndx_1 and \a row_ndx_2 point to the same value
     virtual void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) = 0;
 
     virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
@@ -522,6 +527,16 @@ public:
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
+
+    /// \brief Swap the elements at the specified indices.
+    ///
+    /// If this \c TColumn has a search index defined, it will be updated to
+    /// reflect the changes induced by the swap.
+    ///
+    /// Behaviour is undefined if:
+    /// - \a row_ndx_1 or \a row_ndx_2 point to an invalid element (out-of
+    /// bounds)
+    /// - \a row_ndx_1 and \a row_ndx_2 point to the same value
     void swap_rows(std::size_t, std::size_t) override;
     void clear(std::size_t, bool) override;
 
