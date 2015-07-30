@@ -604,18 +604,12 @@ void AdaptiveStringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     StringData value_1 = get(row_ndx_1);
     StringData value_2 = get(row_ndx_2);
 
-#if REALM_NULL_STRINGS == 1
-
     if (value_1.is_null() && value_2.is_null()) {
         return;
     }
 
-#endif // REALM_NULL_STRINGS
-
     std::string buffer_1{value_1.data(), value_1.size()};
     std::string buffer_2{value_2.data(), value_2.size()};
-
-#if REALM_NULL_STRINGS == 1
 
     if (value_1.is_null()) {
         set(row_ndx_2, realm::null());
@@ -632,15 +626,6 @@ void AdaptiveStringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         StringData copy {buffer_2.data(), buffer_2.size()};
         set(row_ndx_1, copy);
     }
-
-#else // REALM_NULL_STRINGS == 0
-
-    StringData copy_of_value_1{buffer_1.data(), buffer_1.size()};
-    StringData copy_of_value_2{buffer_2.data(), buffer_2.size()};
-    set(row_ndx_1, copy_of_value_2);
-    set(row_ndx_2, copy_of_value_1);
-
-#endif // REALM_NULL_STRINGS
 }
 
 

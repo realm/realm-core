@@ -1221,7 +1221,6 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(1), "a");
     }
 
-#if REALM_NULL_STRINGS == 1
     // Null values
     {
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
@@ -1238,7 +1237,6 @@ TEST(ColumnString_SwapRows)
         CHECK(c.get(1).is_null()); // fails
         CHECK_EQUAL(c.get(2), "b"); // passes
     }
-#endif // REALM_NULL_STRINGS
 }
 
 
