@@ -318,6 +318,154 @@ TEST(ColumnDouble_Delete)
     BasicColumn_Delete<ColumnDouble, double>(test_results, double_values, num_double_values);
 }
 
+TEST(ColumnFloat_SwapRows)
+{
+    auto epsilon = std::numeric_limits<float>::epsilon();
+
+    // Normal case
+    {
+        ref_type ref = ColumnFloat::create(Allocator::get_default());
+        ColumnFloat c(Allocator::get_default(), ref);
+
+        c.add(-21.389);
+        c.add(30.221);
+        c.add(10.93);
+        c.add(5.0099);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type ref = ColumnFloat::create(Allocator::get_default());
+        ColumnFloat c(Allocator::get_default(), ref);
+
+        c.add(30.221);
+        c.add(10.93);
+        c.add(5.0099);
+
+        c.swap_rows(0, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type ref = ColumnFloat::create(Allocator::get_default());
+        ColumnFloat c(Allocator::get_default(), ref);
+
+        c.add(5.0099);
+        c.add(30.221);
+        c.add(10.93);
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = ColumnFloat::create(Allocator::get_default());
+        ColumnFloat c(Allocator::get_default(), ref);
+
+        c.add(5.0099);
+        c.add(30.221);
+        c.add(10.93);
+
+        c.swap_rows(2, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
+
+TEST(ColumnDouble_SwapRows)
+{
+    auto epsilon = std::numeric_limits<double>::epsilon();
+
+    // Normal case
+    {
+        ref_type ref = ColumnDouble::create(Allocator::get_default());
+        ColumnDouble c(Allocator::get_default(), ref);
+
+        c.add(-21.389);
+        c.add(30.221);
+        c.add(10.93);
+        c.add(5.0099);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type ref = ColumnDouble::create(Allocator::get_default());
+        ColumnDouble c(Allocator::get_default(), ref);
+
+        c.add(30.221);
+        c.add(10.93);
+        c.add(5.0099);
+
+        c.swap_rows(0, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type ref = ColumnDouble::create(Allocator::get_default());
+        ColumnDouble c(Allocator::get_default(), ref);
+
+        c.add(5.0099);
+        c.add(30.221);
+        c.add(10.93);
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = ColumnDouble::create(Allocator::get_default());
+        ColumnDouble c(Allocator::get_default(), ref);
+
+        c.add(5.0099);
+        c.add(30.221);
+        c.add(10.93);
+
+        c.swap_rows(2, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
+
 TEST(ColumnDouble_InitOfEmptyColumn)
 {
     Table t;

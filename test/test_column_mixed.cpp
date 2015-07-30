@@ -423,5 +423,82 @@ TEST(ColumnMixed_WriteLeak)
     c.destroy();
 }
 
+TEST(ColumnMixed_SwapRows)
+{
+    auto epsilon = std::numeric_limits<float>::epsilon();
+
+    // Normal case
+    {
+        ref_type ref = ColumnMixed::create(Allocator::get_default());
+        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+        c.insert_binary(3, BinaryData("foo"));
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(type_Float, c.get_type(1));
+        CHECK_APPROXIMATELY_EQUAL(c.get_float(1), 391.931, epsilon);
+        CHECK_EQUAL(type_String, c.get_type(2));
+        CHECK_EQUAL(c.get_string(2), "a");
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type ref = ColumnMixed::create(Allocator::get_default());
+        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+
+        c.swap_rows(0, 1);
+
+        CHECK_EQUAL(type_String, c.get_type(0));
+        CHECK_EQUAL(c.get_string(0), "a");
+        CHECK_EQUAL(type_Bool, c.get_type(1));
+        CHECK_EQUAL(c.get_bool(1), false);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type ref = ColumnMixed::create(Allocator::get_default());
+        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(type_Float, c.get_type(1));
+        CHECK_APPROXIMATELY_EQUAL(c.get_float(1), 391.931, epsilon);
+        CHECK_EQUAL(type_String, c.get_type(2));
+        CHECK_EQUAL(c.get_string(2), "a");
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = ColumnMixed::create(Allocator::get_default());
+        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+
+        c.swap_rows(2, 1);
+
+        CHECK_EQUAL(type_Float, c.get_type(1));
+        CHECK_APPROXIMATELY_EQUAL(c.get_float(1), 391.931, epsilon);
+        CHECK_EQUAL(type_String, c.get_type(2));
+        CHECK_EQUAL(c.get_string(2), "a");
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
 
 #endif // TEST_COLUMN_MIXED
