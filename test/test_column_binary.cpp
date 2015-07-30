@@ -358,7 +358,7 @@ TEST(ColumnBinary_SwapRows)
     // Normal case
     {
         ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref, true);
+        ColumnBinary c(Allocator::get_default(), ref);
 
         c.add(BinaryData("foo"));
         c.add(BinaryData("bar"));
@@ -379,7 +379,7 @@ TEST(ColumnBinary_SwapRows)
     // First two elements
     {
         ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref, true);
+        ColumnBinary c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
         c.add(BinaryData("baz"));
@@ -395,7 +395,7 @@ TEST(ColumnBinary_SwapRows)
     // Last two elements
     {
         ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref, true);
+        ColumnBinary c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
         c.add(BinaryData("baz"));
@@ -411,7 +411,7 @@ TEST(ColumnBinary_SwapRows)
     // Indices in wrong order
     {
         ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref, true);
+        ColumnBinary c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
         c.add(BinaryData("baz"));
@@ -421,6 +421,25 @@ TEST(ColumnBinary_SwapRows)
 
         CHECK_EQUAL(c.get(1), BinaryData("quux"));
         CHECK_EQUAL(c.get(2), BinaryData("baz"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Null values
+    {
+        bool nullable = true;
+        ref_type ref = ColumnBinary::create(Allocator::get_default());
+        ColumnBinary c(Allocator::get_default(), ref, nullable);
+
+        c.add(BinaryData("foo"));
+        c.add(BinaryData("bar"));
+        c.add(BinaryData());
+
+        CHECK(c.get(2).is_null());
+
+        c.swap_rows(2, 1);
+
+        CHECK(c.get(1).is_null());
+        CHECK_EQUAL(c.get(2).data(), BinaryData("bar").data());
         CHECK_EQUAL(c.size(), 3); // size should not change
     }
 }
