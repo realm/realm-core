@@ -245,8 +245,8 @@ TEST(ArrayBigBlobs_Basic)
 
     CHECK_EQUAL(3, c.find_first(BinaryData("baz")));
 
-    ref_type results_ref = Column::create(Allocator::get_default());
-    Column results(Allocator::get_default(), results_ref);
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
     c.find_all(results, BinaryData("foobar"));
     CHECK_EQUAL(3, results.size());
 

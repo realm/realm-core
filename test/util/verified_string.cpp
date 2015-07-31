@@ -7,7 +7,7 @@ using namespace realm::test_util;
 
 
 VerifiedString::VerifiedString():
-    u(Allocator::get_default(), AdaptiveStringColumn::create(Allocator::get_default()))
+    u(Allocator::get_default(), StringColumn::create(Allocator::get_default()))
 {
 }
 
@@ -97,7 +97,7 @@ size_t VerifiedString::size()
 }
 
 // todo/fixme, end ignored
-void VerifiedString::find_all(Column& c, StringData value, size_t start, size_t end)
+void VerifiedString::find_all(IntegerColumn& c, StringData value, size_t start, size_t end)
 {
     std::vector<std::string>::iterator ita = v.begin() + start;
     std::vector<std::string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);

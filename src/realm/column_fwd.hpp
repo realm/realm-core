@@ -20,24 +20,29 @@
 #ifndef REALM_COLUMN_FWD_HPP
 #define REALM_COLUMN_FWD_HPP
 
+#include <cstdint>
+
 namespace realm {
 
-
+// Regular classes
 class ColumnBase;
-template <class T, bool Nullable = false> class TColumn;
-/// FIXME: Rename Column to IntegerColumn.
-using Column = TColumn<int64_t>;
-using ColumnIntNull = TColumn<int64_t, true>;
+class StringColumn;
+class StringEnumColumn;
+class BinaryColumn;
+class SubtableColumn;
+class MixedColumn;
+class LinkColumn;
+class LinkListColumn;
+
+// Templated classes
+template <class T, bool Nullable = false> class Column;
 template<class T> class BasicColumn;
-typedef BasicColumn<double> ColumnDouble;
-typedef BasicColumn<float> ColumnFloat;
-class AdaptiveStringColumn;
-class ColumnStringEnum;
-class ColumnBinary;
-class ColumnTable;
-class ColumnMixed;
-class ColumnLink;
-class ColumnLinkList;
+
+// Shortcuts, aka typedefs.
+using IntegerColumn = Column<std::int64_t, false>;
+using IntNullColumn = Column<std::int64_t, true>;
+using DoubleColumn = BasicColumn<double>;
+using FloatColumn = BasicColumn<float>;
 
 } // namespace realm
 

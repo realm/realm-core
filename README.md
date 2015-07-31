@@ -198,21 +198,6 @@ or `sh build.sh bin-dist`, as in the following example:
 
     CC=clang sh build.sh bin-dist all
 
-### Replication
-
-To enable replication in Realm, set `REALM_ENABLE_REPLICATION` to
-a nonempty value during configuration as in the following example:
-
-    REALM_ENABLE_REPLICATION=1 sh build.sh config
-
-When set during preparation of a distribution package, it will have
-the extra effect of including "replication" as an optional extension
-available for installation to the end-user:
-
-    REALM_ENABLE_REPLICATION=1 sh build.sh bin-dist all
-
-
-
 Testing
 -------
 

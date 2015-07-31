@@ -176,9 +176,7 @@ private:
     static bool get_first_column_type_from_ref(ref_type, Allocator&,
                                                ColumnType& type) REALM_NOEXCEPT;
 
-#ifdef REALM_ENABLE_REPLICATION
     friend class Replication;
-#endif
 
     friend class Table;
 };

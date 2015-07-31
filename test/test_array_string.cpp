@@ -438,8 +438,8 @@ TEST(ArrayString_Basic)
 
     c.clear();
 
-    ref_type results_ref = Column::create(Allocator::get_default());
-    Column results(Allocator::get_default(), results_ref);
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
 
     // first, middle and end
     c.add("foobar");

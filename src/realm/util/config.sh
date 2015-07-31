@@ -52,13 +52,6 @@ install_libexecdir_escaped="$(cstring_escape "$install_libexecdir")" || exit 1
 max_bpnode_size="$(get_config_param "MAX_BPNODE_SIZE")" || exit 1
 max_bpnode_size_debug="$(get_config_param "MAX_BPNODE_SIZE_DEBUG")" || exit 1
 
-enable_replication="$(get_config_param "ENABLE_REPLICATION")" || exit 1
-if [ "$enable_replication" = "yes" ]; then
-    enable_replication="1"
-else
-    enable_replication="0"
-fi
-
 enable_alloc_set_zero="$(get_config_param "ENABLE_ALLOC_SET_ZERO")" || exit 1
 if [ "$enable_alloc_set_zero" = "yes" ]; then
     enable_alloc_set_zero="1"
@@ -78,6 +71,13 @@ if [ "$enable_assertions" = "yes" ]; then
     enable_assertions="1"
 else
     enable_assertions="0"
+fi
+
+enable_null_strings="$(get_config_param "ENABLE_NULL_STRINGS")" || exit 1
+if [ "$enable_null_strings" = "yes" ]; then
+    enable_null_strings="1"
+else
+    enable_null_strings="0"
 fi
 
 cat >"$target" <<EOF
@@ -104,10 +104,6 @@ cat >"$target" <<EOF
 #  define REALM_MAX_BPNODE_SIZE $max_bpnode_size
 #endif
 
-#if $enable_replication
-#  define REALM_ENABLE_REPLICATION 1
-#endif
-
 #if $enable_alloc_set_zero
 #  define REALM_ENABLE_ALLOC_SET_ZERO 1
 #endif
@@ -119,4 +115,6 @@ cat >"$target" <<EOF
 #if $enable_assertions
 #  define REALM_ENABLE_ASSERTIONS 1
 #endif
+
+#define REALM_NULL_STRINGS $enable_null_strings
 EOF

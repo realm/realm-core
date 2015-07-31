@@ -31,19 +31,13 @@ fi
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-# enabling replication support in core, now required for objective-c/ios
-export REALM_ENABLE_REPLICATION=1
-
 # enable assertions in release builds by default
 if [ -z ${REALM_ENABLE_ASSERTIONS+x} ]; then
     export REALM_ENABLE_ASSERTIONS=1
 fi
 
 # Extensions corresponding with additional GIT repositories
-EXTENSIONS="java python ruby objc node php c gui"
-if [ "$REALM_ENABLE_REPLICATION" ]; then
-    EXTENSIONS="$EXTENSIONS replication"
-fi
+EXTENSIONS="java python ruby objc node php c gui replication"
 
 # Auxiliary platforms
 PLATFORMS="iphone"
@@ -483,11 +477,6 @@ case "$MODE" in
             max_bpnode_size_debug="$REALM_MAX_BPNODE_SIZE_DEBUG"
         fi
 
-        enable_replication="no"
-        if [ "$REALM_ENABLE_REPLICATION" ]; then
-            enable_replication="yes"
-        fi
-
         enable_alloc_set_zero="no"
         if [ "$REALM_ENABLE_ALLOC_SET_ZERO" ]; then
             enable_alloc_set_zero="yes"
@@ -501,6 +490,11 @@ case "$MODE" in
         enable_assertions="no"
         if [ "$REALM_ENABLE_ASSERTIONS" ]; then
             enable_assertions="yes"
+        fi
+
+        enable_null_strings="yes"
+        if [ "$REALM_DISABLE_NULL_STRINGS" ]; then
+            enable_null_strings="no"
         fi
 
         # Find Xcode
@@ -605,10 +599,10 @@ INSTALL_LIBDIR        = $install_libdir
 INSTALL_LIBEXECDIR    = $install_libexecdir
 MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
-ENABLE_REPLICATION    = $enable_replication
 ENABLE_ASSERTIONS     = $enable_assertions
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
+ENABLE_NULL_STRINGS   = $enable_null_strings
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
@@ -2900,7 +2894,7 @@ EOF
 
     "jenkins-valgrind")
         # Run by Jenkins. Relies on the WORKSPACE environment variable provided by Jenkins itself
-        REALM_ENABLE_REPLICATION=1 REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
+        REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
         sh build.sh clean || exit 1
         VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=${WORKSPACE}/realm-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
         exit 0

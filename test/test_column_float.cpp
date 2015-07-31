@@ -84,11 +84,11 @@ void BasicColumn_IsEmpty(TestResults& test_results)
 }
 TEST(ColumnFloat_IsEmpty)
 {
-    BasicColumn_IsEmpty<ColumnFloat>(test_results);
+    BasicColumn_IsEmpty<FloatColumn>(test_results);
 }
 TEST(ColumnDouble_IsEmpty)
 {
-    BasicColumn_IsEmpty<ColumnDouble>(test_results);
+    BasicColumn_IsEmpty<DoubleColumn>(test_results);
 }
 
 
@@ -111,11 +111,11 @@ void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values
 }
 TEST(ColumnFloat_AddGet)
 {
-    BasicColumn_AddGet<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_AddGet<FloatColumn, float>(test_results, float_values, num_float_values);
 }
 TEST(ColumnDouble_AddGet)
 {
-    BasicColumn_AddGet<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_AddGet<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -138,11 +138,11 @@ void BasicColumn_Clear(TestResults& test_results)
 }
 TEST(ColumnFloat_Clear)
 {
-    BasicColumn_Clear<ColumnFloat, float>(test_results);
+    BasicColumn_Clear<FloatColumn, float>(test_results);
 }
 TEST(ColumnDouble_Clear)
 {
-    BasicColumn_Clear<ColumnDouble, double>(test_results);
+    BasicColumn_Clear<DoubleColumn, double>(test_results);
 }
 
 
@@ -171,11 +171,11 @@ void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 }
 TEST(ColumnFloat_Set)
 {
-    BasicColumn_Set<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Set<FloatColumn, float>(test_results, float_values, num_float_values);
 }
 TEST(ColumnDouble_Set)
 {
-    BasicColumn_Set<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Set<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -226,11 +226,11 @@ void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values
 }
 TEST(ColumnFloat_Insert)
 {
-    BasicColumn_Insert<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Insert<FloatColumn, float>(test_results, float_values, num_float_values);
 }
 TEST(ColumnDouble_Insert)
 {
-    BasicColumn_Insert<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Insert<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -254,11 +254,11 @@ void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_va
 }
 TEST(ColumnFloat_Aggregates)
 {
-    BasicColumn_Aggregates<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Aggregates<FloatColumn, float>(test_results, float_values, num_float_values);
 }
 TEST(ColumnDouble_Aggregates)
 {
-    BasicColumn_Aggregates<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Aggregates<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -311,11 +311,11 @@ void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values
 }
 TEST(ColumnFloat_Delete)
 {
-    BasicColumn_Delete<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Delete<FloatColumn, float>(test_results, float_values, num_float_values);
 }
 TEST(ColumnDouble_Delete)
 {
-    BasicColumn_Delete<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Delete<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 TEST(ColumnDouble_InitOfEmptyColumn)

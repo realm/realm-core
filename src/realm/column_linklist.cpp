@@ -28,7 +28,7 @@
 using namespace realm;
 
 
-void ColumnLinkList::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
+void LinkListColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
@@ -39,7 +39,7 @@ void ColumnLinkList::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
         size_t old_origin_row_ndx = row_ndx + i - 1;
         size_t new_origin_row_ndx = row_ndx + num_rows_to_insert + i - 1;
         if (ref_type ref = get_as_ref(old_origin_row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
@@ -50,7 +50,7 @@ void ColumnLinkList::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
         }
     }
 
-    ColumnLinkBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows); // Throws
+    LinkColumnBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows); // Throws
 
     if (num_rows_moved > 0) {
         const bool fix_ndx_in_parent = true;
@@ -59,7 +59,7 @@ void ColumnLinkList::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
 }
 
 
-void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                                 bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
@@ -70,7 +70,7 @@ void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     if (!broken_reciprocal_backlinks) {
         for (size_t i = 0; i < num_rows_to_erase; ++i) {
             if (ref_type ref = get_as_ref(row_ndx+1)) {
-                Column link_list(get_alloc(), ref);
+                IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
                     size_t target_row_ndx = to_size_t(link_list.get(j));
@@ -86,7 +86,7 @@ void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
         size_t old_origin_row_ndx = row_ndx + num_rows_to_erase + i;
         size_t new_origin_row_ndx = row_ndx + i;
         if (ref_type ref = get_as_ref(old_origin_row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
@@ -97,7 +97,7 @@ void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
         }
     }
 
-    ColumnLinkBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
                                broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
@@ -105,7 +105,7 @@ void ColumnLinkList::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 }
 
 
-void ColumnLinkList::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
                                         bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
@@ -114,7 +114,7 @@ void ColumnLinkList::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     // Remove backlinks to the removed origin row
     if (!broken_reciprocal_backlinks) {
         if (ref_type ref = get_as_ref(row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
                 size_t target_row_ndx = to_size_t(link_list.get(i));
@@ -127,7 +127,7 @@ void ColumnLinkList::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     size_t last_row_ndx = prior_num_rows - 1;
     if (row_ndx != last_row_ndx) {
         if (ref_type ref = get_as_ref(last_row_ndx)) {
-            Column link_list(get_alloc(), ref);
+            IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
                 size_t target_row_ndx = to_size_t(link_list.get(i));
@@ -139,7 +139,7 @@ void ColumnLinkList::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     // Do the actual delete and move
     bool clear_value = false;
     destroy_subtree(row_ndx, clear_value);
-    ColumnLinkBase::move_last_row_over(row_ndx, prior_num_rows,
+    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
                                        broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
@@ -147,7 +147,7 @@ void ColumnLinkList::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 }
 
 
-void ColumnLinkList::clear(size_t, bool broken_reciprocal_backlinks)
+void LinkListColumn::clear(size_t, bool broken_reciprocal_backlinks)
 {
     if (!broken_reciprocal_backlinks) {
         size_t num_target_rows = m_target_table->size();
@@ -156,21 +156,22 @@ void ColumnLinkList::clear(size_t, bool broken_reciprocal_backlinks)
 
     // Do the actual deletion
     clear_without_updating_index(); // Throws
-    // FIXME: This one is needed because Column::clear_without_updating_index() forgets about the
-    // leaf type. A better solution should probably be sought after.
+    // FIXME: This one is needed because
+    // IntegerColumn::clear_without_updating_index() forgets about the leaf
+    // type. A better solution should probably be sought after.
     get_root_array()->set_type(Array::type_HasRefs); // Throws
 
     discard_child_accessors();
 }
 
 
-void ColumnLinkList::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
+void LinkListColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 {
     if (row_ndx == state.stop_on_link_list_row_ndx && this == state.stop_on_link_list_column)
         return;
 
-    // Avoid the construction of both a LinkView and a Column instance, since
-    // both would involve heap allocations.
+    // Avoid the construction of both a LinkView and a IntegerColumn instance,
+    // since both would involve heap allocations.
     ref_type ref = get_as_ref(row_ndx);
     if (ref == 0)
         return;
@@ -195,7 +196,7 @@ void ColumnLinkList::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
 }
 
 
-void ColumnLinkList::cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf,
+void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf,
                                                       CascadeState& state)
 {
     size_t target_table_ndx = m_target_table->get_index_in_group();
@@ -218,7 +219,7 @@ void ColumnLinkList::cascade_break_backlinks_to__leaf(size_t row_ndx, const Arra
 }
 
 
-void ColumnLinkList::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
+void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
 {
     size_t num_target_rows = m_target_table->size();
     m_backlink_column->remove_all_backlinks(num_target_rows);
@@ -228,8 +229,8 @@ void ColumnLinkList::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
     if (m_target_table == state.stop_on_table)
         return;
 
-    // Avoid the construction of both a LinkView and a Column instance, since
-    // both would involve heap allocations.
+    // Avoid the construction of both a LinkView and a IntegerColumn instance,
+    // since both would involve heap allocations.
     Array root(get_alloc()), leaf(get_alloc());
     for (size_t i = 0; i < num_rows; ++i) {
         ref_type ref = get_as_ref(i);
@@ -255,7 +256,7 @@ void ColumnLinkList::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 }
 
 
-void ColumnLinkList::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
+void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
                                                                CascadeState& state)
 {
     size_t target_table_ndx = m_target_table->get_index_in_group();
@@ -270,7 +271,7 @@ void ColumnLinkList::cascade_break_backlinks_to_all_rows__leaf(const Array& link
 }
 
 
-bool ColumnLinkList::compare_link_list(const ColumnLinkList& c) const
+bool LinkListColumn::compare_link_list(const LinkListColumn& c) const
 {
     size_t n = size();
     if (c.size() != n)
@@ -283,27 +284,27 @@ bool ColumnLinkList::compare_link_list(const ColumnLinkList& c) const
 }
 
 
-void ColumnLinkList::do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx)
+void LinkListColumn::do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx)
 {
     LinkViewRef links = get(row_ndx);
     links->do_nullify_link(old_target_row_ndx);
 }
 
 
-void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx)
+void LinkListColumn::do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx)
 {
     LinkViewRef links = get(row_ndx);
     links->do_update_link(old_target_row_ndx, new_target_row_ndx);
 }
 
-void ColumnLinkList::do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2)
+void LinkListColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2)
 {
     LinkViewRef links = get(row_ndx);
     links->do_swap_link(target_row_ndx_1, target_row_ndx_2);
 }
 
 
-LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
+LinkView* LinkListColumn::get_ptr(size_t row_ndx) const
 {
     REALM_ASSERT_3(row_ndx, <, size());
 
@@ -317,27 +318,27 @@ LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
     m_list_accessors.reserve(m_list_accessors.size() + 1); // Throws
     list_entry entry;
     entry.m_row_ndx = row_ndx;
-    entry.m_list = new LinkView(m_table, const_cast<ColumnLinkList&>(*this), row_ndx); // Throws
+    entry.m_list = new LinkView(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
     m_list_accessors.push_back(entry); // Not throwing due to space reservation
     return entry.m_list;
 }
 
 
-void ColumnLinkList::update_child_ref(size_t child_ndx, ref_type new_ref)
+void LinkListColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
-    ColumnLinkBase::set(child_ndx, new_ref);
+    LinkColumnBase::set(child_ndx, new_ref);
 }
 
 
-ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
+ref_type LinkListColumn::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
 {
-    return ColumnLinkBase::get_as_ref(child_ndx);
+    return LinkColumnBase::get_as_ref(child_ndx);
 }
 
 
-void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
+void LinkListColumn::to_json_row(size_t row_ndx, std::ostream& out) const
 {
-    LinkViewRef links1 = const_cast<ColumnLinkList*>(this)->get(row_ndx);
+    LinkViewRef links1 = const_cast<LinkListColumn*>(this)->get(row_ndx);
     for (size_t t = 0; t < links1->size(); t++) {
         if (t > 0)
             out << ", ";
@@ -347,7 +348,7 @@ void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
 }
 
 
-void ColumnLinkList::discard_child_accessors() REALM_NOEXCEPT
+void LinkListColumn::discard_child_accessors() REALM_NOEXCEPT
 {
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i)
@@ -356,9 +357,9 @@ void ColumnLinkList::discard_child_accessors() REALM_NOEXCEPT
 }
 
 
-void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
-    ColumnLinkBase::refresh_accessor_tree(col_ndx, spec); // Throws
+    LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     m_column_ndx = col_ndx;
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i)
@@ -366,18 +367,18 @@ void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void ColumnLinkList::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
 {
-    ColumnLinkBase::adj_acc_insert_rows(row_ndx, num_rows_inserted);
+    LinkColumnBase::adj_acc_insert_rows(row_ndx, num_rows_inserted);
 
     const bool fix_ndx_in_parent = false;
     adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows_inserted);
 }
 
 
-void ColumnLinkList::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 {
-    ColumnLinkBase::adj_acc_erase_row(row_ndx);
+    LinkColumnBase::adj_acc_erase_row(row_ndx);
 
     const bool fix_ndx_in_parent = false;
     size_t num_rows_erased = 1;
@@ -385,9 +386,9 @@ void ColumnLinkList::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 }
 
 
-void ColumnLinkList::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
 {
-    ColumnLinkBase::adj_acc_move_over(from_row_ndx, to_row_ndx);
+    LinkColumnBase::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
     const bool fix_ndx_in_parent = false;
     adj_move_over<fix_ndx_in_parent>(from_row_ndx, to_row_ndx);
@@ -395,7 +396,7 @@ void ColumnLinkList::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) R
 
 
 template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
+void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
 {
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i) {
@@ -409,7 +410,7 @@ void ColumnLinkList::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) R
 
 
 template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT
+void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT
 {
     auto end = m_list_accessors.end();
     auto i = m_list_accessors.begin();
@@ -435,7 +436,7 @@ void ColumnLinkList::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REAL
 
 
 template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
 {
     size_t i = 0, n = m_list_accessors.size();
     while (i < n) {
@@ -461,14 +462,14 @@ void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM
 }
 
 
-void ColumnLinkList::adj_acc_clear_root_table() REALM_NOEXCEPT
+void LinkListColumn::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
-    ColumnLinkBase::adj_acc_clear_root_table();
+    LinkColumnBase::adj_acc_clear_root_table();
     discard_child_accessors();
 }
 
 
-void ColumnLinkList::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void LinkListColumn::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     if (!get_root_array()->update_from_parent(old_baseline))
         return;
@@ -494,7 +495,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
-void ColumnLinkList::Verify() const
+void LinkListColumn::Verify() const
 {
     if (root_is_leaf()) {
         get_root_array()->Verify();
@@ -506,11 +507,11 @@ void ColumnLinkList::Verify() const
 }
 
 
-void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
+void LinkListColumn::Verify(const Table& table, size_t col_ndx) const
 {
-    ColumnLinkBase::Verify(table, col_ndx);
+    LinkColumnBase::Verify(table, col_ndx);
 
-    std::vector<ColumnBackLink::VerifyPair> pairs;
+    std::vector<BacklinkColumn::VerifyPair> pairs;
     m_backlink_column->get_backlinks(pairs);
 
     // For each link list, verify the accessor, then check that the contents of
@@ -527,8 +528,8 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
         size_t m = link_list->size();
         for (size_t j = 0; j < m; ++j)
             links_1.insert(link_list->get(j).get_index());
-        typedef std::vector<ColumnBackLink::VerifyPair>::const_iterator iter;
-        ColumnBackLink::VerifyPair search_value;
+        typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
+        BacklinkColumn::VerifyPair search_value;
         search_value.origin_row_ndx = i;
         std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         for (iter j = range.first; j != range.second; ++j)
@@ -542,7 +543,7 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
 }
 
 
-std::pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> LinkListColumn::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
     return std::make_pair(p.first.m_ref, p.second);

@@ -80,7 +80,39 @@ REALM_TABLE_3(TestTableGroup2,
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));
+
     CHECK(!group.is_attached());
+}
+
+
+TEST(Group_UnattachedErrorHandling)
+{
+    Group group((Group::unattached_tag()));
+
+    // FIXME: Uncomment the two commented lines below once #935 is fixed.
+
+//  CHECK_LOGIC_ERROR(group.is_empty(),                              LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.size(),                                  LogicError::detached_accessor);
+//  CHECK_LOGIC_ERROR(group.find_table("foo"),                       LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table(0),                            LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table("foo"),                        LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo", false),                 LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0),            LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"),        LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false), LogicError::detached_accessor);
+
+    {
+        const auto& const_group = group;
+        CHECK_LOGIC_ERROR(const_group.get_table(0),                 LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table("foo"),             LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
+    }
+
+    {
+        bool f = false;
+        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f),                 LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f), LogicError::detached_accessor);
+    }
 }
 
 
@@ -104,6 +136,49 @@ TEST(Group_OpenFile)
         Group group((Group::unattached_tag()));
         group.open(path, crypt_key(), Group::mode_ReadOnly);
         CHECK(group.is_attached());
+    }
+
+}
+
+// Ensure that Group throws when you attempt to attach it twice in a row
+TEST(Group_DoubleOpening)
+{
+    // File-based open()
+    {
+        GROUP_TEST_PATH(path);
+        Group group((Group::unattached_tag()));
+
+        group.open(path, crypt_key(), Group::mode_ReadWrite);
+        CHECK_LOGIC_ERROR(group.open(path, crypt_key(), Group::mode_ReadWrite), LogicError::wrong_group_state);
+    }
+
+    // Buffer-based open()
+    {
+        // Produce a valid buffer
+        std::unique_ptr<char[]> buffer;
+        size_t buffer_size;
+
+        {
+            GROUP_TEST_PATH(path);
+            {
+                Group group;
+                group.write(path);
+            }
+            {
+                File file(path);
+                buffer_size = size_t(file.get_size());
+                buffer.reset(static_cast<char*>(malloc(buffer_size)));
+                CHECK(bool(buffer));
+                file.read(buffer.get(), buffer_size);
+            }
+        }
+
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK_LOGIC_ERROR(group.open(BinaryData(buffer.get(), buffer_size), take_ownership),
+                          LogicError::wrong_group_state);
     }
 }
 
@@ -170,7 +245,6 @@ TEST(Group_BadFile)
     }
 }
 
-
 TEST(Group_OpenBuffer)
 {
     // Produce a valid buffer
@@ -190,7 +264,6 @@ TEST(Group_OpenBuffer)
             file.read(buffer.get(), buffer_size);
         }
     }
-
 
     // Keep ownership of buffer
     {
@@ -2078,7 +2151,7 @@ TEST(Group_ToDot)
     s.add_column(type_DateTime, "date");
     s.add_column(type_String,   "string");
     s.add_column(type_String,   "string_long");
-    s.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
+    s.add_column(type_String,   "string_enum"); // becomes StringEnumColumn
     s.add_column(type_Binary,   "binary");
     s.add_column(type_Mixed,    "mixed");
     s.add_column(type_Table,    "tables", &subdesc);
@@ -2150,7 +2223,7 @@ TEST(Group_ToDot)
         }
     }
 
-    // We also want ColumnStringEnum's
+    // We also want StringEnumColumn's
     table->optimize();
 
 #if 1

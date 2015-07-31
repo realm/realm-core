@@ -2014,6 +2014,10 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #if !defined(_WIN32) && !defined(__APPLE__)
 
+
+// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
+/*
+
 namespace {
 
 const int num_threads = 3;
@@ -2062,7 +2066,8 @@ void waiter(std::string path, int i)
         shared_state[i] = 6;
     }
 }
-}
+
+} // anonymous namespace
 
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
@@ -2136,6 +2141,8 @@ TEST(Shared_WaitForChange)
     }
     delete muu;
 }
+
+*/
 
 #endif // endif not on windows (or apple)
 
@@ -2427,9 +2434,9 @@ TEST(Shared_ReserveDiskSpace)
 TEST(Shared_MovingEnumStringColumn)
 {
     // Test that the 'index in parent' property of the column of unique strings
-    // in a ColumnStringEnum is properly adjusted when other string enumeration
+    // in a StringEnumColumn is properly adjusted when other string enumeration
     // columns are inserted or removed before it. Note that the parent of the
-    // column of unique strings in a ColumnStringEnum is a child of an array
+    // column of unique strings in a StringEnumColumn is a child of an array
     // node in the Spec class.
 
     SHARED_GROUP_TEST_PATH(path);

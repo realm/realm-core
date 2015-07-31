@@ -137,7 +137,7 @@ size_t VerifiedInteger::size()
 }
 
 // todo/fixme, end ignored
-void VerifiedInteger::find_all(Column &c, int64_t value, size_t start, size_t end)
+void VerifiedInteger::find_all(IntegerColumn &c, int64_t value, size_t start, size_t end)
 {
     std::vector<int64_t>::iterator ita = v.begin() + start;
     std::vector<int64_t>::iterator itb = end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);;

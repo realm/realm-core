@@ -48,7 +48,7 @@ public:
     void erase(std::size_t ndx);
     void clear();
     size_t find_first(int64_t value);
-    void find_all(Column &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
+    void find_all(IntegerColumn &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
     std::size_t size();
     int64_t sum(std::size_t start = 0, std::size_t end = -1);
     int64_t maximum(std::size_t start = 0, std::size_t end = -1);
@@ -59,7 +59,7 @@ public:
 
 private:
     std::vector<int64_t> v;
-    Column u;
+    IntegerColumn u;
     Random& m_random;
 };
 
@@ -68,7 +68,7 @@ private:
 // Implementation
 
 inline VerifiedInteger::VerifiedInteger(Random& random):
-    u(Column::unattached_root_tag(), Allocator::get_default()),
+    u(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_random(random)
 {
     u.get_root_array()->create(Array::type_Normal); // Throws

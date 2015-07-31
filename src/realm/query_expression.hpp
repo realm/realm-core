@@ -981,14 +981,14 @@ public:
             // Link column can be either LinkList or single Link
             ColumnType type = table->get_real_column_type(columns[t]);
             if (type == col_type_LinkList) {
-                ColumnLinkList& cll = table->get_column_link_list(columns[t]);
+                LinkListColumn& cll = table->get_column_link_list(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
                 m_link_types.push_back(realm::type_LinkList);
                 table = &cll.get_target_table();
             }
             else {
-                ColumnLink& cl = table->get_column_link(columns[t]);
+                LinkColumn& cl = table->get_column_link(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link(columns[t])));
                 m_link_types.push_back(realm::type_Link);
@@ -1011,7 +1011,7 @@ public:
     }
 
     const Table* m_table;
-    std::vector<ColumnLinkBase*> m_link_columns;
+    std::vector<LinkColumnBase*> m_link_columns;
     std::vector<Table*> m_tables;
 
 private:
@@ -1019,11 +1019,11 @@ private:
     {
         bool last = (column + 1 == m_link_columns.size());
         if (m_link_types[column] == type_Link) {
-            ColumnLink& cl = *static_cast<ColumnLink*>(m_link_columns[column]);
+            LinkColumn& cl = *static_cast<LinkColumn*>(m_link_columns[column]);
             size_t r = to_size_t(cl.get(row));
             if (r == 0)
                 return;
-            r--; // ColumnLink stores link to row N as N + 1
+            r--; // LinkColumn stores link to row N as N + 1
             if (last) {
                 bool continue2 = lm.consume(r);
                 if (!continue2)
@@ -1033,7 +1033,7 @@ private:
                 map_links(column + 1, r, lm);
         }
         else {
-            ColumnLinkList& cll = *static_cast<ColumnLinkList*>(m_link_columns[column]);
+            LinkListColumn& cll = *static_cast<LinkListColumn*>(m_link_columns[column]);
             LinkViewRef lvr = cll.get(row);
             for (size_t t = 0; t < lvr->size(); t++) {
                 size_t r = lvr->get(t).get_index();

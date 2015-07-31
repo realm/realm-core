@@ -415,7 +415,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     // or it has to be split into a subindex
     ref_type ref = to_ref(slot_value);
     if (!Array::get_context_flag_from_header(alloc.translate(ref))) {
-        Column sub(alloc, ref); // Throws
+        IntegerColumn sub(alloc, ref); // Throws
         sub.set_parent(m_array.get(), ins_pos_refs);
 
         size_t r1 = to_size_t(sub.get(0));
@@ -459,7 +459,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     return true;
 }
 
-void StringIndex::distinct(Column& result) const
+void StringIndex::distinct(IntegerColumn& result) const
 {
     Allocator& alloc = m_array->get_alloc();
     const size_t count = m_array->size();
@@ -490,7 +490,7 @@ void StringIndex::distinct(Column& result) const
                     ndx.distinct(result);
                 }
                 else {
-                    Column sub(alloc, to_ref(ref)); // Throws
+                    IntegerColumn sub(alloc, to_ref(ref)); // Throws
                     size_t r = to_size_t(sub.get(0)); // get first match
                     result.add(r);
                 }
@@ -539,7 +539,7 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
                     ndx.adjust_row_indexes(min_row_ndx, diff);
                 }
                 else {
-                    Column sub(alloc, to_ref(ref)); // Throws
+                    IntegerColumn sub(alloc, to_ref(ref)); // Throws
                     sub.set_parent(m_array.get(), i);
                     sub.adjust_ge(min_row_ndx, diff);
                 }
@@ -618,7 +618,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
                 }
             }
             else {
-                Column sub(alloc, to_ref(ref)); // Throws
+                IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
                 size_t r = sub.find_first(row_ndx);
                 REALM_ASSERT(r != not_found);
@@ -672,7 +672,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 subindex.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
             }
             else {
-                Column sub(alloc, to_ref(ref)); // Throws
+                IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
 
                 size_t old_pos = sub.find_first(row_ndx);
@@ -788,15 +788,15 @@ void StringIndex::Verify() const
 {
     m_array->Verify();
 
-    // FIXME: Extend verification along the lines of Column::Verify().
+    // FIXME: Extend verification along the lines of IntegerColumn::Verify().
 }
 
 
-void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
+void StringIndex::verify_entries(const StringColumn& column) const
 {
     Allocator& alloc = Allocator::get_default();
-    ref_type results_ref = Column::create(alloc); // Throws
-    Column results(alloc, results_ref); // Throws
+    ref_type results_ref = IntegerColumn::create(alloc); // Throws
+    IntegerColumn results(alloc, results_ref); // Throws
 
     size_t count = column.size();
     for (size_t i = 0; i < count; ++i) {
@@ -861,7 +861,7 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
                 continue;
             }
             out << std::setw(indent) << "" << "  List of row indexes\n";
-            Column::dump_node_structure(subnode, out, level+2);
+            IntegerColumn::dump_node_structure(subnode, out, level+2);
         }
         return;
     }
@@ -912,7 +912,7 @@ void StringIndex::to_dot_2(std::ostream& out, StringData title) const
 void StringIndex::array_to_dot(std::ostream& out, const Array& array)
 {
     if (!array.get_context_flag()) {
-        Column col(array.get_alloc(), array.get_ref()); // Throws
+        IntegerColumn col(array.get_alloc(), array.get_ref()); // Throws
         col.set_parent(array.get_parent(), array.get_ndx_in_parent());
         col.to_dot(out, "ref_list");
         return;

@@ -186,7 +186,7 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
     }
 }
 
-void ArrayIntNull::find_all(Column* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
+void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
 {
     // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
     // in the result column. Since find_all may be invoked many times for different leaves in the

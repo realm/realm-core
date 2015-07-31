@@ -1,6 +1,3 @@
-REPLICATION_HPP = $(if $(REALM_ENABLE_REPLICATION),replication.hpp)
-REPLICATION_CPP = $(if $(REALM_ENABLE_REPLICATION),replication.cpp)
-
 nobase_subinclude_HEADERS = \
 util/features.h \
 util/meta.hpp \
@@ -60,7 +57,7 @@ group.hpp \
 group_shared.hpp \
 history.hpp \
 handover_defs.hpp \
-$(REPLICATION_HPP) \
+replication.hpp \
 query.hpp \
 query_conditions.hpp \
 lang_bind_helper.hpp \
@@ -164,7 +161,7 @@ unicode.cpp \
 utilities.cpp \
 version.cpp \
 views.cpp \
-$(REPLICATION_CPP) \
+replication.cpp \
 commit_log.cpp \
 disable_sync_to_disk.cpp
 

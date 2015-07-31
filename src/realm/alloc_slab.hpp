@@ -369,10 +369,8 @@ private:
     class SlabRefEndEq;
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) REALM_NOEXCEPT;
 
-#ifdef REALM_ENABLE_REPLICATION
     Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
-#endif
 
     friend class Group;
     friend class GroupWriter;

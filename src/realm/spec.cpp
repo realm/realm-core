@@ -1,21 +1,16 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/spec.hpp>
-
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 using namespace realm;
 
 
 Spec::~Spec() REALM_NOEXCEPT
 {
-#ifdef REALM_ENABLE_REPLICATION
     if (m_top.is_attached()) {
         if (Replication* repl = m_top.get_alloc().get_replication())
             repl->on_spec_destroyed(this);
     }
-#endif
 }
 
 
