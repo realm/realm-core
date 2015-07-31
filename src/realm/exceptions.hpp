@@ -59,23 +59,38 @@ public:
 };
 
 
-/// This exception class is intended to be thrown only when applications (or
-/// bindings) violate rules that are stated (or aught to have been stated) in
-/// the documentation of the public API, and only in cases where the violation
-/// could have been easily and efficiently predicted by the application. In
-/// other words, this exception class is for the cases where the error is due to
-/// incorrect use of the public API.
+/// The \c LogicError exception class is intended to be thrown only when
+/// applications (or bindings) violate rules that are stated (or ought to have
+/// been stated) in the documentation of the public API, and only in cases
+/// where the violation could have been easily and efficiently predicted by the
+/// application. In other words, this exception class is for the cases where
+/// the error is due to incorrect use of the public API.
 ///
 /// This class is not supposed to be caught by applications. It is not even
 /// supposed to be considered part of the public API, and therefore the
-/// documentation of the public API should **not** mention this exception class
-/// by name. Note how this contrasts with other exception classes, such as
-/// NoSuchTable, which are part of the public API, and are supposed to be
-/// mentioned in the documentation by name.
+/// documentation of the public API should **not** mention the \c LogicError
+/// exception class by name. Note how this contrasts with other exception
+/// classes, such as \c NoSuchTable, which are part of the public API, and are
+/// supposed to be mentioned in the documentation by name. The \c LogicError
+/// exception is part of Realm's private API.
 ///
-/// A special macro `CHECK_LOGIC_ERROR()` is provided as a test framework plugin
-/// to allow unit tests to check that the functions in the public API do throw
-/// when rules are violated.
+/// In other words, the \c LogicError class should exclusively be used in
+/// replacement (or in addition to) asserts (debug or not) in order to
+/// guarantee program interruption, while still allowing for complete
+/// test-cases to be written and run.
+///
+/// To this effect, the special `CHECK_LOGIC_ERROR()` macro is provided as a
+/// test framework plugin to allow unit tests to check that the functions in
+/// the public API do throw \c LogicError when rules are violated.
+///
+/// The reason behind hiding this class from the public API is to prevent users
+/// from getting used to the idea that "Undefined Behaviour" equates a specific
+/// exception being thrown. The whole point of properly documenting "Undefined
+/// Behaviour" cases is to help the user know what the limits are, without
+/// constraining the database to handle every and any use-case thrown at it.
+///
+/// FIXME: This exception class should probably be moved to the `_impl`
+/// namespace, in order to avoid some confusion.
 class LogicError: public std::exception {
 public:
     enum ErrorKind {
