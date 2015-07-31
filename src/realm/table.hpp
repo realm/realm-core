@@ -58,9 +58,7 @@ typedef Link LinkList;
 
 namespace _impl { class TableFriend; }
 
-#ifdef REALM_ENABLE_REPLICATION
 class Replication;
-#endif
 
 
 /// The Table class is non-polymorphic, that is, it has no virtual
@@ -845,9 +843,7 @@ private:
     /// Table::refresh_accessor_tree().
     mutable bool m_mark;
 
-#ifdef REALM_ENABLE_REPLICATION
     mutable uint_fast64_t m_version;
-#endif
 
     void erase_row(size_t row_ndx, bool is_move_last_over);
     void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
@@ -1251,9 +1247,7 @@ private:
     void mark_link_target_tables(std::size_t col_ndx_begin) REALM_NOEXCEPT;
     void mark_opposite_link_tables() REALM_NOEXCEPT;
 
-#ifdef REALM_ENABLE_REPLICATION
     Replication* get_repl() REALM_NOEXCEPT;
-#endif
 
     void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT;
 
@@ -1359,8 +1353,6 @@ protected:
 // Implementation:
 
 
-#ifdef REALM_ENABLE_REPLICATION
-
 inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
 {
     if (bump_global) {
@@ -1386,15 +1378,6 @@ inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
         }
     }
 }
-
-#else // REALM_ENABLE_REPLICATION
-
-inline void Table::bump_version(bool) const REALM_NOEXCEPT
-{
-    // No-op when replication is disabled at compile time
-}
-
-#endif // REALM_ENABLE_REPLICATION
 
 inline void Table::remove(size_t row_ndx)
 {
@@ -1855,12 +1838,10 @@ inline void Table::unmark() REALM_NOEXCEPT
     m_mark = false;
 }
 
-#ifdef REALM_ENABLE_REPLICATION
 inline Replication* Table::get_repl() REALM_NOEXCEPT
 {
     return m_top.get_alloc().get_replication();
 }
-#endif
 
 inline void Table::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
 {
@@ -2209,12 +2190,10 @@ public:
         return table.is_cross_table_link_target();
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     static Replication* get_repl(Table& table) REALM_NOEXCEPT
     {
         return table.get_repl();
     }
-#endif
 };
 
 

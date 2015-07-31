@@ -32,9 +32,7 @@ namespace realm {
 
 class Allocator;
 
-#ifdef REALM_ENABLE_REPLICATION
 class Replication;
-#endif
 
 typedef std::size_t ref_type;
 
@@ -119,16 +117,12 @@ public:
     void watch(ref_type);
 #endif
 
-#ifdef REALM_ENABLE_REPLICATION
     Replication* get_replication() REALM_NOEXCEPT;
-#endif
 
 protected:
     std::size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
-#ifdef REALM_ENABLE_REPLICATION
     Replication* m_replication;
-#endif
 
 #ifdef REALM_DEBUG
     ref_type m_watch;
@@ -284,11 +278,9 @@ inline bool Allocator::is_read_only(ref_type ref) const REALM_NOEXCEPT
     return ref < m_baseline;
 }
 
-inline Allocator::Allocator() REALM_NOEXCEPT
+inline Allocator::Allocator() REALM_NOEXCEPT:
+    m_replication(nullptr)
 {
-#ifdef REALM_ENABLE_REPLICATION
-    m_replication = nullptr;
-#endif
 #ifdef REALM_DEBUG
     m_watch = 0;
 #endif
@@ -299,12 +291,10 @@ inline Allocator::~Allocator() REALM_NOEXCEPT
 {
 }
 
-#ifdef REALM_ENABLE_REPLICATION
 inline Replication* Allocator::get_replication() REALM_NOEXCEPT
 {
     return m_replication;
 }
-#endif
 
 #ifdef REALM_DEBUG
 inline void Allocator::watch(ref_type ref)

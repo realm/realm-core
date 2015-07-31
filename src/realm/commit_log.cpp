@@ -30,8 +30,6 @@
 #include <realm/commit_log.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
-#ifdef REALM_ENABLE_REPLICATION
-
 using namespace realm::util;
 
 namespace {
@@ -711,5 +709,3 @@ std::unique_ptr<ClientHistory> make_client_history(const std::string& database_n
 
 
 } // namespace realm
-
-#endif // REALM_ENABLE_REPLICATION

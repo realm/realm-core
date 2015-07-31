@@ -28,9 +28,7 @@
 #include <realm/group.hpp>
 #include <realm/group_shared.hpp>
 
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 namespace realm {
 
@@ -107,8 +105,6 @@ public:
 
     static LinkView* get_linklist_ptr(Row&, std::size_t col_ndx);
     static void unbind_linklist_ptr(LinkView*);
-
-#ifdef REALM_ENABLE_REPLICATION
 
     //@{
 
@@ -190,8 +186,6 @@ public:
     {
         return Replication::version_type(sg.get_current_version());
     }
-
-#endif
 
     /// Returns the name of the specified data type as follows:
     ///

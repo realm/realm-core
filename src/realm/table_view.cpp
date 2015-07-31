@@ -392,8 +392,6 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_row(real_ndx, out, widths);
 }
 
-#ifdef REALM_ENABLE_REPLICATION
-
 uint64_t TableViewBase::outside_version() const
 {
     check_cookie();
@@ -434,9 +432,6 @@ uint_fast64_t TableViewBase::sync_if_needed() const
     }
     return m_last_seen_version;
 }
-#else
-uint_fast64_t sync_if_needed() const { return 0; };
-#endif
 
 
 
@@ -493,20 +488,16 @@ void TableView::remove(size_t ndx)
     REALM_ASSERT(m_table);
     REALM_ASSERT(ndx < m_row_indexes.size());
 
-#ifdef REALM_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == outside_version();
-#endif
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_row_indexes.get(ndx));
     m_table->remove(real_ndx);
 
-#ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
         m_last_seen_version = outside_version();
-#endif
 
     // Update refs
     m_row_indexes.erase(ndx);
@@ -521,9 +512,7 @@ void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
-#ifdef REALM_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == outside_version();
-#endif
 
     // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
     // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered 
@@ -548,12 +537,10 @@ void TableView::clear()
     m_num_detached_refs = 0;
     m_table->register_view(this);
 
-#ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
         m_last_seen_version = outside_version();
-#endif
 }
 
 void TableViewBase::sync_distinct_view(size_t column)
@@ -571,7 +558,6 @@ void TableViewBase::sync_distinct_view(size_t column)
     }
 }
 
-#ifdef REALM_ENABLE_REPLICATION
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
@@ -641,4 +627,3 @@ void TableViewBase::do_sync()
 
     m_last_seen_version = outside_version();
 }
-#endif // REALM_ENABLE_REPLICATION

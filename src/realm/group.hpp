@@ -595,14 +595,12 @@ private:
                uint_fast64_t version_number) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
 
-#ifdef REALM_ENABLE_REPLICATION
     Replication* get_replication() const REALM_NOEXCEPT;
     void set_replication(Replication*) REALM_NOEXCEPT;
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
-#endif
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
@@ -948,8 +946,6 @@ inline void Group::reset_free_space_tracking()
     m_alloc.reset_free_space_tracking(); // Throws
 }
 
-#ifdef REALM_ENABLE_REPLICATION
-
 inline Replication* Group::get_replication() const REALM_NOEXCEPT
 {
     return m_alloc.get_replication();
@@ -959,8 +955,6 @@ inline void Group::set_replication(Replication* repl) REALM_NOEXCEPT
 {
     m_alloc.set_replication(repl);
 }
-
-#endif // REALM_ENABLE_REPLICATION
 
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Group class.
@@ -1015,7 +1009,6 @@ public:
         group.send_cascade_notification(notification);
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     static Replication* get_replication(const Group& group) REALM_NOEXCEPT
     {
         return group.get_replication();
@@ -1025,7 +1018,6 @@ public:
     {
         group.set_replication(repl);
     }
-#endif // REALM_ENABLE_REPLICATION
 
     static void detach(Group& group) REALM_NOEXCEPT
     {
