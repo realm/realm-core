@@ -42,8 +42,8 @@ using namespace realm;
 
 TEST(ColumnBinary_Basic)
 {
-    ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref, true);
+    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    BinaryColumn c(Allocator::get_default(), ref, true);
 
     // TEST(ColumnBinary_MultiEmpty)
 
@@ -288,9 +288,9 @@ TEST(ColumnBinary_Basic)
 
 TEST(ColumnBinary_Nulls)
 {
-    ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref, true);
-    
+    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    BinaryColumn c(Allocator::get_default(), ref, true);
+
     c.add(BinaryData());
     c.add(BinaryData("", 0));
     c.add(BinaryData("foo"));

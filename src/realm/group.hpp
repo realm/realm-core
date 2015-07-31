@@ -1064,7 +1064,7 @@ struct CascadeState: Group::CascadeNotification {
     /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
     ///
     /// Must never be set concurrently with stop_on_table.
-    ColumnLinkList* stop_on_link_list_column = nullptr;
+    LinkListColumn* stop_on_link_list_column = nullptr;
 
     /// Is ignored if stop_on_link_list_column is null.
     std::size_t stop_on_link_list_row_ndx = 0;

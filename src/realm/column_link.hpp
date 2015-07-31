@@ -32,10 +32,10 @@ namespace realm {
 /// The individual values in a link column are indexes of rows in the target
 /// table (offset with one to allow zero to indicate null links.) The target
 /// table is specified by the table descriptor.
-class ColumnLink: public ColumnLinkBase {
+class LinkColumn: public LinkColumnBase {
 public:
-    using ColumnLinkBase::ColumnLinkBase;
-    ~ColumnLink() REALM_NOEXCEPT override;
+    using LinkColumnBase::LinkColumnBase;
+    ~LinkColumn() REALM_NOEXCEPT override;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
@@ -68,7 +68,7 @@ public:
 #endif
 
 protected:
-    friend class ColumnBackLink;
+    friend class BacklinkColumn;
     void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                         std::size_t new_target_row_ndx) override;
@@ -80,36 +80,36 @@ private:
 
 // Implementation
 
-inline ColumnLink::~ColumnLink() REALM_NOEXCEPT
+inline LinkColumn::~LinkColumn() REALM_NOEXCEPT
 {
 }
 
-inline ref_type ColumnLink::create(Allocator& alloc, std::size_t size)
+inline ref_type LinkColumn::create(Allocator& alloc, std::size_t size)
 {
     return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
 }
 
-inline std::size_t ColumnLink::get_link(std::size_t row_ndx) const REALM_NOEXCEPT
+inline std::size_t LinkColumn::get_link(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
-    return to_size_t(ColumnLinkBase::get(row_ndx)) - size_t(1);
+    return to_size_t(LinkColumnBase::get(row_ndx)) - size_t(1);
 }
 
-inline bool ColumnLink::is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT
+inline bool LinkColumn::is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     // Null is represented by zero
-    return ColumnLinkBase::get(row_ndx) == 0;
+    return LinkColumnBase::get(row_ndx) == 0;
 }
 
-inline std::size_t ColumnLink::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
+inline std::size_t LinkColumn::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
 {
-    int_fast64_t old_value = ColumnLinkBase::get(row_ndx);
+    int_fast64_t old_value = LinkColumnBase::get(row_ndx);
     std::size_t old_target_row_ndx = to_size_t(old_value) - size_t(1);
     if (old_value != 0)
         m_backlink_column->remove_one_backlink(old_target_row_ndx, row_ndx); // Throws
 
     int_fast64_t new_value = int_fast64_t(size_t(1) + target_row_ndx);
-    ColumnLinkBase::set(row_ndx, new_value); // Throws
+    LinkColumnBase::set(row_ndx, new_value); // Throws
 
     if (target_row_ndx != realm::npos)
         m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
@@ -117,30 +117,30 @@ inline std::size_t ColumnLink::set_link(std::size_t row_ndx, std::size_t target_
     return old_target_row_ndx;
 }
 
-inline void ColumnLink::nullify_link(size_t row_ndx)
+inline void LinkColumn::nullify_link(size_t row_ndx)
 {
     set_link(row_ndx, realm::npos); // Throws
 }
 
-inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)
+inline void LinkColumn::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)
 {
     int_fast64_t value = int_fast64_t(size_t(1) + target_row_ndx);
-    ColumnLinkBase::insert(row_ndx, value); // Throws
+    LinkColumnBase::insert(row_ndx, value); // Throws
 
     if (target_row_ndx != realm::npos)
         m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
 }
 
-inline void ColumnLink::insert_null_link(size_t row_ndx)
+inline void LinkColumn::insert_null_link(size_t row_ndx)
 {
     insert_link(row_ndx, realm::npos); // Throws
 }
 
-inline void ColumnLink::do_update_link(std::size_t row_ndx, std::size_t,
+inline void LinkColumn::do_update_link(std::size_t row_ndx, std::size_t,
                                        std::size_t new_target_row_ndx)
 {
     // Row pos is offset by one, to allow null refs
-    ColumnLinkBase::set(row_ndx, new_target_row_ndx + 1);
+    LinkColumnBase::set(row_ndx, new_target_row_ndx + 1);
 }
 
 } //namespace realm

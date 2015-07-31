@@ -2434,9 +2434,9 @@ TEST(Shared_ReserveDiskSpace)
 TEST(Shared_MovingEnumStringColumn)
 {
     // Test that the 'index in parent' property of the column of unique strings
-    // in a ColumnStringEnum is properly adjusted when other string enumeration
+    // in a StringEnumColumn is properly adjusted when other string enumeration
     // columns are inserted or removed before it. Note that the parent of the
-    // column of unique strings in a ColumnStringEnum is a child of an array
+    // column of unique strings in a StringEnumColumn is a child of an array
     // node in the Spec class.
 
     SHARED_GROUP_TEST_PATH(path);

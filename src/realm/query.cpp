@@ -763,11 +763,11 @@ int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, siz
 }
 double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, resultcount, start, end, limit);
 }
 
 // Maximum
@@ -787,12 +787,12 @@ DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t 
 float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
                            size_t limit, size_t* return_ndx) const
 {
-    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                              size_t limit, size_t* return_ndx) const
 {
-    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit,
+    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, resultcount, start, end, limit,
                                       return_ndx);
 }
 
@@ -807,12 +807,12 @@ int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start,
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
 {
-    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
                              size_t* return_ndx) const
 {
-    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit, 
+    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit, 
                                       return_ndx);
 }
 

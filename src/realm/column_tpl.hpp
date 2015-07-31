@@ -43,11 +43,11 @@ template<class cond> struct ColumnTypeTraits2<cond, bool> {
     typedef ArrayInteger array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
-    typedef ColumnFloat column_type;
+    typedef FloatColumn column_type;
     typedef ArrayFloat array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
-    typedef ColumnDouble column_type;
+    typedef DoubleColumn column_type;
     typedef ArrayDouble array_type;
 };
 

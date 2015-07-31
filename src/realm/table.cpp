@@ -125,7 +125,7 @@
 ///    allows for a column accessor to be properly destroyed.
 ///
 ///  - The map of subtable accessors in a column acccessor
-///    (ColumnSubtableParent::m_subtable_map). All pointers refer to existing
+///    (SubtableColumnParent::m_subtable_map). All pointers refer to existing
 ///    subtable accessors, but it is not required that the set of subtable
 ///    accessors referenced from a particular parent P conincide with the set
 ///    of subtables accessors specifying P as parent.
@@ -137,9 +137,9 @@
 ///    (Descriptor::m_subdesc_map). All non-null pointers refer to existing
 ///    subdescriptor accessors.
 ///
-///  - The `search_index` property of a column accesor
-///    (AdaptiveStringColumn::m_index, ColumnStringEnum::m_index). When it is
-///    non-null, it refers to an existing search index accessor.
+///  - The `search_index` property of a column accesor (StringColumn::m_index,
+///    StringEnumColumn::m_index). When it is non-null, it refers to an existing
+///    search index accessor.
 ///
 ///
 /// Structurally Correspondent Accessor Hierarchy (accessor reattachment)
@@ -188,7 +188,7 @@
 ///    accessor whose type agrees with the data type (realm::DataType) of the
 ///    corresponding underlying column (at same index).
 ///
-///  - If a column accessor is of type `ColumnStringEnum`, then the
+///  - If a column accessor is of type `StringEnumColumn`, then the
 ///    corresponding underlying column must be an enumerated strings column (the
 ///    reverse is not required).
 ///
@@ -199,7 +199,7 @@
 ///  - For each entry in the subtable map of a column accessor there must be an
 ///    underlying subtable at column `i` and row `j`, where `i` is the index of
 ///    the column accessor in `Table::m_cols`, and `j` is the value of
-///    `ColumnSubtableParent::SubtableMap::entry::m_subtable_ndx`. The
+///    `SubtableColumnParent::SubtableMap::entry::m_subtable_ndx`. The
 ///    corresponding subtable accessor must satisfy all the "requirements for a
 ///    table" with respect to that underlying subtable.
 ///
@@ -232,7 +232,7 @@
 ///    (*Table::m_cols[]->m_array).
 ///
 ///  - The root array accessor of the subcolumn of unique strings in an
-///    enumerated string column (*ColumnStringEnum::m_keys.m_array).
+///    enumerated string column (*StringEnumColumn::m_keys.m_array).
 ///
 ///  - The root array accessor of search indexes
 ///    (*Table::m_cols[]->m_index->m_array).
@@ -261,12 +261,12 @@ template<> struct ColumnTypeTraits3<bool> {
 template<> struct ColumnTypeTraits3<float> {
     const static ColumnType ct_id = col_type_Float;
     const static ColumnType ct_id_real = col_type_Float;
-    typedef ColumnFloat column_type;
+    typedef FloatColumn column_type;
 };
 template<> struct ColumnTypeTraits3<double> {
     const static ColumnType ct_id = col_type_Double;
     const static ColumnType ct_id_real = col_type_Double;
-    typedef ColumnDouble column_type;
+    typedef DoubleColumn column_type;
 };
 template<> struct ColumnTypeTraits3<DateTime> {
     const static ColumnType ct_id = col_type_DateTime;
@@ -276,7 +276,7 @@ template<> struct ColumnTypeTraits3<DateTime> {
 template<> struct ColumnTypeTraits3<BinaryData> {
     const static ColumnType ct_id = col_type_Binary;
     const static ColumnType ct_id_real = col_type_Binary;
-    typedef ColumnBinary column_type;
+    typedef BinaryColumn column_type;
 };
 
 // -- Table ---------------------------------------------------------------------------------
@@ -305,7 +305,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
 {
     size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
+    const BacklinkColumn& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink_count(row_ndx);
 }
 
@@ -315,7 +315,7 @@ size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_co
 {
     size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
+    const BacklinkColumn& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink(row_ndx, backlink_ndx);
 }
 
@@ -323,8 +323,8 @@ size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_co
 void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_table,
                                           size_t backlink_col_ndx) REALM_NOEXCEPT
 {
-    ColumnLinkBase& link_col = get_column_link_base(link_col_ndx);
-    ColumnBackLink& backlink_col = target_table.get_column_backlink(backlink_col_ndx);
+    LinkColumnBase& link_col = get_column_link_base(link_col_ndx);
+    BacklinkColumn& backlink_col = target_table.get_column_backlink(backlink_col_ndx);
     link_col.set_target_table(target_table);
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
@@ -338,8 +338,8 @@ size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT
     size_t col_ndx_begin = m_spec.get_public_column_count();
     size_t col_ndx_end   = m_cols.size();
     for (size_t i = col_ndx_begin; i < col_ndx_end; ++i) {
-        const ColumnBackLink& backlink_col = get_column_backlink(i);
-        const ColumnLinkBase& link_col = backlink_col.get_origin_column();
+        const BacklinkColumn& backlink_col = get_column_backlink(i);
+        const LinkColumnBase& link_col = backlink_col.get_origin_column();
         if (link_col.get_weak_links())
             continue;
         sum += backlink_col.get_backlink_count(row_ndx);
@@ -570,7 +570,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
         m_column_ndx(i), m_type(t), m_nullable(nullable)
     {
     }
-    void update(const ColumnTable& subtables, Array& subcolumns) override
+    void update(const SubtableColumn& subtables, Array& subcolumns) override
     {
         size_t row_ndx = subcolumns.get_ndx_in_parent();
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
@@ -599,7 +599,7 @@ struct Table::EraseSubtableColumns: SubtableUpdater {
         m_column_ndx(i)
     {
     }
-    void update(const ColumnTable&, Array& subcolumns) override
+    void update(const SubtableColumn&, Array& subcolumns) override
     {
         ref_type column_ref = to_ref(subcolumns.get(m_column_ndx));
         subcolumns.erase(m_column_ndx); // Throws
@@ -618,7 +618,7 @@ private:
 
 
 struct Table::RenameSubtableColumns: SubtableUpdater {
-    void update(const ColumnTable&, Array&) override
+    void update(const SubtableColumn&, Array&) override
     {
     }
     void update_accessor(Table& table) override
@@ -839,7 +839,7 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
         return;
     m_spec.set_column_attr(col_ndx, new_attr);
 
-    ColumnLinkBase& col = get_column_link_base(col_ndx);
+    LinkColumnBase& col = get_column_link_base(col_ndx);
     col.set_weak_links(weak_links);
 
     if (Replication* repl = get_repl())
@@ -881,7 +881,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
         ColumnType type = m_spec.get_column_type(new_col_ndx);
         if (!is_link_type(type))
             continue;
-        ColumnLinkBase* link_col = static_cast<ColumnLinkBase*>(m_cols[new_col_ndx]);
+        LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[new_col_ndx]);
         Spec& target_spec = link_col->get_target_table().m_spec;
         size_t origin_table_ndx = get_index_in_group();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
@@ -964,7 +964,7 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
     size_t col_ndx = *col_path_begin;
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
 
-    ColumnTable& subtables = get_column_table(col_ndx); // Throws
+    SubtableColumn& subtables = get_column_table(col_ndx); // Throws
     size_t num_rows = size();
     bool is_parent_of_modify_level = col_path_size == 1;
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
@@ -1046,8 +1046,8 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
         return;
 
     if (ColumnBase* col = m_cols[col_ndx]) {
-        REALM_ASSERT(dynamic_cast<ColumnTable*>(col));
-        ColumnTable* col_2 = static_cast<ColumnTable*>(col);
+        REALM_ASSERT(dynamic_cast<SubtableColumn*>(col));
+        SubtableColumn* col_2 = static_cast<SubtableColumn*>(col);
         col_2->update_table_accessors(col_path_begin+1, col_path_end, updater); // Throws
     }
 }
@@ -1209,51 +1209,51 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
         case col_type_Bool:
         case col_type_DateTime:
             if (nullable) {
-                col = new ColumnIntNull(alloc, ref); // Throws
+                col = new IntNullColumn(alloc, ref); // Throws
             }
             else {
                 col = new IntegerColumn(alloc, ref); // Throws
             }
             break;
         case col_type_Float:
-            col = new ColumnFloat(alloc, ref); // Throws
+            col = new FloatColumn(alloc, ref); // Throws
             break;
         case col_type_Double:
-            col = new ColumnDouble(alloc, ref); // Throws
+            col = new DoubleColumn(alloc, ref); // Throws
             break;
         case col_type_String:
-            col = new AdaptiveStringColumn(alloc, ref, nullable); // Throws
+            col = new StringColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Binary:
-            col = new ColumnBinary(alloc, ref, nullable); // Throws
+            col = new BinaryColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
                 m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
-            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref, nullable); // Throws
+            StringEnumColumn* col_2 = new StringEnumColumn(alloc, ref, keys_ref, nullable); // Throws
             col_2->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             col = col_2;
             break;
         }
         case col_type_Table:
-            col = new ColumnTable(alloc, ref, this, col_ndx); // Throws
+            col = new SubtableColumn(alloc, ref, this, col_ndx); // Throws
             break;
         case col_type_Mixed:
-            col = new ColumnMixed(alloc, ref, this, col_ndx); // Throws
+            col = new MixedColumn(alloc, ref, this, col_ndx); // Throws
             break;
         case col_type_Link:
             // Target table will be set by group after entire table has been created
-            col = new ColumnLink(alloc, ref, this, col_ndx); // Throws
+            col = new LinkColumn(alloc, ref, this, col_ndx); // Throws
             break;
         case col_type_LinkList:
             // Target table will be set by group after entire table has been created
-            col = new ColumnLinkList(alloc, ref, this, col_ndx); // Throws
+            col = new LinkListColumn(alloc, ref, this, col_ndx); // Throws
             break;
         case col_type_BackLink:
             // Origin table will be set by group after entire table has been created
-            col = new ColumnBackLink(alloc, ref); // Throws
+            col = new BacklinkColumn(alloc, ref); // Throws
             break;
         case col_type_Reserved1:
         case col_type_Reserved4:
@@ -1360,7 +1360,7 @@ void Table::upgrade_file_format()
     for (size_t c = 0; c < get_column_count(); c++) {
         if (has_search_index(c)) {
             if (get_column_type(c) == type_String) {
-                AdaptiveStringColumn& asc = get_column_string(c);
+                StringColumn& asc = get_column_string(c);
                 asc.get_search_index()->clear();
                 asc.populate_search_index();
             }
@@ -1497,14 +1497,14 @@ bool Table::try_add_primary_key(size_t col_ndx)
     ColumnType type = get_real_column_type(col_ndx);
     ColumnBase& col = get_column_base(col_ndx);
     if (type == col_type_String) {
-        AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
+        StringColumn& col_2 = static_cast<StringColumn&>(col);
         StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_StringEnum) {
-        ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
+        StringEnumColumn& col_2 = static_cast<StringEnumColumn&>(col);
         StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
@@ -1553,12 +1553,12 @@ void Table::remove_primary_key()
             ColumnType type = get_real_column_type(col_ndx);
             ColumnBase& col = get_column_base(col_ndx);
             if (type == col_type_String) {
-                AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
+                StringColumn& col_2 = static_cast<StringColumn&>(col);
                 StringIndex& index = *col_2.get_search_index();
                 index.set_allow_duplicate_values(true);
             }
             else if (type == col_type_StringEnum) {
-                ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
+                StringEnumColumn& col_2 = static_cast<StringEnumColumn&>(col);
                 StringIndex& index = *col_2.get_search_index();
                 index.set_allow_duplicate_values(true);
             }
@@ -1650,132 +1650,132 @@ IntegerColumn& Table::get_column(size_t ndx)
     return get_column<IntegerColumn, col_type_Int>(ndx);
 }
 
-const ColumnIntNull& Table::get_column_int_null(size_t ndx) const REALM_NOEXCEPT
+const IntNullColumn& Table::get_column_int_null(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnIntNull, col_type_Int>(ndx);
+    return get_column<IntNullColumn, col_type_Int>(ndx);
 }
 
-ColumnIntNull& Table::get_column_int_null(size_t ndx)
+IntNullColumn& Table::get_column_int_null(size_t ndx)
 {
-    return get_column<ColumnIntNull, col_type_Int>(ndx);
+    return get_column<IntNullColumn, col_type_Int>(ndx);
 }
 
-const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const REALM_NOEXCEPT
+const StringColumn& Table::get_column_string(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+    return get_column<StringColumn, col_type_String>(ndx);
 }
 
-AdaptiveStringColumn& Table::get_column_string(size_t ndx)
+StringColumn& Table::get_column_string(size_t ndx)
 {
-    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+    return get_column<StringColumn, col_type_String>(ndx);
 }
 
-const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const REALM_NOEXCEPT
+const StringEnumColumn& Table::get_column_string_enum(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+    return get_column<StringEnumColumn, col_type_StringEnum>(ndx);
 }
 
-ColumnStringEnum& Table::get_column_string_enum(size_t ndx)
+StringEnumColumn& Table::get_column_string_enum(size_t ndx)
 {
-    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+    return get_column<StringEnumColumn, col_type_StringEnum>(ndx);
 }
 
-const ColumnFloat& Table::get_column_float(size_t ndx) const REALM_NOEXCEPT
+const FloatColumn& Table::get_column_float(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnFloat, col_type_Float>(ndx);
+    return get_column<FloatColumn, col_type_Float>(ndx);
 }
 
-ColumnFloat& Table::get_column_float(size_t ndx)
+FloatColumn& Table::get_column_float(size_t ndx)
 {
-    return get_column<ColumnFloat, col_type_Float>(ndx);
+    return get_column<FloatColumn, col_type_Float>(ndx);
 }
 
-const ColumnDouble& Table::get_column_double(size_t ndx) const REALM_NOEXCEPT
+const DoubleColumn& Table::get_column_double(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnDouble, col_type_Double>(ndx);
+    return get_column<DoubleColumn, col_type_Double>(ndx);
 }
 
-ColumnDouble& Table::get_column_double(size_t ndx)
+DoubleColumn& Table::get_column_double(size_t ndx)
 {
-    return get_column<ColumnDouble, col_type_Double>(ndx);
+    return get_column<DoubleColumn, col_type_Double>(ndx);
 }
 
-const ColumnBinary& Table::get_column_binary(size_t ndx) const REALM_NOEXCEPT
+const BinaryColumn& Table::get_column_binary(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnBinary, col_type_Binary>(ndx);
+    return get_column<BinaryColumn, col_type_Binary>(ndx);
 }
 
-ColumnBinary& Table::get_column_binary(size_t ndx)
+BinaryColumn& Table::get_column_binary(size_t ndx)
 {
-    return get_column<ColumnBinary, col_type_Binary>(ndx);
+    return get_column<BinaryColumn, col_type_Binary>(ndx);
 }
 
-const ColumnTable &Table::get_column_table(size_t ndx) const REALM_NOEXCEPT
+const SubtableColumn &Table::get_column_table(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnTable, col_type_Table>(ndx);
+    return get_column<SubtableColumn, col_type_Table>(ndx);
 }
 
-ColumnTable &Table::get_column_table(size_t ndx)
+SubtableColumn &Table::get_column_table(size_t ndx)
 {
-    return get_column<ColumnTable, col_type_Table>(ndx);
+    return get_column<SubtableColumn, col_type_Table>(ndx);
 }
 
-const ColumnMixed& Table::get_column_mixed(size_t ndx) const REALM_NOEXCEPT
+const MixedColumn& Table::get_column_mixed(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+    return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
 
-ColumnMixed& Table::get_column_mixed(size_t ndx)
+MixedColumn& Table::get_column_mixed(size_t ndx)
 {
-    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+    return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
 
-const ColumnLinkBase& Table::get_column_link_base(size_t ndx) const REALM_NOEXCEPT
+const LinkColumnBase& Table::get_column_link_base(size_t ndx) const REALM_NOEXCEPT
 {
     const ColumnBase& col_base = get_column_base(ndx);
     REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
                    m_spec.get_column_type(ndx) == col_type_LinkList);
-    const ColumnLinkBase& col_link_base = static_cast<const ColumnLinkBase&>(col_base);
+    const LinkColumnBase& col_link_base = static_cast<const LinkColumnBase&>(col_base);
     return col_link_base;
 }
 
-ColumnLinkBase& Table::get_column_link_base(size_t ndx)
+LinkColumnBase& Table::get_column_link_base(size_t ndx)
 {
     ColumnBase& col_base = get_column_base(ndx);
     REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
                    m_spec.get_column_type(ndx) == col_type_LinkList);
-    ColumnLinkBase& col_link_base = static_cast<ColumnLinkBase&>(col_base);
+    LinkColumnBase& col_link_base = static_cast<LinkColumnBase&>(col_base);
     return col_link_base;
 }
 
-const ColumnLink& Table::get_column_link(size_t ndx) const REALM_NOEXCEPT
+const LinkColumn& Table::get_column_link(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnLink, col_type_Link>(ndx);
+    return get_column<LinkColumn, col_type_Link>(ndx);
 }
 
-ColumnLink& Table::get_column_link(size_t ndx)
+LinkColumn& Table::get_column_link(size_t ndx)
 {
-    return get_column<ColumnLink, col_type_Link>(ndx);
+    return get_column<LinkColumn, col_type_Link>(ndx);
 }
 
-const ColumnLinkList& Table::get_column_link_list(size_t ndx) const REALM_NOEXCEPT
+const LinkListColumn& Table::get_column_link_list(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnLinkList, col_type_LinkList>(ndx);
+    return get_column<LinkListColumn, col_type_LinkList>(ndx);
 }
 
-ColumnLinkList& Table::get_column_link_list(size_t ndx)
+LinkListColumn& Table::get_column_link_list(size_t ndx)
 {
-    return get_column<ColumnLinkList, col_type_LinkList>(ndx);
+    return get_column<LinkListColumn, col_type_LinkList>(ndx);
 }
 
-const ColumnBackLink& Table::get_column_backlink(size_t ndx) const REALM_NOEXCEPT
+const BacklinkColumn& Table::get_column_backlink(size_t ndx) const REALM_NOEXCEPT
 {
-    return get_column<ColumnBackLink, col_type_BackLink>(ndx);
+    return get_column<BacklinkColumn, col_type_BackLink>(ndx);
 }
 
-ColumnBackLink& Table::get_column_backlink(size_t ndx)
+BacklinkColumn& Table::get_column_backlink(size_t ndx)
 {
-    return get_column<ColumnBackLink, col_type_BackLink>(ndx);
+    return get_column<BacklinkColumn, col_type_BackLink>(ndx);
 }
 
 
@@ -1844,29 +1844,29 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_Bool:
         case col_type_DateTime:
             if (nullable) {
-                return ColumnIntNull::create(alloc, Array::type_Normal, size); // Throws
+                return IntNullColumn::create(alloc, Array::type_Normal, size); // Throws
             }
             else {
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
         case col_type_Float:
-            return ColumnFloat::create(alloc, size); // Throws
+            return FloatColumn::create(alloc, size); // Throws
         case col_type_Double:
-            return ColumnDouble::create(alloc, size); // Throws
+            return DoubleColumn::create(alloc, size); // Throws
         case col_type_String:
-            return AdaptiveStringColumn::create(alloc, size); // Throws
+            return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
-            return ColumnBinary::create(alloc, size); // Throws
+            return BinaryColumn::create(alloc, size); // Throws
         case col_type_Table:
-            return ColumnTable::create(alloc, size); // Throws
+            return SubtableColumn::create(alloc, size); // Throws
         case col_type_Mixed:
-            return ColumnMixed::create(alloc, size); // Throws
+            return MixedColumn::create(alloc, size); // Throws
         case col_type_Link:
-            return ColumnLink::create(alloc, size); // Throws
+            return LinkColumn::create(alloc, size); // Throws
         case col_type_LinkList:
-            return ColumnLinkList::create(alloc, size); // Throws
+            return LinkListColumn::create(alloc, size); // Throws
         case col_type_BackLink:
-            return ColumnBackLink::create(alloc, size); // Throws
+            return BacklinkColumn::create(alloc, size); // Throws
         case col_type_StringEnum:
         case col_type_Reserved1:
         case col_type_Reserved4:
@@ -2172,7 +2172,7 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     REALM_ASSERT_3(row_ndx, <, m_size);
     bump_version();
 
-    ColumnTable& subtables = get_column_table(col_ndx);
+    SubtableColumn& subtables = get_column_table(col_ndx);
     subtables.set(row_ndx, table);
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
@@ -2188,7 +2188,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
     REALM_ASSERT_3(row_ndx, <, m_size);
     bump_version();
 
-    ColumnMixed& mixed_col = get_column_mixed(col_ndx);
+    MixedColumn& mixed_col = get_column_mixed(col_ndx);
     mixed_col.set_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
@@ -2223,8 +2223,8 @@ Table* Table::get_link_target_table_accessor(size_t col_ndx) REALM_NOEXCEPT
     REALM_ASSERT(m_columns.is_attached());
     REALM_ASSERT_3(col_ndx, <, m_cols.size());
     if (ColumnBase* col = m_cols[col_ndx]) {
-        REALM_ASSERT(dynamic_cast<ColumnLinkBase*>(col));
-        return &static_cast<ColumnLinkBase*>(col)->get_target_table();
+        REALM_ASSERT(dynamic_cast<LinkColumnBase*>(col));
+        return &static_cast<LinkColumnBase*>(col)->get_target_table();
     }
     return 0;
 }
@@ -2252,11 +2252,11 @@ Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
-        ColumnTable& subtables = get_column_table(col_ndx);
+        SubtableColumn& subtables = get_column_table(col_ndx);
         return subtables.get_subtable_ptr(row_ndx); // Throws
     }
     if (type == col_type_Mixed) {
-        ColumnMixed& subtables = get_column_mixed(col_ndx);
+        MixedColumn& subtables = get_column_mixed(col_ndx);
         return subtables.get_subtable_ptr(row_ndx); // Throws
     }
     REALM_ASSERT(false);
@@ -2271,11 +2271,11 @@ size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const REALM_NOEX
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
-        const ColumnTable& subtables = get_column_table(col_ndx);
+        const SubtableColumn& subtables = get_column_table(col_ndx);
         return subtables.get_subtable_size(row_ndx);
     }
     if (type == col_type_Mixed) {
-        const ColumnMixed& subtables = get_column_mixed(col_ndx);
+        const MixedColumn& subtables = get_column_mixed(col_ndx);
         return subtables.get_subtable_size(row_ndx);
     }
     REALM_ASSERT(false);
@@ -2291,14 +2291,14 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
-        ColumnTable& subtables = get_column_table(col_ndx);
+        SubtableColumn& subtables = get_column_table(col_ndx);
         subtables.set(row_ndx, 0);
 
         if (Replication* repl = get_repl())
             repl->set_table(this, col_ndx, row_ndx); // Throws
     }
     else if (type == col_type_Mixed) {
-        ColumnMixed& subtables = get_column_mixed(col_ndx);
+        MixedColumn& subtables = get_column_mixed(col_ndx);
         subtables.set_subtable(row_ndx, 0);
 
         if (Replication* repl = get_repl())
@@ -2373,7 +2373,7 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_size);
 
     if (is_nullable(col_ndx)) {
-        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        const IntNullColumn& column = get_column_int_null(col_ndx);
         return column.get(ndx);
     }
     else {
@@ -2411,7 +2411,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_size);
 
     if (is_nullable(col_ndx)) {
-        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        const IntNullColumn& column = get_column_int_null(col_ndx);
         return column.get(ndx) != 0;
     }
     else {
@@ -2429,7 +2429,7 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
     bump_version();
 
     if (is_nullable(col_ndx)) {
-        ColumnIntNull& column = get_column_int_null(col_ndx);
+        IntNullColumn& column = get_column_int_null(col_ndx);
         column.set(ndx, value ? 1 : 0);
     }
     else {
@@ -2449,7 +2449,7 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_size);
 
     if (is_nullable(col_ndx)) {
-        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        const IntNullColumn& column = get_column_int_null(col_ndx);
         return column.get(ndx);
     }
     else {
@@ -2467,7 +2467,7 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
     bump_version();
 
     if (is_nullable(col_ndx)) {
-        ColumnIntNull& column = get_column_int_null(col_ndx);
+        IntNullColumn& column = get_column_int_null(col_ndx);
         column.set(ndx, value.get_datetime());
     }
     else {
@@ -2485,7 +2485,7 @@ float Table::get_float(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const ColumnFloat& column = get_column_float(col_ndx);
+    const FloatColumn& column = get_column_float(col_ndx);
     return column.get(ndx);
 }
 
@@ -2496,7 +2496,7 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    ColumnFloat& column = get_column_float(col_ndx);
+    FloatColumn& column = get_column_float(col_ndx);
     column.set(ndx, value);
 
     if (Replication* repl = get_repl())
@@ -2509,7 +2509,7 @@ double Table::get_double(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const ColumnDouble& column = get_column_double(col_ndx);
+    const DoubleColumn& column = get_column_double(col_ndx);
     return column.get(ndx);
 }
 
@@ -2520,7 +2520,7 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    ColumnDouble& column = get_column_double(col_ndx);
+    DoubleColumn& column = get_column_double(col_ndx);
     column.set(ndx, value);
 
     if (Replication* repl = get_repl())
@@ -2535,12 +2535,12 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     StringData sd;
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = get_column_string(col_ndx);
+        const StringColumn& column = get_column_string(col_ndx);
         sd = column.get(ndx);
     }
     else {
         REALM_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+        const StringEnumColumn& column = get_column_string_enum(col_ndx);
         sd = column.get(ndx);
     }
     REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
@@ -2580,7 +2580,7 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const ColumnBinary& column = get_column_binary(col_ndx);
+    const BinaryColumn& column = get_column_binary(col_ndx);
     return column.get(ndx);
 }
 
@@ -2595,7 +2595,7 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
         throw LogicError(LogicError::column_not_nullable);
     bump_version();
 
-    ColumnBinary& column = get_column_binary(col_ndx);
+    BinaryColumn& column = get_column_binary(col_ndx);
     column.set(ndx, value);
 
     if (Replication* repl = get_repl())
@@ -2608,7 +2608,7 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const ColumnMixed& column = get_column_mixed(col_ndx);
+    const MixedColumn& column = get_column_mixed(col_ndx);
 
     DataType type = column.get_type(ndx);
     switch (type) {
@@ -2643,7 +2643,7 @@ DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const ColumnMixed& column = get_column_mixed(col_ndx);
+    const MixedColumn& column = get_column_mixed(col_ndx);
     return column.get_type(ndx);
 }
 
@@ -2654,7 +2654,7 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    ColumnMixed& column = get_column_mixed(col_ndx);
+    MixedColumn& column = get_column_mixed(col_ndx);
     DataType type = value.get_type();
 
     switch (type) {
@@ -2701,14 +2701,14 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 size_t Table::get_link(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
-    const ColumnLink& column = get_column_link(col_ndx);
+    const LinkColumn& column = get_column_link(col_ndx);
     return column.get_link(row_ndx);
 }
 
 
 TableRef Table::get_link_target(size_t col_ndx) REALM_NOEXCEPT
 {
-    ColumnLinkBase& column = get_column_link_base(col_ndx);
+    LinkColumnBase& column = get_column_link_base(col_ndx);
     return column.get_target_table().get_table_ref();
 }
 
@@ -2725,7 +2725,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     if (old_target_row_ndx == realm::npos)
         return;
 
-    ColumnLink& col = get_column_link(col_ndx);
+    LinkColumn& col = get_column_link(col_ndx);
     if (col.get_weak_links())
         return;
 
@@ -2756,7 +2756,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
-    ColumnLink& col = get_column_link(col_ndx);
+    LinkColumn& col = get_column_link(col_ndx);
     size_t old_target_row_ndx = col.set_link(row_ndx, target_row_ndx);
     bump_version();
     return old_target_row_ndx;
@@ -2766,7 +2766,7 @@ size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
-    const ColumnLinkList& column = get_column_link_list(col_ndx);
+    const LinkListColumn& column = get_column_link_list(col_ndx);
     return column.get(row_ndx);
 }
 
@@ -2776,7 +2776,7 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
     REALM_ASSERT_3(row_ndx, <, m_size);
     // FIXME: this looks wrong! It should instead be the modifying operations of
     // LinkView that bump the change count of the containing table.
-    ColumnLinkList& column = get_column_link_list(col_ndx);
+    LinkListColumn& column = get_column_link_list(col_ndx);
     return column.get(row_ndx);
 }
 
@@ -2784,7 +2784,7 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
-    const ColumnLinkList& column = get_column_link_list(col_ndx);
+    const LinkListColumn& column = get_column_link_list(col_ndx);
     return !column.has_links(row_ndx);
 }
 
@@ -2792,7 +2792,7 @@ bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const REALM_NOEXCE
 size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
-    const ColumnLinkList& column = get_column_link_list(col_ndx);
+    const LinkListColumn& column = get_column_link_list(col_ndx);
     return column.get_link_count(row_ndx);
 }
 
@@ -2830,7 +2830,7 @@ size_t Table::count_float(size_t col_ndx, float value) const
     if (!m_columns.is_attached())
         return 0;
 
-    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
     return column.count(value);
 }
 size_t Table::count_double(size_t col_ndx, double value) const
@@ -2838,7 +2838,7 @@ size_t Table::count_double(size_t col_ndx, double value) const
     if (!m_columns.is_attached())
         return 0;
 
-    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
     return column.count(value);
 }
 size_t Table::count_string(size_t col_ndx, StringData value) const
@@ -2850,12 +2850,12 @@ size_t Table::count_string(size_t col_ndx, StringData value) const
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = get_column_string(col_ndx);
+        const StringColumn& column = get_column_string(col_ndx);
         return column.count(value);
     }
     else {
         REALM_ASSERT_3(type, ==, col_type_StringEnum);
-        const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+        const StringEnumColumn& column = get_column_string_enum(col_ndx);
         return column.count(value);
     }
 }
@@ -2875,7 +2875,7 @@ double Table::sum_float(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
     return column.sum();
 }
 double Table::sum_double(size_t col_ndx) const
@@ -2883,7 +2883,7 @@ double Table::sum_double(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
     return column.sum();
 }
 
@@ -2902,7 +2902,7 @@ double Table::average_float(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
     return column.average();
 }
 double Table::average_double(size_t col_ndx) const
@@ -2910,7 +2910,7 @@ double Table::average_double(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
     return column.average();
 }
 
@@ -2946,7 +2946,7 @@ float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 }
 
@@ -2955,7 +2955,7 @@ double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 }
 
@@ -2977,7 +2977,7 @@ int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
 
 #if USE_COLUMN_AGGREGATE
     if (is_nullable(col_ndx)) {
-        const ColumnIntNull& column = get_column_int_null(col_ndx);
+        const IntNullColumn& column = get_column_int_null(col_ndx);
         return column.maximum(0, npos, npos, return_ndx);
     }
     else {
@@ -3005,7 +3005,7 @@ float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
 
@@ -3014,7 +3014,7 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
 
@@ -3037,12 +3037,12 @@ void Table::reveal_primary_key() const
             ColumnType type = m_spec.get_column_type(i);
             const ColumnBase& col = get_column_base(i);
             if (type == col_type_String) {
-                const AdaptiveStringColumn& col_2 = static_cast<const AdaptiveStringColumn&>(col);
+                const StringColumn& col_2 = static_cast<const StringColumn&>(col);
                 m_primary_key = col_2.get_search_index();
                 return;
             }
             if (type == col_type_StringEnum) {
-                const ColumnStringEnum& col_2 = static_cast<const ColumnStringEnum&>(col);
+                const StringEnumColumn& col_2 = static_cast<const StringEnumColumn&>(col);
                 m_primary_key = col_2.get_search_index();
                 return;
             }
@@ -3145,11 +3145,11 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = get_column_string(col_ndx);
+        const StringColumn& column = get_column_string(col_ndx);
         return column.find_first(value);
     }
     REALM_ASSERT_3(type, ==, col_type_StringEnum);
-    const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+    const StringEnumColumn& column = get_column_string_enum(col_ndx);
     return column.find_first(value);
 }
 
@@ -3311,7 +3311,7 @@ struct AggrState {
     const StringIndex* dst_index;
     size_t group_by_column;
 
-    const ColumnStringEnum* enums;
+    const StringEnumColumn* enums;
     std::vector<size_t> keys;
     const ArrayInteger* block = nullptr;
     ArrayInteger cache;
@@ -3397,7 +3397,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     // make much sense). So we can use this knowledge to optimize the process.
     ColumnType key_type = get_real_column_type(group_by_column);
     if (key_type == col_type_StringEnum) {
-        const ColumnStringEnum& enums = get_column_string_enum(group_by_column);
+        const StringEnumColumn& enums = get_column_string_enum(group_by_column);
         size_t key_count = enums.get_keys().size();
 
         state.enums = &enums;
@@ -3465,7 +3465,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
                 // Calculate averages
                 result.add_column(type_Double, "average");
-                ColumnDouble& mean_column = result.get_column_double(3);
+                DoubleColumn& mean_column = result.get_column_double(3);
                 const size_t res_count = result.size();
                 for (size_t i = 0; i < res_count; ++i) {
                     int64_t sum   = dst_column.get(i);
@@ -3557,7 +3557,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
                 // Calculate averages
                 result.add_column(type_Double, "average");
-                ColumnDouble& mean_column = result.get_column_double(3);
+                DoubleColumn& mean_column = result.get_column_double(3);
                 const size_t res_count = result.size();
                 for (size_t i = 0; i < res_count; ++i) {
                     int64_t sum   = dst_column.get(i);
@@ -3684,11 +3684,11 @@ size_t Table::lower_bound_string(size_t col_ndx, StringData value) const REALM_N
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = get_column_string(col_ndx);
+        const StringColumn& column = get_column_string(col_ndx);
         return column.lower_bound_string(value);
     }
     REALM_ASSERT_3(type, ==, col_type_StringEnum);
-    const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+    const StringEnumColumn& column = get_column_string_enum(col_ndx);
     return column.lower_bound_string(value);
 }
 
@@ -3700,11 +3700,11 @@ size_t Table::upper_bound_string(size_t col_ndx, StringData value) const REALM_N
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = get_column_string(col_ndx);
+        const StringColumn& column = get_column_string(col_ndx);
         return column.upper_bound_string(value);
     }
     REALM_ASSERT_3(type, ==, col_type_StringEnum);
-    const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+    const StringEnumColumn& column = get_column_string_enum(col_ndx);
     return column.upper_bound_string(value);
 }
 
@@ -3725,7 +3725,7 @@ void Table::optimize(bool enforce)
     for (size_t i = 0; i < column_count; ++i) {
         ColumnType type = get_real_column_type(i);
         if (type == col_type_String) {
-            AdaptiveStringColumn* column = &get_column_string(i);
+            StringColumn* column = &get_column_string(i);
 
             ref_type ref, keys_ref;
             bool res = column->auto_enumerate(keys_ref, ref, enforce);
@@ -3743,7 +3743,7 @@ void Table::optimize(bool enforce)
             for (size_t c = i+1; c < m_cols.size(); ++c) {
                 ColumnType type = get_real_column_type(c);
                 if (type == col_type_StringEnum) {
-                    ColumnStringEnum& column = get_column_string_enum(c);
+                    StringEnumColumn& column = get_column_string_enum(c);
                     column.adjust_keys_ndx_in_parent(1);
                 }
             }
@@ -3752,7 +3752,7 @@ void Table::optimize(bool enforce)
             size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
-            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref, is_nullable(i)); // Throws
+            StringEnumColumn* e = new StringEnumColumn(alloc, ref, keys_ref, is_nullable(i)); // Throws
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
@@ -4058,8 +4058,8 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
         }
         case type_Link:
         {
-            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
-            ColumnLink& cl = static_cast<ColumnLink&>(clb);
+            LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+            LinkColumn& cl = static_cast<LinkColumn&>(clb);
             Table& table = cl.get_target_table();
 
             if (!cl.is_null_link(row_ndx)) {
@@ -4085,8 +4085,8 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
         }
         case type_LinkList:
         {
-            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
-            ColumnLinkList& cll = static_cast<ColumnLinkList&>(clb);
+            LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+            LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
             Table& table = cll.get_target_table();
             LinkViewRef lv = cll.get(row_ndx);
 
@@ -4326,7 +4326,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
     for (size_t col = 0; col < column_count; ++col) {
         out << "  "; // spacing
         out.width(widths[col+1]);
-        
+
         if (is_nullable(col) && is_null(col, row_ndx)) {
             out << "(null)";
             continue;
@@ -4440,8 +4440,8 @@ bool Table::compare_rows(const Table& t) const
             case col_type_Bool:
             case col_type_DateTime: {
                 if (nullable) {
-                    const ColumnIntNull& c1 = get_column_int_null(i);
-                    const ColumnIntNull& c2 = t.get_column_int_null(i);
+                    const IntNullColumn& c1 = get_column_int_null(i);
+                    const IntNullColumn& c2 = t.get_column_int_null(i);
                     if (!c1.compare_int(c2)) {
                         return false;
                     }
@@ -4455,82 +4455,82 @@ bool Table::compare_rows(const Table& t) const
                 continue;
             }
             case col_type_Float: {
-                const ColumnFloat& c1 = get_column_float(i);
-                const ColumnFloat& c2 = t.get_column_float(i);
+                const FloatColumn& c1 = get_column_float(i);
+                const FloatColumn& c2 = t.get_column_float(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;
             }
             case col_type_Double: {
-                const ColumnDouble& c1 = get_column_double(i);
-                const ColumnDouble& c2 = t.get_column_double(i);
+                const DoubleColumn& c1 = get_column_double(i);
+                const DoubleColumn& c2 = t.get_column_double(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;
             }
             case col_type_String: {
-                const AdaptiveStringColumn& c1 = get_column_string(i);
+                const StringColumn& c1 = get_column_string(i);
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_String) {
-                    const AdaptiveStringColumn& c2 = t.get_column_string(i);
+                    const StringColumn& c2 = t.get_column_string(i);
                     if (!c1.compare_string(c2))
                         return false;
                 }
                 else {
                     REALM_ASSERT_3(type2, ==, col_type_StringEnum);
-                    const ColumnStringEnum& c2 = t.get_column_string_enum(i);
+                    const StringEnumColumn& c2 = t.get_column_string_enum(i);
                     if (!c2.compare_string(c1))
                         return false;
                 }
                 continue;
             }
             case col_type_StringEnum: {
-                const ColumnStringEnum& c1 = get_column_string_enum(i);
+                const StringEnumColumn& c1 = get_column_string_enum(i);
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_StringEnum) {
-                    const ColumnStringEnum& c2 = t.get_column_string_enum(i);
+                    const StringEnumColumn& c2 = t.get_column_string_enum(i);
                     if (!c1.compare_string(c2))
                         return false;
                 }
                 else {
                     REALM_ASSERT_3(type2, ==, col_type_String);
-                    const AdaptiveStringColumn& c2 = t.get_column_string(i);
+                    const StringColumn& c2 = t.get_column_string(i);
                     if (!c1.compare_string(c2))
                         return false;
                 }
                 continue;
             }
             case col_type_Binary: {
-                const ColumnBinary& c1 = get_column_binary(i);
-                const ColumnBinary& c2 = t.get_column_binary(i);
+                const BinaryColumn& c1 = get_column_binary(i);
+                const BinaryColumn& c2 = t.get_column_binary(i);
                 if (!c1.compare_binary(c2))
                     return false;
                 continue;
             }
             case col_type_Table: {
-                const ColumnTable& c1 = get_column_table(i);
-                const ColumnTable& c2 = t.get_column_table(i);
+                const SubtableColumn& c1 = get_column_table(i);
+                const SubtableColumn& c2 = t.get_column_table(i);
                 if (!c1.compare_table(c2)) // Throws
                     return false;
                 continue;
             }
             case col_type_Mixed: {
-                const ColumnMixed& c1 = get_column_mixed(i);
-                const ColumnMixed& c2 = t.get_column_mixed(i);
+                const MixedColumn& c1 = get_column_mixed(i);
+                const MixedColumn& c2 = t.get_column_mixed(i);
                 if (!c1.compare_mixed(c2))
                     return false;
                 continue;
             }
             case col_type_Link: {
-                const ColumnLink& c1 = get_column_link(i);
-                const ColumnLink& c2 = t.get_column_link(i);
+                const LinkColumn& c1 = get_column_link(i);
+                const LinkColumn& c2 = t.get_column_link(i);
                 if (!c1.compare_int(c2))
                     return false;
                 continue;
             }
             case col_type_LinkList: {
-                const ColumnLinkList& c1 = get_column_link_list(i);
-                const ColumnLinkList& c2 = t.get_column_link_list(i);
+                const LinkListColumn& c1 = get_column_link_list(i);
+                const LinkListColumn& c2 = t.get_column_link_list(i);
                 if (!c1.compare_link_list(c2))
                     return false;
                 continue;
@@ -4852,10 +4852,9 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
     for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
         ColumnBase* col = m_cols[col_ndx];
 
-        // If the current column accessor is AdaptiveStringColumn, but the
-        // underlying column has been upgraded to an enumerated strings column,
-        // then we need to replace the accessor with an instance of
-        // ColumnStringEnum.
+        // If the current column accessor is StringColumn, but the underlying
+        // column has been upgraded to an enumerated strings column, then we
+        // need to replace the accessor with an instance of StringEnumColumn.
         if (col && col->is_string_col()) {
             ColumnType col_type = m_spec.get_column_type(col_ndx);
             if (col_type == col_type_StringEnum) {
@@ -4889,7 +4888,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             if (is_link_type(col_type)) {
                 ColumnAttr attr = m_spec.get_column_attr(col_ndx);
                 bool weak_links = (attr & col_attr_StrongLinks) == 0;
-                ColumnLinkBase* link_col = static_cast<ColumnLinkBase*>(col);
+                LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                 link_col->set_weak_links(weak_links);
                 Group& group = *get_parent_group();
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
@@ -4952,8 +4951,8 @@ bool Table::is_cross_table_link_target() const REALM_NOEXCEPT
 {
     size_t n = m_cols.size();
     for (size_t i = m_spec.get_public_column_count(); i < n; ++i) {
-        REALM_ASSERT(dynamic_cast<ColumnBackLink*>(m_cols[i]));
-        ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(*m_cols[i]);
+        REALM_ASSERT(dynamic_cast<BacklinkColumn*>(m_cols[i]));
+        BacklinkColumn& backlink_col = static_cast<BacklinkColumn&>(*m_cols[i]);
         Table& origin = backlink_col.get_origin_table();
         if (&origin != this)
             return true;
@@ -5086,12 +5085,12 @@ void Table::print() const
                     break;
                 }
                 case type_Float: {
-                    const ColumnFloat& column = get_column_float(n);
+                    const FloatColumn& column = get_column_float(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
                 case type_Double: {
-                    const ColumnDouble& column = get_column_double(n);
+                    const DoubleColumn& column = get_column_double(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
@@ -5101,12 +5100,12 @@ void Table::print() const
                     break;
                 }
                 case type_String: {
-                    const AdaptiveStringColumn& column = get_column_string(n);
+                    const StringColumn& column = get_column_string(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
                 case col_type_StringEnum: {
-                    const ColumnStringEnum& column = get_column_string_enum(n);
+                    const StringEnumColumn& column = get_column_string_enum(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }

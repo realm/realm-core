@@ -555,7 +555,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 
 
 
-// Test reading/writing of old version 2 ColumnBinary.
+// Test reading/writing of old version 2 BinaryColumn.
 TEST(Upgrade_Database_Binary)
 {
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";

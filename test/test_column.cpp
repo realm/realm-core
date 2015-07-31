@@ -45,7 +45,7 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST_TYPES(Column_Basic, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -434,7 +434,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, ColumnIntNull)
     c.destroy();
 }
 
-TEST_TYPES(Column_IsNullAlwaysFalse, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_IsNullAlwaysFalse, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -452,7 +452,7 @@ TEST(Column_SetNullThrows)
     c.destroy();
 }
 
-TEST_TYPES(Column_FindLeafs, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_FindLeafs, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     IntegerColumn a(Allocator::get_default(), ref);
@@ -502,7 +502,7 @@ TEST_TYPES(Column_FindLeafs, IntegerColumn, ColumnIntNull)
 
 
 /*
-TEST_TYPES(Column_Sort, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Sort, IntegerColumn, IntNullColumn)
 {
     // Create IntegerColumn with random values
     IntegerColumn a;
@@ -539,7 +539,7 @@ TEST_TYPES(Column_Sort, IntegerColumn, ColumnIntNull)
  *
  */
 
-TEST_TYPES(Column_FindAllIntMin, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_FindAllIntMin, IntegerColumn, IntNullColumn)
 {
     ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
     ref_type ref_r = IntegerColumn::create(Allocator::get_default());
@@ -568,7 +568,7 @@ TEST_TYPES(Column_FindAllIntMin, IntegerColumn, ColumnIntNull)
     r.destroy();
 }
 
-TEST_TYPES(Column_FindAllIntMax, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_FindAllIntMax, IntegerColumn, IntNullColumn)
 {
     ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
     ref_type ref_r = IntegerColumn::create(Allocator::get_default());
@@ -641,7 +641,7 @@ TEST(Column_LowerUpperBound)
 }
 
 
-TEST_TYPES(Column_Average, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Average, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -658,7 +658,7 @@ TEST_TYPES(Column_Average, IntegerColumn, ColumnIntNull)
     c.destroy();
 }
 
-TEST_TYPES(Column_SumAverage, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_SumAverage, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -717,7 +717,7 @@ TEST_TYPES(Column_SumAverage, IntegerColumn, ColumnIntNull)
 }
 
 
-TEST_TYPES(Column_Max, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Max, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -732,7 +732,7 @@ TEST_TYPES(Column_Max, IntegerColumn, ColumnIntNull)
 }
 
 
-TEST_TYPES(Column_Max2, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Max2, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -750,7 +750,7 @@ TEST_TYPES(Column_Max2, IntegerColumn, ColumnIntNull)
     c.destroy();
 }
 
-TEST_TYPES(Column_Min, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Min, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -765,7 +765,7 @@ TEST_TYPES(Column_Min, IntegerColumn, ColumnIntNull)
 }
 
 
-TEST_TYPES(Column_Min2, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Min2, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
@@ -785,7 +785,7 @@ TEST_TYPES(Column_Min2, IntegerColumn, ColumnIntNull)
 
 
 /*
-TEST_TYPES(Column_Sort2, IntegerColumn, ColumnIntNull)
+TEST_TYPES(Column_Sort2, IntegerColumn, IntNullColumn)
 {
     TEST_TYPE c;
 
@@ -822,8 +822,8 @@ TEST_IF(Column_PrependMany, TEST_DURATION >= 1)
 TEST_IF(ColumnIntNull_PrependMany, TEST_DURATION >= 1)
 {
     // Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
-    ref_type ref = ColumnIntNull::create(Allocator::get_default());
-    ColumnIntNull a(Allocator::get_default(), ref);
+    ref_type ref = IntNullColumn::create(Allocator::get_default());
+    IntNullColumn a(Allocator::get_default(), ref);
 
     for (size_t items = 0; items < 3000; ++items) {
         a.clear();
@@ -837,8 +837,8 @@ TEST_IF(ColumnIntNull_PrependMany, TEST_DURATION >= 1)
 TEST(ColumnIntNull_Null)
 {
     {
-        ref_type ref = ColumnIntNull::create(Allocator::get_default());
-        ColumnIntNull a(Allocator::get_default(), ref);
+        ref_type ref = IntNullColumn::create(Allocator::get_default());
+        IntNullColumn a(Allocator::get_default(), ref);
 
         a.add(0);
         size_t t = a.find_first(0);
@@ -848,8 +848,8 @@ TEST(ColumnIntNull_Null)
     }
 
     {
-        ref_type ref = ColumnIntNull::create(Allocator::get_default());
-        ColumnIntNull a(Allocator::get_default(), ref);
+        ref_type ref = IntNullColumn::create(Allocator::get_default());
+        IntNullColumn a(Allocator::get_default(), ref);
 
         a.add(123);
         a.add(0);
@@ -872,8 +872,8 @@ TEST(ColumnIntNull_Null)
     }
 
     {
-        ref_type ref = ColumnIntNull::create(Allocator::get_default());
-        ColumnIntNull a(Allocator::get_default(), ref);
+        ref_type ref = IntNullColumn::create(Allocator::get_default());
+        IntNullColumn a(Allocator::get_default(), ref);
 
         a.add(realm::null());
         a.add(0);
@@ -900,8 +900,8 @@ TEST(ColumnIntNull_Null)
     }
 
     {
-        ref_type ref = ColumnIntNull::create(Allocator::get_default());
-        ColumnIntNull a(Allocator::get_default(), ref);
+        ref_type ref = IntNullColumn::create(Allocator::get_default());
+        IntNullColumn a(Allocator::get_default(), ref);
 
         a.add(0);
         a.add(realm::null());
@@ -925,8 +925,8 @@ TEST(ColumnIntNull_Null)
     Random random(random_int<unsigned long>());
 
     for (size_t t = 0; t < 50; t++) {
-        ref_type ref = ColumnIntNull::create(Allocator::get_default());
-        ColumnIntNull a(Allocator::get_default(), ref);
+        ref_type ref = IntNullColumn::create(Allocator::get_default());
+        IntNullColumn a(Allocator::get_default(), ref);
 
         // vector that is kept in sync with the ArrayIntNull so that we can compare with it
         std::vector<int64_t> v;

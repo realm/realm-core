@@ -86,8 +86,8 @@ TEST_TYPES(StringIndex_IsEmpty, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
@@ -103,8 +103,8 @@ TEST_TYPES(StringIndex_BuildIndex, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -140,8 +140,8 @@ TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -202,8 +202,8 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with random values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -253,8 +253,8 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -326,8 +326,8 @@ TEST_TYPES(StringIndex_ClearEmpty, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
@@ -349,8 +349,8 @@ TEST_TYPES(StringIndex_Clear, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -403,8 +403,8 @@ TEST_TYPES(StringIndex_Insert, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with random values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -455,8 +455,8 @@ TEST_TYPES(StringIndex_Set, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with random values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -506,8 +506,8 @@ TEST_TYPES(StringIndex_Count, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with duplcate values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -544,8 +544,8 @@ TEST_TYPES(StringIndex_Distinct, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with duplcate values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -583,8 +583,8 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with duplcate values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -830,8 +830,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // String index
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
     const StringIndex& ndx = *col.create_search_index();
 
     const size_t MAX_LENGTH = 16; // Test medium
@@ -870,8 +870,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // String index
-    ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col2(Allocator::get_default(), ref2, nullable);
+    ref_type ref2 = StringColumn::create(Allocator::get_default());
+    StringColumn col2(Allocator::get_default(), ref2, nullable);
     const StringIndex& ndx2 = *col2.create_search_index();
 
 #if REALM_NULL_STRINGS == 1
@@ -912,8 +912,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
 TEST(StringIndex_Null)
 {
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, true);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
 
     col.add("");
     col.add(realm::null());

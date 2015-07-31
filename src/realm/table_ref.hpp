@@ -243,7 +243,7 @@ public:
     RowAccessor operator[](std::size_t i) const REALM_NOEXCEPT { return (*this->get())[i]; }
 
 private:
-    friend class ColumnSubtableParent;
+    friend class SubtableColumnParent;
     friend class Table;
     friend class Group;
     template<class> friend class BasicTable;

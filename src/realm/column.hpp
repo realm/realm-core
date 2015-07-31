@@ -69,7 +69,7 @@ template <class T> struct ColumnTemplate : public ColumnTemplateBase
         return a == b ? 0 : a < b ? 1 : -1;
     }
 
-    // We cannot use already-existing get() methods because ColumnStringEnum and LinkList inherit from
+    // We cannot use already-existing get() methods because StringEnumColumn and LinkList inherit from
     // Column and overload get() with different return type than int64_t. Todo, find a way to simplify
     virtual T get_val(size_t row) const = 0;
 };
@@ -134,7 +134,7 @@ public:
 
     virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
 
-    // Returns true if, and only if this column is an AdaptiveStringColumn.
+    // Returns true if, and only if this column is an StringColumn.
     virtual bool is_string_col() const REALM_NOEXCEPT;
 
     virtual void destroy() REALM_NOEXCEPT = 0;

@@ -8,12 +8,12 @@ using namespace realm;
 using namespace realm::util;
 
 
-ColumnMixed::~ColumnMixed() REALM_NOEXCEPT
+MixedColumn::~MixedColumn() REALM_NOEXCEPT
 {
 }
 
 
-void ColumnMixed::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void MixedColumn::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
     if (!get_root_array()->update_from_parent(old_baseline))
         return;
@@ -24,12 +24,12 @@ void ColumnMixed::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
         m_binary_data->update_from_parent(old_baseline);
 }
 
-void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
+void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
 {
     std::unique_ptr<Array> top;
     std::unique_ptr<IntegerColumn> types;
     std::unique_ptr<RefsColumn> data;
-    std::unique_ptr<ColumnBinary> binary_data;
+    std::unique_ptr<BinaryColumn> binary_data;
     top.reset(new Array(alloc)); // Throws
     top->init_from_ref(ref);
     REALM_ASSERT(top->size() == 2 || top->size() == 3);
@@ -45,7 +45,7 @@ void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     // there if needed
     if (top->size() == 3) {
         ref_type binary_data_ref = top->get_as_ref(2);
-        binary_data.reset(new ColumnBinary(alloc, binary_data_ref)); // Throws
+        binary_data.reset(new BinaryColumn(alloc, binary_data_ref)); // Throws
         binary_data->set_parent(&*top, 2);
     }
 
@@ -56,20 +56,20 @@ void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t co
 }
 
 
-void ColumnMixed::ensure_binary_data_column()
+void MixedColumn::ensure_binary_data_column()
 {
     if (m_binary_data)
         return;
 
-    ref_type ref = ColumnBinary::create(m_array->get_alloc()); // Throws
-    m_binary_data.reset(new ColumnBinary(m_array->get_alloc(), ref)); // Throws
+    ref_type ref = BinaryColumn::create(m_array->get_alloc()); // Throws
+    m_binary_data.reset(new BinaryColumn(m_array->get_alloc(), ref)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 2);
     m_array->add(ref); // Throws
     m_binary_data->set_parent(m_array.get(), 2);
 }
 
 
-ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType new_type)
+MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType new_type)
 {
     REALM_ASSERT_3(row_ndx, <, m_types->size());
 
@@ -121,7 +121,7 @@ ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType 
 }
 
 
-void ColumnMixed::do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows)
+void MixedColumn::do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
@@ -141,7 +141,7 @@ void ColumnMixed::do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prio
 }
 
 
-void ColumnMixed::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
+void MixedColumn::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx < prior_num_rows);
@@ -157,7 +157,7 @@ void ColumnMixed::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
 }
 
 
-void ColumnMixed::do_clear(size_t num_rows)
+void MixedColumn::do_clear(size_t num_rows)
 {
     discard_child_accessors();
     bool broken_reciprocal_backlinks = false; // Value is immaterial for these column types
@@ -169,7 +169,7 @@ void ColumnMixed::do_clear(size_t num_rows)
 }
 
 
-DataType ColumnMixed::get_type(size_t ndx) const REALM_NOEXCEPT
+DataType MixedColumn::get_type(size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
@@ -181,7 +181,7 @@ DataType ColumnMixed::get_type(size_t ndx) const REALM_NOEXCEPT
 }
 
 
-void ColumnMixed::set_string(size_t ndx, StringData value)
+void MixedColumn::set_string(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     ensure_binary_data_column();
@@ -214,7 +214,7 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
     }
 }
 
-void ColumnMixed::set_binary(size_t ndx, BinaryData value)
+void MixedColumn::set_binary(size_t ndx, BinaryData value)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     ensure_binary_data_column();
@@ -247,7 +247,7 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
     }
 }
 
-bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
+bool MixedColumn::compare_mixed(const MixedColumn& c) const
 {
     const size_t n = size();
     if (c.size() != n)
@@ -297,13 +297,13 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
 }
 
 
-void ColumnMixed::do_discard_child_accessors() REALM_NOEXCEPT
+void MixedColumn::do_discard_child_accessors() REALM_NOEXCEPT
 {
     discard_child_accessors();
 }
 
 
-ref_type ColumnMixed::create(Allocator& alloc, size_t size)
+ref_type MixedColumn::create(Allocator& alloc, size_t size)
 {
     Array top(alloc);
     top.create(Array::type_HasRefs); // Throws
@@ -325,7 +325,7 @@ ref_type ColumnMixed::create(Allocator& alloc, size_t size)
 }
 
 
-ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
+ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
                             size_t table_size, _impl::OutputStream& out) const
 {
     // FIXME: Oops, there is no reasonably efficient way to implement this. The
@@ -336,7 +336,7 @@ ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
     // entry for each entry in the column, and at the corresponding index.
     //
     // An even better solution will probably be to change a mixed column into an
-    // ordinary column of mixed leafs. ColumnBinary can serve as a model of how
+    // ordinary column of mixed leafs. BinaryColumn can serve as a model of how
     // to place multiple subarrays into a single leaf.
     //
     // There are other options such as storing a ref to a ArrayBlob in m_data if
@@ -345,8 +345,8 @@ ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
     // Unfortunately this will break the file format compatibility.
     //
     // The fact that the current design has other serious flaws (se FIXMEs in
-    // ColumnMixed::clear_value()) makes it even more urgent to change the
-    // representation and implementation of ColumnMixed.
+    // MixedColumn::clear_value()) makes it even more urgent to change the
+    // representation and implementation of MixedColumn.
     //
     // In fact, there is yet another problem with the current design, it relies
     // on the ability of a column to know its own size. While this is not an
@@ -388,12 +388,12 @@ ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
 
 #ifdef REALM_DEBUG
 
-void ColumnMixed::Verify() const
+void MixedColumn::Verify() const
 {
     do_verify(0,0);
 }
 
-void ColumnMixed::Verify(const Table& table, size_t col_ndx) const
+void MixedColumn::Verify(const Table& table, size_t col_ndx) const
 {
     do_verify(&table, col_ndx);
 
@@ -409,7 +409,7 @@ void ColumnMixed::Verify(const Table& table, size_t col_ndx) const
     }
 }
 
-void ColumnMixed::do_verify(const Table* table, size_t col_ndx) const
+void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
 {
     m_array->Verify();
     m_types->Verify();
@@ -428,7 +428,7 @@ void ColumnMixed::do_verify(const Table* table, size_t col_ndx) const
     REALM_ASSERT_3(types_len, ==, refs_len);
 }
 
-void ColumnMixed::to_dot(std::ostream& out, StringData title) const
+void MixedColumn::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
     out << "subgraph cluster_mixed_column" << ref << " {" << std::endl;
@@ -456,7 +456,7 @@ void ColumnMixed::to_dot(std::ostream& out, StringData title) const
     out << "}" << std::endl;
 }
 
-void ColumnMixed::do_dump_node_structure(std::ostream& out, int level) const
+void MixedColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
     m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
 }

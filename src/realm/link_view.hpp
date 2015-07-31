@@ -28,7 +28,7 @@
 
 namespace realm {
 
-class ColumnLinkList;
+class LinkListColumn;
 
 namespace _impl {
 class LinkListFriend;
@@ -105,7 +105,7 @@ public:
 
 private:
     TableRef m_origin_table;
-    ColumnLinkList& m_origin_column;
+    LinkListColumn& m_origin_column;
     mutable std::size_t m_ref_count;
 
     typedef LinkView_Handover_patch Handover_patch;
@@ -113,7 +113,7 @@ private:
     static LinkViewRef create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group);
 
     // constructor (protected since it can only be used by friends)
-    LinkView(Table* origin_table, ColumnLinkList&, std::size_t row_ndx);
+    LinkView(Table* origin_table, LinkListColumn&, std::size_t row_ndx);
 
     void detach();
     void set_origin_row_index(std::size_t row_ndx) REALM_NOEXCEPT;
@@ -141,7 +141,7 @@ private:
 #endif
 
     friend class _impl::LinkListFriend;
-    friend class ColumnLinkList;
+    friend class LinkListColumn;
     friend class util::bind_ptr<LinkView>;
     friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
@@ -153,7 +153,7 @@ private:
 
 // Implementation
 
-inline LinkView::LinkView(Table* origin_table, ColumnLinkList& column, std::size_t row_ndx):
+inline LinkView::LinkView(Table* origin_table, LinkListColumn& column, std::size_t row_ndx):
     RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()), // Throws
     m_origin_table(origin_table->get_table_ref()),
     m_origin_column(column),

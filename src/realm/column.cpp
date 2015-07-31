@@ -134,25 +134,25 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
             op.template call<IntegerColumn>();
             return;
         case col_type_String:
-            op.template call<AdaptiveStringColumn>();
+            op.template call<StringColumn>();
             return;
         case col_type_StringEnum:
-            op.template call<ColumnStringEnum>();
+            op.template call<StringEnumColumn>();
             return;
         case col_type_Binary:
-            op.template call<ColumnBinary>();
+            op.template call<BinaryColumn>();
             return;
         case col_type_Table:
-            op.template call<ColumnTable>();
+            op.template call<SubtableColumn>();
             return;
         case col_type_Mixed:
-            op.template call<ColumnMixed>();
+            op.template call<MixedColumn>();
             return;
         case col_type_Float:
-            op.template call<ColumnFloat>();
+            op.template call<FloatColumn>();
             return;
         case col_type_Double:
-            op.template call<ColumnDouble>();
+            op.template call<DoubleColumn>();
             return;
         case col_type_Reserved1:
         case col_type_Reserved4:
