@@ -6204,11 +6204,11 @@ This does NOT follow SQL! In particular, (null == null) == true and
 
 NOTE NOTE: There is currently only very little syntax checking.
 
-    Price<int>      Shipping<int>       Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
     ----------------------------------------------------------------------------------------------------------------
 0   null            null                null                    1.1                 true          2016-2-2
 1   10              null                "foo"                   2.2                 null          null
-2   20              30                  "bar"                   3.3                 false         2016-6-6
+2   20              30.0                "bar"                   null                false         2016-6-6
 */
 
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
@@ -6221,13 +6221,11 @@ NOTE NOTE: There is currently only very little syntax checking.
     Group g;
     TableRef table = g.add_table("Inventory");
     table->insert_column(0, type_Int, "Price", true);
-    table->insert_column(1, type_Int, "Shipping", true);
+    table->insert_column(1, type_Float, "Shipping", true);
     table->insert_column(2, type_String, "Description", true);
-    table->insert_column(3, type_Double, "RatingD"); // not yet null support
-    table->insert_column(4, type_Bool, "In Stock", true);
-    table->insert_column(5, type_DateTime, "Est delivery date", true);
-    table->insert_column(6, type_Float, "RatingF"); 
-    table->insert_column(7, type_Float, "Nullable Float", true);
+    table->insert_column(3, type_Double, "Rating");
+    table->insert_column(4, type_Bool, "Stock", true);
+    table->insert_column(5, type_DateTime, "Delivery date", true);
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
 
     table->set_null(0, 0);
@@ -6236,7 +6234,7 @@ NOTE NOTE: There is currently only very little syntax checking.
 
     table->set_null(1, 0);
     table->set_null(1, 1);
-    table->set_int(1, 2, 30);
+    table->set_float(1, 2, 30.3f);
     
     table->set_string(2, 0, null());
     table->set_string(2, 1, "foo");
@@ -6254,23 +6252,17 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->set_null(5, 1);
     table->set_datetime(5, 2, DateTime(2016, 6, 6));
 
-    table->set_float(6, 0, 1.1f);
-    table->set_float(6, 1, 2.2f);
-    table->set_float(6, 2, 3.3f);
-
-    table->set_float(7, 0, 1.1f);
-    table->set_null(7, 1);
-    table->set_float(7, 2, 3.3f);
-
     Columns<Int> price = table->column<Int>(0);
-    Columns<Int> shipping = table->column<Int>(1);
+    Columns<Float> shipping = table->column<Float>(1);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
-    Columns<Float> float_rating = table->column<Float>(6);
-    Columns<Float> nfloat = table->column<Float>(7);
-    TableView tv;
 
+    // int/double type mismatch
+    Columns<Int> dummy1;
+    CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
+
+    TableView tv;
     
     tv = (price == null()).find_all();
     check(tv, { 0 }, __LINE__);
@@ -6321,32 +6313,6 @@ NOTE NOTE: There is currently only very little syntax checking.
     check(tv, { 1, 2 }, __LINE__);
 
 
-    // Non-nullable floats
-    // (null > float) == false
-    tv = (price > float_rating).find_all();
-    check(tv, { 1, 2 }, __LINE__);
-
-    tv = (price + float_rating == null()).find_all();
-    check(tv, { 0 }, __LINE__);
-
-    tv = (price + float_rating != null()).find_all();
-    check(tv, { 1, 2 }, __LINE__);
-    
-
-    // Nullable floats
-    tv = (nfloat == null()).find_all();
-    check(tv, { 1 }, __LINE__);
-
-    tv = (nfloat != null()).find_all();
-    check(tv, { 0, 2 }, __LINE__);
-
-    tv = (nfloat > 2.0).find_all();
-    check(tv, { 2 }, __LINE__);
-
-    tv = (nfloat < 2.0).find_all();
-    check(tv, { 0 }, __LINE__);
-
-
     // Booleans
     tv = (stock == true).find_all();
     check(tv, { 0 }, __LINE__);
@@ -6375,8 +6341,8 @@ NOTE NOTE: There is currently only very little syntax checking.
 
 
     // Not valid syntaxes. Only == and != can be used with user-given null argument.
-//    tv = (price > null()).find_all();
-//    tv = (price + rating > null()).find_all();
+    CHECK_THROW_ANY(tv = (price > null()).find_all());
+    CHECK_THROW_ANY(tv = (price + rating > null()).find_all());
 
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
@@ -6386,29 +6352,20 @@ NOTE NOTE: There is currently only very little syntax checking.
     check(tv, { 1, 2 }, __LINE__);
     
     // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
-//    tv = table->where().greater(0, null()).find_all();
-//    tv = table->where().less(0, 0).find_all();
+    CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
-    tv = table->where().equal(7, null()).find_all();
-    check(tv, { 1 }, __LINE__);
+    tv = table->where().equal(1, null()).find_all();
+    check(tv, { 0, 1 }, __LINE__);
 
-    tv = table->where().not_equal(7, null()).find_all();
-    check(tv, { 0, 2 }, __LINE__);
-
-    tv = table->where().greater(7, 2.0f).find_all();
+    tv = table->where().not_equal(1, null()).find_all();
     check(tv, { 2 }, __LINE__);
 
-    tv = table->where().less(7, 2.0f).find_all();
-    check(tv, { 0 }, __LINE__);
+    tv = table->where().greater(1, 0.0f).find_all();
+    check(tv, { 2 }, __LINE__);
 
-
-    tv = table->where().greater(6, 2.0f).find_all();
-    check(tv, { 1, 2 }, __LINE__);
-
-    tv = table->where().less(6, 2.0f).find_all();
-    check(tv, { 0 }, __LINE__);
-
+    tv = table->where().less(1, 20.0f).find_all();
+    check(tv, { }, __LINE__);
 }
 
 #endif // TEST_QUERY

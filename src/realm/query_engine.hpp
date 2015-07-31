@@ -1020,8 +1020,7 @@ public:
     {
         TConditionFunction cond;
         
-        auto find = [&](bool nullability)
-        {
+        auto find = [&](bool nullability)   {
             bool m_value_nan = nullability ? isnan(m_value) : false;
             for (size_t s = start; s < end; ++s) {
                 TConditionValue v = m_condition_column.get_next(s);
