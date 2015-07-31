@@ -116,13 +116,25 @@ Caveats, notes and todos
       entanglement low so that the design is flexible (if you perhaps later want a Columns class that is not dependent
       on ColumnAccessor)
 
-Nulls in Integer columns
----------------------------------------------------------------------------------------------------------------------- -
+Nulls
+-----------------------------------------------------------------------------------------------------------------------
+First note that at array level, nulls are distinguished between non-null in different ways:
+String:
+    m_data == 0 && m_size == 0
 
+Integer, Bool, DateTime stored in ArrayIntNull:
+    value == get(0) (entry 0 determins a magic value that represents nulls)
 
+Float/double:
+    std::isnan(value)
 
+The Columns class encapsulates all this into a simple class that, for any type T has
+    evaluate(size_t index) that reads values from a column, taking nulls in count
+    get(index)
+    set(index)
+    is_null(index)
+    set_null(index)
 */
-
 
 #ifndef REALM_QUERY_EXPRESSION_HPP
 #define REALM_QUERY_EXPRESSION_HPP
@@ -604,6 +616,10 @@ public:
 
 // This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
 // to be null too. It's used by the Value class for internal storage.
+//
+// To indicate nulls, we could have chosen a separate bool vector or some other bitmask construction. But for
+// performance, we customize indication of nulls to match the same indication that is used in the persisted database
+// file
 template <class T, size_t prealloc = 8> struct NullableVector
 {
     typedef typename std::conditional<std::is_same<T, bool>::value 
@@ -626,26 +642,26 @@ template <class T, size_t prealloc = 8> struct NullableVector
 
     T operator[](size_t index) const
     {
-        REALM_ASSERT_3(index, < , m_size);
+        REALM_ASSERT_3(index, <, m_size);
         return m_first[index];
     }
 
 
     inline bool is_null(size_t index) const
     {
-        REALM_ASSERT((std::is_same<T, bool>::value || std::is_same<T, int64_t>::value || std::is_same<T, int>::value));
+        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
         return m_first[index] == m_null;
     }
 
     inline void set_null(size_t index)
     {
-        REALM_ASSERT((std::is_same<T, bool>::value || std::is_same<T, int64_t>::value || std::is_same<T, int>::value));
+        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
         m_first[index] = m_null;
     }
 
     inline void set(size_t index, t_storage value)
     {
-        REALM_ASSERT((std::is_same<T, bool>::value || std::is_same<T, int64_t>::value || std::is_same<T, int>::value));
+        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
 
         // If value collides with magic null value, then switch to a new unique representation for null
         if (REALM_UNLIKELY(value == m_null)) {
@@ -656,7 +672,6 @@ template <class T, size_t prealloc = 8> struct NullableVector
         }
         m_first[index] = value;
     }
-
 
     void fill(T value) 
     {
@@ -705,8 +720,7 @@ template <class T, size_t prealloc = 8> struct NullableVector
     int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
 };
 
-
-
+// Double
 template<> inline void NullableVector<double>::set(size_t index, double value)
 {
     m_first[index] = value;
@@ -722,7 +736,7 @@ template<> inline void NullableVector<double>::set_null(size_t index)
     m_first[index] = std::numeric_limits<double>::quiet_NaN();
 } 
 
-
+// Float
 template<> inline bool NullableVector<float>::is_null(size_t index) const
 {
     return std::isnan(m_first[index]);
@@ -738,8 +752,7 @@ template<> inline void NullableVector<float>::set(size_t index, float value)
     m_first[index] = value;
 }
 
-
-
+// Null
 template<> inline void NullableVector<null>::set_null(size_t)
 {
     return;
@@ -748,10 +761,11 @@ template<> inline bool NullableVector<null>::is_null(size_t) const
 {
     return true;
 }
-template<> inline void NullableVector<null>::set(size_t index, null)
+template<> inline void NullableVector<null>::set(size_t, null)
 {
 }
 
+// DateTime
 template<> inline bool NullableVector<DateTime>::is_null(size_t index) const
 {
     return m_first[index].get_datetime() == m_null;
@@ -767,9 +781,7 @@ template<> inline void NullableVector<DateTime>::set_null(size_t index)
     m_first[index] = m_null;
 }
 
-
-
-
+// StringData
 template<> inline void NullableVector<StringData>::set(size_t index, StringData value)
 {
     m_first[index] = value;
@@ -783,11 +795,6 @@ template<> inline void NullableVector<StringData>::set_null(size_t index)
 {
     m_first[index] = StringData();
 }
-
-
-
-
-
 
 
 // Stores N values of type T. Can also exchange data with other ValueBase of different types

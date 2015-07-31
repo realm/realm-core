@@ -322,8 +322,6 @@ TEST(ArrayIntNull_Find)
     t = a.find_first<NotEqual>(0x33, 0, 50);
     CHECK_EQUAL(not_found, t);
 
-    bool b = a.is_null(0);
-
     t = a.find_first<NotEqual>(null());
     CHECK_EQUAL(0, t);
 

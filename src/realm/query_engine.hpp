@@ -115,17 +115,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #  include <immintrin.h>
 #endif
 
-/*
-
-typedef float __m256 __attribute__ ((__vector_size__ (32),
-                     __may_alias__));
-typedef long long __m256i __attribute__ ((__vector_size__ (32),
-                      __may_alias__));
-typedef double __m256d __attribute__ ((__vector_size__ (32),
-                       __may_alias__));
-
-*/
-
 namespace realm {
 
 // Number of matches to find in best condition loop before breaking out to probe other conditions. Too low value gives too many
