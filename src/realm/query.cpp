@@ -272,13 +272,16 @@ namespace {
 
 struct MakeConditionNode {
     // make() for Node creates a Node* with either a value type
-    // or null, and supports both nodes for values that are implicitly
-    // nullable (like StringData and BinaryData) and others.
-    // Regardless of nullability, it throws a LogicError if trying
-    // to query for a value of type T on a column of a different type.
+    // or null.
+    //
+    // Note that some Realm types (such as Integer) has both a nullable and a non-nullable version 
+    // of query nodes, while other Realm types has just a single version that can handle both nullable
+    // and non-nullable columns. The special_null_node must reflect that.
+    // Regardless of nullability, it throws a LogicError if trying to query for a value of type T on 
+    // a column of a different type.
 
     template <class Node>
-    static typename std::enable_if<Node::implicit_nullable, ParentNode*>::type
+    static typename std::enable_if<Node::special_null_node, ParentNode*>::type
     make(size_t col_ndx, typename Node::TConditionValue value)
     {
         return new Node(std::move(value), col_ndx);
@@ -286,7 +289,7 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        Node::implicit_nullable
+        Node::special_null_node
         && !std::is_same<T, typename Node::TConditionValue>::value
         && !std::is_same<T, null>::value
         , ParentNode*>::type
@@ -297,7 +300,7 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        !Node::implicit_nullable
+        !Node::special_null_node
         && std::is_same<T, null>::value
         , ParentNode*>::type
     make(size_t col_ndx, T value)
@@ -308,7 +311,7 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        !Node::implicit_nullable
+        !Node::special_null_node
         && std::is_same<T, typename Node::TConditionValue>::value
         , ParentNode*>::type
     make(size_t col_ndx, T value)
@@ -318,7 +321,7 @@ struct MakeConditionNode {
 
     template <class Node, class T>
     static typename std::enable_if<
-        !Node::implicit_nullable
+        !Node::special_null_node
         && !std::is_same<T, null>::value
         && !std::is_same<T, typename Node::TConditionValue>::value
         , ParentNode*>::type

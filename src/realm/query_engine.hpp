@@ -850,7 +850,7 @@ class IntegerNode : public IntegerNodeBase<ColType> {
     using BaseType = IntegerNodeBase<ColType>;
     using ThisType = IntegerNode<ColType, TConditionFunction>;
 public:
-    static const bool implicit_nullable = false;
+    static const bool special_null_node = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
     IntegerNode(TConditionValue value, size_t column_ndx)
@@ -981,7 +981,7 @@ protected:
 template <class ColType, class TConditionFunction> class FloatDoubleNode: public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;
-    static const bool implicit_nullable = false;
+    static const bool special_null_node = false;
 
     FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
     {
@@ -1049,7 +1049,7 @@ protected:
 template <class TConditionFunction> class BinaryNode: public ParentNode {
 public:
     using TConditionValue = BinaryData;
-    static const bool implicit_nullable = false;
+    static const bool special_null_node = false;
 
     template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
@@ -1126,7 +1126,7 @@ protected:
 class StringNodeBase : public ParentNode {
 public:
     using TConditionValue = StringData;
-    static const bool implicit_nullable = true;
+    static const bool special_null_node = true;
 
     template <Action TAction>
     int64_t find_all(Column*, size_t, size_t, size_t, size_t)

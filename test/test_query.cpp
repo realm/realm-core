@@ -6185,7 +6185,7 @@ TEST(Query_64BitValues)
 }
 
 
-TEST(Query_NullShowcase)
+ONLY(Query_NullShowcase)
 {
 /*
 Here we show how comparisons and arithmetic with null works in queries. Basic rules:

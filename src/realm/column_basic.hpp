@@ -60,7 +60,10 @@ class BasicColumn : public ColumnBaseSimple, public ColumnTemplate<T> {
 public:
     using LeafType = typename GetLeafType<T, false>::type;
     using value_type = T;
+
+    // All columns are nullable internally, even if they are marked non-nullable by the user
     static const bool nullable = false;
+    
     BasicColumn(Allocator&, ref_type);
 
     std::size_t size() const REALM_NOEXCEPT final;
