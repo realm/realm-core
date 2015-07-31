@@ -24,9 +24,7 @@
 
 #include <realm/group.hpp>
 
-#ifdef REALM_ENABLE_REPLICATION
 #include <realm/replication.hpp>
-#endif
 
 using namespace realm;
 
@@ -176,11 +174,9 @@ void LinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
 
 void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 {
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_root_array()->get_alloc().get_replication()) {
         repl->nullify_link(m_table, m_column_ndx, row_ndx);
     }
-#endif
     LinkColumnBase::set(row_ndx, 0);
 }
 

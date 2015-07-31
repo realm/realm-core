@@ -15,9 +15,7 @@
 #include <realm/column_backlink.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -314,10 +312,8 @@ size_t Group::create_table(StringData name)
     if (!m_table_accessors.empty())
         m_table_accessors.push_back(0); // Throws
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
         repl->insert_group_level_table(ndx, ndx, name); // Throws
-#endif
 
     return ndx;
 }
@@ -472,10 +468,8 @@ void Group::remove_table(size_t table_ndx)
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
         repl->erase_group_level_table(table_ndx, last_ndx+1); // Throws
-#endif
 }
 
 
@@ -815,8 +809,6 @@ void Group::mark_all_table_accessors() REALM_NOEXCEPT
     }
 }
 
-
-#ifdef REALM_ENABLE_REPLICATION
 
 namespace {
 
@@ -1503,8 +1495,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     attach(new_top_ref); // Throws
     refresh_dirty_accessors(); // Throws
 }
-
-#endif // REALM_ENABLE_REPLICATION
 
 
 #ifdef REALM_DEBUG

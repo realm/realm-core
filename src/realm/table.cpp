@@ -25,9 +25,7 @@
 #include <realm/index_string.hpp>
 #include <realm/group.hpp>
 #include <realm/link_view.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -383,14 +381,12 @@ void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
         bool is_move_last_over = (i->is_ordered_removal == 0);
         Table& table = gf::get_table(group, i->table_ndx);
 
-#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = table.get_repl()) {
             size_t num_rows_to_erase = 1;
             size_t prior_num_rows = table.size();
             repl->erase_rows(&table, i->row_ndx, num_rows_to_erase, prior_num_rows,
                              is_move_last_over); // Throws
         }
-#endif
         bool broken_reciprocal_backlinks = true;
         if (is_move_last_over) {
             table.do_move_last_over(i->row_ndx, broken_reciprocal_backlinks);
@@ -521,9 +517,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent,
 {
     m_mark = false;
 
-#ifdef REALM_ENABLE_REPLICATION
     m_version = 0;
-#endif
 
     // Load from allocated memory
     m_top.set_parent(parent, ndx_in_parent);
@@ -551,9 +545,7 @@ void Table::init(ConstSubspecRef shared_spec, ArrayParent* parent_column, size_t
 {
     m_mark = false;
 
-#ifdef REALM_ENABLE_REPLICATION
     m_version = 0;
-#endif
 
     m_spec.init(SubspecRef(SubspecRef::const_cast_tag(), shared_spec));
     m_columns.set_parent(parent_column, parent_row_ndx);
@@ -663,10 +655,8 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
         }
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
         repl->insert_column(desc, col_ndx, type, name, link_target_table, nullable); // Throws
-#endif
 }
 
 
@@ -696,10 +686,8 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
             root_table.clear(); // Throws
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
         repl->erase_column(desc, col_ndx); // Throws
-#endif
 
     if (desc.is_root()) {
         root_table.bump_version();
@@ -740,10 +728,8 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
         }
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
         repl->rename_column(desc, col_ndx, name); // Throws
-#endif
 }
 
 
@@ -856,10 +842,8 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
     LinkColumnBase& col = get_column_link_base(col_ndx);
     col.set_weak_links(weak_links);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_link_type(this, col_ndx, link_type); // Throws
-#endif
 }
 
 
@@ -1104,11 +1088,9 @@ void Table::detach() REALM_NOEXCEPT
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.m_top.detach();
-#endif
 
     discard_desc_accessor();
 
@@ -1312,11 +1294,9 @@ Table::~Table() REALM_NOEXCEPT
         return;
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.m_top.detach();
-#endif
 
     if (!m_top.is_attached()) {
         // This is a subtable with a shared spec, and its lifetime is managed by
@@ -1437,10 +1417,8 @@ void Table::add_search_index(size_t col_ndx)
     // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx+1); // Throws
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->add_search_index(this, col_ndx); // Throws
-#endif
 }
 
 
@@ -1479,10 +1457,8 @@ void Table::remove_search_index(size_t col_ndx)
     // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx + 1); // Throws
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->remove_search_index(this, col_ndx); // Throws
-#endif
 }
 
 
@@ -1551,10 +1527,8 @@ bool Table::try_add_primary_key(size_t col_ndx)
     attr |= col_attr_Unique | col_attr_PrimaryKey;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->add_primary_key(this, col_ndx); // Throws
-#endif
 
     return true;
 }
@@ -1592,10 +1566,8 @@ void Table::remove_primary_key()
                 REALM_ASSERT(false);
             }
 
-#ifdef REALM_ENABLE_REPLICATION
             if (Replication* repl = get_repl())
                 repl->remove_primary_key(this); // Throws
-#endif
             return;
         }
     }
@@ -1967,13 +1939,11 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         adj_row_acc_insert_rows(row_ndx, num_rows);
     m_size += num_rows;
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl()) {
         size_t num_rows_to_insert = num_rows;
         size_t prior_num_rows = m_size - num_rows;
         repl->insert_empty_rows(this, row_ndx, num_rows_to_insert, prior_num_rows); // Throws
     }
-#endif
 }
 
 
@@ -2151,10 +2121,8 @@ void Table::clear()
 {
     REALM_ASSERT(is_attached());
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->clear_table(this); // Throws
-#endif
 
     size_t table_ndx = get_index_in_group();
     if (table_ndx == realm::npos) {
@@ -2208,10 +2176,8 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     subtables.set(row_ndx, table);
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_table(this, col_ndx, row_ndx); // Throws
-#endif
 }
 
 
@@ -2226,10 +2192,8 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
     mixed_col.set_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
-#endif
 }
 
 
@@ -2330,19 +2294,15 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
         SubtableColumn& subtables = get_column_table(col_ndx);
         subtables.set(row_ndx, 0);
 
-#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
             repl->set_table(this, col_ndx, row_ndx); // Throws
-#endif
     }
     else if (type == col_type_Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
         subtables.set_subtable(row_ndx, 0);
 
-#ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
             repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
-#endif
     }
     else {
         REALM_ASSERT(false);
@@ -2439,10 +2399,8 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
         col.set(ndx, value);
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2479,10 +2437,8 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
         column.set(ndx, value ? 1 : 0);
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_bool(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2519,10 +2475,8 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
         column.set(ndx, value.get_datetime());
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_date_time(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2545,10 +2499,8 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value)
     FloatColumn& column = get_column_float(col_ndx);
     column.set(ndx, value);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_float(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2571,10 +2523,8 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value)
     DoubleColumn& column = get_column_double(col_ndx);
     column.set(ndx, value);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_double(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2620,10 +2570,8 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_string(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2650,10 +2598,8 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
     BinaryColumn& column = get_column_binary(col_ndx);
     column.set(ndx, value);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_binary(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2747,10 +2693,8 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
             break;
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_mixed(this, col_ndx, ndx, value); // Throws
-#endif
 }
 
 
@@ -2774,10 +2718,8 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(row_ndx, <, m_size);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_link(this, col_ndx, row_ndx, target_row_ndx); // Throws
-#endif
 
     size_t old_target_row_ndx = do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
     if (old_target_row_ndx == realm::npos)
@@ -2868,10 +2810,8 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     REALM_ASSERT(col.is_nullable());
     col.set_null(row_ndx);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->set_null(this, col_ndx, row_ndx); // Throws
-#endif
 }
 
 
@@ -3829,10 +3769,8 @@ void Table::optimize(bool enforce)
         }
     }
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->optimize_table(this); // Throws
-#endif
 }
 
 
