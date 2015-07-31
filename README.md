@@ -198,12 +198,6 @@ or `sh build.sh bin-dist`, as in the following example:
 
     CC=clang sh build.sh bin-dist all
 
-### Replication
-
-Replication is always active. This has the extra effect of including
-"replication" as an optional extension available for installation to the
-end-user:
-
 Testing
 -------
 
