@@ -132,11 +132,9 @@ private:
 
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
 
-#ifdef REALM_ENABLE_REPLICATION
     Replication* get_repl() REALM_NOEXCEPT;
     void repl_unselect() REALM_NOEXCEPT;
     friend class _impl::TransactLogConvenientEncoder;
-#endif
 
 #ifdef REALM_DEBUG
     void Verify(std::size_t row_ndx) const;
@@ -170,9 +168,7 @@ inline LinkView::LinkView(Table* origin_table, ColumnLinkList& column, std::size
 inline LinkView::~LinkView() REALM_NOEXCEPT
 {
     if (is_attached()) {
-#ifdef REALM_ENABLE_REPLICATION
         repl_unselect();
-#endif
         m_origin_column.unregister_linkview(*this);
     }
 }
@@ -193,9 +189,7 @@ inline void LinkView::unbind_ref() const REALM_NOEXCEPT
 inline void LinkView::detach()
 {
     REALM_ASSERT(is_attached());
-#ifdef REALM_ENABLE_REPLICATION
     repl_unselect();
-#endif
     m_origin_table.reset();
     m_row_indexes.detach();
 }
@@ -344,13 +338,11 @@ inline void LinkView::update_from_parent(std::size_t old_baseline) REALM_NOEXCEP
         m_row_indexes.update_from_parent(old_baseline);
 }
 
-#ifdef REALM_ENABLE_REPLICATION
 inline Replication* LinkView::get_repl() REALM_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
     return tf::get_repl(*m_origin_table);
 }
-#endif
 
 
 // The purpose of this class is to give internal access to some, but not all of

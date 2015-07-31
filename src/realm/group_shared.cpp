@@ -33,9 +33,7 @@
 #include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/link_view.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
 #ifndef _WIN32
@@ -698,11 +696,9 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
             // If replication is enabled, we need to ask it whether we're in server-sync mode
             // and check that the database is operated in the same mode.
             bool server_sync_mode = false;
-#ifdef REALM_ENABLE_REPLICATION
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl)
                 server_sync_mode = repl->is_in_server_synchronization_mode();
-#endif
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
                                                  no_create, skip_validate,
                                                  encryption_key, server_sync_mode); // Throws
@@ -749,13 +745,11 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
                     // the database was just created, no metadata has been written yet.
                     version = 1;
                 }
-#ifdef REALM_ENABLE_REPLICATION
                 // If replication is enabled, we need to inform it of the latest version,
                 // allowing it to discard any surplus log entries
                 repl = _impl::GroupFriend::get_replication(m_group);
                 if (repl)
                     repl->reset_log_management(version);
-#endif
 
 #ifndef _WIN32
                 if (encryption_key) {
@@ -914,7 +908,6 @@ uint_fast64_t SharedGroup::get_number_of_versions()
     RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
     return info->number_of_versions;
 }
-#ifdef REALM_ENABLE_REPLICATION
 
 void SharedGroup::open(Replication& repl, DurabilityLevel durability, const char* encryption_key)
 {
@@ -926,8 +919,6 @@ void SharedGroup::open(Replication& repl, DurabilityLevel durability, const char
     gf::set_replication(m_group, &repl);
     open(file, no_create, durability, is_backend, encryption_key); // Throws
 }
-
-#endif
 
 SharedGroup::~SharedGroup() REALM_NOEXCEPT
 {
@@ -971,7 +962,6 @@ void SharedGroup::close() REALM_NOEXCEPT
                 }
                 catch(...) {} // ignored on purpose.
             }
-#ifdef REALM_ENABLE_REPLICATION
             // If replication is enabled, we need to stop log management:
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl) {
@@ -985,7 +975,6 @@ void SharedGroup::close() REALM_NOEXCEPT
 #endif
 
             }
-#endif
         }
     }
 #ifndef _WIN32
@@ -1402,8 +1391,6 @@ void SharedGroup::release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT
 }
 
 
-#ifdef REALM_ENABLE_REPLICATION
-
 std::unique_ptr<BinaryData[]>
 SharedGroup::advance_readlock(History& history,VersionID specific_version)
 {
@@ -1455,8 +1442,6 @@ SharedGroup::advance_readlock(History& history,VersionID specific_version)
     history.get_changesets(old_readlock.m_version, m_readlock.m_version, changesets.get());
     return changesets;
 }
-
-#endif // REALM_ENABLE_REPLICATION
 
 
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
@@ -1526,14 +1511,11 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
-#ifdef REALM_ENABLE_REPLICATION
         // If replication is enabled, we need to propagate knowledge of the earliest
         // available version:
         Replication* repl = _impl::GroupFriend::get_replication(m_group);
         if (repl)
             repl->set_last_version_seen_locally(readlock_version);
-#endif
-
     }
 
     // Do the actual commit

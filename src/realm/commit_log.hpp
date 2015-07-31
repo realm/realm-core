@@ -20,8 +20,6 @@
 #ifndef REALM_COMMIT_LOG_HPP
 #define REALM_COMMIT_LOG_HPP
 
-#ifdef REALM_ENABLE_REPLICATION
-
 #include <stdexcept>
 #include <string>
 
@@ -68,5 +66,4 @@ std::unique_ptr<ClientHistory> make_client_history(const std::string& path,
 } // namespace realm
 
 
-#endif // REALM_ENABLE_REPLICATION
 #endif // REALM_COMMIT_LOG_HPP

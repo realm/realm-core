@@ -7,13 +7,9 @@
 #include <realm/util/features.h>
 #include <memory>
 #include <realm/util/file.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 #include "test.hpp"
-
-#ifdef REALM_ENABLE_REPLICATION
 
 using namespace realm;
 using namespace realm::util;
@@ -806,5 +802,4 @@ TEST(Replication_NullInteger)
 
 } // anonymous namespace
 
-#endif // REALM_ENABLE_REPLICATION
 #endif // TEST_REPLICATION
