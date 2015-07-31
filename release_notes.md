@@ -20,6 +20,7 @@
 * Renamed `AdaptiveStringColumn` to `StringColumn`.
 * Several column classes were renamed to follow the `XxxColumn` naming scheme
   (e.g., `ColumnLink` to `LinkColumn`).
+* Removed conditional compilation of replication features.
 
 
 ----------------------------------------------
@@ -53,7 +54,6 @@
 
 ### Internals:
 
-* Removed conditional compilation of replication features.
 * Added static `Array::create_array()` for creating non-empty arrays, and extend
   `Array::create()` such that it can create non-empty arrays.
 * The creation of the free-space arrays (`Group::m_free_positions`,
