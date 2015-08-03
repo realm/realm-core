@@ -7,15 +7,15 @@ using namespace realm;
 
 
 
-void ColumnLinkBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+void LinkColumnBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
-    Column::refresh_accessor_tree(col_ndx, spec); // Throws
+    IntegerColumn::refresh_accessor_tree(col_ndx, spec); // Throws
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     m_weak_links = (attr & col_attr_StrongLinks) == 0;
 }
 
 
-void ColumnLinkBase::check_cascade_break_backlinks_to(size_t target_table_ndx, size_t target_row_ndx,
+void LinkColumnBase::check_cascade_break_backlinks_to(size_t target_table_ndx, size_t target_row_ndx,
                                                       CascadeState& state)
 {
     // Stop if the target row was already visited
@@ -42,9 +42,9 @@ void ColumnLinkBase::check_cascade_break_backlinks_to(size_t target_table_ndx, s
 
 #ifdef REALM_DEBUG
 
-void ColumnLinkBase::Verify(const Table& table, size_t col_ndx) const
+void LinkColumnBase::Verify(const Table& table, size_t col_ndx) const
 {
-    Column::Verify(table, col_ndx);
+    IntegerColumn::Verify(table, col_ndx);
 
     // Check that the backlink column specifies the right origin
     REALM_ASSERT(&m_backlink_column->get_origin_table() == &table);

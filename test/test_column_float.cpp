@@ -82,13 +82,13 @@ void BasicColumn_IsEmpty(TestResults& test_results)
     CHECK_EQUAL(0U, c.size());
     c.destroy();
 }
-TEST(ColumnFloat_IsEmpty)
+TEST(FloatColumn_IsEmpty)
 {
-    BasicColumn_IsEmpty<ColumnFloat>(test_results);
+    BasicColumn_IsEmpty<FloatColumn>(test_results);
 }
-TEST(ColumnDouble_IsEmpty)
+TEST(DoubleColumn_IsEmpty)
 {
-    BasicColumn_IsEmpty<ColumnDouble>(test_results);
+    BasicColumn_IsEmpty<DoubleColumn>(test_results);
 }
 
 
@@ -109,13 +109,13 @@ void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values
 
     c.destroy();
 }
-TEST(ColumnFloat_AddGet)
+TEST(FloatColumn_AddGet)
 {
-    BasicColumn_AddGet<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_AddGet<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_AddGet)
+TEST(DoubleColumn_AddGet)
 {
-    BasicColumn_AddGet<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_AddGet<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -136,13 +136,13 @@ void BasicColumn_Clear(TestResults& test_results)
 
     c.destroy();
 }
-TEST(ColumnFloat_Clear)
+TEST(FloatColumn_Clear)
 {
-    BasicColumn_Clear<ColumnFloat, float>(test_results);
+    BasicColumn_Clear<FloatColumn, float>(test_results);
 }
-TEST(ColumnDouble_Clear)
+TEST(DoubleColumn_Clear)
 {
-    BasicColumn_Clear<ColumnDouble, double>(test_results);
+    BasicColumn_Clear<DoubleColumn, double>(test_results);
 }
 
 
@@ -169,13 +169,13 @@ void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 
     c.destroy();
 }
-TEST(ColumnFloat_Set)
+TEST(FloatColumn_Set)
 {
-    BasicColumn_Set<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Set<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Set)
+TEST(DoubleColumn_Set)
 {
-    BasicColumn_Set<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Set<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -224,13 +224,13 @@ void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values
 
     c.destroy();
 }
-TEST(ColumnFloat_Insert)
+TEST(FloatColumn_Insert)
 {
-    BasicColumn_Insert<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Insert<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Insert)
+TEST(DoubleColumn_Insert)
 {
-    BasicColumn_Insert<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Insert<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -252,13 +252,13 @@ void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_va
 
    c.destroy();
 }
-TEST(ColumnFloat_Aggregates)
+TEST(FloatColumn_Aggregates)
 {
-    BasicColumn_Aggregates<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Aggregates<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Aggregates)
+TEST(DoubleColumn_Aggregates)
 {
-    BasicColumn_Aggregates<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Aggregates<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
@@ -309,23 +309,23 @@ void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values
 
     c.destroy();
 }
-TEST(ColumnFloat_Delete)
+TEST(FloatColumn_Delete)
 {
-    BasicColumn_Delete<ColumnFloat, float>(test_results, float_values, num_float_values);
+    BasicColumn_Delete<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Delete)
+TEST(DoubleColumn_Delete)
 {
-    BasicColumn_Delete<ColumnDouble, double>(test_results, double_values, num_double_values);
+    BasicColumn_Delete<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
-TEST(ColumnFloat_SwapRows)
+TEST(FloatColumn_SwapRows)
 {
     auto epsilon = std::numeric_limits<float>::epsilon();
 
     // Normal case
     {
-        ref_type ref = ColumnFloat::create(Allocator::get_default());
-        ColumnFloat c(Allocator::get_default(), ref);
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        FloatColumn c(Allocator::get_default(), ref);
 
         c.add(-21.389);
         c.add(30.221);
@@ -345,8 +345,8 @@ TEST(ColumnFloat_SwapRows)
 
     // First two elements
     {
-        ref_type ref = ColumnFloat::create(Allocator::get_default());
-        ColumnFloat c(Allocator::get_default(), ref);
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        FloatColumn c(Allocator::get_default(), ref);
 
         c.add(30.221);
         c.add(10.93);
@@ -361,8 +361,8 @@ TEST(ColumnFloat_SwapRows)
 
     // Last two elements
     {
-        ref_type ref = ColumnFloat::create(Allocator::get_default());
-        ColumnFloat c(Allocator::get_default(), ref);
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        FloatColumn c(Allocator::get_default(), ref);
 
         c.add(5.0099);
         c.add(30.221);
@@ -377,8 +377,8 @@ TEST(ColumnFloat_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type ref = ColumnFloat::create(Allocator::get_default());
-        ColumnFloat c(Allocator::get_default(), ref);
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        FloatColumn c(Allocator::get_default(), ref);
 
         c.add(5.0099);
         c.add(30.221);
@@ -392,14 +392,14 @@ TEST(ColumnFloat_SwapRows)
     }
 }
 
-TEST(ColumnDouble_SwapRows)
+TEST(DoubleColumn_SwapRows)
 {
     auto epsilon = std::numeric_limits<double>::epsilon();
 
     // Normal case
     {
-        ref_type ref = ColumnDouble::create(Allocator::get_default());
-        ColumnDouble c(Allocator::get_default(), ref);
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        DoubleColumn c(Allocator::get_default(), ref);
 
         c.add(-21.389);
         c.add(30.221);
@@ -419,8 +419,8 @@ TEST(ColumnDouble_SwapRows)
 
     // First two elements
     {
-        ref_type ref = ColumnDouble::create(Allocator::get_default());
-        ColumnDouble c(Allocator::get_default(), ref);
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        DoubleColumn c(Allocator::get_default(), ref);
 
         c.add(30.221);
         c.add(10.93);
@@ -435,8 +435,8 @@ TEST(ColumnDouble_SwapRows)
 
     // Last two elements
     {
-        ref_type ref = ColumnDouble::create(Allocator::get_default());
-        ColumnDouble c(Allocator::get_default(), ref);
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        DoubleColumn c(Allocator::get_default(), ref);
 
         c.add(5.0099);
         c.add(30.221);
@@ -451,8 +451,8 @@ TEST(ColumnDouble_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type ref = ColumnDouble::create(Allocator::get_default());
-        ColumnDouble c(Allocator::get_default(), ref);
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        DoubleColumn c(Allocator::get_default(), ref);
 
         c.add(5.0099);
         c.add(30.221);
@@ -466,7 +466,7 @@ TEST(ColumnDouble_SwapRows)
     }
 }
 
-TEST(ColumnDouble_InitOfEmptyColumn)
+TEST(DoubleColumn_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Double, "works");
@@ -480,7 +480,7 @@ TEST(ColumnDouble_InitOfEmptyColumn)
     CHECK_EQUAL(0.0, t.get_double(1,0));
 }
 
-TEST(ColumnFloat_InitOfEmptyColumn)
+TEST(FloatColumn_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Float, "works");

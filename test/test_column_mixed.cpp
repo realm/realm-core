@@ -42,10 +42,10 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ColumnMixed_Int)
+TEST(MixedColumn_Int)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     int64_t max_val = std::numeric_limits<int64_t>::max();
     int64_t min_val = std::numeric_limits<int64_t>::min();
@@ -83,10 +83,10 @@ TEST(ColumnMixed_Int)
 }
 
 
-TEST(ColumnMixed_Float)
+TEST(MixedColumn_Float)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     uint32_t v = 0xFFFFFFFF;
     float f = float(v);
@@ -118,10 +118,10 @@ TEST(ColumnMixed_Float)
 }
 
 
-TEST(ColumnMixed_Double)
+TEST(MixedColumn_Double)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     uint64_t v = 0xFFFFFFFFFFFFFFFFULL;
     double d = double(v);
@@ -153,10 +153,10 @@ TEST(ColumnMixed_Double)
 }
 
 
-TEST(ColumnMixed_Bool)
+TEST(MixedColumn_Bool)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     c.insert_bool(0, true);
     c.insert_bool(1, false);
@@ -186,10 +186,10 @@ TEST(ColumnMixed_Bool)
 }
 
 
-TEST(ColumnMixed_Date)
+TEST(MixedColumn_Date)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     c.insert_datetime(0,     2);
     c.insert_datetime(1,   100);
@@ -219,10 +219,10 @@ TEST(ColumnMixed_Date)
 }
 
 
-TEST(ColumnMixed_String)
+TEST(MixedColumn_String)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     c.insert_string(0, "aaa");
     c.insert_string(1, "bbbbb");
@@ -252,10 +252,10 @@ TEST(ColumnMixed_String)
 }
 
 
-TEST(ColumnMixed_Binary)
+TEST(MixedColumn_Binary)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     c.insert_binary(0, BinaryData("aaa", 4));
     c.insert_binary(1, BinaryData("bbbbb", 6));
@@ -285,10 +285,10 @@ TEST(ColumnMixed_Binary)
 }
 
 
-TEST(ColumnMixed_Table)
+TEST(MixedColumn_Table)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     c.insert_subtable(0, 0);
     c.insert_subtable(1, 0);
@@ -306,10 +306,10 @@ TEST(ColumnMixed_Table)
 }
 
 
-TEST(ColumnMixed_Mixed)
+TEST(MixedColumn_Mixed)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     // Insert mixed types
     c.insert_int(0, 23);
@@ -355,10 +355,10 @@ TEST(ColumnMixed_Mixed)
 }
 
 
-TEST(ColumnMixed_SubtableSize)
+TEST(MixedColumn_SubtableSize)
 {
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     c.insert_subtable(0, 0);
     c.insert_subtable(1, 0);
@@ -404,7 +404,7 @@ TEST(ColumnMixed_SubtableSize)
 }
 
 
-TEST(ColumnMixed_WriteLeak)
+TEST(MixedColumn_WriteLeak)
 {
     class NullBuffer : public std::streambuf { public: int overflow(int c) { return c; } };
 
@@ -412,8 +412,8 @@ TEST(ColumnMixed_WriteLeak)
     std::ostream null_stream(&null_buffer);
     _impl::OutputStream out(null_stream);
 
-    ref_type ref = ColumnMixed::create(Allocator::get_default());
-    ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
     c.insert_subtable(0, 0);
     c.insert_subtable(1, 0);
@@ -423,14 +423,14 @@ TEST(ColumnMixed_WriteLeak)
     c.destroy();
 }
 
-TEST(ColumnMixed_SwapRows)
+TEST(MixedColumn_SwapRows)
 {
     auto epsilon = std::numeric_limits<float>::epsilon();
 
     // Normal case
     {
-        ref_type ref = ColumnMixed::create(Allocator::get_default());
-        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
@@ -448,8 +448,8 @@ TEST(ColumnMixed_SwapRows)
 
     // First two elements
     {
-        ref_type ref = ColumnMixed::create(Allocator::get_default());
-        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
@@ -466,8 +466,8 @@ TEST(ColumnMixed_SwapRows)
 
     // Last two elements
     {
-        ref_type ref = ColumnMixed::create(Allocator::get_default());
-        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
@@ -484,8 +484,8 @@ TEST(ColumnMixed_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type ref = ColumnMixed::create(Allocator::get_default());
-        ColumnMixed c(Allocator::get_default(), ref, 0, 0);
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");

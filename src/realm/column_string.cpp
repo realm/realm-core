@@ -54,13 +54,13 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref, bool nullable):
+StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable):
     m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
 
-    // Within an AdaptiveStringColumn the leaves can be of different
+    // Within an StringColumn the leaves can be of different
     // type optimized for the lengths of the strings contained
     // therein.  The type is indicated by the combination of the
     // is_inner_bptree_node(N), has_refs(R) and context_flag(C):
@@ -106,24 +106,24 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref, bool 
 }
 
 
-AdaptiveStringColumn::~AdaptiveStringColumn() REALM_NOEXCEPT
+StringColumn::~StringColumn() REALM_NOEXCEPT
 {
 }
 
 
-void AdaptiveStringColumn::destroy() REALM_NOEXCEPT
+void StringColumn::destroy() REALM_NOEXCEPT
 {
     ColumnBaseSimple::destroy();
     if (m_search_index)
         m_search_index->destroy();
 }
 
-bool AdaptiveStringColumn::is_nullable() const REALM_NOEXCEPT
+bool StringColumn::is_nullable() const REALM_NOEXCEPT
 {
     return m_nullable;
 }
 
-StringData AdaptiveStringColumn::get(size_t ndx) const REALM_NOEXCEPT
+StringData StringColumn::get(size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ndx < size());
 
@@ -164,20 +164,20 @@ StringData AdaptiveStringColumn::get(size_t ndx) const REALM_NOEXCEPT
     return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc, m_nullable);
 }
 
-bool AdaptiveStringColumn::is_null(std::size_t ndx) const REALM_NOEXCEPT
+bool StringColumn::is_null(std::size_t ndx) const REALM_NOEXCEPT
 {
     StringData sd = get(ndx);
     REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd.is_null();
 }
 
-StringData AdaptiveStringColumn::get_index_data(std::size_t ndx, char*) const REALM_NOEXCEPT
+StringData StringColumn::get_index_data(std::size_t ndx, char*) const REALM_NOEXCEPT
 {
     return get(ndx);
 }
 
 
-void AdaptiveStringColumn::set_null(std::size_t ndx)
+void StringColumn::set_null(std::size_t ndx)
 {
     if (!m_nullable) {
         throw LogicError{LogicError::column_not_nullable};
@@ -186,7 +186,7 @@ void AdaptiveStringColumn::set_null(std::size_t ndx)
     set(ndx, sd);
 }
 
-void AdaptiveStringColumn::populate_search_index()
+void StringColumn::populate_search_index()
 {
     REALM_ASSERT(m_search_index);
 
@@ -199,7 +199,7 @@ void AdaptiveStringColumn::populate_search_index()
     }
 }
 
-StringIndex* AdaptiveStringColumn::create_search_index()
+StringIndex* StringColumn::create_search_index()
 {
     REALM_ASSERT(!m_search_index);
 
@@ -213,20 +213,20 @@ StringIndex* AdaptiveStringColumn::create_search_index()
 }
 
 
-void AdaptiveStringColumn::destroy_search_index() REALM_NOEXCEPT
+void StringColumn::destroy_search_index() REALM_NOEXCEPT
 {
     m_search_index.reset();
 }
 
 
-std::unique_ptr<StringIndex> AdaptiveStringColumn::release_search_index() REALM_NOEXCEPT
+std::unique_ptr<StringIndex> StringColumn::release_search_index() REALM_NOEXCEPT
 {
     return std::move(m_search_index);
 }
 
 
-void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
-                                                size_t ndx_in_parent, bool allow_duplicate_valaues)
+void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
+                                        size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
     m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
@@ -234,13 +234,13 @@ void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* paren
 }
 
 
-void AdaptiveStringColumn::set_search_index_allow_duplicate_values(bool allow) REALM_NOEXCEPT
+void StringColumn::set_search_index_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 {
     m_search_index->set_allow_duplicate_values(allow);
 }
 
 
-void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
+void StringColumn::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -344,7 +344,7 @@ public:
 
 } // anonymous namespace
 
-void AdaptiveStringColumn::set(size_t ndx, StringData value)
+void StringColumn::set(size_t ndx, StringData value)
 {
     REALM_ASSERT_DEBUG(ndx < size());
 
@@ -388,10 +388,10 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
 }
 
 
-class AdaptiveStringColumn::EraseLeafElem: public Array::EraseHandler {
+class StringColumn::EraseLeafElem: public Array::EraseHandler {
 public:
-    AdaptiveStringColumn& m_column;
-    EraseLeafElem(AdaptiveStringColumn& column, bool nullable) REALM_NOEXCEPT:
+    StringColumn& m_column;
+    EraseLeafElem(StringColumn& column, bool nullable) REALM_NOEXCEPT:
         m_column(column), m_nullable(nullable) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
@@ -486,7 +486,7 @@ private:
     bool m_nullable;
 };
 
-void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
+void StringColumn::do_erase(size_t ndx, bool is_last)
 {
     REALM_ASSERT_3(ndx, <, size());
     REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
@@ -528,7 +528,7 @@ void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
 }
 
 
-void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
+void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
     REALM_ASSERT_3(last_row_ndx + 1, ==, size());
@@ -595,7 +595,7 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     Array::erase_bptree_elem(m_array.get(), realm::npos, erase_leaf_elem); // Throws
 }
 
-void AdaptiveStringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+void StringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     REALM_ASSERT_3(row_ndx_1, <=, size());
     REALM_ASSERT_3(row_ndx_2, <=, size());
@@ -629,7 +629,7 @@ void AdaptiveStringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
-void AdaptiveStringColumn::do_clear()
+void StringColumn::do_clear()
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -671,7 +671,7 @@ void AdaptiveStringColumn::do_clear()
 }
 
 
-size_t AdaptiveStringColumn::count(StringData value) const
+size_t StringColumn::count(StringData value) const
 {
     if (m_search_index)
         return m_search_index->count(value); // Throws
@@ -738,7 +738,7 @@ size_t AdaptiveStringColumn::count(StringData value) const
 }
 
 
-size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t end) const
+size_t StringColumn::find_first(StringData value, size_t begin, size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -820,7 +820,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 }
 
 
-void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t begin, size_t end) const
+void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begin, size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -920,7 +920,7 @@ struct BinToStrAdaptor {
 
 } // anonymous namespace
 
-size_t AdaptiveStringColumn::lower_bound_string(StringData value) const REALM_NOEXCEPT
+size_t StringColumn::lower_bound_string(StringData value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -944,7 +944,7 @@ size_t AdaptiveStringColumn::lower_bound_string(StringData value) const REALM_NO
     return ColumnBase::lower_bound(*this, value);
 }
 
-size_t AdaptiveStringColumn::upper_bound_string(StringData value) const REALM_NOEXCEPT
+size_t StringColumn::upper_bound_string(StringData value) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -969,7 +969,7 @@ size_t AdaptiveStringColumn::upper_bound_string(StringData value) const REALM_NO
 }
 
 
-FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) const
+FindRes StringColumn::find_all_indexref(StringData value, size_t& dst) const
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     REALM_ASSERT(m_search_index);
@@ -978,11 +978,11 @@ FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) c
 }
 
 
-bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool enforce) const
+bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool enforce) const
 {
     Allocator& alloc = m_array->get_alloc();
-    ref_type keys_ref_2 = AdaptiveStringColumn::create(alloc); // Throws
-    AdaptiveStringColumn keys(alloc, keys_ref_2, m_nullable); // Throws // FIXME
+    ref_type keys_ref_2 = StringColumn::create(alloc); // Throws
+    StringColumn keys(alloc, keys_ref_2, m_nullable); // Throws // FIXME
 
     // Generate list of unique values (keys)
     size_t n = size();
@@ -1004,8 +1004,8 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     }
 
     // Generate enumerated list of entries
-    ref_type values_ref_2 = Column::create(alloc); // Throws
-    Column values(alloc, values_ref_2); // Throws
+    ref_type values_ref_2 = IntegerColumn::create(alloc); // Throws
+    IntegerColumn values(alloc, values_ref_2); // Throws
     for (size_t i = 0; i != n; ++i) {
         StringData v = get(i);
         size_t pos = keys.lower_bound_string(v);
@@ -1019,7 +1019,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
 }
 
 
-bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
+bool StringColumn::compare_string(const StringColumn& c) const
 {
     size_t n = size();
     if (c.size() != n)
@@ -1034,7 +1034,7 @@ bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
 }
 
 
-void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
+void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
     bptree_insert(row_ndx, value, num_rows); // Throws
 
@@ -1046,7 +1046,7 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
 }
 
 
-void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
+void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
 {
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     bptree_insert(row_ndx_2, value, num_rows); // Throws
@@ -1056,11 +1056,11 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
 }
 
 
-void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
+void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
     ref_type new_sibling_ref;
-    Array::TreeInsert<AdaptiveStringColumn> state;
+    Array::TreeInsert<StringColumn> state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
@@ -1109,10 +1109,9 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
 }
 
 
-ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
-                                           size_t ndx_in_parent, Allocator& alloc,
-                                           size_t insert_ndx,
-                                           Array::TreeInsert<AdaptiveStringColumn>& state)
+ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t ndx_in_parent,
+                                   Allocator& alloc, size_t insert_ndx,
+                                   Array::TreeInsert<StringColumn>& state)
 {
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
     if (long_strings) {
@@ -1163,7 +1162,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 }
 
 
-AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t value_size)
+StringColumn::LeafType StringColumn::upgrade_root_leaf(size_t value_size)
 {
     REALM_ASSERT(root_is_leaf());
 
@@ -1220,8 +1219,8 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
 }
 
 
-std::unique_ptr<const ArrayParent>
-AdaptiveStringColumn::get_leaf(size_t ndx, size_t& out_ndx_in_leaf, LeafType& out_leaf_type) const
+std::unique_ptr<const ArrayParent> StringColumn::get_leaf(size_t ndx, size_t& out_ndx_in_leaf,
+                                                          LeafType& out_leaf_type) const
 {
     size_t off;
     ArrayParent* ap = nullptr;
@@ -1230,8 +1229,8 @@ AdaptiveStringColumn::get_leaf(size_t ndx, size_t& out_ndx_in_leaf, LeafType& ou
     return std::unique_ptr<const ArrayParent>(ap);
 }
 
-AdaptiveStringColumn::LeafType
-AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool use_retval) const
+StringColumn::LeafType StringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off,
+                                              bool use_retval) const
 {
     static_cast<void>(use_retval);
     REALM_ASSERT_3(use_retval, ==, false); // retval optimization not supported. See Array on how to implement
@@ -1280,9 +1279,12 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
 }
 
 
-class AdaptiveStringColumn::CreateHandler: public ColumnBase::CreateHandler {
+class StringColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    CreateHandler(Allocator& alloc):
+        m_alloc(alloc)
+    {
+    }
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = ArrayString::create_array(size, m_alloc); // Throws
@@ -1292,16 +1294,20 @@ private:
     Allocator& m_alloc;
 };
 
-ref_type AdaptiveStringColumn::create(Allocator& alloc, size_t size)
+ref_type StringColumn::create(Allocator& alloc, size_t size)
 {
     CreateHandler handler(alloc);
     return ColumnBase::create(alloc, size, handler);
 }
 
 
-class AdaptiveStringColumn::SliceHandler: public ColumnBase::SliceHandler {
+class StringColumn::SliceHandler: public ColumnBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc, bool nullable): m_alloc(alloc), m_nullable(nullable) {}
+    SliceHandler(Allocator& alloc, bool nullable):
+        m_alloc(alloc),
+        m_nullable(nullable)
+    {
+    }
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
                       Allocator& target_alloc) override
     {
@@ -1329,8 +1335,8 @@ private:
     bool m_nullable;
 };
 
-ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
-                                     size_t table_size, _impl::OutputStream& out) const
+ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
+                             size_t table_size, _impl::OutputStream& out) const
 {
     ref_type ref;
     if (root_is_leaf()) {
@@ -1370,7 +1376,7 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
-void AdaptiveStringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+void StringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     refresh_root_accessor(); // Throws
 
@@ -1383,7 +1389,7 @@ void AdaptiveStringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spe
 }
 
 
-void AdaptiveStringColumn::refresh_root_accessor()
+void StringColumn::refresh_root_accessor()
 {
     // The type of the cached root array accessor may no longer match the
     // underlying root node. In that case we need to replace it. Note that when
@@ -1498,7 +1504,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
-void AdaptiveStringColumn::Verify() const
+void StringColumn::Verify() const
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -1533,7 +1539,7 @@ void AdaptiveStringColumn::Verify() const
 }
 
 
-void AdaptiveStringColumn::Verify(const Table& table, size_t col_ndx) const
+void StringColumn::Verify(const Table& table, size_t col_ndx) const
 {
     ColumnBase::Verify(table, col_ndx);
 
@@ -1549,7 +1555,7 @@ void AdaptiveStringColumn::Verify(const Table& table, size_t col_ndx) const
 }
 
 
-void AdaptiveStringColumn::to_dot(std::ostream& out, StringData title) const
+void StringColumn::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = m_array->get_ref();
     out << "subgraph cluster_string_column" << ref << " {" << std::endl;
@@ -1561,7 +1567,7 @@ void AdaptiveStringColumn::to_dot(std::ostream& out, StringData title) const
     out << "}" << std::endl;
 }
 
-void AdaptiveStringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
+void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
                                        std::ostream& out) const
 {
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
@@ -1629,7 +1635,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 
 } // anonymous namespace
 
-void AdaptiveStringColumn::do_dump_node_structure(std::ostream& out, int level) const
+void StringColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;

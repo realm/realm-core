@@ -15,9 +15,7 @@
 #include <realm/column_backlink.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -314,10 +312,8 @@ size_t Group::create_table(StringData name)
     if (!m_table_accessors.empty())
         m_table_accessors.push_back(0); // Throws
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
         repl->insert_group_level_table(ndx, ndx, name); // Throws
-#endif
 
     return ndx;
 }
@@ -425,14 +421,14 @@ void Group::remove_table(size_t table_ndx)
             ColumnType type = last_spec.get_column_type(i);
             if (tf::is_link_type(type)) {
                 ColumnBase& col = tf::get_column(*last_table, i);
-                REALM_ASSERT(dynamic_cast<ColumnLinkBase*>(&col));
-                ColumnLinkBase& link_col = static_cast<ColumnLinkBase&>(col);
+                REALM_ASSERT(dynamic_cast<LinkColumnBase*>(&col));
+                LinkColumnBase& link_col = static_cast<LinkColumnBase&>(col);
                 opposite_table = &link_col.get_target_table();
             }
             else if (type == col_type_BackLink) {
                 ColumnBase& col = tf::get_column(*last_table, i);
-                REALM_ASSERT(dynamic_cast<ColumnBackLink*>(&col));
-                ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(col);
+                REALM_ASSERT(dynamic_cast<BacklinkColumn*>(&col));
+                BacklinkColumn& backlink_col = static_cast<BacklinkColumn&>(col);
                 opposite_table = &backlink_col.get_origin_table();
             }
             else {
@@ -472,10 +468,8 @@ void Group::remove_table(size_t table_ndx)
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
 
-#ifdef REALM_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
         repl->erase_group_level_table(table_ndx, last_ndx+1); // Throws
-#endif
 }
 
 
@@ -815,8 +809,6 @@ void Group::mark_all_table_accessors() REALM_NOEXCEPT
     }
 }
 
-
-#ifdef REALM_ENABLE_REPLICATION
 
 namespace {
 
@@ -1514,8 +1506,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     attach(new_top_ref); // Throws
     refresh_dirty_accessors(); // Throws
 }
-
-#endif // REALM_ENABLE_REPLICATION
 
 
 #ifdef REALM_DEBUG

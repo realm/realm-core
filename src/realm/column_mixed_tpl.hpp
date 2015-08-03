@@ -20,35 +20,35 @@
 
 namespace realm {
 
-inline ColumnMixed::ColumnMixed(Allocator& alloc, ref_type ref,
+inline MixedColumn::MixedColumn(Allocator& alloc, ref_type ref,
                                 Table* table, std::size_t column_ndx)
 {
     create(alloc, ref, table, column_ndx);
 }
 
-inline void ColumnMixed::adj_acc_insert_rows(std::size_t row_ndx,
+inline void MixedColumn::adj_acc_insert_rows(std::size_t row_ndx,
                                              std::size_t num_rows) REALM_NOEXCEPT
 {
     m_data->adj_acc_insert_rows(row_ndx, num_rows);
 }
 
-inline void ColumnMixed::adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
+inline void MixedColumn::adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
 {
     m_data->adj_acc_erase_row(row_ndx);
 }
 
-inline void ColumnMixed::adj_acc_move_over(std::size_t from_row_ndx,
+inline void MixedColumn::adj_acc_move_over(std::size_t from_row_ndx,
                                            std::size_t to_row_ndx) REALM_NOEXCEPT
 {
     m_data->adj_acc_move_over(from_row_ndx, to_row_ndx);
 }
 
-inline void ColumnMixed::adj_acc_clear_root_table() REALM_NOEXCEPT
+inline void MixedColumn::adj_acc_clear_root_table() REALM_NOEXCEPT
 {
     m_data->adj_acc_clear_root_table();
 }
 
-inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_ndx) const REALM_NOEXCEPT
+inline ref_type MixedColumn::get_subtable_ref(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
@@ -56,7 +56,7 @@ inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_ndx) const REALM_N
     return m_data->get_as_ref(row_ndx);
 }
 
-inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_ndx) const REALM_NOEXCEPT
+inline std::size_t MixedColumn::get_subtable_size(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     ref_type top_ref = get_subtable_ref(row_ndx);
     if (top_ref == 0)
@@ -64,17 +64,17 @@ inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_ndx) const REA
     return _impl::TableFriend::get_size_from_ref(top_ref, m_data->get_alloc());
 }
 
-inline Table* ColumnMixed::get_subtable_accessor(std::size_t row_ndx) const REALM_NOEXCEPT
+inline Table* MixedColumn::get_subtable_accessor(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     return m_data->get_subtable_accessor(row_ndx);
 }
 
-inline void ColumnMixed::discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT
+inline void MixedColumn::discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT
 {
     m_data->discard_subtable_accessor(row_ndx);
 }
 
-inline Table* ColumnMixed::get_subtable_ptr(std::size_t row_ndx)
+inline Table* MixedColumn::get_subtable_ptr(std::size_t row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
@@ -82,12 +82,12 @@ inline Table* ColumnMixed::get_subtable_ptr(std::size_t row_ndx)
     return m_data->get_subtable_ptr(row_ndx); // Throws
 }
 
-inline const Table* ColumnMixed::get_subtable_ptr(std::size_t subtable_ndx) const
+inline const Table* MixedColumn::get_subtable_ptr(std::size_t subtable_ndx) const
 {
-    return const_cast<ColumnMixed*>(this)->get_subtable_ptr(subtable_ndx);
+    return const_cast<MixedColumn*>(this)->get_subtable_ptr(subtable_ndx);
 }
 
-inline void ColumnMixed::discard_child_accessors() REALM_NOEXCEPT
+inline void MixedColumn::discard_child_accessors() REALM_NOEXCEPT
 {
     m_data->discard_child_accessors();
 }
@@ -99,7 +99,7 @@ inline void ColumnMixed::discard_child_accessors() REALM_NOEXCEPT
 
 #define REALM_BIT63 0x8000000000000000ULL
 
-inline int64_t ColumnMixed::get_value(std::size_t ndx) const REALM_NOEXCEPT
+inline int64_t MixedColumn::get_value(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
 
@@ -109,7 +109,7 @@ inline int64_t ColumnMixed::get_value(std::size_t ndx) const REALM_NOEXCEPT
     return int64_t(value);
 }
 
-inline int64_t ColumnMixed::get_int(std::size_t ndx) const REALM_NOEXCEPT
+inline int64_t MixedColumn::get_int(std::size_t ndx) const REALM_NOEXCEPT
 {
     // Get first 63 bits of the integer value
     int64_t value = get_value(ndx);
@@ -126,21 +126,21 @@ inline int64_t ColumnMixed::get_int(std::size_t ndx) const REALM_NOEXCEPT
     return value;
 }
 
-inline bool ColumnMixed::get_bool(std::size_t ndx) const REALM_NOEXCEPT
+inline bool MixedColumn::get_bool(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Bool);
 
     return (get_value(ndx) != 0);
 }
 
-inline DateTime ColumnMixed::get_datetime(std::size_t ndx) const REALM_NOEXCEPT
+inline DateTime MixedColumn::get_datetime(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Date);
 
     return DateTime(get_value(ndx));
 }
 
-inline float ColumnMixed::get_float(std::size_t ndx) const REALM_NOEXCEPT
+inline float MixedColumn::get_float(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559, "'float' is not IEEE");
     REALM_STATIC_ASSERT((sizeof (float) * CHAR_BIT == 32), "Assume 32 bit float.");
@@ -149,7 +149,7 @@ inline float ColumnMixed::get_float(std::size_t ndx) const REALM_NOEXCEPT
     return type_punning<float>(get_value(ndx));
 }
 
-inline double ColumnMixed::get_double(std::size_t ndx) const REALM_NOEXCEPT
+inline double MixedColumn::get_double(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559, "'double' is not IEEE");
     REALM_STATIC_ASSERT((sizeof (double) * CHAR_BIT == 64), "Assume 64 bit double.");
@@ -166,7 +166,7 @@ inline double ColumnMixed::get_double(std::size_t ndx) const REALM_NOEXCEPT
     return type_punning<double>(int_val);
 }
 
-inline StringData ColumnMixed::get_string(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData MixedColumn::get_string(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_String);
@@ -176,7 +176,7 @@ inline StringData ColumnMixed::get_string(std::size_t ndx) const REALM_NOEXCEPT
     return m_binary_data->get_string(data_ndx);
 }
 
-inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const REALM_NOEXCEPT
+inline BinaryData MixedColumn::get_binary(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Binary);
@@ -193,7 +193,7 @@ inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const REALM_NOEXCEPT
 // Set a int64 value.
 // Store 63 bit of the value in m_data. Store sign bit in m_types.
 
-inline void ColumnMixed::set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
+inline void MixedColumn::set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
 
@@ -208,18 +208,18 @@ inline void ColumnMixed::set_int64(std::size_t ndx, int64_t value, MixedColType 
     m_data->set(ndx, value);
 }
 
-inline void ColumnMixed::set_int(std::size_t ndx, int64_t value)
+inline void MixedColumn::set_int(std::size_t ndx, int64_t value)
 {
     set_int64(ndx, value, mixcol_Int, mixcol_IntNeg); // Throws
 }
 
-inline void ColumnMixed::set_double(std::size_t ndx, double value)
+inline void MixedColumn::set_double(std::size_t ndx, double value)
 {
     int64_t val64 = type_punning<int64_t>(value);
     set_int64(ndx, val64, mixcol_Double, mixcol_DoubleNeg); // Throws
 }
 
-inline void ColumnMixed::set_value(std::size_t ndx, int64_t value, MixedColType coltype)
+inline void MixedColumn::set_value(std::size_t ndx, int64_t value, MixedColType coltype)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
 
@@ -231,23 +231,23 @@ inline void ColumnMixed::set_value(std::size_t ndx, int64_t value, MixedColType 
     m_data->set(ndx, v); // Throws
 }
 
-inline void ColumnMixed::set_float(std::size_t ndx, float value)
+inline void MixedColumn::set_float(std::size_t ndx, float value)
 {
     int64_t val64 = type_punning<int64_t>(value);
     set_value(ndx, val64, mixcol_Float); // Throws
 }
 
-inline void ColumnMixed::set_bool(std::size_t ndx, bool value)
+inline void MixedColumn::set_bool(std::size_t ndx, bool value)
 {
     set_value(ndx, (value ? 1 : 0), mixcol_Bool); // Throws
 }
 
-inline void ColumnMixed::set_datetime(std::size_t ndx, DateTime value)
+inline void MixedColumn::set_datetime(std::size_t ndx, DateTime value)
 {
     set_value(ndx, int64_t(value.get_datetime()), mixcol_Date); // Throws
 }
 
-inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
+inline void MixedColumn::set_subtable(std::size_t ndx, const Table* t)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     typedef _impl::TableFriend tf;
@@ -267,7 +267,7 @@ inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
 // Inserts
 //
 
-inline void ColumnMixed::insert_value(std::size_t row_ndx, int_fast64_t types_value,
+inline void MixedColumn::insert_value(std::size_t row_ndx, int_fast64_t types_value,
                                       int_fast64_t data_value)
 {
     std::size_t size = m_types->size(); // Slow
@@ -281,7 +281,7 @@ inline void ColumnMixed::insert_value(std::size_t row_ndx, int_fast64_t types_va
 // Insert a int64 value.
 // Store 63 bit of the value in m_data. Store sign bit in m_types.
 
-inline void ColumnMixed::insert_int(std::size_t ndx, int_fast64_t value, MixedColType type)
+inline void MixedColumn::insert_int(std::size_t ndx, int_fast64_t value, MixedColType type)
 {
     int_fast64_t types_value = type;
     // Shift value one bit and set lowest bit to indicate that this is not a ref
@@ -289,7 +289,7 @@ inline void ColumnMixed::insert_int(std::size_t ndx, int_fast64_t value, MixedCo
     insert_value(ndx, types_value, data_value); // Throws
 }
 
-inline void ColumnMixed::insert_pos_neg(std::size_t ndx, int_fast64_t value, MixedColType pos_type,
+inline void MixedColumn::insert_pos_neg(std::size_t ndx, int_fast64_t value, MixedColType pos_type,
                                         MixedColType neg_type)
 {
     // 'store' the sign-bit in the integer-type
@@ -300,36 +300,36 @@ inline void ColumnMixed::insert_pos_neg(std::size_t ndx, int_fast64_t value, Mix
     insert_value(ndx, types_value, data_value); // Throws
 }
 
-inline void ColumnMixed::insert_int(std::size_t ndx, int_fast64_t value)
+inline void MixedColumn::insert_int(std::size_t ndx, int_fast64_t value)
 {
     insert_pos_neg(ndx, value, mixcol_Int, mixcol_IntNeg); // Throws
 }
 
-inline void ColumnMixed::insert_double(std::size_t ndx, double value)
+inline void MixedColumn::insert_double(std::size_t ndx, double value)
 {
     int_fast64_t value_2 = type_punning<int64_t>(value);
     insert_pos_neg(ndx, value_2, mixcol_Double, mixcol_DoubleNeg); // Throws
 }
 
-inline void ColumnMixed::insert_float(std::size_t ndx, float value)
+inline void MixedColumn::insert_float(std::size_t ndx, float value)
 {
     int_fast64_t value_2 = type_punning<int32_t>(value);
     insert_int(ndx, value_2, mixcol_Float); // Throws
 }
 
-inline void ColumnMixed::insert_bool(std::size_t ndx, bool value)
+inline void MixedColumn::insert_bool(std::size_t ndx, bool value)
 {
     int_fast64_t value_2 = int_fast64_t(value);
     insert_int(ndx, value_2, mixcol_Bool); // Throws
 }
 
-inline void ColumnMixed::insert_datetime(std::size_t ndx, DateTime value)
+inline void MixedColumn::insert_datetime(std::size_t ndx, DateTime value)
 {
     int_fast64_t value_2 = int_fast64_t(value.get_datetime());
     insert_int(ndx, value_2, mixcol_Date); // Throws
 }
 
-inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
+inline void MixedColumn::insert_string(std::size_t ndx, StringData value)
 {
     ensure_binary_data_column();
     std::size_t blob_ndx = m_binary_data->size();
@@ -339,7 +339,7 @@ inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
     insert_int(ndx, value_2, mixcol_String); // Throws
 }
 
-inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
+inline void MixedColumn::insert_binary(std::size_t ndx, BinaryData value)
 {
     ensure_binary_data_column();
     std::size_t blob_ndx = m_binary_data->size();
@@ -349,7 +349,7 @@ inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
     insert_int(ndx, value_2, mixcol_Binary); // Throws
 }
 
-inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
+inline void MixedColumn::insert_subtable(std::size_t ndx, const Table* t)
 {
     typedef _impl::TableFriend tf;
     ref_type ref;
@@ -364,39 +364,39 @@ inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
     insert_value(ndx, types_value, data_value); // Throws
 }
 
-inline void ColumnMixed::erase(std::size_t row_ndx)
+inline void MixedColumn::erase(std::size_t row_ndx)
 {
     size_t num_rows_to_erase = 1;
     size_t prior_num_rows = size(); // Note that size() is slow
     do_erase(row_ndx, num_rows_to_erase, prior_num_rows); // Throws
 }
 
-inline void ColumnMixed::move_last_over(std::size_t row_ndx)
+inline void MixedColumn::move_last_over(std::size_t row_ndx)
 {
     size_t prior_num_rows = size(); // Note that size() is slow
     do_move_last_over(row_ndx, prior_num_rows); // Throws
 }
 
-inline void ColumnMixed::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+inline void MixedColumn::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
 {
     do_swap_rows(row_ndx_1, row_ndx_2);
 }
 
-inline void ColumnMixed::clear()
+inline void MixedColumn::clear()
 {
     std::size_t num_rows = size(); // Note that size() is slow
     do_clear(num_rows); // Throws
 }
 
-inline std::size_t ColumnMixed::get_size_from_ref(ref_type root_ref,
+inline std::size_t MixedColumn::get_size_from_ref(ref_type root_ref,
                                                   Allocator& alloc) REALM_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
     ref_type types_ref = to_ref(Array::get(root_header, 0));
-    return Column::get_size_from_ref(types_ref, alloc);
+    return IntegerColumn::get_size_from_ref(types_ref, alloc);
 }
 
-inline void ColumnMixed::clear_value_and_discard_subtab_acc(std::size_t row_ndx,
+inline void MixedColumn::clear_value_and_discard_subtab_acc(std::size_t row_ndx,
                                                             MixedColType new_type)
 {
     MixedColType old_type = clear_value(row_ndx, new_type);
@@ -405,7 +405,7 @@ inline void ColumnMixed::clear_value_and_discard_subtab_acc(std::size_t row_ndx,
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnMixed::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
+inline void MixedColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
                                      size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
@@ -423,30 +423,30 @@ inline void ColumnMixed::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnMixed::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+inline void MixedColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
                                     size_t prior_num_rows, bool)
 {
     do_erase(row_ndx, num_rows_to_erase, prior_num_rows); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnMixed::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
+inline void MixedColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
 {
     do_move_last_over(row_ndx, prior_num_rows); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void ColumnMixed::clear(std::size_t num_rows, bool)
+inline void MixedColumn::clear(std::size_t num_rows, bool)
 {
     do_clear(num_rows); // Throws
 }
 
-inline void ColumnMixed::mark(int type) REALM_NOEXCEPT
+inline void MixedColumn::mark(int type) REALM_NOEXCEPT
 {
     m_data->mark(type);
 }
 
-inline void ColumnMixed::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
+inline void MixedColumn::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
 {
     get_root_array()->init_from_parent();
     m_types->refresh_accessor_tree(col_ndx, spec); // Throws
@@ -459,14 +459,14 @@ inline void ColumnMixed::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
     // See if m_binary_data needs to be created.
     if (get_root_array()->size() == 3) {
         ref_type ref = get_root_array()->get_as_ref(2);
-        m_binary_data.reset(new ColumnBinary(get_alloc(), ref)); // Throws
+        m_binary_data.reset(new BinaryColumn(get_alloc(), ref)); // Throws
         m_binary_data->set_parent(get_root_array(), 2);
     }
 }
 
-inline void ColumnMixed::RefsColumn::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
+inline void MixedColumn::RefsColumn::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
 {
-    ColumnSubtableParent::refresh_accessor_tree(col_ndx, spec); // Throws
+    SubtableColumnParent::refresh_accessor_tree(col_ndx, spec); // Throws
     std::size_t spec_ndx_in_parent = 0; // Ignored because these are root tables
     m_subtable_map.refresh_accessor_tree(spec_ndx_in_parent); // Throws
 }

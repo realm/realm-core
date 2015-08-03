@@ -344,8 +344,8 @@ TEST(ArrayIntNull_Find)
     CHECK_EQUAL(found, true);
 
     {
-        ref_type col_ref = Column::create(Allocator::get_default());
-        Column col(Allocator::get_default(), col_ref);
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
 
         a.find_all(&col, 0x44);
 

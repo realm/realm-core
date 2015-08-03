@@ -40,12 +40,12 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ColumnBinary_Basic)
+TEST(BinaryColumn_Basic)
 {
-    ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref, true);
+    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    BinaryColumn c(Allocator::get_default(), ref, true);
 
-    // TEST(ColumnBinary_MultiEmpty)
+    // TEST(BinaryColumn_MultiEmpty)
 
     c.add(BinaryData());
     c.add(BinaryData());
@@ -64,7 +64,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(0, c.get(5).size());
 
 
-    // TEST(ColumnBinary_Set)
+    // TEST(BinaryColumn_Set)
 
     c.set(0, BinaryData("hey"));
 
@@ -79,7 +79,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(0, c.get(5).size());
 
 
-    // TEST(ColumnBinary_Add)
+    // TEST(BinaryColumn_Add)
 
     c.clear();
 
@@ -98,7 +98,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(2, c.size());
 
 
-    // TEST(ColumnBinary_Set2)
+    // TEST(BinaryColumn_Set2)
 
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
@@ -153,7 +153,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(3, c.size());
 
 
-    // TEST(ColumnBinary_Insert)
+    // TEST(BinaryColumn_Insert)
 
     c.clear();
 
@@ -197,7 +197,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(6, c.size());
 
 
-    // TEST(ColumnBinary_Delete)
+    // TEST(BinaryColumn_Delete)
 
     c.clear();
 
@@ -234,7 +234,7 @@ TEST(ColumnBinary_Basic)
     CHECK(c.is_empty());
 
 
-    // TEST(ColumnBinary_Big)
+    // TEST(BinaryColumn_Big)
 
     c.clear();
 
@@ -281,16 +281,16 @@ TEST(ColumnBinary_Basic)
     }
 
 
-    // TEST(ColumnBinary_Destroy)
+    // TEST(BinaryColumn_Destroy)
 
     c.destroy();
 }
 
-TEST(ColumnBinary_Nulls)
+TEST(BinaryColumn_Nulls)
 {
-    ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref, true);
-    
+    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    BinaryColumn c(Allocator::get_default(), ref, true);
+
     c.add(BinaryData());
     c.add(BinaryData("", 0));
     c.add(BinaryData("foo"));
@@ -353,12 +353,12 @@ TEST(ColumnBinary_Nulls)
     c.destroy();
 }
 
-TEST(ColumnBinary_SwapRows)
+TEST(BinaryColumn_SwapRows)
 {
     // Normal case
     {
-        ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref);
+        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("foo"));
         c.add(BinaryData("bar"));
@@ -378,8 +378,8 @@ TEST(ColumnBinary_SwapRows)
 
     // First two elements
     {
-        ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref);
+        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
         c.add(BinaryData("baz"));
@@ -394,8 +394,8 @@ TEST(ColumnBinary_SwapRows)
 
     // Last two elements
     {
-        ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref);
+        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
         c.add(BinaryData("baz"));
@@ -410,8 +410,8 @@ TEST(ColumnBinary_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref);
+        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
         c.add(BinaryData("baz"));
@@ -427,8 +427,8 @@ TEST(ColumnBinary_SwapRows)
     // Null values
     {
         bool nullable = true;
-        ref_type ref = ColumnBinary::create(Allocator::get_default());
-        ColumnBinary c(Allocator::get_default(), ref, nullable);
+        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        BinaryColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(BinaryData("foo"));
         c.add(BinaryData("bar"));

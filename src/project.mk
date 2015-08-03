@@ -70,11 +70,6 @@ ifneq ($(REALM_HAVE_CONFIG),)
   bindir      = $(INSTALL_BINDIR)
   libdir      = $(INSTALL_LIBDIR)
   libexecdir  = $(INSTALL_LIBEXECDIR)
-  ifeq ($(ENABLE_REPLICATION),yes)
-    REALM_ENABLE_REPLICATION = x
-  else
-    REALM_ENABLE_REPLICATION = $(EMPTY)
-  endif
   ifeq ($(ENABLE_ENCRYPTION),yes)
     PROJECT_CFLAGS += -DREALM_ENABLE_ENCRYPTION
     ifeq ($(OS),Linux)
@@ -82,9 +77,6 @@ ifneq ($(REALM_HAVE_CONFIG),)
     endif
   endif
 else
-  ifneq ($(REALM_ENABLE_REPLICATION),)
-    PROJECT_CFLAGS += -DREALM_ENABLE_REPLICATION
-  endif
   ifneq ($(REALM_ENABLE_ALLOC_SET_ZERO),)
     PROJECT_CFLAGS += -DREALM_ENABLE_ALLOC_SET_ZERO
   endif

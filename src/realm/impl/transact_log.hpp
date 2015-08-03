@@ -229,7 +229,7 @@ public:
 
     // Must have linklist selected:
     bool link_list_set(std::size_t link_ndx, std::size_t value);
-    bool link_list_set_all(const Column& values);
+    bool link_list_set_all(const IntegerColumn& values);
     bool link_list_insert(std::size_t link_ndx, std::size_t value);
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     bool link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx);
@@ -313,7 +313,7 @@ public:
     void set_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
     void set_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
     void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
-    void set_link_list(const LinkView&, const Column& values);
+    void set_link_list(const LinkView&, const IntegerColumn& values);
 
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
@@ -1216,7 +1216,7 @@ inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list
     m_encoder.link_list_nullify(link_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_set_all(const Column& values)
+inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
 {
     simple_cmd(instr_LinkListSetAll, util::tuple(values.size())); // Throws
     for (std::size_t i = 0; i < values.size(); i++)
@@ -1224,7 +1224,7 @@ inline bool TransactLogEncoder::link_list_set_all(const Column& values)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_link_list(const LinkView& list, const Column& values)
+inline void TransactLogConvenientEncoder::set_link_list(const LinkView& list, const IntegerColumn& values)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_set_all(values); // Throws
