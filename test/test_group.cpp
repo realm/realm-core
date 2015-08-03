@@ -155,7 +155,8 @@ TEST(Group_DoubleOpening)
     // Buffer-based open()
     {
         // Produce a valid buffer
-        std::unique_ptr<char[], decltype(free)*> buffer(nullptr, free);
+        using Deleter = decltype(::free)*;
+        std::unique_ptr<char[], Deleter> buffer(nullptr, ::free);
         size_t buffer_size;
 
         {
