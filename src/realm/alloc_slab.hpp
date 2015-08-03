@@ -370,8 +370,7 @@ private:
 
     Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
-<<<<<<< HEAD
-#endif
+
     /// Returns the first mmap boundary *above* the given position.
     std::size_t get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
 
@@ -389,8 +388,6 @@ private:
 
     /// Reverse: get the base offset of a chunk at a given index
     std::size_t get_chunk_base(std::size_t index) const REALM_NOEXCEPT;
-=======
->>>>>>> 03ef8f6780acc24f6748d51b77ae3e88d43a2157
 
     friend class Group;
     friend class GroupWriter;
@@ -443,17 +440,6 @@ inline std::size_t SlabAlloc::get_baseline() const REALM_NOEXCEPT
     return m_baseline;
 }
 
-<<<<<<< HEAD
-inline void SlabAlloc::reserve(std::size_t size)
-=======
-inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
-{
-    REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    if (REALM_LIKELY(!m_file_on_streaming_form))
-        return;
-    do_prepare_for_update(mutable_data, mapping);
-}
-
 inline void SlabAlloc::resize_file(size_t new_file_size)
 {
     m_file.prealloc(0, new_file_size); // Throws
@@ -463,7 +449,6 @@ inline void SlabAlloc::resize_file(size_t new_file_size)
 }
 
 inline void SlabAlloc::reserve_disk_space(size_t size)
->>>>>>> 03ef8f6780acc24f6748d51b77ae3e88d43a2157
 {
     m_file.prealloc_if_supported(0, size); // Throws
     bool disable_sync = get_disable_sync_to_disk();

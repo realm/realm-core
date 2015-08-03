@@ -310,8 +310,8 @@ size_t GroupWriter::get_free_space(size_t size)
 
     bool is_shared = m_group.m_is_shared;
 
-    for (size_t i = 0; i < lengths.size(); ++i)
-        REALM_ASSERT((lengths.get(i) % 8) == 0);
+    for (size_t i = 0; i < m_free_lengths.size(); ++i)
+        REALM_ASSERT((m_free_lengths.get(i) % 8) == 0);
 
     // Claim space from identified chunk
     size_t chunk_ndx  = p.first;
@@ -323,37 +323,26 @@ size_t GroupWriter::get_free_space(size_t size)
 
     size_t rest = chunk_size - size;
     if (rest > 0) {
-<<<<<<< HEAD
         // Allocating part of chunk - this alway happens from the beginning
         // of the chunk. The call to reserve_free_space may split chunks
         // in order to make sure that it returns a chunk from which allocation
         // can be done from the beginning
         //std::cerr << "  - from beginning" << std::endl;
-        positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
-        lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
-    }
-    else {
-        // Allocating entire chunk
-        positions.erase(chunk_ndx);
-        lengths.erase(chunk_ndx);
-        if (is_shared)
-            versions.erase(chunk_ndx);
-        //std::cerr << "  - entire chunk" << std::endl;
-=======
         m_free_positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
         m_free_lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
     }
     else {
+        // Allocating entire chunk
         m_free_positions.erase(chunk_ndx);
         m_free_lengths.erase(chunk_ndx);
         if (is_shared)
             m_free_versions.erase(chunk_ndx);
->>>>>>> 03ef8f6780acc24f6748d51b77ae3e88d43a2157
+        //std::cerr << "  - entire chunk" << std::endl;
     }
-    for (size_t i = 0; i < lengths.size(); ++i)
-        REALM_ASSERT((lengths.get(i) % 8) == 0);
-    for (size_t i = 0; i < positions.size(); ++i)
-        REALM_ASSERT((positions.get(i) % 8) == 0);
+    for (size_t i = 0; i < m_free_lengths.size(); ++i)
+        REALM_ASSERT((m_free_lengths.get(i) % 8) == 0);
+    for (size_t i = 0; i < m_free_positions.size(); ++i)
+        REALM_ASSERT((m_free_positions.get(i) % 8) == 0);
     REALM_ASSERT((chunk_pos % 8) == 0);
     //std::cerr << "  - got [" << chunk_pos << ", " << size << "]" << std::endl;
     return chunk_pos;
@@ -362,13 +351,6 @@ size_t GroupWriter::get_free_space(size_t size)
 
 std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
-<<<<<<< HEAD
-    REALM_ASSERT(size < 512 * 1024);
-    ArrayInteger& lengths  = m_group.m_free_lengths;
-    ArrayInteger& versions = m_group.m_free_versions;
-    ArrayInteger& pos      = m_group.m_free_positions;
-=======
->>>>>>> 03ef8f6780acc24f6748d51b77ae3e88d43a2157
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
 
@@ -381,7 +363,6 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     size_t chunks_to_consider = end, i = begin;
 
     // Do we have a free space we can reuse?
-<<<<<<< HEAD
     for (;;) {
 
         // if we started at the middle, we have to wrap around when we reach the end:
@@ -389,7 +370,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             i = 0;
         }
         if (chunks_to_consider) {
-            size_t chunk_size = to_size_t(lengths.get(i));
+            size_t chunk_size = to_size_t(m_free_lengths.get(i));
             if (chunk_size < size) {
                 ++i; --chunks_to_consider;
                 continue;
@@ -398,27 +379,16 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             // Only blocks that are not occupied by current readers
             // are allowed to be used.
             if (is_shared) {
-                size_t ver = to_size_t(versions.get(i));
+                size_t ver = to_size_t(m_free_versions.get(i));
                 if (ver >= m_readlock_version) {
                     ++i; --chunks_to_consider;
-=======
-  again:
-    for (size_t i = begin; i != end; ++i) {
-        size_t chunk_size = to_size_t(m_free_lengths.get(i));
-        if (chunk_size >= size) {
-            // Only blocks that are not occupied by current readers
-            // are allowed to be used.
-            if (is_shared) {
-                size_t ver = to_size_t(m_free_versions.get(i));
-                if (ver >= m_readlock_version)
->>>>>>> 03ef8f6780acc24f6748d51b77ae3e88d43a2157
                     continue;
                 }
             }
 
             // search through the block, finding a place within the block,
             // where an allocation will not cross a mmap boundary
-            size_t start_pos = to_size_t(pos.get(i));
+            size_t start_pos = to_size_t(m_free_positions.get(i));
             size_t end_of_block = start_pos + chunk_size;
             size_t alloc_pos = start_pos;
             bool found_a_place = false;
@@ -439,14 +409,14 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             // beginning of the second block.
             if (alloc_pos != start_pos) {
                 // std::cerr << "  - split [" << start_pos << ", " << chunk_size << "]" << " at " << alloc_pos << std::endl;
-                pos.insert(i, start_pos);
-                lengths.insert(i, alloc_pos - start_pos);
+                m_free_positions.insert(i, start_pos);
+                m_free_lengths.insert(i, alloc_pos - start_pos);
                 if (is_shared)
-                    versions.insert(i, 0);
+                    m_free_versions.insert(i, 0);
                 ++i; ++end;
-                pos.set(i, alloc_pos);
+                m_free_positions.set(i, alloc_pos);
                 chunk_size = start_pos + chunk_size - alloc_pos;
-                lengths.set(i, chunk_size);
+                m_free_lengths.set(i, chunk_size);
             }
             // Match found!
             return std::make_pair(i, chunk_size);
@@ -454,7 +424,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         else { // No free space, so we have to extend the file.
             extend_free_space(size);
             // extending the file will extend the free list
-            end = lengths.size();
+            end = m_free_lengths.size();
             // so next round we must retry with the last entry in the free list
             i = end-1; 
             chunks_to_consider = 1;
@@ -483,73 +453,12 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // extend that chunk. If not, we need to add a new entry to the list of free
     // chunks.
     size_t extend_size = requested_size;
-<<<<<<< HEAD
     size_t new_file_size = logical_file_size + extend_size;
     if (!alloc.matches_mmap_boundary(new_file_size)) {
         new_file_size = alloc.get_upper_mmap_boundary(new_file_size);
     }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
-=======
-    bool extend_last_chunk = false;
-    size_t last_chunk_size = 0;
-    if (!m_free_positions.is_empty()) {
-        bool in_use = false;
-        if (is_shared) {
-            size_t ver = to_size_t(m_free_versions.back());
-            if (ver >= m_readlock_version)
-                in_use = true;
-        }
-        if (!in_use) {
-            size_t last_pos  = to_size_t(m_free_positions.back());
-            size_t last_size = to_size_t(m_free_lengths.back());
-            REALM_ASSERT_3(last_size, <, extend_size);
-            REALM_ASSERT_3(last_pos + last_size, <=, logical_file_size);
-            if (last_pos + last_size == logical_file_size) {
-                extend_last_chunk = true;
-                last_chunk_size = last_size;
-                extend_size -= last_size;
-            }
-        }
-    }
-
-    size_t min_file_size = logical_file_size;
-    if (int_add_with_overflow_detect(min_file_size, extend_size))
-        throw std::runtime_error("File size overflow");
-
-    // We double the size until we reach 'stop_doubling_size'. From then on we
-    // increment the size in steps of 'stop_doubling_size'. This is to achieve a
-    // reasonable compromise between minimizing fragmentation (maximizing
-    // performance) and minimizing over-allocation.
-#ifdef REALM_MOBILE
-    size_t stop_doubling_size = 16 * (1024*1024L); // = 16 MiB
-#else
-    size_t stop_doubling_size = 128 * (1024*1024L); // = 128 MiB
-#endif
-    REALM_ASSERT_3(stop_doubling_size % 8, ==, 0);
-
-    size_t new_file_size = logical_file_size;
-    while (new_file_size < min_file_size) {
-        if (new_file_size < stop_doubling_size) {
-            // The file contains at least a header, so the size can never be
-            // zero. We need this to ensure that the number of iterations will
-            // be finite.
-            REALM_ASSERT_3(new_file_size, !=, 0);
-            // Be sure that the doubling does not overflow
-            REALM_ASSERT_3(stop_doubling_size, <=, std::numeric_limits<size_t>::max() / 2);
-            new_file_size *= 2;
-        }
-        else {
-            if (int_add_with_overflow_detect(new_file_size, stop_doubling_size)) {
-                new_file_size = std::numeric_limits<size_t>::max();
-                new_file_size &= ~size_t(7); // 8-byte alignment
-            }
-        }
-    }
-
-    // The size must be a multiple of 8. This is guaranteed as long as the
-    // initial size is a multiple of 8.
->>>>>>> 03ef8f6780acc24f6748d51b77ae3e88d43a2157
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
     //std::cerr << "--------------------- extend(" << logical_file_size << " to "
@@ -566,27 +475,11 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
     size_t chunk_ndx  = m_free_positions.size();
     size_t chunk_size = new_file_size - logical_file_size;
-<<<<<<< HEAD
     REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
-    positions.add(logical_file_size);
-    lengths.add(chunk_size);
+    m_free_positions.add(logical_file_size);
+    m_free_lengths.add(chunk_size);
     if (is_shared)
-        versions.add(0); // new space is always free for writing
-=======
-    if (extend_last_chunk) {
-        --chunk_ndx;
-        chunk_size += last_chunk_size;
-        REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
-        m_free_lengths.set(chunk_ndx, chunk_size);
-    }
-    else { // Else add new free space
-        REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
-        m_free_positions.add(logical_file_size);
-        m_free_lengths.add(chunk_size);
-        if (is_shared)
-            m_free_versions.add(0); // new space is always free for writing
-    }
->>>>>>> 03ef8f6780acc24f6748d51b77ae3e88d43a2157
+        m_free_versions.add(0); // new space is always free for writing
 
     // Update the logical file size
     m_group.m_top.set(2, 1 + 2*new_file_size); // Throws
