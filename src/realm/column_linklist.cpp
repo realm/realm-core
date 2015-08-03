@@ -297,6 +297,12 @@ void LinkListColumn::do_update_link(size_t row_ndx, size_t old_target_row_ndx, s
     links->do_update_link(old_target_row_ndx, new_target_row_ndx);
 }
 
+void LinkListColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2)
+{
+    LinkViewRef links = get(row_ndx);
+    links->do_swap_link(target_row_ndx_1, target_row_ndx_2);
+}
+
 
 LinkView* LinkListColumn::get_ptr(size_t row_ndx) const
 {

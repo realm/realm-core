@@ -61,29 +61,30 @@ enum Instruction {
     instr_SetNull               = 16,
     instr_InsertEmptyRows       = 17,
     instr_EraseRows             = 18, // Remove (multiple) rows
-    instr_ClearTable            = 19, // Remove all rows in selected table
-    instr_OptimizeTable         = 20,
-    instr_SelectDescriptor      = 21, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 22, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 23, // do, but for a link-type column
-    instr_InsertNullableColumn  = 24, // Insert nullable column
-    instr_EraseColumn           = 25, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 26, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 27, // Rename column in selected descriptor
-    instr_AddSearchIndex        = 28, // Add a search index to a column
-    instr_RemoveSearchIndex     = 29, // Remove a search index from a column
-    instr_AddPrimaryKey         = 30, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 31, // Remove primary key from a table
-    instr_SetLinkType           = 32, // Strong/weak
-    instr_SelectLinkList        = 33,
-    instr_LinkListSet           = 34, // Assign to link list entry
-    instr_LinkListInsert        = 35, // Insert entry into link list
-    instr_LinkListMove          = 36, // Move an entry within a link list
-    instr_LinkListSwap          = 37, // Swap two entries within a link list
-    instr_LinkListErase         = 38, // Remove an entry from a link list
-    instr_LinkListNullify       = 39, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear         = 40, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 41, // Assign to link list entry
+    instr_SwapRows              = 19,
+    instr_ClearTable            = 20, // Remove all rows in selected table
+    instr_OptimizeTable         = 21,
+    instr_SelectDescriptor      = 22, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 23, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 24, // do, but for a link-type column
+    instr_InsertNullableColumn  = 25, // Insert nullable column
+    instr_EraseColumn           = 26, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 27, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 28, // Rename column in selected descriptor
+    instr_AddSearchIndex        = 29, // Add a search index to a column
+    instr_RemoveSearchIndex     = 30, // Remove a search index from a column
+    instr_AddPrimaryKey         = 31, // Add a primary key to a table
+    instr_RemovePrimaryKey      = 32, // Remove primary key from a table
+    instr_SetLinkType           = 33, // Strong/weak
+    instr_SelectLinkList        = 34,
+    instr_LinkListSet           = 35, // Assign to link list entry
+    instr_LinkListInsert        = 36, // Insert entry into link list
+    instr_LinkListMove          = 37, // Move an entry within a link list
+    instr_LinkListSwap          = 38, // Swap two entries within a link list
+    instr_LinkListErase         = 39, // Remove an entry from a link list
+    instr_LinkListNullify       = 40, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 41, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 42, // Assign to link list entry
 };
 
 
@@ -137,6 +138,7 @@ public:
     // Must have table selected:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
+    bool swap_rows(std::size_t, std::size_t) { return true; }
     bool clear_table() { return true; }
     bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
     bool set_bool(std::size_t, std::size_t, bool) { return true; }
@@ -197,6 +199,7 @@ public:
                            bool unordered);
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool unordered);
+    bool swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2);
     bool clear_table();
     bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t);
     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool);
@@ -322,6 +325,7 @@ public:
     void erase_rows(const Table*, size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool is_move_last_over);
 
+    void swap_rows(const Table*, std::size_t row_ndx_1, std::size_t row_ndx_2);
     void add_search_index(const Table*, std::size_t col_ndx);
     void remove_search_index(const Table*, std::size_t col_ndx);
     void add_primary_key(const Table*, std::size_t col_ndx);
@@ -1086,6 +1090,18 @@ inline void TransactLogConvenientEncoder::erase_rows(const Table* t, size_t row_
     m_encoder.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, unordered); // Throws
 }
 
+inline bool TransactLogEncoder::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    simple_cmd(instr_SwapRows, util::tuple(row_ndx_1, row_ndx_2));
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::swap_rows(const Table* t, std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    select_table(t); // Throws
+    m_encoder.swap_rows(row_ndx_1, row_ndx_2);
+}
+
 inline bool TransactLogEncoder::add_search_index(std::size_t col_ndx)
 {
     simple_cmd(instr_AddSearchIndex, util::tuple(col_ndx)); // Throws
@@ -1463,6 +1479,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             bool unordered = read_int<bool>(); // Throws
             if (!handler.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
                                     unordered)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SwapRows: {
+            std::size_t row_ndx_1 = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx_2 = read_int<std::size_t>(); // Throws
+            if (!handler.swap_rows(row_ndx_1, row_ndx_2)) // Throws
                 parser_error();
             return;
         }
@@ -1948,6 +1971,13 @@ public:
         size_t prior_num_rows_2 = prior_num_rows - num_rows_to_erase;
         m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows_2,
                                     unordered); // Throws
+        append_instruction();
+        return true;
+    }
+
+    bool swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+    {
+        m_encoder.swap_rows(row_ndx_1, row_ndx_2);
         append_instruction();
         return true;
     }

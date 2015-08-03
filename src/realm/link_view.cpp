@@ -381,6 +381,23 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
     m_row_indexes.set(pos, new_target_row_ndx);
 }
 
+void LinkView::do_swap_link(size_t target_row_ndx_1, size_t target_row_ndx_2)
+{
+    REALM_ASSERT(m_row_indexes.is_attached());
+
+    // FIXME: Optimize this.
+    size_t len = m_row_indexes.size();
+    for (size_t i = 0; i < len; ++i) {
+        size_t value = m_row_indexes.get(i);
+        if (value == target_row_ndx_1) {
+            m_row_indexes.set(i, target_row_ndx_2);
+        }
+        else if (value == target_row_ndx_2) {
+            m_row_indexes.set(i, target_row_ndx_1);
+        }
+    }
+}
+
 
 void LinkView::repl_unselect() REALM_NOEXCEPT
 {

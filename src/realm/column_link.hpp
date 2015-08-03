@@ -72,6 +72,8 @@ protected:
     void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                         std::size_t new_target_row_ndx) override;
+    void do_swap_link(std::size_t row_ndx, std::size_t target_row_ndx_1,
+                      std::size_t target_row_ndx_2) override;
 
 private:
     void remove_backlinks(std::size_t row_ndx);
@@ -141,6 +143,22 @@ inline void LinkColumn::do_update_link(std::size_t row_ndx, std::size_t,
 {
     // Row pos is offset by one, to allow null refs
     LinkColumnBase::set(row_ndx, new_target_row_ndx + 1);
+}
+
+inline void LinkColumn::do_swap_link(std::size_t row_ndx, std::size_t target_row_ndx_1,
+                                     std::size_t target_row_ndx_2)
+{
+    // Row pos is offset by one, to allow null refs
+    ++target_row_ndx_1;
+    ++target_row_ndx_2;
+
+    std::size_t value = LinkColumnBase::get(row_ndx);
+    if (value == target_row_ndx_1) {
+        LinkColumnBase::set(row_ndx, target_row_ndx_2);
+    }
+    else if (value == target_row_ndx_2) {
+        LinkColumnBase::set(row_ndx, target_row_ndx_1);
+    }
 }
 
 } //namespace realm

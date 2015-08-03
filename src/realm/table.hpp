@@ -849,6 +849,7 @@ private:
     void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
+    void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_clear(bool broken_reciprocal_backlinks);
     std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
 
@@ -1195,6 +1196,7 @@ private:
 
     void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
     void adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
+    void adj_acc_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1233,6 +1235,7 @@ private:
     void adj_acc_clear_nonroot_table() REALM_NOEXCEPT;
     void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
     void adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
+    void adj_row_acc_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
     void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT;
@@ -1995,6 +1998,11 @@ public:
         table.do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
     }
 
+    static void do_swap_rows(Table& table, std::size_t row_ndx_1, std::size_t row_ndx_2)
+    {
+        table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
+    }
+
     static void do_clear(Table& table)
     {
         bool broken_reciprocal_backlinks = false;
@@ -2083,6 +2091,11 @@ public:
     static void adj_acc_erase_row(Table& table, std::size_t row_ndx) REALM_NOEXCEPT
     {
         table.adj_acc_erase_row(row_ndx);
+    }
+
+    static void adj_acc_swap_rows(Table& table, std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT
+    {
+        table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
     }
 
     static void adj_acc_move_over(Table& table, std::size_t from_row_ndx,

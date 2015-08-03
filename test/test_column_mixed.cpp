@@ -42,7 +42,7 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ColumnMixed_Int)
+TEST(MixedColumn_Int)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -83,7 +83,7 @@ TEST(ColumnMixed_Int)
 }
 
 
-TEST(ColumnMixed_Float)
+TEST(MixedColumn_Float)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -118,7 +118,7 @@ TEST(ColumnMixed_Float)
 }
 
 
-TEST(ColumnMixed_Double)
+TEST(MixedColumn_Double)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -153,7 +153,7 @@ TEST(ColumnMixed_Double)
 }
 
 
-TEST(ColumnMixed_Bool)
+TEST(MixedColumn_Bool)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -186,7 +186,7 @@ TEST(ColumnMixed_Bool)
 }
 
 
-TEST(ColumnMixed_Date)
+TEST(MixedColumn_Date)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -219,7 +219,7 @@ TEST(ColumnMixed_Date)
 }
 
 
-TEST(ColumnMixed_String)
+TEST(MixedColumn_String)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -252,7 +252,7 @@ TEST(ColumnMixed_String)
 }
 
 
-TEST(ColumnMixed_Binary)
+TEST(MixedColumn_Binary)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -285,7 +285,7 @@ TEST(ColumnMixed_Binary)
 }
 
 
-TEST(ColumnMixed_Table)
+TEST(MixedColumn_Table)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -306,7 +306,7 @@ TEST(ColumnMixed_Table)
 }
 
 
-TEST(ColumnMixed_Mixed)
+TEST(MixedColumn_Mixed)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -355,7 +355,7 @@ TEST(ColumnMixed_Mixed)
 }
 
 
-TEST(ColumnMixed_SubtableSize)
+TEST(MixedColumn_SubtableSize)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
@@ -404,7 +404,7 @@ TEST(ColumnMixed_SubtableSize)
 }
 
 
-TEST(ColumnMixed_WriteLeak)
+TEST(MixedColumn_WriteLeak)
 {
     class NullBuffer : public std::streambuf { public: int overflow(int c) { return c; } };
 
@@ -423,5 +423,82 @@ TEST(ColumnMixed_WriteLeak)
     c.destroy();
 }
 
+TEST(MixedColumn_SwapRows)
+{
+    auto epsilon = std::numeric_limits<float>::epsilon();
+
+    // Normal case
+    {
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+        c.insert_binary(3, BinaryData("foo"));
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(type_Float, c.get_type(1));
+        CHECK_APPROXIMATELY_EQUAL(c.get_float(1), 391.931, epsilon);
+        CHECK_EQUAL(type_String, c.get_type(2));
+        CHECK_EQUAL(c.get_string(2), "a");
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+
+        c.swap_rows(0, 1);
+
+        CHECK_EQUAL(type_String, c.get_type(0));
+        CHECK_EQUAL(c.get_string(0), "a");
+        CHECK_EQUAL(type_Bool, c.get_type(1));
+        CHECK_EQUAL(c.get_bool(1), false);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(type_Float, c.get_type(1));
+        CHECK_APPROXIMATELY_EQUAL(c.get_float(1), 391.931, epsilon);
+        CHECK_EQUAL(type_String, c.get_type(2));
+        CHECK_EQUAL(c.get_string(2), "a");
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = MixedColumn::create(Allocator::get_default());
+        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+
+        c.insert_bool(0, false);
+        c.insert_string(1, "a");
+        c.insert_float(2, 391.931);
+
+        c.swap_rows(2, 1);
+
+        CHECK_EQUAL(type_Float, c.get_type(1));
+        CHECK_APPROXIMATELY_EQUAL(c.get_float(1), 391.931, epsilon);
+        CHECK_EQUAL(type_String, c.get_type(2));
+        CHECK_EQUAL(c.get_string(2), "a");
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
 
 #endif // TEST_COLUMN_MIXED

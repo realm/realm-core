@@ -156,6 +156,15 @@ void MixedColumn::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
     m_data->move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
+void MixedColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+
+    m_types->swap_rows(row_ndx_1, row_ndx_2);
+    m_data->swap_rows(row_ndx_1, row_ndx_2);
+}
+
 
 void MixedColumn::do_clear(size_t num_rows)
 {

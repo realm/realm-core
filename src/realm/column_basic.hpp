@@ -81,6 +81,7 @@ public:
     void erase(size_t row_ndx);
     void erase(size_t row_ndx, bool is_last);
     void move_last_over(std::size_t row_ndx);
+    void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) override;
     void clear();
 
     std::size_t count(T value) const;
@@ -148,6 +149,7 @@ private:
     class SliceHandler;
 
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2);
     void do_clear();
 
 #ifdef REALM_DEBUG
