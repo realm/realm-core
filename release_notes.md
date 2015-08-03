@@ -16,7 +16,123 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Renamed `Column` to `IntegerColumn` and `TColumn` to `Column`.
+* Renamed `AdaptiveStringColumn` to `StringColumn`.
+* Several column classes were renamed to follow the `XxxColumn` naming scheme
+  (e.g., `ColumnLink` to `LinkColumn`).
+* Removed conditional compilation of replication features.
+
+
+----------------------------------------------
+
+# 0.92.0 Release notes
+
+### Bugfixes:
+
+* The upgraded file format version is written out to disk, eliminating potential
+  deadlocks.
+
+### API breaking changes:
+
+* Support for the following deprecated operations on Table has been removed:
+  insert_int, insert_string, etc., insert_done, and add_int. To insert a value,
+  one must now call insert_empty_row, then set the appropriate values for each
+  column.
+* Changed `LinkView::move` so that the `new_link_ndx` will be the index at which
+  the moved link can be found after the move is completed.
+
+### Enhancements:
+
+* Support for ordered row removal in tables with links. This was done for
+  completeness, and because an ordered insertion in tables with links, when
+  reversed, becomes an ordered removal. Support for ordered insertion in tables
+  with links was added recently because the sync mechanism can produce
+  them. Also added a few missing pieces of support for ordered insertion in
+  tables with links.
+
+-----------
+
+### Internals:
+
+* Added static `Array::create_array()` for creating non-empty arrays, and extend
+  `Array::create()` such that it can create non-empty arrays.
+* The creation of the free-space arrays (`Group::m_free_positions`,
+  `Group::m_free_lengths`, `Group::m_free_versions`) is now always done by
+  `GroupWriter::write_group()`. Previously it was done in various places
+  (`Group::attach()`, `Group::commit()`, `Group::reset_free_space_versions()`).
+* `Group::reset_free_space_versions()` has been eliminated. These days the Realm
+  version is persisted across sessions, so there is no longer any cases where
+  version tracking on free-space chunks needs to be reset.
+* Free-space arrays (`Group::m_free_positions`, `Group::m_free_lengths`,
+  `Group::m_free_versions`) was moved to `GroupWriter`, as they are now only
+  needed during `GroupWriter::write_Group()`. This significantly reduces the
+  "shallow" memory footprint of `Group`.
+* Improved exception safety in `Group::attach()`.
+* `Group::commit()` now throws instead of aborting on an assertion if the group
+  accessor is detached or if it is used in transactional mode (via
+  `SharedGroup`).
+* Instruction encoding changed for `InsertEmptyRows` and `EraseRows` (also used
+  for `move_last_over()`). The third operand is now `prior_num_rows` (the number
+  of rows prior to modification) in all cases. Previously there was a serious
+  confusion about this.
+* Cleaned up the batch removal of rows used by `TableView`.
+* Optimize row removal by skipping cascade mechanism when table has no forward
+  link columns.
+* Virtual `ColumnBase::insert(row_ndx, num_rows, is_append)` was changed to
+  `ColumnBase::insert_rows(row_ndx, num_rows_to_insert,
+  prior_num_rows)`. Virtual `ColumnBase::erase(row_ndx, is_last)` was changed to
+  `ColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows)`. Virtual
+  `ColumnBase::move_last_over(row_ndx, last_row_ndx)` was changed to
+  `ColumnBase::move_last_row_over(row_ndx, prior_num_rows)`. Function names were
+  changed to avoid confusing similarity to the various non-virtual operations of
+  the same name on subclasses of `ColumnBase`. `prior_num_rows` is passed
+  because if carries more useful information than
+  `is_append`/`is_last`. `num_rows_to_erase` was added for consistency.
+* On some subclasses of `ColumnBase` a new non-virtual `erase(row_ndx, is_last)`
+  was added for practical reasons; an intended overload of `erase(row_ndx)` for
+  when you know whether the specified row index is the last one.
+* Slight performance improvements in `Array::FindGTE()`.
+* Renamed `Array::FindGTE()` to `Array::find_gte()`.
+
+----------------------------------------------
+
+# 0.91.2 Release notes
+
+### Enhancements:
+
+* Added support for building for watchOS.
+
+----------------------------------------------
+
+# 0.91.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug in SharedGroup::grab_specific_readlock() which would fail to
+  grab the specified readlock even though the requested version was available
+  in the case where a concurrent cleanup operation had a conflicting request
+  for the same (oldest) entry in the ringbuffer.
+* Fixed a performance regression in TableView::clear().
+
+### API breaking changes:
+
+* Argument `is_backend` removed from from the public version of
+  `SharedGroup::open()`. Fortunately, bindings are not currently calling
+  `SharedGroup::open()`.
+* `File::resize()` no longer calls `fcntl()` with `F_FULLFSYNC`. This feature
+  has been moved to `File::sync()`.
+
+### Enhancements:
+
+* New feature added to disable all forms of 'sync to disk'. This is supposed to
+  be used only during unit testing. See header `disable_sync_to_disk.hpp`.
+* Added `LinkList.swap()` to swap two members of a link list.
+* Added a Query constructor that takes ownership of a TableView.
+
+### Internals:
+
+* On Linux we now call 'sync to disk' after Realm file resizes. Previusly, this
+  was only done on Apple platforms.
 
 ----------------------------------------------
 
@@ -37,12 +153,14 @@
 ### Enhancements:
 
 * Generic networking API added.
-* Support for transfer/handover of TableViews, Queries, ListViews and Rows between SharedGroups in different threads.
-  Cooperative handover (where boths threads participate) is supported for arbitrarily nested TableViews and Queries.
-  Restrictions apply for non-cooperative handover (aka stealing): user must ensure that the producing thread does not
-  trigger a modifying operation on any of the involved TableViews.
-  For TableViews the handover can be one of *moving*, *copying* or *staying*, reflecting how the actual payload
-  is treated.
+* Support for transfer/handover of TableViews, Queries, ListViews and Rows
+  between SharedGroups in different threads.  Cooperative handover (where boths
+  threads participate) is supported for arbitrarily nested TableViews and
+  Queries.  Restrictions apply for non-cooperative handover (aka stealing): user
+  must ensure that the producing thread does not trigger a modifying operation
+  on any of the involved TableViews.  For TableViews the handover can be one of
+  *moving*, *copying* or *staying*, reflecting how the actual payload is
+  treated.
 * Support for non-end row insertion in tables with link and link list columns.
 * Improved documentation of functions concerning the initiation and termination
   of transactions.

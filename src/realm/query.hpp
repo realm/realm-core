@@ -58,6 +58,7 @@ class Group;
 class Query {
 public:
     Query(const Table& table, TableViewBase* tv = nullptr);
+    Query(const Table& table, std::unique_ptr<TableViewBase>);
     Query(const Table& table, const LinkViewRef& lv);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
@@ -310,12 +311,12 @@ private:
     struct PartialCopyTag {};
     Query(const Query& src, PartialCopyTag);
     void copy_nodes(const Query& source);
-    template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
-    template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
-    template <class TColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
-    template <class TColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
-    template <class TColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
-    template <class TColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class ColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
+    template <class ColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
+    template <class ColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class ColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
+    template <class ColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class ColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
 

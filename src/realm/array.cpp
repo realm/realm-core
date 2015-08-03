@@ -466,7 +466,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     std::copy_backward(begin_2, end_2, dest_end_2);
 }
 
-void Array::add_to_column(Column* column, int64_t value)
+void Array::add_to_column(IntegerColumn* column, int64_t value)
 {
     column->add(value);
 }
@@ -693,44 +693,74 @@ void Array::set_all_to_zero()
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) const
+std::size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
+    switch (m_width) {
+        case 0:
+            return find_gte<0>(target, start, indirection);
+        case 1:
+            return find_gte<1>(target, start, indirection);
+        case 2:
+            return find_gte<2>(target, start, indirection);
+        case 4:
+            return find_gte<4>(target, start, indirection);
+        case 8:
+            return find_gte<8>(target, start, indirection);
+        case 16:
+            return find_gte<16>(target, start, indirection);
+        case 32:
+            return find_gte<32>(target, start, indirection);
+        case 64:
+            return find_gte<64>(target, start, indirection);
+        default:
+            return not_found;
+    }
+}
+
+template<std::size_t w>
+std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const* indirection) const
+{
+    REALM_ASSERT(start < (indirection ? indirection->size() : size()));
+
 #if REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
+
     for (idx = start; idx < m_size; ++idx) {
         if (get(indirection ? indirection->get(idx) : idx) >= target) {
             ref = idx;
             break;
         }
     }
-    if (idx == m_size)
+
+    if (idx == m_size) {
         ref = not_found;
+    }
 #endif
 
     size_t ret;
 
-    if (start >= m_size) {
+    if (start >= m_size || target > ubound_for_width(w))
+    {
         ret = not_found;
         goto exit;
     }
 
     if (start + 2 < m_size) {
-        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
+        if (get<w>(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
-        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
+        if (get<w>(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
     }
 
-    // Todo, use templated get<width> from this point for performance
-    if (target > get(indirection ? to_size_t(indirection->get(m_size - 1)) : m_size - 1)) {
+    if (target > get<w>(indirection ? to_size_t(indirection->get(m_size - 1)) : m_size - 1)) {
         ret = not_found;
         goto exit;
     }
@@ -738,11 +768,13 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     size_t add;
     add = 1;
 
-    for (;;) {
-        if (start + add < m_size && get(indirection ? to_size_t(indirection->get(start + add)) : start + add) < target)
+    for (size_t offset = start + add ;; offset = start + add)
+    {
+        if (offset < m_size && get<w>(indirection ? to_size_t(indirection->get(offset)) : offset) < target)
             start += add;
         else
             break;
+
        add *= 2;
     }
 
@@ -761,7 +793,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     orig_high = high;
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
-        int64_t v = get(indirection ? to_size_t(indirection->get(probe)) : probe);
+        int64_t v = get<w>(indirection ? to_size_t(indirection->get(probe)) : probe);
         if (v < target)
             start = probe;
         else
@@ -2594,7 +2626,7 @@ size_t Array::upper_bound_int(int64_t value) const REALM_NOEXCEPT
 }
 
 
-void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
+void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -2742,7 +2774,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, ref_type& result_ref, ColumnBase* column) const
+template <IndexMethod method, class T> size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);
@@ -2853,7 +2885,7 @@ top:
                 }
             }
             else {
-                const Column sub(m_alloc, to_ref(ref));
+                const IntegerColumn sub(m_alloc, to_ref(ref));
                 const size_t first_row_ref = to_size_t(sub.get(0));
 
                 if (count)
@@ -2898,12 +2930,12 @@ top:
 size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column) const
 {
     size_t dummy;
-    Column dummycol;
+    IntegerColumn dummycol;
     return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
 }
 
 
-void Array::IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const
+void Array::IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBase* column) const
 {
     size_t dummy;
 
@@ -2913,14 +2945,13 @@ void Array::IndexStringFindAll(Column& result, StringData value, ColumnBase* col
 
 FindRes Array::IndexStringFindAllNoCopy(StringData value, ref_type& res_ref, ColumnBase* column) const
 {
-    Column dummy;
-    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
+    IntegerColumn dummy; return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
 }
 
 
 size_t Array::IndexStringCount(StringData value, ColumnBase* column) const
 {
-    Column dummy;
+    IntegerColumn dummy;
     size_t dummysizet;
     return index_string<index_Count, StringData>(value, dummy, dummysizet, column);
 }

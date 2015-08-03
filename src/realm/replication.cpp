@@ -175,7 +175,7 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t target_row_ndx)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef REALM_DEBUG
@@ -195,186 +195,35 @@ public:
         return false;
     }
 
-    bool insert_int(size_t col_ndx, size_t row_ndx, std::size_t, int_fast64_t value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_int("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_int(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_bool(size_t col_ndx, size_t row_ndx, std::size_t, bool value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_bool("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_bool(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_float(size_t col_ndx, size_t row_ndx, std::size_t, float value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_float("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_float(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_double(size_t col_ndx, size_t row_ndx, std::size_t, double value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_double("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_double(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_string(size_t col_ndx, size_t row_ndx, std::size_t, StringData value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_string("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_string(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_binary(size_t col_ndx, size_t row_ndx, std::size_t, BinaryData value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_binary("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_binary(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_date_time(size_t col_ndx, size_t row_ndx, std::size_t, DateTime value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_datetime("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_datetime(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_table(size_t col_ndx, size_t row_ndx, std::size_t)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_subtable("<<col_ndx<<", "<<row_ndx<<")\n";
-#endif
-            m_table->insert_subtable(col_ndx, row_ndx); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_mixed(size_t col_ndx, size_t row_ndx, std::size_t, const Mixed& value)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_mixed("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
-#endif
-            m_table->insert_mixed(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t, std::size_t value)
-    {
-        REALM_ASSERT_3(value, >, 0); // Not yet any support for inserting null links
-        REALM_ASSERT_3(value, >, 0); // Not yet any support for inserting null links
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_link("<<col_ndx<<", "<<row_ndx<<", "<<(value-1)<<")\n";
-#endif
-            m_table->insert_link(col_ndx, row_ndx, value-1); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_link_list(size_t col_ndx, size_t row_ndx, std::size_t)
-    {
-        if (REALM_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_link_list("<<col_ndx<<", "<<row_ndx<<")\n";
-#endif
-            m_table->insert_linklist(col_ndx, row_ndx); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool row_insert_complete()
-    {
-        if (REALM_LIKELY(m_table)) {
-#ifdef REALM_DEBUG
-            if (m_log)
-                *m_log << "table->insert_done()\n";
-#endif
-            m_table->insert_done(); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows, std::size_t, bool)
-    {
-        if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(row_ndx <= m_table->size())) {
-#ifdef REALM_DEBUG
-                if (m_log)
-                    *m_log << "table->insert_empty_row("<<row_ndx<<", "<<num_rows<<")\n";
-#endif
-                m_table->insert_empty_row(row_ndx, num_rows); // Throws
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool erase_rows(size_t row_ndx, size_t num_rows, std::size_t last_row_ndx, bool unordered)
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+                           bool unordered)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
-        if (REALM_UNLIKELY(row_ndx > last_row_ndx || last_row_ndx+1 != m_table->size()))
+        if (REALM_UNLIKELY(row_ndx > prior_num_rows))
             return false;
-        if (REALM_UNLIKELY(num_rows != 1))
+        if (REALM_UNLIKELY(prior_num_rows != m_table->size()))
+            return false;
+        if (REALM_UNLIKELY(unordered && row_ndx != prior_num_rows))
+            return false;
+#ifdef REALM_DEBUG
+        if (m_log)
+            *m_log << "table->insert_empty_row("<<row_ndx<<", "<<num_rows_to_insert<<")\n";
+#endif
+        m_table->insert_empty_row(row_ndx, num_rows_to_insert); // Throws
+        return true;
+    }
+
+    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                    bool unordered)
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(row_ndx >= prior_num_rows))
+            return false;
+        if (REALM_UNLIKELY(num_rows_to_erase != 1))
+            return false;
+        if (REALM_UNLIKELY(prior_num_rows != m_table->size()))
             return false;
         typedef _impl::TableFriend tf;
         if (unordered) {
@@ -392,24 +241,6 @@ public:
             tf::do_remove(*m_table, row_ndx); // Throws
         }
         return true;
-    }
-
-    bool add_int_to_column(size_t col_ndx, int_fast64_t value)
-    {
-        if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
-                // FIXME: Don't depend on the existence of int64_t,
-                // but don't allow values to use more than 64 bits
-                // either.
-#ifdef REALM_DEBUG
-                if (m_log)
-                    *m_log << "table->add_int("<<col_ndx<<", "<<value<<")\n";
-#endif
-                m_table->add_int(col_ndx, value); // Throws
-                return true;
-            }
-        }
-        return false;
     }
 
     bool select_table(size_t group_level_ndx, int levels, const size_t* path)
@@ -768,7 +599,7 @@ public:
         size_t num_links = m_link_list->size();
         if (REALM_UNLIKELY(old_link_ndx >= num_links))
             return false;
-        if (REALM_UNLIKELY(new_link_ndx > num_links))
+        if (REALM_UNLIKELY(new_link_ndx >= num_links))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)

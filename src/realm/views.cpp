@@ -63,7 +63,7 @@ RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
     if (source.m_row_indexes.is_attached()) {
         m_row_indexes.detach();
         m_row_indexes.init_from_mem(Allocator::get_default(), source.m_row_indexes.get_mem());
-        source.m_row_indexes.init_from_ref(Allocator::get_default(), Column::create(Allocator::get_default()));
+        source.m_row_indexes.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
     }
 
 #ifdef REALM_COOKIE_CHECK

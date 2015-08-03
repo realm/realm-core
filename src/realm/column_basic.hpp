@@ -42,7 +42,7 @@ struct GetLeafType<double, false> {
     using type = BasicArray<double>;
 };
 
-// FIXME: Remove this — it's unused except in tests.
+// FIXME: Remove this - it's unused except in tests.
 template <>
 struct GetLeafType<int, false> {
     using type = ArrayInteger;
@@ -78,7 +78,8 @@ public:
     void add(T value = T());
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value = T());
-    void erase(std::size_t row_ndx);
+    void erase(size_t row_ndx);
+    void erase(size_t row_ndx, bool is_last);
     void move_last_over(std::size_t row_ndx);
     void clear();
 
@@ -99,7 +100,7 @@ public:
 
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
 
-    void find_all(Column& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
+    void find_all(IntegerColumn& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -117,9 +118,9 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const override;
 
-    void insert(std::size_t, std::size_t, bool) override;
-    void erase(std::size_t, bool) override;
-    void move_last_over(std::size_t, std::size_t, bool) override;
+    void insert_rows(size_t, size_t, size_t) override;
+    void erase_rows(size_t, size_t, size_t, bool) override;
+    void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
@@ -146,7 +147,6 @@ private:
     class CreateHandler;
     class SliceHandler;
 
-    void do_erase(std::size_t row_ndx, bool is_last);
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void do_clear();
 

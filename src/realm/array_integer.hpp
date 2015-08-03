@@ -34,12 +34,6 @@ public:
     explicit ArrayInteger(Allocator&) REALM_NOEXCEPT;
     ~ArrayInteger() REALM_NOEXCEPT override {}
 
-    /// Construct an array of the specified type and size, and return just the
-    /// reference to the underlying memory. All elements will be initialized to
-    /// the specified value.
-    static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
-                               Allocator&);
-
     void add(int64_t value);
     void set(std::size_t ndx, int64_t value);
     void set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT;
@@ -85,7 +79,7 @@ public:
     static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
                                Allocator&);
     void create(Type, bool context_flag = false);
-    
+
     void init_from_ref(ref_type) REALM_NOEXCEPT;
     void init_from_mem(MemRef) REALM_NOEXCEPT;
     void init_from_parent() REALM_NOEXCEPT;
@@ -166,7 +160,7 @@ public:
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = npos) const;
 
-    void find_all(Column* result, int64_t value, std::size_t col_offset = 0,
+    void find_all(IntegerColumn* result, int64_t value, std::size_t col_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     std::size_t find_first(int64_t value, std::size_t begin = 0,
@@ -205,12 +199,6 @@ inline ArrayInteger::ArrayInteger(Array::no_prealloc_tag) REALM_NOEXCEPT:
 inline ArrayInteger::ArrayInteger(Allocator& alloc) REALM_NOEXCEPT:
     Array(alloc)
 {
-}
-
-inline MemRef ArrayInteger::create_array(Type type, bool context_flag, std::size_t size,
-                                  int_fast64_t value, Allocator& alloc)
-{
-    return Array::create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
 inline void ArrayInteger::add(int64_t value)

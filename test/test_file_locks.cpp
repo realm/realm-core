@@ -12,8 +12,10 @@
 #include <realm/util/features.h>
 
 #include "test.hpp"
+#include "util/thread_wrapper.hpp"
 
 using namespace realm::util;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
@@ -46,68 +48,8 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-namespace {
-
-#if TEST_DURATION < 1
-const int num_rounds = 1000;
-#elif TEST_DURATION < 2
-const int num_rounds = 10000;
-#elif TEST_DURATION < 3
-const int num_rounds = 100000;
-#else
-const int num_rounds = 1000000;
-#endif
-
-const int num_slaves = 2;
-
-std::map<int, int> results;
-
-Mutex mutex;
-CondVar cond;
-
-int num_slaves_ready = 0;
-int num_good_locks = 0;
-bool slaves_run[num_slaves];
-
-void master()
-{
-    LockGuard l(mutex);
-    for (int i = 0; i != num_rounds; ++i) {
-        while (num_slaves_ready != num_slaves)
-            cond.wait(l);
-        num_slaves_ready = 0;
-
-        ++results[num_good_locks];
-        num_good_locks = 0;
-
-        for (int j = 0; j != num_slaves; ++j)
-            slaves_run[j] = true;
-        cond.notify_all();
-    }
-}
-
-void slave(int ndx, std::string path)
-{
-    File file(path, File::mode_Write);
-    for (int i = 0; i != num_rounds; ++i) {
-        bool good_lock = file.try_lock_exclusive();
-        if (good_lock)
-            file.unlock();
-        {
-            LockGuard l(mutex);
-            if (good_lock)
-                ++num_good_locks;
-            ++num_slaves_ready;
-            cond.notify_all();
-            while (!slaves_run[ndx])
-                cond.wait(l);
-            slaves_run[ndx] = false;
-        }
-    }
-}
-
-} // anonymous namespace
-
+// FIXME: Why is this disabled on iOS? Is it failing there? Please add a comment
+// about the reason.
 #ifndef REALM_IOS
 
 // The assumption is that if multiple processes try to place an
@@ -118,15 +60,95 @@ void slave(int ndx, std::string path)
 // test, but it is probably the best we can do.
 TEST(File_NoSpuriousTryLockFailures)
 {
+#if TEST_DURATION < 1
+    const int num_rounds = 1000;
+#elif TEST_DURATION < 2
+    const int num_rounds = 10000;
+#elif TEST_DURATION < 3
+    const int num_rounds = 100000;
+#else
+    const int num_rounds = 1000000;
+#endif
+
+    const int num_slaves = 2;
+
+
+    Mutex mutex;
+    CondVar cond;
+    int num_slaves_ready = 0;
+    int num_good_locks = 0;
+    bool slaves_run[num_slaves];
+    std::map<int, int> results;
+    bool terminate = false;
+
+    auto kill_em_all = [&] {
+        LockGuard l(mutex);
+        terminate = true;
+        cond.notify_all();
+    };
+
+    auto master = [&] {
+        try {
+            LockGuard l(mutex);
+            for (int i = 0; i != num_rounds; ++i) {
+                while (num_slaves_ready != num_slaves) {
+                    if (terminate)
+                        return;
+                    cond.wait(l);
+                }
+                num_slaves_ready = 0;
+
+                ++results[num_good_locks];
+                num_good_locks = 0;
+
+                for (int j = 0; j != num_slaves; ++j)
+                    slaves_run[j] = true;
+                cond.notify_all();
+            }
+        }
+        catch (...) {
+            kill_em_all();
+            throw;
+        }
+    };
+
+    auto slave = [&](int ndx, std::string path) {
+        try {
+            File file(path, File::mode_Write);
+            for (int i = 0; i != num_rounds; ++i) {
+                bool good_lock = file.try_lock_exclusive();
+                if (good_lock)
+                    file.unlock();
+                {
+                    LockGuard l(mutex);
+                    if (good_lock)
+                        ++num_good_locks;
+                    ++num_slaves_ready;
+                    cond.notify_all();
+                    while (!slaves_run[ndx]) {
+                        if (terminate)
+                            return;
+                        cond.wait(l);
+                    }
+                    slaves_run[ndx] = false;
+                }
+            }
+        }
+        catch (...) {
+            kill_em_all();
+            throw;
+        }
+    };
+
     TEST_PATH(path);
-    Thread slaves[num_slaves];
+    ThreadWrapper slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
-        slaves[i].start(std::bind(&slave, i, std::string(path)));
+        slaves[i].start([=] { slave(i, std::string(path)); });
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
-        slaves[i].join();
+        CHECK(!slaves[i].join());
 
 /*
     typedef std::map<int, int>::const_iterator iter;

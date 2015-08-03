@@ -106,7 +106,7 @@ void VerifiedInteger::set(size_t ndx, int64_t value)
 void VerifiedInteger::erase(size_t ndx)
 {
     v.erase(v.begin() + ndx);
-    u.erase(ndx, ndx + 1 == u.size());
+    u.erase(ndx);
     REALM_ASSERT(v.size() == u.size());
     verify_neighbours(ndx);
     REALM_ASSERT(occasional_verify());
@@ -137,7 +137,7 @@ size_t VerifiedInteger::size()
 }
 
 // todo/fixme, end ignored
-void VerifiedInteger::find_all(Column &c, int64_t value, size_t start, size_t end)
+void VerifiedInteger::find_all(IntegerColumn &c, int64_t value, size_t start, size_t end)
 {
     std::vector<int64_t>::iterator ita = v.begin() + start;
     std::vector<int64_t>::iterator itb = end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);;

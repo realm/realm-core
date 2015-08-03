@@ -368,7 +368,6 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         int num = 9;
         for (int i=0; i<num; ++i)
             subsubtable->add(i, BinaryData("", 0));
-        subsubtable->column().value += 31;
         wt.commit();
     }
 

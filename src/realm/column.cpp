@@ -131,28 +131,28 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_Bool:
         case col_type_DateTime:
         case col_type_Link:
-            op.template call<Column>();
+            op.template call<IntegerColumn>();
             return;
         case col_type_String:
-            op.template call<AdaptiveStringColumn>();
+            op.template call<StringColumn>();
             return;
         case col_type_StringEnum:
-            op.template call<ColumnStringEnum>();
+            op.template call<StringEnumColumn>();
             return;
         case col_type_Binary:
-            op.template call<ColumnBinary>();
+            op.template call<BinaryColumn>();
             return;
         case col_type_Table:
-            op.template call<ColumnTable>();
+            op.template call<SubtableColumn>();
             return;
         case col_type_Mixed:
-            op.template call<ColumnMixed>();
+            op.template call<MixedColumn>();
             return;
         case col_type_Float:
-            op.template call<ColumnFloat>();
+            op.template call<FloatColumn>();
             return;
         case col_type_Double:
-            op.template call<ColumnDouble>();
+            op.template call<DoubleColumn>();
             return;
         case col_type_Reserved1:
         case col_type_Reserved4:
@@ -519,12 +519,12 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 
 /*
 // TODO: Set owner of created arrays and destroy/delete them if created by merge_references()
-void Column::ReferenceSort(size_t start, size_t end, Column& ref)
+void IntegerColumn::ReferenceSort(size_t start, size_t end, Column& ref)
 {
     Array values; // pointers to non-instantiated arrays of values
     Array indexes; // pointers to instantiated arrays of index pointers
     Array all_values;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, &values);
+    TreeVisitLeafs<Array, IntegerColumn>(start, end, 0, callme_arrays, &values);
 
     size_t offset = 0;
     for (size_t t = 0; t < values.size(); t++) {

@@ -6,9 +6,9 @@
 using namespace realm;
 using namespace realm::util;
 
-void ColumnSubtableParent::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void SubtableColumnParent::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
-    Column::update_from_parent(old_baseline);
+    IntegerColumn::update_from_parent(old_baseline);
     m_subtable_map.update_from_parent(old_baseline);
 }
 
@@ -28,10 +28,10 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
-void ColumnSubtableParent::Verify() const
+void SubtableColumnParent::Verify() const
 {
     if (root_is_leaf()) {
-        Column::Verify();
+        IntegerColumn::Verify();
         REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
@@ -39,9 +39,9 @@ void ColumnSubtableParent::Verify() const
     get_root_array()->verify_bptree(&verify_leaf);
 }
 
-void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
+void SubtableColumnParent::Verify(const Table& table, size_t col_ndx) const
 {
-    Column::Verify(table, col_ndx);
+    IntegerColumn::Verify(table, col_ndx);
 
     REALM_ASSERT(m_table == &table);
     REALM_ASSERT_3(m_column_ndx, ==, col_ndx);
@@ -50,7 +50,7 @@ void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
 #endif
 
 
-Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
+Table* SubtableColumnParent::get_subtable_ptr(size_t subtable_ndx)
 {
     REALM_ASSERT_3(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
@@ -59,11 +59,11 @@ Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
     typedef _impl::TableFriend tf;
     ref_type top_ref = get_as_ref(subtable_ndx);
     Allocator& alloc = get_alloc();
-    ColumnSubtableParent* parent = this;
+    SubtableColumnParent* parent = this;
     std::unique_ptr<Table> subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
-    // ColumnSubtableParent::child_accessor_destroyed() with a pointer that is
+    // SubtableColumnParent::child_accessor_destroyed() with a pointer that is
     // not in the map. Fortunatly, that situation is properly handled.
     bool was_empty = m_subtable_map.empty();
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
@@ -73,7 +73,7 @@ Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
 }
 
 
-Table* ColumnTable::get_subtable_ptr(size_t subtable_ndx)
+Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
 {
     REALM_ASSERT_3(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
@@ -83,11 +83,11 @@ Table* ColumnTable::get_subtable_ptr(size_t subtable_ndx)
     const Spec& spec = tf::get_spec(*m_table);
     size_t subspec_ndx = get_subspec_ndx();
     ConstSubspecRef shared_subspec = spec.get_subspec_by_ndx(subspec_ndx);
-    ColumnTable* parent = this;
+    SubtableColumn* parent = this;
     std::unique_ptr<Table> subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
-    // ColumnSubtableParent::child_accessor_destroyed() with a pointer that is
+    // SubtableColumnParent::child_accessor_destroyed() with a pointer that is
     // not in the map. Fortunately, that situation is properly handled.
     bool was_empty = m_subtable_map.empty();
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
@@ -97,7 +97,7 @@ Table* ColumnTable::get_subtable_ptr(size_t subtable_ndx)
 }
 
 
-void ColumnSubtableParent::child_accessor_destroyed(Table* child) REALM_NOEXCEPT
+void SubtableColumnParent::child_accessor_destroyed(Table* child) REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -117,7 +117,7 @@ void ColumnSubtableParent::child_accessor_destroyed(Table* child) REALM_NOEXCEPT
 }
 
 
-Table* ColumnSubtableParent::get_parent_table(size_t* column_ndx_out) REALM_NOEXCEPT
+Table* SubtableColumnParent::get_parent_table(size_t* column_ndx_out) REALM_NOEXCEPT
 {
     if (column_ndx_out)
         *column_ndx_out = m_column_ndx;
@@ -125,7 +125,7 @@ Table* ColumnSubtableParent::get_parent_table(size_t* column_ndx_out) REALM_NOEX
 }
 
 
-Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const REALM_NOEXCEPT
+Table* SubtableColumnParent::SubtableMap::find(size_t subtable_ndx) const REALM_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -136,7 +136,7 @@ Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const REALM_
 }
 
 
-bool ColumnSubtableParent::SubtableMap::detach_and_remove_all() REALM_NOEXCEPT
+bool SubtableColumnParent::SubtableMap::detach_and_remove_all() REALM_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -152,7 +152,7 @@ bool ColumnSubtableParent::SubtableMap::detach_and_remove_all() REALM_NOEXCEPT
 }
 
 
-bool ColumnSubtableParent::SubtableMap::detach_and_remove(size_t subtable_ndx) REALM_NOEXCEPT
+bool SubtableColumnParent::SubtableMap::detach_and_remove(size_t subtable_ndx) REALM_NOEXCEPT
 {
     typedef entries::iterator iter;
     iter i = m_entries.begin(), end = m_entries.end();
@@ -175,7 +175,7 @@ bool ColumnSubtableParent::SubtableMap::detach_and_remove(size_t subtable_ndx) R
 }
 
 
-bool ColumnSubtableParent::SubtableMap::remove(Table* subtable) REALM_NOEXCEPT
+bool SubtableColumnParent::SubtableMap::remove(Table* subtable) REALM_NOEXCEPT
 {
     typedef entries::iterator iter;
     iter i = m_entries.begin(), end = m_entries.end();
@@ -192,7 +192,7 @@ bool ColumnSubtableParent::SubtableMap::remove(Table* subtable) REALM_NOEXCEPT
 }
 
 
-void ColumnSubtableParent::SubtableMap::update_from_parent(size_t old_baseline)
+void SubtableColumnParent::SubtableMap::update_from_parent(size_t old_baseline)
     const REALM_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
@@ -203,7 +203,7 @@ void ColumnSubtableParent::SubtableMap::update_from_parent(size_t old_baseline)
 }
 
 
-void ColumnSubtableParent::SubtableMap::
+void SubtableColumnParent::SubtableMap::
 update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                  _impl::TableFriend::AccessorUpdater& updater)
 {
@@ -218,7 +218,7 @@ update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
 }
 
 
-void ColumnSubtableParent::SubtableMap::recursive_mark() REALM_NOEXCEPT
+void SubtableColumnParent::SubtableMap::recursive_mark() REALM_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -230,7 +230,7 @@ void ColumnSubtableParent::SubtableMap::recursive_mark() REALM_NOEXCEPT
 }
 
 
-void ColumnSubtableParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_parent)
+void SubtableColumnParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_parent)
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -251,7 +251,7 @@ void ColumnSubtableParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in
 
 #ifdef REALM_DEBUG
 
-std::pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> SubtableColumnParent::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
     return std::make_pair(p.first.m_ref, p.second);
@@ -260,7 +260,7 @@ std::pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_i
 #endif
 
 
-size_t ColumnTable::get_subtable_size(size_t ndx) const REALM_NOEXCEPT
+size_t SubtableColumn::get_subtable_size(size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(ndx, <, size());
 
@@ -277,7 +277,7 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const REALM_NOEXCEPT
 }
 
 
-void ColumnTable::add(const Table* subtable)
+void SubtableColumn::add(const Table* subtable)
 {
     ref_type columns_ref = 0;
     if (subtable && !subtable->is_empty())
@@ -290,7 +290,7 @@ void ColumnTable::add(const Table* subtable)
 }
 
 
-void ColumnTable::insert(size_t row_ndx, const Table* subtable)
+void SubtableColumn::insert(size_t row_ndx, const Table* subtable)
 {
     ref_type columns_ref = 0;
     if (subtable && !subtable->is_empty())
@@ -305,7 +305,7 @@ void ColumnTable::insert(size_t row_ndx, const Table* subtable)
 }
 
 
-void ColumnTable::set(size_t row_ndx, const Table* subtable)
+void SubtableColumn::set(size_t row_ndx, const Table* subtable)
 {
     REALM_ASSERT_3(row_ndx, <, size());
     destroy_subtable(row_ndx);
@@ -315,7 +315,7 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
         columns_ref = clone_table_columns(subtable); // Throws
 
     int_fast64_t value = int_fast64_t(columns_ref);
-    Column::set(row_ndx, value); // Throws
+    IntegerColumn::set(row_ndx, value); // Throws
 
     // Refresh the accessors, if present
     if (Table* table = m_subtable_map.find(row_ndx)) {
@@ -330,33 +330,42 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
 }
 
 
-void ColumnTable::erase(size_t row_ndx, bool is_last)
+void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                             bool broken_reciprocal_backlinks)
 {
-    REALM_ASSERT_3(row_ndx, <, size());
-    destroy_subtable(row_ndx);
-    ColumnSubtableParent::erase(row_ndx, is_last); // Throws
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+
+    for (size_t i = 0; i < num_rows_to_erase; ++i)
+        destroy_subtable(row_ndx + i);
+
+    SubtableColumnParent::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+                                     broken_reciprocal_backlinks); // Throws
 }
 
 
-void ColumnTable::move_last_over(size_t row_ndx, size_t last_row_ndx,
-                                 bool broken_reciprocal_backlinks)
+void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+                                     bool broken_reciprocal_backlinks)
 {
-    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
-    REALM_ASSERT_3(last_row_ndx + 1, ==, size());
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx < prior_num_rows);
+
     destroy_subtable(row_ndx);
-    ColumnSubtableParent::move_last_over(row_ndx, last_row_ndx,
-                                         broken_reciprocal_backlinks); // Throws
+
+    SubtableColumnParent::move_last_row_over(row_ndx, prior_num_rows,
+                                             broken_reciprocal_backlinks); // Throws
 }
 
 
-void ColumnTable::destroy_subtable(size_t ndx) REALM_NOEXCEPT
+void SubtableColumn::destroy_subtable(size_t ndx) REALM_NOEXCEPT
 {
     if (ref_type ref = get_as_ref(ndx))
         Array::destroy_deep(ref, get_alloc());
 }
 
 
-bool ColumnTable::compare_table(const ColumnTable& c) const
+bool SubtableColumn::compare_table(const SubtableColumn& c) const
 {
     size_t n = size();
     if (c.size() != n)
@@ -371,7 +380,7 @@ bool ColumnTable::compare_table(const ColumnTable& c) const
 }
 
 
-void ColumnTable::do_discard_child_accessors() REALM_NOEXCEPT
+void SubtableColumn::do_discard_child_accessors() REALM_NOEXCEPT
 {
     discard_child_accessors();
 }
@@ -379,9 +388,9 @@ void ColumnTable::do_discard_child_accessors() REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-void ColumnTable::Verify(const Table& table, size_t col_ndx) const
+void SubtableColumn::Verify(const Table& table, size_t col_ndx) const
 {
-    ColumnSubtableParent::Verify(table, col_ndx);
+    SubtableColumnParent::Verify(table, col_ndx);
 
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
@@ -401,7 +410,7 @@ void ColumnTable::Verify(const Table& table, size_t col_ndx) const
     }
 }
 
-void ColumnTable::to_dot(std::ostream& out, StringData title) const
+void SubtableColumn::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_root_array()->get_ref();
     out << "subgraph cluster_subtable_column" << ref << " {" << std::endl;
@@ -433,7 +442,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 
 } // anonymous namespace
 
-void ColumnTable::do_dump_node_structure(std::ostream& out, int level) const
+void SubtableColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
     get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
 }

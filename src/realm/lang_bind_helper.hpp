@@ -28,9 +28,7 @@
 #include <realm/group.hpp>
 #include <realm/group_shared.hpp>
 
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 namespace realm {
 
@@ -99,25 +97,14 @@ public:
     static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_ndx,
                                          std::size_t row_ndx);
 
-    /// Calls parent.insert_subtable(col_ndx, row_ndx, &source). Note
+    /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source). Note
     /// that the source table must have a descriptor that is
     /// compatible with the target subtable column.
-    static void insert_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
-                                const Table& source);
-
-
-    /// Calls parent.insert_mixed_subtable(col_ndx, row_ndx, &source).
-    static void insert_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
-                                      const Table& source);
-
-    /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source).
     static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                    const Table& source);
 
     static LinkView* get_linklist_ptr(Row&, std::size_t col_ndx);
     static void unbind_linklist_ptr(LinkView*);
-
-#ifdef REALM_ENABLE_REPLICATION
 
     //@{
 
@@ -199,8 +186,6 @@ public:
     {
         return Replication::version_type(sg.get_current_version());
     }
-
-#endif
 
     /// Returns the name of the specified data type as follows:
     ///
@@ -341,19 +326,6 @@ inline void LangBindHelper::unbind_table_ptr(const Table* t) REALM_NOEXCEPT
 inline void LangBindHelper::bind_table_ptr(const Table* t) REALM_NOEXCEPT
 {
    t->bind_ref();
-}
-
-inline void LangBindHelper::insert_subtable(Table& parent, std::size_t col_ndx,
-                                            std::size_t row_ndx, const Table& source)
-{
-    parent.insert_subtable(col_ndx, row_ndx, &source);
-}
-
-
-inline void LangBindHelper::insert_mixed_subtable(Table& parent, std::size_t col_ndx,
-                                                  std::size_t row_ndx, const Table& source)
-{
-    parent.insert_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
 inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_ndx,

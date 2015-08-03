@@ -146,7 +146,7 @@ const std::size_t not_found = npos;
 
 // Pre-definitions
 class Array;
-class AdaptiveStringColumn;
+class StringColumn;
 class GroupWriter;
 template<class T> class QueryState;
 namespace _impl { class ArrayWriterBase; }
@@ -268,15 +268,13 @@ public:
         type_HasRefs
     };
 
-    /// Create a new empty array of the specified type and attach this accessor
-    /// to it. This does not modify the parent reference information of this
-    /// accessor.
+    /// Create a new integer array of the specified type and size, and filled
+    /// with the specified value, and attach this accessor to it. This does not
+    /// modify the parent reference information of this accessor.
     ///
     /// Note that the caller assumes ownership of the allocated underlying
     /// node. It is not owned by the accessor.
-    ///
-    /// FIXME: Belongs in IntegerArray
-    void create(Type, bool context_flag = false);
+    void create(Type, bool context_flag = false, size_t size = 0, int_fast64_t value = 0);
 
     /// Reinitialize this array accessor to point to the specified new
     /// underlying memory. This does not modify the parent reference information
@@ -317,9 +315,15 @@ public:
 
     void move_assign(Array&) REALM_NOEXCEPT; // Move semantics for assignment
 
-    /// Construct an empty array of the specified type, and return just the
-    /// reference to the underlying memory.
+    /// Construct an empty integer array of the specified type, and return just
+    /// the reference to the underlying memory.
     static MemRef create_empty_array(Type, bool context_flag, Allocator&);
+
+    /// Construct an integer array of the specified type and size, and return
+    /// just the reference to the underlying memory. All elements will be
+    /// initialized to the specified value.
+    static MemRef create_array(Type, bool context_flag, size_t size,
+                               int_fast64_t value, Allocator&);
 
     /// Construct a shallow copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will **not** be cloned. See
@@ -361,8 +365,7 @@ public:
     bool is_empty() const REALM_NOEXCEPT;
     Type get_type() const REALM_NOEXCEPT;
 
-    // Exists for find_all() because array.hpp cannot append results directly to a Column type (incomplete class)
-    static void add_to_column(Column* column, int64_t value);
+    static void add_to_column(IntegerColumn* column, int64_t value);
 
     void insert(std::size_t ndx, int_fast64_t value);
     void add(int_fast64_t value);
@@ -457,7 +460,7 @@ public:
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, ColumnBase* column) const;
-    void   IndexStringFindAll(Column& result, StringData value, ColumnBase* column) const;
+    void   IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBase* column) const;
     size_t IndexStringCount(StringData value, ColumnBase* column) const;
     FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, ColumnBase* column) const;
 
@@ -521,7 +524,29 @@ public:
     std::size_t upper_bound_int(int64_t value) const REALM_NOEXCEPT;
     //@}
 
-    std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
+    /// \brief Search the \c Array for a value greater or equal than \a target,
+    /// starting the search at the \a start index. If \a indirection is
+    /// provided, use it as a look-up table to iterate over the \c Array.
+    ///
+    /// If \a indirection is not provided, then the \c Array must be sorted in
+    /// ascending order. If \a indirection is provided, then its values should
+    /// point to indices in this \c Array in such a way that iteration happens
+    /// in ascending order.
+    ///
+    /// Behaviour is undefined if:
+    /// - a value in \a indirection is out of bounds for this \c Array;
+    /// - \a indirection does not contain at least as many elements as this \c
+    ///   Array;
+    /// - sorting conditions are not respected;
+    /// - \a start is greater than the number of elements in this \c Array or
+    ///   \a indirection (if provided).
+    ///
+    /// \param target the smallest value to search for
+    /// \param start the offset at which to start searching in the array
+    /// \param indirection an \c Array containing valid indices of values in
+    ///        this \c Array, sorted in ascending order
+    /// \return the index of the value if found, or realm::not_found otherwise
+    std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
     void Preset(int64_t min, int64_t max, std::size_t count);
     void Preset(std::size_t bitwidth, std::size_t count);
 
@@ -631,7 +656,7 @@ public:
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = std::size_t(-1)) const;
 
-    void find_all(Column* result, int64_t value, std::size_t col_offset = 0,
+    void find_all(IntegerColumn* result, int64_t value, std::size_t col_offset = 0,
                   std::size_t begin = 0, std::size_t end = std::size_t(-1)) const;
 
     std::size_t find_first(int64_t value, std::size_t begin = 0,
@@ -926,7 +951,7 @@ protected:
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
     template <IndexMethod method, class T>
-    std::size_t index_string(StringData value, Column& result, ref_type& result_ref,
+    std::size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                              ColumnBase* column) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
@@ -990,6 +1015,7 @@ private:
     template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
+    template<size_t w> std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
 
 protected:
     /// The total size in bytes (including the header) of a new empty
@@ -1081,9 +1107,8 @@ protected:
 
     friend class SlabAlloc;
     friend class GroupWriter;
-    friend class AdaptiveStringColumn;
+    friend class StringColumn;
 };
-
 
 
 class Array::NodeInfo {
@@ -1166,7 +1191,7 @@ public:
             return false;
     }
 
-    void init(Action action, Column* akku, size_t limit)
+    void init(Action action, IntegerColumn* akku, size_t limit)
     {
         m_match_count = 0;
         m_limit = limit;
@@ -1230,7 +1255,7 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            Array::add_to_column(reinterpret_cast<Column*>(m_state), index);
+            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
         }
         else if (action == act_ReturnFirst) {
             m_state = index;
@@ -1321,9 +1346,9 @@ inline Array::Array(no_prealloc_tag) REALM_NOEXCEPT:
 }
 
 
-inline void Array::create(Type type, bool context_flag)
+inline void Array::create(Type type, bool context_flag, size_t size, int_fast64_t value)
 {
-    MemRef mem = create_empty_array(type, context_flag, m_alloc); // Throws
+    MemRef mem = create_array(type, context_flag, size, value, m_alloc); // Throws
     init_from_mem(mem);
 }
 
@@ -1881,8 +1906,14 @@ inline void Array::move_assign(Array& a) REALM_NOEXCEPT
 
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
 {
-    std::size_t size = 0;
+    size_t size = 0;
     int_fast64_t value = 0;
+    return create_array(type, context_flag, size, value, alloc); // Throws
+}
+
+inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int_fast64_t value,
+                                  Allocator& alloc)
+{
     return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 

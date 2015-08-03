@@ -520,13 +520,6 @@ void File::resize(SizeType size)
         throw std::runtime_error(get_errno_msg("ftruncate() failed: ", err));
     }
 
-#ifdef __APPLE__
-    if (::fcntl(m_fd, F_FULLFSYNC) != 0) {
-        int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("fcntl(F_FULLFSYNC) failed: ", err));
-    }
-#endif
-
 #endif
 }
 
@@ -638,7 +631,7 @@ File::SizeType File::get_file_position()
     if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
         throw std::runtime_error("SetFilePointerEx() failed");
     return liNew.QuadPart;
-#else 
+#else
     // POSIX version not needed because it's only used by Windows version of resize().
     REALM_ASSERT(false);
     return 0;
@@ -654,11 +647,18 @@ void File::sync()
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if defined _WIN32 // Windows version
 
     if (FlushFileBuffers(m_handle))
         return;
     throw std::runtime_error("FlushFileBuffers() failed");
+
+#elif defined __APPLE__
+
+    if (::fcntl(m_fd, F_FULLFSYNC) == 0)
+        return;
+    int err = errno; // Eliminate any risk of clobbering
+    throw std::runtime_error(get_errno_msg("fcntl() with F_FULLFSYNC failed: ", err));
 
 #else // POSIX version
 

@@ -454,6 +454,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
 
         // Pre-alloc initial space
         m_file.prealloc(0, initial_size); // Throws
+        bool disable_sync = get_disable_sync_to_disk();
+        if (!disable_sync)
+            m_file.sync(); // Throws
         size = initial_size;
     }
 
@@ -512,7 +515,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         }
 
         int select_field = header->m_flags;
-        select_field = ((select_field & 1) ^ SlabAlloc::flags_SelectBit);
+        select_field = select_field & SlabAlloc::flags_SelectBit;
         m_file_format_version = header->m_file_format_version[select_field];
 
         m_data        = map.release();

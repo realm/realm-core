@@ -35,19 +35,19 @@ template<class T> class SequentialGetter;
 template<class cond, class T> struct ColumnTypeTraits2;
 
 template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, bool> {
-    typedef Column column_type;
+    typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
-    typedef ColumnFloat column_type;
+    typedef FloatColumn column_type;
     typedef ArrayFloat array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
-    typedef ColumnDouble column_type;
+    typedef DoubleColumn column_type;
     typedef ArrayDouble array_type;
 };
 
@@ -74,8 +74,8 @@ struct FindInLeaf {
 };
 
 template <bool Nullable>
-struct FindInLeaf<TColumn<int64_t, Nullable>> {
-    using LeafType = typename TColumn<int64_t, Nullable>::LeafType;
+struct FindInLeaf<Column<int64_t, Nullable>> {
+    using LeafType = typename Column<int64_t, Nullable>::LeafType;
 
     template <Action action, class Condition, class T, class R>
     static bool find(const LeafType& leaf, T target, std::size_t local_start, std::size_t local_end, std::size_t leaf_start, QueryState<R>& state)

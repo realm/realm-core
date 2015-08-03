@@ -38,8 +38,8 @@ class SharedGroupFriend;
 class WriteLogCollector;
 }
 
-// Thrown by SharedGroup::open if the lock file is already open in another
-// process which can't share mutexes with this process
+/// Thrown by SharedGroup::open() if the lock file is already open in another
+/// process which can't share mutexes with this process
 struct IncompatibleLockFile: std::runtime_error {
     IncompatibleLockFile():
         std::runtime_error("Incompatible lock file")
@@ -130,18 +130,15 @@ class SharedGroup {
 public:
     enum DurabilityLevel {
         durability_Full,
-        durability_MemOnly
-#ifndef _WIN32
-        // Async commits are not yet supported on windows
-        , durability_Async
-#endif
+        durability_MemOnly,
+        durability_Async    ///< Not yet supported on windows.
     };
 
-    /// Equivalent to calling open(const std::string&, bool,
-    /// DurabilityLevel) on a default constructed instance.
+    /// Equivalent to calling `open(file, no_create, durability,
+    /// encryption_key)` on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         DurabilityLevel dlevel = durability_Full,
-                         const char *encryption_key = 0);
+                         DurabilityLevel durability = durability_Full,
+                         const char* encryption_key = 0);
 
     struct unattached_tag {};
 
@@ -187,24 +184,20 @@ public:
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel dlevel = durability_Full,
-              bool is_backend = false, const char *encryption_key = 0);
+              DurabilityLevel = durability_Full,
+              const char* encryption_key = 0);
 
-#ifdef REALM_ENABLE_REPLICATION
-
-    /// Equivalent to calling open(Replication&) on a
+    /// Equivalent to calling `open(repl, durability, encryption_key)` on a
     /// default constructed instance.
     explicit SharedGroup(Replication& repl,
-                         DurabilityLevel dlevel = durability_Full,
+                         DurabilityLevel durability = durability_Full,
                          const char* encryption_key = 0);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
     /// SharedGroup.
-    void open(Replication&, DurabilityLevel dlevel = durability_Full,
+    void open(Replication&, DurabilityLevel = durability_Full,
               const char* encryption_key = 0);
-
-#endif
 
     /// A SharedGroup may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
@@ -283,7 +276,7 @@ public:
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
-    typedef uint_fast64_t version_type;
+    using version_type = uint_fast64_t;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -403,10 +396,10 @@ public:
     void test_ringbuf();
 #endif
 
-    /// To handover a table view, query, linkview or row accessor of type T, you must 
+    /// To handover a table view, query, linkview or row accessor of type T, you must
     /// wrap it into a Handover<T> for the transfer. Wrapping and unwrapping of a handover
     /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
-    /// declared below. 'export_for_handover()' returns a Handover object, and 
+    /// declared below. 'export_for_handover()' returns a Handover object, and
     /// 'import_for_handover()' consumes that object, producing a new accessor which
     /// is ready for use in the context of the importing SharedGroup.
     ///
@@ -421,7 +414,7 @@ public:
     ///   by the argument MutableSourcePayload::Move
     ///
     /// - with payload copy: a copy of the payload is handed over, so both the accessors
-    ///   on the exporting side *and* the accessors created at the importing side has 
+    ///   on the exporting side *and* the accessors created at the importing side has
     ///   their own payload. This is indicated to handover_export() by the argument
     ///   ConstSourcePayload::Copy
     ///
@@ -434,14 +427,14 @@ public:
     /// For all other (non-TableView) accessors, handover is done with payload copy,
     /// since the payload is trival.
     ///
-    /// Handover *without* payload is useful when you want to ship a tableview with its query for 
-    /// execution in a background thread. Handover with *payload move* is useful when you want to 
+    /// Handover *without* payload is useful when you want to ship a tableview with its query for
+    /// execution in a background thread. Handover with *payload move* is useful when you want to
     /// transfer the result back.
     ///
-    /// Handover *without* payload or with payload copy is guaranteed *not* to change 
-    /// the accessors on the exporting side and is mutually exclusive with respect to 
-    /// advance_read(), promote_to_write etc - but it is not interlocked with deletion of 
-    /// the accessors: The caller must ensure that the accessors relevant for the export 
+    /// Handover *without* payload or with payload copy is guaranteed *not* to change
+    /// the accessors on the exporting side and is mutually exclusive with respect to
+    /// advance_read(), promote_to_write etc - but it is not interlocked with deletion of
+    /// the accessors: The caller must ensure that the accessors relevant for the export
     /// operation stays valid for the duration of the export. Usually, this is trivially
     /// ensured because the reference to the accessor will keep it alive.
     ///
@@ -449,7 +442,7 @@ public:
     /// it would require lots of locking.
     /// This is a decision we might have to change! (FIXME)
     ///
-    /// Handover with payload *move* is *not* thread safe and should be carried out 
+    /// Handover with payload *move* is *not* thread safe and should be carried out
     /// by the thread that "owns" the involved accessors.
     ///
     /// Handover is transitive:
@@ -467,7 +460,7 @@ public:
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
-    /// - advance_read(), promote_to_write(), commit_and_continue_as_read(), 
+    /// - advance_read(), promote_to_write(), commit_and_continue_as_read(),
     ///   rollback_and_continue_as_read(), close()
     template<typename T>
     std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
@@ -529,6 +522,9 @@ private:
     util::PlatformSpecificCondVar m_new_commit_available;
 #endif
 
+    void open(const std::string& file, bool no_create, DurabilityLevel,
+              bool is_backend, const char* encryption_key);
+
     // Ring buffer managment
     bool        ringbuf_is_empty() const REALM_NOEXCEPT;
     std::size_t ringbuf_size() const REALM_NOEXCEPT;
@@ -583,8 +579,6 @@ private:
 
     void upgrade_file_format();
 
-#ifdef REALM_ENABLE_REPLICATION
-
     //@{
     /// See LangBindHelper.
     template<class O> void advance_read(History&, O* observer, VersionID);
@@ -596,8 +590,6 @@ private:
     // Advance the readlock to the given version and return the transaction logs
     // between the old version and the given version, or nullptr if none.
     std::unique_ptr<BinaryData[]> advance_readlock(History&, VersionID specific_version);
-
-#endif
 
     friend class _impl::SharedGroupFriend;
 };
@@ -729,12 +721,13 @@ private:
 
 struct SharedGroup::BadVersion: std::exception {};
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const char* key):
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
+                                DurabilityLevel durability, const char* encryption_key):
     m_group(Group::shared_tag())
 {
-    open(file, no_create, dlevel, false, key);
+    open(file, no_create, durability, encryption_key); // Throws
 
-    upgrade_file_format();
+    upgrade_file_format(); // Throws
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
@@ -742,15 +735,21 @@ inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
 {
 }
 
-#ifdef REALM_ENABLE_REPLICATION
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
+                                const char* encryption_key):
     m_group(Group::shared_tag())
 {
-    open(repl, dlevel, key);
+    open(repl, durability, encryption_key); // Throws
 
-    upgrade_file_format();
+    upgrade_file_format(); // Throws
 }
-#endif
+
+inline void SharedGroup::open(const std::string& path, bool no_create_file,
+                              DurabilityLevel durability, const char* encryption_key)
+{
+    bool is_backend = false;
+    open(path, no_create_file, durability, is_backend, encryption_key); // Throws
+}
 
 inline bool SharedGroup::is_attached() const REALM_NOEXCEPT
 {
@@ -1015,6 +1014,15 @@ public:
     static void rollback_and_continue_as_read(SharedGroup& sg, History& hist, O* obs)
     {
         sg.rollback_and_continue_as_read(hist, obs); // Throws
+    }
+
+    static void async_daemon_open(SharedGroup& sg, const std::string& file)
+    {
+        bool no_create = true;
+        SharedGroup::DurabilityLevel durability = SharedGroup::durability_Async;
+        bool is_backend = true;
+        const char* encryption_key = 0;
+        sg.open(file, no_create, durability, is_backend, encryption_key); // Throws
     }
 };
 

@@ -40,6 +40,8 @@ public:
 
     Allocator& get_alloc() const REALM_NOEXCEPT;
 
+    bool has_strong_link_columns() REALM_NOEXCEPT;
+
     void insert_column(std::size_t column_ndx, ColumnType type, StringData name,
                        ColumnAttr attr = col_attr_None);
     void rename_column(std::size_t column_ndx, StringData new_name);
@@ -132,12 +134,14 @@ private:
     ArrayInteger m_attr; // 3rd slot in m_top
     Array m_subspecs;    // 4th slot in m_top (optional)
     Array m_enumkeys;    // 5th slot in m_top (optional)
+    bool m_has_strong_link_columns;
 
     Spec(Allocator&) REALM_NOEXCEPT; // Unattached
 
     void init(ref_type) REALM_NOEXCEPT;
     void init(MemRef) REALM_NOEXCEPT;
     void init(SubspecRef) REALM_NOEXCEPT;
+    void update_has_strong_link_columns() REALM_NOEXCEPT;
 
     // Similar in function to Array::init_from_parent().
     void init_from_parent() REALM_NOEXCEPT;
@@ -172,9 +176,7 @@ private:
     static bool get_first_column_type_from_ref(ref_type, Allocator&,
                                                ColumnType& type) REALM_NOEXCEPT;
 
-#ifdef REALM_ENABLE_REPLICATION
     friend class Replication;
-#endif
 
     friend class Table;
 };
@@ -223,6 +225,11 @@ private:
 inline Allocator& Spec::get_alloc() const REALM_NOEXCEPT
 {
     return m_top.get_alloc();
+}
+
+inline bool Spec::has_strong_link_columns() REALM_NOEXCEPT
+{
+    return m_has_strong_link_columns;
 }
 
 inline ref_type Spec::get_subspec_ref(std::size_t subspec_ndx) const REALM_NOEXCEPT
@@ -360,6 +367,8 @@ inline void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
     REALM_ASSERT(type == col_type_StringEnum);
 
     m_types.set(column_ndx, type); // Throws
+
+    update_has_strong_link_columns();
 }
 
 inline ColumnAttr Spec::get_column_attr(std::size_t ndx) const REALM_NOEXCEPT
@@ -376,6 +385,8 @@ inline void Spec::set_column_attr(std::size_t column_ndx, ColumnAttr attr)
     // so setting it will overwrite existing. In the future
     // we will allow combinations.
     m_attr.set(column_ndx, attr);
+
+    update_has_strong_link_columns();
 }
 
 inline StringData Spec::get_column_name(std::size_t ndx) const REALM_NOEXCEPT

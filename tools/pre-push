@@ -13,6 +13,8 @@ declare -a authorized_remotes=(
     'https://github.com/kspangsege/realm-core.git'
     'git@github.com:finnschiermer/realm-core.git'
     'https://github.com/finnschiermer/realm-core.git'
+    'git@github.com:teotwaki/realm-core.git'
+    'https://github.com/teotwaki/realm-core.git'
 )
 repo_name='realm-core'
 

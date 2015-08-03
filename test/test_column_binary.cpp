@@ -42,8 +42,8 @@ using namespace realm;
 
 TEST(ColumnBinary_Basic)
 {
-    ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref, true);
+    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    BinaryColumn c(Allocator::get_default(), ref, true);
 
     // TEST(ColumnBinary_MultiEmpty)
 
@@ -207,29 +207,29 @@ TEST(ColumnBinary_Basic)
     c.add(BinaryData("ghij"));
     c.add(BinaryData("klmno"));
 
-    c.erase(0, 0 == c.size()-1); // first
+    c.erase(0); // first
     CHECK_EQUAL(BinaryData("bc"),        c.get(0));
     CHECK_EQUAL(BinaryData("def"),       c.get(1));
     CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
     CHECK_EQUAL(BinaryData("klmno"),     c.get(3));
     CHECK_EQUAL(4, c.size());
 
-    c.erase(3, 3 == c.size()-1); // last
+    c.erase(3); // last
     CHECK_EQUAL(BinaryData("bc"),        c.get(0));
     CHECK_EQUAL(BinaryData("def"),       c.get(1));
     CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
     CHECK_EQUAL(3, c.size());
 
-    c.erase(1, 1 == c.size()-1); // middle
+    c.erase(1); // middle
     CHECK_EQUAL(BinaryData("bc"),        c.get(0));
     CHECK_EQUAL(BinaryData("ghij"),      c.get(1));
     CHECK_EQUAL(2, c.size());
 
-    c.erase(0, 0 == c.size()-1); // single
+    c.erase(0); // single
     CHECK_EQUAL(BinaryData("ghij"),      c.get(0));
     CHECK_EQUAL(1, c.size());
 
-    c.erase(0, 0 == c.size()-1); // all
+    c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
 
@@ -288,9 +288,9 @@ TEST(ColumnBinary_Basic)
 
 TEST(ColumnBinary_Nulls)
 {
-    ref_type ref = ColumnBinary::create(Allocator::get_default());
-    ColumnBinary c(Allocator::get_default(), ref, true);
-    
+    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    BinaryColumn c(Allocator::get_default(), ref, true);
+
     c.add(BinaryData());
     c.add(BinaryData("", 0));
     c.add(BinaryData("foo"));

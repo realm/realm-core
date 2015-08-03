@@ -17,33 +17,22 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef REALM_COLUMN_FWD_HPP
-#define REALM_COLUMN_FWD_HPP
+#ifndef REALM_DISABLE_SYNC_TO_DISK_HPP
+#define REALM_DISABLE_SYNC_TO_DISK_HPP
 
-#include <cstdint>
+#include <realm/util/features.h>
 
 namespace realm {
 
-// Regular classes
-class ColumnBase;
-class StringColumn;
-class StringEnumColumn;
-class BinaryColumn;
-class SubtableColumn;
-class MixedColumn;
-class LinkColumn;
-class LinkListColumn;
+/// Completely disable synchronization with storage device to speed up unit
+/// testing. This is an unsafe mode of operation, and should never be used in
+/// production. This function is thread safe.
+void disable_sync_to_disk();
 
-// Templated classes
-template <class T, bool Nullable = false> class Column;
-template<class T> class BasicColumn;
-
-// Shortcuts, aka typedefs.
-using IntegerColumn = Column<std::int64_t, false>;
-using IntNullColumn = Column<std::int64_t, true>;
-using DoubleColumn = BasicColumn<double>;
-using FloatColumn = BasicColumn<float>;
+/// Returns true after disable_sync_to_disk() has been called. This function is
+/// thread safe.
+bool get_disable_sync_to_disk() REALM_NOEXCEPT;
 
 } // namespace realm
 
-#endif // REALM_COLUMN_FWD_HPP
+#endif // REALM_DISABLE_SYNC_TO_DISK_HPP

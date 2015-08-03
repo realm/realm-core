@@ -80,7 +80,39 @@ REALM_TABLE_3(TestTableGroup2,
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));
+
     CHECK(!group.is_attached());
+}
+
+
+TEST(Group_UnattachedErrorHandling)
+{
+    Group group((Group::unattached_tag()));
+
+    // FIXME: Uncomment the two commented lines below once #935 is fixed.
+
+//  CHECK_LOGIC_ERROR(group.is_empty(),                              LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.size(),                                  LogicError::detached_accessor);
+//  CHECK_LOGIC_ERROR(group.find_table("foo"),                       LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table(0),                            LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table("foo"),                        LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo", false),                 LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0),            LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"),        LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false), LogicError::detached_accessor);
+
+    {
+        const auto& const_group = group;
+        CHECK_LOGIC_ERROR(const_group.get_table(0),                 LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table("foo"),             LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
+    }
+
+    {
+        bool f = false;
+        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f),                 LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f), LogicError::detached_accessor);
+    }
 }
 
 
@@ -105,6 +137,50 @@ TEST(Group_OpenFile)
         group.open(path, crypt_key(), Group::mode_ReadOnly);
         CHECK(group.is_attached());
     }
+
+}
+
+// Ensure that Group throws when you attempt to attach it twice in a row
+TEST(Group_DoubleOpening)
+{
+    // File-based open()
+    {
+        GROUP_TEST_PATH(path);
+        Group group((Group::unattached_tag()));
+
+        group.open(path, crypt_key(), Group::mode_ReadWrite);
+        CHECK_LOGIC_ERROR(group.open(path, crypt_key(), Group::mode_ReadWrite), LogicError::wrong_group_state);
+    }
+
+    // Buffer-based open()
+    {
+        // Produce a valid buffer
+        using Deleter = decltype(::free)*;
+        std::unique_ptr<char[], Deleter> buffer(nullptr, ::free);
+        size_t buffer_size;
+
+        {
+            GROUP_TEST_PATH(path);
+            {
+                Group group;
+                group.write(path);
+            }
+            {
+                File file(path);
+                buffer_size = size_t(file.get_size());
+                buffer.reset(static_cast<char*>(malloc(buffer_size)));
+                CHECK(bool(buffer));
+                file.read(buffer.get(), buffer_size);
+            }
+        }
+
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK_LOGIC_ERROR(group.open(BinaryData(buffer.get(), buffer_size), take_ownership),
+                          LogicError::wrong_group_state);
+    }
 }
 
 #ifndef _WIN32
@@ -122,9 +198,9 @@ TEST(Group_Permissions)
         t1->add_column(type_String, "s");
         t1->add_column(type_Int,    "i");
         for(size_t i=0; i<4; ++i) {
-            t1->insert_string(0, i, "a");
-            t1->insert_int(1, i, 3);
-            t1->insert_done();
+            t1->insert_empty_row(i);
+            t1->set_string(0, i, "a");
+            t1->set_int(1, i, 3);
         }
         group1.write(path, crypt_key());
     }
@@ -170,7 +246,6 @@ TEST(Group_BadFile)
     }
 }
 
-
 TEST(Group_OpenBuffer)
 {
     // Produce a valid buffer
@@ -190,7 +265,6 @@ TEST(Group_OpenBuffer)
             file.read(buffer.get(), buffer_size);
         }
     }
-
 
     // Keep ownership of buffer
     {
@@ -985,13 +1059,13 @@ TEST(Group_Serialize_All)
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
 
-    table->insert_int(0, 0, 12);
-    table->insert_bool(1, 0, true);
-    table->insert_datetime(2, 0, 12345);
-    table->insert_string(3, 0, "test");
-    table->insert_binary(4, 0, BinaryData("binary", 7));
-    table->insert_mixed(5, 0, false);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 12);
+    table->set_bool(1, 0, true);
+    table->set_datetime(2, 0, 12345);
+    table->set_string(3, 0, "test");
+    table->set_binary(4, 0, BinaryData("binary", 7));
+    table->set_mixed(5, 0, false);
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1027,13 +1101,13 @@ TEST(Group_Persist)
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
-    table->insert_int(0, 0, 12);
-    table->insert_bool(1, 0, true);
-    table->insert_datetime(2, 0, 12345);
-    table->insert_string(3, 0, "test");
-    table->insert_binary(4, 0, BinaryData("binary", 7));
-    table->insert_mixed(5, 0, false);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 12);
+    table->set_bool(1, 0, true);
+    table->set_datetime(2, 0, 12345);
+    table->set_string(3, 0, "test");
+    table->set_binary(4, 0, BinaryData("binary", 7));
+    table->set_mixed(5, 0, false);
 
     // Write changes to file
     db.commit();
@@ -1676,8 +1750,8 @@ TEST(Group_StockBug)
 
     for (size_t i = 0; i < 100; ++i) {
         table->Verify();
-        table->insert_string(0, i, "123456789012345678901234567890123456789");
-        table->insert_done();
+        table->insert_empty_row(i);
+        table->set_string(0, i, "123456789012345678901234567890123456789");
         table->Verify();
         group.commit();
     }
@@ -1723,7 +1797,7 @@ TEST(Group_Commit_Update_Integer_Index)
 
     g.commit();
 
-    // This would fail (sometimes return not_found, sometimes crash) 
+    // This would fail (sometimes return not_found, sometimes crash)
     CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
 }
 
@@ -1739,14 +1813,12 @@ TEST(Group_CascadeNotify_Simple)
     // Add some extra rows so that the indexes being tested aren't all 0
     t->add_empty_row(100);
 
-    // remove() does not send a notification as it can't be used on tables with
-    // links, so it can never cause a cascade
     bool called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification&) {
         called = true;
     });
     t->remove(5);
-    CHECK(!called);
+    CHECK(called);
 
     // move_last_over() on a table with no (back)links just sends that single
     // row in the notification
@@ -2080,7 +2152,7 @@ TEST(Group_ToDot)
     s.add_column(type_DateTime, "date");
     s.add_column(type_String,   "string");
     s.add_column(type_String,   "string_long");
-    s.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
+    s.add_column(type_String,   "string_enum"); // becomes StringEnumColumn
     s.add_column(type_Binary,   "binary");
     s.add_column(type_Mixed,    "mixed");
     s.add_column(type_Table,    "tables", &subdesc);
@@ -2089,45 +2161,45 @@ TEST(Group_ToDot)
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
-        table->insert_int(0, i, i);
-        table->insert_bool(1, i, (i % 2 ? true : false));
-        table->insert_datetime(2, i, 12345);
+        table->insert_empty_row(i);
+        table->set_int(0, i, i);
+        table->set_bool(1, i, (i % 2 ? true : false));
+        table->set_datetime(2, i, 12345);
 
         std::stringstream ss;
         ss << "string" << i;
-        table->insert_string(3, i, ss.str().c_str());
+        table->set_string(3, i, ss.str().c_str());
 
         ss << " very long string.........";
-        table->insert_string(4, i, ss.str().c_str());
+        table->set_string(4, i, ss.str().c_str());
 
         switch (i % 3) {
             case 0:
-                table->insert_string(5, i, "test1");
+                table->set_string(5, i, "test1");
                 break;
             case 1:
-                table->insert_string(5, i, "test2");
+                table->set_string(5, i, "test2");
                 break;
             case 2:
-                table->insert_string(5, i, "test3");
+                table->set_string(5, i, "test3");
                 break;
         }
 
-        table->insert_binary(6, i, "binary", 7);
+        table->set_binary(6, i, "binary", 7);
 
         switch (i % 3) {
             case 0:
-                table->insert_mixed(7, i, false);
+                table->set_mixed(7, i, false);
                 break;
             case 1:
-                table->insert_mixed(7, i, (int64_t)i);
+                table->set_mixed(7, i, (int64_t)i);
                 break;
             case 2:
-                table->insert_mixed(7, i, "string");
+                table->set_mixed(7, i, "string");
                 break;
         }
 
-        table->insert_subtable(8, i);
-        table->insert_done();
+        table->set_subtable(8, i);
 
         // Add sub-tables
         if (i == 2) {
@@ -2140,19 +2212,19 @@ TEST(Group_ToDot)
             s.add_column(type_String, "second");
             subtable->UpdateFromSpec(s.get_ref());
 
-            subtable->insert_int(0, 0, 42);
-            subtable->insert_string(1, 0, "meaning");
-            subtable->insert_done();
+            subtable->insert_empty_row(0);
+            subtable->set_int(0, 0, 42);
+            subtable->set_string(1, 0, "meaning");
 
             // To table column
             Table subtable2 = table->get_subtable(8, i);
-            subtable2->insert_int(0, 0, 42);
-            subtable2->insert_string(1, 0, "meaning");
-            subtable2->insert_done();
+            subtable2->set_empty_row(0);
+            subtable2->set_int(0, 0, 42);
+            subtable2->set_string(1, 0, "meaning");
         }
     }
 
-    // We also want ColumnStringEnum's
+    // We also want StringEnumColumn's
     table->optimize();
 
 #if 1

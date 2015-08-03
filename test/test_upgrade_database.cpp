@@ -296,7 +296,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 #if REALM_NULL_STRINGS == 1
         CHECK_EQUAL(rt.get_group().get_file_format(), 3);
 #else
-        CHECK_EQUAL(g.get_group().get_file_format(), 2);
+        CHECK_EQUAL(rt.get_group().get_file_format(), 2);
 #endif
 
         size_t f;
@@ -555,7 +555,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 
 
 
-// Test reading/writing of old version 2 ColumnBinary.
+// Test reading/writing of old version 2 BinaryColumn.
 TEST(Upgrade_Database_Binary)
 {
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
@@ -639,4 +639,97 @@ TEST(Upgrade_Database_Binary)
 }
 
 
-#endif 
+
+// Test upgrading a database with single column containing strings with embedded NULs
+TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_NULL_STRINGS)
+{
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
+
+    // entries in this array must have length == index
+    const char* const nul_strings[] = {
+        "", // length == 0
+        "\0",  // length == 1 etc.
+        "\0\0",
+        "\0\0\0",
+        "\0\0\0\0",
+    };
+    constexpr size_t num_nul_strings = sizeof(nul_strings) / sizeof(nul_strings[0]);
+
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    SharedGroup g(temp_copy, 0);
+
+    WriteTransaction wt(g);
+    TableRef t = wt.get_table("table");
+    size_t reserved_row_index = t->add_empty_row(); // reserved for "upgrading" entry
+
+    // Check if the previously added strings are in the column, 3 times:
+    // 0) as is (with ArrayString leafs)
+    // 1) after upgrading to ArrayStringLong
+    // 2) after upgrading to ArrayBigBlobs
+    for (int test_num = 0; test_num < 3; ++test_num) {
+        for (size_t j = 0; j < num_nul_strings; ++j) {
+            size_t f = t->find_first_string(0, StringData(nul_strings[j], j));
+            CHECK_EQUAL(f, j);
+            f = t->where().equal(0, StringData(nul_strings[j], j)).find();
+            CHECK_EQUAL(f, j);
+            CHECK(t->get_string(0, j) == StringData(nul_strings[j], j));
+        }
+
+        t->add_search_index(0);
+
+        size_t f = t->where().not_equal(0, StringData(nul_strings[0], 0)).find();
+        CHECK(f == 1);
+        f = t->where().not_equal(0, StringData(nul_strings[1], 1)).find();
+        CHECK(f == 0);
+
+        switch (test_num) {
+            case 0:
+                t->set_string(0, reserved_row_index, StringData("12345678901234567890")); // length == 20
+            case 1:
+                t->set_string(0, reserved_row_index, StringData("1234567890123456789012345678901234567890123456789012345678901234567890")); // length == 70
+            default:
+                break;
+        }
+    }
+
+#else // test write mode
+    File::try_remove(path);
+
+    Group g;
+
+    TableRef t = g.add_table("table");
+    t->add_column(type_String, "strings_with_nul_bytes");
+    t->add_empty_row(num_nul_strings);
+    for (size_t i = 0; i < num_nul_strings; ++i) {
+        t->set_string(0, i, StringData(nul_strings[i], i));
+    }
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
+#if TEST_READ_UPGRADE_MODE
+TEST(Upgrade_Database_2_3_Writes_New_File_Format) {
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    SharedGroup sg1(temp_copy);
+    WriteTransaction wt1(sg1);
+    SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
+    ReadTransaction rt2(sg2);
+    Group const& g1 = wt1.get_group();
+    Group const& g2 = rt2.get_group();
+    CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
+}
+#endif
+
+
+
+#endif // TEST_GROUP

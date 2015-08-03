@@ -266,7 +266,6 @@ public:
     void to_string(std::ostream&, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
-#ifdef REALM_ENABLE_REPLICATION
     // Determine if the view is 'in sync' with the underlying table
     // as well as other views used to generate the view. Note that updates
     // through views maintains synchronization between view and table.
@@ -285,9 +284,6 @@ public:
     // before any of the other access-methods whenever the view may have become
     // outdated.
     uint_fast64_t sync_if_needed() const;
-#else
-    uint_fast64_t sync_if_needed() const;
-#endif
 
     // Set this undetached TableView to be a distinct view, and sync immediately.
     void sync_distinct_view(size_t column_ndx);
@@ -311,9 +307,7 @@ public:
     virtual ~TableViewBase() REALM_NOEXCEPT;
 
 protected:
-#ifdef REALM_ENABLE_REPLICATION
     void do_sync();
-#endif
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
@@ -456,7 +450,6 @@ public:
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void set_subtable(size_t column_ndx,size_t row_ndx, const Table* table);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-    void add_int(size_t column_ndx, int64_t value);
 
     // Subtables
     TableRef      get_subtable(size_t column_ndx, size_t row_ndx);
@@ -695,77 +688,69 @@ inline std::size_t TableViewBase::find_by_source_ndx(std::size_t source_ndx) con
 }
 
 inline TableViewBase::TableViewBase():
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
-    m_distinct_column_source(npos)
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), // Throws
+    m_last_seen_version(0),
+    m_distinct_column_source(npos),
+    m_auto_sort(false)
 {
-#ifdef REALM_ENABLE_REPLICATION
-    m_last_seen_version = 0;
-    m_auto_sort = false;
-#endif
-    ref_type ref = Column::create(m_row_indexes.get_alloc()); // Throws
+    ref_type ref = IntegerColumn::create(m_row_indexes.get_alloc()); // Throws
     m_row_indexes.get_root_array()->init_from_ref(ref);
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), 
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), 
     m_table(parent->get_table_ref()), // Throws
-    m_distinct_column_source(npos)
+    m_last_seen_version(m_table ? m_table->m_version : 0),
+    m_distinct_column_source(npos),
+    m_auto_sort(false)
     {
-#ifdef REALM_ENABLE_REPLICATION
-    m_last_seen_version = m_table ? m_table->m_version : 0;
-    m_auto_sort = false;
-#endif
-    // FIXME: This code is unreasonably complicated because it uses `Column` as
-    // a free-standing container, and beause `Column` does not conform to the
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
     // RAII idiom (nor should it).
     Allocator& alloc = m_row_indexes.get_alloc();
     _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(Column::create(alloc)); // Throws
+    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
     parent->register_view(this); // Throws
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), // Throws
     m_table(parent->get_table_ref()),
+    m_last_seen_version(m_table ? m_table->m_version : 0),
     m_distinct_column_source(npos),
-    m_query(query, Query::TCopyExpressionTag())
+    m_auto_sort(false),
+    m_query(query, Query::TCopyExpressionTag()),
+    m_start(start),
+    m_end(end),
+    m_limit(limit)
 {
-#ifdef REALM_ENABLE_REPLICATION
-    m_last_seen_version = m_table ? m_table->m_version : 0;
-    m_auto_sort = false;
-#endif
-    m_start = start;
-    m_end = end;
-    m_limit = limit;
-    // FIXME: This code is unreasonably complicated because it uses `Column` as
-    // a free-standing container, and beause `Column` does not conform to the
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
     // RAII idiom (nor should it).
     Allocator& alloc = m_row_indexes.get_alloc();
     _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(Column::create(alloc)); // Throws
+    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
     parent->register_view(this); // Throws
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()),
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
+    m_linkview_source(tv.m_linkview_source),
+    m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
-    m_query(tv.m_query, Query::TCopyExpressionTag()), 
+    m_sorting_predicate(tv.m_sorting_predicate),
+    m_auto_sort(tv.m_auto_sort),
+    m_query(tv.m_query, Query::TCopyExpressionTag()),
+    m_start(tv.m_start),
+    m_end(tv.m_end),
+    m_limit(tv.m_limit),
     m_num_detached_refs(tv.m_num_detached_refs)
     {
-#ifdef REALM_ENABLE_REPLICATION
-    m_last_seen_version = tv.m_last_seen_version;
-    m_auto_sort = tv.m_auto_sort;
-    m_start = tv.m_start;
-    m_end = tv.m_end;
-    m_limit = tv.m_limit;
-    m_linkview_source = tv.m_linkview_source;
-    m_sorting_predicate = tv.m_sorting_predicate;
-#endif
-    // FIXME: This code is unreasonably complicated because it uses `Column` as
-    // a free-standing container, and beause `Column` does not conform to the
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
     // RAII idiom (nor should it).
     Allocator& alloc = m_row_indexes.get_alloc();
     MemRef mem = tv.m_row_indexes.get_root_array()->clone_deep(alloc); // Throws
@@ -779,21 +764,19 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) REALM_NOEXCEPT:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(move(tv.m_table)),
-    m_distinct_column_source(tv.m_distinct_column_source),
-    m_query(tv.m_query, Query::TCopyExpressionTag()),
-    m_num_detached_refs(tv.m_num_detached_refs)
-{
-#ifdef REALM_ENABLE_REPLICATION
+    m_linkview_source(tv.m_linkview_source),
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
-    m_last_seen_version = tv.m_last_seen_version;
-    m_auto_sort = tv.m_auto_sort;
-    m_start = tv.m_start;
-    m_end = tv.m_end;
-    m_limit = tv.m_limit;
-    m_linkview_source = tv.m_linkview_source;
-    m_sorting_predicate = tv.m_sorting_predicate;
-#endif
+    m_last_seen_version(tv.m_last_seen_version),
+    m_distinct_column_source(tv.m_distinct_column_source),
+    m_sorting_predicate(tv.m_sorting_predicate),
+    m_auto_sort(tv.m_auto_sort),
+    m_query(tv.m_query, Query::TCopyExpressionTag()),
+    m_start(tv.m_start),
+    m_end(tv.m_end),
+    m_limit(tv.m_limit),
+    m_num_detached_refs(tv.m_num_detached_refs)
+{
     if (m_table)
         m_table->move_registered_view(&tv, this);
 }
@@ -818,7 +801,6 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) REALM_NOEXCEP
     m_row_indexes.move_assign(tv.m_row_indexes);
     m_query = tv.m_query;
     m_num_detached_refs = tv.m_num_detached_refs;
-#ifdef REALM_ENABLE_REPLICATION
     m_last_seen_version = tv.m_last_seen_version;
     m_auto_sort = tv.m_auto_sort;
     m_start = tv.m_start;
@@ -826,7 +808,6 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) REALM_NOEXCEP
     m_limit = tv.m_limit;
     m_linkview_source = tv.m_linkview_source;
     m_sorting_predicate = tv.m_sorting_predicate;
-#endif
 
     return *this;
 }
@@ -1502,12 +1483,6 @@ inline void TableView::nullify_link(std::size_t column_ndx, std::size_t row_ndx)
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     REALM_ASSERT(real_ndx != detached_ref);
     m_table->nullify_link(column_ndx, real_ndx);
-}
-
-
-inline void TableView::add_int(size_t column_ndx, int64_t value)
-{
-    m_table->add_int(column_ndx, value);
 }
 
 } // namespace realm

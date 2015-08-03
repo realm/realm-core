@@ -1,21 +1,16 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/spec.hpp>
-
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#endif
+#include <realm/replication.hpp>
 
 using namespace realm;
 
 
 Spec::~Spec() REALM_NOEXCEPT
 {
-#ifdef REALM_ENABLE_REPLICATION
     if (m_top.is_attached()) {
         if (Replication* repl = m_top.get_alloc().get_replication())
             repl->on_spec_destroyed(this);
     }
-#endif
 }
 
 
@@ -46,6 +41,21 @@ void Spec::init(MemRef mem) REALM_NOEXCEPT
         m_enumkeys.init_from_ref(m_top.get_as_ref(4));
         m_enumkeys.set_parent(&m_top, 4);
     }
+
+    update_has_strong_link_columns();
+}
+
+
+void Spec::update_has_strong_link_columns() REALM_NOEXCEPT
+{
+    size_t n = m_types.size();
+    for (size_t i = 0; i < n; ++i) {
+        if (ColumnAttr(m_attr.get(i)) & col_attr_StrongLinks) {
+            m_has_strong_link_columns = true;
+            return;
+        }
+    }
+    m_has_strong_link_columns = false;
 }
 
 
@@ -170,6 +180,8 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             m_subspecs.insert(subspec_ndx, 1); // Throws
         }
     }
+
+    update_has_strong_link_columns();
 }
 
 
@@ -216,6 +228,8 @@ void Spec::erase_column(size_t column_ndx)
         m_names.erase(column_ndx); // Throws
     m_types.erase(column_ndx);  // Throws
     m_attr.erase(column_ndx);  // Throws
+
+    update_has_strong_link_columns();
 }
 
 

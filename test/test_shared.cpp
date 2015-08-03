@@ -237,8 +237,7 @@ TEST(Shared_CompactingOnTheFly)
         {
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            for (int i = 0; i < 100; ++i)
-            {
+            for (int i = 0; i < 100; ++i) {
                 t1->add(0, i, false, "test");
             }
             wt.commit();
@@ -844,6 +843,17 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
     }
 }
 
+namespace {
+
+void add_int(Table& table, size_t col_ndx, int_fast64_t diff)
+{
+    for (size_t i = 0; i < table.size(); ++i) {
+        table.set_int(col_ndx, i, table.get_int(col_ndx, i) + diff);
+    }
+}
+
+} // anonymous namespace
+
 
 TEST(Shared_ManyReaders)
 {
@@ -887,8 +897,8 @@ TEST(Shared_ManyReaders)
             wt.get_group().Verify();
             TableRef test_1 = wt.get_or_add_table("test_1");
             test_1->add_column(type_Int, "i");
-            test_1->insert_int(0,0,0);
-            test_1->insert_done();
+            test_1->insert_empty_row(0);
+            test_1->set_int(0,0,0);
             TableRef test_2 = wt.get_or_add_table("test_2");
             test_2->add_column(type_Binary, "b");
             wt.commit();
@@ -920,10 +930,10 @@ TEST(Shared_ManyReaders)
                 WriteTransaction wt(root_sg);
                 wt.get_group().Verify();
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,1);
+                add_int(*test_1, 0, 1);
                 TableRef test_2 = wt.get_table("test_2");
-                test_2->insert_binary(0, 0, BinaryData(chunk_1));
-                test_2->insert_done();
+                test_2->insert_empty_row(0);
+                test_2->set_binary(0, 0, BinaryData(chunk_1));
                 wt.commit();
             }
             {
@@ -931,8 +941,8 @@ TEST(Shared_ManyReaders)
                 wt.get_group().Verify();
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
-                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
-                    test_2->insert_done();
+                    test_2->insert_empty_row(test_2->size());
+                    test_2->set_binary(0, test_2->size() - 1, BinaryData(chunk_2));
                 }
                 wt.commit();
             }
@@ -962,7 +972,7 @@ TEST(Shared_ManyReaders)
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,2);
+                add_int(*test_1, 0, 2);
                 wt.commit();
             }
             {
@@ -984,7 +994,7 @@ TEST(Shared_ManyReaders)
         // Initiate 6*N extra read transactionss with further progressive changes
         for (int i = 2*N; i < 8*N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
             read_transactions[i]->get_group().Verify();
 #endif
             {
@@ -1003,25 +1013,25 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,1);
+                add_int(*test_1, 0, 1);
                 TableRef test_2 = wt.get_table("test_2");
-                test_2->insert_binary(0, 0, BinaryData(chunk_1));
-                test_2->insert_done();
+                test_2->insert_empty_row(0);
+                test_2->set_binary(0, 0, BinaryData(chunk_1));
                 wt.commit();
             }
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 wt.get_group().Verify();
 #endif
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
-                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
-                    test_2->insert_done();
+                    test_2->insert_empty_row(test_2->size());
+                    test_2->set_binary(0, test_2->size() - 1, BinaryData(chunk_2));
                 }
                 wt.commit();
             }
@@ -1031,11 +1041,11 @@ TEST(Shared_ManyReaders)
         for (int i = 1*N; i < 8*N; ++i) {
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 wt.get_group().Verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
-                test_1->add_int(0,2);
+                add_int(*test_1, 0, 2);
                 wt.commit();
             }
             {
@@ -1059,7 +1069,7 @@ TEST(Shared_ManyReaders)
         for (int i=0; i<8*N; ++i) {
             {
                 ReadTransaction rt(*shared_groups[i]);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
                 rt.get_group().Verify();
 #endif
                 ConstTableRef test_1 = rt.get_table("test_1");
@@ -1081,7 +1091,7 @@ TEST(Shared_ManyReaders)
         {
             SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
             ReadTransaction rt(sg);
-#if !defined(_WIN32) || TEST_DURATION > 0 
+#if !defined(_WIN32) || TEST_DURATION > 0
             rt.get_group().Verify();
 #endif
             ConstTableRef test_1 = rt.get_table("test_1");
@@ -1285,10 +1295,10 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             TableRef table = wt.add_table("beta");
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
-                table->insert_int(0,0,0);
-                table->insert_done();
+                table->insert_empty_row(0);
+                table->set_int(0,0,0);
             }
-            table->add_int(0,1);
+            add_int(*table, 0, 1);
             wt.commit();
         }
     }
@@ -1364,9 +1374,8 @@ TEST(Shared_FormerErrorCase1)
         {
             TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
-            table2->insert_int(0, 0, 0);
-            table2->insert_subtable(1, 0);
-            table2->insert_done();
+            table2->insert_empty_row(0);
+            table2->set_int(0, 0, 0);
         }
         {
             TableRef table = wt.get_table("my_table");
@@ -2005,6 +2014,10 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #if !defined(_WIN32) && !defined(__APPLE__)
 
+
+// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
+/*
+
 namespace {
 
 const int num_threads = 3;
@@ -2053,7 +2066,8 @@ void waiter(std::string path, int i)
         shared_state[i] = 6;
     }
 }
-}
+
+} // anonymous namespace
 
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
@@ -2127,6 +2141,8 @@ TEST(Shared_WaitForChange)
     }
     delete muu;
 }
+
+*/
 
 #endif // endif not on windows (or apple)
 
@@ -2221,7 +2237,9 @@ TEST(Shared_MixedWithNonShared)
     {
         // Create non-empty file without free-space tracking
         Group g;
+        g.Verify();
         g.add_table("x");
+        g.Verify();
         g.write(path, crypt_key());
     }
     {
@@ -2236,6 +2254,7 @@ TEST(Shared_MixedWithNonShared)
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             wt.add_table("foo"); // Add table "foo"
+            wt.get_group().Verify();
             wt.commit();
         }
     }
@@ -2250,13 +2269,18 @@ TEST(Shared_MixedWithNonShared)
     {
         // Access using non-shared group
         Group g(path, crypt_key(), Group::mode_ReadWrite);
+        g.Verify();
         g.commit();
+        g.Verify();
     }
     {
         // Modify using non-shared group
         Group g(path, crypt_key(), Group::mode_ReadWrite);
+        g.Verify();
         g.add_table("bar"); // Add table "bar"
+        g.Verify();
         g.commit();
+        g.Verify();
     }
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
@@ -2410,9 +2434,9 @@ TEST(Shared_ReserveDiskSpace)
 TEST(Shared_MovingEnumStringColumn)
 {
     // Test that the 'index in parent' property of the column of unique strings
-    // in a ColumnStringEnum is properly adjusted when other string enumeration
+    // in a StringEnumColumn is properly adjusted when other string enumeration
     // columns are inserted or removed before it. Note that the parent of the
-    // column of unique strings in a ColumnStringEnum is a child of an array
+    // column of unique strings in a StringEnumColumn is a child of an array
     // node in the Spec class.
 
     SHARED_GROUP_TEST_PATH(path);
