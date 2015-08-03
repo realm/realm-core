@@ -21,6 +21,7 @@
 * Several column classes were renamed to follow the `XxxColumn` naming scheme
   (e.g., `ColumnLink` to `LinkColumn`).
 * Removed conditional compilation of replication features.
+* More information from `InvalidDatabase::what()`.
 
 
 ----------------------------------------------
