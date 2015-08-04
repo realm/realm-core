@@ -980,6 +980,7 @@ inline void SharedGroup::upgrade_file_format()
     if (upgrade) {
         begin_write();
         m_group.upgrade_file_format();
+        m_group.m_alloc.set_file_format(default_file_format_version);
         commit();
     }
 }

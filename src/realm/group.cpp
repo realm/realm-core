@@ -45,7 +45,7 @@ void Group::upgrade_file_format()
         table->upgrade_file_format();
     }
 
-    m_alloc.m_file_format_version = default_file_format_version;
+    m_alloc.set_file_format(default_file_format_version);
 #endif
 }
 
@@ -207,6 +207,8 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
         m_alloc.remap(new_file_size); // Throws
 
     attach(new_top_ref); // Throws
+
+    m_alloc.set_file_format(m_alloc.get_committed_file_format());
 }
 
 
