@@ -121,7 +121,7 @@ template<class T> inline void BasicColumn<T>::erase(std::size_t row_ndx)
 {
     std::size_t last_row_ndx = size() - 1; // Note that size() is slow
     bool is_last = row_ndx == last_row_ndx;
-    do_erase(row_ndx, is_last); // Throws
+    erase(row_ndx, is_last); // Throws
 }
 
 template<class T> inline void BasicColumn<T>::move_last_over(std::size_t row_ndx)
@@ -194,19 +194,19 @@ public:
 };
 
 template<class T>
-void BasicColumn<T>::do_erase(std::size_t ndx, bool is_last)
+void BasicColumn<T>::erase(std::size_t row_ndx, bool is_last)
 {
-    REALM_ASSERT_3(ndx, <, size());
-    REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
+    REALM_ASSERT_3(row_ndx, <, size());
+    REALM_ASSERT_3(is_last, ==, (row_ndx == size() - 1));
 
     if (!m_array->is_inner_bptree_node()) {
-        static_cast<BasicArray<T>*>(m_array.get())->erase(ndx); // Throws
+        static_cast<BasicArray<T>*>(m_array.get())->erase(row_ndx); // Throws
         return;
     }
 
-    std::size_t ndx_2 = is_last ? npos : ndx;
+    size_t row_ndx_2 = is_last ? npos : row_ndx;
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array.get(), ndx_2, erase_leaf_elem); // Throws
+    Array::erase_bptree_elem(m_array.get(), row_ndx_2, erase_leaf_elem); // Throws
 }
 
 
@@ -303,23 +303,41 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
 
 // Implementing pure virtual method of ColumnBase.
 template<class T>
-inline void BasicColumn<T>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+inline void BasicColumn<T>::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
+                                        size_t prior_num_rows)
 {
-    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
-    T value = T();
-    do_insert(row_ndx_2, value, num_rows); // Throws
-}
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx <= prior_num_rows);
 
-// Implementing pure virtual method of ColumnBase.
-template<class T> inline void BasicColumn<T>::erase(std::size_t row_ndx, bool is_last)
-{
-    do_erase(row_ndx, is_last); // Throws
+    size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
+    T value = T();
+    do_insert(row_ndx_2, value, num_rows_to_insert); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
 template<class T>
-void BasicColumn<T>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+inline void BasicColumn<T>::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+                                       size_t prior_num_rows, bool)
 {
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
+    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+
+    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    for (size_t i = num_rows_to_erase; i > 0; --i) {
+        size_t row_ndx_2 = row_ndx + i - 1;
+        erase(row_ndx_2, is_last); // Throws
+    }
+}
+
+// Implementing pure virtual method of ColumnBase.
+template<class T>
+void BasicColumn<T>::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
+{
+    REALM_ASSERT_DEBUG(prior_num_rows == size());
+    REALM_ASSERT(row_ndx < prior_num_rows);
+
+    size_t last_row_ndx = prior_num_rows - 1;
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
@@ -478,7 +496,7 @@ std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t e
 }
 
 template<class T>
-void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::size_t end) const
+void BasicColumn<T>::find_all(IntegerColumn &result, T value, std::size_t begin, std::size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));

@@ -137,7 +137,7 @@ typedef bool (*CallbackDummy)(int64_t);
 template <class T, bool Nullable> struct ColumnTypeTraits;
 
 template <bool Nullable> struct ColumnTypeTraits<int64_t, Nullable> {
-    using column_type = TColumn<int64_t, Nullable>;
+    using column_type = Column<int64_t, Nullable>;
     using leaf_type = typename column_type::LeafType;
     using sum_type = int64_t;
     static const DataType id = type_Int;
@@ -150,14 +150,14 @@ template <bool Nullable> struct ColumnTypeTraits<bool, Nullable>:
 };
 
 template <bool N> struct ColumnTypeTraits<float, N> {
-    using column_type = ColumnFloat;
+    using column_type = FloatColumn;
     using leaf_type = ArrayFloat;
     using sum_type = double;
     static const DataType id = type_Float;
 };
 
 template <bool N> struct ColumnTypeTraits<double, N> {
-    using column_type = ColumnDouble;
+    using column_type = DoubleColumn;
     using leaf_type = ArrayDouble;
     using sum_type = double;
     static const DataType id = type_Double;
@@ -170,26 +170,26 @@ template <bool N> struct ColumnTypeTraits<DateTime, N>:
 };
 
 template <bool N> struct ColumnTypeTraits<StringData, N> {
-    using column_type = ColumnStringEnum;
-    using leaf_type = ColumnStringEnum::LeafType;
+    using column_type = StringEnumColumn;
+    using leaf_type = StringEnumColumn::LeafType;
     using sum_type = int64_t;
     static const DataType id = type_String;
 };
 
 template <DataType, bool Nullable> struct GetColumnType;
 template <> struct GetColumnType<type_Int, false> {
-    using type = Column;
+    using type = IntegerColumn;
 };
 template <> struct GetColumnType<type_Int, true> {
-    using type = ColumnIntNull;  
+    using type = IntNullColumn;
 };
 template <bool N> struct GetColumnType<type_Float, N> {
     // FIXME: Null definition
-    using type = ColumnFloat;  
+    using type = FloatColumn;  
 };
 template <bool N> struct GetColumnType<type_Double, N> {
     // FIXME: Null definition
-    using type = ColumnDouble;  
+    using type = DoubleColumn;
 };
 
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
@@ -366,7 +366,7 @@ public:
                                                         !std::is_same<TResult, double>::value)), "");
 
         TSourceValue av{};
-        // uses_val test because compiler cannot see that Column::get has no side effect and result is discarded
+        // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
             REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
@@ -423,8 +423,8 @@ public:
     size_t m_probes = 0;
     size_t m_matches = 0;
 protected:
-    typedef bool (ParentNode::* TColumn_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
-    TColumn_action_specialized m_column_action_specializer;
+    typedef bool (ParentNode::* Column_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
+    Column_action_specialized m_column_action_specializer;
     const Table* m_table;
     std::string error_code;
 
@@ -587,12 +587,12 @@ namespace _impl {
 
 template <class ColType> struct CostHeuristic;
 
-template <> struct CostHeuristic<Column> {
+template <> struct CostHeuristic<IntegerColumn> {
     static const double dD;
     static const double dT;
 };
 
-template <> struct CostHeuristic<ColumnIntNull> {
+template <> struct CostHeuristic<IntNullColumn> {
     static const double dD;
     static const double dT;
 };
@@ -635,7 +635,7 @@ protected:
         }
 
         bool b;
-        if (state->template uses_val<TAction>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded
+        if (state->template uses_val<TAction>())    { // Compiler cannot see that IntegerColumn::Get has no side effect and result is discarded
             TSourceValue av = source_column->get_next(i);
             b = state->template match<TAction, false>(i, 0, av);
         }
@@ -1051,7 +1051,7 @@ public:
     using TConditionValue = BinaryData;
     static const bool special_null_node = false;
 
-    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     BinaryNode(BinaryData v, size_t column)
     {
@@ -1078,7 +1078,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column = static_cast<const ColumnBinary*>(&get_column_base(table, m_condition_column_idx));
+        m_condition_column = static_cast<const BinaryColumn*>(&get_column_base(table, m_condition_column_idx));
         m_column_type = get_real_column_type(table, m_condition_column_idx);
 
         if (m_child)
@@ -1118,7 +1118,7 @@ protected:
 private:
     BinaryData m_value;
 protected:
-    const ColumnBinary* m_condition_column;
+    const BinaryColumn* m_condition_column;
     ColumnType m_column_type;
 };
 
@@ -1129,7 +1129,7 @@ public:
     static const bool special_null_node = true;
 
     template <Action TAction>
-    int64_t find_all(Column*, size_t, size_t, size_t, size_t)
+    int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1193,7 +1193,7 @@ protected:
 
     // Used for linear scan through short/long-string
     std::unique_ptr<const ArrayParent> m_leaf;
-    AdaptiveStringColumn::LeafType m_leaf_type;
+    StringColumn::LeafType m_leaf_type;
     size_t m_end_s;
     size_t m_leaf_start;
     size_t m_leaf_end;
@@ -1248,11 +1248,11 @@ public:
 
             if (m_column_type == col_type_StringEnum) {
                 // enum
-                t = static_cast<const ColumnStringEnum*>(m_condition_column)->get(s);
+                t = static_cast<const StringEnumColumn*>(m_condition_column)->get(s);
             }
             else {
                 // short or long
-                const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
+                const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
                 REALM_ASSERT_3(s, <, asc->size());
                 if (s >= m_end_s || s < m_leaf_start) {
                     // we exceeded current leaf's range
@@ -1261,17 +1261,17 @@ public:
                     m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
                     m_leaf_start = s - ndx_in_leaf;
 
-                    if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                    if (m_leaf_type == StringColumn::leaf_type_Small)
                         m_end_s = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
-                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                    else if (m_leaf_type ==  StringColumn::leaf_type_Medium)
                         m_end_s = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
                     else
                         m_end_s = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
                 }
 
-                if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                if (m_leaf_type == StringColumn::leaf_type_Small)
                     t = static_cast<const ArrayString&>(*m_leaf).get(s - m_leaf_start);
-                else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                else if (m_leaf_type ==  StringColumn::leaf_type_Medium)
                     t = static_cast<const ArrayStringLong&>(*m_leaf).get(s - m_leaf_start);
                 else
                     t = static_cast<const ArrayBigBlobs&>(*m_leaf).get_string(s - m_leaf_start);
@@ -1339,7 +1339,7 @@ public:
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
-            m_key_ndx = static_cast<const ColumnStringEnum*>(m_condition_column)->GetKeyNdx(m_value);
+            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->GetKeyNdx(m_value);
         }
         else if (m_condition_column->has_search_index()) {
             m_dT = 0.0;
@@ -1354,10 +1354,10 @@ public:
             size_t index_ref;
 
             if (m_column_type == col_type_StringEnum) {
-                fr = static_cast<const ColumnStringEnum*>(m_condition_column)->find_all_indexref(m_value, index_ref);
+                fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
             }
             else {
-                fr = static_cast<const AdaptiveStringColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
+                fr = static_cast<const StringColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
             }
 
             m_index_matches_destroy = false;
@@ -1366,7 +1366,7 @@ public:
 
             switch (fr) {
                 case FindRes_single:
-                    m_index_matches.reset(new Column(Column::unattached_root_tag(), Allocator::get_default())); // Throws
+                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
                     m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
                     m_index_matches->add(index_ref);
                     m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
@@ -1375,7 +1375,7 @@ public:
                 case FindRes_column:
                     // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
                     // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-                    m_index_matches.reset(new Column(Column::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
+                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
                     m_index_matches->get_root_array()->init_from_ref(index_ref);
                     break;
 
@@ -1387,14 +1387,14 @@ public:
             }
 
             if (m_index_matches) {
-                m_index_getter.reset(new SequentialGetter<Column>(m_index_matches.get()));
+                m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
                 m_index_size = m_index_getter->m_column->size();
             }
 
         }
         else if (m_column_type != col_type_String) {
-            REALM_ASSERT_DEBUG(dynamic_cast<const ColumnStringEnum*>(m_condition_column));
-            m_cse.init(static_cast<const ColumnStringEnum*>(m_condition_column));
+            REALM_ASSERT_DEBUG(dynamic_cast<const StringEnumColumn*>(m_condition_column));
+            m_cse.init(static_cast<const StringEnumColumn*>(m_condition_column));
         }
 
         if (m_child)
@@ -1418,7 +1418,7 @@ public:
 
             while (f == not_found && m_last_indexed < m_index_size) {
                 m_index_getter->cache_next(m_last_indexed);
-                f = m_index_getter->m_leaf_ptr->FindGTE(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
+                f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
 
                 if (f >= end || f == not_found) {
                     m_last_indexed = m_index_getter->m_leaf_end;
@@ -1455,15 +1455,15 @@ public:
 
         // Normal string column, with long or short leaf
         for (size_t s = start; s < end; ++s) {
-            const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
+            const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
             if (s >= m_leaf_end || s < m_leaf_start) {
                 clear_leaf_state();
                 std::size_t ndx_in_leaf;
                 m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
                 m_leaf_start = s - ndx_in_leaf;
-                if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                if (m_leaf_type == StringColumn::leaf_type_Small)
                     m_leaf_end = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
-                else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                else if (m_leaf_type ==  StringColumn::leaf_type_Medium)
                     m_leaf_end = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
                 else
                     m_leaf_end = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
@@ -1471,9 +1471,9 @@ public:
             }
             size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
-            if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+            if (m_leaf_type == StringColumn::leaf_type_Small)
                 s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-            else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+            else if (m_leaf_type ==  StringColumn::leaf_type_Medium)
                 s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
             else
                 s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
@@ -1508,12 +1508,12 @@ private:
     size_t m_last_indexed;
 
     // Used for linear scan through enum-string
-    SequentialGetter<ColumnStringEnum> m_cse;
+    SequentialGetter<StringEnumColumn> m_cse;
 
     // Used for index lookup
-    std::unique_ptr<Column> m_index_matches;
+    std::unique_ptr<IntegerColumn> m_index_matches;
     bool m_index_matches_destroy = false;
-    std::unique_ptr<SequentialGetter<Column>> m_index_getter;
+    std::unique_ptr<SequentialGetter<IntegerColumn>> m_index_getter;
     size_t m_index_size;
     size_t m_last_start;
 };
@@ -1527,7 +1527,7 @@ private:
 // also set to next AND condition (if any exists) following the OR.
 class OrNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(Column*, size_t, size_t, size_t, size_t)
+    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1649,7 +1649,7 @@ private:
 
 class NotNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(Column*, size_t, size_t, size_t, size_t)
+    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1743,7 +1743,7 @@ template <class ColType, class TConditionFunction> class TwoColumnsNode: public 
 public:
     using TConditionValue = typename ColType::value_type;
 
-    template <Action TAction> int64_t find_all(Column* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     TwoColumnsNode(size_t column1, size_t column2)
     {
@@ -1842,7 +1842,7 @@ public:
 
 protected:
     BinaryData m_value;
-    const ColumnBinary* m_condition_column;
+    const BinaryColumn* m_condition_column;
     ColumnType m_column_type;
 
     size_t m_condition_column_idx1;
@@ -1922,13 +1922,13 @@ public:
         DataType type = m_table->get_column_type(m_origin_column);
 
         if (type == type_Link) {
-            ColumnLinkBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
-            ColumnLink& cl = static_cast<ColumnLink&>(clb);
-            ret = cl.find_first(m_target_row + 1, start, end); // ColumnLink stores link to row N as the integer N + 1
+            LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
+            LinkColumn& cl = static_cast<LinkColumn&>(clb);
+            ret = cl.find_first(m_target_row + 1, start, end); // LinkColumn stores link to row N as the integer N + 1
         }
         else if (type == type_LinkList) {
-            ColumnLinkBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
-            ColumnLinkList& cll = static_cast<ColumnLinkList&>(clb);
+            LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
+            LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
             for (size_t i = start; i < end; i++) {
                 LinkViewRef lv = cll.get(i);
                 ret = lv->find(m_target_row);

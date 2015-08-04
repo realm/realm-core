@@ -86,8 +86,8 @@ TEST_TYPES(StringIndex_IsEmpty, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
@@ -103,8 +103,8 @@ TEST_TYPES(StringIndex_BuildIndex, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -140,8 +140,8 @@ TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -156,13 +156,13 @@ TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
 
     // Delete all entries
     // (reverse order to avoid ref updates)
-    col.erase(6, 6 == col.size()-1);
-    col.erase(5, 5 == col.size()-1);
-    col.erase(4, 4 == col.size()-1);
-    col.erase(3, 3 == col.size()-1);
-    col.erase(2, 2 == col.size()-1);
-    col.erase(1, 1 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
+    col.erase(6);
+    col.erase(5);
+    col.erase(4);
+    col.erase(3);
+    col.erase(2);
+    col.erase(1);
+    col.erase(0);
 #ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
@@ -180,13 +180,13 @@ TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
 
     // Delete all entries
     // (in order to force constant ref updating)
-    col.erase(0, 0 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
+    col.erase(0);
+    col.erase(0);
+    col.erase(0);
+    col.erase(0);
+    col.erase(0);
+    col.erase(0);
+    col.erase(0);
 #ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #else
@@ -202,8 +202,8 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with random values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -215,7 +215,7 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     const StringIndex& ndx = *col.create_search_index();
 
     // Delete first item (in index)
-    col.erase(1, 1 == col.size()-1);
+    col.erase(1);
 
     CHECK_EQUAL(0, col.find_first(s1));
     CHECK_EQUAL(1, col.find_first(s3));
@@ -223,7 +223,7 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     CHECK_EQUAL(not_found, ndx.find_first(s2));
 
     // Delete last item (in index)
-    col.erase(2, 2 == col.size()-1);
+    col.erase(2);
 
     CHECK_EQUAL(0, col.find_first(s1));
     CHECK_EQUAL(1, col.find_first(s3));
@@ -231,7 +231,7 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     CHECK_EQUAL(not_found, col.find_first(s2));
 
     // Delete middle item (in index)
-    col.erase(1, 1 == col.size()-1);
+    col.erase(1);
 
     CHECK_EQUAL(0, col.find_first(s1));
     CHECK_EQUAL(not_found, col.find_first(s3));
@@ -239,8 +239,8 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     CHECK_EQUAL(not_found, col.find_first(s2));
 
     // Delete all items
-    col.erase(0, 0 == col.size()-1);
-    col.erase(0, 0 == col.size()-1);
+    col.erase(0);
+    col.erase(0);
 #ifdef REALM_DEBUG
     CHECK(ndx.is_empty());
 #endif
@@ -253,8 +253,8 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -272,7 +272,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
         matches.get_root_array()->init_from_ref(index_ref);
 
         CHECK_EQUAL(3, matches.size());
@@ -291,7 +291,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
         matches.get_root_array()->init_from_ref(index_ref);
 
         CHECK_EQUAL(3, matches.size());
@@ -310,7 +310,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        Column matches(Column::unattached_root_tag(), col.get_alloc());
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
         matches.get_root_array()->init_from_ref(index_ref);
 
         CHECK_EQUAL(2, matches.size());
@@ -326,8 +326,8 @@ TEST_TYPES(StringIndex_ClearEmpty, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
@@ -349,8 +349,8 @@ TEST_TYPES(StringIndex_Clear, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -403,8 +403,8 @@ TEST_TYPES(StringIndex_Insert, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with random values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -455,8 +455,8 @@ TEST_TYPES(StringIndex_Set, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with random values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -506,8 +506,8 @@ TEST_TYPES(StringIndex_Count, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with duplcate values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -544,8 +544,8 @@ TEST_TYPES(StringIndex_Distinct, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with duplcate values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -563,8 +563,8 @@ TEST_TYPES(StringIndex_Distinct, non_nullable, nullable)
 
     // Get view of unique values
     // (sorted in alphabetical order, each ref to first match)
-    ref_type results_ref = Column::create(Allocator::get_default());
-    Column results(Allocator::get_default(), results_ref);
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
     ndx.distinct(results);
 
     CHECK_EQUAL(4, results.size());
@@ -583,8 +583,8 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // Create a column with duplcate values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
 
     col.add(s1);
     col.add(s2);
@@ -610,7 +610,7 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
 
     FindRes res3 = ndx.find_all(s4, ref_2);
     CHECK_EQUAL(FindRes_column, res3);
-    const Column results(Allocator::get_default(), ref_type(ref_2));
+    const IntegerColumn results(Allocator::get_default(), ref_type(ref_2));
     CHECK_EQUAL(4, results.size());
     CHECK_EQUAL(6, results.get(0));
     CHECK_EQUAL(7, results.get(1));
@@ -625,8 +625,8 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
 TEST(StringIndex_FindAllNoCopy2_Int)
 {
     // Create a column with duplcate values
-    ref_type ref = Column::create(Allocator::get_default());
-    Column col(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn col(Allocator::get_default(), ref);
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
         col.add(ints[t]);
@@ -651,7 +651,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
-            const Column results2(Allocator::get_default(), ref_type(results));
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results));
             CHECK_EQUAL(real, results2.size());
             for (size_t y = 0; y < real; y++)
                 CHECK_EQUAL(ints[t], ints[results2.get(y)]);
@@ -665,8 +665,8 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 TEST(StringIndex_FindAllNoCopy2_IntNull)
 {
     // Create a column with duplcate values
-    ref_type ref = ColumnIntNull::create(Allocator::get_default());
-    ColumnIntNull col(Allocator::get_default(), ref);
+    ref_type ref = IntNullColumn::create(Allocator::get_default());
+    IntNullColumn col(Allocator::get_default(), ref);
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
         col.add(ints[t]);
@@ -692,7 +692,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
-            const Column results2(Allocator::get_default(), ref_type(results));
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results));
             CHECK_EQUAL(real, results2.size());
             for (size_t y = 0; y < real; y++)
                 CHECK_EQUAL(ints[t], ints[results2.get(y)]);
@@ -711,8 +711,8 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 TEST(StringIndex_Count_Int)
 {
     // Create a column with duplcate values
-    ref_type ref = Column::create(Allocator::get_default());
-    Column col(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn col(Allocator::get_default(), ref);
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
         col.add(ints[t]);
@@ -740,8 +740,8 @@ TEST(StringIndex_Count_Int)
 TEST(StringIndex_Distinct_Int)
 {
     // Create a column with duplcate values
-    ref_type ref = Column::create(Allocator::get_default());
-    Column col(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn col(Allocator::get_default(), ref);
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
         col.add(ints[t]);
@@ -752,8 +752,8 @@ TEST(StringIndex_Distinct_Int)
 
     StringIndex& ndx = *col.get_search_index();
 
-    ref_type results_ref = Column::create(Allocator::get_default());
-    Column results(Allocator::get_default(), results_ref);
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
 
     ndx.distinct(results);
 
@@ -772,8 +772,8 @@ TEST(StringIndex_Distinct_Int)
 
 TEST(StringIndex_Set_Add_Erase_Insert_Int)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column col(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn col(Allocator::get_default(), ref);
 
     col.add(1);
     col.add(2);
@@ -792,7 +792,7 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
     f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(3, f);
 
-    col.erase(1, false);
+    col.erase(1);
 
     f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(2, f);
@@ -825,8 +825,8 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
 
 TEST(StringIndex_FuzzyTest_Int)
 {
-    ref_type ref = Column::create(Allocator::get_default());
-    Column col(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn col(Allocator::get_default(), ref);
     Random random(random_int<unsigned long>());
     const size_t n = static_cast<size_t>(1.2 * REALM_MAX_BPNODE_SIZE);
 
@@ -875,8 +875,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // String index
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, nullable);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
     const StringIndex& ndx = *col.create_search_index();
 
     const size_t MAX_LENGTH = 16; // Test medium
@@ -915,8 +915,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     // String index
-    ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col2(Allocator::get_default(), ref2, nullable);
+    ref_type ref2 = StringColumn::create(Allocator::get_default());
+    StringColumn col2(Allocator::get_default(), ref2, nullable);
     const StringIndex& ndx2 = *col2.create_search_index();
 
 #if REALM_NULL_STRINGS == 1
@@ -941,8 +941,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
 
     // Integer index (uses String index internally)
     int64_t v = 1ULL << 41;
-    ref_type ref = Column::create(Allocator::get_default());
-    Column col(Allocator::get_default(), ref);
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn col(Allocator::get_default(), ref);
     col.create_search_index();
     col.add(1ULL << 40);
     StringIndex& ndx = *col.get_search_index();
@@ -957,8 +957,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
 TEST(StringIndex_Null)
 {
     // Create a column with string values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref, true);
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
 
     col.add("");
     col.add(realm::null());

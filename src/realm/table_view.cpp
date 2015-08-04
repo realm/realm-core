@@ -29,9 +29,9 @@
 
 using namespace realm;
 
-TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch, 
+TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
                              MutableSourcePayload mode)
-    : RowIndexes(src, mode), 
+    : RowIndexes(src, mode),
       m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
@@ -54,9 +54,9 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
     m_num_detached_refs = 0;
 }
 
-TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch, 
+TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
                              ConstSourcePayload mode)
-    : RowIndexes(src, mode), 
+    : RowIndexes(src, mode),
       m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
@@ -193,7 +193,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
     if (return_ndx)
         *return_ndx = 0;
-    
+
     if(function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
     else
@@ -235,88 +235,88 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     return res;
 }
 
-// sum 
+// sum
 
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0);
+    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0);
 }
 double TableViewBase::sum_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0);
 }
 
 // Maximum
 
 int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, 0.0, return_ndx);
 }
 double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, 0.0, return_ndx);
 }
 DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 
 // Minimum
 
 int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, 0.0, return_ndx);
 }
 double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, 0.0, return_ndx);
 }
 DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
 // Average
 
 double TableViewBase::average_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
+    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) 
+    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0)
         / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) 
+    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0)
         / static_cast<double>(num_attached_rows());
 }
 
 // Count
 size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
 {
-    return aggregate<act_Count, int64_t, size_t, Column>(nullptr, column_ndx, target);
+    return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_float(size_t column_ndx, float target) const
 {
-    return aggregate<act_Count, float, size_t, ColumnFloat>(nullptr, column_ndx, target);
+    return aggregate<act_Count, float, size_t, FloatColumn>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_double(size_t column_ndx, double target) const
 {
-    return aggregate<act_Count, double, size_t, ColumnDouble>(nullptr, column_ndx, target);
+    return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_ndx, target);
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
@@ -355,7 +355,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
 
     // Set limit=-1 to print all rows, otherwise only print to limit
     const size_t row_count = num_attached_rows();
-    const size_t out_count = (limit == size_t(-1)) 
+    const size_t out_count = (limit == size_t(-1))
         ? row_count
         : (row_count < limit) ? row_count : limit;
 
@@ -392,8 +392,6 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     REALM_ASSERT(real_ndx != detached_ref);
     m_table->to_string_row(real_ndx, out, widths);
 }
-
-#ifdef REALM_ENABLE_REPLICATION
 
 uint64_t TableViewBase::outside_version() const
 {
@@ -435,9 +433,6 @@ uint_fast64_t TableViewBase::sync_if_needed() const
     }
     return m_last_seen_version;
 }
-#else
-uint_fast64_t sync_if_needed() const { return 0; };
-#endif
 
 
 
@@ -452,7 +447,7 @@ void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
     std::size_t it = 0;
     for (;;) {
         it = m_row_indexes.find_first(row_ndx, it);
-        if (it == not_found) 
+        if (it == not_found)
             break;
         ++m_num_detached_refs;
         m_row_indexes.set(it, -1);
@@ -467,7 +462,7 @@ void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t 
     // kill any refs to the target row ndx
     for (;;) {
         it = m_row_indexes.find_first(to_row_ndx, it);
-        if (it == not_found) 
+        if (it == not_found)
             break;
         ++m_num_detached_refs;
         m_row_indexes.set(it, -1);
@@ -494,25 +489,21 @@ void TableView::remove(size_t ndx)
     REALM_ASSERT(m_table);
     REALM_ASSERT(ndx < m_row_indexes.size());
 
-#ifdef REALM_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == outside_version();
-#endif
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_row_indexes.get(ndx));
     m_table->remove(real_ndx);
 
-#ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
         m_last_seen_version = outside_version();
-#endif
 
     // Update refs
-    m_row_indexes.erase(ndx, ndx == size() - 1);
+    m_row_indexes.erase(ndx);
 
-    // Adjustment of row indexes greater than the removed index is done by 
+    // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
     // update of the table, so we don't need to do it here (it has already been done)
 }
@@ -522,12 +513,10 @@ void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
-#ifdef REALM_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == outside_version();
-#endif
 
     // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
-    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered 
+    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered
     // tables with no links - and then this test will break.
     bool is_ordered = true;
     for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
@@ -542,21 +531,17 @@ void TableView::clear()
     // for the row removals
     m_table->unregister_view(this);
 
-    if (is_ordered)
-        m_table->batch_remove(m_row_indexes);
-    else
-        m_table->batch_move_last_over(m_row_indexes);
+    bool is_move_last_over = !is_ordered;
+    m_table->batch_erase_rows(m_row_indexes, is_move_last_over);
 
     m_row_indexes.clear();
     m_num_detached_refs = 0;
     m_table->register_view(this);
 
-#ifdef REALM_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
         m_last_seen_version = outside_version();
-#endif
 }
 
 void TableViewBase::sync_distinct_view(size_t column)
@@ -574,7 +559,6 @@ void TableViewBase::sync_distinct_view(size_t column)
     }
 }
 
-#ifdef REALM_ENABLE_REPLICATION
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
@@ -600,11 +584,11 @@ void TableViewBase::re_sort()
 }
 
 
-void TableViewBase::do_sync() 
+void TableViewBase::do_sync()
 {
     // A TableView can be "born" from 4 different sources: LinkView, Table::get_distinct_view(),
     // Table::find_all() or Query. Here we sync with the respective source.
-    
+
     if (m_linkview_source) {
         m_row_indexes.clear();
         for (size_t t = 0; t < m_linkview_source->size(); t++)
@@ -615,7 +599,7 @@ void TableViewBase::do_sync()
     }
     // precondition: m_table is attached
     else if (!m_query.m_table) {
-        // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled 
+        // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled
         // because it doesn't take the search parameter in count. FIXME/Todo
         REALM_ASSERT(false);
         // no valid query
@@ -628,8 +612,8 @@ void TableViewBase::do_sync()
         if (m_row_indexes.is_attached())
             m_row_indexes.clear();
         else
-            m_row_indexes.init_from_ref(Allocator::get_default(), 
-                                        Column::create(Allocator::get_default()));
+            m_row_indexes.init_from_ref(Allocator::get_default(),
+                                        IntegerColumn::create(Allocator::get_default()));
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
@@ -644,4 +628,3 @@ void TableViewBase::do_sync()
 
     m_last_seen_version = outside_version();
 }
-#endif // REALM_ENABLE_REPLICATION

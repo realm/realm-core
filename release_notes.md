@@ -16,10 +16,16 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Renamed `Column` to `IntegerColumn` and `TColumn` to `Column`.
+* Renamed `AdaptiveStringColumn` to `StringColumn`.
+* Several column classes were renamed to follow the `XxxColumn` naming scheme
+  (e.g., `ColumnLink` to `LinkColumn`).
+* Removed conditional compilation of replication features.
+
 
 ----------------------------------------------
 
+<<<<<<< HEAD
 # 0.91.0 Release notes
 
 ### Bugfixes:
@@ -47,24 +53,84 @@
 ----------------------------------------------
 
 # 0.91.2 Release notes
+=======
+# 0.92.0 Release notes
+>>>>>>> 5597186c6c0ae3f08d9a316a7fda8fb78bb8a359
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* The upgraded file format version is written out to disk, eliminating potential
+  deadlocks.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Support for the following deprecated operations on Table has been removed:
+  insert_int, insert_string, etc., insert_done, and add_int. To insert a value,
+  one must now call insert_empty_row, then set the appropriate values for each
+  column.
+* Changed `LinkView::move` so that the `new_link_ndx` will be the index at which
+  the moved link can be found after the move is completed.
 
 ### Enhancements:
 
-* Added support for building for watchOS.
+* Support for ordered row removal in tables with links. This was done for
+  completeness, and because an ordered insertion in tables with links, when
+  reversed, becomes an ordered removal. Support for ordered insertion in tables
+  with links was added recently because the sync mechanism can produce
+  them. Also added a few missing pieces of support for ordered insertion in
+  tables with links.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Added static `Array::create_array()` for creating non-empty arrays, and extend
+  `Array::create()` such that it can create non-empty arrays.
+* The creation of the free-space arrays (`Group::m_free_positions`,
+  `Group::m_free_lengths`, `Group::m_free_versions`) is now always done by
+  `GroupWriter::write_group()`. Previously it was done in various places
+  (`Group::attach()`, `Group::commit()`, `Group::reset_free_space_versions()`).
+* `Group::reset_free_space_versions()` has been eliminated. These days the Realm
+  version is persisted across sessions, so there is no longer any cases where
+  version tracking on free-space chunks needs to be reset.
+* Free-space arrays (`Group::m_free_positions`, `Group::m_free_lengths`,
+  `Group::m_free_versions`) was moved to `GroupWriter`, as they are now only
+  needed during `GroupWriter::write_Group()`. This significantly reduces the
+  "shallow" memory footprint of `Group`.
+* Improved exception safety in `Group::attach()`.
+* `Group::commit()` now throws instead of aborting on an assertion if the group
+  accessor is detached or if it is used in transactional mode (via
+  `SharedGroup`).
+* Instruction encoding changed for `InsertEmptyRows` and `EraseRows` (also used
+  for `move_last_over()`). The third operand is now `prior_num_rows` (the number
+  of rows prior to modification) in all cases. Previously there was a serious
+  confusion about this.
+* Cleaned up the batch removal of rows used by `TableView`.
+* Optimize row removal by skipping cascade mechanism when table has no forward
+  link columns.
+* Virtual `ColumnBase::insert(row_ndx, num_rows, is_append)` was changed to
+  `ColumnBase::insert_rows(row_ndx, num_rows_to_insert,
+  prior_num_rows)`. Virtual `ColumnBase::erase(row_ndx, is_last)` was changed to
+  `ColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows)`. Virtual
+  `ColumnBase::move_last_over(row_ndx, last_row_ndx)` was changed to
+  `ColumnBase::move_last_row_over(row_ndx, prior_num_rows)`. Function names were
+  changed to avoid confusing similarity to the various non-virtual operations of
+  the same name on subclasses of `ColumnBase`. `prior_num_rows` is passed
+  because if carries more useful information than
+  `is_append`/`is_last`. `num_rows_to_erase` was added for consistency.
+* On some subclasses of `ColumnBase` a new non-virtual `erase(row_ndx, is_last)`
+  was added for practical reasons; an intended overload of `erase(row_ndx)` for
+  when you know whether the specified row index is the last one.
+* Slight performance improvements in `Array::FindGTE()`.
+* Renamed `Array::FindGTE()` to `Array::find_gte()`.
+
+----------------------------------------------
+
+# 0.91.2 Release notes
+
+### Enhancements:
+
+* Added support for building for watchOS.
 
 ----------------------------------------------
 

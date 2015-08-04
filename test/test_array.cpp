@@ -54,8 +54,8 @@ void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
 {
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     for (size_t i = 0; i < reps - 1; ++i)
         a.add(value);
@@ -300,7 +300,7 @@ TEST(Array_General)
 
 /*
     // Create index
-    Column index;
+    IntegerColumn index;
     c.BuildIndex(index);
 
     CHECK_EQUAL(0, c.FindWithIndex(256));
@@ -592,8 +592,8 @@ TEST(Array_FindAllInt0)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int value = 0;
     const int vReps = 5;
@@ -623,8 +623,8 @@ TEST(Array_FindAllInt1)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int value = 1;
     const int vReps = 5;
@@ -657,8 +657,8 @@ TEST(Array_FindAllInt2)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int value = 3;
     const int vReps = 5;
@@ -691,8 +691,8 @@ TEST(Array_FindAllInt3)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int value = 10;
     const int vReps = 5;
@@ -725,8 +725,8 @@ TEST(Array_FindAllInt4)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int value = 20;
     const int vReps = 5;
@@ -760,8 +760,8 @@ TEST(Array_FindAllInt5)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int value = 303;
     const int vReps = 5;
@@ -795,8 +795,8 @@ TEST(Array_FindAllInt6)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int value = 70000;
     const int vReps = 5;
@@ -830,8 +830,8 @@ TEST(Array_FindAllInt7)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = Column::create(Allocator::get_default());
-    Column r(Allocator::get_default(), column_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn r(Allocator::get_default(), column_ref);
 
     const int64_t value = 4300000003ULL;
     const int vReps = 5;
@@ -1422,6 +1422,126 @@ TEST(Array_Count)
 
     // Clean-up
     a.destroy();
+}
+
+TEST(Array_FindGTE_NoIndirection)
+{
+    // Zeroes only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+
+        CHECK_EQUAL(c.find_gte(1, 0, nullptr), not_found);
+        CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
+        CHECK_EQUAL(c.find_gte(0, 5, nullptr), 5);
+
+        c.destroy();
+    }
+
+    // Booleans only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(1);
+        c.add(1);
+
+        CHECK_EQUAL(c.find_gte(2, 0, nullptr), not_found);
+        CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
+        CHECK_EQUAL(c.find_gte(0, 2, nullptr), 2);
+        CHECK_EQUAL(c.find_gte(1, 0, nullptr), 2);
+        CHECK_EQUAL(c.find_gte(1, 3, nullptr), 3);
+
+        c.destroy();
+    }
+
+    // Random values
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(-10293);
+        c.add(0);
+        c.add(1);
+        c.add(11111);
+        c.add(2819283);
+
+        CHECK_EQUAL(c.find_gte(3333333, 0, nullptr), not_found);
+        CHECK_EQUAL(c.find_gte(10, 1, nullptr), 3);
+        CHECK_EQUAL(c.find_gte(-20000, 0, nullptr), 0);
+        CHECK_EQUAL(c.find_gte(-20000, 3, nullptr), 3);
+
+        c.destroy();
+    }
+}
+
+TEST(Array_FindGTE_WithIndirection)
+{
+    Array lut(Allocator::get_default());
+    lut.create(Array::type_Normal);
+
+    // This indirection needs to result in a sorted Array c (below).
+    lut.add(4);
+    lut.add(2);
+    lut.add(0);
+    lut.add(5);
+    lut.add(3);
+    lut.add(1);
+    lut.add(10000);
+
+    // Zeroes only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+        c.add(0);
+
+        CHECK_EQUAL(c.find_gte(1, 0, &lut), not_found);
+        CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found); // array only has 5 entries, lut has 6.
+        CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
+        CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
+
+        c.destroy();
+    }
+
+    // Booleans only
+    {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+
+        // No need to be sorted, the lookup table does the sorting for us
+        c.add(0);
+        c.add(1);
+        c.add(0);
+        c.add(1);
+        c.add(0);
+        c.add(1);
+
+        CHECK_EQUAL(c.find_gte(3, 0, &lut), not_found);
+        CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found);
+        CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
+        CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
+
+        c.destroy();
+    }
+
+    lut.destroy();
 }
 
 #endif // TEST_ARRAY

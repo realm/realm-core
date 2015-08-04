@@ -19,10 +19,8 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string_long.hpp>
 #include <realm/lang_bind_helper.hpp>
-#ifdef REALM_ENABLE_REPLICATION
-#  include <realm/replication.hpp>
-#  include <realm/commit_log.hpp>
-#endif
+#include <realm/replication.hpp>
+#include <realm/commit_log.hpp>
 
 #include "../test.hpp"
 #include "../util/demangle.hpp"

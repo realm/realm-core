@@ -41,8 +41,8 @@ using namespace realm;
 TEST(ColumnBasic_LowerUpperBound)
 {
     // Create column with sorted members
-    ref_type ref = BasicColumn<int>::create(Allocator::get_default());
-    BasicColumn<int> col(Allocator::get_default(), ref);
+    ref_type ref = BasicColumn<int64_t>::create(Allocator::get_default());
+    BasicColumn<int64_t> col(Allocator::get_default(), ref);
 
     col.add(5);
     for (int i = 5; i < 100; i += 5)
@@ -74,6 +74,27 @@ TEST(ColumnBasic_LowerUpperBound)
 
     // Clean up
     col.destroy();
+}
+
+TEST(ColumnBasic_NullOperations)
+{
+    ref_type ref = BasicColumn<int64_t>::create(Allocator::get_default());
+    BasicColumn<int64_t> c(Allocator::get_default(), ref);
+
+    CHECK(!c.is_nullable());
+    CHECK(!c.is_null(0));
+
+    c.destroy();
+}
+
+TEST(ColumnBasic_NullErrorHandling)
+{
+    ref_type ref = BasicColumn<int64_t>::create(Allocator::get_default());
+    BasicColumn<int64_t> c(Allocator::get_default(), ref);
+
+    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
+
+    c.destroy();
 }
 
 #endif // TEST_COLUMN_BASIC

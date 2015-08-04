@@ -3,10 +3,10 @@
 namespace realm {
 namespace _impl {
 
-const double CostHeuristic<Column>::dD = 100.0;
-const double CostHeuristic<Column>::dT = 1.0 / 4.0;
-const double CostHeuristic<ColumnIntNull>::dD = 100.0;
-const double CostHeuristic<ColumnIntNull>::dT = 1.0 / 4.0;
+const double CostHeuristic<IntegerColumn>::dD = 100.0;
+const double CostHeuristic<IntegerColumn>::dT = 1.0 / 4.0;
+const double CostHeuristic<IntNullColumn>::dD = 100.0;
+const double CostHeuristic<IntNullColumn>::dT = 1.0 / 4.0;
 
 }
 }
@@ -43,13 +43,13 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
     static_cast<void>(nullable);
 
     if (TAction == act_ReturnFirst)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, Column>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
 
     else if (TAction == act_Count)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Count, Column>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Count, IntegerColumn>;
 
     else if (TAction == act_Sum && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, Column>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, IntegerColumn>;
 
     else if (TAction == act_Sum && col_id == type_Float)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<float>>;
@@ -57,24 +57,24 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<double>>;
 
     else if (TAction == act_Max && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, Column>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, IntegerColumn>;
     else if (TAction == act_Max && col_id == type_Float)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<float>>;
     else if (TAction == act_Max && col_id == type_Double)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<double>>;
 
     else if (TAction == act_Min && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, Column>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, IntegerColumn>;
     else if (TAction == act_Min && col_id == type_Float)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<float>>;
     else if (TAction == act_Min && col_id == type_Double)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<double>>;
 
     else if (TAction == act_FindAll)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, Column>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
 
     else if (TAction == act_CallbackIdx)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, Column>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, IntegerColumn>;
 
     else {
         REALM_ASSERT(false);

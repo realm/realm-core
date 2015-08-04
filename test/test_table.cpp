@@ -316,20 +316,6 @@ TEST(Table_StringOrBinaryTooBig)
     table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
     table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
     table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
-
-    CHECK_LOGIC_ERROR(table.insert_string(0, 1, StringData(large_buf.get(), large_str_size)),
-                      LogicError::string_too_big);
-    table.insert_string(0, 0, StringData(large_buf.get(), large_str_size - 1));
-    CHECK_LOGIC_ERROR(table.insert_binary(1, 1, BinaryData(large_buf.get(), large_bin_size)),
-                      LogicError::binary_too_big);
-    table.insert_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
-    CHECK_LOGIC_ERROR(table.insert_mixed(2, 1, Mixed(StringData(large_buf.get(), large_str_size))),
-                      LogicError::string_too_big);
-    table.insert_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
-    CHECK_LOGIC_ERROR(table.insert_mixed(3, 1, Mixed(BinaryData(large_buf.get(), large_bin_size))),
-                      LogicError::binary_too_big);
-    table.insert_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
-    table.insert_done();
 }
 
 
@@ -418,11 +404,6 @@ TEST(Table_3)
     CHECK_EQUAL(size_t(-1), table.column().third.find_first(false));
     CHECK_EQUAL(size_t(0) , table.column().fourth.find_first(Wed));
     CHECK_EQUAL(size_t(-1), table.column().fourth.find_first(Mon));
-
-    // Test column incrementing
-    table.column().first += 3;
-    CHECK_EQUAL(3, table[0].first);
-    CHECK_EQUAL(3, table[99].first);
 
 #ifdef REALM_DEBUG
     table.Verify();
@@ -587,7 +568,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         table.add_column(type_String,   "string");           //  5
         table.add_column(type_String,   "string_long");      //  6
         table.add_column(type_String,   "string_big_blobs"); //  7
-        table.add_column(type_String,   "string_enum");      //  8 - becomes ColumnStringEnum
+        table.add_column(type_String,   "string_enum");      //  8 - becomes StringEnumColumn
         table.add_column(type_Binary,   "binary");           //  9
         table.add_column(type_Table,    "tables", &sub1);    // 10
         table.add_column(type_Mixed,    "mixed");            // 11
@@ -601,7 +582,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_int(0, i, int64_t(i*sign));
-        
+
         if (i % 4 == 0) {
             table.set_null(12, i);
         }
@@ -669,9 +650,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         for (size_t j = 0; j != n; ++j) {
             TableRef subtable = table.get_subtable(10, i);
             int64_t val = -123+i*j*1234*sign;
-            subtable->insert_int(0, j, val);
-            subtable->insert_string(1, j, "sub");
-            subtable->insert_done();
+            subtable->insert_empty_row(j);
+            subtable->set_int(0, j, val);
+            subtable->set_string(1, j, "sub");
         }
     }
     for (size_t i = 0; i < rows; ++i) {
@@ -701,9 +682,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
                 subtable->add_column(type_Int,    "first");
                 subtable->add_column(type_String, "second");
                 for (size_t j = 0; j != 2; ++j) {
-                    subtable->insert_int(0, j, i*i*j*sign);
-                    subtable->insert_string(1, j, "mixed sub");
-                    subtable->insert_done();
+                    subtable->insert_empty_row(j);
+                    subtable->set_int(0, j, i*i*j*sign);
+                    subtable->set_string(1, j, "mixed sub");
                 }
                 break;
             }
@@ -716,7 +697,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         }
     }
 
-    // We also want a ColumnStringEnum
+    // We also want a StringEnumColumn
     table.optimize();
 }
 
@@ -1459,8 +1440,8 @@ TEST(Table_PrimaryKeyBasics)
     // Table::insert_string() throw.
 //    CHECK_LOGIC_ERROR(table.insert_string(0, 2, "foo"), LogicError::unique_constraint_violation);
     table.Verify();
-    table.insert_string(0, 2, "bar");
-    table.insert_done();
+    table.insert_empty_row(2);
+    table.set_string(0, 2, "bar");
     table.Verify();
     table.add_empty_row();
     table.Verify();
@@ -2114,10 +2095,9 @@ TEST(Table_Spec)
     CHECK_EQUAL(3, table->get_column_count());
 
     // Add a row
-    table->insert_int(0, 0, 4);
-    table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
 
     CHECK_EQUAL(0, table->get_subtable_size(2, 0));
 
@@ -2126,9 +2106,9 @@ TEST(Table_Spec)
         TableRef subtable = table->get_subtable(2, 0);
         CHECK(subtable->is_empty());
 
-        subtable->insert_int(0, 0, 42);
-        subtable->insert_string(1, 0, "test");
-        subtable->insert_done();
+        subtable->insert_empty_row(0);
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "test");
 
         CHECK_EQUAL(42,     subtable->get_int(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
@@ -2182,19 +2162,18 @@ TEST(Table_SpecColumnPath)
     table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Add a row
-    table->insert_int(0, 0, 4);
-    table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
 
     // Get the sub-table
     {
         TableRef subtable = table->get_subtable(2, 0);
         CHECK(subtable->is_empty());
 
-        subtable->insert_int(0, 0, 42);
-        subtable->insert_string(1, 0, "test");
-        subtable->insert_done();
+        subtable->insert_empty_row(0);
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "test");
 
         CHECK_EQUAL(42,     subtable->get_int(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
@@ -2219,19 +2198,18 @@ TEST(Table_SpecRenameColumns)
     table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Add a row
-    table->insert_int(0, 0, 4);
-    table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
 
     // Get the sub-table
     {
         TableRef subtable = table->get_subtable(2, 0);
         CHECK(subtable->is_empty());
 
-        subtable->insert_int(0, 0, 42);
-        subtable->insert_string(1, 0, "test");
-        subtable->insert_done();
+        subtable->insert_empty_row(0);
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "test");
 
         CHECK_EQUAL(42,     subtable->get_int(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
@@ -2275,23 +2253,20 @@ TEST(Table_SpecDeleteColumns)
     CHECK_EQUAL(4, table->get_column_count());
 
     // Add a few rows
-    table->insert_int(0, 0, 4);
-    table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);
-    table->insert_string(3, 0, "X");
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
+    table->set_string(3, 0, "X");
 
-    table->insert_int(0, 1, 4);
-    table->insert_string(1, 1, "World");
-    table->insert_subtable(2, 1);
-    table->insert_string(3, 1, "X");
-    table->insert_done();
+    table->insert_empty_row(1);
+    table->set_int(0, 1, 4);
+    table->set_string(1, 1, "World");
+    table->set_string(3, 1, "X");
 
-    table->insert_int(0, 2, 4);
-    table->insert_string(1, 2, "Goodbye");
-    table->insert_subtable(2, 2);
-    table->insert_string(3, 2, "X");
-    table->insert_done();
+    table->insert_empty_row(2);
+    table->set_int(0, 2, 4);
+    table->set_string(1, 2, "Goodbye");
+    table->set_string(3, 2, "X");
 
     // We want the last column to be StringEnum column
     table->optimize();
@@ -2303,9 +2278,9 @@ TEST(Table_SpecDeleteColumns)
         TableRef subtable = table->get_subtable(2, 0);
         CHECK(subtable->is_empty());
 
-        subtable->insert_int(0, 0, 42);
-        subtable->insert_string(1, 0, "test");
-        subtable->insert_done();
+        subtable->insert_empty_row(0);
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "test");
 
         CHECK_EQUAL(42,     subtable->get_int(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
@@ -2375,8 +2350,8 @@ TEST(Table_NullInEnum)
     table->add_column(type_String, "second", true);
 
     for (size_t c = 0; c < 100; c++) {
-        table->insert_string(0, c, "hello");
-        table->insert_done();
+        table->insert_empty_row(c);
+        table->set_string(0, c, "hello");
     }
 
     size_t r;
@@ -2440,10 +2415,9 @@ TEST(Table_SpecAddColumns)
     CHECK_EQUAL(3, table->get_column_count());
 
     // Add a row
-    table->insert_int(0, 0, 4);
-    table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
 
     CHECK_EQUAL(0, table->get_subtable_size(2, 0));
 
@@ -2452,9 +2426,9 @@ TEST(Table_SpecAddColumns)
         TableRef subtable = table->get_subtable(2, 0);
         CHECK(subtable->is_empty());
 
-        subtable->insert_int(0, 0, 42);
-        subtable->insert_string(1, 0, "test");
-        subtable->insert_done();
+        subtable->insert_empty_row(0);
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "test");
 
         CHECK_EQUAL(42,     subtable->get_int(0, 0));
         CHECK_EQUAL("test", subtable->get_string(1, 0));
@@ -2538,10 +2512,10 @@ TEST(Table_SpecAddColumns)
     table->set_mixed(7, 0, Mixed::subtable_tag());
     TableRef stab = table->get_subtable(7, 0);
     stab->add_column(type_Int, "smurf");
-    stab->insert_int(0, 0, 1);
-    stab->insert_done();
-    stab->insert_int(0, 1, 2);
-    stab->insert_done();
+    stab->insert_empty_row(0);
+    stab->set_int(0, 0, 1);
+    stab->insert_empty_row(1);
+    stab->set_int(0, 1, 2);
     CHECK_EQUAL(2, table->get_subtable_size(7, 0));
 
 #ifdef REALM_DEBUG
@@ -2640,9 +2614,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
 
-    table.insert_int(0, 1, 43);
-    table.insert_mixed(1, 1, (int64_t)12);
-    table.insert_done();
+    table.insert_empty_row(1);
+    table.set_int(0, 1, 43);
+    table.set_mixed(1, 1, (int64_t)12);
 
     CHECK_EQUAL(0,  table.get_int(0, ndx));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -2651,9 +2625,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,   table.get_mixed(1, 1).get_int());
 
-    table.insert_int(0, 2, 100);
-    table.insert_mixed(1, 2, "test");
-    table.insert_done();
+    table.insert_empty_row(2);
+    table.set_int(0, 2, 100);
+    table.set_mixed(1, 2, "test");
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -2664,9 +2638,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
 
-    table.insert_int(0, 3, 0);
-    table.insert_mixed(1, 3, DateTime(324234));
-    table.insert_done();
+    table.insert_empty_row(3);
+    table.set_int(0, 3, 0);
+    table.set_mixed(1, 3, DateTime(324234));
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -2680,9 +2654,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
 
-    table.insert_int(0, 4, 43);
-    table.insert_mixed(1, 4, Mixed(BinaryData("binary", 7)));
-    table.insert_done();
+    table.insert_empty_row(4);
+    table.set_int(0, 4, 43);
+    table.set_mixed(1, 4, Mixed(BinaryData("binary", 7)));
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -2700,9 +2674,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
-    table.insert_int(0, 5, 0);
-    table.insert_mixed(1, 5, Mixed::subtable_tag());
-    table.insert_done();
+    table.insert_empty_row(5);
+    table.set_int(0, 5, 0);
+    table.set_mixed(1, 5, Mixed::subtable_tag());
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -2727,9 +2701,9 @@ TEST(Table_Mixed)
     subtable->add_column(type_String, "name");
     subtable->add_column(type_Int,    "age");
 
-    subtable->insert_string(0, 0, "John");
-    subtable->insert_int(1, 0, 40);
-    subtable->insert_done();
+    subtable->insert_empty_row(0);
+    subtable->set_string(0, 0, "John");
+    subtable->set_int(1, 0, 40);
 
     // Get same table again and verify values
     TableRef subtable2 = table.get_subtable(1, 5);
@@ -2738,12 +2712,12 @@ TEST(Table_Mixed)
     CHECK_EQUAL(40, subtable2->get_int(1, 0));
 
     // Insert float, double
-    table.insert_int(0, 6, 31);
-    table.insert_mixed(1, 6, float(1.123));
-    table.insert_done();
-    table.insert_int(0, 7, 0);
-    table.insert_mixed(1, 7, double(2.234));
-    table.insert_done();
+    table.insert_empty_row(6);
+    table.set_int(0, 6, 31);
+    table.set_mixed(1, 6, float(1.123));
+    table.insert_empty_row(7);
+    table.set_int(0, 7, 0);
+    table.set_mixed(1, 7, double(2.234));
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -2809,13 +2783,10 @@ TEST(Table_SubtableSizeAndClear)
     table.add_column(type_Mixed, "mixed");
     subdesc->add_column(type_Int,  "int");
 
-    table.insert_subtable(0,0);
-    table.insert_mixed(1, 0, false);
-    table.insert_done();
-
-    table.insert_subtable(0,1);
-    table.insert_mixed(1, 1, Mixed::subtable_tag());
-    table.insert_done();
+    table.insert_empty_row(0);
+    table.insert_empty_row(1);
+    Table subtable;
+    table.set_mixed_subtable(1, 1, &subtable);
 
     CHECK_EQUAL(0, table.get_subtable_size(0,0)); // Subtable column
     CHECK_EQUAL(0, table.get_subtable_size(1,0)); // Mixed column, bool value
@@ -2837,11 +2808,8 @@ TEST(Table_SubtableSizeAndClear)
     CHECK_EQUAL(0, table.get_subtable_size(1,0));
     CHECK(table.get_subtable(1,0));
 
-    subtab1->insert_int(0,0,0);
-    subtab1->insert_done();
-
-    subtab2->insert_int(0,0,0);
-    subtab2->insert_done();
+    subtab1->insert_empty_row(0);
+    subtab2->insert_empty_row(0);
 
     CHECK_EQUAL(1, table.get_subtable_size(0,0));
     CHECK_EQUAL(1, table.get_subtable_size(1,0));
@@ -3181,9 +3149,8 @@ TEST(Table_ClearWithSubtableAndGroup)
     CHECK_EQUAL(2, table->get_column_count());
 
     // Add a row
-    table->insert_string(0, 0, "Foo");
-    table->insert_subtable(1, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_string(0, 0, "Foo");
 
     CHECK_EQUAL(0, table->get_subtable_size(1, 0));
 
@@ -3192,8 +3159,8 @@ TEST(Table_ClearWithSubtableAndGroup)
         TableRef subtable = table->get_subtable(1, 0);
         CHECK(subtable->is_empty());
 
-        subtable->insert_int(0, 0, 123);
-        subtable->insert_done();
+        subtable->insert_empty_row(0);
+        subtable->set_int(0, 0, 123);
 
         CHECK_EQUAL(123, subtable->get_int(0, 0));
     }
@@ -3224,10 +3191,9 @@ TEST(Table_SetSubTableByExample1)
     table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Add a row
-    table->insert_int(0, 0, 4);
-    table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
 
     // create a freestanding table to be used as a source by set_subtable
 
@@ -3278,15 +3244,13 @@ TEST(Table_SetSubTableByExample2)
     table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Add two rows
-    table->insert_int(0, 0, 4);
-    table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);// create a freestanding table to be used as a source by set_subtable
-    table->insert_done();
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
 
-    table->insert_int(0, 1, 8);
-    table->insert_string(1, 1, "Hi!, Hello?");
-    table->insert_subtable(2, 1);
-    table->insert_done();
+    table->insert_empty_row(1);
+    table->set_int(0, 1, 8);
+    table->set_string(1, 1, "Hi!, Hello?");
 
     Table  sub = Table();
     sub.add_column(type_Int,"sub_first");
@@ -3436,10 +3400,10 @@ TEST(Table_LanguageBindings)
    CHECK(table->is_attached());
 
    table->add_column(type_Int, "i");
-   table->insert_int(0, 0, 10);
-   table->insert_done();
-   table->insert_int(0, 1, 12);
-   table->insert_done();
+   table->insert_empty_row(0);
+   table->set_int(0, 0, 10);
+   table->insert_empty_row(1);
+   table->set_int(0, 1, 12);
 
    Table* table2 = LangBindHelper::copy_table(*table);
    CHECK(table2->is_attached());

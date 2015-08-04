@@ -37,11 +37,7 @@ bool Version::has_feature(Feature feature)
 #endif
 
         case feature_Replication:
-#ifdef REALM_ENABLE_REPLICATION
             return true;
-#else
-            return false;
-#endif
     }
     return false;
 }

@@ -187,8 +187,6 @@ public:
               DurabilityLevel = durability_Full,
               const char* encryption_key = 0);
 
-#ifdef REALM_ENABLE_REPLICATION
-
     /// Equivalent to calling `open(repl, durability, encryption_key)` on a
     /// default constructed instance.
     explicit SharedGroup(Replication& repl,
@@ -200,8 +198,6 @@ public:
     /// SharedGroup.
     void open(Replication&, DurabilityLevel = durability_Full,
               const char* encryption_key = 0);
-
-#endif
 
     /// A SharedGroup may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
@@ -280,7 +276,7 @@ public:
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
-    typedef uint_fast64_t version_type;
+    using version_type = uint_fast64_t;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -583,8 +579,6 @@ private:
 
     void upgrade_file_format();
 
-#ifdef REALM_ENABLE_REPLICATION
-
     //@{
     /// See LangBindHelper.
     template<class O> void advance_read(History&, O* observer, VersionID);
@@ -596,8 +590,6 @@ private:
     // Advance the readlock to the given version and return the transaction logs
     // between the old version and the given version, or nullptr if none.
     std::unique_ptr<BinaryData[]> advance_readlock(History&, VersionID specific_version);
-
-#endif
 
     friend class _impl::SharedGroupFriend;
 };
@@ -743,7 +735,6 @@ inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
 {
 }
 
-#ifdef REALM_ENABLE_REPLICATION
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
                                 const char* encryption_key):
     m_group(Group::shared_tag())
@@ -752,7 +743,6 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
 
     upgrade_file_format(); // Throws
 }
-#endif
 
 inline void SharedGroup::open(const std::string& path, bool no_create_file,
                               DurabilityLevel durability, const char* encryption_key)

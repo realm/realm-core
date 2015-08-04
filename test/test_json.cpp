@@ -77,7 +77,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         table.add_column(type_String, "string");           //  5
         table.add_column(type_String, "string_long");      //  6
         table.add_column(type_String, "string_big_blobs"); //  7
-        table.add_column(type_String, "string_enum");      //  8 - becomes ColumnStringEnum
+        table.add_column(type_String, "string_enum");      //  8 - becomes StringEnumColumn
         table.add_column(type_Binary, "binary");           //  9
         table.add_column(type_Table, "tables", &sub1);    // 10
         table.add_column(type_Mixed, "mixed");            // 11
@@ -151,9 +151,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         for (size_t j = 0; j != n; ++j) {
             TableRef subtable = table.get_subtable(10, i);
             int64_t val = -123 + i*j * 1234 * sign;
-            subtable->insert_int(0, j, val);
-            subtable->insert_string(1, j, "sub");
-            subtable->insert_done();
+            subtable->insert_empty_row(j);
+            subtable->set_int(0, j, val);
+            subtable->set_string(1, j, "sub");
         }
     }
     for (size_t i = 0; i < rows; ++i) {
@@ -183,9 +183,9 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
                     subtable->add_column(type_Int, "first");
                     subtable->add_column(type_String, "second");
                     for (size_t j = 0; j != 2; ++j) {
-                        subtable->insert_int(0, j, i*i*j*sign);
-                        subtable->insert_string(1, j, "mixed sub");
-                        subtable->insert_done();
+                        subtable->insert_empty_row(j);
+                        subtable->set_int(0, j, i*i*j*sign);
+                        subtable->set_string(1, j, "mixed sub");
                     }
                     break;
         }
@@ -198,7 +198,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         }
     }
 
-    // We also want a ColumnStringEnum
+    // We also want a StringEnumColumn
     table.optimize();
 }
 
