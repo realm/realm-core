@@ -687,7 +687,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
             bool begin_new_session = info->num_participants == 0;
             bool is_shared = true;
             bool read_only = false;
-            bool skip_validate = false;
+            bool skip_validate = !begin_new_session;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
