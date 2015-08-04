@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the same file if opened from two places simultaneously)
 
 ### API breaking changes:
 
