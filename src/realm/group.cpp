@@ -44,8 +44,8 @@ void Group::upgrade_file_format()
         TableRef table = get_table(t);
         table->upgrade_file_format();
     }
+    m_alloc.set_file_format(default_file_format_version);
 
-    m_alloc.m_file_format_version = default_file_format_version;
 #endif
 }
 
@@ -179,6 +179,8 @@ void Group::attach(ref_type top_ref)
         // file size must never exceed actual file size.
         REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
     }
+
+
 }
 
 
@@ -207,6 +209,8 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
         m_alloc.remap(new_file_size); // Throws
 
     attach(new_top_ref); // Throws
+
+    m_alloc.set_file_format(m_alloc.get_committed_file_format());
 }
 
 

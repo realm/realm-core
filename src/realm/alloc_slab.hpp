@@ -116,6 +116,14 @@ public:
     /// \throw InvalidDatabase
     ref_type attach_buffer(char* data, std::size_t size);
 
+    // Sets the m_file_format_version member. When doing a commit, this member is written to file header
+    void set_file_format(unsigned char version);
+
+    // Reads file format from file header. Called when starting any transaction to initialize 
+    // m_file_format_version member
+    unsigned char get_committed_file_format() const;
+
+    // Simple read-accessors for m_file_format_version
     unsigned char get_file_format() const;
 
     /// Attach this allocator to an empty buffer.
