@@ -24,30 +24,41 @@ const char* system_category::name() const REALM_NOEXCEPT
 
 std::string system_category::message(int value) const
 {
-#if defined _WIN32 // Windows version <stdlib.h>
-
-    if (REALM_LIKELY(0 <= value || value < _sys_nerr))
-        return _sys_errlist[value];
-
-#elif _GNU_SOURCE && !REALM_ANDROID // GNU specific version <string.h>
-
-    // Note that Linux provides the GNU specific version even though
-    // it sets _POSIX_C_SOURCE >= 200112L.
-
     const size_t max_msg_size = 256;
     char buffer[max_msg_size+1];
-    if (char* msg = strerror_r(value, buffer, max_msg_size)) {
-        buffer[max_msg_size] = 0; // For safety's sake
-        return msg;
+
+#ifdef _WIN32 // Windows version
+
+    if (REALM_LIKELY(strerror_s(buffer, max_msg_size, value) == 0)) {
+        return buffer; // Guaranteed to be truncated
     }
 
-#else // POSIX.1-2001 fallback version <string.h>
+#elif defined __APPLE__ && defined __MACH__ // OSX, iOS and WatchOS version
 
-    const size_t max_msg_size = 256;
-    char buffer[max_msg_size+1];
-    if (REALM_LIKELY(strerror_r(value, buffer, max_msg_size) == 0)) {
-        buffer[max_msg_size] = 0; // For safety's sake
-        return buffer;
+    {
+        const int result = strerror_r(value, buffer, max_msg_size);
+        if (REALM_LIKELY(result == 0 || result == ERANGE || result == EINVAL)) {
+            return buffer; // Guaranteed to be truncated
+        }
+    }
+
+#elif ! REALM_ANDROID && _GNU_SOURCE // GNU specific version
+
+    {
+        char* msg = nullptr;
+        if (REALM_LIKELY((msg = strerror_r(value, buffer, max_msg_size)) != nullptr)) {
+            return msg; // Guaranteed to be truncated
+        }
+    }
+
+#else // POSIX.1-2001 fallback version
+
+    {
+        const int result = strerror_r(value, buffer, max_msg_size);
+        if (REALM_LIKELY(result == 0 || result == EINVAL)) {
+            buffer[max_msg_size] = 0; // For safety's sake, not guaranteed to be truncated by POSIX
+            return buffer;
+        }
     }
 
 #endif
