@@ -27,17 +27,17 @@ std::string system_category::message(int value) const
     const size_t max_msg_size = 256;
     char buffer[max_msg_size+1];
 
-#if defined _WIN32 // Windows version
+#ifdef _WIN32 // Windows version
 
     if (REALM_LIKELY(strerror_s(buffer, max_msg_size, value) == 0)) {
         return buffer; // Guaranteed to be truncated
     }
 
-#elif defined __APPLE__ && defined __MACH__ // OSX and iOS/WatchOS version
+#elif defined __APPLE__ && defined __MACH__ // OSX, iOS and WatchOS version
 
     {
         int result = strerror_r(value, buffer, max_msg_size);
-        if (result == 0 || result == ERANGE) {
+        if (REALM_LIKELY(result == 0 || result == ERANGE)) {
             return buffer; // Guaranteed to be truncated
         }
     }
