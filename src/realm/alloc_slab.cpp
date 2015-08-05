@@ -476,7 +476,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // This assumption obviously will not hold, if the file is shared by multiple
     // processes with different opening modes.
     if (!read_only && !matches_mmap_boundary(size)) {
+
+        if (!session_initiator && is_shared)
+            throw InvalidDatabase("Filesize does not match mmap boundary, and file is already active");
         size = get_upper_mmap_boundary(size);
+        // std::cerr << "resizing during attach to " << size << std::endl;
         m_file.resize(size);
         // resizing the file (as we do here) without actually changing any internal
         // datastructures to reflect the additional free space will work, because the
@@ -490,7 +494,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            validate_buffer(map.get_addr(), size, top_ref); // Throws
+            validate_buffer(map.get_addr(), size_of_streaming_file, top_ref); // Throws
         }
 
         Header* header;
@@ -533,7 +537,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     m_free_space_state = free_space_Invalid;
 
     if (m_file_on_streaming_form && read_only && is_shared)
-        goto invalid_database;
+        throw InvalidDatabase("Illegal: sharing a read-only file on streaming form");
 
     // make sure the database is not on streaming format. This has to be done at
     // session initialization, even if it means writing the database during open.
@@ -710,7 +714,6 @@ bool SlabAlloc::remap(size_t file_size)
 
     // Extend mapping by adding chunks
     REALM_ASSERT_DEBUG(matches_mmap_boundary(file_size));
-    m_file.resize(file_size);
     m_baseline = file_size;
     auto num_chunks = get_chunk_index(file_size);
     auto num_additional_mappings = num_chunks - m_first_additional_chunk;
