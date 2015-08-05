@@ -153,6 +153,11 @@
 using namespace realm;
 using namespace realm::util;
 
+ArrayParent::~ArrayParent() REALM_NOEXCEPT
+{
+    // Out-of-line to anchor the vtable and typeinfo
+}
+
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
