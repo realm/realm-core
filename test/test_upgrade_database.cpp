@@ -8,6 +8,12 @@
 #include <fstream>
 #include <thread>
 
+#include <mutex>
+// These 3 lines are needed in Visual Studio 2015 to make std::thread work
+#define __STDC_LIMIT_MACROS
+#include <stdint.h> 
+#include <thread>
+
 #include <sys/stat.h>
 #ifndef _WIN32
 #  include <unistd.h>
