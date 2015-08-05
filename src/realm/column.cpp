@@ -19,6 +19,23 @@ using namespace std;
 using namespace realm;
 using namespace realm::util;
 
+namespace realm {
+// Explicitly instantiate the templated column types so that their typeinfo has
+// external linkage, which is required for RTTI to work in some scenarios.
+// Implicit instantiations of tmeplates use vague linkage, where the typeinfo
+// is emitted into every object file using the class, and then all but one are
+// dropped by the linker, and the remaining one is converted to internal linkage.
+// The problem with this is that it that only works if every object file which
+// contains the typeinfo is linked at the same time, which is not the case when
+// linking as a dynamic library or relocatable object. With multiple copies of
+// the typeinfo, typeid() checks and dynamic_cast() will fail unpredictably
+// based on platform implementation details.
+template class BasicColumn<float>;
+template class BasicColumn<double>;
+template class Column<int64_t, true>;
+template class Column<int64_t, false>;
+}
+
 bool ColumnBase::is_nullable() const REALM_NOEXCEPT
 {
     return false;

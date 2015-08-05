@@ -167,10 +167,11 @@ public:
 };
 #endif
 
+
 class ArrayParent
 {
 public:
-    virtual ~ArrayParent() REALM_NOEXCEPT;
+    virtual ~ArrayParent() REALM_NOEXCEPT {}
 
 protected:
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;

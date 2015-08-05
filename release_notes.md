@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fix crash when sorting by an integer or float/double column on ARM64 due to
+  duplicated typeinfo definitions.
 
 ### API breaking changes:
 

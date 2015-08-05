@@ -503,7 +503,7 @@ void BasicColumn<T>::find_all(IntegerColumn &result, T value, std::size_t begin,
 
     if (root_is_leaf()) {
         std::size_t leaf_offset = 0;
-        static_cast<BasicArray<T>*>(m_array)->find_all(&result, value, leaf_offset, begin, end); // Throws
+        static_cast<BasicArray<T>*>(m_array.get())->find_all(&result, value, leaf_offset, begin, end); // Throws
         return;
     }
 
