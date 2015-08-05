@@ -4,6 +4,12 @@
 #include <algorithm>
 #include <fstream>
 
+#include <mutex>
+// These 3 lines are needed in Visual Studio 2015 to make std::thread work
+#define __STDC_LIMIT_MACROS
+#include <stdint.h> 
+#include <thread>
+
 #include <sys/stat.h>
 #ifndef _WIN32
 #  include <unistd.h>
@@ -728,6 +734,45 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format) {
     Group const& g2 = rt2.get_group();
     CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
 }
+
+
+
+ONLY(Upgrade_Database_2_3_Writes_New_File_Format_new) {
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+
+    std::thread t1([&]() {
+        std::cerr << "t1\n";
+        SharedGroup sg1(temp_copy);
+    });
+
+    std::thread t2([&]() {
+        std::cerr << "t2\n";
+        SharedGroup sg1(temp_copy);
+    });
+
+    getchar();
+    return;
+    std::cout << "main thread\n";
+
+
+
+
+    SharedGroup sg1(temp_copy);
+    WriteTransaction wt1(sg1);
+    SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
+    ReadTransaction rt2(sg2);
+    Group const& g1 = wt1.get_group();
+    Group const& g2 = rt2.get_group();
+    CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
+}
+
+
+
+
 #endif
 
 
