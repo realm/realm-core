@@ -40,8 +40,6 @@ void Group::upgrade_file_format()
     if (m_alloc.get_file_format() >= default_file_format_version)
         return;
 
-    std::cerr << "******        ";
-
     for (size_t t = 0; t < m_tables.size(); t++) {
         TableRef table = get_table(t);
         table->upgrade_file_format();
