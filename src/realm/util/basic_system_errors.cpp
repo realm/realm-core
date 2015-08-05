@@ -36,8 +36,8 @@ std::string system_category::message(int value) const
 #elif defined __APPLE__ && defined __MACH__ // OSX, iOS and WatchOS version
 
     {
-        int result = strerror_r(value, buffer, max_msg_size);
-        if (REALM_LIKELY(result == 0 || result == ERANGE)) {
+        const int result = strerror_r(value, buffer, max_msg_size);
+        if (REALM_LIKELY(result == 0 || result == ERANGE || result == EINVAL)) {
             return buffer; // Guaranteed to be truncated
         }
     }
@@ -53,9 +53,12 @@ std::string system_category::message(int value) const
 
 #else // XSI-compliant version, used by Android
 
-    if (REALM_LIKELY(strerror_r(value, buffer, max_msg_size) == 0)) {
-        buffer[max_msg_size] = 0; // For safety's sake, not guaranteed to be truncated by POSIX
-        return buffer;
+    {
+        const int result = strerror_r(value, buffer, max_msg_size);
+        if (REALM_LIKELY(result == 0 || result == EINVAL)) {
+            buffer[max_msg_size] = 0; // For safety's sake, not guaranteed to be truncated by POSIX
+            return buffer;
+        }
     }
 
 #endif
