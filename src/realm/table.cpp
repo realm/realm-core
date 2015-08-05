@@ -2176,6 +2176,18 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
     bump_version();
 }
 
+void Table::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(row_ndx_1, <, m_size);
+    REALM_ASSERT_3(row_ndx_2, <, m_size);
+
+    do_swap_rows(row_ndx_1, row_ndx_2);
+
+    if (Replication* repl = get_repl()) {
+        repl->swap_rows(this, row_ndx_1, row_ndx_2);
+    }
+}
 
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
