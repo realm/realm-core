@@ -661,6 +661,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
         CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
     }
 
     // First two elements
@@ -677,6 +679,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(0), 10);
         CHECK_EQUAL(c.get(1), 30);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Last two elements
@@ -693,6 +697,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Indices in wrong order
@@ -709,6 +715,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 }
 
