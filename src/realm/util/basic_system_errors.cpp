@@ -42,7 +42,7 @@ std::string system_category::message(int value) const
         }
     }
 
-#elif ! ((_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && ! _GNU_SOURCE) // GNU specific version
+#elif ! REALM_ANDROID && _GNU_SOURCE // GNU specific version
 
     {
         char* msg = nullptr;
