@@ -42,20 +42,20 @@ std::string system_category::message(int value) const
         }
     }
 
-#elif (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && ! _GNU_SOURCE // XSI-compliant version
-
-    if (REALM_LIKELY(strerror_r(value, buffer, max_msg_size) == 0)) {
-        buffer[max_msg_size] = 0; // For safety's sake, not guaranteed to be truncated by POSIX
-        return buffer;
-    }
-
-#else // GNU specific version
+#elif ! ((_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && ! _GNU_SOURCE) // GNU specific version
 
     {
         char* msg = nullptr;
         if (REALM_LIKELY((msg = strerror_r(value, buffer, max_msg_size)) != nullptr)) {
             return msg; // Guaranteed to be truncated
         }
+    }
+
+#else // XSI-compliant version, used by Android
+
+    if (REALM_LIKELY(strerror_r(value, buffer, max_msg_size) == 0)) {
+        buffer[max_msg_size] = 0; // For safety's sake, not guaranteed to be truncated by POSIX
+        return buffer;
     }
 
 #endif
