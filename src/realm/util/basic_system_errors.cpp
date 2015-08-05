@@ -51,7 +51,7 @@ std::string system_category::message(int value) const
         }
     }
 
-#else // XSI-compliant version, used by Android
+#else // POSIX.1-2001 fallback version
 
     {
         const int result = strerror_r(value, buffer, max_msg_size);
