@@ -1,8 +1,12 @@
 #include "testsettings.hpp"
 #ifdef TEST_GROUP
 
+
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
 #include <algorithm>
 #include <fstream>
+#include <thread>
 
 #include <sys/stat.h>
 #ifndef _WIN32
@@ -727,6 +731,32 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format) {
     Group const& g1 = wt1.get_group();
     Group const& g2 = rt2.get_group();
     CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
+}
+
+TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) {
+    // The method `inline void SharedGroup::upgrade_file_format()` will first have a fast non-threadsafe
+    // test for seeing if the file needs to be upgraded. Then it will make a slower thread-safe check inside a
+    // write transaction (transaction acts like a mutex). In debug mode, the `inline void SharedGroup::upgrade_file_format()`
+    // method will sleep 1 second between the non-threadsafe and the threadsafe test, to ensure that two threads opening
+    // the same database file will both think the database needs upgrade in the first check.
+
+    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+    std::thread t1([&]() {
+        SharedGroup sg(temp_copy);
+    });
+
+    std::thread t2([&]() {
+        SharedGroup sg(temp_copy);
+    });
+
+    // Unit test passed if it doesn't deadlock or crash
+
+    t1.join();
+    t2.join();
 }
 #endif
 
