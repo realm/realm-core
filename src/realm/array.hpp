@@ -709,7 +709,7 @@ public:
     template<size_t width> inline bool test_zero(uint64_t value) const;         // Tests value for 0-elements
     template<bool eq, size_t width>size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
-    template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
+    template<bool gt, size_t width>int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template<size_t width> inline int64_t lower_bits() const;                   // Return chunk with lower bit set in each element
     std::size_t first_set_bit(unsigned int v) const;
     std::size_t first_set_bit64(int64_t v) const;
@@ -2562,7 +2562,7 @@ template<bool eq, size_t width>size_t Array::find_zero(uint64_t v) const
 }
 
 // Generate a magic constant used for later bithacks
-template<bool gt, size_t width>int64_t Array::FindGTLT_Magic(int64_t v) const
+template<bool gt, size_t width>int64_t Array::find_gtlt_magic(int64_t v) const
 {
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
@@ -3209,7 +3209,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
 
     if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
-        uint64_t magic = FindGTLT_Magic<gt, bitwidth>(value);
+        uint64_t magic = find_gtlt_magic<gt, bitwidth>(value);
 
         // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
         if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0))) {
