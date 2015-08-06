@@ -132,7 +132,7 @@ public:
     /// should ignore this argument.
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
-    virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
+    virtual bool is_int_column() const REALM_NOEXCEPT { return false; }
 
     // Returns true if, and only if this column is an StringColumn.
     virtual bool is_string_col() const REALM_NOEXCEPT;
@@ -412,7 +412,7 @@ public:
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column<T, Nullable>&);
-    bool IsIntColumn() const REALM_NOEXCEPT override;
+    bool is_int_column() const REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -972,7 +972,7 @@ void Column<T,N>::move_assign(Column<T,N>& col)
 }
 
 template <class T, bool N>
-bool Column<T,N>::IsIntColumn() const REALM_NOEXCEPT
+bool Column<T,N>::is_int_column() const REALM_NOEXCEPT
 {
     return std::is_integral<T>::value;
 }
