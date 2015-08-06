@@ -2949,7 +2949,7 @@ FindRes Array::index_string_find_all_no_copy(StringData value, ref_type& res_ref
 }
 
 
-size_t Array::IndexStringCount(StringData value, ColumnBase* column) const
+size_t Array::index_string_count(StringData value, ColumnBase* column) const
 {
     IntegerColumn dummy;
     size_t dummysizet;

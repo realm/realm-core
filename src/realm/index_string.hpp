@@ -105,7 +105,7 @@ public:
     template <class T> size_t count(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringCount(to_str(value), m_target_column);
+        return m_array->index_string_count(to_str(value), m_target_column);
     }
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
