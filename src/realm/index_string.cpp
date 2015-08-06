@@ -125,7 +125,7 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
 
 void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
 {
-    NodeChange nc = DoInsert(row_ndx, key, offset, value);
+    NodeChange nc = do_insert(row_ndx, key, offset, value);
     switch (nc.type) {
         case NodeChange::none:
             return;
@@ -158,7 +158,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
 }
 
 
-StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
+StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, size_t offset, StringData value)
 {
     Allocator& alloc = m_array->get_alloc();
     if (m_array->is_inner_bptree_node()) {
@@ -181,7 +181,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
                            m_deny_duplicate_values, alloc);
 
         // Insert item
-        NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
+        NodeChange nc = target.do_insert(row_ndx, key, offset, value);
         if (nc.type ==  NodeChange::none) {
             // update keys
             key_type last_key = target.get_last_key();

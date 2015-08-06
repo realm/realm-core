@@ -165,7 +165,7 @@ private:
 
     // B-Tree functions
     void TreeInsert(size_t row_ndx, key_type, size_t offset, StringData value);
-    NodeChange DoInsert(size_t ndx, key_type, size_t offset, StringData value);
+    NodeChange do_insert(size_t ndx, key_type, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
     bool LeafInsert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
     void NodeInsertSplit(size_t ndx, size_t new_ref);
