@@ -678,7 +678,7 @@ public:
                          QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t foreign_width, class Callback, size_t width>
-    bool CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex,
                        QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
@@ -2996,13 +2996,13 @@ template<class cond, Action action, size_t width, class Callback> bool Array::Co
 {
     size_t fw = foreign->m_width;
     bool r;
-    REALM_TEMPEX5(r = CompareLeafs4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX5(r = compare_leafs_4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
 
 template<class cond, Action action, size_t width, class Callback, size_t foreign_width>
-bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                           Callback callback) const
 {
     cond c;
