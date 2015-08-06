@@ -954,7 +954,7 @@ protected:
     std::size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                              ColumnBase* column) const;
 protected:
-//    void AddPositiveLocal(int64_t value);
+//    void add_positive_local(int64_t value);
 
     // Includes array header. Not necessarily 8-byte aligned.
     virtual std::size_t calc_byte_len(std::size_t size, std::size_t width) const;
@@ -2691,10 +2691,10 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
 
         /*
         // Faster but disabled due to bug in VC2010 compiler (fixed in 2012 toolchain) where last 'if' is errorneously optimized away
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(2 + baseindex); else return 2;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(3 + baseindex); else return 3;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(0 + baseindex); else return 0;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(1 + baseindex); else return 1;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(2 + baseindex); else return 2;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(3 + baseindex); else return 3;} chunk >>= 16;
 
         // Following illustrates it:
         #include <stdint.h>

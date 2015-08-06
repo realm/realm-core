@@ -507,7 +507,7 @@ void Array::set_as_ref(std::size_t ndx, ref_type ref)
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
-void Array::AddPositiveLocal(int64_t value)
+void Array::add_positive_local(int64_t value)
 {
     REALM_ASSERT(value >= 0);
     REALM_ASSERT(&m_alloc == &Allocator::get_default());
