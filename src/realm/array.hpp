@@ -722,7 +722,7 @@ public:
 
     // Find value greater/less in 64-bit chunk - no constraints
     template<bool gt, Action action, std::size_t width, class Callback>
-    bool FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
+    bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
                   Callback callback) const;
 
 
@@ -2599,7 +2599,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::find_
 }
 
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
@@ -3229,7 +3229,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
                     idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
                 else
-                    idx = FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
+                    idx = find_gtlt<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
 
                 if (!idx)
                     return false;
@@ -3240,7 +3240,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
             // 24 ms
             while (p < e) {
                 int64_t v = *p;
-                if (!FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback))
+                if (!find_gtlt<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback))
                     return false;
                 ++p;
             }
