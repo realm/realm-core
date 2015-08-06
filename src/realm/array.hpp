@@ -664,7 +664,7 @@ public:
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
     template<class cond2, Action action, size_t bitwidth, class Callback>
-    bool Compare(int64_t value, size_t start, size_t end, size_t baseindex,
+    bool compare(int64_t value, size_t start, size_t end, size_t baseindex,
                  QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Equal/NotEqual
@@ -2449,7 +2449,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
         __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
 
-        if (!Compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
+        if (!compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
             return false;
 
         // Search aligned area with SSE
@@ -2466,16 +2466,16 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         }
 
         // Search remainder with compare_equality()
-        if (!Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
+        if (!compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
             return false;
 
         return true;
     }
     else {
-        return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        return compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     }
 #else
-return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+return compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 #endif
 }
 
@@ -3163,7 +3163,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
 
 
 template<class cond2, Action action, size_t bitwidth, class Callback>
-bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                     Callback callback) const
 {
     int cond = cond2::condition;
