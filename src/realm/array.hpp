@@ -957,7 +957,7 @@ protected:
 //    void AddPositiveLocal(int64_t value);
 
     // Includes array header. Not necessarily 8-byte aligned.
-    virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
+    virtual std::size_t calc_byte_len(std::size_t size, std::size_t width) const;
 
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }

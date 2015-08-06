@@ -1401,15 +1401,15 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     return aligned_byte_size;
 }
 
-size_t Array::CalcByteLen(size_t count, size_t width) const
+size_t Array::calc_byte_len(size_t count, size_t width) const
 {
     REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
 
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that CalcByteLen() is supposed to return
+    // instead. Note however, that calc_byte_len() is supposed to return
     // the unaligned byte size. It is probably the case that no harm
     // is done by returning the aligned version, and most callers of
-    // CalcByteLen() will actually benefit if CalcByteLen() was
+    // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
 
     // FIXME: This arithemtic could overflow. Consider using <realm/util/safe_int_ops.hpp>
@@ -1499,7 +1499,7 @@ void Array::copy_on_write()
         return;
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
-    size_t size = CalcByteLen(m_size, m_width);
+    size_t size = calc_byte_len(m_size, m_width);
     size_t rest = (~size & 0x7) + 1;
     if (rest < 8)
         size += rest; // 64bit blocks
@@ -1659,7 +1659,7 @@ void Array::alloc(size_t size, size_t width)
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
     REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < size || width != m_width) {
-        size_t needed_bytes   = CalcByteLen(size, width);
+        size_t needed_bytes   = calc_byte_len(size, width);
         size_t orig_capacity_bytes = get_capacity_from_header();
         size_t capacity_bytes = orig_capacity_bytes;
 

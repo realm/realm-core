@@ -86,7 +86,7 @@ public:
 private:
     std::size_t find(T target, std::size_t begin, std::size_t end) const;
 
-    std::size_t CalcByteLen(std::size_t count, std::size_t width) const override;
+    std::size_t calc_byte_len(std::size_t count, std::size_t width) const override;
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT override;
     virtual WidthType GetWidthType() const override { return wtype_Multiply; }
 

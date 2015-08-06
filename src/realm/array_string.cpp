@@ -181,7 +181,7 @@ void ArrayString::erase(size_t ndx)
     set_header_size(m_size);
 }
 
-size_t ArrayString::CalcByteLen(size_t count, size_t width) const
+size_t ArrayString::calc_byte_len(size_t count, size_t width) const
 {
     // FIXME: This arithemtic could overflow. Consider using one of
     // the functions in <realm/util/safe_int_ops.hpp>
