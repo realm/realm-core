@@ -219,7 +219,7 @@ size_t StringEnumColumn::find_first(StringData value, size_t begin, size_t end) 
     return IntegerColumn::find_first(key_ndx, begin, end);
 }
 
-size_t StringEnumColumn::GetKeyNdx(StringData value) const
+size_t StringEnumColumn::get_key_ndx(StringData value) const
 {
     return m_keys.find_first(value);
 }

@@ -1219,7 +1219,7 @@ public:
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
-            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->GetKeyNdx(m_value);
+            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
         }
         else if (m_condition_column->has_search_index()) {
             m_dT = 0.0;

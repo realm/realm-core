@@ -129,7 +129,7 @@ public:
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
-    std::size_t GetKeyNdx(StringData value) const;
+    std::size_t get_key_ndx(StringData value) const;
     std::size_t get_key_ndx_or_add(StringData value);
 
     StringColumn& get_keys();
