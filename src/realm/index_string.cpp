@@ -250,13 +250,13 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
-        if (LeafInsert(row_ndx, key, offset, value, noextend))
+        if (leaf_insert(row_ndx, key, offset, value, noextend))
             return NodeChange::none;
 
         // Create new list for item (a leaf)
         StringIndex new_list(m_target_column, m_array->get_alloc());
 
-        new_list.LeafInsert(row_ndx, key, offset, value);
+        new_list.leaf_insert(row_ndx, key, offset, value);
 
         size_t ndx = old_offsets.lower_bound_int(key);
 
@@ -344,7 +344,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
 }
 
 
-bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, StringData value, bool noextend)
+bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, StringData value, bool noextend)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node());
 

@@ -167,7 +167,7 @@ private:
     void TreeInsert(size_t row_ndx, key_type, size_t offset, StringData value);
     NodeChange do_insert(size_t ndx, key_type, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
-    bool LeafInsert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
+    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
     void DoDelete(size_t ndx, StringData, size_t offset);
