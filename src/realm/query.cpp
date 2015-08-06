@@ -904,7 +904,7 @@ Query& Query::end_group()
     pending_not.pop_back();
     update.pop_back();
     update_override.pop_back();
-    HandlePendingNot();
+    handle_pending_not();
     return *this;
 }
 
@@ -929,11 +929,11 @@ Query& Query::Not()
     return *this;
 }
 
-// And-terms must end by calling HandlePendingNot. This will check if a negation is pending,
+// And-terms must end by calling handle_pending_not. This will check if a negation is pending,
 // and if so, it will end the implicit group created to hold the term to negate. Note that
-// end_group itself will recurse into HandlePendingNot if multiple implicit groups are nested
+// end_group itself will recurse into handle_pending_not if multiple implicit groups are nested
 // within each other.
-void Query::HandlePendingNot()
+void Query::handle_pending_not()
 {
     if (pending_not.size() > 1 && pending_not[pending_not.size()-1]) {
         // we are inside group(s) implicitly created to handle a not, so pop it/them:
@@ -1353,7 +1353,7 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
     }
     update[update.size()-1] = newnode;
 
-    HandlePendingNot();
+    handle_pending_not();
 }
 
 /* ********************************************************************************************************************

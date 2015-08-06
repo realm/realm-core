@@ -262,7 +262,7 @@ protected:
     size_t FindInternal(size_t start = 0, size_t end=size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;
     void   UpdatePointers(ParentNode* p, ParentNode** newnode);
-    void HandlePendingNot();
+    void handle_pending_not();
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
 
