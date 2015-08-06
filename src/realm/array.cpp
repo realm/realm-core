@@ -2935,7 +2935,7 @@ size_t Array::index_string_find_first(StringData value, ColumnBase* column) cons
 }
 
 
-void Array::IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBase* column) const
+void Array::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const
 {
     size_t dummy;
 

@@ -93,7 +93,7 @@ public:
     template <class T> void find_all(IntegerColumn& result, T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, to_str(value), m_target_column);
+        return m_array->index_string_find_all(result, to_str(value), m_target_column);
     }
 
     template <class T> FindRes find_all(T value, ref_type& ref) const
