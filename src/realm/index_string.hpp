@@ -170,7 +170,7 @@ private:
     bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
-    void DoDelete(size_t ndx, StringData, size_t offset);
+    void do_delete(size_t ndx, StringData, size_t offset);
     void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
     StringData get(size_t ndx, char* buffer) const;
@@ -323,7 +323,7 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
     char buffer[sizeof(T)];
     StringData value = get(row_ndx, buffer);
 
-    DoDelete(row_ndx, value, 0);
+    do_delete(row_ndx, value, 0);
 
     // Collapse top nodes with single item
     while (m_array->is_inner_bptree_node()) {

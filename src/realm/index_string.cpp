@@ -565,7 +565,7 @@ void StringIndex::clear()
 }
 
 
-void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
+void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
 {
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
@@ -583,7 +583,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
         ref_type ref = m_array->get_as_ref(pos_refs);
         StringIndex node(ref, m_array.get(), pos_refs, m_target_column,
                          m_deny_duplicate_values, alloc);
-        node.DoDelete(row_ndx, value, offset);
+        node.do_delete(row_ndx, value, offset);
 
         // Update the ref
         if (node.is_empty()) {
@@ -609,7 +609,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
             if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.DoDelete(row_ndx, value, offset+4);
+                subindex.do_delete(row_ndx, value, offset+4);
 
                 if (subindex.is_empty()) {
                     values.erase(pos);
