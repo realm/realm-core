@@ -131,24 +131,24 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             return;
         case NodeChange::insert_before: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.NodeAddKey(nc.ref1);
-            new_node.NodeAddKey(get_ref());
+            new_node.node_add_key(nc.ref1);
+            new_node.node_add_key(get_ref());
             m_array->init_from_ref(new_node.get_ref());
             m_array->update_parent();
             return;
         }
         case NodeChange::insert_after: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.NodeAddKey(get_ref());
-            new_node.NodeAddKey(nc.ref1);
+            new_node.node_add_key(get_ref());
+            new_node.node_add_key(nc.ref1);
             m_array->init_from_ref(new_node.get_ref());
             m_array->update_parent();
             return;
         }
         case NodeChange::split: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.NodeAddKey(nc.ref1);
-            new_node.NodeAddKey(nc.ref2);
+            new_node.node_add_key(nc.ref1);
+            new_node.node_add_key(nc.ref2);
             m_array->init_from_ref(new_node.get_ref());
             m_array->update_parent();
             return;
@@ -212,12 +212,12 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
             key_type last_key = target.get_last_key();
             offsets.set(node_ndx, last_key);
 
-            new_node.NodeAddKey(nc.ref2);
+            new_node.node_add_key(nc.ref2);
             ++node_ndx;
             ++refs_ndx;
         }
         else {
-            new_node.NodeAddKey(nc.ref1);
+            new_node.node_add_key(nc.ref1);
         }
 
         switch (node_ndx) {
@@ -232,7 +232,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
                 size_t len = m_array->size();
                 for (size_t i = refs_ndx; i < len; ++i) {
                     ref_type ref = m_array->get_as_ref(i);
-                    new_node.NodeAddKey(ref);
+                    new_node.node_add_key(ref);
                 }
                 offsets.truncate(node_ndx);
                 m_array->truncate(refs_ndx);
@@ -759,7 +759,7 @@ bool StringIndex::is_empty() const
 }
 
 
-void StringIndex::NodeAddKey(ref_type ref)
+void StringIndex::node_add_key(ref_type ref)
 {
     REALM_ASSERT(ref);
     REALM_ASSERT(m_array->is_inner_bptree_node());

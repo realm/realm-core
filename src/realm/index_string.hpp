@@ -175,7 +175,7 @@ private:
 
     StringData get(size_t ndx, char* buffer) const;
 
-    void NodeAddKey(ref_type ref);
+    void node_add_key(ref_type ref);
 
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& node, std::ostream&, int level);
