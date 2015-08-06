@@ -547,8 +547,8 @@ public:
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
     std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
-    void Preset(int64_t min, int64_t max, std::size_t count);
-    void Preset(std::size_t bitwidth, std::size_t count);
+    void preset(int64_t min, int64_t max, std::size_t count);
+    void preset(std::size_t bitwidth, std::size_t count);
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     std::size_t count(int64_t value) const REALM_NOEXCEPT;

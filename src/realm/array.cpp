@@ -309,7 +309,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
 
 
 // Allocates space for 'size' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
-void Array::Preset(size_t width, size_t size)
+void Array::preset(size_t width, size_t size)
 {
     clear_and_destroy_children();
     set_width(width);
@@ -319,10 +319,10 @@ void Array::Preset(size_t width, size_t size)
         set(i, 0);
 }
 
-void Array::Preset(int64_t min, int64_t max, size_t count)
+void Array::preset(int64_t min, int64_t max, size_t count)
 {
     size_t w = std::max(bit_width(max), bit_width(min));
-    Preset(w, count);
+    preset(w, count);
 }
 
 
