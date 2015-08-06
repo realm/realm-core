@@ -22,6 +22,7 @@
   (e.g., `ColumnLink` to `LinkColumn`).
 * Removed conditional compilation of replication features.
 * More information from `InvalidDatabase::what()`.
+* Disabled support for the async daemon on iOS and watchOS.
 
 
 ----------------------------------------------
