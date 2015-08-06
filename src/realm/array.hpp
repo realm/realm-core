@@ -711,8 +711,8 @@ public:
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
     template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template<size_t width> inline int64_t LowerBits() const;                   // Return chunk with lower bit set in each element
-    std::size_t FirstSetBit(unsigned int v) const;
-    std::size_t FirstSetBit64(int64_t v) const;
+    std::size_t first_set_bit(unsigned int v) const;
+    std::size_t first_set_bit64(int64_t v) const;
     template<std::size_t w> int64_t get_universal(const char* const data, const std::size_t ndx) const;
 
     // Find value greater/less in 64-bit chunk - only works for positive values
@@ -2583,7 +2583,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
         if (find_action_pattern<action, Callback>(baseindex, m >> (no0(width) - 1), state, callback))
             break; // consumed, so do not call find_action()
 
-        size_t t = FirstSetBit64(m) / no0(width);
+        size_t t = first_set_bit64(m) / no0(width);
         p += t;
         if (!find_action<action, Callback>(p + baseindex, (chunk >> (p * width)) & mask1, state, callback))
             return false;
@@ -2930,7 +2930,7 @@ REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data
             if (find_action_pattern<action, Callback>(s + baseindex, pattern, state, callback))
                 break;
 
-            size_t idx = FirstSetBit(resmask) * 8 / no0(width);
+            size_t idx = first_set_bit(resmask) * 8 / no0(width);
             s += idx;
             if (!find_action<action, Callback>( s + baseindex, get_universal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
                 return false;

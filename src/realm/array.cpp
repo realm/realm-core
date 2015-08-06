@@ -811,7 +811,7 @@ exit:
     return ret;
 }
 
-size_t Array::FirstSetBit(unsigned int v) const
+size_t Array::first_set_bit(unsigned int v) const
 {
 #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
     unsigned long ul;
@@ -833,7 +833,7 @@ return r;
 #endif
 }
 
-size_t Array::FirstSetBit64(int64_t v) const
+size_t Array::first_set_bit64(int64_t v) const
 {
 #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
     unsigned long ul;
@@ -848,9 +848,9 @@ size_t Array::FirstSetBit64(int64_t v) const
     size_t r;
 
     if (v0 != 0)
-        r = FirstSetBit(v0);
+        r = first_set_bit(v0);
     else
-        r = FirstSetBit(v1) + 32;
+        r = first_set_bit(v1) + 32;
 
     return r;
 #endif
