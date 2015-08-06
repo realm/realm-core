@@ -707,7 +707,7 @@ public:
 #endif
 
     template<size_t width> inline bool test_zero(uint64_t value) const;         // Tests value for 0-elements
-    template<bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
+    template<bool eq, size_t width>size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
     template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template<size_t width> inline int64_t lower_bits() const;                   // Return chunk with lower bit set in each element
@@ -2513,7 +2513,7 @@ template<size_t width> inline bool Array::test_zero(uint64_t value) const
 
 // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
 // IMPORTANT: This function assumes that at least 1 item matches (test this with test_zero() or other means first)!
-template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
+template<bool eq, size_t width>size_t Array::find_zero(uint64_t v) const
 {
     size_t start = 0;
     uint64_t hasZeroByte;
@@ -2553,7 +2553,7 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     }
 
     while (eq == (((v >> (width * start)) & mask) != 0)) {
-        // You must only call FindZero() if you are sure that at least 1 item matches
+        // You must only call find_zero() if you are sure that at least 1 item matches
         REALM_ASSERT_3(start, <=, 8 * sizeof(v));
         start++;
     }
@@ -2784,7 +2784,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
                 if (find_action_pattern<action, Callback>(start + baseindex, cascade<width, eq>(v2), state, callback))
                     break; // consumed
 
-                size_t t = FindZero<eq, width>(v2);
+                size_t t = find_zero<eq, width>(v2);
                 a += t;
 
                 if (a >= 64 / no0(width))

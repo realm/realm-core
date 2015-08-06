@@ -892,7 +892,7 @@ template<size_t width> inline bool has_zero_element(uint64_t value) {
 
 
 // Finds zero element of bit width 'width'
-template<bool eq, size_t width> size_t FindZero(uint64_t v)
+template<bool eq, size_t width> size_t find_zero(uint64_t v)
 {
     size_t start = 0;
     uint64_t hasZeroByte;
