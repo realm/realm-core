@@ -226,7 +226,7 @@ Expression* Query::get_expression() {
 Query& Query::expression(Expression* compare, bool auto_delete)
 {
     ParentNode* const p = new ExpressionNode(compare, auto_delete);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 
@@ -234,31 +234,31 @@ Query& Query::expression(Expression* compare, bool auto_delete)
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
     ParentNode* const p = new BinaryNode<Equal>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, BinaryData b)
 {
     ParentNode* const p = new BinaryNode<NotEqual>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::begins_with(size_t column_ndx, BinaryData b)
 {
     ParentNode* p = new BinaryNode<BeginsWith>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::ends_with(size_t column_ndx, BinaryData b)
 {
     ParentNode* p = new BinaryNode<EndsWith>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::contains(size_t column_ndx, BinaryData b)
 {
     ParentNode* p = new BinaryNode<Contains>(b, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 
@@ -267,7 +267,7 @@ template <typename T, class N>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
     ParentNode* const parent = new N(value, column_ndx);
-    UpdatePointers(parent, &parent->m_child);
+    update_pointers(parent, &parent->m_child);
     return *this;
 }
 
@@ -275,7 +275,7 @@ Query& Query::add_condition(size_t column_ndx, T value)
 template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 
@@ -283,31 +283,31 @@ template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t colum
 template <class ColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 template <class ColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 template <class ColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 template <class ColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 template <class ColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 
@@ -437,7 +437,7 @@ Query& Query::between(size_t column_ndx, int from, int to)
 Query& Query::links_to(size_t origin_column, size_t target_row)
 {
     ParentNode* const p = new LinksToNode(origin_column, target_row);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 
@@ -445,26 +445,26 @@ Query& Query::links_to(size_t origin_column, size_t target_row)
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new IntegerNode<int64_t, NotEqual>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new IntegerNode<int64_t, Greater>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::greater_equal(size_t column_ndx, int64_t value)
 {
     if (value > LLONG_MIN) {
         ParentNode* const p = new IntegerNode<int64_t, Greater>(value - 1, column_ndx);
-        UpdatePointers(p, &p->m_child);
+        update_pointers(p, &p->m_child);
     }
     // field >= LLONG_MIN has no effect
     return *this;
@@ -473,7 +473,7 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
 {
     if (value < LLONG_MAX) {
         ParentNode* const p = new IntegerNode<int64_t, Less>(value + 1, column_ndx);
-        UpdatePointers(p, &p->m_child);
+        update_pointers(p, &p->m_child);
     }
     // field <= LLONG_MAX has no effect
     return *this;
@@ -481,7 +481,7 @@ Query& Query::less_equal(size_t column_ndx, int64_t value)
 Query& Query::less(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new IntegerNode<int64_t, Less>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
@@ -495,7 +495,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 Query& Query::equal(size_t column_ndx, bool value)
 {
     ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 
@@ -578,7 +578,7 @@ Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
         p = new StringNode<Equal>(value, column_ndx);
     else
         p = new StringNode<EqualIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::begins_with(size_t column_ndx, StringData value, bool case_sensitive)
@@ -588,7 +588,7 @@ Query& Query::begins_with(size_t column_ndx, StringData value, bool case_sensiti
         p = new StringNode<BeginsWith>(value, column_ndx);
     else
         p = new StringNode<BeginsWithIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::ends_with(size_t column_ndx, StringData value, bool case_sensitive)
@@ -598,7 +598,7 @@ Query& Query::ends_with(size_t column_ndx, StringData value, bool case_sensitive
         p = new StringNode<EndsWith>(value, column_ndx);
     else
         p = new StringNode<EndsWithIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::contains(size_t column_ndx, StringData value, bool case_sensitive)
@@ -608,7 +608,7 @@ Query& Query::contains(size_t column_ndx, StringData value, bool case_sensitive)
         p = new StringNode<Contains>(value, column_ndx);
     else
         p = new StringNode<ContainsIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive)
@@ -618,7 +618,7 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
         p = new StringNode<NotEqual>(value, column_ndx);
     else
         p = new StringNode<NotEqualIns>(value, column_ndx);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     return *this;
 }
 
@@ -967,7 +967,7 @@ Query& Query::Or()
 Query& Query::subtable(size_t column)
 {
     SubtableNode* const p = new SubtableNode(column);
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
     // once subtable conditions have been evaluated, resume evaluation from m_child2
     subtables.push_back(&p->m_child2);
     group();
@@ -1341,7 +1341,7 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
     return a.first < b.first;
 }
 
-void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
+void Query::update_pointers(ParentNode* p, ParentNode** newnode)
 {
     all_nodes.push_back(p);
     if (first[first.size()-1] == 0) {
@@ -1369,9 +1369,9 @@ Query& Query::and_query(Query q)
     REALM_ASSERT(do_delete && q.do_delete);
 
     ParentNode* const p = q.first[0];
-    UpdatePointers(p, &p->m_child);
+    update_pointers(p, &p->m_child);
 
-    // q.first[0] was added by UpdatePointers, but it'll be added again below
+    // q.first[0] was added by update_pointers, but it'll be added again below
     // so remove it
     all_nodes.pop_back();
 
