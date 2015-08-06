@@ -1191,12 +1191,12 @@ std::unique_ptr<const ArrayParent> StringColumn::get_leaf(size_t ndx, size_t& ou
 {
     size_t off;
     ArrayParent* ap = nullptr;
-    out_leaf_type = GetBlock(ndx, &ap, off, false);
+    out_leaf_type = get_block(ndx, &ap, off, false);
     out_ndx_in_leaf = ndx - off;
     return std::unique_ptr<const ArrayParent>(ap);
 }
 
-StringColumn::LeafType StringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off,
+StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, size_t& off,
                                               bool use_retval) const
 {
     static_cast<void>(use_retval);
