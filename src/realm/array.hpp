@@ -700,7 +700,7 @@ public:
                  size_t baseindex, Callback callback) const;
 
     template<class cond2, Action action, size_t width, class Callback>
-    REALM_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
+    REALM_FORCEINLINE bool find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                             QueryState<int64_t>* state, size_t baseindex,
                                             Callback callback) const;
 
@@ -2861,13 +2861,13 @@ bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64
             search = _mm_set_epi64x(value, value);
     }
 
-    return FindSSE_intern<cond2, action, width, Callback>(data, &search, items, state, baseindex, callback);
+    return find_sse_intern<cond2, action, width, Callback>(data, &search, items, state, baseindex, callback);
 }
 
 // Compares packed action_data with packed data (equal, less, etc) and performs aggregate action (max, min, sum,
 // find_all, etc) on value inside action_data for first match, if any
 template<class cond2, Action action, size_t width, class Callback>
-REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
+REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     int cond = cond2::condition;
@@ -3045,7 +3045,7 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
             __m128i* a = reinterpret_cast<__m128i*>(m_data + start * width / 8);
             __m128i* b = reinterpret_cast<__m128i*>(foreign_m_data + start * width / 8);
 
-            bool continue_search = FindSSE_intern<cond, action, width, Callback>(a, b, 1, state, baseindex + start, callback);
+            bool continue_search = find_sse_intern<cond, action, width, Callback>(a, b, 1, state, baseindex + start, callback);
 
             if (!continue_search)
                 return false;
