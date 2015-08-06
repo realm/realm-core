@@ -197,7 +197,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         // If there is room, just update node directly
         if (offsets.size() < REALM_MAX_BPNODE_SIZE) {
             if (nc.type == NodeChange::split) {
-                NodeInsertSplit(node_ndx, nc.ref2);
+                node_insert_split(node_ndx, nc.ref2);
             }
             else {
                 NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
@@ -290,7 +290,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 }
 
 
-void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
+void StringIndex::node_insert_split(size_t ndx, size_t new_ref)
 {
     REALM_ASSERT(m_array->is_inner_bptree_node());
     REALM_ASSERT(new_ref);
