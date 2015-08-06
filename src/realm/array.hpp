@@ -911,7 +911,7 @@ public:
 
 #ifdef REALM_DEBUG
     void print() const;
-    void Verify() const;
+    void verify() const;
     typedef std::size_t (*LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;
     class MemUsageHandler {

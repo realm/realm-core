@@ -185,7 +185,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 
 #ifdef REALM_DEBUG
 
-void ArrayBigBlobs::Verify() const
+void ArrayBigBlobs::verify() const
 {
     REALM_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
@@ -194,7 +194,7 @@ void ArrayBigBlobs::Verify() const
         if (blob_ref != 0) {
             ArrayBlob blob(m_alloc);
             blob.init_from_ref(blob_ref);
-            blob.Verify();
+            blob.verify();
         }
     }
 }

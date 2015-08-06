@@ -122,7 +122,7 @@ public:
     void set_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
-    void Verify() const;
+    void verify() const;
     void verify_entries(const StringColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const { to_dot(std::cerr); }

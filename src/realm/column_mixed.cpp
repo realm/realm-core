@@ -388,12 +388,12 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
 
 #ifdef REALM_DEBUG
 
-void MixedColumn::Verify() const
+void MixedColumn::verify() const
 {
     do_verify(0,0);
 }
 
-void MixedColumn::Verify(const Table& table, size_t col_ndx) const
+void MixedColumn::verify(const Table& table, size_t col_ndx) const
 {
     do_verify(&table, col_ndx);
 
@@ -405,22 +405,22 @@ void MixedColumn::Verify(const Table& table, size_t col_ndx) const
             continue;
         ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         REALM_ASSERT_3(subtable->get_parent_row_index(), ==, i);
-        subtable->Verify();
+        subtable->verify();
     }
 }
 
 void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
 {
-    m_array->Verify();
-    m_types->Verify();
+    m_array->verify();
+    m_types->verify();
     if (table) {
-        m_data->Verify(*table, col_ndx);
+        m_data->verify(*table, col_ndx);
     }
     else {
-        m_data->Verify();
+        m_data->verify();
     }
     if (m_binary_data)
-        m_binary_data->Verify();
+        m_binary_data->verify();
 
     // types and refs should be in sync
     size_t types_len = m_types->size();

@@ -1601,11 +1601,11 @@ private:
 
 } // anonymous namespace
 
-void Group::Verify() const
+void Group::verify() const
 {
     REALM_ASSERT(is_attached());
 
-    m_alloc.Verify();
+    m_alloc.verify();
 
     // Verify tables
     {
@@ -1613,7 +1613,7 @@ void Group::Verify() const
         for (size_t i = 0; i != n; ++i) {
             ConstTableRef table = get_table(i);
             REALM_ASSERT_3(table->get_index_in_group(), ==, i);
-            table->Verify();
+            table->verify();
         }
     }
 

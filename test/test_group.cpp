@@ -509,7 +509,7 @@ TEST(Group_BasicRemoveTable)
     CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
     CHECK_LOGIC_ERROR(group.remove_table(1), LogicError::table_index_out_of_range);
     CHECK_THROW(group.remove_table("epsilon"), NoSuchTable);
-    group.Verify();
+    group.verify();
 }
 
 
@@ -600,11 +600,11 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     fourth->set_link(1,0,0); // fourth[0].five = third[0]
     fourth->set_link(1,1,1); // fourth[1].five = third[1]
 
-    group.Verify();
+    group.verify();
 
     group.remove_table(1); // Second
 
-    group.Verify();
+    group.verify();
 
     CHECK_EQUAL(3, group.size());
     CHECK(first->is_attached());
@@ -629,7 +629,7 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     fourth->set_link(0,1,1); // fourth[1].four = first[1]
     first->set_link(0,0,1);  // first[0].one   = third[1]
 
-    group.Verify();
+    group.verify();
 
     CHECK_EQUAL(2, first->size());
     CHECK_EQUAL(1, first->get_link(0,0));
@@ -674,7 +674,7 @@ TEST(Group_RemoveLinkTable)
     CHECK_EQUAL(1, group.size());
     CHECK(!origin->is_attached());
     CHECK(target->is_attached());
-    group.Verify();
+    group.verify();
 }
 
 
@@ -698,7 +698,7 @@ TEST(Group_RenameTable)
     CHECK_EQUAL("alpha", alpha->get_name());
     CHECK_EQUAL("alpha", beta->get_name());
     CHECK_EQUAL("gamma", gamma->get_name());
-    group.Verify();
+    group.verify();
 }
 
 
@@ -842,7 +842,7 @@ TEST(Group_Serialize1)
         table->add("",  9, true, Wed);
 
 #ifdef REALM_DEBUG
-        to_disk.Verify();
+        to_disk.verify();
 #endif
 
         // Serialize to disk
@@ -869,8 +869,8 @@ TEST(Group_Serialize1)
         // Verify that both changed correctly
         CHECK(*table == *t);
 #ifdef REALM_DEBUG
-        to_disk.Verify();
-        from_disk.Verify();
+        to_disk.verify();
+        from_disk.verify();
 #endif
     }
     {
@@ -897,7 +897,7 @@ TEST(Group_Serialize2)
     table2->add("hello", 3232, false, Sun);
 
 #ifdef REALM_DEBUG
-    to_disk.Verify();
+    to_disk.verify();
 #endif
 
     // Serialize to disk
@@ -913,8 +913,8 @@ TEST(Group_Serialize2)
     CHECK(*table2 == *t2);
 
 #ifdef REALM_DEBUG
-    to_disk.Verify();
-    from_disk.Verify();
+    to_disk.verify();
+    from_disk.verify();
 #endif
 }
 
@@ -930,7 +930,7 @@ TEST(Group_Serialize3)
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
 #ifdef REALM_DEBUG
-    to_disk.Verify();
+    to_disk.verify();
 #endif
 
     // Serialize to disk
@@ -943,8 +943,8 @@ TEST(Group_Serialize3)
     // Verify that original values are there
     CHECK(*table == *t);
 #ifdef REALM_DEBUG
-    to_disk.Verify();
-    from_disk.Verify();
+    to_disk.verify();
+    from_disk.verify();
 #endif
 }
 
@@ -966,7 +966,7 @@ TEST(Group_Serialize_Mem)
     table->add("",  9, true, Wed);
 
 #ifdef REALM_DEBUG
-    to_mem.Verify();
+    to_mem.verify();
 #endif
 
     // Serialize to memory (we now own the buffer)
@@ -982,8 +982,8 @@ TEST(Group_Serialize_Mem)
     // Verify that original values are there
     CHECK(*table == *t);
 #ifdef REALM_DEBUG
-    to_mem.Verify();
-    from_mem.Verify();
+    to_mem.verify();
+    from_mem.verify();
 #endif
 }
 
@@ -1019,7 +1019,7 @@ TEST(Group_Serialize_Optimized)
     table->optimize();
 
 #ifdef REALM_DEBUG
-    to_mem.Verify();
+    to_mem.verify();
 #endif
 
     // Serialize to memory (we now own the buffer)
@@ -1041,8 +1041,8 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(table->size()-1, res);
 
 #ifdef REALM_DEBUG
-    to_mem.Verify();
-    from_mem.Verify();
+    to_mem.verify();
+    from_mem.verify();
 #endif
 }
 
@@ -1114,7 +1114,7 @@ TEST(Group_Persist)
     db.commit();
 
 #ifdef REALM_DEBUG
-    db.Verify();
+    db.verify();
 #endif
 
     CHECK_EQUAL(6, table->get_column_count());
@@ -1135,7 +1135,7 @@ TEST(Group_Persist)
     db.commit();
 
 #ifdef REALM_DEBUG
-    db.Verify();
+    db.verify();
 #endif
 
     CHECK_EQUAL(6, table->get_column_count());
@@ -1728,7 +1728,7 @@ TEST(Group_IndexString)
     // Remove the search index and verify
     t->column().first.remove_search_index();
     CHECK(!t->column().first.has_search_index());
-    from_mem.Verify();
+    from_mem.verify();
 
     size_t m7 = t->column().first.find_first("jimmi");
     size_t m8 = t->column().first.find_first("johnny");
@@ -1750,10 +1750,10 @@ TEST(Group_StockBug)
     table->add_column(type_String, "ticker");
 
     for (size_t i = 0; i < 100; ++i) {
-        table->Verify();
+        table->verify();
         table->insert_empty_row(i);
         table->set_string(0, i, "123456789012345678901234567890123456789");
-        table->Verify();
+        table->verify();
         group.commit();
     }
 }
@@ -1772,7 +1772,7 @@ TEST(Group_CommitLinkListChange)
     LinkViewRef link_list = origin->get_linklist(0,0);
     link_list->add(0);
     group.commit();
-    group.Verify();
+    group.verify();
 }
 
 

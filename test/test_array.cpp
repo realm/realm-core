@@ -1297,7 +1297,7 @@ TEST(Array_Copy)
     b.init_from_mem(a.clone_deep(Allocator::get_default()));
 
 #ifdef REALM_DEBUG
-    b.Verify();
+    b.verify();
 #endif
 
     CHECK_EQUAL(5, b.size());
@@ -1316,7 +1316,7 @@ TEST(Array_Copy)
     d.init_from_mem(c.clone_deep(Allocator::get_default()));
 
 #ifdef REALM_DEBUG
-    d.Verify();
+    d.verify();
 #endif
 
     CHECK(d.has_refs());

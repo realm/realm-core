@@ -2039,7 +2039,7 @@ void Array::print() const
     std::cout << "\n";
 }
 
-void Array::Verify() const
+void Array::verify() const
 {
     REALM_ASSERT(is_attached());
 
@@ -2062,7 +2062,7 @@ typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptre
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
 {
-    node.Verify();
+    node.verify();
 
     // This node must not be a leaf
     REALM_ASSERT_3(node.get_type(), ==, Array::type_InnerBptreeNode);
@@ -2082,7 +2082,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         general_form = first_value % 2 == 0;
         if (general_form) {
             offsets.init_from_ref(to_ref(first_value));
-            offsets.Verify();
+            offsets.verify();
             REALM_ASSERT_3(offsets.get_type(), ==, Array::type_Normal);
             REALM_ASSERT_3(offsets.size(), ==, num_children - 1);
         }

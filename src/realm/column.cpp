@@ -93,9 +93,9 @@ void ColumnBaseWithIndex::destroy() REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-void ColumnBase::Verify(const Table&, size_t) const
+void ColumnBase::verify(const Table&, size_t) const
 {
-    Verify();
+    verify();
 }
 
 #endif // REALM_DEBUG

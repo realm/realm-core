@@ -58,7 +58,7 @@ public:
     static MemRef create_array(std::size_t size, Allocator&);
 
 #ifdef REALM_DEBUG
-    void Verify() const;
+    void verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 

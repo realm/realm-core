@@ -784,11 +784,11 @@ void StringIndex::NodeAddKey(ref_type ref)
 
 #ifdef REALM_DEBUG
 
-void StringIndex::Verify() const
+void StringIndex::verify() const
 {
-    m_array->Verify();
+    m_array->verify();
 
-    // FIXME: Extend verification along the lines of IntegerColumn::Verify().
+    // FIXME: Extend verification along the lines of IntegerColumn::verify().
 }
 
 

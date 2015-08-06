@@ -343,17 +343,17 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     REALM_ASSERT(leaf.has_refs());
     return leaf.size();
 }
 
 } // anonymous namespace
 
-void BacklinkColumn::Verify() const
+void BacklinkColumn::verify() const
 {
     if (root_is_leaf()) {
-        get_root_array()->Verify();
+        get_root_array()->verify();
         REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
@@ -361,9 +361,9 @@ void BacklinkColumn::Verify() const
     get_root_array()->verify_bptree(&verify_leaf);
 }
 
-void BacklinkColumn::Verify(const Table& table, size_t col_ndx) const
+void BacklinkColumn::verify(const Table& table, size_t col_ndx) const
 {
-    IntegerColumn::Verify(table, col_ndx);
+    IntegerColumn::verify(table, col_ndx);
 
     // Check that the origin column specifies the right target
     REALM_ASSERT(&m_origin_column->get_target_table() == &table);

@@ -326,26 +326,26 @@ void StringEnumColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
 #ifdef REALM_DEBUG
 
-void StringEnumColumn::Verify() const
+void StringEnumColumn::verify() const
 {
-    m_keys.Verify();
-    IntegerColumn::Verify();
+    m_keys.verify();
+    IntegerColumn::verify();
 
     if (m_search_index) {
-        m_search_index->Verify();
+        m_search_index->verify();
         // FIXME: Verify search index contents in a way similar to what is done
-        // in StringColumn::Verify().
+        // in StringColumn::verify().
     }
 }
 
 
-void StringEnumColumn::Verify(const Table& table, size_t col_ndx) const
+void StringEnumColumn::verify(const Table& table, size_t col_ndx) const
 {
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
     REALM_ASSERT_3(m_keys.get_root_array()->get_ndx_in_parent(), ==, spec.get_enumkeys_ndx(col_ndx));
 
-    IntegerColumn::Verify(table, col_ndx);
+    IntegerColumn::verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     bool has_search_index = (attr & col_attr_Indexed) != 0;
