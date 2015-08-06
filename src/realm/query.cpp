@@ -1144,7 +1144,7 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
             // so we have to re-initialize it before searching
             Init(*m_table);
 
-            r = FindInternal(r, end - results);
+            r = find_internal(r, end - results);
             if (r == not_found || r == m_table->size() || results == limit)
                 break;
             ++results;
@@ -1317,7 +1317,7 @@ bool Query::is_initialized() const
     return true;
 }
 
-size_t Query::FindInternal(size_t start, size_t end) const
+size_t Query::find_internal(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_table->size();
