@@ -89,7 +89,7 @@ void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t of
 }
 
 
-void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
+void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
@@ -444,7 +444,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         }
         else {
             StringIndex subindex(m_target_column, m_array->get_alloc());
-            subindex.InsertRowList(sub.get_ref(), suboffset, v2);
+            subindex.insert_row_list(sub.get_ref(), suboffset, v2);
             subindex.insert_with_offset(row_ndx, value, suboffset);
             m_array->set(ins_pos_refs, subindex.get_ref());
         }

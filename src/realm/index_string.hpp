@@ -145,7 +145,7 @@ private:
     static Array* create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
-    void InsertRowList(size_t ref, size_t offset, StringData value);
+    void insert_row_list(size_t ref, size_t offset, StringData value);
     key_type GetLastKey() const;
 
     /// Add small signed \a diff to all elements that are greater than, or equal
