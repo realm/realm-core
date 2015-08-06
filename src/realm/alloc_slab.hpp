@@ -65,7 +65,7 @@ struct InvalidDatabase;
 class SlabAlloc: public Allocator {
 public:
     ~SlabAlloc() REALM_NOEXCEPT override;
-
+    SlabAlloc();
     /// Attach this allocator to the specified file.
     ///
     /// When used by free-standing Group instances, no concurrency is
@@ -318,7 +318,10 @@ private:
     std::size_t m_num_additional_mappings = 0;
     std::size_t m_capacity_additional_mappings = 0;
     std::size_t m_chunk_size = 0;
+    int m_chunk_shifts = 0;
     util::File::Map<char>* m_additional_mappings = 0;
+    std::size_t* m_chunk_bases = 0;
+    int m_num_chunk_bases = 0;
     AttachMode m_attach_mode = attach_None;
 
     /// If a file or buffer is currently attached and validation was
@@ -387,10 +390,12 @@ private:
     /// The chunk index is determined solely by the minimal chunk size,
     /// and does not necessarily reflect the mapping. A mapping may
     /// cover multiple chunks - the initial mapping often does.
-    std::size_t get_chunk_index(std::size_t pos) const REALM_NOEXCEPT;
+    inline std::size_t get_chunk_index(std::size_t pos) const REALM_NOEXCEPT;
 
     /// Reverse: get the base offset of a chunk at a given index
-    std::size_t get_chunk_base(std::size_t index) const REALM_NOEXCEPT;
+    inline std::size_t get_chunk_base(std::size_t index) const REALM_NOEXCEPT;
+
+    std::size_t compute_chunk_base(std::size_t index) const REALM_NOEXCEPT;
 
     friend class Group;
     friend class GroupWriter;

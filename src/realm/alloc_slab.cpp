@@ -35,6 +35,17 @@ public:
 
 } // anonymous namespace
 
+SlabAlloc::SlabAlloc()
+{
+    m_chunk_size = page_size();
+    m_chunk_shifts = 1 + log2(m_chunk_size);
+    std::size_t max = std::numeric_limits<std::size_t>::max();
+    m_num_chunk_bases = 1 + get_chunk_index(max);
+    m_chunk_bases = new std::size_t[m_num_chunk_bases];
+    for (int i = 0; i < m_num_chunk_bases; ++i) {
+        m_chunk_bases[i] = compute_chunk_base(i);
+    }
+}
 
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
     { 0, 0 }, // top-refs
@@ -111,8 +122,11 @@ void SlabAlloc::detach() REALM_NOEXCEPT
         case attach_UnsharedFile:
             File::unmap(m_data, m_initial_mapping_size);
             if (m_additional_mappings) {
+                // running the destructors on the mappings will cause them to unmap:
                 delete[] m_additional_mappings;
                 m_additional_mappings = 0;
+                delete[] m_chunk_bases;
+                m_chunk_bases = 0;
             }
             m_file.close();
             goto found;
@@ -378,7 +392,7 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
         // reference must be inside a chunk mapped later
         std::size_t chunk_index = get_chunk_index(ref);
         std::size_t mapping_index = chunk_index - m_first_additional_chunk;
-        std::size_t chunk_offset = ref - get_lower_mmap_boundary(ref);
+        std::size_t chunk_offset = ref - get_chunk_base(chunk_index);
         REALM_ASSERT_DEBUG(m_additional_mappings);
         REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
         return m_additional_mappings[mapping_index].get_addr() + chunk_offset;
@@ -402,7 +416,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // the detached state.
 
     REALM_ASSERT(!is_attached());
-    m_chunk_size = page_size();
 
     // When 'read_only' is true, this function will throw InvalidDatabase if the
     // file exists already but is empty. This can happen if another process is
@@ -776,9 +789,22 @@ bool SlabAlloc::matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT
     return pos == get_lower_mmap_boundary(pos);
 }
 
-std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
+// A database file is viewed as a number of chunks of exponentially growing size.
+// The first 16 chunks are 1 x page size, the next 8 chunks are 2 x page size,
+// then follows 8 chunks of 4 x page size, 8 chunks of 8 x page size and so forth.
+// This layout makes it possible to determine the chunk number for a given offset
+// into the file in constant time using a bit scan intrinsic and a few bit manipulations.
+// The get_chunk_index() method determines the chunk number from the offset, while
+// the get_chunk_base() does the opposite, giving the starting offset for a given
+// chunk number.
+//
+// Please note that the file is not necessarily mmapped with a separate mapping
+// for each chunk, multiple chunks may be mmapped with a single mmap.
+
+inline std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
 {
-    size_t chunk_base_number = pos/m_chunk_size;
+    // size_t chunk_base_number = pos/m_chunk_size;
+    size_t chunk_base_number = pos >> m_chunk_shifts;
     size_t chunk_group_number = chunk_base_number/16;
     size_t index;
     if (chunk_group_number == 0) {
@@ -797,22 +823,30 @@ std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
     return index;
 }
 
-std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
+std::size_t SlabAlloc::compute_chunk_base(std::size_t index) const REALM_NOEXCEPT
 {
     size_t base;
     if (index < 16) {
-        base = index * m_chunk_size;
+        // base = index * m_chunk_size;
+        base = index << m_chunk_shifts;
     }
     else {
         size_t chunk_index_in_group = index & 7;
         size_t log_index = (index - chunk_index_in_group)/8 - 2;
         size_t chunk_base_number = (8 + chunk_index_in_group)<<(1+log_index);
-        base = m_chunk_size * chunk_base_number;
+        // base = m_chunk_size * chunk_base_number;
+        base = chunk_base_number << m_chunk_shifts;
     }
 //    std::cerr << "                                   chunk_base( " << 
 //        index << " ) -> " << base << std::endl;
     return base;
 //    return index * m_chunk_size;
+}
+
+inline std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
+{
+    REALM_ASSERT_DEBUG(index < m_num_chunk_bases);
+    return m_chunk_bases[index];
 }
 
 #ifdef REALM_DEBUG
