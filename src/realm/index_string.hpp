@@ -87,7 +87,7 @@ public:
     template <class T> size_t find_first(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindFirst(to_str(value), m_target_column);
+        return m_array->index_string_find_first(to_str(value), m_target_column);
     }
 
     template <class T> void find_all(IntegerColumn& result, T value) const

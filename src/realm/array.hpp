@@ -459,7 +459,7 @@ public:
     void ensure_minimum_width(int64_t value);
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(StringData value, ColumnBase* column) const;
+    size_t index_string_find_first(StringData value, ColumnBase* column) const;
     void   IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBase* column) const;
     size_t IndexStringCount(StringData value, ColumnBase* column) const;
     FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, ColumnBase* column) const;

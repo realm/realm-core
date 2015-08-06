@@ -2927,7 +2927,7 @@ top:
     }
 }
 
-size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column) const
+size_t Array::index_string_find_first(StringData value, ColumnBase* column) const
 {
     size_t dummy;
     IntegerColumn dummycol;
