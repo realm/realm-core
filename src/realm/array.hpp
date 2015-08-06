@@ -674,7 +674,7 @@ public:
 
     // Non-SSE find for Less/Greater
     template<bool gt, Action action, size_t bitwidth, class Callback>
-    bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex,
+    bool compare_relation(int64_t value, size_t start, size_t end, size_t baseindex,
                          QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t foreign_width, class Callback, size_t width>
@@ -3174,9 +3174,9 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
     else if (cond == cond_NotEqual)
         ret = compare_equality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_Greater)
-        ret = CompareRelation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_relation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_Less)
-        ret = CompareRelation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_relation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else
         REALM_ASSERT_DEBUG(false);
 
@@ -3184,7 +3184,7 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
 }
 
 template<bool gt, Action action, size_t bitwidth, class Callback>
-bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                             Callback callback) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
