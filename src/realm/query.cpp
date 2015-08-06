@@ -13,7 +13,7 @@ using namespace realm;
 
 Query::Query() : m_view(nullptr), m_source_table_view(0), m_owns_source_table_view(false)
 {
-    Create();
+    create();
 //    expression(static_cast<Expression*>(this));
 }
 
@@ -21,7 +21,7 @@ Query::Query(Table& table, TableViewBase* tv)
     : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
-    Create();
+    create();
 }
 
 Query::Query(const Table& table, const LinkViewRef& lv):
@@ -30,14 +30,14 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     m_source_link_view(lv), m_source_table_view(0), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
-    Create();
+    create();
 }
 
 Query::Query(const Table& table, TableViewBase* tv) 
     : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
-    Create();
+    create();
 }
 
 Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
@@ -46,9 +46,9 @@ Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
     tv.release();
 
     REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
-    Create();
+    create();
 }
-void Query::Create()
+void Query::create()
 {
     // fixme, hack that prevents 'first' from relocating; this limits queries to 16 nested levels of group/end_group
     first.reserve(16);
@@ -92,7 +92,7 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 
 void Query::copy_nodes(const Query& source)
 {
-        Create();
+        create();
         first = source.first;
         std::map<ParentNode*, ParentNode*> node_mapping;
         node_mapping[nullptr] = nullptr;
@@ -865,7 +865,7 @@ Query& Query::group()
 {
     update.push_back(0);
     update_override.push_back(0);
-    REALM_ASSERT_3(first.capacity(), >, first.size()); // see fixme in ::Create()
+    REALM_ASSERT_3(first.capacity(), >, first.size()); // see fixme in ::create()
     first.push_back(0);
     pending_not.push_back(false);
     return *this;

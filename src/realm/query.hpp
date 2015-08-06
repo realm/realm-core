@@ -255,7 +255,7 @@ public:
 protected:
     Query(Table& table, TableViewBase* tv = nullptr);
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
-    void Create();
+    void create();
 
     void   Init(const Table& table) const;
     bool   is_initialized() const;
