@@ -73,7 +73,7 @@ void StringIndex::set_target(ColumnBase* target_column) REALM_NOEXCEPT
 }
 
 
-StringIndex::key_type StringIndex::GetLastKey() const
+StringIndex::key_type StringIndex::get_last_key() const
 {
     Array offsets(m_array->get_alloc());
     get_child(*m_array, 0, offsets);
@@ -184,7 +184,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
         if (nc.type ==  NodeChange::none) {
             // update keys
-            key_type last_key = target.GetLastKey();
+            key_type last_key = target.get_last_key();
             offsets.set(node_ndx, last_key);
             return NodeChange::none; // no new nodes
         }
@@ -209,7 +209,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         StringIndex new_node(inner_node_tag(), alloc);
         if (nc.type == NodeChange::split) {
             // update offset for left node
-            key_type last_key = target.GetLastKey();
+            key_type last_key = target.get_last_key();
             offsets.set(node_ndx, last_key);
 
             new_node.NodeAddKey(nc.ref2);
@@ -312,11 +312,11 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
                         m_deny_duplicate_values, alloc);
 
     // Update original key
-    key_type last_key = orig_col.GetLastKey();
+    key_type last_key = orig_col.get_last_key();
     offsets.set(ndx, last_key);
 
     // Insert new ref
-    key_type new_key = new_col.GetLastKey();
+    key_type new_key = new_col.get_last_key();
     offsets.insert(ndx+1, new_key);
     m_array->insert(ndx+2, new_ref);
 }
@@ -337,7 +337,7 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
 
     StringIndex col(ref, 0, 0, m_target_column,
                     m_deny_duplicate_values, alloc);
-    key_type last_key = col.GetLastKey();
+    key_type last_key = col.get_last_key();
 
     offsets.insert(ndx, last_key);
     m_array->insert(ndx+1, ref);
@@ -592,7 +592,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
             node.destroy();
         }
         else {
-            key_type max_val = node.GetLastKey();
+            key_type max_val = node.get_last_key();
             if (max_val != key_type(values.get(pos)))
                 values.set(pos, max_val);
         }

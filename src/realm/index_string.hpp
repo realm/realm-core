@@ -146,7 +146,7 @@ private:
 
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
-    key_type GetLastKey() const;
+    key_type get_last_key() const;
 
     /// Add small signed \a diff to all elements that are greater than, or equal
     /// to \a min_row_ndx.
