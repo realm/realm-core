@@ -257,7 +257,7 @@ protected:
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void create();
 
-    void   Init(const Table& table) const;
+    void   init(const Table& table) const;
     bool   is_initialized() const;
     size_t find_internal(size_t start = 0, size_t end=size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;

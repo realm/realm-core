@@ -674,7 +674,7 @@ template <Action action, typename T, typename R, class ColType>
     else {
 
         // Aggregate with criteria - goes through the nodes in the query system
-        Init(*m_table);
+        init(*m_table);
         QueryState<R> st;
         st.init(action, nullptr, limit);
 
@@ -998,7 +998,7 @@ size_t Query::find(size_t begin)
 
     REALM_ASSERT_3(begin, <=, m_table->size());
 
-    Init(*m_table);
+    init(*m_table);
 
     // User created query with no criteria; return first
     if (first.size() == 0 || first[0] == nullptr) {
@@ -1031,7 +1031,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
 
     REALM_ASSERT_3(start, <=, m_table->size());
 
-    Init(*m_table);
+    init(*m_table);
 
     if (end == size_t(-1))
         end = m_view ? m_view->size() : m_table->size();
@@ -1087,7 +1087,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
         return (limit < end - start ? limit : end - start);
     }
 
-    Init(*m_table);
+    init(*m_table);
     size_t cnt = 0;
 
     if (m_view) {
@@ -1124,7 +1124,7 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
             if (start + results == end || results == limit)
                 return results;
 
-            Init(*m_table);
+            init(*m_table);
             size_t r = peek_tableview(start + results);
             if (r != not_found) {
                 m_table->remove(r);
@@ -1142,7 +1142,7 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
         for (;;) {
             // Every remove invalidates the array cache in the nodes
             // so we have to re-initialize it before searching
-            Init(*m_table);
+            init(*m_table);
 
             r = find_internal(r, end - results);
             if (r == not_found || r == m_table->size() || results == limit)
@@ -1161,7 +1161,7 @@ TableView Query::find_all_multi(size_t start, size_t end)
     (void)end;
 
     // Initialization
-    Init(*m_table);
+    init(*m_table);
     ts.next_job = start;
     ts.end_job = end;
     ts.done_job = 0;
@@ -1298,7 +1298,7 @@ std::string Query::validate()
     return first[0]->validate(); // errors detected by QueryEngine
 }
 
-void Query::Init(const Table& table) const
+void Query::init(const Table& table) const
 {
     if (first[0] != nullptr) {
         ParentNode* top = first[0];
