@@ -99,7 +99,7 @@ public:
     template <class T> FindRes find_all(T value, ref_type& ref) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column);
+        return m_array->index_string_find_all_no_copy(to_str(value), ref, m_target_column);
     }
 
     template <class T> size_t count(T value) const

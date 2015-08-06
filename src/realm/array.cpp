@@ -2943,7 +2943,7 @@ void Array::IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBa
 }
 
 
-FindRes Array::IndexStringFindAllNoCopy(StringData value, ref_type& res_ref, ColumnBase* column) const
+FindRes Array::index_string_find_all_no_copy(StringData value, ref_type& res_ref, ColumnBase* column) const
 {
     IntegerColumn dummy; return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
 }
