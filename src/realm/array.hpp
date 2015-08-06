@@ -706,7 +706,7 @@ public:
 
 #endif
 
-    template<size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
+    template<size_t width> inline bool test_zero(uint64_t value) const;         // Tests value for 0-elements
     template<bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
     template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
@@ -2502,7 +2502,7 @@ template<size_t width> inline int64_t Array::lower_bits() const
 }
 
 // Tests if any chunk in 'value' is 0
-template<size_t width> inline bool Array::TestZero(uint64_t value) const
+template<size_t width> inline bool Array::test_zero(uint64_t value) const
 {
     uint64_t hasZeroByte;
     uint64_t lower = lower_bits<width>();
@@ -2512,7 +2512,7 @@ template<size_t width> inline bool Array::TestZero(uint64_t value) const
 }
 
 // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
-// IMPORTANT: This function assumes that at least 1 item matches (test this with TestZero() or other means first)!
+// IMPORTANT: This function assumes that at least 1 item matches (test this with test_zero() or other means first)!
 template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
 {
     size_t start = 0;
@@ -2525,15 +2525,15 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     }
 
     // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay
-    // off because the work done by TestZero() is wasted for the cases where the value exists in first half, but
+    // off because the work done by test_zero() is wasted for the cases where the value exists in first half, but
     // useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
-        hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
+        hasZeroByte = test_zero<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
             start += 64 / no0(width) / 2;
             if (width <= 4) {
-                hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
+                hasZeroByte = test_zero<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
                     start += 64 / no0(width) / 4;
@@ -2543,7 +2543,7 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
         else {
             if (width <= 4) {
                 // ??00
-                hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
+                hasZeroByte = test_zero<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
                     start += 64 / no0(width) / 4;
@@ -2779,7 +2779,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
             start = (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(width);
             size_t a = 0;
 
-            while (eq ? TestZero<width>(v2) : v2) {
+            while (eq ? test_zero<width>(v2) : v2) {
 
                 if (find_action_pattern<action, Callback>(start + baseindex, cascade<width, eq>(v2), state, callback))
                     break; // consumed
