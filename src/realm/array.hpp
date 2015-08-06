@@ -669,7 +669,7 @@ public:
 
     // Non-SSE find for Equal/NotEqual
     template<bool eq, Action action, size_t width, class Callback>
-    inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex,
+    inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex,
                                 QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Less/Greater
@@ -2445,7 +2445,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start >= sizeof(__m128i) && m_width >= 8 &&
         (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
 
-        // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
+        // FindSSE() must start at 16-byte boundary, so search area before that using compare_equality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
         __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
 
@@ -2465,7 +2465,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
                 }
         }
 
-        // Search remainder with CompareEquality()
+        // Search remainder with compare_equality()
         if (!Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
             return false;
 
@@ -2750,7 +2750,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::find_
 }
 
 
-template<bool eq, Action action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<bool eq, Action action, size_t width, class Callback> inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
@@ -3170,9 +3170,9 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
     bool ret = false;
 
     if (cond == cond_Equal)
-        ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_equality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_NotEqual)
-        ret = CompareEquality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_equality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_Greater)
         ret = CompareRelation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_Less)
