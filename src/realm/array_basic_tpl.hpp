@@ -223,7 +223,7 @@ std::size_t BasicArray<T>::calc_byte_len(std::size_t size, std::size_t) const
 }
 
 template<class T>
-std::size_t BasicArray<T>::CalcItemCount(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
+std::size_t BasicArray<T>::calc_item_count(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
 {
     // FIXME: ??? what about width = 0? return -1?
 

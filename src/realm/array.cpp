@@ -192,11 +192,11 @@ void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
     }
     else {
         size_t byte_capacity = get_capacity_from_header(header);
-        // FIXME: Avoid calling virtual method CalcItemCount() here,
+        // FIXME: Avoid calling virtual method calc_item_count() here,
         // instead calculate the capacity in a way similar to what is done
         // in get_byte_size_from_header(). The virtual call makes "life"
         // hard for constructors in derived array classes.
-        m_capacity = CalcItemCount(byte_capacity, m_width);
+        m_capacity = calc_item_count(byte_capacity, m_width);
     }
 
     m_ref = mem.m_ref;
@@ -610,7 +610,7 @@ void Array::truncate(size_t size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (size == 0) {
-        m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
     }
@@ -641,7 +641,7 @@ void Array::truncate_and_destroy_children(size_t size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (size == 0) {
-        m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
     }
@@ -677,7 +677,7 @@ void Array::set_all_to_zero()
 {
     copy_on_write(); // Throws
 
-    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+    m_capacity = calc_item_count(get_capacity_from_header(), 0);
     set_width(0);
 
     // Update header
@@ -1418,7 +1418,7 @@ size_t Array::calc_byte_len(size_t count, size_t width) const
     return bytes + header_size; // add room for 8 byte header
 }
 
-size_t Array::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
+size_t Array::calc_item_count(size_t bytes, size_t width) const REALM_NOEXCEPT
 {
     if (width == 0)
         return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
@@ -1517,7 +1517,7 @@ void Array::copy_on_write()
     // Update internal data
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
-    m_capacity = CalcItemCount(new_size, m_width);
+    m_capacity = calc_item_count(new_size, m_width);
     REALM_ASSERT_DEBUG(m_capacity > 0);
 
     // Update capacity in header. Uses m_data to find header, so
@@ -1687,14 +1687,14 @@ void Array::alloc(size_t size, size_t width)
             // Update this accessor and its ancestors
             m_ref      = mem_ref.m_ref;
             m_data     = get_data_from_header(header);
-            m_capacity = CalcItemCount(capacity_bytes, width);
+            m_capacity = calc_item_count(capacity_bytes, width);
             // FIXME: Trouble when this one throws. We will then leave
             // this array instance in a corrupt state
             update_parent(); // Throws
             return;
         }
 
-        m_capacity = CalcItemCount(capacity_bytes, width);
+        m_capacity = calc_item_count(capacity_bytes, width);
         set_header_width(int(width));
     }
 

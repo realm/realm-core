@@ -64,7 +64,7 @@ public:
 
 private:
     std::size_t calc_byte_len(std::size_t count, std::size_t width) const override;
-    std::size_t CalcItemCount(std::size_t bytes,
+    std::size_t calc_item_count(std::size_t bytes,
                               std::size_t width) const REALM_NOEXCEPT override;
     WidthType GetWidthType() const override { return wtype_Ignore; }
 };
@@ -133,7 +133,7 @@ inline std::size_t ArrayBlob::calc_byte_len(std::size_t count, std::size_t) cons
     return header_size + count;
 }
 
-inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
+inline std::size_t ArrayBlob::calc_item_count(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
 {
     return bytes - header_size;
 }

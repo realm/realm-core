@@ -959,7 +959,7 @@ protected:
     // Includes array header. Not necessarily 8-byte aligned.
     virtual std::size_t calc_byte_len(std::size_t size, std::size_t width) const;
 
-    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
+    virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
     bool get_is_inner_bptree_node_from_header() const REALM_NOEXCEPT;

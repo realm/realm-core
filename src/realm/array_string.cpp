@@ -188,7 +188,7 @@ size_t ArrayString::calc_byte_len(size_t count, size_t width) const
     return header_size + (count * width);
 }
 
-size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
+size_t ArrayString::calc_item_count(size_t bytes, size_t width) const REALM_NOEXCEPT
 {
     if (width == 0) return size_t(-1); // zero-width gives infinite space
 
