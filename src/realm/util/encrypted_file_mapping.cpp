@@ -24,10 +24,13 @@
 
 #if REALM_ENABLE_ENCRYPTION
 #include <cstdlib>
-#include <iostream>
 #include <algorithm>
 
-#include <cstdio>
+#ifdef REALM_DEBUG
+#  include <cstdio>
+#  include <iostream>
+#endif
+
 #include <cstring>
 #include <pthread.h>
 #include <sys/mman.h>

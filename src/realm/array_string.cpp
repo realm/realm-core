@@ -1,9 +1,12 @@
 #include <cstdlib>
-#include <cstdio> // debug
 #include <algorithm>
-#include <iostream>
-#include <iomanip>
 #include <cstring>
+
+#ifdef REALM_DEBUG
+#  include <cstdio>
+#  include <iostream>
+#  include <iomanip>
+#endif
 
 #include <realm/utilities.hpp>
 #include <realm/array_string.hpp>

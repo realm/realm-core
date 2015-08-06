@@ -45,7 +45,6 @@ Searching: The main finding function is:
 #include <utility>
 #include <vector>
 #include <ostream>
-#include <sstream>
 
 #include <stdint.h> // unint8_t etc
 
@@ -159,30 +158,13 @@ namespace _impl { class ArrayWriterBase; }
 
 
 #ifdef REALM_DEBUG
-class MemStats {
-public:
-    MemStats():
-        allocated(0),
-        used(0),
-        array_count(0)
-    {
-    }
-    size_t allocated;
-    size_t used;
-    size_t array_count;
+struct MemStats {
+    size_t allocated = 0;
+    size_t used = 0;
+    size_t array_count = 0;
 };
 template<class C, class T>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats)
-{
-    std::ostringstream out_2;
-    out_2.setf(std::ios::fixed);
-    out_2.precision(1);
-    double used_percent = 100.0 * stats.used / stats.allocated;
-    out_2 << "allocated = "<<stats.allocated<<", used = "<<stats.used<<" ("<<used_percent<<"%), "
-        "array_count = "<<stats.array_count;
-    out << out_2.str();
-    return out;
-}
+std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats);
 #endif
 
 

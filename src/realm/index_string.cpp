@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <iomanip>
+#include <iostream>
 
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
@@ -891,6 +892,12 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
 {
     dump_node_structure(*m_array, out, level);
+}
+
+
+void StringIndex::to_dot() const
+{
+    to_dot(std::cerr);
 }
 
 

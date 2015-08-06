@@ -1,9 +1,12 @@
 #include <new>
 #include <algorithm>
 #include <set>
-#include <iostream>
-#include <iomanip>
 #include <fstream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#  include <iomanip>
+#endif
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
