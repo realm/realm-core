@@ -77,14 +77,14 @@ void StringEnumColumn::set(size_t ndx, StringData value)
         m_search_index->set(ndx, value);
     }
 
-    size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = get_key_ndx_or_add(value);
     set_without_updating_index(ndx, key_ndx);
 }
 
 
 void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
-    size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = get_key_ndx_or_add(value);
     int64_t value_2 = int64_t(key_ndx);
     insert_without_updating_index(row_ndx, value_2, num_rows); // Throws
 
@@ -98,7 +98,7 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
 
 void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
 {
-    size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = get_key_ndx_or_add(value);
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     int64_t value_2 = int64_t(key_ndx);
     insert_without_updating_index(row_ndx_2, value_2, num_rows); // Throws
@@ -224,7 +224,7 @@ size_t StringEnumColumn::GetKeyNdx(StringData value) const
     return m_keys.find_first(value);
 }
 
-size_t StringEnumColumn::GetKeyNdxOrAdd(StringData value)
+size_t StringEnumColumn::get_key_ndx_or_add(StringData value)
 {
     size_t res = m_keys.find_first(value);
     if (res != realm::not_found)
