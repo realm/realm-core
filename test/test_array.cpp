@@ -874,8 +874,8 @@ TEST(Array_FindHasZeroByte)
     has_zero_byte(test_results, 8000000000LL, n); // 64
 }
 
-// New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
-TEST(Array_FindSSE)
+// New find test for SSE search, to trigger partial finds (see find_sse()) before and after the aligned data area
+TEST(Array_find_sse)
 {
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);

@@ -696,7 +696,7 @@ public:
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef REALM_COMPILER_SSE
     template<class cond2, Action action, size_t width, class Callback>
-    bool FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
+    bool find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
                  size_t baseindex, Callback callback) const;
 
     template<class cond2, Action action, size_t width, class Callback>
@@ -2445,7 +2445,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start >= sizeof(__m128i) && m_width >= 8 &&
         (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
 
-        // FindSSE() must start at 16-byte boundary, so search area before that using compare_equality()
+        // find_sse() must start at 16-byte boundary, so search area before that using compare_equality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
         __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
 
@@ -2455,12 +2455,12 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         // Search aligned area with SSE
         if (b > a) {
             if (sseavx<42>()) {
-                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!find_sse<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
                 }
                 else if (sseavx<30>()) {
 
-                if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!find_sse<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
                 }
         }
@@ -2842,7 +2842,7 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 #ifdef REALM_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
 template<class cond2, Action action, size_t width, class Callback>
-bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
+bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
                     Callback callback) const
 {
     __m128i search = {0};
