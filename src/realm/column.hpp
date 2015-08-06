@@ -586,6 +586,9 @@ private:
     void do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last);
 };
 
+extern template class Column<int64_t, true>;
+extern template class Column<int64_t, false>;
+
 
 // Implementation:
 
