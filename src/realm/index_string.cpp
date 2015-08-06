@@ -200,7 +200,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
                 node_insert_split(node_ndx, nc.ref2);
             }
             else {
-                NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+                node_insert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             }
             return NodeChange::none;
         }
@@ -322,7 +322,7 @@ void StringIndex::node_insert_split(size_t ndx, size_t new_ref)
 }
 
 
-void StringIndex::NodeInsert(size_t ndx, size_t ref)
+void StringIndex::node_insert(size_t ndx, size_t ref)
 {
     REALM_ASSERT(ref);
     REALM_ASSERT(m_array->is_inner_bptree_node());
