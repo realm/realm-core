@@ -859,7 +859,7 @@ size_t Array::first_set_bit64(int64_t v) const
 
 namespace {
 
-template<size_t width> inline int64_t LowerBits()
+template<size_t width> inline int64_t lower_bits()
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -884,8 +884,8 @@ template<size_t width> inline int64_t LowerBits()
 // Return true if 'value' has an element (of bit-width 'width') which is 0
 template<size_t width> inline bool has_zero_element(uint64_t value) {
     uint64_t hasZeroByte;
-    uint64_t lower = LowerBits<width>();
-    uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
+    uint64_t lower = lower_bits<width>();
+    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
     hasZeroByte = (value - lower) & ~value & upper;
     return hasZeroByte != 0;
 }

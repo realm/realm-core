@@ -710,7 +710,7 @@ public:
     template<bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
     template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
-    template<size_t width> inline int64_t LowerBits() const;                   // Return chunk with lower bit set in each element
+    template<size_t width> inline int64_t lower_bits() const;                   // Return chunk with lower bit set in each element
     std::size_t first_set_bit(unsigned int v) const;
     std::size_t first_set_bit64(int64_t v) const;
     template<std::size_t w> int64_t get_universal(const char* const data, const std::size_t ndx) const;
@@ -2479,7 +2479,7 @@ return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, 
 #endif
 }
 
-template<size_t width> inline int64_t Array::LowerBits() const
+template<size_t width> inline int64_t Array::lower_bits() const
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -2505,8 +2505,8 @@ template<size_t width> inline int64_t Array::LowerBits() const
 template<size_t width> inline bool Array::TestZero(uint64_t value) const
 {
     uint64_t hasZeroByte;
-    uint64_t lower = LowerBits<width>();
-    uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
+    uint64_t lower = lower_bits<width>();
+    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
     hasZeroByte = (value - lower) & ~value & upper;
     return hasZeroByte != 0;
 }
@@ -2925,7 +2925,7 @@ REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data
 
         while (resmask != 0) {
 
-            uint64_t upper = LowerBits<width / 8>() << (no0(width / 8) - 1);
+            uint64_t upper = lower_bits<width / 8>() << (no0(width / 8) - 1);
             uint64_t pattern = resmask & upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
             if (find_action_pattern<action, Callback>(s + baseindex, pattern, state, callback))
                 break;
@@ -3215,7 +3215,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
         if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0))) {
             // 15 ms
             while (p < e) {
-                uint64_t upper = LowerBits<bitwidth>() << (no0(bitwidth) - 1);
+                uint64_t upper = lower_bits<bitwidth>() << (no0(bitwidth) - 1);
 
                 const int64_t v = *p;
                 size_t idx;
@@ -3225,7 +3225,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
                 if ((bitwidth > 4 ? !upper : true)) {
                     // Assert that all values in chunk are positive.
-                    REALM_ASSERT(bitwidth <= 4 || ((LowerBits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
+                    REALM_ASSERT(bitwidth <= 4 || ((lower_bits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
                     idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
                 else
