@@ -682,15 +682,15 @@ public:
                        QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                       QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                       QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t width, class Callback>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                       QueryState<int64_t>* state, Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
@@ -2944,7 +2944,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 #endif //REALM_COMPILER_SSE
 
 template<class cond, Action action, class Callback>
-bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                          Callback callback) const
 {
     cond c;
@@ -2987,12 +2987,12 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
     }
 
     bool r;
-    REALM_TEMPEX4(r = CompareLeafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX4(r = compare_leafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
 
-template<class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<class cond, Action action, size_t width, class Callback> bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     size_t fw = foreign->m_width;
     bool r;

@@ -1661,13 +1661,13 @@ public:
 
         while (s < end) {
             if (std::is_same<TConditionValue, int64_t>::value) {
-                // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
+                // For int64_t we've created an array intrinsics named compare_leafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 m_getter1.cache_next(s);
                 m_getter2.cache_next(s);
 
                 QueryState<int64_t> qs;
-                bool resume = m_getter1.m_leaf_ptr->template CompareLeafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_leaf_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
+                bool resume = m_getter1.m_leaf_ptr->template compare_leafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_leaf_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
 
                 if (resume)
                     s = m_getter1.m_leaf_end;
