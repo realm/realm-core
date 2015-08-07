@@ -59,6 +59,16 @@ public:
 };
 
 
+/// Thrown by the \c SharedGroup constructor if an attempt is made to open a
+/// file that contains an old version / of the database, all the while
+/// preventing the constructing from upgrading the database (by setting the
+/// \a allow_upgrade argument to `false`).
+class UpgradeRequired: public std::exception {
+public:
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+};
+
+
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
 /// been stated) in the documentation of the public API, and only in cases
@@ -184,6 +194,11 @@ inline const char* CrossTableLinkTarget::what() const REALM_NOEXCEPT_OR_NOTHROW
 inline const char* DescriptorMismatch::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "Table descriptor mismatch";
+}
+
+inline const char* UpgradeRequired::what() const REALM_NOEXCEPT_OR_NOTHROW
+{
+    return "Database upgrade required but prohibited";
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):
