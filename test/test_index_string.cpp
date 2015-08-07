@@ -94,7 +94,7 @@ TEST(StringIndex_NonIndexable)
     table->add_column(type_Binary, "binary");
 
     for (size_t i = 0; i < table->size(); i++) {
-        CHECK_THROW(table->add_search_index(i), LogicError);
+        CHECK_LOGIC_ERROR(table->add_search_index(i), LogicError::illegal_combination);
     }
 }
 
