@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Reverted prelinking of static libraries on Apple platforms as it caused
+  `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
+  when sorting by integer or floating point columns.
 
 ### API breaking changes:
 
