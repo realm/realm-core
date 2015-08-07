@@ -392,7 +392,6 @@ public:
     Column(Allocator&, ref_type);
     Column(unattached_root_tag, Allocator&);
     Column(Column<T, Nullable>&&) REALM_NOEXCEPT = default;
-    ~Column() REALM_NOEXCEPT override;
 
     void init_from_parent();
     void init_from_ref(Allocator&, ref_type);
@@ -441,12 +440,18 @@ public:
     bool is_null(std::size_t ndx) const REALM_NOEXCEPT override;
     T back() const REALM_NOEXCEPT;
     void set(std::size_t, T value);
-    void set(std::size_t, null);
+    template <bool Enable=Nullable>
+    typename std::enable_if<Enable>::type
+    set(std::size_t, null);
     void set_null(std::size_t) override;
     void add(T value = T{});
-    void add(null);
+    template <bool Enable=Nullable>
+    typename std::enable_if<Enable>::type
+    add(null);
     void insert(std::size_t ndx, T value = T{}, std::size_t num_rows = 1);
-    void insert(std::size_t ndx, null, std::size_t num_rows = 1);
+    template<bool Enable = Nullable>
+    typename std::enable_if<Enable>::type
+    insert(std::size_t ndx, null, std::size_t num_rows = 1);
     void erase(size_t row_ndx);
     void erase(size_t row_ndx, bool is_last);
     void move_last_over(size_t row_ndx, size_t last_row_ndx);
@@ -461,7 +466,9 @@ public:
     void set_uint(std::size_t ndx, uint64_t value);
     void set_as_ref(std::size_t ndx, ref_type value);
 
-    void destroy_subtree(std::size_t ndx, bool clear_value);
+    template<bool N = Nullable>
+    typename std::enable_if<!N>::type
+    destroy_subtree(std::size_t ndx, bool clear_value);
 
     template <class U>
     void adjust(std::size_t ndx, U diff);
@@ -496,9 +503,13 @@ public:
     /// that the elements are already sorted in ascending order
     /// according to ordinary integer comparison.
     // FIXME: Rename
-    std::size_t lower_bound_int(T value) const REALM_NOEXCEPT;
+    template<bool N = Nullable>
+    typename std::enable_if<!N, std::size_t>::type
+    lower_bound_int(T value) const REALM_NOEXCEPT;
     // FIXME: Rename
-    std::size_t upper_bound_int(T value) const REALM_NOEXCEPT;
+    template<bool N = Nullable>
+    typename std::enable_if<!N, std::size_t>::type
+    upper_bound_int(T value) const REALM_NOEXCEPT;
     //@}
 
     std::size_t find_gte(T target, std::size_t start) const;
@@ -574,6 +585,9 @@ private:
 
     void do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last);
 };
+
+extern template class Column<int64_t, true>;
+extern template class Column<int64_t, false>;
 
 
 // Implementation:
@@ -690,7 +704,9 @@ void Column<T, N>::set_null(std::size_t ndx)
 }
 
 template <class T, bool N>
-void Column<T, N>::set(std::size_t ndx, null)
+template<bool Enable>
+typename std::enable_if<Enable>::type
+Column<T, N>::set(std::size_t ndx, null)
 {
     set_null(ndx);
 }
@@ -773,8 +789,10 @@ T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_nd
     return aggregate<T, T, act_Max, None>(*this, 0, start, end, limit, return_ndx);
 }
 
-template <class T, bool N>
-void Column<T,N>::destroy_subtree(size_t ndx, bool clear_value)
+template <class T, bool Nullable>
+template <bool N>
+typename std::enable_if<!N>::type
+Column<T,Nullable>::destroy_subtree(size_t ndx, bool clear_value)
 {
     static_assert(std::is_same<T, int_fast64_t>::value && !N,
         "destroy_subtree only makes sense on non-nullable integer columns");
@@ -935,11 +953,6 @@ Column<T,N>::Column(std::unique_ptr<Array> root) REALM_NOEXCEPT : m_tree(std::mo
 }
 
 template <class T, bool N>
-Column<T,N>::~Column() REALM_NOEXCEPT
-{
-}
-
-template <class T, bool N>
 void Column<T,N>::init_from_parent()
 {
     m_tree.init_from_parent();
@@ -1089,7 +1102,9 @@ void Column<T,N>::add(T value)
 }
 
 template <class T, bool N>
-void Column<T,N>::add(null)
+template <bool Enable>
+typename std::enable_if<Enable>::type
+Column<T,N>::add(null)
 {
     insert(npos, null{});
 }
@@ -1120,7 +1135,9 @@ void Column<T,N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
 }
 
 template <class T, bool N>
-void Column<T,N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
+template<bool Enable>
+typename std::enable_if<Enable>::type
+Column<T,N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
 {
     std::size_t size = this->size(); // Slow
     bool is_append = row_ndx == size || row_ndx == npos;
@@ -1250,8 +1267,10 @@ void Column<T,N>::clear(std::size_t, bool)
 }
 
 
-template <class T, bool N>
-std::size_t Column<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
+template <class T, bool Nullable>
+template <bool N>
+typename std::enable_if<!N, std::size_t>::type
+Column<T,Nullable>::lower_bound_int(T value) const REALM_NOEXCEPT
 {
     static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
@@ -1260,8 +1279,10 @@ std::size_t Column<T,N>::lower_bound_int(T value) const REALM_NOEXCEPT
     return ColumnBase::lower_bound(*this, value);
 }
 
-template <class T, bool N>
-std::size_t Column<T,N>::upper_bound_int(T value) const REALM_NOEXCEPT
+template <class T, bool Nullable>
+template <bool N>
+typename std::enable_if<!N, std::size_t>::type
+Column<T,Nullable>::upper_bound_int(T value) const REALM_NOEXCEPT
 {
     static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {

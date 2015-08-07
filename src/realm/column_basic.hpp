@@ -183,6 +183,9 @@ StringData BasicColumn<T>::get_index_data(std::size_t, char*) const REALM_NOEXCE
     REALM_UNREACHABLE();
 }
 
+extern template class BasicColumn<float>;
+extern template class BasicColumn<double>;
+
 
 } // namespace realm
 
