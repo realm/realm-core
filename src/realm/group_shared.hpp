@@ -578,7 +578,6 @@ private:
     void do_async_commits();
 
     void upgrade_file_format();
-    bool file_format_upgrade_required();
 
     //@{
     /// See LangBindHelper.
@@ -729,7 +728,7 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
 {
     open(file, no_create, durability, encryption_key); // Throws
 
-    if (!allow_upgrade && file_format_upgrade_required()) {
+    if (!allow_upgrade && m_group.file_format_upgrade_required()) {
         close();
         throw UpgradeRequired();
     }
@@ -748,7 +747,7 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
 {
     open(repl, durability, encryption_key); // Throws
 
-    if (!allow_upgrade && file_format_upgrade_required())
+    if (!allow_upgrade && m_group.file_format_upgrade_required())
         throw UpgradeRequired();
 
     upgrade_file_format(); // Throws
@@ -978,7 +977,7 @@ inline void SharedGroup::upgrade_file_format()
     // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set
     // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
     // call returns immediately if it finds that the upgrade is already complete.
-    bool upgrade = file_format_upgrade_required();
+    bool upgrade = m_group.file_format_upgrade_required();
 
     // Only create write transaction if needed; that's why we test whether to upgrade or not in a separate read
     // transaction. Else unit tests would fail.
@@ -987,18 +986,6 @@ inline void SharedGroup::upgrade_file_format()
         m_group.upgrade_file_format();
         commit();
     }
-}
-
-inline bool SharedGroup::file_format_upgrade_required()
-{
-    // FIXME: ExceptionSafety: This function does not appear to be exception
-    // safe. For example, it can leak read locks.
-
-    begin_read();
-    bool upgrade = m_group.file_format_upgrade_required();
-    end_read();
-
-    return upgrade;
 }
 
 
