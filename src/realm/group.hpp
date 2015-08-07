@@ -602,6 +602,8 @@ private:
                           _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
 
+    bool file_format_upgrade_required() const;
+
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const override;
