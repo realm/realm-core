@@ -93,7 +93,7 @@ TEST(StringIndex_NonIndexable)
     table->add_column(type_Float, "float");
     table->add_column(type_Binary, "binary");
 
-    for (size_t i = 0; i < table->size(); i++) {
+    for (size_t i = 0; i < table->get_column_count(); i++) {
         CHECK_LOGIC_ERROR(table->add_search_index(i), LogicError::illegal_combination);
     }
 }
