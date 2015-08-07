@@ -3,6 +3,7 @@
 
 #include <realm.hpp>
 #include <realm/index_string.hpp>
+#include <realm/column_linklist.hpp>
 #include <realm/column_string.hpp>
 #include <set>
 #include "test.hpp"
@@ -80,6 +81,22 @@ struct non_nullable {
 
 } // anonymous namespace
 
+TEST(StringIndex_NonIndexable)
+{
+    // Create a column with string values
+    Group group;
+    TableRef table = group.add_table("table");
+    TableRef target_table = group.add_table("target");
+    table->add_column_link(type_Link, "link", *target_table);
+    table->add_column_link(type_LinkList, "linkList", *target_table);
+    table->add_column(type_Double, "double");
+    table->add_column(type_Float, "float");
+    table->add_column(type_Binary, "binary");
+
+    for (size_t i = 0; i < table->size(); i++) {
+        CHECK_THROW(table->add_search_index(i), LogicError);
+    }
+}
 
 TEST_TYPES(StringIndex_IsEmpty, non_nullable, nullable)
 {
