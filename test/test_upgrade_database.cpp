@@ -127,6 +127,21 @@ TEST(Upgrade_Database_2_3)
     }
 #endif
 
+    // Prohibit automatic upgrade by SharedGroup
+    {
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+        bool no_create = false;
+        SharedGroup::DurabilityLevel durability = SharedGroup::durability_Full;
+        const char* encryption_key = nullptr;
+        bool allow_upgrade = false;
+
+        CHECK_THROW(
+            SharedGroup(temp_copy, no_create, durability, encryption_key, allow_upgrade),
+            UpgradeRequired);
+    }
+
     // Automatic upgrade from SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
@@ -151,7 +166,6 @@ TEST(Upgrade_Database_2_3)
             CHECK_EQUAL(f, i);
         }
     }
-
 
     // Now see if we can open the upgraded file and also commit to it
     {

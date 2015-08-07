@@ -138,7 +138,7 @@ public:
     /// encryption_key)` on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0);
+                         const char* encryption_key = 0, bool allow_upgrade = true);
 
     struct unattached_tag {};
 
@@ -191,7 +191,7 @@ public:
     /// default constructed instance.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0);
+                         const char* encryption_key = 0, bool allow_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
@@ -723,10 +723,16 @@ private:
 struct SharedGroup::BadVersion: std::exception {};
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
-                                DurabilityLevel durability, const char* encryption_key):
+                                DurabilityLevel durability, const char* encryption_key,
+                                bool allow_upgrade):
     m_group(Group::shared_tag())
 {
     open(file, no_create, durability, encryption_key); // Throws
+
+    if (!allow_upgrade && file_format_upgrade_required()) {
+        close();
+        throw UpgradeRequired();
+    }
 
     upgrade_file_format(); // Throws
 }
@@ -737,10 +743,13 @@ inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
 }
 
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
-                                const char* encryption_key):
+                                const char* encryption_key, bool allow_upgrade):
     m_group(Group::shared_tag())
 {
     open(repl, durability, encryption_key); // Throws
+
+    if (!allow_upgrade && file_format_upgrade_required())
+        throw UpgradeRequired();
 
     upgrade_file_format(); // Throws
 }
