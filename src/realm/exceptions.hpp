@@ -63,7 +63,7 @@ public:
 /// file that contains an old version / of the database, all the while
 /// preventing the constructing from upgrading the database (by setting the
 /// \a allow_upgrade argument to `false`).
-class UpgradeRequired: public std::exception {
+class FileFormatUpgradeRequired: public std::exception {
 public:
     const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
 };
@@ -196,7 +196,7 @@ inline const char* DescriptorMismatch::what() const REALM_NOEXCEPT_OR_NOTHROW
     return "Table descriptor mismatch";
 }
 
-inline const char* UpgradeRequired::what() const REALM_NOEXCEPT_OR_NOTHROW
+inline const char* FileFormatUpgradeRequired::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "Database upgrade required but prohibited";
 }

@@ -139,7 +139,7 @@ TEST(Upgrade_Database_2_3)
 
         CHECK_THROW(
             SharedGroup(temp_copy, no_create, durability, encryption_key, allow_upgrade),
-            UpgradeRequired);
+            FileFormatUpgradeRequired);
     }
 
     // Automatic upgrade from SharedGroup

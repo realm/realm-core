@@ -730,7 +730,7 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
 
     if (!allow_upgrade && m_group.file_format_upgrade_required()) {
         close();
-        throw UpgradeRequired();
+        throw FileFormatUpgradeRequired();
     }
 
     upgrade_file_format(); // Throws
@@ -748,7 +748,7 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
     open(repl, durability, encryption_key); // Throws
 
     if (!allow_upgrade && m_group.file_format_upgrade_required())
-        throw UpgradeRequired();
+        throw FileFormatUpgradeRequired();
 
     upgrade_file_format(); // Throws
 }
