@@ -69,7 +69,7 @@ public:
 
     Query& operator = (const Query& source);
 
-    Query& expression(Expression* compare, bool auto_delete = false);
+    Query& expression(Expression* compare);
     Expression* get_expression();
 
     // Find links that point to a specific target row 
