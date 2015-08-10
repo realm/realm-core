@@ -47,6 +47,8 @@
 * Removed conditional compilation of replication features.
 * More information from `InvalidDatabase::what()`.
 * Disabled support for the async daemon on iOS and watchOS.
+* Added argument to SharedGroup to prevent automatic file format upgrade. If an
+  upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
 
 
 ----------------------------------------------
