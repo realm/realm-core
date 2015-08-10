@@ -6,7 +6,6 @@
 #include <iostream>
 #include <functional>
 
-#include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/features.h>
@@ -47,10 +46,6 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
-// FIXME: Why is this disabled on iOS? Is it failing there? Please add a comment
-// about the reason.
-#ifndef REALM_IOS
 
 // The assumption is that if multiple processes try to place an
 // exclusive lock on a file in a non-blocking fashion, then at least
@@ -160,7 +155,5 @@ TEST(File_NoSpuriousTryLockFailures)
     // Check that there are no cases where no one got the lock
     CHECK_EQUAL(0, results[0]);
 }
-
-#endif // REALM_IOS
 
 #endif // TEST_FILE_LOCKS
