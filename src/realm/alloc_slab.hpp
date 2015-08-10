@@ -390,12 +390,14 @@ private:
     /// The chunk index is determined solely by the minimal chunk size,
     /// and does not necessarily reflect the mapping. A mapping may
     /// cover multiple chunks - the initial mapping often does.
-    inline std::size_t get_chunk_index(std::size_t pos) const REALM_NOEXCEPT;
+    std::size_t get_chunk_index(std::size_t pos) const REALM_NOEXCEPT;
 
     /// Reverse: get the base offset of a chunk at a given index
     inline std::size_t get_chunk_base(std::size_t index) const REALM_NOEXCEPT;
 
     std::size_t compute_chunk_base(std::size_t index) const REALM_NOEXCEPT;
+
+    std::size_t find_section_in_range(std::size_t start_pos, std::size_t chunk_size, std::size_t range_size) const REALM_NOEXCEPT;
 
     friend class Group;
     friend class GroupWriter;
@@ -481,6 +483,32 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
 {
     return ref < slab.ref_end;
 }
+
+
+
+inline std::size_t SlabAlloc::get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+{
+    return get_chunk_base(1+get_chunk_index(start_pos));
+}
+
+inline std::size_t SlabAlloc::get_lower_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+{
+    return get_chunk_base(get_chunk_index(start_pos));
+}
+
+inline bool SlabAlloc::matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT
+{
+    return pos == get_lower_mmap_boundary(pos);
+}
+
+inline std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
+{
+    return m_chunk_bases[index];
+}
+
+
+
+
 
 } // namespace realm
 

@@ -774,20 +774,6 @@ const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 }
 
 
-std::size_t SlabAlloc::get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
-{
-    return get_chunk_base(1+get_chunk_index(start_pos));
-}
-
-std::size_t SlabAlloc::get_lower_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
-{
-    return get_chunk_base(get_chunk_index(start_pos));
-}
-
-bool SlabAlloc::matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT
-{
-    return pos == get_lower_mmap_boundary(pos);
-}
 
 // A database file is viewed as a number of chunks of exponentially growing size.
 // The first 16 chunks are 1 x page size, the next 8 chunks are 2 x page size,
@@ -801,7 +787,7 @@ bool SlabAlloc::matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT
 // Please note that the file is not necessarily mmapped with a separate mapping
 // for each chunk, multiple chunks may be mmapped with a single mmap.
 
-inline std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
+std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
 {
     // size_t chunk_base_number = pos/m_chunk_size;
     size_t chunk_base_number = pos >> m_chunk_shifts;
@@ -837,10 +823,23 @@ std::size_t SlabAlloc::compute_chunk_base(std::size_t index) const REALM_NOEXCEP
     return base;
 }
 
-inline std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
+std::size_t SlabAlloc::find_section_in_range(std::size_t start_pos, 
+                                             std::size_t chunk_size,
+                                             std::size_t section_size) const REALM_NOEXCEPT
 {
-    return m_chunk_bases[index];
+    size_t end_of_block = start_pos + chunk_size;
+    size_t alloc_pos = start_pos;
+    while (alloc_pos + section_size <= end_of_block) {
+        size_t next_mmap_boundary = get_upper_mmap_boundary(alloc_pos);
+        if (alloc_pos + section_size <= next_mmap_boundary) {
+            return alloc_pos;
+        }
+        alloc_pos = next_mmap_boundary;
+    }
+    return 0;
 }
+
+
 
 #ifdef REALM_DEBUG
 

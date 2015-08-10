@@ -343,91 +343,96 @@ size_t GroupWriter::get_free_space(size_t size)
 }
 
 
-std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
+inline std::size_t GroupWriter::split_freelist_chunk(std::size_t index, std::size_t start_pos, 
+                                                     std::size_t alloc_pos, std::size_t chunk_size, 
+                                                     bool is_shared)
+{
+    // std::cerr << "  - split [" << start_pos << ", " << chunk_size << "]" << " at " << alloc_pos << std::endl;
+    m_free_positions.insert(index, start_pos);
+    m_free_lengths.insert(index, alloc_pos - start_pos);
+    if (is_shared)
+        m_free_versions.insert(index, 0);
+    ++index;
+    m_free_positions.set(index, alloc_pos);
+    chunk_size = start_pos + chunk_size - alloc_pos;
+    m_free_lengths.set(index, chunk_size);
+    return chunk_size;
+}
+
+
+std::pair<std::size_t, std::size_t> 
+GroupWriter::search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin, std::size_t end)
 {
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
+    for (std::size_t i = begin; i != end; ++i) {
+        size_t chunk_size = to_size_t(m_free_lengths.get(i));
+        if (chunk_size < size) {
+            continue;
+        }
 
+        // Only chunks that are not occupied by current readers
+        // are allowed to be used.
+        if (is_shared) {
+            size_t ver = to_size_t(m_free_versions.get(i));
+            if (ver >= m_readlock_version) {
+                continue;
+            }
+        }
+
+        // search through the chunk, finding a place within it,
+        // where an allocation will not cross a mmap boundary
+        size_t start_pos = to_size_t(m_free_positions.get(i));
+        size_t alloc_pos = alloc.find_section_in_range(start_pos, chunk_size, size);
+        if (alloc_pos == 0) {
+            continue;
+        }
+        // we found a place - if it's not at the beginning of the chunk,
+        // we split the chunk so that the allocation can be done from the
+        // beginning of the second chunk.
+        if (alloc_pos != start_pos) {
+            chunk_size = split_freelist_chunk(i, start_pos, alloc_pos, chunk_size, is_shared);
+            ++i;
+        }
+        // Match found!
+        return std::make_pair(i, chunk_size);
+    }
+    // No match
+    return std::make_pair(end,0);
+}
+
+
+std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
+{
+    typedef std::pair<std::size_t, std::size_t> Chunk;
+    SlabAlloc& alloc = m_group.m_alloc;
+    Chunk found;
     // Since we do a first-fit search for small chunks, the top pieces are
     // likely to get smaller and smaller. So when we are looking for bigger
     // chunks we are likely to find them faster by skipping the first half of
     // the list.
-    size_t end   = m_free_lengths.size();
-    size_t begin = size < 1024 ? 0 : end / 2;
-    size_t chunks_to_consider = end, i = begin;
-
-    // Do we have a free space we can reuse?
-    for (;;) {
-
-        // if we started at the middle, we have to wrap around when we reach the end:
-        if (i == end) {
-            i = 0;
-        }
-        if (chunks_to_consider) {
-            size_t chunk_size = to_size_t(m_free_lengths.get(i));
-            if (chunk_size < size) {
-                ++i;
-                --chunks_to_consider;
-                continue;
-            }
-
-            // Only blocks that are not occupied by current readers
-            // are allowed to be used.
-            if (is_shared) {
-                size_t ver = to_size_t(m_free_versions.get(i));
-                if (ver >= m_readlock_version) {
-                    ++i;
-                    --chunks_to_consider;
-                    continue;
-                }
-            }
-
-            // search through the block, finding a place within the block,
-            // where an allocation will not cross a mmap boundary
-            size_t start_pos = to_size_t(m_free_positions.get(i));
-            size_t end_of_block = start_pos + chunk_size;
-            size_t alloc_pos = start_pos;
-            bool found_a_place = false;
-            while (alloc_pos + size < end_of_block) {
-                size_t next_mmap_boundary = alloc.get_upper_mmap_boundary(alloc_pos);
-                if (alloc_pos + size < next_mmap_boundary) {
-                    found_a_place = true;
-                    break;
-                }
-                alloc_pos = next_mmap_boundary;
-            }
-            if (!found_a_place) {
-                ++i;
-                --chunks_to_consider;
-                continue;
-            }
-            // we found a place - if it's not at the beginning of the block,
-            // we split the block so that the allocation can be done from the
-            // beginning of the second block.
-            if (alloc_pos != start_pos) {
-                // std::cerr << "  - split [" << start_pos << ", " << chunk_size << "]" << " at " << alloc_pos << std::endl;
-                m_free_positions.insert(i, start_pos);
-                m_free_lengths.insert(i, alloc_pos - start_pos);
-                if (is_shared)
-                    m_free_versions.insert(i, 0);
-                ++i; ++end;
-                m_free_positions.set(i, alloc_pos);
-                chunk_size = start_pos + chunk_size - alloc_pos;
-                m_free_lengths.set(i, chunk_size);
-            }
-            // Match found!
-            return std::make_pair(i, chunk_size);
-        }
-        else { // No free space, so we have to extend the file.
-            extend_free_space(size);
-            // extending the file will extend the free list
-            end = m_free_lengths.size();
-            // so next round we must retry with the last entry in the free list
-            i = end-1; 
-            chunks_to_consider = 1;
-        }
+    size_t end = m_free_lengths.size();
+    if (size < 1024) {
+        found = search_free_space_in_part_of_freelist(size, 0, end);
+        if (found.first != end) return found;
     }
-    REALM_ASSERT(false);
+    else {
+        found = search_free_space_in_part_of_freelist(size, end/2, end);
+        if (found.first != end) return found;
+        found = search_free_space_in_part_of_freelist(size, 0, end/2);
+        if (found.first != end/2) return found;
+    }
+
+    // No free space, so we have to extend the file.
+    do {
+        extend_free_space(size);
+        // extending the file will add a new entry at the end of the freelist,
+        // so search that particular entry
+        end = m_free_lengths.size();
+        found = search_free_space_in_part_of_freelist(size, end-1, end);
+    } 
+    while (found.first == end);
+    return found;
 }
 
 // Extend the free space with at least the requested size.
@@ -445,10 +450,6 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // write_group() fails before writing the new top-ref, but after having
     // extended the file size.
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-
-    // If we already have a free chunk at the end of the file, we only need to
-    // extend that chunk. If not, we need to add a new entry to the list of free
-    // chunks.
     size_t extend_size = requested_size;
     size_t new_file_size = logical_file_size + extend_size;
     if (!alloc.matches_mmap_boundary(new_file_size)) {
@@ -468,7 +469,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
 
-    m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
+    m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size); // Throws
 
     size_t chunk_ndx  = m_free_positions.size();
     size_t chunk_size = new_file_size - logical_file_size;
