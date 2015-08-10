@@ -46,33 +46,47 @@ TEST(BasicSystemErrors_Category)
 
 TEST(BasicSystemErrors_Messages)
 {
+    const std::string error_message("Unknown error");
+
     {
         std::error_code err = make_error_code(error::address_family_not_supported);
-        CHECK_GREATER(std::strlen(err.message().c_str()), 0);
-        CHECK(err.message() != "Unknown error");
+        CHECK_GREATER(err.message().length(), 0);
+#ifdef _WIN32
+        CHECK_EQUAL(err.message(), error_message);
+#else
+        CHECK_NOT_EQUAL(err.message(), error_message);
+#endif
     }
     {
         std::error_code err = make_error_code(error::invalid_argument);
-        CHECK_GREATER(std::strlen(err.message().c_str()), 0);
-        CHECK(err.message() != "Unknown error");
+        CHECK_GREATER(err.message().length(), 0);
+        CHECK_NOT_EQUAL(err.message(), error_message);
     }
     {
         std::error_code err = make_error_code(error::no_memory);
-        CHECK_GREATER(std::strlen(err.message().c_str()), 0);
-        CHECK(err.message() != "Unknown error");
+        CHECK_GREATER(err.message().length(), 0);
+        CHECK_NOT_EQUAL(err.message(), error_message);
     }
     {
         std::error_code err = make_error_code(error::operation_aborted);
-        CHECK_GREATER(std::strlen(err.message().c_str()), 0);
-        CHECK(err.message() != "Unknown error");
+        CHECK_GREATER(err.message().length(), 0);
+#ifdef _WIN32
+        CHECK_EQUAL(err.message(), error_message);
+#else
+        CHECK_NOT_EQUAL(err.message(), error_message);
+#endif
     }
 
     // Ensure that if we pass an unknown error code, we get some error reporting
-    // This may potentially pass on some operating system. If this test starts failing, simply change the
-    // magic number below.
+    // This may potentially pass on some operating system. If this test starts
+    // failing, simply change the magic number below.
     {
         std::error_code err = make_error_code(static_cast<error::basic_system_errors>(64532));
-        CHECK_EQUAL(err.message(), "Unknown error 64532");
+        CHECK_GREATER(err.message().length(), 0);
+        // Check that `err.message()` begins with `error_message_prefix`
+        // On Linux and Apple systems, the returned string is of format:
+        // "Unknown error: <errcode>"
+        CHECK(err.message().compare(0, error_message.length(), error_message) == 0);
     }
 }
 
