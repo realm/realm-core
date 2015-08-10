@@ -2377,7 +2377,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if (nullable_array) {
         for (; start < end; start++) {
             int64_t v = get<bitwidth>(start + 1);
-            if (c(v, value, value_null, v == get(0))) {
+            if (c(v, value, v == get(0), value_null)) {
                 if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                     return false; // tell caller to stop aggregating/search
             }

@@ -765,13 +765,13 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
 template <class T, bool N>
 T Column<T,N>::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Min, None>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
 T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Max, None>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Max, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>

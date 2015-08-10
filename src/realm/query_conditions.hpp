@@ -28,7 +28,7 @@
 
 namespace realm {
 
-enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, cond_LessEqual, cond_None, cond_Count};
+enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, cond_LessEqual, cond_None, cond_Count, cond_LeftNotNull };
 
 // Quick hack to make "Queries with Integer null columns" able to compile in Visual Studio 2015 which doesn't full support sfinae
 // (real cause hasn't been investigated yet, cannot exclude that we don't obey c++11 standard)
@@ -282,8 +282,16 @@ struct None {
     template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
-
 };
+
+struct LeftNotNull {
+    template<class T> bool operator()(const T&, const T&, bool v = false, bool = false) const { return !v; }
+    static const int condition = cond_LeftNotNull;
+    template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
+};
+
 
 struct Less {
     static const int avx = 0x11; // _CMP_LT_OQ

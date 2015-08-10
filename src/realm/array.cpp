@@ -2772,6 +2772,29 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
             REALM_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
         }
     }
+    else if (cond == cond_LeftNotNull) {
+        if (action == act_ReturnFirst) {
+            REALM_TEMPEX3(return find, LeftNotNull, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+        }
+        else if (action == act_Sum) {
+            REALM_TEMPEX3(return find, LeftNotNull, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+        }
+        else if (action == act_Min) {
+            REALM_TEMPEX3(return find, LeftNotNull, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+        }
+        else if (action == act_Max) {
+            REALM_TEMPEX3(return find, LeftNotNull, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+        }
+        else if (action == act_Count) {
+            REALM_TEMPEX3(return find, LeftNotNull, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+        }
+        else if (action == act_FindAll) {
+            REALM_TEMPEX3(return find, LeftNotNull, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+        }
+        else if (action == act_CallbackIdx) {
+            REALM_TEMPEX3(return find, LeftNotNull, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+        }
+    }
     REALM_ASSERT_DEBUG(false);
     return false;
 
