@@ -134,8 +134,15 @@ public:
         durability_Async    ///< Not yet supported on windows.
     };
 
-    /// Equivalent to calling `open(file, no_create, durability,
+    /// \brief Almost equivalent to calling `open(file, no_create, durability,
     /// encryption_key)` on a default constructed instance.
+    ///
+    /// The major difference is that this constructor will automatically
+    /// upgrade the provided database's file format if it is outdated. In order
+    /// to prevent this, it is possible to set \a allow_upgrade to `false`.
+    ///
+    /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
+    ///        and an upgrade is required.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = 0, bool allow_upgrade = true);
@@ -187,8 +194,15 @@ public:
               DurabilityLevel = durability_Full,
               const char* encryption_key = 0);
 
-    /// Equivalent to calling `open(repl, durability, encryption_key)` on a
-    /// default constructed instance.
+    /// \brief Almost equivalent to calling `open(repl, durability,
+    /// encryption_key)` on a default constructed instance.
+    ///
+    /// The major difference is that this constructor will automatically
+    /// upgrade the provided database's file format if it is outdated. In order
+    /// to prevent this, it is possible to set \a allow_upgrade to `false`.
+    ///
+    /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
+    ///        and an upgrade is required.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = 0, bool allow_upgrade = true);
