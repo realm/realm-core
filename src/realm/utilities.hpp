@@ -142,6 +142,15 @@ inline int log2(std::size_t x) {
     else
         return -1;
 }
+#else
+inline int log2(std::size_t x) {
+    int result = -1;
+    while (x) {
+        ++result;
+        x >>= 1;
+    }
+    return result;
+}
 #endif
 
 // Implementation:
