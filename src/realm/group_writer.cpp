@@ -139,14 +139,15 @@ size_t GroupWriter::write_group()
     // If the database has *max* theoretical fragmentation, it'll need one
     // entry in the free list for every 16 bytes, because both allocated and
     // free chunks are at least 8 bytes in size. In the worst case each
-    // free list entry requires 17 bytes (8 for the position, 8 for the version
-    // and a single one for the size). The worst case scenario thus needs access
-    // to a contiguous address range of 17/16 * the existing database size.
+    // free list entry requires 24 bytes (8 for the position, 8 for the version
+    // and 8 for the size). The worst case scenario thus needs access
+    // to a contiguous address range of 24/16 * the existing database size.
     // The memory mapping grows with one contiguous memory range at a time,
     // each of these being at least 1/16 of the existing database size.
-    // To be sure to get a contiguous range of 17/16 of the current database
-    // size, the database itself would have to grow x17. This growth requires
+    // To be sure to get a contiguous range of 24/16 of the current database
+    // size, the database itself would have to grow x24. This growth requires
     // at the most 5x16 = 80 extension steps, each adding one entry to the free list.
+    // (a smaller upper bound could likely be derived here, but it's not that important)
     max_free_list_size += 80;
 
     int num_free_lists = is_shared ? 3 : 2;
@@ -365,7 +366,8 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         if (chunks_to_consider) {
             size_t chunk_size = to_size_t(m_free_lengths.get(i));
             if (chunk_size < size) {
-                ++i; --chunks_to_consider;
+                ++i;
+                --chunks_to_consider;
                 continue;
             }
 
@@ -374,7 +376,8 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             if (is_shared) {
                 size_t ver = to_size_t(m_free_versions.get(i));
                 if (ver >= m_readlock_version) {
-                    ++i; --chunks_to_consider;
+                    ++i;
+                    --chunks_to_consider;
                     continue;
                 }
             }
@@ -394,7 +397,8 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
                 alloc_pos = next_mmap_boundary;
             }
             if (!found_a_place) {
-                ++i; --chunks_to_consider;
+                ++i;
+                --chunks_to_consider;
                 continue;
             }
             // we found a place - if it's not at the beginning of the block,
