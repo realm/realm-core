@@ -816,10 +816,7 @@ inline std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXC
         size_t log_index = log2(chunk_group_number);
         size_t chunk_index_in_group = (chunk_base_number >> (1+log_index)) & 0x7;
         index = (16 + (log_index * 8)) + chunk_index_in_group;
-//        std::cerr << "  group_number = " << chunk_group_number
-//                  << "  log_index = " << log_index << "  in group = " << chunk_index_in_group << std::endl;
     }
-//    std::cerr << "chunk_index( " << pos << " ) -> " << index << std::endl;
     return index;
 }
 
@@ -837,15 +834,11 @@ std::size_t SlabAlloc::compute_chunk_base(std::size_t index) const REALM_NOEXCEP
         // base = m_chunk_size * chunk_base_number;
         base = chunk_base_number << m_chunk_shifts;
     }
-//    std::cerr << "                                   chunk_base( " << 
-//        index << " ) -> " << base << std::endl;
     return base;
-//    return index * m_chunk_size;
 }
 
 inline std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_DEBUG(index < m_num_chunk_bases);
     return m_chunk_bases[index];
 }
 

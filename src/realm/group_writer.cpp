@@ -310,9 +310,6 @@ size_t GroupWriter::get_free_space(size_t size)
 
     bool is_shared = m_group.m_is_shared;
 
-    for (size_t i = 0; i < m_free_lengths.size(); ++i)
-        REALM_ASSERT((m_free_lengths.get(i) % 8) == 0);
-
     // Claim space from identified chunk
     size_t chunk_ndx  = p.first;
     size_t chunk_pos  = to_size_t(m_free_positions.get(chunk_ndx));
@@ -339,10 +336,6 @@ size_t GroupWriter::get_free_space(size_t size)
             m_free_versions.erase(chunk_ndx);
         //std::cerr << "  - entire chunk" << std::endl;
     }
-    for (size_t i = 0; i < m_free_lengths.size(); ++i)
-        REALM_ASSERT((m_free_lengths.get(i) % 8) == 0);
-    for (size_t i = 0; i < m_free_positions.size(); ++i)
-        REALM_ASSERT((m_free_positions.get(i) % 8) == 0);
     REALM_ASSERT((chunk_pos % 8) == 0);
     //std::cerr << "  - got [" << chunk_pos << ", " << size << "]" << std::endl;
     return chunk_pos;
