@@ -3,6 +3,9 @@
 ### Bugfixes:
 
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the same file if opened from two places simultaneously)
+* Reverted prelinking of static libraries on Apple platforms as it caused
+  `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
+  when sorting by integer or floating point columns.
 
 ### API breaking changes:
 
@@ -21,6 +24,8 @@
 * Several column classes were renamed to follow the `XxxColumn` naming scheme
   (e.g., `ColumnLink` to `LinkColumn`).
 * Removed conditional compilation of replication features.
+* More information from `InvalidDatabase::what()`.
+* Disabled support for the async daemon on iOS and watchOS.
 
 
 ----------------------------------------------

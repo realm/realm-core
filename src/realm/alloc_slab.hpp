@@ -242,7 +242,7 @@ public:
     /// size becomes available in memory. If sucessfull,
     /// get_baseline() will return the specified new file size.
     ///
-    /// It is an error to call this function on a detasched allocator,
+    /// It is an error to call this function on a detached allocator,
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
@@ -368,7 +368,10 @@ private:
     /// Throws if free-lists are no longer valid.
     const chunks& get_free_read_only() const;
 
-    bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
+    /// Throws InvalidDatabase if the file is not a Realm file, if the file is
+    /// corrupted, or if the specified encryption key is incorrect. This
+    /// function will not detect all forms of corruption, though.
+    void validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
 
     void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 

@@ -458,7 +458,7 @@ void recover_from_dead_write_transact()
     // Nothing needs to be done
 }
 
-#ifndef _WIN32
+#ifdef REALM_ASYNC_DAEMON
 
 void spawn_daemon(const std::string& file)
 {
@@ -548,8 +548,6 @@ void spawn_daemon(const std::string& file)
         throw std::runtime_error("Failed to spawn async commit");
     }
 }
-#else
-void spawn_daemon(const std::string& file) {}
 #endif
 
 
@@ -579,9 +577,9 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
 {
     REALM_ASSERT(!is_attached());
 
-#ifdef _WIN32
+#ifndef REALM_ASYNC_DAEMON
     if (durability == durability_Async)
-        throw std::runtime_error("Async mode not yet supported on Windows");
+        throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
 #endif
 
     m_db_path = path;
@@ -687,7 +685,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
             bool begin_new_session = info->num_participants == 0;
             bool is_shared = true;
             bool read_only = false;
-            bool skip_validate = false;
+            bool skip_validate = !begin_new_session;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
@@ -774,6 +772,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
             m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
             m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
             m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
+#ifdef REALM_ASYNC_DAEMON
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
@@ -788,6 +787,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
                 }
             }
             // std::cerr << "daemon should be ready" << std::endl;
+#endif
 #endif
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to detect concurrent expansion of the ringbuffer.
@@ -831,12 +831,14 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
     m_transact_stage = transact_Ready;
     // std::cerr << "open completed" << std::endl;
 
-#ifndef _WIN32
+#ifdef REALM_ASYNC_DAEMON
     if (durability == durability_Async) {
         if (is_backend) {
             do_async_commits();
         }
     }
+#else
+    static_cast<void>(is_backend);
 #endif
 }
 
@@ -1325,7 +1327,7 @@ void SharedGroup::do_begin_write()
     // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
-#ifndef _WIN32
+#ifdef REALM_ASYNC_DAEMON
     if (info->durability == durability_Async) {
 
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
