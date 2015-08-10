@@ -749,7 +749,7 @@ SHELL_ESCAPE = $(shell printf '%s\n' '$(call SHELL_ESCAPE_1,$(1))' | sed $(SHELL
 SHELL_ESCAPE_1 = $(subst $(APOSTROPHE),$(APOSTROPHE)\$(APOSTROPHE)$(APOSTROPHE),$(1))
 SHELL_ESCAPE_2 = 's/\([]$(TAB)$(SPACE)!"\#$$&'\''()*;<>?[\`{|}~]\)/\\\1/g'
 
-HAVE_CMD = $(shell which $(word 1,$(1)))
+HAVE_CMD = $(shell which $(word 1,$(1)) 2>/dev/null)
 
 # ARGS: command, prefix_to_class_map
 # Returns empty if identification fails
