@@ -783,7 +783,10 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
         CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
     if (REALM_UNLIKELY(!map_handle))
         throw std::runtime_error("CreateFileMapping() failed");
-    void* addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
+    if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
+        throw std::runtime_error("Map offset is too large");
+    SIZE_T _size = size;
+    void* addr = MapViewOfFile(map_handle, desired_access, large_int.HighPart, large_int.LowPart, _size);
     {
         BOOL r = CloseHandle(map_handle);
         REALM_ASSERT_RELEASE(r);
