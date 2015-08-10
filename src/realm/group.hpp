@@ -473,7 +473,7 @@ public:
     bool operator!=(const Group& g) const { return !(*this == g); }
 
 #ifdef REALM_DEBUG
-    void verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
+    void verify() const;
     void print() const;
     void print_free() const;
     MemStats stats();
