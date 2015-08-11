@@ -374,6 +374,13 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
     return i->addr + (ref - slab_ref);
 }
 
+unsigned char SlabAlloc::get_committed_file_format() const
+{
+    Header* header = reinterpret_cast<Header*>(m_data);
+    int select_field = header->m_flags & SlabAlloc::flags_SelectBit;
+    unsigned char file_format_version = header->m_file_format_version[select_field];
+    return file_format_version;
+}
 
 ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool read_only,
                                 bool no_create, bool skip_validate,
@@ -470,7 +477,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
 
         int select_field = header->m_flags;
         select_field = select_field & SlabAlloc::flags_SelectBit;
-        m_file_format_version = header->m_file_format_version[select_field];
+        m_initial_file_format_version = header->m_file_format_version[select_field];
 
         m_data        = map.release();
         m_baseline    = size;
@@ -487,11 +494,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
 
     fcg.release(); // Do not close
     return top_ref;
-}
-
-unsigned char SlabAlloc::get_file_format() const
-{
-    return m_file_format_version;
 }
 
 ref_type SlabAlloc::attach_buffer(char* data, size_t size)

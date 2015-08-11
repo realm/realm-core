@@ -107,7 +107,6 @@ public:
     ~Group() REALM_NOEXCEPT override;
 
     void upgrade_file_format();
-    unsigned char get_file_format() const;
 
     /// Attach this Group instance to the specified database file.
     ///
@@ -233,6 +232,8 @@ public:
 
     /// Returns the number of tables in this group.
     std::size_t size() const;
+
+    unsigned char get_file_format() const;
 
     //@{
 
@@ -651,7 +652,10 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode):
 
     // Fixme / Review: We assume that database files opened with read-only access are using Group and that
     // read/write access makes the language binding use SharedGroup instead (which will perform the auto-upgrade)
-    if (m_alloc.get_file_format() < default_file_format_version)
+    if (m_alloc.get_committed_file_format() == 1)
+        throw std::runtime_error("Version 1 database files are no longer supported by Realm");
+
+    if (m_alloc.get_committed_file_format() < default_file_format_version)
         throw std::runtime_error("You attempted to open a database file of an older format. Please open it with \
         write access flags and make sure it resides on writable storage in order for it to be auto-upgraded");
 }
@@ -665,6 +669,8 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
 {
     init_array_parents();
     open(buffer, take_ownership); // Throws
+
+
 }
 
 inline Group::Group(unattached_tag) REALM_NOEXCEPT:

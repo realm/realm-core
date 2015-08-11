@@ -37,7 +37,7 @@ void Group::upgrade_file_format()
 {
 #if REALM_NULL_STRINGS == 1
     REALM_ASSERT(is_attached());
-    if (m_alloc.get_file_format() >= default_file_format_version)
+    if (m_alloc.get_committed_file_format() >= default_file_format_version)
         return;
 
     for (size_t t = 0; t < m_tables.size(); t++) {
@@ -45,13 +45,12 @@ void Group::upgrade_file_format()
         table->upgrade_file_format();
     }
 
-    m_alloc.m_file_format_version = default_file_format_version;
 #endif
 }
 
 unsigned char Group::get_file_format() const
 {
-    return m_alloc.get_file_format();
+    return m_alloc.get_committed_file_format();
 }
 
 
@@ -672,7 +671,7 @@ void Group::commit()
         throw LogicError(LogicError::detached_accessor);
     if (m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
-     REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
+//     REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     GroupWriter out(*this); // Throws
 

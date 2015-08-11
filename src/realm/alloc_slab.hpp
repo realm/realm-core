@@ -116,7 +116,8 @@ public:
     /// \throw InvalidDatabase
     ref_type attach_buffer(char* data, std::size_t size);
 
-    unsigned char get_file_format() const;
+    /// Reads file format from file header.
+    unsigned char get_committed_file_format() const;
 
     /// Attach this allocator to an empty buffer.
     ///
@@ -345,7 +346,7 @@ private:
     /// less padding between members due to alignment requirements.
     FeeeSpaceState m_free_space_state = free_space_Clean;
 
-    unsigned char m_file_format_version = default_file_format_version;
+    unsigned char m_initial_file_format_version;
 
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;

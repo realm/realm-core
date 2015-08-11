@@ -968,12 +968,13 @@ inline void SharedGroup::upgrade_file_format()
     // FIXME: ExceptionSafety: This function does not appear to be exception
     // safe. For example, it can leak read locks.
 
+    if (m_group.m_alloc.get_committed_file_format() == 1)
+        throw std::runtime_error("Version 1 database files are no longer supported by Realm");
+    
     // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set
     // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
     // call returns immediately if it finds that the upgrade is already complete.
-    begin_read();
-    bool upgrade = m_group.get_file_format() < default_file_format_version;
-    end_read();
+    bool upgrade = m_group.m_alloc.get_committed_file_format() < default_file_format_version;
 
     // Only create write transaction if needed; that's why we test whether to upgrade or not in a separate read
     // transaction. Else unit tests would fail.
