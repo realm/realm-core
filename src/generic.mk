@@ -749,7 +749,7 @@ SHELL_ESCAPE = $(shell printf '%s\n' '$(call SHELL_ESCAPE_1,$(1))' | sed $(SHELL
 SHELL_ESCAPE_1 = $(subst $(APOSTROPHE),$(APOSTROPHE)\$(APOSTROPHE)$(APOSTROPHE),$(1))
 SHELL_ESCAPE_2 = 's/\([]$(TAB)$(SPACE)!"\#$$&'\''()*;<>?[\`{|}~]\)/\\\1/g'
 
-HAVE_CMD = $(shell which $(word 1,$(1)))
+HAVE_CMD = $(shell which $(word 1,$(1)) 2>/dev/null)
 
 # ARGS: command, prefix_to_class_map
 # Returns empty if identification fails
@@ -860,7 +860,11 @@ GCC_LIKE_COMPILERS = gcc clang
 CC_TO_CXXL_MAP = gcc:g++ g++:g++ clang:clang++ clang++:clang++
 
 # How to map C compiler to corresponding archiver (static libraries).
-CC_TO_AR_MAP  = gcc:gcc-ar g++:gcc-ar gcc:ar g++:ar clang:clang-ar clang++:clang-ar clang:ar clang++:ar
+CC_TO_AR_MAP  = gcc:gcc-ar g++:gcc-ar \
+                gcc:ar g++:ar \
+                clang:clang-ar clang++:clang-ar \
+                clang:llvm-ar clang++:llvm-ar \
+                clang:ar clang++:ar
 
 DETECT_COMPILER = $(call FIND,HAVE_CMD,$(COMPILER_DETECT_LIST))
 IDENT_COMPILER = $(call IDENT_CMD,$(1),$(COMPILER_IDENT_MAP))
