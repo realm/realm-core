@@ -1495,7 +1495,8 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     refresh_dirty_accessors(); // Throws
 }
 
-bool Group::file_format_upgrade_required() const {
+bool Group::file_format_upgrade_required() const
+{
     return m_alloc.get_file_format() < default_file_format_version;
 }
 
