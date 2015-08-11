@@ -995,7 +995,7 @@ inline void SharedGroup::upgrade_file_format()
         begin_write();
         // upgrade_file_format() will also check if upgrade is needed, which happens thread safely
         // due to this write transaction
-        m_group.upgrade_file_format();>
+        m_group.upgrade_file_format();
         commit();
     }
 }

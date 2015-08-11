@@ -504,11 +504,6 @@ unsigned char SlabAlloc::get_committed_file_format() const
     return file_format_version;
 }
 
-void SlabAlloc::set_file_format(unsigned char version) 
-{
-    m_file_format_version = version;
-}
-
 ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in
