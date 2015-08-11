@@ -405,15 +405,15 @@ std::size_t BasicColumn<T>::verify_leaf(MemRef mem, Allocator& alloc)
 {
     BasicArray<T> leaf(alloc);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     return leaf.size();
 }
 
 template<class T>
-void BasicColumn<T>::Verify() const
+void BasicColumn<T>::verify() const
 {
     if (root_is_leaf()) {
-        static_cast<BasicArray<T>*>(m_array.get())->Verify();
+        static_cast<BasicArray<T>*>(m_array.get())->verify();
         return;
     }
 

@@ -76,8 +76,8 @@ public:
     void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&) override;
 
 #ifdef REALM_DEBUG
-    void Verify() const override;
-    void Verify(const Table&, std::size_t) const override;
+    void verify() const override;
+    void verify(const Table&, std::size_t) const override;
     struct VerifyPair {
         std::size_t origin_row_ndx, target_row_ndx;
         bool operator<(const VerifyPair&) const REALM_NOEXCEPT;

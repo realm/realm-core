@@ -58,13 +58,13 @@ public:
     static MemRef create_array(std::size_t size, Allocator&);
 
 #ifdef REALM_DEBUG
-    void Verify() const;
+    void verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:
-    std::size_t CalcByteLen(std::size_t count, std::size_t width) const override;
-    std::size_t CalcItemCount(std::size_t bytes,
+    std::size_t calc_byte_len(std::size_t count, std::size_t width) const override;
+    std::size_t calc_item_count(std::size_t bytes,
                               std::size_t width) const REALM_NOEXCEPT override;
     WidthType GetWidthType() const override { return wtype_Ignore; }
 };
@@ -128,12 +128,12 @@ inline MemRef ArrayBlob::create_array(std::size_t size, Allocator& alloc)
     return Array::create(type_Normal, context_flag, wtype_Ignore, size, value, alloc); // Throws
 }
 
-inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const
+inline std::size_t ArrayBlob::calc_byte_len(std::size_t count, std::size_t) const
 {
     return header_size + count;
 }
 
-inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
+inline std::size_t ArrayBlob::calc_item_count(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
 {
     return bytes - header_size;
 }
