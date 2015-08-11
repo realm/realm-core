@@ -141,6 +141,12 @@ public:
     /// upgrade the provided database's file format if it is outdated. In order
     /// to prevent this, it is possible to set \a allow_upgrade to `false`.
     ///
+    /// If \a allow_upgrade is set to `false`, only two outcomes are possible:
+    ///
+    /// - the designed database is at the latest version, and can be used;
+    /// - the designed database uses a deprecated file format and can not be
+    ///   used for neither read or write operations (exception thrown).
+    ///
     /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
     ///        and an upgrade is required.
     explicit SharedGroup(const std::string& file, bool no_create = false,
@@ -200,6 +206,12 @@ public:
     /// The major difference is that this constructor will automatically
     /// upgrade the provided database's file format if it is outdated. In order
     /// to prevent this, it is possible to set \a allow_upgrade to `false`.
+    ///
+    /// If \a allow_upgrade is set to `false`, only two outcomes are possible:
+    ///
+    /// - the designed database is at the latest version, and can be used;
+    /// - the designed database uses a deprecated file format and can not be
+    ///   used for neither read or write operations (exception thrown).
     ///
     /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
     ///        and an upgrade is required.

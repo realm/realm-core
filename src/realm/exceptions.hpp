@@ -59,10 +59,12 @@ public:
 };
 
 
-/// Thrown by the \c SharedGroup constructor if an attempt is made to open a
-/// file that contains an old version of the database, all the while preventing
-/// the constructing from upgrading the database (by setting the \a
-/// allow_upgrade argument to `false`).
+/// The \c FileFormatUpgradeRequired exception can be thrown by the \c
+/// SharedGroup constructor when opening a database that uses a deprecated file
+/// format, and the user has indicated he does not want automatic upgrades to
+/// be performed. This exception indicates that until an upgrade of the file
+/// format is performed, the database will be unavailable for read or write
+/// operations.
 class FileFormatUpgradeRequired: public std::exception {
 public:
     const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
