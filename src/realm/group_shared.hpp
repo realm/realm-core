@@ -20,8 +20,11 @@
 #ifndef REALM_GROUP_SHARED_HPP
 #define REALM_GROUP_SHARED_HPP
 
-#include <limits>
+#ifdef REALM_DEBUG
+    #include <time.h> // usleep()
+#endif
 
+#include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
@@ -971,16 +974,28 @@ inline void SharedGroup::upgrade_file_format()
     if (m_group.m_alloc.get_committed_file_format() == 1)
         throw std::runtime_error("Version 1 database files are no longer supported by Realm");
     
-    // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set
-    // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
-    // call returns immediately if it finds that the upgrade is already complete.
+    // First a non-threadsafe but fast check
     bool upgrade = m_group.m_alloc.get_committed_file_format() < default_file_format_version;
 
-    // Only create write transaction if needed; that's why we test whether to upgrade or not in a separate read
-    // transaction. Else unit tests would fail.
     if (upgrade) {
+
+#ifdef REALM_DEBUG
+        // Sleep 1 second to create a simple thread-barrier for the two threads in the 
+        // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test. See the unit test for details.
+#ifdef _WIN32
+        _sleep(1);
+#else
+        timespec ts;
+        ts.tv_sec = 1;
+        ts.tv_nsec = 0;
+        nanosleep(&ts, 0);
+#endif
+#endif
+
         begin_write();
-        m_group.upgrade_file_format();
+        // upgrade_file_format() will also check if upgrade is needed, which happens thread safely
+        // due to this write transaction
+        m_group.upgrade_file_format();>
         commit();
     }
 }

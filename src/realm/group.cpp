@@ -206,6 +206,8 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
         m_alloc.remap(new_file_size); // Throws
 
     attach(new_top_ref); // Throws
+
+    m_alloc.set_file_format(m_alloc.get_committed_file_format());
 }
 
 
