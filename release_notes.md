@@ -19,6 +19,30 @@
 
 ### Internals:
 
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.92.1 Release notes
+
+### Bugfixes:
+
+* Reverted prelinking of static libraries on Apple platforms as it caused
+  `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
+  when sorting by integer or floating point columns.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
 * Renamed `Column` to `IntegerColumn` and `TColumn` to `Column`.
 * Renamed `AdaptiveStringColumn` to `StringColumn`.
 * Several column classes were renamed to follow the `XxxColumn` naming scheme
