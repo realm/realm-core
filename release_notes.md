@@ -6,7 +6,13 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* A number of methods in the following classes have been renamed to match the
+  coding guidelines (lowercase, underscore separation):
+    * `Array`, `ArrayBlob`, `ArrayInteger`, `ArrayString`, `BasicArray<T>`;
+    * `Column<T, N>`, `IntegerColumn`, `StringColumn`, `StringEnumColumn`;
+    * `Group`;
+    * `Query`;
+    * `StringIndex`.
 
 ### Enhancements:
 
@@ -16,7 +22,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Added argument to SharedGroup to prevent automatic file format upgrade. If an
+  upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
 
 ----------------------------------------------
 
@@ -47,7 +54,6 @@
 * Removed conditional compilation of replication features.
 * More information from `InvalidDatabase::what()`.
 * Disabled support for the async daemon on iOS and watchOS.
-
 
 ----------------------------------------------
 

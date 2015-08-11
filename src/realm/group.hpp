@@ -473,7 +473,7 @@ public:
     bool operator!=(const Group& g) const { return !(*this == g); }
 
 #ifdef REALM_DEBUG
-    void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
+    void verify() const;
     void print() const;
     void print_free() const;
     MemStats stats();
@@ -482,7 +482,7 @@ public:
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
 #else
-    void Verify() const {}
+    void verify() const {}
 #endif
 
 private:
@@ -601,6 +601,8 @@ private:
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
+
+    bool file_format_upgrade_required() const;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>

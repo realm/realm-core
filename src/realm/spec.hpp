@@ -113,7 +113,7 @@ public:
     void set_ndx_in_parent(std::size_t) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 

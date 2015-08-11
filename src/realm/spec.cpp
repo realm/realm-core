@@ -452,7 +452,7 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-void Spec::Verify() const
+void Spec::verify() const
 {
     REALM_ASSERT(m_names.size() == get_public_column_count());
     REALM_ASSERT(m_types.size()  == get_column_count());
