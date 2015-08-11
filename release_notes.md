@@ -22,7 +22,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Added argument to SharedGroup to prevent automatic file format upgrade. If an
+  upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
 
 ----------------------------------------------
 
