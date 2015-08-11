@@ -446,7 +446,7 @@
 # the command line. For example, to enable POSIX Threads and disable
 # automatic dependency tracking, you could do this:
 #
-#   make CFLAGS_PTHREADS="-pthreads" CFLAGS_AUTODEP=""
+#   make CFLAGS_PTHREADS="-pthread" CFLAGS_AUTODEP=""
 #
 # If CFLAGS is specified in the environment or on the command line, it
 # will replace the value of CFLAGS_GENERAL. Similarly with LDFLAGS and
