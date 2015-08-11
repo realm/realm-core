@@ -42,7 +42,7 @@ SlabAlloc::SlabAlloc()
     m_chunk_shifts = 1 + log2(m_initial_chunk_size);
     std::size_t max = std::numeric_limits<std::size_t>::max();
     m_num_chunk_bases = 1 + get_chunk_index(max);
-    m_chunk_bases = new std::size_t[m_num_chunk_bases];
+    m_chunk_bases.reset( new std::size_t[m_num_chunk_bases] );
     for (int i = 0; i < m_num_chunk_bases; ++i) {
         m_chunk_bases[i] = compute_chunk_base(i);
     }
@@ -164,9 +164,6 @@ SlabAlloc::~SlabAlloc() REALM_NOEXCEPT
 
     if (is_attached())
         detach();
-
-    delete[] m_chunk_bases;
-    m_chunk_bases = 0;
 }
 
 

@@ -316,8 +316,8 @@ private:
     std::size_t m_capacity_additional_mappings = 0;
     std::size_t m_initial_chunk_size = 0;
     int m_chunk_shifts = 0;
-    util::File::Map<char>* m_additional_mappings = 0;
-    std::size_t* m_chunk_bases = 0;
+    util::File::Map<char>* m_additional_mappings = nullptr;
+    std::unique_ptr<std::size_t[]> m_chunk_bases;
     int m_num_chunk_bases = 0;
     AttachMode m_attach_mode = attach_None;
 
@@ -389,12 +389,19 @@ private:
     /// cover multiple chunks - the initial mapping often does.
     std::size_t get_chunk_index(std::size_t pos) const REALM_NOEXCEPT;
 
-    /// Reverse: get the base offset of a chunk at a given index
+    /// Reverse: get the base offset of a chunk at a given index. Since the
+    /// computation is very time critical, this method just looks it up in
+    /// a table. The aactual computation and setup of that table is done
+    /// during initialization with the help of compute_chunk_base() below.
     inline std::size_t get_chunk_base(std::size_t index) const REALM_NOEXCEPT;
 
+    /// Actually compute the starting offset of a chunk. Only used to initialize
+    /// a table of predefined results, which are then used by get_chunk_base().
     std::size_t compute_chunk_base(std::size_t index) const REALM_NOEXCEPT;
 
-    std::size_t find_section_in_range(std::size_t start_pos, std::size_t chunk_size, std::size_t range_size) const REALM_NOEXCEPT;
+    /// Find a possible allocation that will fit into a section.
+    std::size_t find_section_in_range(std::size_t start_pos, std::size_t chunk_size, 
+                                      std::size_t range_size) const REALM_NOEXCEPT;
 
     friend class Group;
     friend class GroupWriter;

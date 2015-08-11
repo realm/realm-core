@@ -128,9 +128,7 @@ public:
     // Does not call fsync
     void flush() REALM_NOEXCEPT;
 
-    // Sync this file to disk -- FIXME: when having multiple mappings to different parts of the file,
-    // it has a large overhead if we sync after every write through A mapping. Instead we should only sync the
-    // file once all the writes are done.
+    // Sync this file to disk
     void sync() REALM_NOEXCEPT;
 
     // Handle a SEGV or BUS at the given address, which must be within this

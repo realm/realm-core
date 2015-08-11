@@ -119,9 +119,10 @@ private:
 
     /// Search only a range of the free list for a block as big as the
     /// specified size. Return a pair with index and size of the found chunk.
-    /// if no chunk is found, the index will be equal to the end argument.
+    /// \param found indicates whether a suitable block was found.
     std::pair<std::size_t, std::size_t> 
-    search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin, std::size_t end);
+    search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin, 
+                                          std::size_t end, bool& found);
 
     /// Extend the file to ensure that a chunk of free space of the
     /// specified size is available. The specified size does not need

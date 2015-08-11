@@ -361,7 +361,8 @@ inline std::size_t GroupWriter::split_freelist_chunk(std::size_t index, std::siz
 
 
 std::pair<std::size_t, std::size_t> 
-GroupWriter::search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin, std::size_t end)
+GroupWriter::search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin, 
+                                                   std::size_t end, bool& found)
 {
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
@@ -395,9 +396,11 @@ GroupWriter::search_free_space_in_part_of_freelist(std::size_t size, std::size_t
             ++i;
         }
         // Match found!
+        found = true;
         return std::make_pair(i, chunk_size);
     }
     // No match
+    found = false;
     return std::make_pair(end,0);
 }
 
@@ -406,21 +409,22 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
     typedef std::pair<std::size_t, std::size_t> Chunk;
     SlabAlloc& alloc = m_group.m_alloc;
-    Chunk found;
+    Chunk chunk;
+    bool found;
     // Since we do a first-fit search for small chunks, the top pieces are
     // likely to get smaller and smaller. So when we are looking for bigger
     // chunks we are likely to find them faster by skipping the first half of
     // the list.
     size_t end = m_free_lengths.size();
     if (size < 1024) {
-        found = search_free_space_in_part_of_freelist(size, 0, end);
-        if (found.first != end) return found;
+        chunk = search_free_space_in_part_of_freelist(size, 0, end, found);
+        if (found) return chunk;
     }
     else {
-        found = search_free_space_in_part_of_freelist(size, end/2, end);
-        if (found.first != end) return found;
-        found = search_free_space_in_part_of_freelist(size, 0, end/2);
-        if (found.first != end/2) return found;
+        chunk = search_free_space_in_part_of_freelist(size, end/2, end, found);
+        if (found) return chunk;
+        chunk = search_free_space_in_part_of_freelist(size, 0, end/2, found);
+        if (found) return chunk;
     }
 
     // No free space, so we have to extend the file.
@@ -429,10 +433,10 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         // extending the file will add a new entry at the end of the freelist,
         // so search that particular entry
         end = m_free_lengths.size();
-        found = search_free_space_in_part_of_freelist(size, end-1, end);
+        chunk = search_free_space_in_part_of_freelist(size, end-1, end, found);
     } 
-    while (found.first == end);
-    return found;
+    while (!found);
+    return chunk;
 }
 
 // Extend the free space with at least the requested size.
