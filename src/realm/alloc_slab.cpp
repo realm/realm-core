@@ -494,19 +494,6 @@ unsigned char SlabAlloc::get_file_format() const
     return m_file_format_version;
 }
 
-unsigned char SlabAlloc::get_committed_file_format() const
-{
-    Header* header = reinterpret_cast<Header*>(m_data);
-    int select_field = header->m_flags & SlabAlloc::flags_SelectBit;
-    unsigned char file_format_version = header->m_file_format_version[select_field];
-    return file_format_version;
-}
-
-void SlabAlloc::set_file_format(unsigned char version) 
-{
-    m_file_format_version = version;
-}
-
 ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in

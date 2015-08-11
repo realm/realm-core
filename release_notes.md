@@ -2,10 +2,7 @@
 
 ### Bugfixes:
 
-* Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the same file if opened from two places simultaneously)
-* Reverted prelinking of static libraries on Apple platforms as it caused
-  `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
-  when sorting by integer or floating point columns.
+* Lorem ipsum.
 
 ### API breaking changes:
 
