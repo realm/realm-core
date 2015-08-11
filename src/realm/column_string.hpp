@@ -141,8 +141,8 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify() const override;
-    void Verify(const Table&, std::size_t) const override;
+    void verify() const override;
+    void verify(const Table&, std::size_t) const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
 #endif
@@ -154,7 +154,7 @@ private:
     std::unique_ptr<StringIndex> m_search_index;
     bool m_nullable;
 
-    LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
+    LeafType get_block(std::size_t ndx, ArrayParent**, std::size_t& off,
                       bool use_retval = false) const;
 
     /// If you are appending and have the size of the column readily available,

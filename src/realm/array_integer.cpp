@@ -46,7 +46,7 @@ bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t *min
 }
 
 
-std::vector<int64_t> ArrayInteger::ToVector() const
+std::vector<int64_t> ArrayInteger::to_vector() const
 {
     std::vector<int64_t> v;
     const size_t count = size();

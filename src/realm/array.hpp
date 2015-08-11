@@ -459,10 +459,10 @@ public:
     void ensure_minimum_width(int64_t value);
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(StringData value, ColumnBase* column) const;
-    void   IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBase* column) const;
-    size_t IndexStringCount(StringData value, ColumnBase* column) const;
-    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, ColumnBase* column) const;
+    size_t index_string_find_first(StringData value, ColumnBase* column) const;
+    void   index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
+    size_t index_string_count(StringData value, ColumnBase* column) const;
+    FindRes index_string_find_all_no_copy(StringData value, size_t& res_ref, ColumnBase* column) const;
 
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().
@@ -547,8 +547,8 @@ public:
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
     std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
-    void Preset(int64_t min, int64_t max, std::size_t count);
-    void Preset(std::size_t bitwidth, std::size_t count);
+    void preset(int64_t min, int64_t max, std::size_t count);
+    void preset(std::size_t bitwidth, std::size_t count);
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     std::size_t count(int64_t value) const REALM_NOEXCEPT;
@@ -675,65 +675,65 @@ public:
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
     template<class cond2, Action action, size_t bitwidth, class Callback>
-    bool Compare(int64_t value, size_t start, size_t end, size_t baseindex,
+    bool compare(int64_t value, size_t start, size_t end, size_t baseindex,
                  QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Equal/NotEqual
     template<bool eq, Action action, size_t width, class Callback>
-    inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex,
+    inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex,
                                 QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Less/Greater
     template<bool gt, Action action, size_t bitwidth, class Callback>
-    bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex,
+    bool compare_relation(int64_t value, size_t start, size_t end, size_t baseindex,
                          QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t foreign_width, class Callback, size_t width>
-    bool CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex,
                        QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                       QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                       QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t width, class Callback>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                       QueryState<int64_t>* state, Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef REALM_COMPILER_SSE
     template<class cond2, Action action, size_t width, class Callback>
-    bool FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
+    bool find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
                  size_t baseindex, Callback callback) const;
 
     template<class cond2, Action action, size_t width, class Callback>
-    REALM_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
+    REALM_FORCEINLINE bool find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                             QueryState<int64_t>* state, size_t baseindex,
                                             Callback callback) const;
 
 #endif
 
-    template<size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
-    template<bool eq, size_t width>size_t FindZero(uint64_t v) const;          // Finds position of 0/non-zero element
+    template<size_t width> inline bool test_zero(uint64_t value) const;         // Tests value for 0-elements
+    template<bool eq, size_t width>size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
-    template<bool gt, size_t width>int64_t FindGTLT_Magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
-    template<size_t width> inline int64_t LowerBits() const;                   // Return chunk with lower bit set in each element
-    std::size_t FirstSetBit(unsigned int v) const;
-    std::size_t FirstSetBit64(int64_t v) const;
+    template<bool gt, size_t width>int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
+    template<size_t width> inline int64_t lower_bits() const;                   // Return chunk with lower bit set in each element
+    std::size_t first_set_bit(unsigned int v) const;
+    std::size_t first_set_bit64(int64_t v) const;
     template<std::size_t w> int64_t get_universal(const char* const data, const std::size_t ndx) const;
 
     // Find value greater/less in 64-bit chunk - only works for positive values
     template<bool gt, Action action, std::size_t width, class Callback>
-    bool FindGTLT_Fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, std::size_t baseindex,
+    bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, std::size_t baseindex,
                        Callback callback) const;
 
     // Find value greater/less in 64-bit chunk - no constraints
     template<bool gt, Action action, std::size_t width, class Callback>
-    bool FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
+    bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
                   Callback callback) const;
 
 
@@ -922,7 +922,7 @@ public:
 
 #ifdef REALM_DEBUG
     void print() const;
-    void Verify() const;
+    void verify() const;
     typedef std::size_t (*LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;
     class MemUsageHandler {
@@ -965,12 +965,12 @@ protected:
     std::size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                              ColumnBase* column) const;
 protected:
-//    void AddPositiveLocal(int64_t value);
+//    void add_positive_local(int64_t value);
 
     // Includes array header. Not necessarily 8-byte aligned.
-    virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
+    virtual std::size_t calc_byte_len(std::size_t size, std::size_t width) const;
 
-    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
+    virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
     bool get_is_inner_bptree_node_from_header() const REALM_NOEXCEPT;
@@ -2472,41 +2472,41 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start >= sizeof(__m128i) && m_width >= 8 &&
         (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
 
-        // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
+        // find_sse() must start at 16-byte boundary, so search area before that using compare_equality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
         __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
 
-        if (!Compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
+        if (!compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
             return false;
 
         // Search aligned area with SSE
         if (b > a) {
             if (sseavx<42>()) {
-                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!find_sse<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
                 }
                 else if (sseavx<30>()) {
 
-                if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!find_sse<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
                 }
         }
 
-        // Search remainder with CompareEquality()
-        if (!Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
+        // Search remainder with compare_equality()
+        if (!compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
             return false;
 
         return true;
     }
     else {
-        return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        return compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     }
 #else
-return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+return compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 #endif
 }
 
-template<size_t width> inline int64_t Array::LowerBits() const
+template<size_t width> inline int64_t Array::lower_bits() const
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -2529,18 +2529,18 @@ template<size_t width> inline int64_t Array::LowerBits() const
 }
 
 // Tests if any chunk in 'value' is 0
-template<size_t width> inline bool Array::TestZero(uint64_t value) const
+template<size_t width> inline bool Array::test_zero(uint64_t value) const
 {
     uint64_t hasZeroByte;
-    uint64_t lower = LowerBits<width>();
-    uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
+    uint64_t lower = lower_bits<width>();
+    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
     hasZeroByte = (value - lower) & ~value & upper;
     return hasZeroByte != 0;
 }
 
 // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
-// IMPORTANT: This function assumes that at least 1 item matches (test this with TestZero() or other means first)!
-template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
+// IMPORTANT: This function assumes that at least 1 item matches (test this with test_zero() or other means first)!
+template<bool eq, size_t width>size_t Array::find_zero(uint64_t v) const
 {
     size_t start = 0;
     uint64_t hasZeroByte;
@@ -2552,15 +2552,15 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     }
 
     // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay
-    // off because the work done by TestZero() is wasted for the cases where the value exists in first half, but
+    // off because the work done by test_zero() is wasted for the cases where the value exists in first half, but
     // useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
-        hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
+        hasZeroByte = test_zero<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
             // 00?? -> increasing
             start += 64 / no0(width) / 2;
             if (width <= 4) {
-                hasZeroByte = TestZero<width>(v | 0xffff000000000000ULL);
+                hasZeroByte = test_zero<width>(v | 0xffff000000000000ULL);
                 if (eq ? !hasZeroByte : (v & 0x0000ffffffffffffULL) == 0) {
                     // 000?
                     start += 64 / no0(width) / 4;
@@ -2570,7 +2570,7 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
         else {
             if (width <= 4) {
                 // ??00
-                hasZeroByte = TestZero<width>(v | 0xffffffffffff0000ULL);
+                hasZeroByte = test_zero<width>(v | 0xffffffffffff0000ULL);
                 if (eq ? !hasZeroByte : (v & 0x000000000000ffffULL) == 0) {
                     // 0?00
                     start += 64 / no0(width) / 4;
@@ -2580,7 +2580,7 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     }
 
     while (eq == (((v >> (width * start)) & mask) != 0)) {
-        // You must only call FindZero() if you are sure that at least 1 item matches
+        // You must only call find_zero() if you are sure that at least 1 item matches
         REALM_ASSERT_3(start, <=, 8 * sizeof(v));
         start++;
     }
@@ -2589,7 +2589,7 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
 }
 
 // Generate a magic constant used for later bithacks
-template<bool gt, size_t width>int64_t Array::FindGTLT_Magic(int64_t v) const
+template<bool gt, size_t width>int64_t Array::find_gtlt_magic(int64_t v) const
 {
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
@@ -2597,7 +2597,7 @@ template<bool gt, size_t width>int64_t Array::FindGTLT_Magic(int64_t v) const
     return magic;
 }
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::FindGTLT_Fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v.
     // Fast, but limited to work when all values in the chunk are positive.
@@ -2610,7 +2610,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
         if (find_action_pattern<action, Callback>(baseindex, m >> (no0(width) - 1), state, callback))
             break; // consumed, so do not call find_action()
 
-        size_t t = FirstSetBit64(m) / no0(width);
+        size_t t = first_set_bit64(m) / no0(width);
         p += t;
         if (!find_action<action, Callback>(p + baseindex, (chunk >> (p * width)) & mask1, state, callback))
             return false;
@@ -2626,7 +2626,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
 }
 
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
@@ -2718,10 +2718,10 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
 
         /*
         // Faster but disabled due to bug in VC2010 compiler (fixed in 2012 toolchain) where last 'if' is errorneously optimized away
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(0 + baseindex); else return 0;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(1 + baseindex); else return 1;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(2 + baseindex); else return 2;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->AddPositiveLocal(3 + baseindex); else return 3;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(0 + baseindex); else return 0;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(1 + baseindex); else return 1;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(2 + baseindex); else return 2;} chunk >>= 16;
+        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(3 + baseindex); else return 3;} chunk >>= 16;
 
         // Following illustrates it:
         #include <stdint.h>
@@ -2777,7 +2777,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
 }
 
 
-template<bool eq, Action action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<bool eq, Action action, size_t width, class Callback> inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
@@ -2806,12 +2806,12 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
             start = (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(width);
             size_t a = 0;
 
-            while (eq ? TestZero<width>(v2) : v2) {
+            while (eq ? test_zero<width>(v2) : v2) {
 
                 if (find_action_pattern<action, Callback>(start + baseindex, cascade<width, eq>(v2), state, callback))
                     break; // consumed
 
-                size_t t = FindZero<eq, width>(v2);
+                size_t t = find_zero<eq, width>(v2);
                 a += t;
 
                 if (a >= 64 / no0(width))
@@ -2878,7 +2878,7 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 #ifdef REALM_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
 template<class cond2, Action action, size_t width, class Callback>
-bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
+bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
                     Callback callback) const
 {
     __m128i search = {0};
@@ -2897,13 +2897,13 @@ bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64
             search = _mm_set_epi64x(value, value);
     }
 
-    return FindSSE_intern<cond2, action, width, Callback>(data, &search, items, state, baseindex, callback);
+    return find_sse_intern<cond2, action, width, Callback>(data, &search, items, state, baseindex, callback);
 }
 
 // Compares packed action_data with packed data (equal, less, etc) and performs aggregate action (max, min, sum,
 // find_all, etc) on value inside action_data for first match, if any
 template<class cond2, Action action, size_t width, class Callback>
-REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
+REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     int cond = cond2::condition;
@@ -2961,12 +2961,12 @@ REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data
 
         while (resmask != 0) {
 
-            uint64_t upper = LowerBits<width / 8>() << (no0(width / 8) - 1);
+            uint64_t upper = lower_bits<width / 8>() << (no0(width / 8) - 1);
             uint64_t pattern = resmask & upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
             if (find_action_pattern<action, Callback>(s + baseindex, pattern, state, callback))
                 break;
 
-            size_t idx = FirstSetBit(resmask) * 8 / no0(width);
+            size_t idx = first_set_bit(resmask) * 8 / no0(width);
             s += idx;
             if (!find_action<action, Callback>( s + baseindex, get_universal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
                 return false;
@@ -2980,7 +2980,7 @@ REALM_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data
 #endif //REALM_COMPILER_SSE
 
 template<class cond, Action action, class Callback>
-bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                          Callback callback) const
 {
     cond c;
@@ -3023,22 +3023,22 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
     }
 
     bool r;
-    REALM_TEMPEX4(r = CompareLeafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX4(r = compare_leafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
 
-template<class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<class cond, Action action, size_t width, class Callback> bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     size_t fw = foreign->m_width;
     bool r;
-    REALM_TEMPEX5(r = CompareLeafs4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX5(r = compare_leafs_4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
 
 template<class cond, Action action, size_t width, class Callback, size_t foreign_width>
-bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                           Callback callback) const
 {
     cond c;
@@ -3081,7 +3081,7 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
             __m128i* a = reinterpret_cast<__m128i*>(m_data + start * width / 8);
             __m128i* b = reinterpret_cast<__m128i*>(foreign_m_data + start * width / 8);
 
-            bool continue_search = FindSSE_intern<cond, action, width, Callback>(a, b, 1, state, baseindex + start, callback);
+            bool continue_search = find_sse_intern<cond, action, width, Callback>(a, b, 1, state, baseindex + start, callback);
 
             if (!continue_search)
                 return false;
@@ -3199,20 +3199,20 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
 
 
 template<class cond2, Action action, size_t bitwidth, class Callback>
-bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                     Callback callback) const
 {
     int cond = cond2::condition;
     bool ret = false;
 
     if (cond == cond_Equal)
-        ret = CompareEquality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_equality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_NotEqual)
-        ret = CompareEquality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_equality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_Greater)
-        ret = CompareRelation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_relation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else if (cond == cond_Less)
-        ret = CompareRelation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        ret = compare_relation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else
         REALM_ASSERT_DEBUG(false);
 
@@ -3220,7 +3220,7 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
 }
 
 template<bool gt, Action action, size_t bitwidth, class Callback>
-bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                             Callback callback) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
@@ -3245,13 +3245,13 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
     // bit hacks from http://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
 
     if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
-        uint64_t magic = FindGTLT_Magic<gt, bitwidth>(value);
+        uint64_t magic = find_gtlt_magic<gt, bitwidth>(value);
 
         // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
         if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0))) {
             // 15 ms
             while (p < e) {
-                uint64_t upper = LowerBits<bitwidth>() << (no0(bitwidth) - 1);
+                uint64_t upper = lower_bits<bitwidth>() << (no0(bitwidth) - 1);
 
                 const int64_t v = *p;
                 size_t idx;
@@ -3261,11 +3261,11 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
                 if ((bitwidth > 4 ? !upper : true)) {
                     // Assert that all values in chunk are positive.
-                    REALM_ASSERT(bitwidth <= 4 || ((LowerBits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
-                    idx = FindGTLT_Fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
+                    REALM_ASSERT(bitwidth <= 4 || ((lower_bits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
+                    idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
                 else
-                    idx = FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
+                    idx = find_gtlt<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
 
                 if (!idx)
                     return false;
@@ -3276,7 +3276,7 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
             // 24 ms
             while (p < e) {
                 int64_t v = *p;
-                if (!FindGTLT<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback))
+                if (!find_gtlt<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback))
                     return false;
                 ++p;
             }

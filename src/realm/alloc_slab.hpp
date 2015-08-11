@@ -244,7 +244,7 @@ public:
 
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
-    void Verify() const override;
+    void verify() const override;
     bool is_all_free() const;
     void print() const;
 #endif

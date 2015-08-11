@@ -56,8 +56,8 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify(const Table&, std::size_t) const override;
-    using IntegerColumn::Verify;
+    void verify(const Table&, std::size_t) const override;
+    using IntegerColumn::verify;
 #endif
 
 protected:

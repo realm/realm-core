@@ -259,7 +259,7 @@ TEST(Table_1)
     }
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -354,7 +354,7 @@ TEST(Table_Floats)
     }
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -383,7 +383,7 @@ TEST(Table_2)
     CHECK_EQUAL(Wed, r.fourth);
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -406,7 +406,7 @@ TEST(Table_3)
     CHECK_EQUAL(size_t(-1), table.column().fourth.find_first(Mon));
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -434,7 +434,7 @@ TEST(Table_4)
     CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -458,7 +458,7 @@ TEST(Table_Float2)
     CHECK_EQUAL(2.2, r.second);
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -484,7 +484,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(8, table[6].second);
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 
     // Delete all items one at a time
@@ -496,7 +496,7 @@ TEST(Table_Delete)
     CHECK_EQUAL(0, table.size());
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -710,13 +710,13 @@ TEST(Table_LowLevelCopy)
     setup_multi_table(table, 15, 2);
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 
     Table table2 = table;
 
 #ifdef REALM_DEBUG
-    table2.Verify();
+    table2.verify();
 #endif
 
     CHECK(table2 == table);
@@ -724,7 +724,7 @@ TEST(Table_LowLevelCopy)
     TableRef table3 = table.copy();
 
 #ifdef REALM_DEBUG
-    table3->Verify();
+    table3->verify();
 #endif
 
     CHECK(*table3 == table);
@@ -738,13 +738,13 @@ TEST(Table_HighLevelCopy)
     table.add(12, 100, true,  Tue);
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 
     TestTable table2 = table;
 
 #ifdef REALM_DEBUG
-    table2.Verify();
+    table2.verify();
 #endif
 
     CHECK(table2 == table);
@@ -752,7 +752,7 @@ TEST(Table_HighLevelCopy)
     TestTable::Ref table3 = table.copy();
 
 #ifdef REALM_DEBUG
-    table3->Verify();
+    table3->verify();
 #endif
 
     CHECK(*table3 == table);
@@ -772,7 +772,7 @@ TEST(Table_DeleteAllTypes)
     CHECK_EQUAL(12, table.size());
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 
     // Test Clear
@@ -780,7 +780,7 @@ TEST(Table_DeleteAllTypes)
     CHECK_EQUAL(0, table.size());
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -819,7 +819,7 @@ TEST(Table_MoveAllTypes)
         size_t size = table.size();
         size_t target_row_ndx = random.draw_int_mod(size);
         table.move_last_over(target_row_ndx);
-        table.Verify();
+        table.verify();
     }
 }
 
@@ -1072,7 +1072,7 @@ TEST(Table_FindInt)
     CHECK_EQUAL(size_t(-1),   table.column().second.find_first(1001));
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 */
@@ -1100,7 +1100,7 @@ TEST(Table_6)
     //CHECK_EQUAL((size_t)-1, result2);
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 */
@@ -1136,7 +1136,7 @@ TEST(Table_FindAllInt)
     CHECK_EQUAL(9, v.get_source_ndx(4));
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -1171,7 +1171,7 @@ TEST(Table_SortedInt)
     CHECK_EQUAL(8, v.get_source_ndx(9));
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -1208,7 +1208,7 @@ TEST(Table_Sorted_Query_where)
     CHECK_EQUAL(table.size(), v_sorted.size());
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -1439,12 +1439,12 @@ TEST(Table_PrimaryKeyBasics)
     // Unfortunately, we could not have recovered and continued if we had let
     // Table::insert_string() throw.
 //    CHECK_LOGIC_ERROR(table.insert_string(0, 2, "foo"), LogicError::unique_constraint_violation);
-    table.Verify();
+    table.verify();
     table.insert_empty_row(2);
     table.set_string(0, 2, "bar");
-    table.Verify();
+    table.verify();
     table.add_empty_row();
-    table.Verify();
+    table.verify();
     // Unfortunately, we could not have recovered and continued if we had let
     // Table::add_empty_row() throw.
 //    CHECK_LOGIC_ERROR(table.add_empty_row(), LogicError::unique_constraint_violation);
@@ -1512,7 +1512,7 @@ TEST(Table_PrimaryKeyExtra)
     CHECK(table.try_add_primary_key(0));
     CHECK(table.has_primary_key());
 
-    table.Verify();
+    table.verify();
 
     Row a0 = table.find_pkey_string("jeff");
     Row a1 = table.find_pkey_string("jim");
@@ -1822,7 +1822,7 @@ TEST(Table_IndexInt)
     CHECK_EQUAL(7, table.column().second.find_first(100));
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -1967,7 +1967,7 @@ TEST(Table_AutoEnumerationOptimize)
     }
 
 #ifdef REALM_DEBUG
-    t.Verify();
+    t.verify();
 #endif
 }
 
@@ -2072,7 +2072,7 @@ TEST(Table_SlabAlloc)
     table.remove(4);
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -2339,7 +2339,7 @@ TEST(Table_SpecDeleteColumns)
     CHECK(table->is_empty());
 
 #ifdef REALM_DEBUG
-    table->Verify();
+    table->verify();
 #endif
 }
 
@@ -2519,7 +2519,7 @@ TEST(Table_SpecAddColumns)
     CHECK_EQUAL(2, table->get_subtable_size(7, 0));
 
 #ifdef REALM_DEBUG
-    table->Verify();
+    table->verify();
 #endif
 }
 
@@ -2590,7 +2590,7 @@ TEST(Table_SpecDeleteColumnsBug)
     table->remove_column(3); // extra
 
 #ifdef REALM_DEBUG
-    table->Verify();
+    table->verify();
 #endif
 }
 
@@ -2744,7 +2744,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
 
 #ifdef REALM_DEBUG
-    table.Verify();
+    table.verify();
 #endif
 }
 
@@ -5163,7 +5163,7 @@ TEST(Table_RowAccessorCopyAndAssign)
         CHECK_EQUAL(0, crow_3.get_index());
         CHECK_EQUAL(1, crow_4.get_index());
     }
-    table.Verify();
+    table.verify();
 
     // Check assignment of row expression to row accessor
     {
@@ -5304,7 +5304,7 @@ TEST(Table_RowAccessorRetain)
     parent->add_empty_row(2);
     parent->set_int(0, 0, 27);
     parent->set_int(0, 1, 227);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(2, parent->size());
     ConstRow row_1 = (*parent)[0];
     ConstRow row_2 = (*parent)[1];
@@ -5320,7 +5320,7 @@ TEST(Table_RowAccessorRetain)
     parent->insert_empty_row(1); // Between
     parent->add_empty_row();     // After
     parent->insert_empty_row(0); // Before
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
@@ -5334,7 +5334,7 @@ TEST(Table_RowAccessorRetain)
     parent->insert_empty_row(5); // Immediately after  row_2
     parent->insert_empty_row(3); // Immediately after  row_1
     parent->insert_empty_row(5); // Immediately before row_2
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(9, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
@@ -5351,7 +5351,7 @@ TEST(Table_RowAccessorRetain)
     parent->remove(1); // Immediately before row_1
     parent->remove(3); // Immediately before row_2
     parent->remove(4); // Immediately after  row_2
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
@@ -5364,7 +5364,7 @@ TEST(Table_RowAccessorRetain)
     parent->remove(4); // After
     parent->remove(0); // Before
     parent->remove(1); // Between
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
@@ -5377,7 +5377,7 @@ TEST(Table_RowAccessorRetain)
 
     // Check that removal of first row detaches row_1
     parent->remove(0);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(1, parent->size());
     CHECK(!row_1.is_attached());
     CHECK(row_2.is_attached());
@@ -5387,7 +5387,7 @@ TEST(Table_RowAccessorRetain)
     // Restore first row and recover row_1
     parent->insert_empty_row(0);
     parent->set_int(0, 0, 27);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(2, parent->size());
     row_1 = (*parent)[0];
     CHECK(row_1.is_attached());
@@ -5401,7 +5401,7 @@ TEST(Table_RowAccessorRetain)
 
     // Check that removal of second row detaches row_2
     parent->remove(1);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(1, parent->size());
     CHECK(row_1.is_attached());
     CHECK(!row_2.is_attached());
@@ -5411,7 +5411,7 @@ TEST(Table_RowAccessorRetain)
     // Restore second row and recover row_2
     parent->add_empty_row();
     parent->set_int(0, 1, 227);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(2, parent->size());
     row_2 = (*parent)[1];
     CHECK(row_1.is_attached());
@@ -5427,7 +5427,7 @@ TEST(Table_RowAccessorRetain)
     // long as we do not remove the last column)
     parent->add_column(type_String, "x");
     parent->insert_column(0, type_Float, "y");
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
@@ -5439,7 +5439,7 @@ TEST(Table_RowAccessorRetain)
     CHECK_EQUAL(227, row_2.get_int(1));
     parent->remove_column(0);
     parent->remove_column(1);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
@@ -5452,7 +5452,7 @@ TEST(Table_RowAccessorRetain)
 
     // Check that removal of the last column detaches all row accessors
     parent->remove_column(0);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
     CHECK(!row_1.is_attached());
@@ -5462,7 +5462,7 @@ TEST(Table_RowAccessorRetain)
     parent->add_empty_row(2);
     parent->set_int(0, 0, 27);
     parent->set_int(0, 1, 227);
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(2, parent->size());
     row_1 = (*parent)[0];
     row_2 = (*parent)[1];
@@ -5475,7 +5475,7 @@ TEST(Table_RowAccessorRetain)
 
     // Check that clearing of the table detaches all row accessors
     parent->clear();
-    parent->Verify();
+    parent->verify();
     CHECK_EQUAL(0, parent->size());
     CHECK(!row_1.is_attached());
     CHECK(!row_2.is_attached());
@@ -5819,7 +5819,7 @@ TEST(Table_AddColumnWithThreeLevelBptree)
     table.add_column(type_Int, "");
     table.add_empty_row(REALM_MAX_BPNODE_SIZE*REALM_MAX_BPNODE_SIZE+1);
     table.add_column(type_Int, "");
-    table.Verify();
+    table.verify();
 }
 
 
@@ -5829,7 +5829,7 @@ TEST(Table_ClearWithTwoLevelBptree)
     table.add_column(type_Mixed, "");
     table.add_empty_row(REALM_MAX_BPNODE_SIZE+1);
     table.clear();
-    table.Verify();
+    table.verify();
 }
 
 

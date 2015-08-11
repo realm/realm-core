@@ -117,7 +117,7 @@ public:
     }
 
 #ifdef REALM_DEBUG
-    void Verify() const override
+    void verify() const override
     {
     }
 #endif

@@ -37,15 +37,14 @@ void Group::upgrade_file_format()
 {
 #if REALM_NULL_STRINGS == 1
     REALM_ASSERT(is_attached());
-    if (m_alloc.get_file_format() >= default_file_format_version)
-        return;
+    if (file_format_upgrade_required()) {
+        for (size_t t = 0; t < m_tables.size(); t++) {
+            TableRef table = get_table(t);
+            table->upgrade_file_format();
+        }
 
-    for (size_t t = 0; t < m_tables.size(); t++) {
-        TableRef table = get_table(t);
-        table->upgrade_file_format();
+        m_alloc.m_file_format_version = default_file_format_version;
     }
-
-    m_alloc.m_file_format_version = default_file_format_version;
 #endif
 }
 
@@ -1496,6 +1495,11 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     refresh_dirty_accessors(); // Throws
 }
 
+bool Group::file_format_upgrade_required() const
+{
+    return m_alloc.get_file_format() < default_file_format_version;
+}
+
 
 #ifdef REALM_DEBUG
 
@@ -1601,11 +1605,11 @@ private:
 
 } // anonymous namespace
 
-void Group::Verify() const
+void Group::verify() const
 {
     REALM_ASSERT(is_attached());
 
-    m_alloc.Verify();
+    m_alloc.verify();
 
     // Verify tables
     {
@@ -1613,7 +1617,7 @@ void Group::Verify() const
         for (size_t i = 0; i != n; ++i) {
             ConstTableRef table = get_table(i);
             REALM_ASSERT_3(table->get_index_in_group(), ==, i);
-            table->Verify();
+            table->verify();
         }
     }
 

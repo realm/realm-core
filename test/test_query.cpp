@@ -4973,7 +4973,7 @@ TEST(Query_SyntaxCheck)
     /*
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
     #ifdef REALM_DEBUG
-    s = q7.Verify();
+    s = q7.verify();
     CHECK(s != "");
     #endif
     */

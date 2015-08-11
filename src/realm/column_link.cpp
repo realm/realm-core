@@ -183,9 +183,9 @@ void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 
 #ifdef REALM_DEBUG
 
-void LinkColumn::Verify(const Table& table, size_t col_ndx) const
+void LinkColumn::verify(const Table& table, size_t col_ndx) const
 {
-    LinkColumnBase::Verify(table, col_ndx);
+    LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
     m_backlink_column->get_backlinks(pairs);

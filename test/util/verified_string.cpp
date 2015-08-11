@@ -125,7 +125,7 @@ void VerifiedString::find_all(IntegerColumn& c, StringData value, size_t start, 
     return;
 }
 
-bool VerifiedString::Verify()
+bool VerifiedString::verify()
 {
     REALM_ASSERT(u.size() == v.size());
     if (u.size() != v.size())
@@ -143,7 +143,7 @@ bool VerifiedString::Verify()
 bool VerifiedString::conditional_verify()
 {
     if ((uint64_t(rand()) * uint64_t(rand()))  % (v.size() / 10 + 1) == 0) {
-        return Verify();
+        return verify();
     }
     else {
         return true;

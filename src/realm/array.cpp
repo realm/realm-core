@@ -192,11 +192,11 @@ void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
     }
     else {
         size_t byte_capacity = get_capacity_from_header(header);
-        // FIXME: Avoid calling virtual method CalcItemCount() here,
+        // FIXME: Avoid calling virtual method calc_item_count() here,
         // instead calculate the capacity in a way similar to what is done
         // in get_byte_size_from_header(). The virtual call makes "life"
         // hard for constructors in derived array classes.
-        m_capacity = CalcItemCount(byte_capacity, m_width);
+        m_capacity = calc_item_count(byte_capacity, m_width);
     }
 
     m_ref = mem.m_ref;
@@ -309,7 +309,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
 
 
 // Allocates space for 'size' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
-void Array::Preset(size_t width, size_t size)
+void Array::preset(size_t width, size_t size)
 {
     clear_and_destroy_children();
     set_width(width);
@@ -319,10 +319,10 @@ void Array::Preset(size_t width, size_t size)
         set(i, 0);
 }
 
-void Array::Preset(int64_t min, int64_t max, size_t count)
+void Array::preset(int64_t min, int64_t max, size_t count)
 {
     size_t w = std::max(bit_width(max), bit_width(min));
-    Preset(w, count);
+    preset(w, count);
 }
 
 
@@ -507,7 +507,7 @@ void Array::set_as_ref(std::size_t ndx, ref_type ref)
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
-void Array::AddPositiveLocal(int64_t value)
+void Array::add_positive_local(int64_t value)
 {
     REALM_ASSERT(value >= 0);
     REALM_ASSERT(&m_alloc == &Allocator::get_default());
@@ -610,7 +610,7 @@ void Array::truncate(size_t size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (size == 0) {
-        m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
     }
@@ -641,7 +641,7 @@ void Array::truncate_and_destroy_children(size_t size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (size == 0) {
-        m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
     }
@@ -677,7 +677,7 @@ void Array::set_all_to_zero()
 {
     copy_on_write(); // Throws
 
-    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+    m_capacity = calc_item_count(get_capacity_from_header(), 0);
     set_width(0);
 
     // Update header
@@ -811,7 +811,7 @@ exit:
     return ret;
 }
 
-size_t Array::FirstSetBit(unsigned int v) const
+size_t Array::first_set_bit(unsigned int v) const
 {
 #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
     unsigned long ul;
@@ -833,7 +833,7 @@ return r;
 #endif
 }
 
-size_t Array::FirstSetBit64(int64_t v) const
+size_t Array::first_set_bit64(int64_t v) const
 {
 #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
     unsigned long ul;
@@ -848,9 +848,9 @@ size_t Array::FirstSetBit64(int64_t v) const
     size_t r;
 
     if (v0 != 0)
-        r = FirstSetBit(v0);
+        r = first_set_bit(v0);
     else
-        r = FirstSetBit(v1) + 32;
+        r = first_set_bit(v1) + 32;
 
     return r;
 #endif
@@ -859,7 +859,7 @@ size_t Array::FirstSetBit64(int64_t v) const
 
 namespace {
 
-template<size_t width> inline int64_t LowerBits()
+template<size_t width> inline int64_t lower_bits()
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -884,21 +884,21 @@ template<size_t width> inline int64_t LowerBits()
 // Return true if 'value' has an element (of bit-width 'width') which is 0
 template<size_t width> inline bool has_zero_element(uint64_t value) {
     uint64_t hasZeroByte;
-    uint64_t lower = LowerBits<width>();
-    uint64_t upper = LowerBits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
+    uint64_t lower = lower_bits<width>();
+    uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
     hasZeroByte = (value - lower) & ~value & upper;
     return hasZeroByte != 0;
 }
 
 
 // Finds zero element of bit width 'width'
-template<bool eq, size_t width> size_t FindZero(uint64_t v)
+template<bool eq, size_t width> size_t find_zero(uint64_t v)
 {
     size_t start = 0;
     uint64_t hasZeroByte;
 
     // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay off because
-    // the work done by TestZero() is wasted for the cases where the value exists in first half, but useful if it exists in last
+    // the work done by test_zero() is wasted for the cases where the value exists in first half, but useful if it exists in last
     // half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
         hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
@@ -1401,15 +1401,15 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     return aligned_byte_size;
 }
 
-size_t Array::CalcByteLen(size_t count, size_t width) const
+size_t Array::calc_byte_len(size_t count, size_t width) const
 {
     REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
 
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that CalcByteLen() is supposed to return
+    // instead. Note however, that calc_byte_len() is supposed to return
     // the unaligned byte size. It is probably the case that no harm
     // is done by returning the aligned version, and most callers of
-    // CalcByteLen() will actually benefit if CalcByteLen() was
+    // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
 
     // FIXME: This arithemtic could overflow. Consider using <realm/util/safe_int_ops.hpp>
@@ -1418,7 +1418,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
     return bytes + header_size; // add room for 8 byte header
 }
 
-size_t Array::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
+size_t Array::calc_item_count(size_t bytes, size_t width) const REALM_NOEXCEPT
 {
     if (width == 0)
         return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
@@ -1499,7 +1499,7 @@ void Array::copy_on_write()
         return;
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
-    size_t size = CalcByteLen(m_size, m_width);
+    size_t size = calc_byte_len(m_size, m_width);
     size_t rest = (~size & 0x7) + 1;
     if (rest < 8)
         size += rest; // 64bit blocks
@@ -1517,7 +1517,7 @@ void Array::copy_on_write()
     // Update internal data
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
-    m_capacity = CalcItemCount(new_size, m_width);
+    m_capacity = calc_item_count(new_size, m_width);
     REALM_ASSERT_DEBUG(m_capacity > 0);
 
     // Update capacity in header. Uses m_data to find header, so
@@ -1659,7 +1659,7 @@ void Array::alloc(size_t size, size_t width)
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
     REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < size || width != m_width) {
-        size_t needed_bytes   = CalcByteLen(size, width);
+        size_t needed_bytes   = calc_byte_len(size, width);
         size_t orig_capacity_bytes = get_capacity_from_header();
         size_t capacity_bytes = orig_capacity_bytes;
 
@@ -1687,14 +1687,14 @@ void Array::alloc(size_t size, size_t width)
             // Update this accessor and its ancestors
             m_ref      = mem_ref.m_ref;
             m_data     = get_data_from_header(header);
-            m_capacity = CalcItemCount(capacity_bytes, width);
+            m_capacity = calc_item_count(capacity_bytes, width);
             // FIXME: Trouble when this one throws. We will then leave
             // this array instance in a corrupt state
             update_parent(); // Throws
             return;
         }
 
-        m_capacity = CalcItemCount(capacity_bytes, width);
+        m_capacity = calc_item_count(capacity_bytes, width);
         set_header_width(int(width));
     }
 
@@ -2039,7 +2039,7 @@ void Array::print() const
     std::cout << "\n";
 }
 
-void Array::Verify() const
+void Array::verify() const
 {
     REALM_ASSERT(is_attached());
 
@@ -2062,7 +2062,7 @@ typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptre
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
 {
-    node.Verify();
+    node.verify();
 
     // This node must not be a leaf
     REALM_ASSERT_3(node.get_type(), ==, Array::type_InnerBptreeNode);
@@ -2082,7 +2082,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         general_form = first_value % 2 == 0;
         if (general_form) {
             offsets.init_from_ref(to_ref(first_value));
-            offsets.Verify();
+            offsets.verify();
             REALM_ASSERT_3(offsets.get_type(), ==, Array::type_Normal);
             REALM_ASSERT_3(offsets.size(), ==, num_children - 1);
         }
@@ -2960,7 +2960,7 @@ top:
     }
 }
 
-size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column) const
+size_t Array::index_string_find_first(StringData value, ColumnBase* column) const
 {
     size_t dummy;
     IntegerColumn dummycol;
@@ -2968,7 +2968,7 @@ size_t Array::IndexStringFindFirst(StringData value, ColumnBase* column) const
 }
 
 
-void Array::IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBase* column) const
+void Array::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const
 {
     size_t dummy;
 
@@ -2976,13 +2976,13 @@ void Array::IndexStringFindAll(IntegerColumn& result, StringData value, ColumnBa
 }
 
 
-FindRes Array::IndexStringFindAllNoCopy(StringData value, ref_type& res_ref, ColumnBase* column) const
+FindRes Array::index_string_find_all_no_copy(StringData value, ref_type& res_ref, ColumnBase* column) const
 {
     IntegerColumn dummy; return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
 }
 
 
-size_t Array::IndexStringCount(StringData value, ColumnBase* column) const
+size_t Array::index_string_count(StringData value, ColumnBase* column) const
 {
     IntegerColumn dummy;
     size_t dummysizet;
