@@ -102,6 +102,7 @@ public:
     /// guarantees exclusive access to the file. If attaching in read/write mode,
     /// the file is modified: files on streaming form is changed to non-streaming
     /// form, and if needed the file size is adjusted to match mmap boundaries.
+    /// Must be set to false if is_shared is false.
     ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
@@ -225,13 +226,9 @@ public:
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
-    /// If chunked memory mapping is enabled, the file_size argument
-    /// must be a multipla of the chunk_size.
+    /// the file_size argument must be aligned to a chunk boundary.
     ///
-    /// \return True if, and only if the memory address of the first
-    /// mapped byte has changed. If chunked memory mapping is enabled,
-    /// addresses never change and remap() will always return false.
-    bool remap(std::size_t file_size);
+    void remap(std::size_t file_size);
 
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
@@ -317,7 +314,7 @@ private:
     std::size_t m_first_additional_chunk = 0;
     std::size_t m_num_additional_mappings = 0;
     std::size_t m_capacity_additional_mappings = 0;
-    std::size_t m_chunk_size = 0;
+    std::size_t m_initial_chunk_size = 0;
     int m_chunk_shifts = 0;
     util::File::Map<char>* m_additional_mappings = 0;
     std::size_t* m_chunk_bases = 0;

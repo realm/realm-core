@@ -13,6 +13,7 @@
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
+// needed for mprotect - this has to be moved into File and generalised to work on win32
 #include <sys/mman.h>
 
 using namespace realm;
@@ -37,8 +38,8 @@ public:
 
 SlabAlloc::SlabAlloc()
 {
-    m_chunk_size = page_size();
-    m_chunk_shifts = 1 + log2(m_chunk_size);
+    m_initial_chunk_size = page_size();
+    m_chunk_shifts = 1 + log2(m_initial_chunk_size);
     std::size_t max = std::numeric_limits<std::size_t>::max();
     m_num_chunk_bases = 1 + get_chunk_index(max);
     m_chunk_bases = new std::size_t[m_num_chunk_bases];
@@ -125,8 +126,6 @@ void SlabAlloc::detach() REALM_NOEXCEPT
                 // running the destructors on the mappings will cause them to unmap:
                 delete[] m_additional_mappings;
                 m_additional_mappings = 0;
-                delete[] m_chunk_bases;
-                m_chunk_bases = 0;
             }
             m_file.close();
             goto found;
@@ -165,6 +164,9 @@ SlabAlloc::~SlabAlloc() REALM_NOEXCEPT
 
     if (is_attached())
         detach();
+
+    delete[] m_chunk_bases;
+    m_chunk_bases = 0;
 }
 
 
@@ -383,11 +385,11 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(is_attached());
 
-    if (ref < m_baseline) {
+    // fast path if reference is inside the initial mapping:
+    if (ref < m_initial_mapping_size)
+        return m_data + ref;
 
-        // reference is inside the initial mapping:
-        if (ref < m_initial_mapping_size)
-            return m_data + ref;
+    if (ref < m_baseline) {
 
         // reference must be inside a chunk mapped later
         std::size_t chunk_index = get_chunk_index(ref);
@@ -423,6 +425,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // processes to access a database file concurrently if it is done via a
     // SharedGroup, and in that case 'read_only' can never be true.
     REALM_ASSERT(!(is_shared && read_only));
+    // session_initiator can be set *only* if we're shared.
+    REALM_ASSERT(is_shared || !session_initiator);
     static_cast<void>(is_shared);
 
     using namespace realm::util;
@@ -433,9 +437,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_file.set_encryption_key(encryption_key);
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = m_chunk_size;
+    size_t initial_size = m_initial_chunk_size;
 
-    std::size_t size_of_streaming_file;
+    std::size_t initial_size_of_file;
     ref_type top_ref = 0;
 
     // The size of a database file must not exceed what can be encoded in
@@ -474,8 +478,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     }
 
     // We must now make sure the filesize matches a page boundary...
-    // first, save the original filesize for use later when converting from streaming format
-    size_of_streaming_file = size;
+    // first, save the original filesize for use during validation and
+    // (potentially) conversion from streaming format.
+    initial_size_of_file = size;
 
     // next extend the file to a mmapping boundary (unless already there)
     // The file must be extended prior to being mmapped, as extending it after mmap has
@@ -490,11 +495,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // processes with different opening modes.
     if (!read_only && !matches_mmap_boundary(size)) {
 
-        if (!session_initiator && is_shared)
-            throw InvalidDatabase("Filesize does not match mmap boundary, and file is already active");
+        REALM_ASSERT(session_initiator || !is_shared);
         size = get_upper_mmap_boundary(size);
         // std::cerr << "resizing during attach to " << size << std::endl;
-        m_file.resize(size);
+        m_file.prealloc(0, size);
         // resizing the file (as we do here) without actually changing any internal
         // datastructures to reflect the additional free space will work, because the
         // free space management relies on the logical filesize and disregards the
@@ -507,7 +511,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            validate_buffer(map.get_addr(), size_of_streaming_file, top_ref); // Throws
+            validate_buffer(map.get_addr(), initial_size_of_file, top_ref); // Throws
         }
 
         Header* header;
@@ -549,9 +553,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // make sure that any call to begin_read cause any slab to be placed in free lists correctly
     m_free_space_state = free_space_Invalid;
 
-    if (m_file_on_streaming_form && read_only && is_shared)
-        throw InvalidDatabase("Illegal: sharing a read-only file on streaming form");
-
     // make sure the database is not on streaming format. This has to be done at
     // session initialization, even if it means writing the database during open.
     if (session_initiator && m_file_on_streaming_form) {
@@ -568,7 +569,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         REALM_ASSERT_3(header->m_top_ref[0], == , streaming_header.m_top_ref[0]);
         REALM_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
 
-        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+size_of_streaming_file) - 1;
+        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1;
+        // TODO: move to File abstraction and implement mprotect handling for windows there
         REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
         ::mprotect(header, sizeof(Header), PROT_READ | PROT_WRITE);
         header->m_top_ref[1] = footer->m_top_ref;
@@ -714,7 +716,7 @@ void SlabAlloc::reset_free_space_tracking()
 }
 
 
-bool SlabAlloc::remap(size_t file_size)
+void SlabAlloc::remap(size_t file_size)
 {
     //std::cerr << "------------------------- remap(" << file_size << ") --------------------------" << std::endl;
 
@@ -722,8 +724,6 @@ bool SlabAlloc::remap(size_t file_size)
     REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
     REALM_ASSERT_DEBUG(m_baseline <= file_size);
-
-    bool addr_changed;
 
     // Extend mapping by adding chunks
     REALM_ASSERT_DEBUG(matches_mmap_boundary(file_size));
@@ -748,7 +748,6 @@ bool SlabAlloc::remap(size_t file_size)
         m_additional_mappings[k].move(map);
     }
     m_num_additional_mappings = num_additional_mappings;
-    addr_changed = false; // mappings never change :-)
 
     // Rebase slabs and free list (assumes exactly one entry in m_free_space for
     // each entire slab in m_slabs)
@@ -762,8 +761,6 @@ bool SlabAlloc::remap(size_t file_size)
         m_slabs[i].ref_end = slab_ref_end;
         slab_ref = slab_ref_end;
     }
-
-    return addr_changed;
 }
 
 const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
@@ -789,7 +786,7 @@ const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 
 std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
 {
-    // size_t chunk_base_number = pos/m_chunk_size;
+    // size_t chunk_base_number = pos/m_initial_chunk_size;
     size_t chunk_base_number = pos >> m_chunk_shifts;
     size_t chunk_group_number = chunk_base_number/16;
     size_t index;
@@ -810,14 +807,14 @@ std::size_t SlabAlloc::compute_chunk_base(std::size_t index) const REALM_NOEXCEP
 {
     size_t base;
     if (index < 16) {
-        // base = index * m_chunk_size;
+        // base = index * m_initial_chunk_size;
         base = index << m_chunk_shifts;
     }
     else {
         size_t chunk_index_in_group = index & 7;
         size_t log_index = (index - chunk_index_in_group)/8 - 2;
         size_t chunk_base_number = (8 + chunk_index_in_group)<<(1+log_index);
-        // base = m_chunk_size * chunk_base_number;
+        // base = m_initial_chunk_size * chunk_base_number;
         base = chunk_base_number << m_chunk_shifts;
     }
     return base;

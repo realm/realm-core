@@ -129,11 +129,7 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
     size_t old_baseline = m_alloc.get_baseline();
 
     if (new_file_size > old_baseline) {
-        bool addr_changed = m_alloc.remap(new_file_size); // Throws
-        // If the file was mapped to a new address, all array accessors must be
-        // updated.
-        if (addr_changed)
-            old_baseline = 0;
+        m_alloc.remap(new_file_size); // Throws
     }
 
     update_refs(new_top_ref, old_baseline);
@@ -696,11 +692,7 @@ void Group::commit()
     // Remap file if it has grown
     size_t new_file_size = out.get_file_size();
     if (new_file_size > old_baseline) {
-        bool addr_changed = m_alloc.remap(new_file_size); // Throws
-        // If the file was mapped to a new address, all array accessors must be
-        // updated.
-        if (addr_changed)
-            old_baseline = 0;
+        m_alloc.remap(new_file_size); // Throws
     }
 
     out.commit(top_ref); // Throws
@@ -1487,11 +1479,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 
     // Update memory mapping if database file has grown
     if (new_file_size > m_alloc.get_baseline()) {
-        bool addr_changed = m_alloc.remap(new_file_size); // Throws
-        // If the file was mapped to a new address, all array accessors must be
-        // updated.
-        if (addr_changed)
-            mark_all_table_accessors();
+        m_alloc.remap(new_file_size); // Throws
     }
 
     m_top.detach(); // Soft detach
