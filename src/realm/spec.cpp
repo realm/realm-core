@@ -444,6 +444,8 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
 {
     if (!m_types.compare_int(spec.m_types))
         return false;
+    if (!m_attr.compare_int(spec.m_attr))
+        return false;
     if (!m_names.compare_string(spec.m_names))
         return false;
     return true;
