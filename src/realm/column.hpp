@@ -140,7 +140,7 @@ public:
     /// - \a row_ndx_1 and \a row_ndx_2 point to the same value
     virtual void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) = 0;
 
-    virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
+    virtual bool is_int_column() const REALM_NOEXCEPT { return false; }
 
     // Returns true if, and only if this column is an StringColumn.
     virtual bool is_string_col() const REALM_NOEXCEPT;
@@ -267,8 +267,8 @@ public:
 
 #ifdef REALM_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
-    virtual void Verify() const = 0;
-    virtual void Verify(const Table&, std::size_t col_ndx) const;
+    virtual void verify() const = 0;
+    virtual void verify(const Table&, std::size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
@@ -421,7 +421,7 @@ public:
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column<T, Nullable>&);
-    bool IsIntColumn() const REALM_NOEXCEPT override;
+    bool is_int_column() const REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -542,8 +542,8 @@ public:
     void insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows);
 
 #ifdef REALM_DEBUG
-    void Verify() const override;
-    using ColumnBase::Verify;
+    void verify() const override;
+    using ColumnBase::verify;
     void to_dot(std::ostream&, StringData title) const override;
     void tree_to_dot(std::ostream&) const;
     MemStats stats() const;
@@ -998,7 +998,7 @@ void Column<T,N>::move_assign(Column<T,N>& col)
 }
 
 template <class T, bool N>
-bool Column<T,N>::IsIntColumn() const REALM_NOEXCEPT
+bool Column<T,N>::is_int_column() const REALM_NOEXCEPT
 {
     return std::is_integral<T>::value;
 }
@@ -1411,7 +1411,7 @@ void Column<T,N>::do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_las
 #ifdef REALM_DEBUG
 
 template <class T, bool N>
-void Column<T,N>::Verify() const
+void Column<T,N>::verify() const
 {
     m_tree.verify();
 }

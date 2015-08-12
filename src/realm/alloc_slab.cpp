@@ -408,8 +408,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // std::size_t.
     size_t size;
     bool did_create = false;
-    if (int_cast_with_overflow_detect(m_file.get_size(), size))
-        goto invalid_database;
+    if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file.get_size(), size)))
+        throw InvalidDatabase("Realm file too large");
 
     // FIXME: This initialization procedure does not provide sufficient
     // robustness given that processes may be abruptly terminated at any point
@@ -425,8 +425,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // good. In this case we proceede as normal.
     if (size == 0) {
         did_create = true;
-        if (read_only)
-            goto invalid_database;
+        if (REALM_UNLIKELY(read_only))
+            throw InvalidDatabase("Read-only access to empty Realm file");
 
         const char* data = reinterpret_cast<const char*>(&empty_file_header);
         m_file.write(data, sizeof empty_file_header); // Throws
@@ -445,8 +445,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            if (!validate_buffer(map.get_addr(), size, top_ref))
-                goto invalid_database;
+            validate_buffer(map.get_addr(), size, top_ref); // Throws
         }
 
         Header* header;
@@ -480,7 +479,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         // Below this point (assignment to `m_attach_mode`), nothing must throw.
     }
     catch (DecryptionFailed) {
-        goto invalid_database;
+        throw InvalidDatabase("Realm file decryption failed");
     }
 
     // make sure that any call to begin_read cause any slab to be placed in free lists correctly
@@ -488,9 +487,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
 
     fcg.release(); // Do not close
     return top_ref;
-
-  invalid_database:
-    throw InvalidDatabase("Invalid database");
 }
 
 unsigned char SlabAlloc::get_file_format() const
@@ -508,8 +504,7 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     // Verify the data structures
     m_file_on_streaming_form = false; // May be updated by validate_buffer()
     ref_type top_ref;
-    if (!validate_buffer(data, size, top_ref))
-        throw InvalidDatabase("Invalid database");
+    validate_buffer(data, size, top_ref); // Throws
 
     m_data        = data;
     m_baseline    = size;
@@ -538,11 +533,11 @@ void SlabAlloc::attach_empty()
     m_baseline = sizeof (Header);
 }
 
-bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref)
+void SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref)
 {
     // Verify that size is sane and 8-byte aligned
-    if (size < sizeof (Header) || size % 8 != 0)
-        return false;
+    if (REALM_UNLIKELY(size < sizeof (Header) || size % 8 != 0))
+        throw InvalidDatabase("Realm file has bad size");
 
     // File header is 24 bytes, composed of three 64-bit
     // blocks. The two first being top_refs (only one valid
@@ -550,37 +545,43 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
     const char* file_header = data;
 
     // First four bytes of info block is file format id
-    if (!(file_header[16] == 'T' &&
-          file_header[17] == '-' &&
-          file_header[18] == 'D' &&
-          file_header[19] == 'B'))
-        return false; // Not a realm file
+    if (REALM_UNLIKELY(!(file_header[16] == 'T' &&
+                         file_header[17] == '-' &&
+                         file_header[18] == 'D' &&
+                         file_header[19] == 'B')))
+        throw InvalidDatabase("Not a Realm file");
 
     // Last bit in info block indicates which top_ref block is valid
     int valid_part = file_header[16 + 7] & 0x1;
 
+    // FIXME: How can it be that we allow the file format version to be anything
+    // less than, or qual to default_file_format_version? As far as I can see,
+    // core is not prepared to handle file format version 1. See
+    // https://github.com/realm/realm-core/issues/975.
+
     // Byte 4 and 5 (depending on valid_part) in the info block is version
     int version = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
-    if (version > default_file_format_version)
-        return false; // unsupported version
+    if (REALM_UNLIKELY(version > default_file_format_version))
+        throw InvalidDatabase("Unsupported Realm file format version");
 
     // Top_ref should always point within buffer
     const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(data);
     uint_fast64_t ref = top_refs[valid_part];
     if (valid_part == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
-        if (size < sizeof (Header) + sizeof (StreamingFooter))
-            return false;
+        if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
+            throw InvalidDatabase("Realm file in streaming form has bad size");
         const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data+size) - 1;
         ref = footer->m_top_ref;
-        if (footer->m_magic_cookie != footer_magic_cookie)
-            return false;
+        if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie))
+            throw InvalidDatabase("Bad Realm file header (#1)");
         m_file_on_streaming_form = true;
     }
-    if (ref >= size || ref % 8 != 0 || ref > std::numeric_limits<ref_type>::max())
-        return false; // invalid top_ref
+    if (REALM_UNLIKELY(ref % 8 != 0))
+        throw InvalidDatabase("Bad Realm file header (#2)");
+    if (REALM_UNLIKELY(ref >= size))
+        throw InvalidDatabase("Bad Realm file header (#3)");
 
     top_ref = ref_type(ref);
-    return true;
 }
 
 
@@ -705,7 +706,7 @@ bool SlabAlloc::is_all_free() const
 }
 
 
-void SlabAlloc::Verify() const
+void SlabAlloc::verify() const
 {
     // Make sure that all free blocks fit within a slab
     typedef chunks::const_iterator iter;

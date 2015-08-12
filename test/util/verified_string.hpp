@@ -48,7 +48,7 @@ public:
     std::size_t find_first(StringData value);
     void find_all(IntegerColumn& c, StringData value, std::size_t start = 0, std::size_t end = -1);
     std::size_t size();
-    bool Verify();
+    bool verify();
     bool conditional_verify();
     void verify_neighbours(std::size_t ndx);
 

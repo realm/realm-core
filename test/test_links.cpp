@@ -1055,7 +1055,7 @@ TEST(Links_ClearColumnWithTwoLevelBptree)
     origin->clear();
     origin->add_empty_row();
     origin->get_linklist(0,0)->add(0);
-    group.Verify();
+    group.verify();
 }
 
 
@@ -1071,7 +1071,7 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE+1; ++i)
         link_list->add(0);
     link_list->clear();
-    group.Verify();
+    group.verify();
 }
 
 
@@ -1095,7 +1095,7 @@ TEST(Links_FormerMemLeakCase)
         WriteTransaction wt(sg_w);
         TableRef target = wt.get_table("target");
         target->move_last_over(0);
-        wt.get_group().Verify();
+        wt.get_group().verify();
         wt.commit();
     }
 }

@@ -181,14 +181,14 @@ void ArrayString::erase(size_t ndx)
     set_header_size(m_size);
 }
 
-size_t ArrayString::CalcByteLen(size_t count, size_t width) const
+size_t ArrayString::calc_byte_len(size_t count, size_t width) const
 {
     // FIXME: This arithemtic could overflow. Consider using one of
     // the functions in <realm/util/safe_int_ops.hpp>
     return header_size + (count * width);
 }
 
-size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const REALM_NOEXCEPT
+size_t ArrayString::calc_item_count(size_t bytes, size_t width) const REALM_NOEXCEPT
 {
     if (width == 0) return size_t(-1); // zero-width gives infinite space
 

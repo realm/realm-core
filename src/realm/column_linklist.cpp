@@ -488,17 +488,17 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     REALM_ASSERT(leaf.has_refs());
     return leaf.size();
 }
 
 } // anonymous namespace
 
-void LinkListColumn::Verify() const
+void LinkListColumn::verify() const
 {
     if (root_is_leaf()) {
-        get_root_array()->Verify();
+        get_root_array()->verify();
         REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
@@ -507,9 +507,9 @@ void LinkListColumn::Verify() const
 }
 
 
-void LinkListColumn::Verify(const Table& table, size_t col_ndx) const
+void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 {
-    LinkColumnBase::Verify(table, col_ndx);
+    LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
     m_backlink_column->get_backlinks(pairs);
@@ -523,7 +523,7 @@ void LinkListColumn::Verify(const Table& table, size_t col_ndx) const
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
         ConstLinkViewRef link_list = get(i);
-        link_list->Verify(i);
+        link_list->verify(i);
         std::multiset<size_t> links_1, links_2;
         size_t m = link_list->size();
         for (size_t j = 0; j < m; ++j)

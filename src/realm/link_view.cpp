@@ -408,7 +408,7 @@ void LinkView::repl_unselect() REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-void LinkView::Verify(size_t row_ndx) const
+void LinkView::verify(size_t row_ndx) const
 {
     // Only called for attached lists
     REALM_ASSERT(is_attached());
@@ -417,7 +417,7 @@ void LinkView::Verify(size_t row_ndx) const
     bool not_degenerate = m_row_indexes.get_root_array()->get_ref_from_parent() != 0;
     REALM_ASSERT_3(not_degenerate, ==, m_row_indexes.is_attached());
     if (m_row_indexes.is_attached())
-        m_row_indexes.Verify();
+        m_row_indexes.verify();
 }
 
 #endif // REALM_DEBUG

@@ -57,8 +57,6 @@ Static library*/
 /iphone-lib/include
 /iphone-lib/librealm-ios.a
 /iphone-lib/librealm-ios-dbg.a
-/iphone-lib/librealm-ios-prelink.a
-/iphone-lib/librealm-ios-dbg-prelink.a
 /iphone-lib/realm-config
 /iphone-lib/realm-config-dbg
 
@@ -66,8 +64,6 @@ Static library*/
 /watchos-lib/include
 /watchos-lib/librealm-watchos.a
 /watchos-lib/librealm-watchos-dbg.a
-/watchos-lib/librealm-watchos-prelink.a
-/watchos-lib/librealm-watchos-dbg-prelink.a
 /watchos-lib/realm-config
 /watchos-lib/realm-config-dbg
 

@@ -570,31 +570,31 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
         // Small blobs
         ArrayBinary leaf(alloc);
         leaf.init_from_mem(mem);
-        leaf.Verify();
+        leaf.verify();
         return leaf.size();
     }
     // Big blobs
     ArrayBigBlobs leaf(alloc, false);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     return leaf.size();
 }
 
 } // anonymous namespace
 
-void BinaryColumn::Verify() const
+void BinaryColumn::verify() const
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
-            leaf->Verify();
+            leaf->verify();
             return;
         }
         // Big blobs root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-        leaf->Verify();
+        leaf->verify();
         return;
     }
     // Non-leaf root

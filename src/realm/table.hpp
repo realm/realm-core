@@ -734,14 +734,14 @@ public:
 
     // Debug
 #ifdef REALM_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
     void dump_node_structure() const; // To std::cerr (for GDB)
     void dump_node_structure(std::ostream&, int level) const;
 #else
-    void Verify() const {}
+    void verify() const {}
 #endif
 
     class Parent;

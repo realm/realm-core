@@ -684,8 +684,8 @@ EOF
         (
             cd src/realm
             export REALM_ENABLE_FAT_BINARIES="1"
-            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm-prelink.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
-            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm-dbg-prelink.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
         ) || exit 1
         exit 0
         ;;
@@ -718,10 +718,10 @@ EOF
                 word_list_append "cflags_arch" "-mios-simulator-version-min=7.0" || exit 1
             fi
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/realm" "librealm-$platform-prelink.a" "librealm-$platform-dbg-prelink.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
+            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
-            cp "src/realm/librealm-$platform-prelink.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
-            cp "src/realm/librealm-$platform-dbg-prelink.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
+            cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
+            cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
         done
         REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-ios" "realm-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_IOS" AR="libtool" ARFLAGS="-o" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
@@ -773,10 +773,10 @@ EOF
                 word_list_append "cflags_arch" "-mwatchos-simulator-version-min=2.0" || exit 1
             fi
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/realm" "librealm-$platform-prelink.a" "librealm-$platform-dbg-prelink.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
+            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
-            cp "src/realm/librealm-$platform-prelink.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
-            cp "src/realm/librealm-$platform-dbg-prelink.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
+            cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
+            cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
         done
         REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-watchos" "realm-config-watchos-dbg" BASE_DENOM="watchos" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_WATCHOS" AR="libtool" ARFLAGS="-o" || exit 1
         mkdir -p "$WATCHOS_DIR" || exit 1
@@ -936,8 +936,8 @@ EOF
             cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
         done
-        cp src/realm/librealm-prelink.a "$tmpdir/$BASENAME/librealm.a" || exit 1
-        cp src/realm/librealm-dbg-prelink.a "$tmpdir/$BASENAME/librealm-dbg.a" || exit 1
+        cp src/realm/librealm.a "$tmpdir/$BASENAME" || exit 1
+        cp src/realm/librealm-dbg.a "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
@@ -1011,6 +1011,7 @@ EOF
         check_mode="$(printf "%s\n" "$MODE" | sed 's/asan/check/')" || exit 1
         auto_configure || exit 1
         touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        export ASAN_OPTIONS="detect_odr_violation=2"
         export REALM_HAVE_CONFIG="1"
         error=""
         if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then

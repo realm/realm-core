@@ -64,7 +64,7 @@ public:
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
 
 #ifdef REALM_DEBUG
-    void Verify(const Table&, std::size_t) const override;
+    void verify(const Table&, std::size_t) const override;
 #endif
 
 protected:

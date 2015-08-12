@@ -874,8 +874,8 @@ TEST(Array_FindHasZeroByte)
     has_zero_byte(test_results, 8000000000LL, n); // 64
 }
 
-// New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
-TEST(Array_FindSSE)
+// New find test for SSE search, to trigger partial finds (see find_sse()) before and after the aligned data area
+TEST(Array_find_sse)
 {
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
@@ -1297,7 +1297,7 @@ TEST(Array_Copy)
     b.init_from_mem(a.clone_deep(Allocator::get_default()));
 
 #ifdef REALM_DEBUG
-    b.Verify();
+    b.verify();
 #endif
 
     CHECK_EQUAL(5, b.size());
@@ -1316,7 +1316,7 @@ TEST(Array_Copy)
     d.init_from_mem(c.clone_deep(Allocator::get_default()));
 
 #ifdef REALM_DEBUG
-    d.Verify();
+    d.verify();
 #endif
 
     CHECK(d.has_refs());

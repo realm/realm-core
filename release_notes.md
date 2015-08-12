@@ -6,6 +6,37 @@
 
 ### API breaking changes:
 
+* A number of methods in the following classes have been renamed to match the
+  coding guidelines (lowercase, underscore separation):
+    * `Array`, `ArrayBlob`, `ArrayInteger`, `ArrayString`, `BasicArray<T>`;
+    * `Column<T, N>`, `IntegerColumn`, `StringColumn`, `StringEnumColumn`;
+    * `Group`;
+    * `Query`;
+    * `StringIndex`.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Added argument to SharedGroup to prevent automatic file format upgrade. If an
+  upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
+
+----------------------------------------------
+
+# 0.92.1 Release notes
+
+### Bugfixes:
+
+* Reverted prelinking of static libraries on Apple platforms as it caused
+  `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
+  when sorting by integer or floating point columns.
+
+### API breaking changes:
+
 * Lorem ipsum.
 
 ### Enhancements:
@@ -21,7 +52,8 @@
 * Several column classes were renamed to follow the `XxxColumn` naming scheme
   (e.g., `ColumnLink` to `LinkColumn`).
 * Removed conditional compilation of replication features.
-
+* More information from `InvalidDatabase::what()`.
+* Disabled support for the async daemon on iOS and watchOS.
 
 ----------------------------------------------
 

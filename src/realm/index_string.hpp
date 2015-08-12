@@ -87,25 +87,25 @@ public:
     template <class T> size_t find_first(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindFirst(to_str(value), m_target_column);
+        return m_array->index_string_find_first(to_str(value), m_target_column);
     }
 
     template <class T> void find_all(IntegerColumn& result, T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, to_str(value), m_target_column);
+        return m_array->index_string_find_all(result, to_str(value), m_target_column);
     }
 
     template <class T> FindRes find_all(T value, ref_type& ref) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column);
+        return m_array->index_string_find_all_no_copy(to_str(value), ref, m_target_column);
     }
 
     template <class T> size_t count(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringCount(to_str(value), m_target_column);
+        return m_array->index_string_count(to_str(value), m_target_column);
     }
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
@@ -122,7 +122,7 @@ public:
     void set_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
-    void Verify() const;
+    void verify() const;
     void verify_entries(const StringColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const { to_dot(std::cerr); }
@@ -145,8 +145,8 @@ private:
     static Array* create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
-    void InsertRowList(size_t ref, size_t offset, StringData value);
-    key_type GetLastKey() const;
+    void insert_row_list(size_t ref, size_t offset, StringData value);
+    key_type get_last_key() const;
 
     /// Add small signed \a diff to all elements that are greater than, or equal
     /// to \a min_row_ndx.
@@ -165,17 +165,17 @@ private:
 
     // B-Tree functions
     void TreeInsert(size_t row_ndx, key_type, size_t offset, StringData value);
-    NodeChange DoInsert(size_t ndx, key_type, size_t offset, StringData value);
+    NodeChange do_insert(size_t ndx, key_type, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
-    bool LeafInsert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
-    void NodeInsertSplit(size_t ndx, size_t new_ref);
-    void NodeInsert(size_t ndx, size_t ref);
-    void DoDelete(size_t ndx, StringData, size_t offset);
+    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
+    void node_insert_split(size_t ndx, size_t new_ref);
+    void node_insert(size_t ndx, size_t ref);
+    void do_delete(size_t ndx, StringData, size_t offset);
     void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
     StringData get(size_t ndx, char* buffer) const;
 
-    void NodeAddKey(ref_type ref);
+    void node_add_key(ref_type ref);
 
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& node, std::ostream&, int level);
@@ -323,7 +323,7 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
     char buffer[sizeof(T)];
     StringData value = get(row_ndx, buffer);
 
-    DoDelete(row_ndx, value, 0);
+    do_delete(row_ndx, value, 0);
 
     // Collapse top nodes with single item
     while (m_array->is_inner_bptree_node()) {
