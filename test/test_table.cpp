@@ -5955,6 +5955,25 @@ TEST(Table_Nulls)
         CHECK(t.is_null(2, 1));
     }
 }
+
+TEST(Table_DescriptorEqualityNulls)
+{
+    Table t1;
+    t1.add_column(type_Int, "int");
+    t1.add_column(type_String, "str");
+
+    Table t2;
+    t2.add_column(type_Int, "int", true);
+    t2.add_column(type_String, "str");
+
+    Table t3;
+    t3.add_column(type_Int, "int", true);
+    t3.add_column(type_String, "str");
+
+    CHECK(*t1.get_descriptor() != *t2.get_descriptor());
+    CHECK(*t2.get_descriptor() == *t3.get_descriptor());
+}
+
 #endif 
 
 #endif // TEST_TABLE
