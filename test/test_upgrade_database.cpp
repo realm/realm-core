@@ -739,7 +739,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format) {
     CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
 }
 
-ONLY(Upgrade_Database_2_3_Writes_New_File_Format_new) {
+TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) {
     // The method `inline void SharedGroup::upgrade_file_format()` will first have a fast non-threadsafe
     // test for seeing if the file needs to be upgraded. Then it will make a slower thread-safe check inside a
     // write transaction (transaction acts like a mutex). In debug mode, the `inline void SharedGroup::upgrade_file_format()`
