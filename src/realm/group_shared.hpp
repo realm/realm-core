@@ -980,14 +980,15 @@ inline void SharedGroup::upgrade_file_format()
     if (upgrade) {
 
 #ifdef REALM_DEBUG
-        // Sleep 1 second to create a simple thread-barrier for the two threads in the 
+        // Sleep 0.2 seconds to create a simple thread-barrier for the two threads in the 
         // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test. See the unit test for details.
 #ifdef _WIN32
-        _sleep(1);
+        _sleep(200);
 #else
+        // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
         timespec ts;
-        ts.tv_sec = 1;
-        ts.tv_nsec = 0;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 200000000;
         nanosleep(&ts, 0);
 #endif
 #endif

@@ -739,11 +739,11 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format) {
     CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
 }
 
-TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) {
+ONLY(Upgrade_Database_2_3_Writes_New_File_Format_new) {
     // The method `inline void SharedGroup::upgrade_file_format()` will first have a fast non-threadsafe
     // test for seeing if the file needs to be upgraded. Then it will make a slower thread-safe check inside a
     // write transaction (transaction acts like a mutex). In debug mode, the `inline void SharedGroup::upgrade_file_format()`
-    // method will sleep 1 second between the non-threadsafe and the threadsafe test, to ensure that two threads opening
+    // method will sleep 0.2 second between the non-threadsafe and the threadsafe test, to ensure that two threads opening
     // the same database file will both think the database needs upgrade in the first check.
 
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
@@ -751,18 +751,16 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) {
     SHARED_GROUP_TEST_PATH(temp_copy);
     CHECK_OR_RETURN(File::copy(path, temp_copy));
 
-    std::thread t1([&]() {
-        SharedGroup sg(temp_copy);
-    });
+    std::thread t[10];
 
-    std::thread t2([&]() {
-        SharedGroup sg(temp_copy);
-    });
+    for (std::thread& tt : t) {
+        tt = std::thread([&]() {
+            SharedGroup sg(temp_copy);
+        });
+    }
 
-    // Unit test passed if it doesn't deadlock or crash
-
-    t1.join();
-    t2.join();
+    for (std::thread& tt : t)
+        tt.join();
 }
 
 #endif
