@@ -569,13 +569,13 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1;
         // TODO: move to File abstraction and implement mprotect handling for windows there
         REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
-        ::mprotect(header, sizeof(Header), PROT_READ | PROT_WRITE);
+        File::protect(header, sizeof(Header), File::Protection::RW);
         header->m_top_ref[1] = footer->m_top_ref;
-        ::msync(header, sizeof(Header), MS_SYNC);
+        File::sync_map(header, sizeof(Header));
         header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
         m_file_on_streaming_form = false;
-        ::msync(header, sizeof(Header), MS_SYNC);
-        ::mprotect(header, sizeof(Header), PROT_READ);
+        File::sync_map(header, sizeof(Header));
+        File::protect(header, sizeof(Header), File::Protection::RO);
     }
 
     fcg.release(); // Do not close

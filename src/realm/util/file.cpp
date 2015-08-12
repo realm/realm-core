@@ -856,6 +856,31 @@ void File::sync_map(void* addr, size_t size)
 }
 
 
+void File::protect(void* addr, size_t size, Protection prot)
+{
+#ifdef _WIN32 // Windows version
+
+    if (prot == Protection::RO) {
+        if (VirtualProtect(addr, size, PAGE_READONLY)
+            return;
+    }
+    else if (prot == Protection::RW) {
+        if (VirtualProtect(addr, size, PAGE_READWRITE)
+            return;
+    }
+    throw std::runtime_error("FlushViewOfFile() failed");
+
+#else // POSIX version
+    if (prot == Protection::RO)
+        ::mprotect(addr, size, PROT_READ);
+    else if (prot == Protection::RW)
+        ::mprotect(addr, size, PROT_READ | PROT_WRITE);
+    else 
+        REALM_ASSERT(false);
+#endif
+}
+
+
 bool File::exists(const std::string& path)
 {
 #ifdef _WIN32

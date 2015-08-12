@@ -294,7 +294,7 @@ public:
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
         /// systems this cannot be disabled. On other systems it is
-        /// the default behavior. An explicit call to sync_map() will
+        /// the default behavior. An explicit call to sync_map) will
         /// flush the buffers regardless of whether this flag is
         /// specified or not.
         map_NoSync = 1
@@ -343,9 +343,13 @@ public:
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete. The specified
-    /// address range must be one that was previously returned by
+    /// address range must be (a subset of) one that was previously returned by
     /// map().
     static void sync_map(void* addr, std::size_t size);
+
+    /// Change the protection for a range of pages.
+    enum class Protection { RO, RW };
+    static void protect(void* addr, std::size_t size, Protection prot);
 
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
