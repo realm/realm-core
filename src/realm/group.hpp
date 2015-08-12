@@ -661,8 +661,6 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
 {
     init_array_parents();
     open(buffer, take_ownership); // Throws
-
-
 }
 
 inline Group::Group(unattached_tag) REALM_NOEXCEPT:
