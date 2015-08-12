@@ -2660,7 +2660,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
         // rows 2 and 3 will be tested later on.
 
         LangBindHelper::advance_read(sg, hist);
-        group.Verify();
+        group.verify();
         ConstTableRef table = rt.get_table("parent_1");
 
         ConstRow row_0 = (*table)[0];
@@ -2708,7 +2708,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
         }
 
         LangBindHelper::advance_read(sg, hist);
-        group.Verify();
+        group.verify();
 
         // No rows were deleted, so everything should still be attached
         CHECK(row_0.is_attached());
