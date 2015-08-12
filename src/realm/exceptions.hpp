@@ -59,6 +59,18 @@ public:
 };
 
 
+/// The \c FileFormatUpgradeRequired exception can be thrown by the \c
+/// SharedGroup constructor when opening a database that uses a deprecated file
+/// format, and the user has indicated he does not want automatic upgrades to
+/// be performed. This exception indicates that until an upgrade of the file
+/// format is performed, the database will be unavailable for read or write
+/// operations.
+class FileFormatUpgradeRequired: public std::exception {
+public:
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+};
+
+
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
 /// been stated) in the documentation of the public API, and only in cases
@@ -184,6 +196,11 @@ inline const char* CrossTableLinkTarget::what() const REALM_NOEXCEPT_OR_NOTHROW
 inline const char* DescriptorMismatch::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "Table descriptor mismatch";
+}
+
+inline const char* FileFormatUpgradeRequired::what() const REALM_NOEXCEPT_OR_NOTHROW
+{
+    return "Database upgrade required but prohibited";
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):

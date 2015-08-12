@@ -21,17 +21,17 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     REALM_ASSERT(leaf.has_refs());
     return leaf.size();
 }
 
 } // anonymous namespace
 
-void SubtableColumnParent::Verify() const
+void SubtableColumnParent::verify() const
 {
     if (root_is_leaf()) {
-        IntegerColumn::Verify();
+        IntegerColumn::verify();
         REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
@@ -39,9 +39,9 @@ void SubtableColumnParent::Verify() const
     get_root_array()->verify_bptree(&verify_leaf);
 }
 
-void SubtableColumnParent::Verify(const Table& table, size_t col_ndx) const
+void SubtableColumnParent::verify(const Table& table, size_t col_ndx) const
 {
-    IntegerColumn::Verify(table, col_ndx);
+    IntegerColumn::verify(table, col_ndx);
 
     REALM_ASSERT(m_table == &table);
     REALM_ASSERT_3(m_column_ndx, ==, col_ndx);
@@ -388,9 +388,9 @@ void SubtableColumn::do_discard_child_accessors() REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-void SubtableColumn::Verify(const Table& table, size_t col_ndx) const
+void SubtableColumn::verify(const Table& table, size_t col_ndx) const
 {
-    SubtableColumnParent::Verify(table, col_ndx);
+    SubtableColumnParent::verify(table, col_ndx);
 
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
@@ -406,7 +406,7 @@ void SubtableColumn::Verify(const Table& table, size_t col_ndx) const
         ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
         REALM_ASSERT_3(tf::get_spec(*subtable).get_ndx_in_parent(), ==, subspec_ndx);
         REALM_ASSERT_3(subtable->get_parent_row_index(), ==, i);
-        subtable->Verify();
+        subtable->verify();
     }
 }
 

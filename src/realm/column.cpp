@@ -93,9 +93,9 @@ void ColumnBaseWithIndex::destroy() REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-void ColumnBase::Verify(const Table&, size_t) const
+void ColumnBase::verify(const Table&, size_t) const
 {
-    Verify();
+    verify();
 }
 
 #endif // REALM_DEBUG
@@ -519,7 +519,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 
 /*
 // TODO: Set owner of created arrays and destroy/delete them if created by merge_references()
-void IntegerColumn::ReferenceSort(size_t start, size_t end, Column& ref)
+void IntegerColumn::reference_sort(size_t start, size_t end, Column& ref)
 {
     Array values; // pointers to non-instantiated arrays of values
     Array indexes; // pointers to instantiated arrays of index pointers
@@ -533,7 +533,7 @@ void IntegerColumn::ReferenceSort(size_t start, size_t end, Column& ref)
         Array v(ref);
         for (size_t j = 0; j < v.size(); j++)
             all_values.add(v.get(j));
-        v.ReferenceSort(*i);
+        v.reference_sort(*i);
         for (size_t n = 0; n < v.size(); n++)
             i->set(n, i->get(n) + offset);
         offset += v.size();

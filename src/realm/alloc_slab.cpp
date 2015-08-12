@@ -860,7 +860,7 @@ bool SlabAlloc::is_all_free() const
 }
 
 
-void SlabAlloc::Verify() const
+void SlabAlloc::verify() const
 {
     // Make sure that all free blocks fit within a slab
     typedef chunks::const_iterator iter;

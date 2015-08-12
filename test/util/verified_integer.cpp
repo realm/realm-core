@@ -164,7 +164,7 @@ void VerifiedInteger::find_all(IntegerColumn &c, int64_t value, size_t start, si
     return;
 }
 
-bool VerifiedInteger::Verify()
+bool VerifiedInteger::verify()
 {
     REALM_ASSERT(u.size() == v.size());
     if (u.size() != v.size())
@@ -182,7 +182,7 @@ bool VerifiedInteger::Verify()
 bool VerifiedInteger::occasional_verify()
 {
     if (m_random.draw_int_max(v.size() / 10) == 0)
-        return Verify();
+        return verify();
     return true;
 }
 

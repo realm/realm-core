@@ -134,11 +134,24 @@ public:
         durability_Async    ///< Not yet supported on windows.
     };
 
-    /// Equivalent to calling `open(file, no_create, durability,
+    /// \brief Almost equivalent to calling `open(file, no_create, durability,
     /// encryption_key)` on a default constructed instance.
+    ///
+    /// The major difference is that this constructor will automatically
+    /// upgrade the provided database's file format if it is outdated. In order
+    /// to prevent this, it is possible to set \a allow_upgrade to `false`.
+    ///
+    /// If \a allow_upgrade is set to `false`, only two outcomes are possible:
+    ///
+    /// - the designed database is at the latest version, and can be used;
+    /// - the designed database uses a deprecated file format and can not be
+    ///   used for neither read or write operations (exception thrown).
+    ///
+    /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
+    ///        and an upgrade is required.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0);
+                         const char* encryption_key = 0, bool allow_upgrade = true);
 
     struct unattached_tag {};
 
@@ -187,11 +200,24 @@ public:
               DurabilityLevel = durability_Full,
               const char* encryption_key = 0);
 
-    /// Equivalent to calling `open(repl, durability, encryption_key)` on a
-    /// default constructed instance.
+    /// \brief Almost equivalent to calling `open(repl, durability,
+    /// encryption_key)` on a default constructed instance.
+    ///
+    /// The major difference is that this constructor will automatically
+    /// upgrade the provided database's file format if it is outdated. In order
+    /// to prevent this, it is possible to set \a allow_upgrade to `false`.
+    ///
+    /// If \a allow_upgrade is set to `false`, only two outcomes are possible:
+    ///
+    /// - the designed database is at the latest version, and can be used;
+    /// - the designed database uses a deprecated file format and can not be
+    ///   used for neither read or write operations (exception thrown).
+    ///
+    /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
+    ///        and an upgrade is required.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0);
+                         const char* encryption_key = 0, bool allow_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
@@ -722,10 +748,16 @@ private:
 struct SharedGroup::BadVersion: std::exception {};
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
-                                DurabilityLevel durability, const char* encryption_key):
+                                DurabilityLevel durability, const char* encryption_key,
+                                bool allow_upgrade):
     m_group(Group::shared_tag())
 {
     open(file, no_create, durability, encryption_key); // Throws
+
+    if (!allow_upgrade && m_group.file_format_upgrade_required()) {
+        close();
+        throw FileFormatUpgradeRequired();
+    }
 
     upgrade_file_format(); // Throws
 }
@@ -736,10 +768,13 @@ inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
 }
 
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
-                                const char* encryption_key):
+                                const char* encryption_key, bool allow_upgrade):
     m_group(Group::shared_tag())
 {
     open(repl, durability, encryption_key); // Throws
+
+    if (!allow_upgrade && m_group.file_format_upgrade_required())
+        throw FileFormatUpgradeRequired();
 
     upgrade_file_format(); // Throws
 }
@@ -965,15 +1000,10 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
 
 inline void SharedGroup::upgrade_file_format()
 {
-    // FIXME: ExceptionSafety: This function does not appear to be exception
-    // safe. For example, it can leak read locks.
-
     // Upgrade file format from 2 to 3 (no-op if already 3). In a multithreaded scenario multiple threads may set
     // upgrade = true, but that is ok, because the calls to m_group.upgrade_file_format() is serialized, and that
     // call returns immediately if it finds that the upgrade is already complete.
-    begin_read();
-    bool upgrade = m_group.get_file_format() < default_file_format_version;
-    end_read();
+    bool upgrade = m_group.file_format_upgrade_required();
 
     // Only create write transaction if needed; that's why we test whether to upgrade or not in a separate read
     // transaction. Else unit tests would fail.

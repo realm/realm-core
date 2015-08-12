@@ -874,7 +874,7 @@ std::size_t BpTree<T, N>::verify_leaf(MemRef mem, Allocator& alloc)
 {
     LeafType leaf(alloc);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     return leaf.size();
 }
 
@@ -882,7 +882,7 @@ template <class T, bool N>
 void BpTree<T, N>::verify() const
 {
     if (root_is_leaf()) {
-        root_as_leaf().Verify();
+        root_as_leaf().verify();
     }
     else {
         root().verify_bptree(&verify_leaf);

@@ -82,7 +82,7 @@ public:
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
 #ifdef REALM_DEBUG
-    void Verify() const;
+    void verify() const;
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
 
