@@ -594,6 +594,8 @@ private:
     // between the old version and the given version, or nullptr if none.
     std::unique_ptr<BinaryData[]> advance_readlock(History&, VersionID specific_version);
 
+    int get_file_format() const REALM_NOEXCEPT;
+
     friend class _impl::SharedGroupFriend;
 };
 
@@ -971,16 +973,17 @@ inline void SharedGroup::upgrade_file_format()
     // FIXME: ExceptionSafety: This function does not appear to be exception
     // safe. For example, it can leak read locks.
 
-    if (m_group.m_alloc.get_committed_file_format() == 1)
-        throw std::runtime_error("Version 1 database files are no longer supported by Realm");
-    
-    // First a non-threadsafe but fast check
-    bool upgrade = m_group.m_alloc.get_committed_file_format() < default_file_format_version;
+    // Please revisit upgrade logic when library_file_format is bumped beyond 3
+    REALM_ASSERT(SlabAlloc::library_file_format == 3);
 
+    // First a non-threadsafe but fast check
+    int file_format = m_group.get_file_format();
+    REALM_ASSERT(file_format <= SlabAlloc::library_file_format);
+    bool upgrade = (file_format < SlabAlloc::library_file_format);
     if (upgrade) {
 
 #ifdef REALM_DEBUG
-        // Sleep 0.2 seconds to create a simple thread-barrier for the two threads in the 
+        // Sleep 0.2 seconds to create a simple thread-barrier for the two threads in the
         // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test. See the unit test for details.
 #ifdef _WIN32
         _sleep(200);
@@ -999,6 +1002,11 @@ inline void SharedGroup::upgrade_file_format()
         m_group.upgrade_file_format();
         commit();
     }
+}
+
+inline int SharedGroup::get_file_format() const REALM_NOEXCEPT
+{
+    return m_group.get_file_format();
 }
 
 
@@ -1040,6 +1048,11 @@ public:
         bool is_backend = true;
         const char* encryption_key = 0;
         sg.open(file, no_create, durability, is_backend, encryption_key); // Throws
+    }
+
+    static int get_file_format(const SharedGroup& sg) REALM_NOEXCEPT
+    {
+        return sg.get_file_format();
     }
 };
 

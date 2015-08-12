@@ -11,7 +11,7 @@
 #include <mutex>
 // These 3 lines are needed in Visual Studio 2015 to make std::thread work
 #define __STDC_LIMIT_MACROS
-#include <stdint.h> 
+#include <stdint.h>
 #include <thread>
 
 #include <sys/stat.h>
@@ -104,14 +104,8 @@ TEST(Upgrade_Database_2_3)
         // Open copy. Group constructor will upgrade automatically if needed, also even though user requested ReadOnly. Todo,
         // discuss if this is OK.
         Group g(temp_copy, 0, Group::mode_ReadOnly);
-        
-        TableRef t = g.get_table("table");
 
-#if REALM_NULL_STRINGS == 1
-        CHECK_EQUAL(g.get_file_format(), 3);
-#else
-        CHECK_EQUAL(g.get_file_format(), 2);
-#endif
+        TableRef t = g.get_table("table");
 
         CHECK(t->has_search_index(0));
         CHECK(t->has_search_index(1));
@@ -186,8 +180,8 @@ TEST(Upgrade_Database_2_3)
 
         sg.commit();
     }
-    
-    
+
+
     // Begin from scratch; see if we can upgrade file and then use a write transaction
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
@@ -297,17 +291,18 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     CHECK_OR_RETURN(File::copy(path, temp_copy));
     SharedGroup g(temp_copy, 0);
 
+    using sgf = _impl::SharedGroupFriend;
+#if REALM_NULL_STRINGS == 1
+    CHECK_EQUAL(3, sgf::get_file_format(g));
+#else
+    CHECK_EQUAL(2, sgf::get_file_format(g));
+#endif
+
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
         ReadTransaction rt(g);
 
         ConstTableRef t = rt.get_table(tbl);
-
-#if REALM_NULL_STRINGS == 1
-        CHECK_EQUAL(rt.get_group().get_file_format(), 3);
-#else
-        CHECK_EQUAL(rt.get_group().get_file_format(), 2);
-#endif
 
         size_t f;
 
@@ -439,16 +434,17 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     CHECK_OR_RETURN(File::copy(path, temp_copy));
     SharedGroup g(temp_copy, 0);
 
+    using sgf = _impl::SharedGroupFriend;
+#if REALM_NULL_STRINGS == 1
+    CHECK_EQUAL(3, sgf::get_file_format(g));
+#else
+    CHECK_EQUAL(2, sgf::get_file_format(g));
+#endif
+
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
         WriteTransaction wt(g);
         TableRef t = wt.get_table(tbl);
-
-#if REALM_NULL_STRINGS == 1
-        CHECK_EQUAL(wt.get_group().get_file_format(), 3);
-#else
-        CHECK_EQUAL(wt.get_group().get_file_format(), 2);
-#endif
 
         size_t f;
 
@@ -731,12 +727,9 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format) {
     SHARED_GROUP_TEST_PATH(temp_copy);
     CHECK_OR_RETURN(File::copy(path, temp_copy));
     SharedGroup sg1(temp_copy);
-    WriteTransaction wt1(sg1);
     SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
-    ReadTransaction rt2(sg2);
-    Group const& g1 = wt1.get_group();
-    Group const& g2 = rt2.get_group();
-    CHECK_EQUAL(g1.get_file_format(), g2.get_file_format());
+    using sgf = _impl::SharedGroupFriend;
+    CHECK_EQUAL(sgf::get_file_format(sg1), sgf::get_file_format(sg2));
 }
 
 TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) {
