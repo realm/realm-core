@@ -1011,6 +1011,7 @@ EOF
         check_mode="$(printf "%s\n" "$MODE" | sed 's/asan/check/')" || exit 1
         auto_configure || exit 1
         touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        export ASAN_OPTIONS="detect_odr_violation=2"
         export REALM_HAVE_CONFIG="1"
         error=""
         if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then

@@ -42,11 +42,15 @@
 
 using namespace realm::util;
 
+namespace {
+const uint8_t test_key[] = "1234567890123456789012345678901123456789012345678901234567890123";
+}
+
 TEST(EncryptedFile_CryptorBasic)
 {
     TEST_PATH(path);
 
-    AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+    AESCryptor cryptor(test_key);
     cryptor.set_file_size(16);
     const char data[4096] = "test data";
     char buffer[4096];
@@ -61,7 +65,7 @@ TEST(EncryptedFile_CryptorBasic)
 TEST(EncryptedFile_CryptorRepeatedWrites)
 {
     TEST_PATH(path);
-    AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+    AESCryptor cryptor(test_key);
     cryptor.set_file_size(16);
 
     const char data[4096] = "test data";
@@ -90,12 +94,12 @@ TEST(EncryptedFile_SeparateCryptors)
 
     int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     {
-        AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
         cryptor.write(fd, 0, data, sizeof(data));
     }
     {
-        AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
         cryptor.read(fd, 0, buffer, sizeof(buffer));
     }
@@ -112,7 +116,7 @@ TEST(EncryptedFile_InterruptedWrite)
 
     int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     {
-        AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
         cryptor.write(fd, 0, data, sizeof(data));
     }
@@ -125,7 +129,7 @@ TEST(EncryptedFile_InterruptedWrite)
     pwrite(fd, buffer, 64, 0);
 
     {
-        AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
         cryptor.read(fd, 0, buffer, sizeof(buffer));
         CHECK(memcmp(buffer, data, strlen(data)) == 0);
@@ -142,7 +146,7 @@ TEST(EncryptedFile_LargePages)
     for (size_t i = 0; i < sizeof(data); ++i)
         data[i] = static_cast<char>(i);
 
-    AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+    AESCryptor cryptor(test_key);
     cryptor.set_file_size(sizeof(data));
     char buffer[sizeof(data)];
 
