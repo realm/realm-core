@@ -46,12 +46,14 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
+    void swap_rows(size_t, size_t) override;
     void discard_subtable_accessor(std::size_t) REALM_NOEXCEPT override;
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_clear_root_table() REALM_NOEXCEPT override;
+    void adj_acc_swap_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void mark(int) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
@@ -90,11 +92,16 @@ protected:
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
         bool adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT;
+
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
         bool adj_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx)
             REALM_NOEXCEPT;
+
+        template<bool fix_ndx_in_parent>
+        void adj_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT;
+
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
         void recursive_mark() REALM_NOEXCEPT;
@@ -213,6 +220,7 @@ public:
 
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
+    void swap_rows(std::size_t, std::size_t) override;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const SubtableColumn&) const;
@@ -294,6 +302,14 @@ inline void SubtableColumnParent::clear(std::size_t, bool)
     get_root_array()->set_type(Array::type_HasRefs);
 }
 
+inline void SubtableColumnParent::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    IntegerColumn::swap_rows(row_ndx_1, row_ndx_2); // Throws
+
+    const bool fix_ndx_in_parent = true;
+    m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
+}
+
 inline void SubtableColumnParent::mark(int type) REALM_NOEXCEPT
 {
     if (type & mark_Recursive)
@@ -355,6 +371,12 @@ inline void SubtableColumnParent::adj_acc_clear_root_table() REALM_NOEXCEPT
 
     IntegerColumn::adj_acc_clear_root_table();
     discard_child_accessors();
+}
+
+inline void SubtableColumnParent::adj_acc_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT
+{
+    const bool fix_ndx_in_parent = false;
+    m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
 }
 
 inline Table* SubtableColumnParent::get_subtable_accessor(std::size_t row_ndx) const
@@ -470,6 +492,29 @@ bool SubtableColumnParent::SubtableMap::adj_move_over(std::size_t from_row_ndx,
         }
     }
     return m_entries.empty();
+}
+
+template<bool fix_ndx_in_parent>
+void SubtableColumnParent::SubtableMap::adj_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT
+{
+    using tf = _impl::TableFriend;
+
+    if (empty())
+        return;
+
+    entry& entry_1 = m_entries[row_ndx_1];
+    entry& entry_2 = m_entries[row_ndx_2];
+
+    {
+        Table* tmp = entry_1.m_table;
+        entry_1.m_table = entry_2.m_table;
+        entry_2.m_table = tmp;
+    }
+
+    if (fix_ndx_in_parent) {
+        tf::set_ndx_in_parent(*(entry_1.m_table), entry_1.m_subtable_ndx);
+        tf::set_ndx_in_parent(*(entry_2.m_table), entry_2.m_subtable_ndx);
+    }
 }
 
 inline SubtableColumnParent::SubtableColumnParent(Allocator& alloc, ref_type ref,
