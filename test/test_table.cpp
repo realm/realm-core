@@ -5976,4 +5976,22 @@ TEST(Table_DescriptorEqualityNulls)
 
 #endif 
 
+TEST(Table_SubTableEquality)
+{
+    DescriptorRef sub;
+
+    Table t1;
+    t1.add_column(type_Table, "sub", false, &sub);
+
+    sub->add_column(type_Int, "int");
+
+    Table t2;
+    t2.add_column(type_Table, "sub", false, &sub);
+
+    sub->add_column(type_String, "str");
+
+    CHECK(*t1.get_descriptor() != *t2.get_descriptor());
+
+}
+
 #endif // TEST_TABLE
