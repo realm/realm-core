@@ -713,12 +713,15 @@ public:
     TableRef get_table_ref() { return TableRef(this); }
     ConstTableRef get_table_ref() const { return ConstTableRef(this); }
 
-    /// Compare two tables for equality. Two tables are equal if, and
-    /// only if, they contain the same columns and rows in the same
-    /// order, that is, for each value V of type T at column index C
-    /// and row index R in one of the tables, there is a value of type
-    /// T at column index C and row index R in the other table that
-    /// is equal to V.
+    /// Compare two tables for equality. Two tables are equal if they have equal
+    /// descriptors (`Descriptor::operator==()`) and equal contents. Equal
+    /// descriptors imply that the two tables have the same columns in the same
+    /// order. Equal contents means that the two tables have the same number of
+    /// rows, and that for each row index, the two rows have the same values in
+    /// each column. In subtable columns, value equality implies a recusive
+    /// invocation of table equality, although the descriptors are guaranteed to
+    /// be equal in this case. In mixed columns, the value types and the values
+    /// are required to be the same.
     bool operator==(const Table&) const;
 
     /// Compare two tables for inequality. See operator==().
