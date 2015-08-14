@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <string>
 #include <ostream>
+#include <cstring>
 
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
@@ -337,7 +338,7 @@ struct null {
 
     /// Returns 0xffffffff (if float) or 0xffffffffffffffff (if double). These are quiet NaNs.
     template <class T> static T get_null() {
-        std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = ~0;
+        typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = ~0;
         T d = type_punning<T, decltype(i)>(i);
         REALM_ASSERT_DEBUG(std::isnan(static_cast<double>(d)));
         REALM_ASSERT_DEBUG(!is_signalling(d));
@@ -347,7 +348,8 @@ struct null {
     /// Takes a NaN as argument and returns whether or not it's signalling
     template <class T> static bool is_signalling(T v) {
         REALM_ASSERT(std::isnan(static_cast<double>(v)));
-        std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = type_punning<decltype(i), T>(v);
+        typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
+        i = type_punning<decltype(i), T>(v);
         size_t signal_bit = std::is_same<T, float>::value ? 22 : 51; // If this bit is set, it's quiet
         return !(i & (1 << signal_bit));
     }
@@ -357,7 +359,7 @@ struct null {
     /// unmodified `v` if not a NaN.
     template <class T> static T to_realm(T v) {
         if (std::isnan<double>(v)) {
-            std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = (~0) << 8;
+            typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = (~0) << 8;
             size_t signal_bit = std::is_same<T, float>::value ? 22 : 51; // If this bit is set, it's quiet
   
             if (is_signalling) 
