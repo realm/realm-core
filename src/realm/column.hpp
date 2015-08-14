@@ -746,7 +746,10 @@ std::size_t Column<T, N>::count(T target) const
 template <class T, bool N>
 T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
+    if(N)
+        return aggregate<T, T, act_Sum, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
+    else
+        return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
@@ -755,10 +758,14 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
     if (end == size_t(-1))
         end = size();
     size_t size = end - start;
+
+    // fixme, doesn't look correct
     if(limit < size)
         size = limit;
+
     auto s = sum(start, end, limit, return_ndx);
-    double avg = double(s) / double(size == 0 ? 1 : size);
+    size_t cnt = aggregate<T, int64_t, act_Count, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
+    double avg = double(s) / (cnt == 0 ? 1 : cnt);
     return avg;
 }
 

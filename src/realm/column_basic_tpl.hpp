@@ -535,32 +535,34 @@ template<class T>
 typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t begin, std::size_t end,
     std::size_t limit, std::size_t* return_ndx) const
 {
-    return aggregate<T, SumType, act_Sum, None>(*this, 0, begin, end, limit, return_ndx);
+    return aggregate<T, SumType, act_Sum, LeftNotNull>(*this, 0, begin, end, limit, return_ndx);
 }
 template<class T>
 T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Min, None>(*this, 0, begin, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, LeftNotNull>(*this, 0, begin, end, limit, return_ndx);
 }
 
 template<class T>
 T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Max, None>(*this, 0, begin, end, limit, return_ndx);
+    return aggregate<T, T, act_Max, LeftNotNull>(*this, 0, begin, end, limit, return_ndx);
 }
 
 template<class T>
-double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit, size_t* /*return_ndx*/) const
+double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    if (end == npos)
+    if (end == size_t(-1))
         end = size();
+    size_t size = end - begin;
+    
+    // fixme, doesn't look correct
+    if (limit < size)
+        size = limit;
 
-    if(limit != npos && begin + limit < end)
-        end = begin + limit;
-
-    std::size_t size = end - begin;
-    double sum1 = sum(begin, end);
-    double avg = sum1 / ( size == 0 ? 1 : size );
+    auto s = sum(begin, end, limit, return_ndx);
+    size_t cnt = aggregate<T, int64_t, act_Count, LeftNotNull>(*this, 0, begin, end, limit, return_ndx);
+    double avg = double(s) / (cnt == 0 ? 1 : cnt);
     return avg;
 }
 

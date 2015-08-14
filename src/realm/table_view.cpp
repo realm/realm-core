@@ -162,7 +162,8 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
     using ColTypeTraits = ColumnTypeTraits<T, ColType::nullable>;
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
-    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
+    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count 
+              || function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
     if ((m_row_indexes.size() - m_num_detached_refs) == 0)
@@ -207,7 +208,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
-            typename ColType::LeafInfo leaf { &arrp, &arr };
+            typename ColType::LeafInfo leaf{ &arrp, &arr };
             column->get_leaf(row_ndx, ndx_in_leaf, leaf);
             leaf_start = row_ndx - ndx_in_leaf;
             leaf_end = leaf_start + arrp->size();
@@ -215,8 +216,9 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
         T v = arrp->get(row_ndx - leaf_start);
 
-        if (function == act_Sum)
+        if (function == act_Sum) {
             res += static_cast<R>(v);
+        }
         else if (function == act_Max && v > static_cast<T>(res)) {
             res = static_cast<R>(v);
             if (return_ndx)
@@ -227,19 +229,28 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
             if (return_ndx)
                 *return_ndx = ss;
         }
-        else if (function == act_Count && v == count_target)
+        else if (function == act_Count && v == count_target) {
             res++;
-
+        }
+        else if (function == act_Average) {
+            res += static_cast<R>(v);
+        }
     }
 
-    return res;
+    if (function == act_Average)
+            return res / (m_row_indexes.size() == 0 ? 1 : m_row_indexes.size());
+    else
+        return res;
 }
 
 // sum
 
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, 0);
+    else
+        return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
@@ -298,12 +309,14 @@ DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) 
 
 double TableViewBase::average_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0);
+    else
+        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0);
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0)
-        / static_cast<double>(num_attached_rows());
+    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0);
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
@@ -314,7 +327,10 @@ double TableViewBase::average_double(size_t column_ndx) const
 // Count
 size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
 {
-    return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Count, int64_t, size_t, IntNullColumn>(nullptr, column_ndx, target);
+    else
+        return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_float(size_t column_ndx, float target) const
 {

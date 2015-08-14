@@ -73,7 +73,7 @@ Searching: The main finding function is:
 namespace realm {
 
 enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx,
-             act_CallbackVal, act_CallbackNone, act_CallbackBoth};
+             act_CallbackVal, act_CallbackNone, act_CallbackBoth, act_Average};
 
 template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
@@ -1289,13 +1289,13 @@ public:
 
     template<Action action> bool uses_val()
     {
-        return (action == act_Max || action == act_Min || action == act_Sum);
+        return (action == act_Max || action == act_Min || action == act_Sum || action == act_Count);
     }
 
     void init(Action action, Array*, size_t limit)
     {
-        REALM_STATIC_ASSERT((std::is_same<R, float>::value ||
-                               std::is_same<R, double>::value), "");
+        REALM_ASSERT((std::is_same<R, float>::value ||
+                               std::is_same<R, double>::value));
         m_match_count = 0;
         m_limit = limit;
         m_minmax_index = not_found;
@@ -1317,7 +1317,8 @@ public:
         if (pattern)
             return false;
 
-        REALM_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min, "");
+        REALM_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Count, "Search action not supported");
+
         ++m_match_count;
 
         if (action == act_Max) {

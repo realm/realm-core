@@ -6176,7 +6176,7 @@ TEST(Query_64BitValues)
 }
 
 
-ONLY(Query_NullShowcase)
+TEST(Query_NullShowcase)
 {
 /*
 Here we show how comparisons and arithmetic with null works in queries. Basic rules:
@@ -6199,7 +6199,7 @@ NOTE NOTE: There is currently only very little syntax checking.
     ----------------------------------------------------------------------------------------------------------------
 0   null            null                null                    1.1                 true          2016-2-2
 1   10              null                "foo"                   2.2                 null          null
-2   20              30.0                "bar"                   null                false         2016-6-6
+2   20              30.0                "bar"                   3.3                 false         2016-6-6
 */
 
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
@@ -6225,8 +6225,8 @@ NOTE NOTE: There is currently only very little syntax checking.
 
     table->set_null(1, 0);
     table->set_null(1, 1);
-    table->set_float(1, 2, 30.3f);
-    
+    table->set_float(1, 2, 30.f);
+
     table->set_string(2, 0, null());
     table->set_string(2, 1, "foo");
     table->set_string(2, 2, "bar");
@@ -6359,16 +6359,39 @@ NOTE NOTE: There is currently only very little syntax checking.
     check(tv, { }, __LINE__);
 
     // TableView
-    tv = table->where().find_all();
-    int64_t m;
-    m = tv.maximum_int(0);
-    CHECK_EQUAL(m, 20);
-    m = tv.minimum_int(0);
-    CHECK_EQUAL(m, 10);
-    m = tv.minimum_int(0);
-    CHECK_EQUAL(m, 10);
+    int64_t i;
+    double d;
+    tv = table->where().find_all();    
 
+    // Integer column
+    i = tv.maximum_int(0);
+    CHECK_EQUAL(i, 20);
+    i = tv.minimum_int(0);
+    CHECK_EQUAL(i, 10);
+    d = tv.average_int(0);
+    CHECK_APPROXIMATELY_EQUAL(d, 15., 0.001);
+    i = tv.sum_int(0);
+    CHECK_EQUAL(i, 30);
 
+    // Float column
+    d = tv.maximum_float(1);
+    CHECK_EQUAL(d, 30.);
+    d = tv.minimum_float(1);
+    CHECK_EQUAL(d, 30.);
+    d = tv.average_float(1);
+    CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+    d = tv.sum_float(1);
+    CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+
+    // Double column
+    d = tv.maximum_double(3);
+    CHECK_EQUAL(d, 3.3);
+    d = tv.minimum_double(3);
+    CHECK_EQUAL(d, 1.1);
+    d = tv.average_double(3);
+    CHECK_APPROXIMATELY_EQUAL(d, (1.1 + 2.2 + 3.3) / 3, 0.001);
+    d = tv.sum_double(3);
+    CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
 }
 
 #endif // TEST_QUERY

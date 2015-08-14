@@ -301,7 +301,21 @@ inline StringData::operator unspecified_bool_type() const REALM_NOEXCEPT
 }
 #endif
 
-// Represents null in Query, find(), get(), set(), etc.
+/*
+Represents null in Query, find(), get(), set(), etc. Todo, maybe move this outside string_data.hpp.
+
+Float/Double: Realm can both store user-given NaNs and null. Any user-given signalling NaN is converted to 
+0xffbfff00 (if float) or 0xfff7ffffffffff00 (if double). Any user-given quiet NaN is converted to 
+0xffffff00 (if float) or 0xffffffffffffff00 (if double). So Realm does not preserve the optional bits in
+user-given NaNs.
+
+If set_null() is called, a null is stored in form of the bit pattern 0xffffffff (if float) or 
+0xffffffffffffffff (if double). These are quiet NaNs.
+
+Executing a query that involves a float/double column that contains NaNs gives an undefined result. If
+it contains signalling NaNs, it may throw an exception.
+*/
+
 struct null {
     null(int) {}
     null() {}
@@ -314,6 +328,48 @@ struct null {
     template <class T> bool operator >= (const T&) const { REALM_ASSERT(false); return false; }
     template <class T> bool operator <= (const T&) const { REALM_ASSERT(false); return false; }
     template <class T> bool operator < (const T&) const { REALM_ASSERT(false); return false; }
+
+    /// Returns whether `v` bitwise equals the null bit-pattern
+    template <class T> static bool is_null(T v) {
+        T i = null::get_null<T>();
+        return std::memcmp(&i, &v, sizeof(T)) == 0;
+    }
+
+    /// Returns 0xffffffff (if float) or 0xffffffffffffffff (if double). These are quiet NaNs.
+    template <class T> static T get_null() {
+        std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = ~0;
+        T d = type_punning<T, decltype(i)>(i);
+        REALM_ASSERT_DEBUG(std::isnan(static_cast<double>(d)));
+        REALM_ASSERT_DEBUG(!is_signalling(d));
+        return d;
+    }
+    
+    /// Takes a NaN as argument and returns whether or not it's signalling
+    template <class T> static bool is_signalling(T v) {
+        REALM_ASSERT(std::isnan(static_cast<double>(v)));
+        std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = type_punning<decltype(i), T>(v);
+        size_t signal_bit = std::is_same<T, float>::value ? 22 : 51; // If this bit is set, it's quiet
+        return !(i & (1 << signal_bit));
+    }
+
+    /// Converts any signalling NaN to 0xffbfff00 (if float) or 0xfff7ffffffffff00 (if double), and any 
+    /// non-signalling NaN to 0xffffff00 (if float) or 0xffffffffffffff00 (if double), or just returns 
+    /// unmodified `v` if not a NaN.
+    template <class T> static T to_realm(T v) {
+        if (std::isnan<double>(v)) {
+            std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = (~0) << 8;
+            size_t signal_bit = std::is_same<T, float>::value ? 22 : 51; // If this bit is set, it's quiet
+  
+            if (is_signalling) 
+                return type_punning<decltype(i), T>(i & (~(1ull << signal_bit)));
+            else            
+                return type_punning<decltype(i), T>(i | (1ull << signal_bit));
+        }
+        else {
+            return v;
+        }
+    }
+
 };
 
 } // namespace realm

@@ -75,7 +75,7 @@ public:
     ColsAccessor column() REALM_NOEXCEPT
     {
         return ColsAccessor(static_cast<View*>(this));
-    }
+     }
 
     ConstColsAccessor column() const REALM_NOEXCEPT
     {

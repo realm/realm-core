@@ -988,7 +988,7 @@ public:
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    FloatDoubleNode(null, size_t column_ndx) : m_value(std::numeric_limits<float>::quiet_NaN())
+    FloatDoubleNode(null, size_t column_ndx) : m_value(null::get_null<float>())
     {
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
@@ -1010,11 +1010,11 @@ public:
         TConditionFunction cond;
         
         auto find = [&](bool nullability)   {
-            bool m_value_nan = nullability ? isnan(m_value) : false;
+            bool m_value_nan = nullability ? null::is_null(m_value) : false;
             for (size_t s = start; s < end; ++s) {
                 TConditionValue v = m_condition_column.get_next(s);
-                REALM_ASSERT(!(std::isnan(v) && !nullability));
-                if (cond(v, m_value, nullability ? std::isnan(v) : false, m_value_nan))
+                REALM_ASSERT(!(null::is_null(v) && !nullability));
+                if (cond(v, m_value, nullability ? null::is_null<TConditionValue>(v) : false, m_value_nan))
                     return s;
             }
             return not_found;

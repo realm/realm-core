@@ -75,12 +75,12 @@ public:
     }
     bool is_null(size_t index) const REALM_NOEXCEPT
     {
-        return std::isnan((float)get(index));
+        return null::is_null(get(index));
     }
 
     void set_null(size_t index)
     {
-        set(index, std::numeric_limits<T>::quiet_NaN());
+        set(index, null::get_null<T>()); 
     }
 
     struct LeafInfo {
