@@ -1,0 +1,3 @@
+# Global Architecture {#primer_architecture} #
+
+Lorem Ipsum...
