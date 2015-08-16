@@ -67,9 +67,9 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
 
     // Remove backlinks to the removed origin rows
-    if (!broken_reciprocal_backlinks) {
-        for (size_t i = 0; i < num_rows_to_erase; ++i) {
-            if (ref_type ref = get_as_ref(row_ndx+i)) {
+    for (size_t i = 0; i < num_rows_to_erase; ++i) {
+        if (ref_type ref = get_as_ref(row_ndx+i)) {
+            if (!broken_reciprocal_backlinks) {
                 IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
@@ -77,6 +77,7 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
                     m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+i);
                 }
             }
+            Array::destroy_deep(ref, get_alloc());
         }
     }
 
@@ -112,8 +113,8 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     REALM_ASSERT(row_ndx <= prior_num_rows);
 
     // Remove backlinks to the removed origin row
-    if (!broken_reciprocal_backlinks) {
-        if (ref_type ref = get_as_ref(row_ndx)) {
+    if (ref_type ref = get_as_ref(row_ndx)) {
+        if (!broken_reciprocal_backlinks) {
             IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
@@ -121,6 +122,7 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
                 m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
             }
         }
+        Array::destroy_deep(ref, get_alloc());
     }
 
     // Update backlinks to the moved origin row
@@ -137,8 +139,6 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     }
 
     // Do the actual delete and move
-    bool clear_value = false;
-    destroy_subtree(row_ndx, clear_value);
     LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
                                        broken_reciprocal_backlinks); // Throws
 
