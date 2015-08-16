@@ -442,8 +442,6 @@ Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const REALM_NOEXCEPT
 
 bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
 {
-    if (!m_types.compare_int(spec.m_types))
-        return false;
     if (!m_attr.compare_int(spec.m_attr))
         return false;
     if (!m_names.compare_string(spec.m_names))
@@ -453,13 +451,29 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
     const size_t column_count = get_column_count();
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx)
     {
-        if (m_types.get(col_ndx) == col_type_Table)
+        switch (m_types.get(col_ndx))
         {
-            const size_t subspec_index = get_subspec_ndx(col_ndx);
-            const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
-            const Spec rhs = Spec(const_cast<Spec&>(spec).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
-            if (lhs != rhs)
-                return false;
+            case col_type_String:
+            case col_type_StringEnum:
+            {
+                const int64_t rhs_type = spec.m_types.get(col_ndx);
+                if (rhs_type != col_type_String && rhs_type != col_type_StringEnum)
+                    return false;
+                break;
+            }
+            case col_type_Table:
+            {
+                const size_t subspec_index = get_subspec_ndx(col_ndx);
+                const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
+                const Spec rhs = Spec(const_cast<Spec&>(spec).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
+                if (lhs != rhs)
+                    return false;
+                break;
+            }
+            default:
+                if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
+                    return false;
+                break;
         }
     }
 
