@@ -317,7 +317,6 @@ size_t GroupWriter::get_free_space(size_t size)
     size_t chunk_size = p.second;
     REALM_ASSERT_3(chunk_size, >=, size);
     REALM_ASSERT((chunk_size % 8) == 0);
-    //std::cerr << "alloc(" << size << ") from chunk [" << chunk_pos << ", " << chunk_size << "]" << std::endl;
 
     size_t rest = chunk_size - size;
     if (rest > 0) {
@@ -325,7 +324,6 @@ size_t GroupWriter::get_free_space(size_t size)
         // of the chunk. The call to reserve_free_space may split chunks
         // in order to make sure that it returns a chunk from which allocation
         // can be done from the beginning
-        //std::cerr << "  - from beginning" << std::endl;
         m_free_positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
         m_free_lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
     }
@@ -335,10 +333,8 @@ size_t GroupWriter::get_free_space(size_t size)
         m_free_lengths.erase(chunk_ndx);
         if (is_shared)
             m_free_versions.erase(chunk_ndx);
-        //std::cerr << "  - entire chunk" << std::endl;
     }
     REALM_ASSERT((chunk_pos % 8) == 0);
-    //std::cerr << "  - got [" << chunk_pos << ", " << size << "]" << std::endl;
     return chunk_pos;
 }
 
@@ -347,7 +343,6 @@ inline std::size_t GroupWriter::split_freelist_chunk(std::size_t index, std::siz
                                                      std::size_t alloc_pos, std::size_t chunk_size, 
                                                      bool is_shared)
 {
-    // std::cerr << "  - split [" << start_pos << ", " << chunk_size << "]" << " at " << alloc_pos << std::endl;
     m_free_positions.insert(index, start_pos);
     m_free_lengths.insert(index, alloc_pos - start_pos);
     if (is_shared)
@@ -452,19 +447,18 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // size. The real size may have changed without the free space information
     // having been adjusted accordingly. This can happen, for example, if
     // write_group() fails before writing the new top-ref, but after having
-    // extended the file size.
+    // extended the file size. It can also happen as part of initial file expansion
+    // during attach_file().
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
     size_t extend_size = requested_size;
     size_t new_file_size = logical_file_size + extend_size;
-    if (!alloc.matches_mmap_boundary(new_file_size)) {
-        new_file_size = alloc.get_upper_mmap_boundary(new_file_size);
+    if (!alloc.matches_section_boundary(new_file_size)) {
+        new_file_size = alloc.get_upper_section_boundary(new_file_size);
     }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
-    //std::cerr << "--------------------- extend(" << logical_file_size << " to "
-    //          << new_file_size << ") ---------------" << std::endl;
 
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can

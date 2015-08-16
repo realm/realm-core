@@ -63,7 +63,8 @@ struct InvalidDatabase;
 /// For efficiency, this allocator manages its mutable memory as a set
 /// of slabs.
 
-// first a few convenience enums
+/// first a few convenience enums, used to aid readability at call-sites
+/// of alloc_attach()
 enum class Shared { No, Yes };
 enum class Writable { No, Yes };
 enum class Create { No, Yes };
@@ -172,7 +173,7 @@ public:
     /// Reserve disk space now to avoid allocation errors at a later
     /// point in time, and to minimize on-disk fragmentation. In some
     /// cases, less fragmentation translates into improved
-    /// performance.
+    /// performance. On flash or SSD-drives this is likely a waste.
     ///
     /// Note: File::prealloc() may misbehave under race conditions (see
     /// documentation of File::prealloc()). For that reason, to avoid race
@@ -189,7 +190,8 @@ public:
 
     /// Reserve disk space now to avoid allocation errors at a later point in
     /// time, and to minimize on-disk fragmentation. In some cases, less
-    /// fragmentation translates into improved performance.
+    /// fragmentation translates into improved performance. On SSD-drives
+    /// preallocation is likely a waste.
     ///
     /// When supported by the system, a call to this function will make the
     /// database file at least as big as the specified size, and cause space on
@@ -235,8 +237,11 @@ public:
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
-    /// the file_size argument must be aligned to a chunk boundary.
-    ///
+    /// the file_size argument must be aligned to a *section* boundary:
+    /// The database file is logically split into sections, each section
+    /// guaranteed to be mapped as a contiguous address range. The allocation
+    /// of memory in the file must ensure that no allocation crosses the
+    /// boundary between two sections.
     void remap(std::size_t file_size);
 
 #ifdef REALM_DEBUG
@@ -320,14 +325,16 @@ private:
     // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
     char* m_data = 0;
     std::size_t m_initial_mapping_size = 0;
-    std::size_t m_first_additional_chunk = 0;
+    // additional sections beyond those covered by the initial mapping, are
+    // managed as separate mmap allocations, each covering one section.
+    std::size_t m_first_additional_mapping = 0;
     std::size_t m_num_additional_mappings = 0;
     std::size_t m_capacity_additional_mappings = 0;
-    std::size_t m_initial_chunk_size = 0;
-    int m_chunk_shifts = 0;
+    std::size_t m_initial_section_size = 0;
+    int m_section_shifts = 0;
     util::File::Map<char>* m_additional_mappings = nullptr;
-    std::unique_ptr<std::size_t[]> m_chunk_bases;
-    int m_num_chunk_bases = 0;
+    std::unique_ptr<std::size_t[]> m_section_bases;
+    int m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
 
     /// If a file or buffer is currently attached and validation was
@@ -383,34 +390,36 @@ private:
     Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
 
-    /// Returns the first mmap boundary *above* the given position.
-    std::size_t get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
+    /// Returns the first section boundary *above* the given position.
+    std::size_t get_upper_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
 
-    /// Returns the first mmap boundary *at or below* the given position.
-    std::size_t get_lower_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
+    /// Returns the first section boundary *at or below* the given position.
+    std::size_t get_lower_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
 
-    /// Returns true if the given position is at a mmap boundary
-    bool matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT;
+    /// Returns true if the given position is at a section boundary
+    bool matches_section_boundary(std::size_t pos) const REALM_NOEXCEPT;
 
-    /// Returns the index of the chunk holding a given address.
-    /// The chunk index is determined solely by the minimal chunk size,
+    /// Returns the index of the section holding a given address.
+    /// The section index is determined solely by the minimal section size,
     /// and does not necessarily reflect the mapping. A mapping may
-    /// cover multiple chunks - the initial mapping often does.
-    std::size_t get_chunk_index(std::size_t pos) const REALM_NOEXCEPT;
+    /// cover multiple sections - the initial mapping often does.
+    std::size_t get_section_index(std::size_t pos) const REALM_NOEXCEPT;
 
-    /// Reverse: get the base offset of a chunk at a given index. Since the
+    /// Reverse: get the base offset of a section at a given index. Since the
     /// computation is very time critical, this method just looks it up in
-    /// a table. The aactual computation and setup of that table is done
-    /// during initialization with the help of compute_chunk_base() below.
-    inline std::size_t get_chunk_base(std::size_t index) const REALM_NOEXCEPT;
+    /// a table. The actual computation and setup of that table is done
+    /// during initialization with the help of compute_section_base() below.
+    inline std::size_t get_section_base(std::size_t index) const REALM_NOEXCEPT;
 
-    /// Actually compute the starting offset of a chunk. Only used to initialize
-    /// a table of predefined results, which are then used by get_chunk_base().
-    std::size_t compute_chunk_base(std::size_t index) const REALM_NOEXCEPT;
+    /// Actually compute the starting offset of a section. Only used to initialize
+    /// a table of predefined results, which are then used by get_section_base().
+    std::size_t compute_section_base(std::size_t index) const REALM_NOEXCEPT;
 
-    /// Find a possible allocation that will fit into a section.
-    std::size_t find_section_in_range(std::size_t start_pos, std::size_t chunk_size, 
-                                      std::size_t range_size) const REALM_NOEXCEPT;
+    /// Find a possible allocation of 'request_size' that will fit into a section
+    /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
+    /// If found return the position, if not return 0.
+    std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size, 
+                                      std::size_t request_size) const REALM_NOEXCEPT;
 
     friend class Group;
     friend class GroupWriter;
@@ -499,24 +508,24 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
 
 
 
-inline std::size_t SlabAlloc::get_upper_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_upper_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT
 {
-    return get_chunk_base(1+get_chunk_index(start_pos));
+    return get_section_base(1+get_section_index(start_pos));
 }
 
-inline std::size_t SlabAlloc::get_lower_mmap_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_lower_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT
 {
-    return get_chunk_base(get_chunk_index(start_pos));
+    return get_section_base(get_section_index(start_pos));
 }
 
-inline bool SlabAlloc::matches_mmap_boundary(std::size_t pos) const REALM_NOEXCEPT
+inline bool SlabAlloc::matches_section_boundary(std::size_t pos) const REALM_NOEXCEPT
 {
-    return pos == get_lower_mmap_boundary(pos);
+    return pos == get_lower_section_boundary(pos);
 }
 
-inline std::size_t SlabAlloc::get_chunk_base(std::size_t index) const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_section_base(std::size_t index) const REALM_NOEXCEPT
 {
-    return m_chunk_bases[index];
+    return m_section_bases[index];
 }
 
 

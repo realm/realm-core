@@ -36,13 +36,13 @@ public:
 
 SlabAlloc::SlabAlloc()
 {
-    m_initial_chunk_size = page_size();
-    m_chunk_shifts = 1 + log2(m_initial_chunk_size);
+    m_initial_section_size = page_size();
+    m_section_shifts = 1 + log2(m_initial_section_size);
     std::size_t max = std::numeric_limits<std::size_t>::max();
-    m_num_chunk_bases = 1 + get_chunk_index(max);
-    m_chunk_bases.reset( new std::size_t[m_num_chunk_bases] );
-    for (int i = 0; i < m_num_chunk_bases; ++i) {
-        m_chunk_bases[i] = compute_chunk_base(i);
+    m_num_section_bases = 1 + get_section_index(max);
+    m_section_bases.reset( new std::size_t[m_num_section_bases] );
+    for (int i = 0; i < m_num_section_bases; ++i) {
+        m_section_bases[i] = compute_section_base(i);
     }
 }
 
@@ -386,13 +386,13 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
 
     if (ref < m_baseline) {
 
-        // reference must be inside a chunk mapped later
-        std::size_t chunk_index = get_chunk_index(ref);
-        std::size_t mapping_index = chunk_index - m_first_additional_chunk;
-        std::size_t chunk_offset = ref - get_chunk_base(chunk_index);
+        // reference must be inside a section mapped later
+        std::size_t section_index = get_section_index(ref);
+        std::size_t mapping_index = section_index - m_first_additional_mapping;
+        std::size_t section_offset = ref - get_section_base(section_index);
         REALM_ASSERT_DEBUG(m_additional_mappings);
         REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
-        return m_additional_mappings[mapping_index].get_addr() + chunk_offset;
+        return m_additional_mappings[mapping_index].get_addr() + section_offset;
     }
 
     typedef slabs::const_iterator iter;
@@ -435,7 +435,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Shared shared, Writable
         m_file.set_encryption_key(encryption_key);
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = m_initial_chunk_size;
+    size_t initial_size = m_initial_section_size;
 
     std::size_t initial_size_of_file;
     ref_type top_ref = 0;
@@ -484,18 +484,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, Shared shared, Writable
     // The file must be extended prior to being mmapped, as extending it after mmap has
     // undefined behavior.
     // The mapping of the first part of the file *must* be contiguous, because
-    // we do not know if the file was created without chunking. If it was created 
-    // without chunking, we cannot map it in chunks without risking datastructures
-    // that cross a mapping boundary.
+    // we do not know if the file was created by a version of the code, that took
+    // the section boundaries into account. If it wasn't we cannot map it in sections 
+    // without risking datastructures that cross a mapping boundary.
     // If the file is opened read-only, we cannot extend it. This is not a problem,
     // because for a read-only file we assume that it will not change while we use it.
     // This assumption obviously will not hold, if the file is shared by multiple
     // processes with different opening modes.
-    if (!read_only && !matches_mmap_boundary(size)) {
+    if (!read_only && !matches_section_boundary(size)) {
 
         REALM_ASSERT(Is(session_initiator) || Not(shared));
-        size = get_upper_mmap_boundary(size);
-        // std::cerr << "resizing during attach to " << size << std::endl;
+        size = get_upper_section_boundary(size);
         m_file.prealloc(0, size);
         // resizing the file (as we do here) without actually changing any internal
         // datastructures to reflect the additional free space will work, because the
@@ -539,7 +538,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Shared shared, Writable
         m_data        = map.release();
         m_baseline    = size;
         m_initial_mapping_size = size;
-        m_first_additional_chunk = get_chunk_index(m_initial_mapping_size);
+        m_first_additional_mapping = get_section_index(m_initial_mapping_size);
         m_attach_mode = Is(shared) ? attach_SharedFile : attach_UnsharedFile;
 
         // Below this point (assignment to `m_attach_mode`), nothing must throw.
@@ -723,11 +722,11 @@ void SlabAlloc::remap(size_t file_size)
     REALM_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
     REALM_ASSERT_DEBUG(m_baseline <= file_size);
 
-    // Extend mapping by adding chunks
-    REALM_ASSERT_DEBUG(matches_mmap_boundary(file_size));
+    // Extend mapping by adding sections
+    REALM_ASSERT_DEBUG(matches_section_boundary(file_size));
     m_baseline = file_size;
-    auto num_chunks = get_chunk_index(file_size);
-    auto num_additional_mappings = num_chunks - m_first_additional_chunk;
+    auto num_sections = get_section_index(file_size);
+    auto num_additional_mappings = num_sections - m_first_additional_mapping;
 
     if (num_additional_mappings > m_capacity_additional_mappings) {
         // FIXME: No harcoded constants here
@@ -740,9 +739,9 @@ void SlabAlloc::remap(size_t file_size)
     }
     for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
     {
-        auto chunk_start_offset = get_chunk_base(k + m_first_additional_chunk);
-        auto chunk_size = get_chunk_base(1 + k + m_first_additional_chunk) - chunk_start_offset;
-        util::File::Map<char> map(m_file, chunk_start_offset, File::access_ReadOnly, chunk_size);
+        auto section_start_offset = get_section_base(k + m_first_additional_mapping);
+        auto section_size = get_section_base(1 + k + m_first_additional_mapping) - section_start_offset;
+        util::File::Map<char> map(m_file, section_start_offset, File::access_ReadOnly, section_size);
         m_additional_mappings[k].move(map);
     }
     m_num_additional_mappings = num_additional_mappings;
@@ -770,66 +769,66 @@ const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 
 
 
-// A database file is viewed as a number of chunks of exponentially growing size.
-// The first 16 chunks are 1 x page size, the next 8 chunks are 2 x page size,
-// then follows 8 chunks of 4 x page size, 8 chunks of 8 x page size and so forth.
-// This layout makes it possible to determine the chunk number for a given offset
+// A database file is viewed as a number of sections of exponentially growing size.
+// The first 16 sections are 1 x page size, the next 8 sections are 2 x page size,
+// then follows 8 sections of 4 x page size, 8 sections of 8 x page size and so forth.
+// This layout makes it possible to determine the section number for a given offset
 // into the file in constant time using a bit scan intrinsic and a few bit manipulations.
-// The get_chunk_index() method determines the chunk number from the offset, while
-// the get_chunk_base() does the opposite, giving the starting offset for a given
-// chunk number.
+// The get_section_index() method determines the section number from the offset, while
+// the get_section_base() does the opposite, giving the starting offset for a given
+// section number.
 //
 // Please note that the file is not necessarily mmapped with a separate mapping
-// for each chunk, multiple chunks may be mmapped with a single mmap.
+// for each section, multiple sections may be mmapped with a single mmap.
 
-std::size_t SlabAlloc::get_chunk_index(std::size_t pos) const REALM_NOEXCEPT
+std::size_t SlabAlloc::get_section_index(std::size_t pos) const REALM_NOEXCEPT
 {
-    // size_t chunk_base_number = pos/m_initial_chunk_size;
-    size_t chunk_base_number = pos >> m_chunk_shifts;
-    size_t chunk_group_number = chunk_base_number/16;
+    // size_t section_base_number = pos/m_initial_section_size;
+    size_t section_base_number = pos >> m_section_shifts;
+    size_t section_group_number = section_base_number/16;
     size_t index;
-    if (chunk_group_number == 0) {
+    if (section_group_number == 0) {
         // first 16 entries aligns 1:1
-        index = chunk_base_number;
+        index = section_base_number;
     }
     else {
         // remaning entries are exponential
-        size_t log_index = log2(chunk_group_number);
-        size_t chunk_index_in_group = (chunk_base_number >> (1+log_index)) & 0x7;
-        index = (16 + (log_index * 8)) + chunk_index_in_group;
+        size_t log_index = log2(section_group_number);
+        size_t section_index_in_group = (section_base_number >> (1+log_index)) & 0x7;
+        index = (16 + (log_index * 8)) + section_index_in_group;
     }
     return index;
 }
 
-std::size_t SlabAlloc::compute_chunk_base(std::size_t index) const REALM_NOEXCEPT
+std::size_t SlabAlloc::compute_section_base(std::size_t index) const REALM_NOEXCEPT
 {
     size_t base;
     if (index < 16) {
-        // base = index * m_initial_chunk_size;
-        base = index << m_chunk_shifts;
+        // base = index * m_initial_section_size;
+        base = index << m_section_shifts;
     }
     else {
-        size_t chunk_index_in_group = index & 7;
-        size_t log_index = (index - chunk_index_in_group)/8 - 2;
-        size_t chunk_base_number = (8 + chunk_index_in_group)<<(1+log_index);
-        // base = m_initial_chunk_size * chunk_base_number;
-        base = chunk_base_number << m_chunk_shifts;
+        size_t section_index_in_group = index & 7;
+        size_t log_index = (index - section_index_in_group)/8 - 2;
+        size_t section_base_number = (8 + section_index_in_group)<<(1+log_index);
+        // base = m_initial_section_size * section_base_number;
+        base = section_base_number << m_section_shifts;
     }
     return base;
 }
 
 std::size_t SlabAlloc::find_section_in_range(std::size_t start_pos, 
-                                             std::size_t chunk_size,
-                                             std::size_t section_size) const REALM_NOEXCEPT
+                                             std::size_t free_chunk_size,
+                                             std::size_t request_size) const REALM_NOEXCEPT
 {
-    size_t end_of_block = start_pos + chunk_size;
+    size_t end_of_block = start_pos + free_chunk_size;
     size_t alloc_pos = start_pos;
-    while (alloc_pos + section_size <= end_of_block) {
-        size_t next_mmap_boundary = get_upper_mmap_boundary(alloc_pos);
-        if (alloc_pos + section_size <= next_mmap_boundary) {
+    while (alloc_pos + request_size <= end_of_block) {
+        size_t next_section_boundary = get_upper_section_boundary(alloc_pos);
+        if (alloc_pos + request_size <= next_section_boundary) {
             return alloc_pos;
         }
-        alloc_pos = next_mmap_boundary;
+        alloc_pos = next_section_boundary;
     }
     return 0;
 }
