@@ -1382,13 +1382,13 @@ inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
 inline void Table::remove(size_t row_ndx)
 {
     bool is_move_last_over = false;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_ndx, is_move_last_over); // Throws
 }
 
 inline void Table::move_last_over(size_t row_ndx)
 {
     bool is_move_last_over = true;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_ndx, is_move_last_over); // Throws
 }
 
 inline void Table::remove_last()

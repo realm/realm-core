@@ -485,7 +485,7 @@ public:
     Table& get_parent() REALM_NOEXCEPT;
     const Table& get_parent() const REALM_NOEXCEPT;
 
-    std::unique_ptr<TableViewBase> 
+    std::unique_ptr<TableViewBase>
     clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const override
     {
         patch.reset(new Handover_patch);
@@ -493,7 +493,7 @@ public:
         return retval;
     }
 
-    std::unique_ptr<TableViewBase> 
+    std::unique_ptr<TableViewBase>
     clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode) override
     {
         patch.reset(new Handover_patch);
