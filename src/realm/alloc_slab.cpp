@@ -13,8 +13,6 @@
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
-// needed for mprotect - this has to be moved into File and generalised to work on win32
-#include <sys/mman.h>
 
 using namespace realm;
 using namespace realm::util;
@@ -405,31 +403,34 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
     return i->addr + (ref - slab_ref);
 }
 
+// little helpers...
+template<typename T> inline bool Is(T t) { return t == T::Yes; }
+template<typename T> inline bool Not(T t) { return t == T::No; }
 
-ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool read_only,
-                                bool no_create, bool skip_validate,
-                                const char* encryption_key, bool server_sync_mode,
-                                bool session_initiator)
+ref_type SlabAlloc::attach_file(const std::string& path, Shared shared, Writable writable, Create create,
+                                Validate validate, const char* encryption_key, Sync sync,
+                                SessionInitiator session_initiator)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
 
     REALM_ASSERT(!is_attached());
 
-    // When 'read_only' is true, this function will throw InvalidDatabase if the
+    // When the file is not writable, this function will throw InvalidDatabase if the
     // file exists already but is empty. This can happen if another process is
     // currently creating it. Note however, that it is only legal for multiple
     // processes to access a database file concurrently if it is done via a
-    // SharedGroup, and in that case 'read_only' can never be true.
-    REALM_ASSERT(!(is_shared && read_only));
+    // SharedGroup, and in that case writable must be true.
+    REALM_ASSERT(! (Is(shared) && Not(writable)) );
     // session_initiator can be set *only* if we're shared.
-    REALM_ASSERT(is_shared || !session_initiator);
-    static_cast<void>(is_shared);
+    REALM_ASSERT(Is(shared) || Not(session_initiator));
+    static_cast<void>(shared);
 
     using namespace realm::util;
+    bool read_only = Not(writable);
     File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
-    File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
-    m_file.open(path.c_str(), access, create, 0); // Throws
+    File::CreateMode create_m = read_only || Not(create) ? File::create_Never : File::create_Auto;
+    m_file.open(path.c_str(), access, create_m, 0); // Throws
     if (encryption_key)
         m_file.set_encryption_key(encryption_key);
     File::CloseGuard fcg(m_file);
@@ -492,7 +493,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     // processes with different opening modes.
     if (!read_only && !matches_mmap_boundary(size)) {
 
-        REALM_ASSERT(session_initiator || !is_shared);
+        REALM_ASSERT(Is(session_initiator) || Not(shared));
         size = get_upper_mmap_boundary(size);
         // std::cerr << "resizing during attach to " << size << std::endl;
         m_file.prealloc(0, size);
@@ -506,7 +507,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
-        if (!skip_validate) {
+        if (Is(validate)) {
             // Verify the data structures
             validate_buffer(map.get_addr(), initial_size_of_file, top_ref); // Throws
         }
@@ -516,17 +517,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             header = writable_map.get_addr();
-            header->m_flags |= server_sync_mode ? flags_ServerSyncMode : 0x0;
+            header->m_flags |= Is(sync) ? flags_ServerSyncMode : 0x0;
             header = reinterpret_cast<Header*>(map.get_addr());
-            REALM_ASSERT(server_sync_mode == ((header->m_flags & flags_ServerSyncMode) != 0));
+            REALM_ASSERT(Is(sync) == ((header->m_flags & flags_ServerSyncMode) != 0));
         }
         else {
             header = reinterpret_cast<Header*>(map.get_addr());
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
-            if (server_sync_mode &&  !stored_server_sync_mode)
+            if (Is(sync) &&  !stored_server_sync_mode)
                 throw InvalidDatabase("Specified Realm file was not created with support for "
                                       "client/server synchronization");
-            if (!server_sync_mode &&  stored_server_sync_mode)
+            if (Not(sync) &&  stored_server_sync_mode)
                 throw InvalidDatabase("Specified Realm file requires support for client/server "
                                       "synchronization");
         }
@@ -539,7 +540,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_baseline    = size;
         m_initial_mapping_size = size;
         m_first_additional_chunk = get_chunk_index(m_initial_mapping_size);
-        m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
+        m_attach_mode = Is(shared) ? attach_SharedFile : attach_UnsharedFile;
 
         // Below this point (assignment to `m_attach_mode`), nothing must throw.
     }
@@ -552,7 +553,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
 
     // make sure the database is not on streaming format. This has to be done at
     // session initialization, even if it means writing the database during open.
-    if (session_initiator && m_file_on_streaming_form) {
+    if (Is(session_initiator) && m_file_on_streaming_form) {
 
         Header* header = reinterpret_cast<Header*>(m_data);
 

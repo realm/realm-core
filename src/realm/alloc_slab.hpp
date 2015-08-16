@@ -62,6 +62,15 @@ struct InvalidDatabase;
 ///
 /// For efficiency, this allocator manages its mutable memory as a set
 /// of slabs.
+
+// first a few convenience enums
+enum class Shared { No, Yes };
+enum class Writable { No, Yes };
+enum class Create { No, Yes };
+enum class Validate { No, Yes };
+enum class Sync { No, Yes };
+enum class SessionInitiator { No, Yes };
+
 class SlabAlloc: public Allocator {
 public:
     ~SlabAlloc() REALM_NOEXCEPT override;
@@ -76,15 +85,15 @@ public:
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
     ///
-    /// \param is_shared Must be true if, and only if we are called on
+    /// \param shared Must be Yes if, and only if we are called on
     /// behalf of SharedGroup.
     ///
-    /// \param read_only Open the file in read-only mode. This implies
-    /// \a no_create.
+    /// \param writable Open the file in read-write mode. Specifying
+    /// writable == Writable::No must be accompanied by create == Create::No
     ///
-    /// \param no_create Fail if the file does not already exist.
+    /// \param create Create the file if does not already exist.
     ///
-    /// \param bool skip_validate Skip validation of file header. In a
+    /// \param bool validate if Yes validate the file header. In a
     /// set of overlapping SharedGroups, only the first one (the one
     /// that creates/initlializes the coordination file) may validate
     /// the header, otherwise it will result in a race condition.
@@ -92,24 +101,24 @@ public:
     /// \param encryption_key 32-byte key to use to encrypt and decrypt
     /// the backing storage, or nullptr to disable encryption.
     ///
-    /// \param server_sync_mode bool indicating whether the database is operated
+    /// \param sync A Sync indicating whether the database is operated
     /// in server_synchronization mode or not. If the database is created,
     /// this setting is stored in it. If the database exists already, it is validated
     /// that the database was created with the same setting. In case of conflict
     /// a runtime_error is thrown.
     ///
-    /// \param session_initiator if set, the caller is the session initiator and
+    /// \param session_initiator if set to Yes, the caller is the session initiator and
     /// guarantees exclusive access to the file. If attaching in read/write mode,
     /// the file is modified: files on streaming form is changed to non-streaming
     /// form, and if needed the file size is adjusted to match mmap boundaries.
-    /// Must be set to false if is_shared is false.
+    /// Must be set to No if shared is No.
     ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
-    ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate, const char* encryption_key, bool server_sync_mode, 
-                         bool session_initiator);
+    ref_type attach_file(const std::string& path, Shared shared, Writable writable, Create create,
+                         Validate validate, const char* encryption_key, Sync sync,
+                         SessionInitiator session_initiator);
 
     /// Attach this allocator to the specified memory buffer.
     ///
