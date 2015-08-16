@@ -5994,4 +5994,39 @@ TEST(Table_SubTableEquality)
 
 }
 
+TEST(Table_TwoStringColumnTypesEquality)
+{
+    Table t1;
+    Table t2;
+    Table t3;
+    t1.add_column(type_String, "str");
+    t2.add_column(type_String, "str");
+    t3.add_column(type_String, "str");
+    t1.add_empty_row(10);
+    t2.add_empty_row(10);
+    t3.add_empty_row(10);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        t1.set_string(0, i, StringData("a", 1));
+        t2.set_string(0, i, StringData("a", 1));
+        t3.set_string(0, i, StringData("a", 1));
+    }
+
+    CHECK(*t1.get_descriptor() == *t2.get_descriptor()); // (col_type_String == col_type_String)
+
+    t2.optimize();
+
+    CHECK(*t1.get_descriptor() == *t2.get_descriptor()); // (col_type_String == col_type_StringEnum)
+
+    t1.optimize();
+
+    CHECK(*t1.get_descriptor() == *t3.get_descriptor()); // (col_type_StringEnum == col_type_String)
+
+    t3.optimize();
+
+    CHECK(*t1.get_descriptor() == *t3.get_descriptor()); // (col_type_StringEnum == col_type_StringEunm)
+
+}
+
 #endif // TEST_TABLE
