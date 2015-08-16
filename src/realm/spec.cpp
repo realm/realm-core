@@ -448,6 +448,21 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
         return false;
     if (!m_names.compare_string(spec.m_names))
         return false;
+
+    // check each column's type, also comparing sub tables
+    const size_t column_count = get_column_count();
+    for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx)
+    {
+        if (m_types.get(col_ndx) == col_type_Table)
+        {
+            const size_t subspec_index = get_subspec_ndx(col_ndx);
+            const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
+            const Spec rhs = Spec(const_cast<Spec&>(spec).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
+            if (lhs != rhs)
+                return false;
+        }
+    }
+
     return true;
 }
 
