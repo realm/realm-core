@@ -69,12 +69,12 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     // Remove backlinks to the removed origin rows
     if (!broken_reciprocal_backlinks) {
         for (size_t i = 0; i < num_rows_to_erase; ++i) {
-            if (ref_type ref = get_as_ref(row_ndx+1)) {
+            if (ref_type ref = get_as_ref(row_ndx+i)) {
                 IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
                     size_t target_row_ndx = to_size_t(link_list.get(j));
-                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+1);
+                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+i);
                 }
             }
         }
