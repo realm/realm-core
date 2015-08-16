@@ -1475,45 +1475,4 @@ TEST(TableView_SortEnum)
 
 }
 
-// Crash in update_backlink
-TEST(TableView_Remove1)
-{
-    Group group;
-
-    TableRef table = group.add_table("table1");
-
-    table->add_column_link(type_LinkList, "linkList", *table);
-    table->add_empty_row();
-    table->add_empty_row();
-    table->get_linklist(0, 0)->add(0);
-    table->get_linklist(0, 1)->add(0);
-
-    // Test if copy-assign of Query in TableView works
-    TableView tv = table->where().find_all();
-
-    CHECK_EQUAL(2, tv.size());
-    tv.remove(0);
-    CHECK_EQUAL(0, tv.size());
-}
-
-// A different crash in do_nullify_link
-TEST(TableView_Remove2)
-{
-    Group group;
-
-    TableRef table = group.add_table("table1");
-
-    table->add_column_link(type_LinkList, "linkList", *table);
-    table->add_empty_row();
-    table->add_empty_row();
-    table->get_linklist(0, 0)->add(0);
-
-    // Test if copy-assign of Query in TableView works
-    TableView tv = table->where().find_all();
-
-    CHECK_EQUAL(1, tv.size());
-    tv.remove(0);
-    CHECK_EQUAL(0, tv.size());
-}
-
 #endif // TEST_TABLE_VIEW
