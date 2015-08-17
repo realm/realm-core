@@ -683,8 +683,8 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
             // proceed to initialize versioning and other metadata information related to
             // the database. Also create the database if we're beginning a new session
             bool begin_new_session = info->num_participants == 0;
-            //bool is_shared = true;
-            //bool read_only = false;
+            bool is_shared = true;
+            bool read_only = false;
             bool skip_validate = !begin_new_session;
 
             // only the session initiator is allowed to create the database, all other
@@ -697,12 +697,9 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl)
                 server_sync_mode = repl->is_in_server_synchronization_mode();
-            ref_type top_ref = alloc.attach_file(path, Shared::Yes, Writable::Yes,
-                                                 no_create ? Create::No : Create::Yes, 
-                                                 skip_validate ? Validate::No : Validate::Yes, 
-                                                 encryption_key, 
-                                                 server_sync_mode ? Sync::Yes : Sync::No, 
-                                                 begin_new_session ? SessionInitiator::Yes : SessionInitiator::No); // Throws
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
+                                                 no_create, skip_validate, encryption_key, 
+                                                 server_sync_mode, begin_new_session); // Throws
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
@@ -878,17 +875,15 @@ bool SharedGroup::compact()
 
     // close and reopen the database file.
     alloc.detach();
-/*
     bool skip_validate = false;
     bool no_create = true;
     bool read_only = false;
     bool is_shared = true;
     bool server_sync_mode = false;
     bool is_session_initiator = true;
-*/
-    ref_type top_ref = alloc.attach_file(m_db_path, Shared::Yes, Writable::Yes, Create::No,
-                                         Validate::Yes, m_key, Sync::No,
-                                         SessionInitiator::Yes); // Throws
+    ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create, 
+                                         skip_validate, m_key, server_sync_mode,
+                                         is_session_initiator); // Throws
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match
