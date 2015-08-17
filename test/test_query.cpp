@@ -6176,7 +6176,7 @@ TEST(Query_64BitValues)
 }
 
 
-TEST(Query_NullShowcase)
+ONLY(Query_NullShowcase)
 {
 /*
 Here we show how comparisons and arithmetic with null works in queries. Basic rules:
@@ -6218,6 +6218,9 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->insert_column(4, type_Bool, "Stock", true);
     table->insert_column(5, type_DateTime, "Delivery date", true);
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
+
+    // Default values for nullable float and double columns is null
+    CHECK(table->is_null(1, 0));
 
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
@@ -6392,6 +6395,24 @@ NOTE NOTE: There is currently only very little syntax checking.
     CHECK_APPROXIMATELY_EQUAL(d, (1.1 + 2.2 + 3.3) / 3, 0.001);
     d = tv.sum_double(3);
     CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
+
+    // NaN
+    // null converts to 0 when calling get_float() on it. We intentionally do not return the bit pattern
+    // for internal Realm representation, because that's a NaN, hence making it harder for the end user
+    // to distinguish between his own NaNs and null
+    CHECK_EQUAL(table->get_float(1, 0), 0);
+
+    table->set_float(1, 0, std::numeric_limits<float>::signaling_NaN());
+    table->set_float(1, 1, std::numeric_limits<float>::quiet_NaN());
+
+    CHECK(std::isnan(table->get_float(1, 0)));
+    CHECK(std::isnan(table->get_float(1, 1)));
+
+    CHECK(!table->is_null(1, 0));
+    CHECK(!table->is_null(1, 1));
+
+    // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
+
 }
 
 #endif // TEST_QUERY

@@ -614,12 +614,35 @@ public:
 };
 
 
-// This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
-// to be null too. It's used by the Value class for internal storage.
-//
-// To indicate nulls, we could have chosen a separate bool vector or some other bitmask construction. But for
-// performance, we customize indication of nulls to match the same indication that is used in the persisted database
-// file
+/* 
+This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
+to be null too. It's used by the Value class for internal storage.
+
+To indicate nulls, we could have chosen a separate bool vector or some other bitmask construction. But for
+performance, we customize indication of nulls to match the same indication that is used in the persisted database
+file
+
+Queries in query_expression.hpp execute by processing chunks of 8 rows at a time. Assume you have a column:
+
+    price (int) = {1, 2, 3, null, 1, 6, 6, 9, 5, 2, null}
+
+And perform a query:
+
+    Query q = (price + 2 == 5);
+
+query_expression.hpp will then create a NullableVector<int> = {5, 5, 5, 5, 5, 5, 5, 5} and then read values
+NullableVector<int> = {1, 2, 3, null, 1, 6, 6, 9} from the column, and then perform `+` and `==` on these chunks.
+
+See the top of this file for more information on all this.
+
+Assume the user specifies the null constant in a query:
+
+Query q = (price == null)
+
+The query system will then construct a NullableVector of type `null` (NullableVector<null>). This allows compile
+time optimizations for these cases.
+*/
+
 template <class T, size_t prealloc = 8> struct NullableVector
 {
     typedef typename std::conditional<std::is_same<T, bool>::value 

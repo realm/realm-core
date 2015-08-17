@@ -308,13 +308,23 @@ Represents null in Query, find(), get(), set(), etc. Todo, maybe move this outsi
 Float/Double: Realm can both store user-given NaNs and null. Any user-given signalling NaN is converted to 
 0xffbfff00 (if float) or 0xfff7ffffffffff00 (if double). Any user-given quiet NaN is converted to 
 0xffffff00 (if float) or 0xffffffffffffff00 (if double). So Realm does not preserve the optional bits in
-user-given NaNs.
+user-given NaNs. 
 
 If set_null() is called, a null is stored in form of the bit pattern 0xffffffff (if float) or 
 0xffffffffffffffff (if double). These are quiet NaNs.
 
 Executing a query that involves a float/double column that contains NaNs gives an undefined result. If
 it contains signalling NaNs, it may throw an exception.
+
+Notes on IEEE:
+
+A NaN float is any bit pattern `s 11111111 S xxxxxxxxxxxxxxxxxxxxxx` where `s` and `x` are arbitrary, but at
+least 1 `x` must be 1. If `S` is 1, it's a quiet NaN, else it's a signalling NaN.
+
+A NaN doubule is the same as above, but for `s eeeeeeeeeee S xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+
+The `S` bit is at position 22 (float) or 51 (double).
+
 */
 
 struct null {
