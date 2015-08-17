@@ -215,21 +215,21 @@ TEST(Table_1)
 
     // Test adding a single empty row
     // and filling it with values
-    size_t ndx = table.add_empty_row();
-    table.set_int(0, ndx, 0);
-    table.set_int(1, ndx, 10);
+    size_t index = table.add_empty_row();
+    table.set_int(0, index, 0);
+    table.set_int(1, index, 10);
 
-    CHECK_EQUAL(0, table.get_int(0, ndx));
-    CHECK_EQUAL(10, table.get_int(1, ndx));
+    CHECK_EQUAL(0, table.get_int(0, index));
+    CHECK_EQUAL(10, table.get_int(1, index));
 
     // Test adding multiple rows
-    ndx = table.add_empty_row(7);
-    for (size_t i = ndx; i < 7; ++i) {
+    index = table.add_empty_row(7);
+    for (size_t i = index; i < 7; ++i) {
         table.set_int(0, i, 2*i);
         table.set_int(1, i, 20*i);
     }
 
-    for (size_t i = ndx; i < 7; ++i) {
+    for (size_t i = index; i < 7; ++i) {
         const int64_t v1 = 2 * i;
         const int64_t v2 = 20 * i;
         CHECK_EQUAL(v1, table.get_int(0, i));
@@ -310,21 +310,21 @@ TEST(Table_Floats)
 
     // Test adding a single empty row
     // and filling it with values
-    size_t ndx = table.add_empty_row();
-    table.set_float(0, ndx, float(1.12));
-    table.set_double(1, ndx, double(102.13));
+    size_t index = table.add_empty_row();
+    table.set_float(0, index, float(1.12));
+    table.set_double(1, index, double(102.13));
 
-    CHECK_EQUAL(float(1.12), table.get_float(0, ndx));
-    CHECK_EQUAL(double(102.13), table.get_double(1, ndx));
+    CHECK_EQUAL(float(1.12), table.get_float(0, index));
+    CHECK_EQUAL(double(102.13), table.get_double(1, index));
 
     // Test adding multiple rows
-    ndx = table.add_empty_row(7);
-    for (size_t i = ndx; i < 7; ++i) {
+    index = table.add_empty_row(7);
+    for (size_t i = index; i < 7; ++i) {
         table.set_float(0, i, float(1.12) + 100*i);
         table.set_double(1, i, double(102.13)*200*i);
     }
 
-    for (size_t i = ndx; i < 7; ++i) {
+    for (size_t i = index; i < 7; ++i) {
         const float v1  = float(1.12) + 100*i;
         const double v2 = double(102.13)*200*i;
         CHECK_EQUAL(v1, table.get_float(0, i));
@@ -795,8 +795,8 @@ TEST(Table_MoveAllTypes)
 
     while (!table.is_empty()) {
         size_t size = table.size();
-        size_t target_row_ndx = random.draw_int_mod(size);
-        table.move_last_over(target_row_ndx);
+        size_t target_row_index = random.draw_int_mod(size);
+        table.move_last_over(target_row_index);
         table.verify();
     }
 }
@@ -1107,11 +1107,11 @@ TEST(Table_FindAllInt)
     const TestTable::View v = table.column().second.find_all(20);
 
     CHECK_EQUAL(5, v.size());
-    CHECK_EQUAL(1, v.get_source_ndx(0));
-    CHECK_EQUAL(3, v.get_source_ndx(1));
-    CHECK_EQUAL(5, v.get_source_ndx(2));
-    CHECK_EQUAL(7, v.get_source_ndx(3));
-    CHECK_EQUAL(9, v.get_source_ndx(4));
+    CHECK_EQUAL(1, v.get_source_index(0));
+    CHECK_EQUAL(3, v.get_source_index(1));
+    CHECK_EQUAL(5, v.get_source_index(2));
+    CHECK_EQUAL(7, v.get_source_index(3));
+    CHECK_EQUAL(9, v.get_source_index(4));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1137,16 +1137,16 @@ TEST(Table_SortedInt)
     TestTable::View v = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v.size());
 
-    CHECK_EQUAL(2, v.get_source_ndx(0));
-    CHECK_EQUAL(9, v.get_source_ndx(1));
-    CHECK_EQUAL(7, v.get_source_ndx(2));
-    CHECK_EQUAL(6, v.get_source_ndx(3));
-    CHECK_EQUAL(0, v.get_source_ndx(4));
-    CHECK_EQUAL(5, v.get_source_ndx(5));
-    CHECK_EQUAL(4, v.get_source_ndx(6));
-    CHECK_EQUAL(1, v.get_source_ndx(7));
-    CHECK_EQUAL(3, v.get_source_ndx(8));
-    CHECK_EQUAL(8, v.get_source_ndx(9));
+    CHECK_EQUAL(2, v.get_source_index(0));
+    CHECK_EQUAL(9, v.get_source_index(1));
+    CHECK_EQUAL(7, v.get_source_index(2));
+    CHECK_EQUAL(6, v.get_source_index(3));
+    CHECK_EQUAL(0, v.get_source_index(4));
+    CHECK_EQUAL(5, v.get_source_index(5));
+    CHECK_EQUAL(4, v.get_source_index(6));
+    CHECK_EQUAL(1, v.get_source_index(7));
+    CHECK_EQUAL(3, v.get_source_index(8));
+    CHECK_EQUAL(8, v.get_source_index(9));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1218,35 +1218,35 @@ TEST(Table_Multi_Sort)
     table.set_int(0, 4, 1);
     table.set_int(1, 4, 14);
 
-    std::vector<size_t> col_ndx1;
-    col_ndx1.push_back(0);
-    col_ndx1.push_back(1);
+    std::vector<size_t> column_index1;
+    column_index1.push_back(0);
+    column_index1.push_back(1);
 
     std::vector<bool> asc;
     asc.push_back(true);
     asc.push_back(true);
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
-    TableView v_sorted1 = table.get_sorted_view(col_ndx1, asc);
+    TableView v_sorted1 = table.get_sorted_view(column_index1, asc);
     CHECK_EQUAL(table.size(), v_sorted1.size());
-    CHECK_EQUAL(2, v_sorted1.get_source_ndx(0));
-    CHECK_EQUAL(0, v_sorted1.get_source_ndx(1));
-    CHECK_EQUAL(4, v_sorted1.get_source_ndx(2));
-    CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
-    CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
+    CHECK_EQUAL(2, v_sorted1.get_source_index(0));
+    CHECK_EQUAL(0, v_sorted1.get_source_index(1));
+    CHECK_EQUAL(4, v_sorted1.get_source_index(2));
+    CHECK_EQUAL(1, v_sorted1.get_source_index(3));
+    CHECK_EQUAL(3, v_sorted1.get_source_index(4));
 
-    std::vector<size_t> col_ndx2;
-    col_ndx2.push_back(1);
-    col_ndx2.push_back(0);
+    std::vector<size_t> column_index2;
+    column_index2.push_back(1);
+    column_index2.push_back(0);
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
-    TableView v_sorted2 = table.get_sorted_view(col_ndx2, asc);
+    TableView v_sorted2 = table.get_sorted_view(column_index2, asc);
     CHECK_EQUAL(table.size(), v_sorted2.size());
-    CHECK_EQUAL(2, v_sorted2.get_source_ndx(0));
-    CHECK_EQUAL(0, v_sorted2.get_source_ndx(1));
-    CHECK_EQUAL(1, v_sorted2.get_source_ndx(2));
-    CHECK_EQUAL(4, v_sorted2.get_source_ndx(3));
-    CHECK_EQUAL(3, v_sorted2.get_source_ndx(4));
+    CHECK_EQUAL(2, v_sorted2.get_source_index(0));
+    CHECK_EQUAL(0, v_sorted2.get_source_index(1));
+    CHECK_EQUAL(1, v_sorted2.get_source_index(2));
+    CHECK_EQUAL(4, v_sorted2.get_source_index(3));
+    CHECK_EQUAL(3, v_sorted2.get_source_index(4));
 }
 
 
@@ -1549,10 +1549,10 @@ TEST(Table_Distinct)
     TestTableEnum::View view = table.column().second.get_distinct_view();
 
     CHECK_EQUAL(4, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(0));
-    CHECK_EQUAL(1, view.get_source_ndx(1));
-    CHECK_EQUAL(2, view.get_source_ndx(2));
-    CHECK_EQUAL(5, view.get_source_ndx(3));
+    CHECK_EQUAL(0, view.get_source_index(0));
+    CHECK_EQUAL(1, view.get_source_index(1));
+    CHECK_EQUAL(2, view.get_source_index(2));
+    CHECK_EQUAL(5, view.get_source_index(3));
 }
 
 
@@ -1574,13 +1574,13 @@ TEST(Table_DistinctEnums)
     TestTableEnum::View view = table.column().first.get_distinct_view();
 
     CHECK_EQUAL(7, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(0));
-    CHECK_EQUAL(1, view.get_source_ndx(1));
-    CHECK_EQUAL(2, view.get_source_ndx(2));
-    CHECK_EQUAL(3, view.get_source_ndx(3));
-    CHECK_EQUAL(4, view.get_source_ndx(4));
-    CHECK_EQUAL(5, view.get_source_ndx(5));
-    CHECK_EQUAL(6, view.get_source_ndx(6));
+    CHECK_EQUAL(0, view.get_source_index(0));
+    CHECK_EQUAL(1, view.get_source_index(1));
+    CHECK_EQUAL(2, view.get_source_index(2));
+    CHECK_EQUAL(3, view.get_source_index(3));
+    CHECK_EQUAL(4, view.get_source_index(4));
+    CHECK_EQUAL(5, view.get_source_index(5));
+    CHECK_EQUAL(6, view.get_source_index(6));
 }
 
 
@@ -1600,9 +1600,9 @@ TEST(Table_DistinctIntegers)
     TableView view = table.get_distinct_view(0);
 
     CHECK_EQUAL(3, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(0));
-    CHECK_EQUAL(1, view.get_source_ndx(1));
-    CHECK_EQUAL(2, view.get_source_ndx(2));
+    CHECK_EQUAL(0, view.get_source_index(0));
+    CHECK_EQUAL(1, view.get_source_index(1));
+    CHECK_EQUAL(2, view.get_source_index(2));
 }
 
 
@@ -1622,8 +1622,8 @@ TEST(Table_DistinctBool)
     TableView view = table.get_distinct_view(0);
 
     CHECK_EQUAL(2, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(1));
-    CHECK_EQUAL(1, view.get_source_ndx(0));
+    CHECK_EQUAL(0, view.get_source_index(1));
+    CHECK_EQUAL(1, view.get_source_index(0));
 }
 
 
@@ -1712,9 +1712,9 @@ TEST(Table_DistinctFromPersistedTable)
         TableView view = table->get_distinct_view(0);
 
         CHECK_EQUAL(3, view.size());
-        CHECK_EQUAL(0, view.get_source_ndx(0));
-        CHECK_EQUAL(1, view.get_source_ndx(1));
-        CHECK_EQUAL(2, view.get_source_ndx(2));
+        CHECK_EQUAL(0, view.get_source_index(0));
+        CHECK_EQUAL(1, view.get_source_index(1));
+        CHECK_EQUAL(2, view.get_source_index(2));
     }
 }
 
@@ -2584,9 +2584,9 @@ TEST(Table_Mixed)
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
 
-    const size_t ndx = table.add_empty_row();
-    table.set_int(0, ndx, 0);
-    table.set_mixed(1, ndx, true);
+    const size_t index = table.add_empty_row();
+    table.set_int(0, index, 0);
+    table.set_mixed(1, index, true);
 
     CHECK_EQUAL(0, table.get_int(0, 0));
     CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
@@ -2596,7 +2596,7 @@ TEST(Table_Mixed)
     table.set_int(0, 1, 43);
     table.set_mixed(1, 1, (int64_t)12);
 
-    CHECK_EQUAL(0,  table.get_int(0, ndx));
+    CHECK_EQUAL(0,  table.get_int(0, index));
     CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(type_Int,  table.get_mixed(1, 1).get_type());
@@ -2856,12 +2856,12 @@ TEST(Table_LowLevelSubtables)
 
         table.clear_subtable(1, i_1); // Mixed
         TableRef subtab_mix = table.get_subtable(1, i_1);
-        std::vector<size_t> subcol_path;
+        std::vector<size_t> subcolumn_path;
         subtab_mix->add_column(type_Table, "subtab");
         subtab_mix->add_column(type_Mixed, "mixed");
-        subcol_path.push_back(0);
-        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
-        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
+        subcolumn_path.push_back(0);
+        subtab_mix->add_subcolumn(subcolumn_path, type_Table, "subtab");
+        subtab_mix->add_subcolumn(subcolumn_path, type_Mixed, "mixed");
         subtab_mix->add_empty_row(3 + i_1);
         CHECK_EQUAL(3 + i_1, subtab_mix->size());
         {
@@ -3515,70 +3515,70 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
         return;
 
     size_t num_cols = table.get_column_count();
-    for (size_t col_i = 0; col_i != num_cols; ++col_i) {
-        DataType type = table.get_column_type(col_i);
+    for (size_t column_i = 0; column_i != num_cols; ++column_i) {
+        DataType type = table.get_column_type(column_i);
         switch (type) {
             case type_Int:
             case type_Link:
                 for (size_t i = 0; i != size; ++i) {
-                    int_fast64_t v_1 = table.get_int(col_i, offset + i);
-                    int_fast64_t v_2 = slice.get_int(col_i, i);
+                    int_fast64_t v_1 = table.get_int(column_i, offset + i);
+                    int_fast64_t v_2 = slice.get_int(column_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
             case type_Bool:
                 for (size_t i = 0; i != size; ++i) {
-                    bool v_1 = table.get_bool(col_i, offset + i);
-                    bool v_2 = slice.get_bool(col_i, i);
+                    bool v_1 = table.get_bool(column_i, offset + i);
+                    bool v_2 = slice.get_bool(column_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
             case type_Float:
                 for (size_t i = 0; i != size; ++i) {
-                    float v_1 = table.get_float(col_i, offset + i);
-                    float v_2 = slice.get_float(col_i, i);
+                    float v_1 = table.get_float(column_i, offset + i);
+                    float v_2 = slice.get_float(column_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
             case type_Double:
                 for (size_t i = 0; i != size; ++i) {
-                    double v_1 = table.get_double(col_i, offset + i);
-                    double v_2 = slice.get_double(col_i, i);
+                    double v_1 = table.get_double(column_i, offset + i);
+                    double v_2 = slice.get_double(column_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
             case type_String:
                 for (size_t i = 0; i != size; ++i) {
-                    StringData v_1 = table.get_string(col_i, offset + i);
-                    StringData v_2 = slice.get_string(col_i, i);
+                    StringData v_1 = table.get_string(column_i, offset + i);
+                    StringData v_2 = slice.get_string(column_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
             case type_Binary:
                 for (size_t i = 0; i != size; ++i) {
-                    BinaryData v_1 = table.get_binary(col_i, offset + i);
-                    BinaryData v_2 = slice.get_binary(col_i, i);
+                    BinaryData v_1 = table.get_binary(column_i, offset + i);
+                    BinaryData v_2 = slice.get_binary(column_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
             case type_DateTime:
                 for (size_t i = 0; i != size; ++i) {
-                    DateTime v_1 = table.get_datetime(col_i, offset + i);
-                    DateTime v_2 = slice.get_datetime(col_i, i);
+                    DateTime v_1 = table.get_datetime(column_i, offset + i);
+                    DateTime v_2 = slice.get_datetime(column_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
             case type_Table:
                 for (size_t i = 0; i != size; ++i) {
-                    ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
-                    ConstTableRef t_2 = slice.get_subtable(col_i, i);
+                    ConstTableRef t_1 = table.get_subtable(column_i, offset + i);
+                    ConstTableRef t_2 = slice.get_subtable(column_i, i);
                     CHECK(*t_1 == *t_2);
                 }
                 break;
             case type_Mixed:
                 for (size_t i = 0; i != size; ++i) {
-                    Mixed v_1 = table.get_mixed(col_i, offset + i);
-                    Mixed v_2 = slice.get_mixed(col_i, i);
+                    Mixed v_1 = table.get_mixed(column_i, offset + i);
+                    Mixed v_2 = slice.get_mixed(column_i, i);
                     CHECK_EQUAL(v_1.get_type(), v_2.get_type());
                     if (v_1.get_type() == v_2.get_type()) {
                         switch (v_1.get_type()) {
@@ -3604,8 +3604,8 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
                                 CHECK_EQUAL(v_1.get_datetime(), v_2.get_datetime());
                                 break;
                             case type_Table: {
-                                ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
-                                ConstTableRef t_2 = slice.get_subtable(col_i, i);
+                                ConstTableRef t_1 = table.get_subtable(column_i, offset + i);
+                                ConstTableRef t_2 = slice.get_subtable(column_i, i);
                                 CHECK(*t_1 == *t_2);
                                 break;
                             }
@@ -3733,26 +3733,26 @@ TEST(Table_Parent)
     table->set_mixed(1, 1, Mixed::subtable_tag());
 
     TableRef subtab;
-    size_t column_ndx = 0;
+    size_t column_index = 0;
 
     subtab = table->get_subtable(0,0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(0, column_index);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(0,1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(0, column_index);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(1, column_index);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(1, column_index);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     // Check that column indexes are properly adjusted after new
@@ -3760,23 +3760,23 @@ TEST(Table_Parent)
     table->insert_column(0, type_Int, "");
 
     subtab = table->get_subtable(1,0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(1, column_index);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(1, column_index);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(2,0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(2, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(2, column_index);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(2,1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(2, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(2, column_index);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     // Check that column indexes are properly adjusted after inserted
@@ -3784,23 +3784,23 @@ TEST(Table_Parent)
     table->remove_column(0);
 
     subtab = table->get_subtable(0,0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(0, column_index);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(0,1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(0, column_index);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(1, column_index);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_index));
+    CHECK_EQUAL(1, column_index);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 }
 
@@ -5531,15 +5531,15 @@ TEST(Table_MoveLastOverRetain)
         DescriptorRef subdesc = parent->get_subdescriptor(0);
         subdesc->add_column(type_Int, "regular");
         parent->add_empty_row(5);
-        for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
-            TableRef regular = parent->get_subtable(0, row_ndx);
+        for (int row_index = 0; row_index < 5; ++row_index) {
+            TableRef regular = parent->get_subtable(0, row_index);
             regular->add_empty_row();
-            regular->set_int(0, 0, 10 + row_ndx);
-            parent->set_mixed(1, row_ndx, Mixed::subtable_tag());
-            TableRef mixed = parent->get_subtable(1, row_ndx);
+            regular->set_int(0, 0, 10 + row_index);
+            parent->set_mixed(1, row_index, Mixed::subtable_tag());
+            TableRef mixed = parent->get_subtable(1, row_index);
             mixed->add_column(type_Int, "mixed");
             mixed->add_empty_row();
-            mixed->set_int(0, 0, 20 + row_ndx);
+            mixed->set_int(0, 0, 20 + row_index);
         }
     }
 
@@ -5873,13 +5873,13 @@ TEST(Table_Nulls)
 
         tv = t.find_all_string(0, "foo");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        CHECK_EQUAL(0, tv.get_source_index(0));
         tv = t.find_all_string(0, "");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        CHECK_EQUAL(1, tv.get_source_index(0));
         tv = t.find_all_string(0, realm::null());
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(2, tv.get_source_ndx(0));
+        CHECK_EQUAL(2, tv.get_source_index(0));
 
         t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYY"); // medium strings (< 64)
 
@@ -5893,13 +5893,13 @@ TEST(Table_Nulls)
 
         tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYY");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        CHECK_EQUAL(0, tv.get_source_index(0));
         tv = t.find_all_string(0, "");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        CHECK_EQUAL(1, tv.get_source_index(0));
         tv = t.find_all_string(0, realm::null());
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(2, tv.get_source_ndx(0));
+        CHECK_EQUAL(2, tv.get_source_index(0));
 
 
         // long strings (>= 64)
@@ -5917,13 +5917,13 @@ TEST(Table_Nulls)
 
         tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        CHECK_EQUAL(0, tv.get_source_index(0));
         tv = t.find_all_string(0, "");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        CHECK_EQUAL(1, tv.get_source_index(0));
         tv = t.find_all_string(0, realm::null());
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(2, tv.get_source_ndx(0));
+        CHECK_EQUAL(2, tv.get_source_index(0));
     }
 
     {

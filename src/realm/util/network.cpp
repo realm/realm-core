@@ -561,14 +561,14 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
     // Copy the IPv4/IPv6 endpoints
     list.m_endpoints.set_size(num_endpoints); // Throws
     struct addrinfo* curr = first;
-    size_t endpoint_ndx = 0;
+    size_t endpoint_index = 0;
     while (curr) {
         bool ip_v4 = curr->ai_family == AF_INET;
         bool ip_v6 = curr->ai_family == AF_INET6;
         if (ip_v4 || ip_v6) {
             REALM_ASSERT((ip_v4 && curr->ai_addrlen == sizeof (endpoint::sockaddr_ip_v4_type)) ||
                            (ip_v6 && curr->ai_addrlen == sizeof (endpoint::sockaddr_ip_v6_type)));
-            endpoint& ep = list.m_endpoints[endpoint_ndx];
+            endpoint& ep = list.m_endpoints[endpoint_index];
             ep.m_protocol.m_family   = curr->ai_family;
             ep.m_protocol.m_socktype = curr->ai_socktype;
             ep.m_protocol.m_protocol = curr->ai_protocol;
@@ -580,7 +580,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
                 ep.m_sockaddr_union.m_ip_v6 =
                     reinterpret_cast<endpoint::sockaddr_ip_v6_type&>(*curr->ai_addr);
             }
-            ++endpoint_ndx;
+            ++endpoint_index;
         }
         curr = curr->ai_next;
     }

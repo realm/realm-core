@@ -53,7 +53,7 @@ int main()
 
 // @@EndFold@@
     // Find next 2 matches of table
-    start = view3.get_source_ndx(view3.size() - 1) + 1; // start = 1 + 1 = 2
+    start = view3.get_source_index(view3.size() - 1) + 1; // start = 1 + 1 = 2
     PeopleTable::View view4 = query.find_all(start, size_t(-1), 2);
 
 // @@Fold@@

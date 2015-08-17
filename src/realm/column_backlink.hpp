@@ -42,15 +42,15 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    bool has_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t get_backlink_count(std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t get_backlink(std::size_t row_ndx, std::size_t backlink_ndx) const REALM_NOEXCEPT;
+    bool has_backlinks(std::size_t row_index) const REALM_NOEXCEPT;
+    std::size_t get_backlink_count(std::size_t row_index) const REALM_NOEXCEPT;
+    std::size_t get_backlink(std::size_t row_index, std::size_t backlink_index) const REALM_NOEXCEPT;
 
-    void add_backlink(std::size_t row_ndx, std::size_t origin_row_ndx);
-    void remove_one_backlink(std::size_t row_ndx, std::size_t origin_row_ndx);
+    void add_backlink(std::size_t row_index, std::size_t origin_row_index);
+    void remove_one_backlink(std::size_t row_index, std::size_t origin_row_index);
     void remove_all_backlinks(std::size_t num_rows);
-    void update_backlink(std::size_t row_ndx, std::size_t old_origin_row_ndx,
-                         std::size_t new_origin_row_ndx);
+    void update_backlink(std::size_t row_index, std::size_t old_origin_row_index,
+                         std::size_t new_origin_row_index);
 
     void add_row();
 
@@ -58,7 +58,7 @@ public:
     Table& get_origin_table() const REALM_NOEXCEPT;
     void set_origin_table(Table&) REALM_NOEXCEPT;
     LinkColumnBase& get_origin_column() const REALM_NOEXCEPT;
-    void set_origin_column(LinkColumnBase& column, std::size_t col_ndx) REALM_NOEXCEPT;
+    void set_origin_column(LinkColumnBase& column, std::size_t column_index) REALM_NOEXCEPT;
 
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
@@ -72,14 +72,14 @@ public:
 
     void bump_link_origin_table_version() REALM_NOEXCEPT override;
 
-    void cascade_break_backlinks_to(size_t row_ndx, CascadeState& state) override;
+    void cascade_break_backlinks_to(size_t row_index, CascadeState& state) override;
     void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&) override;
 
 #ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, std::size_t) const override;
     struct VerifyPair {
-        std::size_t origin_row_ndx, target_row_ndx;
+        std::size_t origin_row_index, target_row_index;
         bool operator<(const VerifyPair&) const REALM_NOEXCEPT;
     };
     void get_backlinks(std::vector<VerifyPair>&); // Sorts
@@ -87,8 +87,8 @@ public:
 
 protected:
     // ArrayParent overrides
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
-    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT override;
+    void update_child_ref(std::size_t child_index, ref_type new_ref) override;
+    ref_type get_child_ref(std::size_t child_index) const REALM_NOEXCEPT override;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
@@ -97,10 +97,10 @@ protected:
 private:
     TableRef        m_origin_table;
     LinkColumnBase* m_origin_column = nullptr;
-    std::size_t     m_origin_column_ndx = npos;
+    std::size_t     m_origin_column_index = npos;
 
     template<typename Func>
-    std::size_t for_each_link(std::size_t row_ndx, bool do_destroy, Func&& f);
+    std::size_t for_each_link(std::size_t row_index, bool do_destroy, Func&& f);
 };
 
 
@@ -118,9 +118,9 @@ inline ref_type BacklinkColumn::create(Allocator& alloc, std::size_t size)
     return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
-inline bool BacklinkColumn::has_backlinks(std::size_t ndx) const REALM_NOEXCEPT
+inline bool BacklinkColumn::has_backlinks(std::size_t index) const REALM_NOEXCEPT
 {
-    return IntegerColumn::get(ndx) != 0;
+    return IntegerColumn::get(index) != 0;
 }
 
 inline Table& BacklinkColumn::get_origin_table() const REALM_NOEXCEPT
@@ -139,10 +139,10 @@ inline LinkColumnBase& BacklinkColumn::get_origin_column() const REALM_NOEXCEPT
     return *m_origin_column;
 }
 
-inline void BacklinkColumn::set_origin_column(LinkColumnBase& column, std::size_t col_ndx) REALM_NOEXCEPT
+inline void BacklinkColumn::set_origin_column(LinkColumnBase& column, std::size_t column_index) REALM_NOEXCEPT
 {
     m_origin_column = &column;
-    m_origin_column_ndx = col_ndx;
+    m_origin_column_index = column_index;
 }
 
 inline void BacklinkColumn::add_row()
@@ -150,27 +150,27 @@ inline void BacklinkColumn::add_row()
     IntegerColumn::add(0);
 }
 
-inline void BacklinkColumn::adj_acc_insert_rows(std::size_t row_ndx,
+inline void BacklinkColumn::adj_acc_insert_rows(std::size_t row_index,
                                                 std::size_t num_rows) REALM_NOEXCEPT
 {
-    IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
+    IntegerColumn::adj_acc_insert_rows(row_index, num_rows);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);
 }
 
-inline void BacklinkColumn::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+inline void BacklinkColumn::adj_acc_erase_row(size_t row_index) REALM_NOEXCEPT
 {
-    IntegerColumn::adj_acc_erase_row(row_ndx);
+    IntegerColumn::adj_acc_erase_row(row_index);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);
 }
 
-inline void BacklinkColumn::adj_acc_move_over(std::size_t from_row_ndx,
-                                              std::size_t to_row_ndx) REALM_NOEXCEPT
+inline void BacklinkColumn::adj_acc_move_over(std::size_t from_row_index,
+                                              std::size_t to_row_index) REALM_NOEXCEPT
 {
-    IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
+    IntegerColumn::adj_acc_move_over(from_row_index, to_row_index);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);
@@ -205,7 +205,7 @@ inline void BacklinkColumn::bump_link_origin_table_version() REALM_NOEXCEPT
 
 inline bool BacklinkColumn::VerifyPair::operator<(const VerifyPair& p) const REALM_NOEXCEPT
 {
-    return origin_row_ndx < p.origin_row_ndx;
+    return origin_row_index < p.origin_row_index;
 }
 
 #endif // REALM_DEBUG

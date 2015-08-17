@@ -1221,14 +1221,14 @@ TEST(Group_Subtable)
             TableRef st = table->get_subtable(1,i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(200+i, st->get_int(0, index));
+                ++index;
             }
             if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(300+i, st->get_int(0, index));
+                ++index;
             }
         }
         CHECK_EQUAL(i%3 == 1 || i%8 == 3 ? type_Table : type_Int, table->get_mixed_type(2,i));
@@ -1236,14 +1236,14 @@ TEST(Group_Subtable)
             TableRef st = table->get_subtable(2,i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(700+i, st->get_int(0, index));
+                ++index;
             }
             if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(800+i, st->get_int(0, index));
+                ++index;
             }
         }
     }
@@ -1260,14 +1260,14 @@ TEST(Group_Subtable)
             TableRef st = table2->get_subtable(1,i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(200+i, st->get_int(0, index));
+                ++index;
             }
             if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(300+i, st->get_int(0, index));
+                ++index;
             }
             if (i%5 == 0) {
                 st->add_empty_row();
@@ -1279,14 +1279,14 @@ TEST(Group_Subtable)
             TableRef st = table2->get_subtable(2,i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(700+i, st->get_int(0, index));
+                ++index;
             }
             if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(800+i, st->get_int(0, index));
+                ++index;
             }
         }
         if (i%7 == 4) {
@@ -1306,18 +1306,18 @@ TEST(Group_Subtable)
             TableRef st = table2->get_subtable(1,i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(200+i, st->get_int(0, index));
+                ++index;
             }
             if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(300+i, st->get_int(0, index));
+                ++index;
             }
             if (i%5 == 0) {
-                CHECK_EQUAL(400+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(400+i, st->get_int(0, index));
+                ++index;
             }
         }
         CHECK_EQUAL(i%3 == 1 || i%8 == 3 || i%7 == 4 ? type_Table : type_Int, table2->get_mixed_type(2,i));
@@ -1325,18 +1325,18 @@ TEST(Group_Subtable)
             TableRef st = table2->get_subtable(2,i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(700+i, st->get_int(0, index));
+                ++index;
             }
             if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(800+i, st->get_int(0, index));
+                ++index;
             }
             if (i%7 == 4) {
-                CHECK_EQUAL(900+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(900+i, st->get_int(0, index));
+                ++index;
             }
         }
     }
@@ -1353,18 +1353,18 @@ TEST(Group_Subtable)
             TableRef st = table3->get_subtable(1,i);
             size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(200+i, st->get_int(0, index));
+                ++index;
             }
             if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(300+i, st->get_int(0, index));
+                ++index;
             }
             if (i%5 == 0) {
-                CHECK_EQUAL(400+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(400+i, st->get_int(0, index));
+                ++index;
             }
         }
         CHECK_EQUAL(i%3 == 1 || i%8 == 3 || i%7 == 4 ? type_Table : type_Int, table3->get_mixed_type(2,i));
@@ -1372,18 +1372,18 @@ TEST(Group_Subtable)
             TableRef st = table3->get_subtable(2,i);
             size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
+            size_t index = 0;
             if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(700+i, st->get_int(0, index));
+                ++index;
             }
             if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(800+i, st->get_int(0, index));
+                ++index;
             }
             if (i%7 == 4) {
-                CHECK_EQUAL(900+i, st->get_int(0, ndx));
-                ++ndx;
+                CHECK_EQUAL(900+i, st->get_int(0, index));
+                ++index;
             }
         }
     }
@@ -1828,8 +1828,8 @@ TEST(Group_CascadeNotify_Simple)
         called = true;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(5, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[0].table_index);
+        CHECK_EQUAL(5, notification.rows[0].row_index);
     });
     t->move_last_over(5);
     CHECK(called);
@@ -1850,8 +1850,8 @@ TEST(Group_CascadeNotify_Simple)
         called = true;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(5, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[0].table_index);
+        CHECK_EQUAL(5, notification.rows[0].row_index);
     });
     t->move_last_over(5);
     CHECK(called);
@@ -1866,17 +1866,17 @@ TEST(Group_CascadeNotify_Simple)
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(11, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[0].table_index);
+        CHECK_EQUAL(11, notification.rows[0].row_index);
 
         CHECK_EQUAL(2, notification.links.size());
-        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(10, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(11, notification.links[0].old_target_row_ndx);
+        CHECK_EQUAL(0, notification.links[0].origin_column_index);
+        CHECK_EQUAL(10, notification.links[0].origin_row_index);
+        CHECK_EQUAL(11, notification.links[0].old_target_row_index);
 
-        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(15, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(11, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(1, notification.links[1].origin_column_index);
+        CHECK_EQUAL(15, notification.links[1].origin_row_index);
+        CHECK_EQUAL(11, notification.links[1].old_target_row_index);
     });
     t->move_last_over(11);
     CHECK(called);
@@ -1889,8 +1889,8 @@ TEST(Group_CascadeNotify_Simple)
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(1, notification.rows[0].table_ndx);
-        CHECK_EQUAL(10, notification.rows[0].row_ndx);
+        CHECK_EQUAL(1, notification.rows[0].table_index);
+        CHECK_EQUAL(10, notification.rows[0].row_index);
 
         CHECK_EQUAL(0, notification.links.size());
     });
@@ -1914,14 +1914,14 @@ TEST(Group_CascadeNotify_Simple)
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(4, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(50, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(60, notification.rows[1].row_ndx);
-        CHECK_EQUAL(0, notification.rows[2].table_ndx);
-        CHECK_EQUAL(61, notification.rows[2].row_ndx);
-        CHECK_EQUAL(1, notification.rows[3].table_ndx);
-        CHECK_EQUAL(10, notification.rows[3].row_ndx);
+        CHECK_EQUAL(0, notification.rows[0].table_index);
+        CHECK_EQUAL(50, notification.rows[0].row_index);
+        CHECK_EQUAL(0, notification.rows[1].table_index);
+        CHECK_EQUAL(60, notification.rows[1].row_index);
+        CHECK_EQUAL(0, notification.rows[2].table_index);
+        CHECK_EQUAL(61, notification.rows[2].row_index);
+        CHECK_EQUAL(1, notification.rows[3].table_index);
+        CHECK_EQUAL(10, notification.rows[3].row_index);
 
         CHECK_EQUAL(0, notification.links.size());
     });
@@ -1956,21 +1956,21 @@ TEST(Group_CascadeNotify_Simple)
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(3, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(30, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(31, notification.rows[1].row_ndx);
-        CHECK_EQUAL(1, notification.rows[2].table_ndx);
-        CHECK_EQUAL(20, notification.rows[2].row_ndx);
+        CHECK_EQUAL(0, notification.rows[0].table_index);
+        CHECK_EQUAL(30, notification.rows[0].row_index);
+        CHECK_EQUAL(0, notification.rows[1].table_index);
+        CHECK_EQUAL(31, notification.rows[1].row_index);
+        CHECK_EQUAL(1, notification.rows[2].table_index);
+        CHECK_EQUAL(20, notification.rows[2].row_index);
 
         CHECK_EQUAL(2, notification.links.size());
-        CHECK_EQUAL(3, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(25, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(30, notification.links[0].old_target_row_ndx);
+        CHECK_EQUAL(3, notification.links[0].origin_column_index);
+        CHECK_EQUAL(25, notification.links[0].origin_row_index);
+        CHECK_EQUAL(30, notification.links[0].old_target_row_index);
 
-        CHECK_EQUAL(2, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(25, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(31, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(2, notification.links[1].origin_column_index);
+        CHECK_EQUAL(25, notification.links[1].origin_row_index);
+        CHECK_EQUAL(31, notification.links[1].old_target_row_index);
     });
     origin->move_last_over(20);
     CHECK(called);
@@ -2015,13 +2015,13 @@ TEST(Group_CascadeNotify_TableClear)
         CHECK_EQUAL(0, notification.rows.size());
 
         CHECK_EQUAL(2, notification.links.size());
-        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(1, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(2, notification.links[0].old_target_row_ndx);
+        CHECK_EQUAL(0, notification.links[0].origin_column_index);
+        CHECK_EQUAL(1, notification.links[0].origin_row_index);
+        CHECK_EQUAL(2, notification.links[0].old_target_row_index);
 
-        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(3, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(4, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(1, notification.links[1].origin_column_index);
+        CHECK_EQUAL(3, notification.links[1].origin_row_index);
+        CHECK_EQUAL(4, notification.links[1].old_target_row_index);
     });
     t->clear();
     CHECK(called);
@@ -2039,10 +2039,10 @@ TEST(Group_CascadeNotify_TableClear)
         called = true;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(2, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(2, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(4, notification.rows[1].row_ndx);
+        CHECK_EQUAL(0, notification.rows[0].table_index);
+        CHECK_EQUAL(2, notification.rows[0].row_index);
+        CHECK_EQUAL(0, notification.rows[1].table_index);
+        CHECK_EQUAL(4, notification.rows[1].row_index);
     });
     origin->clear();
     CHECK(called);
@@ -2100,13 +2100,13 @@ TEST(Group_CascadeNotify_TableViewClear)
         CHECK_EQUAL(10, notification.rows.size());
         CHECK_EQUAL(2, notification.links.size());
 
-        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(1, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(2, notification.links[0].old_target_row_ndx);
+        CHECK_EQUAL(0, notification.links[0].origin_column_index);
+        CHECK_EQUAL(1, notification.links[0].origin_row_index);
+        CHECK_EQUAL(2, notification.links[0].old_target_row_index);
 
-        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(3, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(4, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(1, notification.links[1].origin_column_index);
+        CHECK_EQUAL(3, notification.links[1].origin_row_index);
+        CHECK_EQUAL(4, notification.links[1].old_target_row_index);
     });
     t->where().find_all().clear();
     CHECK(called);
@@ -2126,10 +2126,10 @@ TEST(Group_CascadeNotify_TableViewClear)
         called = true;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(12, notification.rows.size()); // 10 from origin, 2 from target
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(2, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(4, notification.rows[1].row_ndx);
+        CHECK_EQUAL(0, notification.rows[0].table_index);
+        CHECK_EQUAL(2, notification.rows[0].row_index);
+        CHECK_EQUAL(0, notification.rows[1].table_index);
+        CHECK_EQUAL(4, notification.rows[1].row_index);
     });
     origin->where().find_all().clear();
     CHECK(called);

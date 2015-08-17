@@ -514,12 +514,12 @@ private:
     struct ReadCount;
     struct ReadLockInfo {
         uint_fast64_t   m_version;
-        uint_fast32_t   m_reader_idx;
+        uint_fast32_t   m_reader_index;
         ref_type        m_top_ref;
         size_t          m_file_size;
         // FIXME: Bad initialization as std::size_t is not necessarily equal to uint_fast64_t.
         ReadLockInfo() : m_version(std::numeric_limits<std::size_t>::max()),
-                         m_reader_idx(0), m_top_ref(0), m_file_size(0) {};
+                         m_reader_index(0), m_top_ref(0), m_file_size(0) {};
     };
     class ReadLockUnlockGuard;
 
@@ -555,10 +555,10 @@ private:
     bool        ringbuf_is_empty() const REALM_NOEXCEPT;
     std::size_t ringbuf_size() const REALM_NOEXCEPT;
     std::size_t ringbuf_capacity() const REALM_NOEXCEPT;
-    bool        ringbuf_is_first(std::size_t ndx) const REALM_NOEXCEPT;
+    bool        ringbuf_is_first(std::size_t index) const REALM_NOEXCEPT;
     void        ringbuf_remove_first() REALM_NOEXCEPT;
     std::size_t ringbuf_find(uint64_t version) const REALM_NOEXCEPT;
-    ReadCount&  ringbuf_get(std::size_t ndx) REALM_NOEXCEPT;
+    ReadCount&  ringbuf_get(std::size_t index) REALM_NOEXCEPT;
     ReadCount&  ringbuf_get_first() REALM_NOEXCEPT;
     ReadCount&  ringbuf_get_last() REALM_NOEXCEPT;
     void        ringbuf_put(const ReadCount& v);
@@ -640,9 +640,9 @@ public:
         return get_group().has_table(name);
     }
 
-    ConstTableRef get_table(std::size_t table_ndx) const
+    ConstTableRef get_table(std::size_t table_index) const
     {
-        return get_group().get_table(table_ndx); // Throws
+        return get_group().get_table(table_index); // Throws
     }
 
     ConstTableRef get_table(StringData name) const
@@ -681,9 +681,9 @@ public:
         return get_group().has_table(name);
     }
 
-    TableRef get_table(std::size_t table_ndx) const
+    TableRef get_table(std::size_t table_index) const
     {
-        return get_group().get_table(table_ndx); // Throws
+        return get_group().get_table(table_index); // Throws
     }
 
     TableRef get_table(StringData name) const

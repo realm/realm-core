@@ -59,7 +59,7 @@ inline StringData to_str(const char* value)
 class StringIndex {
 public:
     StringIndex(ColumnBase* target_column, Allocator&);
-    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, ColumnBase* target_column,
+    StringIndex(ref_type, ArrayParent*, std::size_t index_in_parent, ColumnBase* target_column,
                 bool allow_duplicate_values, Allocator&);
     ~StringIndex() REALM_NOEXCEPT {}
     void set_target(ColumnBase* target_column) REALM_NOEXCEPT;
@@ -69,9 +69,9 @@ public:
     void destroy() REALM_NOEXCEPT;
     void detach();
     bool is_attached() const REALM_NOEXCEPT;
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT;
-    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT;
-    void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT;
+    void set_parent(ArrayParent* parent, std::size_t index_in_parent) REALM_NOEXCEPT;
+    std::size_t get_index_in_parent() const REALM_NOEXCEPT;
+    void set_index_in_parent(std::size_t index_in_parent) REALM_NOEXCEPT;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
     void refresh_accessor_tree(std::size_t, const Spec&);
     ref_type get_ref() const REALM_NOEXCEPT;
@@ -80,9 +80,9 @@ public:
 
     bool is_empty() const;
 
-    template <class T> void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
-    template <class T> void set(size_t row_ndx, T new_value);
-    template <class T> void erase(size_t row_ndx, bool is_last);
+    template <class T> void insert(size_t row_index, T value, size_t num_rows, bool is_append);
+    template <class T> void set(size_t row_index, T new_value);
+    template <class T> void erase(size_t row_index, bool is_last);
 
     template <class T> size_t find_first(T value) const
     {
@@ -108,9 +108,9 @@ public:
         return m_array->index_string_count(to_str(value), m_target_column);
     }
 
-    template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
+    template <class T> void update_ref(T value, size_t old_row_index, size_t new_row_index)
     {
-        do_update_ref(to_str(value), old_row_ndx, new_row_ndx, 0);
+        do_update_ref(to_str(value), old_row_index, new_row_index, 0);
     }
 
     void clear();
@@ -144,13 +144,13 @@ private:
 
     static Array* create_node(Allocator&, bool is_leaf);
 
-    void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
+    void insert_with_offset(size_t row_index, StringData value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
     key_type get_last_key() const;
 
     /// Add small signed \a diff to all elements that are greater than, or equal
-    /// to \a min_row_ndx.
-    void adjust_row_indexes(size_t min_row_ndx, int diff);
+    /// to \a min_row_index.
+    void adjust_row_indexes(size_t min_row_index, int diff);
 
     void validate_value(StringData data) const;
     void validate_value(int64_t value) const REALM_NOEXCEPT;
@@ -164,16 +164,16 @@ private:
     };
 
     // B-Tree functions
-    void TreeInsert(size_t row_ndx, key_type, size_t offset, StringData value);
-    NodeChange do_insert(size_t ndx, key_type, size_t offset, StringData value);
+    void TreeInsert(size_t row_index, key_type, size_t offset, StringData value);
+    NodeChange do_insert(size_t index, key_type, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
-    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
-    void node_insert_split(size_t ndx, size_t new_ref);
-    void node_insert(size_t ndx, size_t ref);
-    void do_delete(size_t ndx, StringData, size_t offset);
-    void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
+    bool leaf_insert(size_t row_index, key_type, size_t offset, StringData value, bool noextend=false);
+    void node_insert_split(size_t index, size_t new_ref);
+    void node_insert(size_t index, size_t ref);
+    void do_delete(size_t index, StringData, size_t offset);
+    void do_update_ref(StringData value, size_t row_index, size_t new_row_index, size_t offset);
 
-    StringData get(size_t ndx, char* buffer) const;
+    StringData get(size_t index, char* buffer) const;
 
     void node_add_key(ref_type ref);
 
@@ -197,7 +197,7 @@ inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
 {
 }
 
-inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t index_in_parent,
                                 ColumnBase* target_column,
                                 bool deny_duplicate_values, Allocator& alloc):
     m_array(new Array(alloc)),
@@ -206,7 +206,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t n
 {
     REALM_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
     m_array->init_from_ref(ref);
-    set_parent(parent, ndx_in_parent);
+    set_parent(parent, index_in_parent);
 }
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
@@ -278,52 +278,52 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
     return create_key(str.substr(offset));
 }
 
-template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
+template <class T> void StringIndex::insert(size_t row_index, T value, size_t num_rows, bool is_append)
 {
-    REALM_ASSERT_3(row_ndx, !=, npos);
+    REALM_ASSERT_3(row_index, !=, npos);
     validate_value(value); // Throws
 
     // If the new row is inserted after the last row in the table, we don't need
     // to adjust any row indexes.
     if (!is_append) {
         for (size_t i = 0; i < num_rows; ++i) {
-            size_t row_ndx_2 = row_ndx + i;
-            adjust_row_indexes(row_ndx_2, 1); // Throws
+            size_t row_index_2 = row_index + i;
+            adjust_row_indexes(row_index_2, 1); // Throws
         }
     }
 
     for (size_t i = 0; i < num_rows; ++i) {
-        size_t row_ndx_2 = row_ndx + i;
+        size_t row_index_2 = row_index + i;
         size_t offset = 0; // First key from beginning of string
-        insert_with_offset(row_ndx_2, to_str(value), offset); // Throws
+        insert_with_offset(row_index_2, to_str(value), offset); // Throws
     }
 }
 
-template <class T> void StringIndex::set(size_t row_ndx, T new_value)
+template <class T> void StringIndex::set(size_t row_index, T new_value)
 {
     validate_value(new_value); // Throws
 
     char buffer[sizeof(T)];
-    StringData old_value = get(row_ndx, buffer);
+    StringData old_value = get(row_index, buffer);
     StringData new_value2 = to_str(new_value);
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.
 
     if (REALM_LIKELY(new_value2 != old_value)) {
         size_t offset = 0; // First key from beginning of string
-        insert_with_offset(row_ndx, new_value2, offset); // Throws
+        insert_with_offset(row_index, new_value2, offset); // Throws
 
         bool is_last = true; // To avoid updating refs
-        erase<T>(row_ndx, is_last); // Throws
+        erase<T>(row_index, is_last); // Throws
     }
 }
 
-template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
+template <class T> void StringIndex::erase(size_t row_index, bool is_last)
 {
     char buffer[sizeof(T)];
-    StringData value = get(row_ndx, buffer);
+    StringData value = get(row_index, buffer);
 
-    do_delete(row_ndx, value, 0);
+    do_delete(row_index, value, 0);
 
     // Collapse top nodes with single item
     while (m_array->is_inner_bptree_node()) {
@@ -340,7 +340,7 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 
     // If it is last item in column, we don't have to update refs
     if (!is_last)
-        adjust_row_indexes(row_ndx, -1);
+        adjust_row_indexes(row_index, -1);
 }
 
 inline
@@ -368,21 +368,21 @@ ref_type StringIndex::get_ref() const REALM_NOEXCEPT
 }
 
 inline
-void StringIndex::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
+void StringIndex::set_parent(ArrayParent* parent, std::size_t index_in_parent) REALM_NOEXCEPT
 {
-    m_array->set_parent(parent, ndx_in_parent);
+    m_array->set_parent(parent, index_in_parent);
 }
 
 inline
-std::size_t StringIndex::get_ndx_in_parent() const REALM_NOEXCEPT
+std::size_t StringIndex::get_index_in_parent() const REALM_NOEXCEPT
 {
-    return m_array->get_ndx_in_parent();
+    return m_array->get_index_in_parent();
 }
 
 inline
-void StringIndex::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
+void StringIndex::set_index_in_parent(std::size_t index_in_parent) REALM_NOEXCEPT
 {
-    m_array->set_ndx_in_parent(ndx_in_parent);
+    m_array->set_index_in_parent(index_in_parent);
 }
 
 inline

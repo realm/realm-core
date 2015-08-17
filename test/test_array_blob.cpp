@@ -117,8 +117,8 @@ TEST(ArrayBlob_General)
 
 TEST(ArrayBlob_AdaptiveStringLeak)
 {
-    ref_type col_ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), col_ref);
+    ref_type column_ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), column_ref);
     for (size_t i = 0; i != 2 * REALM_MAX_BPNODE_SIZE; ++i)
         col.insert(0, std::string(100, 'a'));  // use constant larger than 'medium_string_max_size'
 

@@ -100,41 +100,41 @@ inline void BasicArray<T>::add(T value)
 }
 
 
-template<class T> inline T BasicArray<T>::get(std::size_t ndx) const REALM_NOEXCEPT
+template<class T> inline T BasicArray<T>::get(std::size_t index) const REALM_NOEXCEPT
 {
-    return *(reinterpret_cast<const T*>(m_data) + ndx);
+    return *(reinterpret_cast<const T*>(m_data) + index);
 }
 
 
 template<class T>
-inline T BasicArray<T>::get(const char* header, std::size_t ndx) REALM_NOEXCEPT
+inline T BasicArray<T>::get(const char* header, std::size_t index) REALM_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     // FIXME: This casting assumes that T can be aliged on an 8-bype
     // boundary (since data is aligned on an 8-byte boundary.) This
     // restricts portability. The same problem recurs several times in
     // the remainder of this file.
-    return *(reinterpret_cast<const T*>(data) + ndx);
+    return *(reinterpret_cast<const T*>(data) + index);
 }
 
 
 template<class T>
-inline void BasicArray<T>::set(std::size_t ndx, T value)
+inline void BasicArray<T>::set(std::size_t index, T value)
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(index, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
     // Set the value
-    T* data = reinterpret_cast<T*>(m_data) + ndx;
+    T* data = reinterpret_cast<T*>(m_data) + index;
     *data = value;
 }
 
 template<class T>
-void BasicArray<T>::insert(std::size_t ndx, T value)
+void BasicArray<T>::insert(std::size_t index, T value)
 {
-    REALM_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(index, <=, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -143,33 +143,33 @@ void BasicArray<T>::insert(std::size_t ndx, T value)
     alloc(m_size+1, m_width); // Throws
 
     // Move values below insertion
-    if (ndx != m_size) {
+    if (index != m_size) {
         char* base = reinterpret_cast<char*>(m_data);
-        char* src_begin = base + ndx*m_width;
+        char* src_begin = base + index*m_width;
         char* src_end   = base + m_size*m_width;
         char* dst_end   = src_end + m_width;
         std::copy_backward(src_begin, src_end, dst_end);
     }
 
     // Set the value
-    T* data = reinterpret_cast<T*>(m_data) + ndx;
+    T* data = reinterpret_cast<T*>(m_data) + index;
     *data = value;
 
      ++m_size;
 }
 
 template<class T>
-void BasicArray<T>::erase(std::size_t ndx)
+void BasicArray<T>::erase(std::size_t index)
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(index, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
     // move data under deletion up
-    if (ndx < m_size-1) {
+    if (index < m_size-1) {
         char* base = reinterpret_cast<char*>(m_data);
-        char* dst_begin = base + ndx*m_width;
+        char* dst_begin = base + index*m_width;
         const char* src_begin = dst_begin + m_width;
         const char* src_end   = base + m_size*m_width;
         std::copy(src_begin, src_end, dst_begin);
@@ -319,32 +319,32 @@ bool BasicArray<T>::minimum(T& result, std::size_t begin, std::size_t end) const
 
 
 template<class T>
-ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
+ref_type BasicArray<T>::bptree_leaf_insert(size_t index, T value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
+    if (leaf_size < index)
+        index = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value);
+        insert(index, value);
         return 0; // Leaf was not split
     }
 
     // Split leaf node
     BasicArray<T> new_leaf(get_alloc());
     new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
+    if (index == leaf_size) {
         new_leaf.add(value);
-        state.m_split_offset = ndx;
+        state.m_split_offset = index;
     }
     else {
         // FIXME: Could be optimized by first resizing the target
         // array, then copy elements with std::copy().
-        for (size_t i = ndx; i != leaf_size; ++i)
+        for (size_t i = index; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        truncate(ndx);
+        truncate(index);
         add(value);
-        state.m_split_offset = ndx + 1;
+        state.m_split_offset = index + 1;
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();

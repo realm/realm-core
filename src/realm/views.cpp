@@ -17,9 +17,9 @@ void RowIndexes::sort(Sorter& sorting_predicate)
     // (handling detached refs is not required in linkviews)
     size_t detached_ref_count = 0;
     for (size_t t = 0; t < sz; t++) {
-        size_t ndx = m_row_indexes.get(t);
-        if (ndx != detached_ref) {
-            v.push_back(ndx);
+        size_t index = m_row_indexes.get(t);
+        if (index != detached_ref) {
+            v.push_back(index);
         }
         else
             ++detached_ref_count;

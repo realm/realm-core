@@ -149,7 +149,7 @@ size_t GroupWriter::write_group()
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
     std::pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
-    size_t reserve_ndx  = reserve.first;
+    size_t reserve_index  = reserve.first;
     size_t reserve_size = reserve.second;
 
     // At this point we have allocated all the space we need, so we can add to
@@ -167,14 +167,14 @@ size_t GroupWriter::write_group()
             // We always want to keep the list of free space in sorted order (by
             // ascending position) to facilitate merge of adjacent segments. We
             // can find the correct insert postion by binary search
-            size_t ndx = m_free_positions.lower_bound_int(ref);
-            m_free_positions.insert(ndx, ref); // Throws
-            m_free_lengths.insert(ndx, size); // Throws
+            size_t index = m_free_positions.lower_bound_int(ref);
+            m_free_positions.insert(index, ref); // Throws
+            m_free_lengths.insert(index, size); // Throws
             if (is_shared)
-                m_free_versions.insert(ndx, m_current_version); // Throws
-            // Adjust reserve_ndx if necessary
-            if (ndx <= reserve_ndx)
-                ++reserve_ndx;
+                m_free_versions.insert(index, m_current_version); // Throws
+            // Adjust reserve_index if necessary
+            if (index <= reserve_index)
+                ++reserve_index;
         }
     }
 
@@ -182,7 +182,7 @@ size_t GroupWriter::write_group()
     // make sure that the final adjustments of the free lists (i.e., the
     // deduction of the actually used space from the reserved chunk,) will not
     // change the byte-size of those arrays.
-    size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
+    size_t reserve_pos = to_size_t(m_free_positions.get(reserve_index));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     m_free_positions.ensure_minimum_width(reserve_pos + max_free_space_needed); // Throws
 
@@ -224,8 +224,8 @@ size_t GroupWriter::write_group()
     // reallocation.
     size_t rest = reserve_pos + reserve_size - end_pos;
     REALM_ASSERT_3(rest, >, 0);
-    m_free_positions.set(reserve_ndx, end_pos); // Throws
-    m_free_lengths.set(reserve_ndx, rest); // Throws
+    m_free_positions.set(reserve_index, end_pos); // Throws
+    m_free_lengths.set(reserve_index, rest); // Throws
 
     // The free-list now have their final form, so we can write them to the file
     write_array_at(free_positions_pos, m_free_positions.get_header(),
@@ -300,21 +300,21 @@ size_t GroupWriter::get_free_space(size_t size)
     bool is_shared = m_group.m_is_shared;
 
     // Claim space from identified chunk
-    size_t chunk_ndx  = p.first;
-    size_t chunk_pos  = to_size_t(m_free_positions.get(chunk_ndx));
+    size_t chunk_index  = p.first;
+    size_t chunk_pos  = to_size_t(m_free_positions.get(chunk_index));
     size_t chunk_size = p.second;
     REALM_ASSERT_3(chunk_size, >=, size);
 
     size_t rest = chunk_size - size;
     if (rest > 0) {
-        m_free_positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
-        m_free_lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
+        m_free_positions.set(chunk_index, chunk_pos + size); // FIXME: Undefined conversion to signed
+        m_free_lengths.set(chunk_index, rest); // FIXME: Undefined conversion to signed
     }
     else {
-        m_free_positions.erase(chunk_ndx);
-        m_free_lengths.erase(chunk_ndx);
+        m_free_positions.erase(chunk_index);
+        m_free_lengths.erase(chunk_index);
         if (is_shared)
-            m_free_versions.erase(chunk_ndx);
+            m_free_versions.erase(chunk_index);
     }
 
     return chunk_pos;
@@ -445,13 +445,13 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
 
-    size_t chunk_ndx  = m_free_positions.size();
+    size_t chunk_index  = m_free_positions.size();
     size_t chunk_size = new_file_size - logical_file_size;
     if (extend_last_chunk) {
-        --chunk_ndx;
+        --chunk_index;
         chunk_size += last_chunk_size;
         REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
-        m_free_lengths.set(chunk_ndx, chunk_size);
+        m_free_lengths.set(chunk_index, chunk_size);
     }
     else { // Else add new free space
         REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
@@ -464,7 +464,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // Update the logical file size
     m_group.m_top.set(2, 1 + 2*new_file_size); // Throws
 
-    return std::make_pair(chunk_ndx, chunk_size);
+    return std::make_pair(chunk_index, chunk_size);
 }
 
 

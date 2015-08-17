@@ -59,7 +59,7 @@ namespace query
 
 
 
-    template<class Tab, int col_idx, class Type> struct ColRef
+    template<class Tab, int column_index, class Type> struct ColRef
     {
         typedef Type column_type;
     };
@@ -92,8 +92,8 @@ namespace query
 
     /// We need to specialize Expr for ColRef because it has to have a
     /// constructor that takes EmptyType as argument.
-    template<class Tab, int col_idx, class Type> struct Expr<ColRef<Tab, col_idx, Type>> {
-        ColRef<Tab, col_idx, Type> value;
+    template<class Tab, int column_index, class Type> struct Expr<ColRef<Tab, column_index, Type>> {
+        ColRef<Tab, column_index, Type> value;
         explicit Expr(EmptyType) {}
     };
 
@@ -691,16 +691,16 @@ namespace query
     }
 
 
-    template<class Tab, int col_idx, class Type, class Query>
-    inline Expr<Subquery<Exists, ColRef<Tab, col_idx, Type>, Query>>
-    exists(const Expr<ColRef<Tab, col_idx, Type>>& col, const Query& query)
+    template<class Tab, int column_index, class Type, class Query>
+    inline Expr<Subquery<Exists, ColRef<Tab, column_index, Type>, Query>>
+    exists(const Expr<ColRef<Tab, column_index, Type>>& col, const Query& query)
     {
         return expr(subquery<Exists>(col.value, query));
     }
 
-    template<class Tab, int col_idx, class Type, class Query>
-    inline Expr<Subquery<Count, ColRef<Tab, col_idx, Type>, Query>>
-    count(const Expr<ColRef<Tab, col_idx, Type>>& col, const Query& query)
+    template<class Tab, int column_index, class Type, class Query>
+    inline Expr<Subquery<Count, ColRef<Tab, column_index, Type>, Query>>
+    count(const Expr<ColRef<Tab, column_index, Type>>& col, const Query& query)
     {
         return expr(subquery<Count>(col.value, query));
     }
@@ -714,7 +714,7 @@ namespace query
     template<class> struct HasCol {
         static const bool value = false;
     };
-    template<class Tab, int col_idx, class Type> struct HasCol<ColRef<Tab, col_idx, Type>> {
+    template<class Tab, int column_index, class Type> struct HasCol<ColRef<Tab, column_index, Type>> {
         static const bool value = true;
     };
     template<class Op, class A> struct HasCol<UnOp<Op, A>> {
@@ -738,30 +738,30 @@ namespace query
     template<class> struct GetCol {};
     template<class Tab, int i, class T> struct GetCol<ColRef<Tab, i, T>> {
         typedef T type;
-        static const int col_idx = i;
+        static const int column_index = i;
     };
     template<class Op, class A> struct GetCol<UnOp<Op, A>> {
         typedef typename GetCol<A>::type type;
-        static const int col_idx = GetCol<A>::col_idx;
+        static const int column_index = GetCol<A>::column_index;
     };
     template<class Op, class A, class B> struct GetCol<BinOp<Op, A, B>> {
         typedef typename GetColBinOp<HasCol<A>::value, A, B>::type type;
-        static const int col_idx = GetColBinOp<HasCol<A>::value, A, B>::col_idx;
+        static const int column_index = GetColBinOp<HasCol<A>::value, A, B>::column_index;
     };
     template<class Op, class Col, class Query> struct GetCol<Subquery<Op, Col, Query>> {
         typedef typename GetCol<Col>::type type;
-        static const int col_idx = GetCol<Col>::col_idx;
+        static const int column_index = GetCol<Col>::column_index;
     };
 
 
 
     template<bool a_has_col, class A, class B> struct GetColBinOp {
         typedef typename GetCol<A>::type type;
-        static const int col_idx = GetCol<A>::col_idx;
+        static const int column_index = GetCol<A>::column_index;
     };
     template<class A, class B> struct GetColBinOp<false, A, B> {
         typedef typename GetCol<B>::type type;
-        static const int col_idx = GetCol<B>::col_idx;
+        static const int column_index = GetCol<B>::column_index;
     };
 
 
@@ -775,7 +775,7 @@ namespace query
      * query expression.
      */
     template<class T> struct ExprResult { typedef T type; };
-    template<class Tab, int col_idx, class Type> struct ExprResult<ColRef<Tab, col_idx, Type>> {
+    template<class Tab, int column_index, class Type> struct ExprResult<ColRef<Tab, column_index, Type>> {
         typedef Type type;
     };
     template<class Op, class A> struct ExprResult<UnOp<Op, A>> {
@@ -856,7 +856,7 @@ namespace query
      * Handles the evaluation of a query expression based on a
      * specific principal column.
      */
-    template<class Tab, int col_idx, class Type> class ColEval {
+    template<class Tab, int column_index, class Type> class ColEval {
     public:
         ColEval(const void* c, const Tab* t): m_column(c), m_table(t) {}
 
@@ -865,19 +865,19 @@ namespace query
             return expr;
         }
 
-        Type operator()(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
+        Type operator()(const ColRef<Tab, column_index, Type>&, std::size_t i) const
         {
             REALM_STATIC_ASSERT(!IsSubtable<Type>::value,
                                   "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
             return static_cast<const Type*>(m_column)[i];
         }
 
-        template<int col_idx2, class Type2>
-        Type2 operator()(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
+        template<int column_index2, class Type2>
+        Type2 operator()(const ColRef<Tab, column_index2, Type2>&, std::size_t i) const
         {
             REALM_STATIC_ASSERT(!IsSubtable<Type2>::value,
                                   "A subtable column not acceptable at this point"); // FIXME: Why is this never triggered?
-            return m_table->template get<col_idx2, Type2>(i);
+            return m_table->template get<column_index2, Type2>(i);
         }
 
         template<class Op, class A>
@@ -905,25 +905,25 @@ namespace query
         const Tab* m_table;
 
         template<class Subtab> const Subtab*
-        subtable(const ColRef<Tab, col_idx, Type>&, std::size_t i) const
+        subtable(const ColRef<Tab, column_index, Type>&, std::size_t i) const
         {
             return static_cast<const Subtab* const*>(m_column)[i];
         }
 
-        template<class Subtab, int col_idx2, class Type2> const Subtab*
-        subtable(const ColRef<Tab, col_idx2, Type2>&, std::size_t i) const
+        template<class Subtab, int column_index2, class Type2> const Subtab*
+        subtable(const ColRef<Tab, column_index2, Type2>&, std::size_t i) const
         {
-            return m_table->template get<col_idx2, const Subtab*>(i);
+            return m_table->template get<column_index2, const Subtab*>(i);
         }
     };
 
 
 
-    template<class Ch, class Tr, class Tab, int col_idx, class Type>
+    template<class Ch, class Tr, class Tab, int column_index, class Type>
     inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out,
-                                                  const ColRef<Tab, col_idx, Type>&)
+                                                  const ColRef<Tab, column_index, Type>&)
     {
-        out << "t" << '.' << Tab::get_column_name(col_idx);
+        out << "t" << '.' << Tab::get_column_name(column_index);
         return out;
     }
     template<class Ch, class Tr, class Op, class Q>
@@ -959,9 +959,9 @@ private:
      * This template class simply maps a column index to the
      * appropriate query expression type.
      */
-    template<int col_idx> struct QueryCol {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type val_type;
-        typedef query::ColRef<BasicTable, col_idx, val_type> expr_type;
+    template<int column_index> struct QueryCol {
+        typedef typename TypeAt<typename Spec::Columns, column_index>::type val_type;
+        typedef query::ColRef<BasicTable, column_index, val_type> expr_type;
         typedef query::Expr<expr_type> type;
     };
 
@@ -969,17 +969,17 @@ private:
 
 public:
     // FIXME: Make private
-    template<int col_idx, class Type> Type get(std::size_t i) const
+    template<int column_index, class Type> Type get(std::size_t i) const
     {
-        return static_cast<Type*>(m_cols[col_idx])[i];
+        return static_cast<Type*>(m_cols[column_index])[i];
 
     }
 
     std::size_t size() const { return m_size; }
 
-    static const char* get_column_name(int col_idx)
+    static const char* get_column_name(int column_index)
     {
-        return Spec::col_names()[col_idx];
+        return Spec::column_names()[column_index];
     }
 
     BasicTable(): m_size(0)
@@ -1005,11 +1005,11 @@ private:
     std::size_t m_size;
     void** m_cols;
 
-    template<class Type, int col_idx> struct MakeCol {
-        static void exec(BasicTable* t) { t->m_cols[col_idx] = new Type[t->m_size]; }
+    template<class Type, int column_index> struct MakeCol {
+        static void exec(BasicTable* t) { t->m_cols[column_index] = new Type[t->m_size]; }
     };
-    template<class T, int col_idx> struct MakeCol<SpecBase::Subtable<T>, col_idx> {
-        static void exec(BasicTable* t) { t->m_cols[col_idx] = new T*[t->m_size]; }
+    template<class T, int column_index> struct MakeCol<SpecBase::Subtable<T>, column_index> {
+        static void exec(BasicTable* t) { t->m_cols[column_index] = new T*[t->m_size]; }
     };
 
     template<class T> bool _exists(const T& q) const
@@ -1077,8 +1077,8 @@ private:
         static std::size_t find(const BasicTable* t, const T& q, std::size_t begin, std::size_t end)
         {
             typedef typename query::GetCol<T>::type Type;
-            const int col_idx = query::GetCol<T>::col_idx;
-            query::ColEval<BasicTable, col_idx, Type> eval(t->m_cols[col_idx], t);
+            const int column_index = query::GetCol<T>::column_index;
+            query::ColEval<BasicTable, column_index, Type> eval(t->m_cols[column_index], t);
             for (std::size_t i = begin; i != end; ++i)
                 if (eval(q,i)) return i;
             return end;

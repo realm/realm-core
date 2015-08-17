@@ -75,100 +75,100 @@ public:
     // Find links that point to a specific target row 
 
     // Find links that point to a specific target row 
-    Query& links_to(size_t column_ndx, size_t target_row);
+    Query& links_to(size_t column_index, size_t target_row);
 
     // Conditions: int64_t
-    Query& equal(size_t column_ndx, int64_t value);
-    Query& not_equal(size_t column_ndx, int64_t value);
-    Query& greater(size_t column_ndx, int64_t value);
-    Query& greater_equal(size_t column_ndx, int64_t value);
-    Query& less(size_t column_ndx, int64_t value);
-    Query& less_equal(size_t column_ndx, int64_t value);
-    Query& between(size_t column_ndx, int64_t from, int64_t to);
+    Query& equal(size_t column_index, int64_t value);
+    Query& not_equal(size_t column_index, int64_t value);
+    Query& greater(size_t column_index, int64_t value);
+    Query& greater_equal(size_t column_index, int64_t value);
+    Query& less(size_t column_index, int64_t value);
+    Query& less_equal(size_t column_index, int64_t value);
+    Query& between(size_t column_index, int64_t from, int64_t to);
 
     // Conditions: int (we need those because conversion from '1234' is ambiguous with float/double)
-    Query& equal(size_t column_ndx, int value);
-    Query& not_equal(size_t column_ndx, int value);
-    Query& greater(size_t column_ndx, int value);
-    Query& greater_equal(size_t column_ndx, int value);
-    Query& less(size_t column_ndx, int value);
-    Query& less_equal(size_t column_ndx, int value);
-    Query& between(size_t column_ndx, int from, int to);
+    Query& equal(size_t column_index, int value);
+    Query& not_equal(size_t column_index, int value);
+    Query& greater(size_t column_index, int value);
+    Query& greater_equal(size_t column_index, int value);
+    Query& less(size_t column_index, int value);
+    Query& less_equal(size_t column_index, int value);
+    Query& between(size_t column_index, int from, int to);
 
     // Conditions: 2 int columns
-    Query& equal_int(size_t column_ndx1, size_t column_ndx2);
-    Query& not_equal_int(size_t column_ndx1, size_t column_ndx2);
-    Query& greater_int(size_t column_ndx1, size_t column_ndx2);
-    Query& less_int(size_t column_ndx1, size_t column_ndx2);
-    Query& greater_equal_int(size_t column_ndx1, size_t column_ndx2);
-    Query& less_equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& equal_int(size_t column_index1, size_t column_index2);
+    Query& not_equal_int(size_t column_index1, size_t column_index2);
+    Query& greater_int(size_t column_index1, size_t column_index2);
+    Query& less_int(size_t column_index1, size_t column_index2);
+    Query& greater_equal_int(size_t column_index1, size_t column_index2);
+    Query& less_equal_int(size_t column_index1, size_t column_index2);
 
     // Conditions: float
-    Query& equal(size_t column_ndx, float value);
-    Query& not_equal(size_t column_ndx, float value);
-    Query& greater(size_t column_ndx, float value);
-    Query& greater_equal(size_t column_ndx, float value);
-    Query& less(size_t column_ndx, float value);
-    Query& less_equal(size_t column_ndx, float value);
-    Query& between(size_t column_ndx, float from, float to);
+    Query& equal(size_t column_index, float value);
+    Query& not_equal(size_t column_index, float value);
+    Query& greater(size_t column_index, float value);
+    Query& greater_equal(size_t column_index, float value);
+    Query& less(size_t column_index, float value);
+    Query& less_equal(size_t column_index, float value);
+    Query& between(size_t column_index, float from, float to);
 
     // Conditions: 2 float columns
-    Query& equal_float(size_t column_ndx1, size_t column_ndx2);
-    Query& not_equal_float(size_t column_ndx1, size_t column_ndx2);
-    Query& greater_float(size_t column_ndx1, size_t column_ndx2);
-    Query& greater_equal_float(size_t column_ndx1, size_t column_ndx2);
-    Query& less_float(size_t column_ndx1, size_t column_ndx2);
-    Query& less_equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& equal_float(size_t column_index1, size_t column_index2);
+    Query& not_equal_float(size_t column_index1, size_t column_index2);
+    Query& greater_float(size_t column_index1, size_t column_index2);
+    Query& greater_equal_float(size_t column_index1, size_t column_index2);
+    Query& less_float(size_t column_index1, size_t column_index2);
+    Query& less_equal_float(size_t column_index1, size_t column_index2);
 
      // Conditions: double
-    Query& equal(size_t column_ndx, double value);
-    Query& not_equal(size_t column_ndx, double value);
-    Query& greater(size_t column_ndx, double value);
-    Query& greater_equal(size_t column_ndx, double value);
-    Query& less(size_t column_ndx, double value);
-    Query& less_equal(size_t column_ndx, double value);
-    Query& between(size_t column_ndx, double from, double to);
+    Query& equal(size_t column_index, double value);
+    Query& not_equal(size_t column_index, double value);
+    Query& greater(size_t column_index, double value);
+    Query& greater_equal(size_t column_index, double value);
+    Query& less(size_t column_index, double value);
+    Query& less_equal(size_t column_index, double value);
+    Query& between(size_t column_index, double from, double to);
 
     // Conditions: 2 double columns
-    Query& equal_double(size_t column_ndx1, size_t column_ndx2);
-    Query& not_equal_double(size_t column_ndx1, size_t column_ndx2);
-    Query& greater_double(size_t column_ndx1, size_t column_ndx2);
-    Query& greater_equal_double(size_t column_ndx1, size_t column_ndx2);
-    Query& less_double(size_t column_ndx1, size_t column_ndx2);
-    Query& less_equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& equal_double(size_t column_index1, size_t column_index2);
+    Query& not_equal_double(size_t column_index1, size_t column_index2);
+    Query& greater_double(size_t column_index1, size_t column_index2);
+    Query& greater_equal_double(size_t column_index1, size_t column_index2);
+    Query& less_double(size_t column_index1, size_t column_index2);
+    Query& less_equal_double(size_t column_index1, size_t column_index2);
 
     // Conditions: bool
-    Query& equal(size_t column_ndx, bool value);
+    Query& equal(size_t column_index, bool value);
 
     // Conditions: date
-    Query& equal_datetime(size_t column_ndx, DateTime value) { return equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& not_equal_datetime(size_t column_ndx, DateTime value) { return not_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& greater_datetime(size_t column_ndx, DateTime value) { return greater(column_ndx, int64_t(value.get_datetime())); }
-    Query& greater_equal_datetime(size_t column_ndx, DateTime value) { return greater_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& less_datetime(size_t column_ndx, DateTime value) { return less(column_ndx, int64_t(value.get_datetime())); }
-    Query& less_equal_datetime(size_t column_ndx, DateTime value) { return less_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& between_datetime(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_datetime()), int64_t(to.get_datetime())); }
+    Query& equal_datetime(size_t column_index, DateTime value) { return equal(column_index, int64_t(value.get_datetime())); }
+    Query& not_equal_datetime(size_t column_index, DateTime value) { return not_equal(column_index, int64_t(value.get_datetime())); }
+    Query& greater_datetime(size_t column_index, DateTime value) { return greater(column_index, int64_t(value.get_datetime())); }
+    Query& greater_equal_datetime(size_t column_index, DateTime value) { return greater_equal(column_index, int64_t(value.get_datetime())); }
+    Query& less_datetime(size_t column_index, DateTime value) { return less(column_index, int64_t(value.get_datetime())); }
+    Query& less_equal_datetime(size_t column_index, DateTime value) { return less_equal(column_index, int64_t(value.get_datetime())); }
+    Query& between_datetime(size_t column_index, DateTime from, DateTime to) { return between(column_index, int64_t(from.get_datetime()), int64_t(to.get_datetime())); }
 
     // Conditions: strings
 
-    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& equal(size_t column_index, StringData value, bool case_sensitive=true);
+    Query& not_equal(size_t column_index, StringData value, bool case_sensitive=true);
+    Query& begins_with(size_t column_index, StringData value, bool case_sensitive=true);
+    Query& ends_with(size_t column_index, StringData value, bool case_sensitive=true);
+    Query& contains(size_t column_index, StringData value, bool case_sensitive=true);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
     // implicit conversion of char* to bool.
-    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
+    Query& equal(size_t column_index, const char* c_str, bool case_sensitive=true);
+    Query& not_equal(size_t column_index, const char* c_str, bool case_sensitive=true);
 
     // Conditions: binary data
-    Query& equal(size_t column_ndx, BinaryData value);
-    Query& not_equal(size_t column_ndx, BinaryData value);
-    Query& begins_with(size_t column_ndx, BinaryData value);
-    Query& ends_with(size_t column_ndx, BinaryData value);
-    Query& contains(size_t column_ndx, BinaryData value);
+    Query& equal(size_t column_index, BinaryData value);
+    Query& not_equal(size_t column_index, BinaryData value);
+    Query& begins_with(size_t column_index, BinaryData value);
+    Query& ends_with(size_t column_index, BinaryData value);
+    Query& contains(size_t column_index, BinaryData value);
 
     // Negation
     Query& Not();
@@ -194,47 +194,47 @@ public:
     // Aggregates
     size_t count(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
 
-    int64_t sum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    int64_t sum_int(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
                     size_t limit = size_t(-1)) const;
 
-    double  average_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
+    double  average_int(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                         size_t limit = size_t(-1)) const;
 
-    int64_t maximum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                        size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    int64_t maximum_int(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+                        size_t limit = size_t(-1), size_t* return_index = 0) const;
 
-    int64_t minimum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                        size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    int64_t minimum_int(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+                        size_t limit = size_t(-1), size_t* return_index = 0) const;
 
-    double sum_float(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double sum_float(    size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
                          size_t limit = size_t(-1)) const;
 
-    double average_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double average_float(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
                          size_t limit = size_t(-1)) const;
 
-    float  maximum_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
-                         size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    float  maximum_float(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
+                         size_t limit = size_t(-1), size_t* return_index = 0) const;
 
-    float  minimum_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
-                         size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    float  minimum_float(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
+                         size_t limit = size_t(-1), size_t* return_index = 0) const;
 
-    double sum_double(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double sum_double(    size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
                           size_t limit = size_t(-1)) const;
 
-    double average_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double average_double(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
                           size_t limit = size_t(-1)) const;
 
-    double maximum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                          size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    double maximum_double(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+                          size_t limit = size_t(-1), size_t* return_index = 0) const;
 
-    double minimum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                          size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    double minimum_double(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+                          size_t limit = size_t(-1), size_t* return_index = 0) const;
 
-    DateTime maximum_datetime(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
-                              size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    DateTime maximum_datetime(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
+                              size_t limit = size_t(-1), size_t* return_index = 0) const;
 
-    DateTime minimum_datetime(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                              size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    DateTime minimum_datetime(size_t column_index, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+                              size_t limit = size_t(-1), size_t* return_index = 0) const;
 
     // Deletion
     size_t  remove(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
@@ -311,22 +311,22 @@ private:
     struct PartialCopyTag {};
     Query(const Query& src, PartialCopyTag);
     void copy_nodes(const Query& source);
-    template <class ColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class ColumnType> Query& equal(size_t column_index1, size_t column_index2);
+    template <class ColumnType> Query& less(size_t column_index1, size_t column_index2);
+    template <class ColumnType> Query& less_equal(size_t column_index1, size_t column_index2);
+    template <class ColumnType> Query& greater(size_t column_index1, size_t column_index2);
+    template <class ColumnType> Query& greater_equal(size_t column_index1, size_t column_index2);
+    template <class ColumnType> Query& not_equal(size_t column_index1, size_t column_index2);
 
-    template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
+    template <typename T, class N> Query& add_condition(size_t column_index, T value);
 
-    template<typename T> double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
+    template<typename T> double average(size_t column_index, size_t* resultcount = 0, size_t start = 0,
                                         size_t end=size_t(-1), size_t limit = size_t(-1)) const;
 
     template <Action action, typename T, typename R, class ColClass>
         R aggregate(R (ColClass::*method)(size_t, size_t, size_t, size_t*) const,
-                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-                    size_t* return_ndx = nullptr) const;
+                    size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit, 
+                    size_t* return_index = nullptr) const;
 
     void aggregate_internal(Action TAction, DataType TSourceColumn,
                             ParentNode* pn, QueryStateBase* st, 
@@ -353,14 +353,14 @@ private:
 
 // Implementation:
 
-inline Query& Query::equal(size_t column_ndx, const char* c_str, bool case_sensitive)
+inline Query& Query::equal(size_t column_index, const char* c_str, bool case_sensitive)
 {
-    return equal(column_ndx, StringData(c_str), case_sensitive);
+    return equal(column_index, StringData(c_str), case_sensitive);
 }
 
-inline Query& Query::not_equal(size_t column_ndx, const char* c_str, bool case_sensitive)
+inline Query& Query::not_equal(size_t column_index, const char* c_str, bool case_sensitive)
 {
-    return not_equal(column_ndx, StringData(c_str), case_sensitive);
+    return not_equal(column_index, StringData(c_str), case_sensitive);
 }
 
 } // namespace realm

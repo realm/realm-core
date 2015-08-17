@@ -111,7 +111,7 @@ private:
     /// function guarantees that it will add at most one entry to the
     /// free-lists.
     ///
-    /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
+    /// \return A pair (`chunk_index`, `chunk_size`) where `chunk_index`
     /// is the index of a chunk whose size is at least the requestd
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<std::size_t, std::size_t> reserve_free_space(std::size_t size);
@@ -121,7 +121,7 @@ private:
     /// to be 8-byte aligned. This function guarantees that it will
     /// add at most one entry to the free-lists.
     ///
-    /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
+    /// \return A pair (`chunk_index`, `chunk_size`) where `chunk_index`
     /// is the index of a chunk whose size is at least the requestd
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);

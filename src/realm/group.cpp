@@ -223,20 +223,20 @@ void Group::detach_table_accessors() REALM_NOEXCEPT
 }
 
 
-Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
+Table* Group::do_get_table(size_t table_index, DescMatcher desc_matcher)
 {
     REALM_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
 
-    if (table_ndx >= m_tables.size())
+    if (table_index >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
 
     // Get table accessor from cache if it exists, else create
-    Table* table = m_table_accessors[table_ndx];
+    Table* table = m_table_accessors[table_index];
     if (!table)
-        table = create_table_accessor(table_ndx); // Throws
+        table = create_table_accessor(table_index); // Throws
 
     if (desc_matcher) {
         typedef _impl::TableFriend tf;
@@ -250,11 +250,11 @@ Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
 
 Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
 {
-    size_t table_ndx = m_table_names.find_first(name);
-    if (table_ndx == not_found)
+    size_t table_index = m_table_names.find_first(name);
+    if (table_index == not_found)
         return 0;
 
-    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    Table* table = do_get_table(table_index, desc_matcher); // Throws
     return table;
 }
 
@@ -269,8 +269,8 @@ Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require
 
 Table* Group::do_add_table(StringData name, DescSetter desc_setter)
 {
-    size_t table_ndx = create_table(name); // Throws
-    Table* table = create_table_accessor(table_ndx); // Throws
+    size_t table_index = create_table(name); // Throws
+    Table* table = create_table_accessor(table_index); // Throws
     if (desc_setter)
         (*desc_setter)(*table); // Throws
     return table;
@@ -281,15 +281,15 @@ Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
                                   DescSetter desc_setter, bool* was_added)
 {
     Table* table;
-    size_t table_ndx = m_table_names.find_first(name);
-    if (table_ndx == not_found) {
+    size_t table_index = m_table_names.find_first(name);
+    if (table_index == not_found) {
         table = do_add_table(name, desc_setter); // Throws
     }
     else {
-        table = do_get_table(table_ndx, desc_matcher); // Throws
+        table = do_get_table(table_index, desc_matcher); // Throws
     }
     if (was_added)
-        *was_added = (table_ndx == not_found);
+        *was_added = (table_index == not_found);
     return table;
 }
 
@@ -302,8 +302,8 @@ size_t Group::create_table(StringData name)
     using namespace _impl;
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
-    size_t ndx = m_tables.size();
-    REALM_ASSERT_3(ndx, ==, m_table_names.size());
+    size_t index = m_tables.size();
+    REALM_ASSERT_3(index, ==, m_table_names.size());
     m_tables.add(ref); // Throws
     m_table_names.add(name); // Throws
 
@@ -312,15 +312,15 @@ size_t Group::create_table(StringData name)
         m_table_accessors.push_back(0); // Throws
 
     if (Replication* repl = m_alloc.get_replication())
-        repl->insert_group_level_table(ndx, ndx, name); // Throws
+        repl->insert_group_level_table(index, index, name); // Throws
 
-    return ndx;
+    return index;
 }
 
 
-Table* Group::create_table_accessor(size_t table_ndx)
+Table* Group::create_table_accessor(size_t table_index)
 {
-    REALM_ASSERT(m_table_accessors.empty() || table_ndx < m_table_accessors.size());
+    REALM_ASSERT(m_table_accessors.empty() || table_index < m_table_accessors.size());
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
@@ -350,8 +350,8 @@ Table* Group::create_table_accessor(size_t table_ndx)
     // registration in the group accessor of inclomplete table accessors.
 
     typedef _impl::TableFriend tf;
-    ref_type ref = m_tables.get_as_ref(table_ndx);
-    Table* table = tf::create_incomplete_accessor(m_alloc, ref, this, table_ndx); // Throws
+    ref_type ref = m_tables.get_as_ref(table_index);
+    Table* table = tf::create_incomplete_accessor(m_alloc, ref, this, table_index); // Throws
 
     // The new accessor cannot be leaked, because no exceptions can be throws
     // before it becomes referenced from `m_column_accessors`.
@@ -362,7 +362,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
     tf::bind_ref(*table);
 
     tf::mark(*table);
-    m_table_accessors[table_ndx] = table;
+    m_table_accessors[table_index] = table;
     tf::complete_accessor(*table); // Throws
     tf::unmark(*table);
     return table;
@@ -372,17 +372,17 @@ Table* Group::create_table_accessor(size_t table_ndx)
 void Group::remove_table(StringData name)
 {
     REALM_ASSERT(is_attached());
-    size_t table_ndx = m_table_names.find_first(name);
-    if (table_ndx == not_found)
+    size_t table_index = m_table_names.find_first(name);
+    if (table_index == not_found)
         throw NoSuchTable();
-    remove_table(table_ndx); // Throws
+    remove_table(table_index); // Throws
 }
 
 
-void Group::remove_table(size_t table_ndx)
+void Group::remove_table(size_t table_index)
 {
     REALM_ASSERT(is_attached());
-    TableRef table = get_table(table_ndx);
+    TableRef table = get_table(table_index);
 
     // In principle we could remove a table even if it is the target of link
     // columns of other tables, however, to do that, we would have to
@@ -404,14 +404,14 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i-1);
 
-    ref_type ref = m_tables.get(table_ndx);
+    ref_type ref = m_tables.get(table_index);
 
     // If the specified table is not the last one, it will be removed by moving
     // that last table to the index of the removed one. The movement of the last
     // table requires link column adjustments.
-    size_t last_ndx = m_tables.size() - 1;
-    if (last_ndx != table_ndx) {
-        TableRef last_table = get_table(last_ndx);
+    size_t last_index = m_tables.size() - 1;
+    if (last_index != table_index) {
+        TableRef last_table = get_table(last_index);
         const Spec& last_spec = tf::get_spec(*last_table);
         size_t last_num_cols = last_spec.get_column_count();
         std::set<Table*> opposite_tables;
@@ -424,7 +424,7 @@ void Group::remove_table(size_t table_ndx)
                 LinkColumnBase& link_col = static_cast<LinkColumnBase&>(col);
                 opposite_table = &link_col.get_target_table();
             }
-            else if (type == col_type_BackLink) {
+            else if (type == column_type_BackLink) {
                 ColumnBase& col = tf::get_column(*last_table, i);
                 REALM_ASSERT(dynamic_cast<BacklinkColumn*>(&col));
                 BacklinkColumn& backlink_col = static_cast<BacklinkColumn&>(col);
@@ -441,25 +441,25 @@ void Group::remove_table(size_t table_ndx)
             Table* table_2 = *i;
             Spec& spec_2 = tf::get_spec(*table_2);
             size_t num_cols_2 = spec_2.get_column_count();
-            for (size_t col_ndx_2 = 0; col_ndx_2 < num_cols_2; ++col_ndx_2) {
-                ColumnType type_2 = spec_2.get_column_type(col_ndx_2);
-                if (type_2 == col_type_Link || type_2 == col_type_LinkList ||
-                    type_2 == col_type_BackLink) {
-                    size_t table_ndx_2 = spec_2.get_opposite_link_table_ndx(col_ndx_2);
-                    if (table_ndx_2 == last_ndx)
-                        spec_2.set_opposite_link_table_ndx(col_ndx_2, table_ndx); // Throws
+            for (size_t column_index_2 = 0; column_index_2 < num_cols_2; ++column_index_2) {
+                ColumnType type_2 = spec_2.get_column_type(column_index_2);
+                if (type_2 == column_type_Link || type_2 == column_type_LinkList ||
+                    type_2 == column_type_BackLink) {
+                    size_t table_index_2 = spec_2.get_opposite_link_table_index(column_index_2);
+                    if (table_index_2 == last_index)
+                        spec_2.set_opposite_link_table_index(column_index_2, table_index); // Throws
                 }
             }
         }
-        m_tables.set(table_ndx, m_tables.get(last_ndx)); // Throws
-        m_table_names.set(table_ndx, m_table_names.get(last_ndx)); // Throws
-        tf::set_ndx_in_parent(*last_table, table_ndx);
+        m_tables.set(table_index, m_tables.get(last_index)); // Throws
+        m_table_names.set(table_index, m_table_names.get(last_index)); // Throws
+        tf::set_index_in_parent(*last_table, table_index);
     }
 
-    m_tables.erase(last_ndx); // Throws
-    m_table_names.erase(last_ndx); // Throws
+    m_tables.erase(last_index); // Throws
+    m_table_names.erase(last_index); // Throws
 
-    m_table_accessors[table_ndx] = m_table_accessors[last_ndx];
+    m_table_accessors[table_index] = m_table_accessors[last_index];
     m_table_accessors.pop_back();
     tf::detach(*table);
     tf::unbind_ref(*table);
@@ -468,31 +468,31 @@ void Group::remove_table(size_t table_ndx)
     Array::destroy_deep(ref, m_alloc);
 
     if (Replication* repl = m_alloc.get_replication())
-        repl->erase_group_level_table(table_ndx, last_ndx+1); // Throws
+        repl->erase_group_level_table(table_index, last_index+1); // Throws
 }
 
 
 void Group::rename_table(StringData name, StringData new_name, bool require_unique_name)
 {
     REALM_ASSERT(is_attached());
-    size_t table_ndx = m_table_names.find_first(name);
-    if (table_ndx == not_found)
+    size_t table_index = m_table_names.find_first(name);
+    if (table_index == not_found)
         throw NoSuchTable();
-    rename_table(table_ndx, new_name, require_unique_name); // Throws
+    rename_table(table_index, new_name, require_unique_name); // Throws
 }
 
 
-void Group::rename_table(size_t table_ndx, StringData new_name, bool require_unique_name)
+void Group::rename_table(size_t table_index, StringData new_name, bool require_unique_name)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    if (table_ndx >= m_tables.size())
+    if (table_index >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
-    m_table_names.set(table_ndx, new_name);
+    m_table_names.set(table_index, new_name);
     if (Replication* repl = m_alloc.get_replication())
-        repl->rename_group_level_table(table_ndx, new_name); // Throws
+        repl->rename_group_level_table(table_index, new_name); // Throws
 }
 
 
@@ -800,8 +800,8 @@ void Group::to_string(std::ostream& out) const
 void Group::mark_all_table_accessors() REALM_NOEXCEPT
 {
     size_t num_tables = m_table_accessors.size();
-    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
+    for (size_t table_index = 0; table_index != num_tables; ++table_index) {
+        if (Table* table = m_table_accessors[table_index]) {
             typedef _impl::TableFriend tf;
             tf::recursive_mark(*table); // Also all subtable accessors
         }
@@ -825,23 +825,23 @@ public:
         tf::mark(table);
     }
 
-    size_t m_col_ndx;
+    size_t m_column_index;
     DataType m_type;
 };
 
 
 class InsertColumnUpdater: public _impl::TableFriend::AccessorUpdater {
 public:
-    InsertColumnUpdater(size_t col_ndx):
-        m_col_ndx(col_ndx)
+    InsertColumnUpdater(size_t column_index):
+        m_column_index(column_index)
     {
     }
 
     void update(Table& table) override
     {
         typedef _impl::TableFriend tf;
-        tf::adj_insert_column(table, m_col_ndx); // Throws
-        tf::mark_link_target_tables(table, m_col_ndx+1);
+        tf::adj_insert_column(table, m_column_index); // Throws
+        tf::mark_link_target_tables(table, m_column_index+1);
     }
 
     void update_parent(Table&) override
@@ -849,22 +849,22 @@ public:
     }
 
 private:
-    size_t m_col_ndx;
+    size_t m_column_index;
 };
 
 
 class EraseColumnUpdater: public _impl::TableFriend::AccessorUpdater {
 public:
-    EraseColumnUpdater(size_t col_ndx):
-        m_col_ndx(col_ndx)
+    EraseColumnUpdater(size_t column_index):
+        m_column_index(column_index)
     {
     }
 
     void update(Table& table) override
     {
         typedef _impl::TableFriend tf;
-        tf::adj_erase_column(table, m_col_ndx);
-        tf::mark_link_target_tables(table, m_col_ndx);
+        tf::adj_erase_column(table, m_column_index);
+        tf::mark_link_target_tables(table, m_column_index);
     }
 
     void update_parent(Table&) override
@@ -872,7 +872,7 @@ public:
     }
 
 private:
-    size_t m_col_ndx;
+    size_t m_column_index;
 };
 
 } // anonymous namespace
@@ -894,19 +894,19 @@ public:
     {
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) REALM_NOEXCEPT
+    bool insert_group_level_table(size_t table_index, size_t num_tables, StringData) REALM_NOEXCEPT
     {
-        REALM_ASSERT_3(table_ndx, <=, num_tables);
+        REALM_ASSERT_3(table_index, <=, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() ||
                        m_group.m_table_accessors.size() == num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
-            // for end-insertions, table_ndx will be equal to num_tables
+            // for end-insertions, table_index will be equal to num_tables
             m_group.m_table_accessors.push_back(0); // Throws
-            size_t last_ndx = num_tables;
-            m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-            m_group.m_table_accessors[table_ndx] = 0;
-            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+            size_t last_index = num_tables;
+            m_group.m_table_accessors[last_index] = m_group.m_table_accessors[table_index];
+            m_group.m_table_accessors[table_index] = 0;
+            if (Table* moved_table = m_group.m_table_accessors[last_index]) {
                 typedef _impl::TableFriend tf;
                 tf::mark(*moved_table);
                 tf::mark_opposite_link_tables(*moved_table);
@@ -916,29 +916,29 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(size_t table_ndx, size_t num_tables) REALM_NOEXCEPT
+    bool erase_group_level_table(size_t table_index, size_t num_tables) REALM_NOEXCEPT
     {
-        REALM_ASSERT_3(table_ndx, <, num_tables);
+        REALM_ASSERT_3(table_index, <, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() ||
                        m_group.m_table_accessors.size() == num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             // Link target tables do not need to be considered here, since all
             // columns will already have been removed at this point.
-            if (Table* table = m_group.m_table_accessors[table_ndx]) {
+            if (Table* table = m_group.m_table_accessors[table_index]) {
                 typedef _impl::TableFriend tf;
                 tf::detach(*table);
                 tf::unbind_ref(*table);
             }
 
-            size_t last_ndx = num_tables - 1;
-            if (table_ndx < last_ndx) {
-                if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+            size_t last_index = num_tables - 1;
+            if (table_index < last_index) {
+                if (Table* moved_table = m_group.m_table_accessors[last_index]) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*moved_table);
                     tf::mark_opposite_link_tables(*moved_table);
                 }
-                m_group.m_table_accessors[table_ndx] = m_group.m_table_accessors[last_ndx];
+                m_group.m_table_accessors[table_index] = m_group.m_table_accessors[last_index];
             }
             m_group.m_table_accessors.pop_back();
         }
@@ -953,11 +953,11 @@ public:
         return true;
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t* path) REALM_NOEXCEPT
+    bool select_table(size_t group_level_index, int levels, const size_t* path) REALM_NOEXCEPT
     {
         m_table.reset();
-        if (group_level_ndx < m_group.m_table_accessors.size()) {
-            if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
+        if (group_level_index < m_group.m_table_accessors.size()) {
+            if (Table* table = m_group.m_table_accessors[group_level_index]) {
                 const size_t* path_begin = path;
                 const size_t* path_end = path_begin + 2*levels;
                 for (;;) {
@@ -967,9 +967,9 @@ public:
                         m_table.reset(table);
                         break;
                     }
-                    size_t col_ndx = path_begin[0];
-                    size_t row_ndx = path_begin[1];
-                    table = tf::get_subtable_accessor(*table, col_ndx, row_ndx);
+                    size_t column_index = path_begin[0];
+                    size_t row_index = path_begin[1];
+                    table = tf::get_subtable_accessor(*table, column_index, row_index);
                     if (!table)
                         break;
                     path_begin += 2;
@@ -979,7 +979,7 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+    bool insert_empty_rows(size_t row_index, size_t num_rows_to_insert, size_t prior_num_rows,
                            bool unordered) REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
@@ -994,19 +994,19 @@ public:
                     // Unordered insertion of multiple rows is not yet supported (and not
                     // yet needed).
                     REALM_ASSERT(num_rows_to_insert == 1);
-                    size_t from_row_ndx = row_ndx;
-                    size_t to_row_ndx = prior_num_rows;
-                    tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
+                    size_t from_row_index = row_index;
+                    size_t to_row_index = prior_num_rows;
+                    tf::adj_acc_move_over(*m_table, from_row_index, to_row_index);
                 }
             }
             else {
-                tf::adj_acc_insert_rows(*m_table, row_ndx, num_rows_to_insert);
+                tf::adj_acc_insert_rows(*m_table, row_index, num_rows_to_insert);
             }
         }
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+    bool erase_rows(size_t row_index, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool unordered) REALM_NOEXCEPT
     {
         if (unordered) {
@@ -1015,15 +1015,15 @@ public:
             REALM_ASSERT_3(num_rows_to_erase, ==, 1);
             typedef _impl::TableFriend tf;
             if (m_table) {
-                size_t prior_last_row_ndx = prior_num_rows - 1;
-                tf::adj_acc_move_over(*m_table, prior_last_row_ndx, row_ndx);
+                size_t prior_last_row_index = prior_num_rows - 1;
+                tf::adj_acc_move_over(*m_table, prior_last_row_index, row_index);
             }
         }
         else {
             typedef _impl::TableFriend tf;
             if (m_table) {
                 for (size_t i = 0; i < num_rows_to_erase; ++i)
-                    tf::adj_acc_erase_row(*m_table, row_ndx + num_rows_to_erase - 1 - i);
+                    tf::adj_acc_erase_row(*m_table, row_index + num_rows_to_erase - 1 - i);
             }
         }
         return true;
@@ -1037,83 +1037,83 @@ public:
         return true;
     }
 
-    bool insert_int(size_t col_ndx, size_t row_ndx, size_t tbl_sz, int_fast64_t) REALM_NOEXCEPT
+    bool insert_int(size_t column_index, size_t row_index, size_t tbl_sz, int_fast64_t) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_bool(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool) REALM_NOEXCEPT
+    bool insert_bool(size_t column_index, size_t row_index, size_t tbl_sz, bool) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_float(size_t col_ndx, size_t row_ndx, size_t tbl_sz, float) REALM_NOEXCEPT
+    bool insert_float(size_t column_index, size_t row_index, size_t tbl_sz, float) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_double(size_t col_ndx, size_t row_ndx, size_t tbl_sz, double) REALM_NOEXCEPT
+    bool insert_double(size_t column_index, size_t row_index, size_t tbl_sz, double) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_string(size_t col_ndx, size_t row_ndx, size_t tbl_sz, StringData) REALM_NOEXCEPT
+    bool insert_string(size_t column_index, size_t row_index, size_t tbl_sz, StringData) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_binary(size_t col_ndx, size_t row_ndx, size_t tbl_sz, BinaryData) REALM_NOEXCEPT
+    bool insert_binary(size_t column_index, size_t row_index, size_t tbl_sz, BinaryData) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_date_time(size_t col_ndx, size_t row_ndx, size_t tbl_sz, DateTime) REALM_NOEXCEPT
+    bool insert_date_time(size_t column_index, size_t row_index, size_t tbl_sz, DateTime) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_table(size_t col_ndx, size_t row_ndx, size_t tbl_sz) REALM_NOEXCEPT
+    bool insert_table(size_t column_index, size_t row_index, size_t tbl_sz) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_mixed(size_t col_ndx, size_t row_ndx, size_t tbl_sz, const Mixed&) REALM_NOEXCEPT
+    bool insert_mixed(size_t column_index, size_t row_index, size_t tbl_sz, const Mixed&) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_link(size_t col_ndx, size_t row_ndx, size_t tbl_sz, size_t) REALM_NOEXCEPT
+    bool insert_link(size_t column_index, size_t row_index, size_t tbl_sz, size_t) REALM_NOEXCEPT
     {
         // The marking dirty of the target table is handled by
         // insert_empty_rows() regardless of whether the link column is the
         // first column or not.
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
        return true;
     }
 
-    bool insert_link_list(size_t col_ndx, size_t row_ndx, size_t tbl_sz) REALM_NOEXCEPT
+    bool insert_link_list(size_t column_index, size_t row_index, size_t tbl_sz) REALM_NOEXCEPT
     {
-        if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1, tbl_sz, false);
+        if (column_index == 0)
+            insert_empty_rows(row_index, 1, tbl_sz, false);
         return true;
     }
 
@@ -1157,11 +1157,11 @@ public:
         return true; // No-op
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+    bool set_table(size_t column_index, size_t row_index) REALM_NOEXCEPT
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
-            if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
+            if (Table* subtab = tf::get_subtable_accessor(*m_table, column_index, row_index)) {
                 tf::mark(*subtab);
                 tf::adj_acc_clear_nonroot_table(*subtab);
             }
@@ -1169,11 +1169,11 @@ public:
         return true;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) REALM_NOEXCEPT
+    bool set_mixed(size_t column_index, size_t row_index, const Mixed&) REALM_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (m_table)
-            tf::discard_subtable_accessor(*m_table, col_ndx, row_ndx);
+            tf::discard_subtable_accessor(*m_table, column_index, row_index);
         return true;
     }
 
@@ -1182,7 +1182,7 @@ public:
         return true; // No-op
     }
 
-    bool set_link(size_t col_ndx, size_t, size_t) REALM_NOEXCEPT
+    bool set_link(size_t column_index, size_t, size_t) REALM_NOEXCEPT
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1197,13 +1197,13 @@ public:
         // table accessor exists.
         //
         // get_link_target_table_accessor() will return null if the
-        // m_table->m_cols[col_ndx] is null, but this can happen only when the
+        // m_table->m_cols[column_index] is null, but this can happen only when the
         // column was inserted earlier during this transaction advance, and in
         // that case, we have already marked the target table accesor dirty.
 
         typedef _impl::TableFriend tf;
         if (m_table) {
-            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, column_index))
                 tf::mark(*target);
         }
         return true;
@@ -1228,8 +1228,8 @@ public:
                     break;
                 }
                 typedef _impl::DescriptorFriend df;
-                size_t col_ndx = path[i];
-                desc = df::get_subdesc_accessor(*desc, col_ndx);
+                size_t column_index = path[i];
+                desc = df::get_subdesc_accessor(*desc, column_index);
                 ++i;
             }
             m_desc_path_begin = path;
@@ -1240,52 +1240,52 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, bool nullable)
+    bool insert_column(size_t column_index, DataType, StringData, bool nullable)
     {
         static_cast<void>(nullable);
         if (m_table) {
             typedef _impl::TableFriend tf;
-            InsertColumnUpdater updater(col_ndx);
+            InsertColumnUpdater updater(column_index);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
-            df::adj_insert_column(*m_desc, col_ndx);
+            df::adj_insert_column(*m_desc, column_index);
         return true;
     }
 
-    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t)
+    bool insert_link_column(size_t column_index, DataType, StringData, size_t link_target_table_index, size_t)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
-            InsertColumnUpdater updater(col_ndx);
+            InsertColumnUpdater updater(column_index);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
 
             // See comments on link handling in TransactAdvancer::set_link().
-            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
+            TableRef target = m_group.get_table(link_target_table_index); // Throws
             tf::adj_add_column(*target); // Throws
             tf::mark(*target);
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
-            df::adj_insert_column(*m_desc, col_ndx);
+            df::adj_insert_column(*m_desc, column_index);
         return true;
     }
 
-    bool erase_column(size_t col_ndx)
+    bool erase_column(size_t column_index)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
-            EraseColumnUpdater updater(col_ndx);
+            EraseColumnUpdater updater(column_index);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
-            df::adj_erase_column(*m_desc, col_ndx);
+            df::adj_erase_column(*m_desc, column_index);
         return true;
     }
 
-    bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
+    bool erase_link_column(size_t column_index, size_t link_target_table_index, size_t backlink_column_index)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1294,16 +1294,16 @@ public:
             // case the target table is the same as the origin table (because
             // the backlink column occurs after regular columns.) Also see
             // comments on link handling in TransactAdvancer::set_link().
-            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-            tf::adj_erase_column(*target, backlink_col_ndx); // Throws
+            TableRef target = m_group.get_table(link_target_table_index); // Throws
+            tf::adj_erase_column(*target, backlink_column_index); // Throws
             tf::mark(*target);
 
-            EraseColumnUpdater updater(col_ndx);
+            EraseColumnUpdater updater(column_index);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
-            df::adj_erase_column(*m_desc, col_ndx);
+            df::adj_erase_column(*m_desc, column_index);
         return true;
     }
 
@@ -1337,12 +1337,12 @@ public:
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, size_t) REALM_NOEXCEPT
+    bool select_link_list(size_t column_index, size_t) REALM_NOEXCEPT
     {
         // See comments on link handling in TransactAdvancer::set_link().
         typedef _impl::TableFriend tf;
         if (m_table) {
-            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, column_index))
                 tf::mark(*target);
         }
         return true; // No-op
@@ -1402,10 +1402,10 @@ void Group::refresh_dirty_accessors()
 
     // Refresh all remaining dirty table accessors
     size_t num_tables = m_table_accessors.size();
-    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
+    for (size_t table_index = 0; table_index != num_tables; ++table_index) {
+        if (Table* table = m_table_accessors[table_index]) {
             typedef _impl::TableFriend tf;
-            tf::set_ndx_in_parent(*table, table_ndx);
+            tf::set_index_in_parent(*table, table_index);
             if (tf::is_marked(*table)) {
                 tf::refresh_accessor_tree(*table); // Throws
                 bool bump_global = false;
@@ -1639,20 +1639,20 @@ void Group::verify() const
         REALM_ASSERT(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7);
         Allocator& alloc = m_top.get_alloc();
         ArrayInteger pos(alloc), len(alloc), ver(alloc);
-        size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;
-        pos.set_parent(const_cast<Array*>(&m_top), pos_ndx);
-        len.set_parent(const_cast<Array*>(&m_top), len_ndx);
-        ver.set_parent(const_cast<Array*>(&m_top), ver_ndx);
-        if (m_top.size() > pos_ndx) {
-            if (ref_type ref = m_top.get_as_ref(pos_ndx))
+        size_t pos_index = 3, len_index = 4, ver_index = 5;
+        pos.set_parent(const_cast<Array*>(&m_top), pos_index);
+        len.set_parent(const_cast<Array*>(&m_top), len_index);
+        ver.set_parent(const_cast<Array*>(&m_top), ver_index);
+        if (m_top.size() > pos_index) {
+            if (ref_type ref = m_top.get_as_ref(pos_index))
                 pos.init_from_ref(ref);
         }
-        if (m_top.size() > len_ndx) {
-            if (ref_type ref = m_top.get_as_ref(len_ndx))
+        if (m_top.size() > len_index) {
+            if (ref_type ref = m_top.get_as_ref(len_index))
                 len.init_from_ref(ref);
         }
-        if (m_top.size() > ver_ndx) {
-            if (ref_type ref = m_top.get_as_ref(ver_ndx))
+        if (m_top.size() > ver_index) {
+            if (ref_type ref = m_top.get_as_ref(ver_index))
                 ver.init_from_ref(ref);
         }
         REALM_ASSERT(pos.is_attached() == len.is_attached());
@@ -1737,20 +1737,20 @@ void Group::print_free() const
 {
     Allocator& alloc = m_top.get_alloc();
     ArrayInteger pos(alloc), len(alloc), ver(alloc);
-    size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;
-    pos.set_parent(const_cast<Array*>(&m_top), pos_ndx);
-    len.set_parent(const_cast<Array*>(&m_top), len_ndx);
-    ver.set_parent(const_cast<Array*>(&m_top), ver_ndx);
-    if (m_top.size() > pos_ndx) {
-        if (ref_type ref = m_top.get_as_ref(pos_ndx))
+    size_t pos_index = 3, len_index = 4, ver_index = 5;
+    pos.set_parent(const_cast<Array*>(&m_top), pos_index);
+    len.set_parent(const_cast<Array*>(&m_top), len_index);
+    ver.set_parent(const_cast<Array*>(&m_top), ver_index);
+    if (m_top.size() > pos_index) {
+        if (ref_type ref = m_top.get_as_ref(pos_index))
             pos.init_from_ref(ref);
     }
-    if (m_top.size() > len_ndx) {
-        if (ref_type ref = m_top.get_as_ref(len_ndx))
+    if (m_top.size() > len_index) {
+        if (ref_type ref = m_top.get_as_ref(len_index))
             len.init_from_ref(ref);
     }
-    if (m_top.size() > ver_ndx) {
-        if (ref_type ref = m_top.get_as_ref(ver_ndx))
+    if (m_top.size() > ver_index) {
+        if (ref_type ref = m_top.get_as_ref(ver_index))
             ver.init_from_ref(ref);
     }
 
@@ -1811,9 +1811,9 @@ void Group::to_dot(const char* file_path) const
     to_dot(out);
 }
 
-std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t index_in_parent) const
 {
-    return std::make_pair(m_tables.get_ref(), ndx_in_parent);
+    return std::make_pair(m_tables.get_ref(), index_in_parent);
 }
 
 #endif // REALM_DEBUG

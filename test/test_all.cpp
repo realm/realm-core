@@ -212,26 +212,26 @@ public:
             return;
 
         partial_sort(m_results.begin(), m_results.begin() + n, m_results.end());
-        size_t name_col_width = 0, time_col_width = 0;
+        size_t name_column_width = 0, time_column_width = 0;
         for(size_t i = 0; i != n; ++i) {
             const result& r = m_results[i];
             size_t size = r.m_test_name.size();
-            if (size > name_col_width)
-                name_col_width = size;
+            if (size > name_column_width)
+                name_column_width = size;
             size = Timer::format(r.m_elapsed_seconds).size();
-            if (size > time_col_width)
-                time_col_width = size;
+            if (size > time_column_width)
+                time_column_width = size;
         }
-        name_col_width += 2;
-        size_t full_width = name_col_width + time_col_width;
+        name_column_width += 2;
+        size_t full_width = name_column_width + time_column_width;
         std::cout.fill('-');
         std::cout << "\nTop " << n << " time usage:\n" << std::setw(int(full_width)) << "" << "\n";
         std::cout.fill(' ');
         for(size_t i = 0; i != n; ++i) {
             const result& r = m_results[i];
             std::cout <<
-                std::left  << std::setw(int(name_col_width)) << r.m_test_name <<
-                std::right << std::setw(int(time_col_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
+                std::left  << std::setw(int(name_column_width)) << r.m_test_name <<
+                std::right << std::setw(int(time_column_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
         }
     }
 

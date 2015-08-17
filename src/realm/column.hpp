@@ -57,7 +57,7 @@ struct ColumnTemplateBase
 
 template <class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
-                std::size_t limit, std::size_t* return_ndx);
+                std::size_t limit, std::size_t* return_index);
 
 template <class T> struct ColumnTemplate : public ColumnTemplateBase
 {
@@ -82,18 +82,18 @@ public:
     virtual std::size_t size() const REALM_NOEXCEPT = 0;
 
     /// \throw LogicError Thrown if this column is not string valued.
-    virtual void set_string(std::size_t row_ndx, StringData value);
+    virtual void set_string(std::size_t row_index, StringData value);
 
     /// Whether or not this column is nullable.
     virtual bool is_nullable() const REALM_NOEXCEPT;
 
-    /// Whether or not the value at \a row_ndx is NULL. If the column is not
+    /// Whether or not the value at \a row_index is NULL. If the column is not
     /// nullable, always returns false.
-    virtual bool is_null(std::size_t row_ndx) const REALM_NOEXCEPT;
+    virtual bool is_null(std::size_t row_index) const REALM_NOEXCEPT;
 
-    /// Sets the value at \a row_ndx to be NULL.
+    /// Sets the value at \a row_index to be NULL.
     /// \throw LogicError Thrown if this column is not nullable.
-    virtual void set_null(std::size_t row_ndx);
+    virtual void set_null(std::size_t row_index);
 
     //@{
 
@@ -115,10 +115,10 @@ public:
     /// that reciprocal backlinks have already been removed. Non-link columns
     /// should ignore this argument.
 
-    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows) = 0;
-    virtual void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+    virtual void insert_rows(size_t row_index, size_t num_rows_to_insert, size_t prior_num_rows) = 0;
+    virtual void erase_rows(size_t row_index, size_t num_rows_to_erase, size_t prior_num_rows,
                             bool broken_reciprocal_backlinks) = 0;
-    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+    virtual void move_last_row_over(size_t row_index, size_t prior_num_rows,
                                     bool broken_reciprocal_backlinks) = 0;
 
     //@}
@@ -153,7 +153,7 @@ public:
     virtual void destroy_search_index() REALM_NOEXCEPT;
     virtual const StringIndex* get_search_index() const REALM_NOEXCEPT;
     virtual StringIndex* get_search_index() REALM_NOEXCEPT;
-    virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+    virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t index_in_parent,
                                       bool allow_duplicate_values);
     virtual void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT;
 
@@ -179,9 +179,9 @@ public:
     virtual ref_type write(std::size_t slice_offset, std::size_t slice_size,
                            std::size_t table_size, _impl::OutputStream&) const = 0;
 
-    virtual void set_parent(ArrayParent*, std::size_t ndx_in_parent) REALM_NOEXCEPT = 0;
-    virtual std::size_t get_ndx_in_parent() const REALM_NOEXCEPT = 0;
-    virtual void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT = 0;
+    virtual void set_parent(ArrayParent*, std::size_t index_in_parent) REALM_NOEXCEPT = 0;
+    virtual std::size_t get_index_in_parent() const REALM_NOEXCEPT = 0;
+    virtual void set_index_in_parent(std::size_t index_in_parent) REALM_NOEXCEPT = 0;
 
     /// Called in the context of Group::commit() and
     /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
@@ -199,7 +199,7 @@ public:
     /// Table::cascade_break_backlinks_to_all_rows() to pass the number of rows
     /// in the table as \a num_rows.
 
-    virtual void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState&);
+    virtual void cascade_break_backlinks_to(std::size_t row_index, CascadeState&);
     virtual void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&);
 
     //@}
@@ -210,18 +210,18 @@ public:
     /// the pointer to the subtable accessor at the specified row index if it
     /// exists, otherwise it returns null. For other column types, this function
     /// returns null.
-    virtual Table* get_subtable_accessor(std::size_t row_ndx) const REALM_NOEXCEPT;
+    virtual Table* get_subtable_accessor(std::size_t row_index) const REALM_NOEXCEPT;
 
     /// Detach and remove the subtable accessor at the specified row if it
     /// exists. For column types that are unable to contain subtable, this
     /// function does nothing.
-    virtual void discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT;
+    virtual void discard_subtable_accessor(std::size_t row_index) REALM_NOEXCEPT;
 
-    virtual void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
-    virtual void adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
+    virtual void adj_acc_insert_rows(std::size_t row_index, std::size_t num_rows) REALM_NOEXCEPT;
+    virtual void adj_acc_erase_row(std::size_t row_index) REALM_NOEXCEPT;
     /// See Table::adj_acc_move_over()
-    virtual void adj_acc_move_over(std::size_t from_row_ndx,
-                                   std::size_t to_row_ndx) REALM_NOEXCEPT;
+    virtual void adj_acc_move_over(std::size_t from_row_index,
+                                   std::size_t to_row_index) REALM_NOEXCEPT;
     virtual void adj_acc_clear_root_table() REALM_NOEXCEPT;
 
     enum {
@@ -253,13 +253,13 @@ public:
     ///    AccessorConsistencyLevels).
     ///
     ///  - The 'index in parent' property of the cached root array
-    ///    (`root->m_ndx_in_parent`) is valid.
-    virtual void refresh_accessor_tree(std::size_t new_col_ndx, const Spec&) = 0;
+    ///    (`root->m_index_in_parent`) is valid.
+    virtual void refresh_accessor_tree(std::size_t new_column_index, const Spec&) = 0;
 
 #ifdef REALM_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void verify() const = 0;
-    virtual void verify(const Table&, std::size_t col_ndx) const;
+    virtual void verify(const Table&, std::size_t column_index) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
@@ -297,7 +297,7 @@ protected:
 
 #ifdef REALM_DEBUG
     class LeafToDot;
-    virtual void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+    virtual void leaf_to_dot(MemRef, ArrayParent*, std::size_t index_in_parent,
                              std::ostream&) const = 0;
 #endif
 
@@ -327,9 +327,9 @@ public:
     MemRef get_mem() const REALM_NOEXCEPT final { return m_array->get_mem(); }
     void detach() REALM_NOEXCEPT final { m_array->detach(); }
     bool is_attached() const REALM_NOEXCEPT final { return m_array->is_attached(); }
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT final { m_array->set_parent(parent, ndx_in_parent); }
-    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT final { return m_array->get_ndx_in_parent(); }
-    void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT final { m_array->set_ndx_in_parent(ndx_in_parent); }
+    void set_parent(ArrayParent* parent, std::size_t index_in_parent) REALM_NOEXCEPT final { m_array->set_parent(parent, index_in_parent); }
+    std::size_t get_index_in_parent() const REALM_NOEXCEPT final { return m_array->get_index_in_parent(); }
+    void set_index_in_parent(std::size_t index_in_parent) REALM_NOEXCEPT final { m_array->set_index_in_parent(index_in_parent); }
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override { m_array->update_from_parent(old_baseline); }
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 protected:
@@ -356,7 +356,7 @@ protected:
 class ColumnBaseWithIndex : public ColumnBase {
 public:
     ~ColumnBaseWithIndex() REALM_NOEXCEPT override {}
-    void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT override;
+    void set_index_in_parent(std::size_t index) REALM_NOEXCEPT override;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
     void move_assign(ColumnBaseWithIndex& col) REALM_NOEXCEPT;
@@ -367,7 +367,7 @@ public:
     const StringIndex* get_search_index() const REALM_NOEXCEPT final { return m_search_index.get(); }
     void destroy_search_index() REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type ref, ArrayParent* parent,
-            size_t ndx_in_parent, bool allow_duplicate_valaues) final;
+            size_t index_in_parent, bool allow_duplicate_valaues) final;
     StringIndex* create_search_index() override = 0;
 protected:
     ColumnBaseWithIndex() {}
@@ -402,9 +402,9 @@ public:
     Allocator& get_alloc() const REALM_NOEXCEPT final;
     ref_type get_ref() const REALM_NOEXCEPT final;
     MemRef get_mem() const REALM_NOEXCEPT final;
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT override;
-    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT final;
-    void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT final;
+    void set_parent(ArrayParent* parent, std::size_t index_in_parent) REALM_NOEXCEPT override;
+    std::size_t get_index_in_parent() const REALM_NOEXCEPT final;
+    void set_index_in_parent(std::size_t index) REALM_NOEXCEPT final;
     void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
     void detach() REALM_NOEXCEPT final;
@@ -419,7 +419,7 @@ public:
     bool is_nullable() const REALM_NOEXCEPT override;
 
     /// Provides access to the leaf that contains the element at the
-    /// specified index. Upon return \a ndx_in_leaf will be set to the
+    /// specified index. Upon return \a index_in_leaf will be set to the
     /// corresponding index relative to the beginning of the leaf.
     ///
     /// LeafInfo is a struct defined by the underlying BpTree<T,N>
@@ -432,39 +432,39 @@ public:
     /// accessors. For this reason, the identified leaf should always
     /// be accessed through the returned const-qualified reference,
     /// and never directly through the specfied fallback accessor.
-    void get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+    void get_leaf(std::size_t index, std::size_t& index_in_leaf,
         LeafInfo& inout_leaf) const REALM_NOEXCEPT;
 
     // Getting and setting values
-    T get_val(std::size_t ndx) const REALM_NOEXCEPT final { return get(ndx); }
-    T get(std::size_t ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT override;
+    T get_val(std::size_t index) const REALM_NOEXCEPT final { return get(index); }
+    T get(std::size_t index) const REALM_NOEXCEPT;
+    bool is_null(std::size_t index) const REALM_NOEXCEPT override;
     T back() const REALM_NOEXCEPT;
     void set(std::size_t, T value);
     void set(std::size_t, null);
     void set_null(std::size_t) override;
     void add(T value = T{});
     void add(null);
-    void insert(std::size_t ndx, T value = T{}, std::size_t num_rows = 1);
-    void insert(std::size_t ndx, null, std::size_t num_rows = 1);
-    void erase(size_t row_ndx);
-    void erase(size_t row_ndx, bool is_last);
-    void move_last_over(size_t row_ndx, size_t last_row_ndx);
+    void insert(std::size_t index, T value = T{}, std::size_t num_rows = 1);
+    void insert(std::size_t index, null, std::size_t num_rows = 1);
+    void erase(size_t row_index);
+    void erase(size_t row_index, bool is_last);
+    void move_last_over(size_t row_index, size_t last_row_index);
     void clear();
 
     // Index support
-    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT override;
+    StringData get_index_data(std::size_t index, char* buffer) const REALM_NOEXCEPT override;
 
     // FIXME: Remove these
-    uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
-    ref_type get_as_ref(std::size_t ndx) const REALM_NOEXCEPT;
-    void set_uint(std::size_t ndx, uint64_t value);
-    void set_as_ref(std::size_t ndx, ref_type value);
+    uint64_t get_uint(std::size_t index) const REALM_NOEXCEPT;
+    ref_type get_as_ref(std::size_t index) const REALM_NOEXCEPT;
+    void set_uint(std::size_t index, uint64_t value);
+    void set_as_ref(std::size_t index, ref_type value);
 
-    void destroy_subtree(std::size_t ndx, bool clear_value);
+    void destroy_subtree(std::size_t index, bool clear_value);
 
     template <class U>
-    void adjust(std::size_t ndx, U diff);
+    void adjust(std::size_t index, U diff);
     template <class U>
     void adjust(U diff);
     template <class U>
@@ -473,16 +473,16 @@ public:
     std::size_t count(T target) const;
 
     T sum(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                std::size_t* return_ndx = nullptr) const;
+                std::size_t* return_index = nullptr) const;
 
     T maximum(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                    std::size_t* return_ndx = nullptr) const;
+                    std::size_t* return_index = nullptr) const;
 
     T minimum(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                    std::size_t* return_ndx = nullptr) const;
+                    std::size_t* return_index = nullptr) const;
 
     double average(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                    std::size_t* return_ndx = nullptr) const;
+                    std::size_t* return_index = nullptr) const;
 
     std::size_t find_first(T value, std::size_t begin = 0, std::size_t end = npos) const;
     void find_all(Column<int64_t, false>& out_indices, T value,
@@ -518,8 +518,8 @@ public:
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
 
-    /// \param row_ndx Must be `realm::npos` if appending.
-    void insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows);
+    /// \param row_index Must be `realm::npos` if appending.
+    void insert_without_updating_index(std::size_t row_index, T value, std::size_t num_rows);
 
 #ifdef REALM_DEBUG
     void verify() const override;
@@ -543,9 +543,9 @@ protected:
     bool root_is_leaf() const REALM_NOEXCEPT { return m_tree.root_is_leaf(); }
     void replace_root_array(std::unique_ptr<Array> leaf) final { m_tree.replace_root(std::move(leaf)); }
 
-    void set_without_updating_index(std::size_t row_ndx, T value);
-    void erase_without_updating_index(std::size_t row_ndx, bool is_last);
-    void move_last_over_without_updating_index(std::size_t row_ndx, std::size_t last_row_ndx);
+    void set_without_updating_index(std::size_t row_index, T value);
+    void erase_without_updating_index(std::size_t row_index, bool is_last);
+    void move_last_over_without_updating_index(std::size_t row_index, std::size_t last_row_index);
 
     /// If any element points to an array node, this function recursively
     /// destroys that array node. Note that the same is **not** true for
@@ -556,7 +556,7 @@ protected:
     void clear_without_updating_index();
 
 #ifdef REALM_DEBUG
-    void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+    void leaf_to_dot(MemRef, ArrayParent*, std::size_t index_in_parent,
                      std::ostream&) const override;
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
@@ -572,7 +572,7 @@ private:
 
     BpTree<T, Nullable> m_tree;
 
-    void do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last);
+    void do_erase(size_t row_index, size_t num_rows_to_erase, bool is_last);
 };
 
 
@@ -661,38 +661,38 @@ inline void ColumnBase::bump_link_origin_table_version() REALM_NOEXCEPT
 }
 
 template <class T, bool N>
-void Column<T, N>::set_without_updating_index(std::size_t ndx, T value)
+void Column<T, N>::set_without_updating_index(std::size_t index, T value)
 {
-    m_tree.set(ndx, std::move(value));
+    m_tree.set(index, std::move(value));
 }
 
 template <class T, bool N>
-void Column<T, N>::set(std::size_t ndx, T value)
+void Column<T, N>::set(std::size_t index, T value)
 {
-    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(index < size());
     if (has_search_index()) {
-        m_search_index->set(ndx, value);
+        m_search_index->set(index, value);
     }
-    set_without_updating_index(ndx, std::move(value));
+    set_without_updating_index(index, std::move(value));
 }
 
 template <class T, bool N>
-void Column<T, N>::set_null(std::size_t ndx)
+void Column<T, N>::set_null(std::size_t index)
 {
-    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(index < size());
     if (!is_nullable()) {
         throw LogicError{LogicError::column_not_nullable};
     }
     if (has_search_index()) {
-        m_search_index->set(ndx, null{});
+        m_search_index->set(index, null{});
     }
-    m_tree.set_null(ndx);
+    m_tree.set_null(index);
 }
 
 template <class T, bool N>
-void Column<T, N>::set(std::size_t ndx, null)
+void Column<T, N>::set(std::size_t index, null)
 {
-    set_null(ndx);
+    set_null(index);
 }
 
 // When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values
@@ -700,23 +700,23 @@ void Column<T, N>::set(std::size_t ndx, null)
 // realm::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
 // which reduces to a no-op when 2's complement is the native representation of negative values.
 template <class T, bool N>
-void Column<T, N>::set_uint(std::size_t ndx, uint64_t value)
+void Column<T, N>::set_uint(std::size_t index, uint64_t value)
 {
-    set(ndx, util::from_twos_compl<int_fast64_t>(value));
+    set(index, util::from_twos_compl<int_fast64_t>(value));
 }
 
 template <class T, bool N>
-void Column<T, N>::set_as_ref(std::size_t ndx, ref_type ref)
+void Column<T, N>::set_as_ref(std::size_t index, ref_type ref)
 {
-    set(ndx, from_ref(ref));
+    set(index, from_ref(ref));
 }
 
 template <class T, bool N>
 template <class U>
-void Column<T, N>::adjust(std::size_t ndx, U diff)
+void Column<T, N>::adjust(std::size_t index, U diff)
 {
-    REALM_ASSERT_3(ndx, <, size());
-    m_tree.adjust(ndx, diff);
+    REALM_ASSERT_3(index, <, size());
+    m_tree.adjust(index, diff);
 }
 
 template <class T, bool N>
@@ -743,42 +743,42 @@ std::size_t Column<T, N>::count(T target) const
 }
 
 template <class T, bool N>
-T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
+T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_index) const
 {
-    return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_index);
 }
 
 template <class T, bool N>
-double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
+double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_index) const
 {
     if (end == size_t(-1))
         end = size();
     size_t size = end - start;
     if(limit < size)
         size = limit;
-    auto s = sum(start, end, limit, return_ndx);
+    auto s = sum(start, end, limit, return_index);
     double avg = double(s) / double(size == 0 ? 1 : size);
     return avg;
 }
 
 template <class T, bool N>
-T Column<T,N>::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
+T Column<T,N>::minimum(size_t start, size_t end, size_t limit, size_t* return_index) const
 {
-    return aggregate<T, T, act_Min, None>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, None>(*this, 0, start, end, limit, return_index);
 }
 
 template <class T, bool N>
-T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
+T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_index) const
 {
-    return aggregate<T, T, act_Max, None>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Max, None>(*this, 0, start, end, limit, return_index);
 }
 
 template <class T, bool N>
-void Column<T,N>::destroy_subtree(size_t ndx, bool clear_value)
+void Column<T,N>::destroy_subtree(size_t index, bool clear_value)
 {
     static_assert(std::is_same<T, int_fast64_t>::value && !N,
         "destroy_subtree only makes sense on non-nullable integer columns");
-    int_fast64_t value = get(ndx);
+    int_fast64_t value = get(index);
 
     // Null-refs indicate empty subtrees
     if (value == 0)
@@ -796,21 +796,21 @@ void Column<T,N>::destroy_subtree(size_t ndx, bool clear_value)
     Array::destroy_deep(ref, alloc);
 
     if (clear_value)
-        set(ndx, 0); // Throws
+        set(index, 0); // Throws
 }
 
 template <class T, bool N>
-void Column<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+void Column<T, N>::get_leaf(std::size_t index, std::size_t& index_in_leaf,
                              typename BpTree<T,N>::LeafInfo& inout_leaf_info) const REALM_NOEXCEPT
 {
-    m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
+    m_tree.get_leaf(index, index_in_leaf, inout_leaf_info);
 }
 
 template <class T, bool N>
-StringData Column<T, N>::get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT
+StringData Column<T, N>::get_index_data(std::size_t index, char* buffer) const REALM_NOEXCEPT
 {
     static_assert(sizeof(T) == 8, "not filling buffer");
-    T x = get(ndx);
+    T x = get(index);
     *reinterpret_cast<T*>(buffer) = x;
       return StringData(buffer, sizeof(T));
 }
@@ -821,11 +821,11 @@ void Column<T,N>::populate_search_index()
     REALM_ASSERT(has_search_index());
     // Populate the index
     std::size_t num_rows = size();
-    for (std::size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        T value = get(row_ndx);
+    for (std::size_t row_index = 0; row_index != num_rows; ++row_index) {
+        T value = get(row_index);
         size_t num_rows = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_index, value, num_rows, is_append); // Throws
     }
 }
 
@@ -984,22 +984,22 @@ Allocator& Column<T,N>::get_alloc() const REALM_NOEXCEPT
 }
 
 template <class T, bool N>
-void Column<T,N>::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
+void Column<T,N>::set_parent(ArrayParent* parent, std::size_t index_in_parent) REALM_NOEXCEPT
 {
-    m_tree.set_parent(parent, ndx_in_parent);
+    m_tree.set_parent(parent, index_in_parent);
 }
 
 template <class T, bool N>
-std::size_t Column<T,N>::get_ndx_in_parent() const REALM_NOEXCEPT
+std::size_t Column<T,N>::get_index_in_parent() const REALM_NOEXCEPT
 {
-    return m_tree.get_ndx_in_parent();
+    return m_tree.get_index_in_parent();
 }
 
 template <class T, bool N>
-void Column<T,N>::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
+void Column<T,N>::set_index_in_parent(std::size_t index_in_parent) REALM_NOEXCEPT
 {
-    ColumnBaseWithIndex::set_ndx_in_parent(ndx_in_parent);
-    m_tree.set_ndx_in_parent(ndx_in_parent);
+    ColumnBaseWithIndex::set_index_in_parent(index_in_parent);
+    m_tree.set_index_in_parent(index_in_parent);
 }
 
 template <class T, bool N>
@@ -1052,15 +1052,15 @@ bool Column<T,N>::is_nullable() const REALM_NOEXCEPT
 }
 
 template <class T, bool N>
-T Column<T,N>::get(std::size_t ndx) const REALM_NOEXCEPT
+T Column<T,N>::get(std::size_t index) const REALM_NOEXCEPT
 {
-    return m_tree.get(ndx);
+    return m_tree.get(index);
 }
 
 template <class T, bool N>
-bool Column<T,N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
+bool Column<T,N>::is_null(std::size_t index) const REALM_NOEXCEPT
 {
-    return m_tree.is_null(ndx);
+    return m_tree.is_null(index);
 }
 
 template <class T, bool N>
@@ -1070,16 +1070,16 @@ T Column<T,N>::back() const REALM_NOEXCEPT
 }
 
 template <class T, bool N>
-ref_type Column<T,N>::get_as_ref(std::size_t ndx) const REALM_NOEXCEPT
+ref_type Column<T,N>::get_as_ref(std::size_t index) const REALM_NOEXCEPT
 {
-    return to_ref(get(ndx));
+    return to_ref(get(index));
 }
 
 template <class T, bool N>
-uint64_t Column<T,N>::get_uint(std::size_t ndx) const REALM_NOEXCEPT
+uint64_t Column<T,N>::get_uint(std::size_t index) const REALM_NOEXCEPT
 {
     static_assert(std::is_convertible<T, uint64_t>::value, "T is not convertible to uint.");
-    return static_cast<uint64_t>(get(ndx));
+    return static_cast<uint64_t>(get(index));
 }
 
 template <class T, bool N>
@@ -1095,92 +1095,92 @@ void Column<T,N>::add(null)
 }
 
 template <class T, bool N>
-void Column<T,N>::insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows)
+void Column<T,N>::insert_without_updating_index(std::size_t row_index, T value, std::size_t num_rows)
 {
     std::size_t size = this->size(); // Slow
-    bool is_append = row_ndx == size || row_ndx == npos;
-    std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
+    bool is_append = row_index == size || row_index == npos;
+    std::size_t index_or_npos_if_append = is_append ? npos : row_index;
 
-    m_tree.insert(ndx_or_npos_if_append, std::move(value), num_rows); // Throws
+    m_tree.insert(index_or_npos_if_append, std::move(value), num_rows); // Throws
 }
 
 template <class T, bool N>
-void Column<T,N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
+void Column<T,N>::insert(std::size_t row_index, T value, std::size_t num_rows)
 {
     std::size_t size = this->size(); // Slow
-    bool is_append = row_ndx == size || row_ndx == npos;
-    std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
+    bool is_append = row_index == size || row_index == npos;
+    std::size_t index_or_npos_if_append = is_append ? npos : row_index;
 
-    m_tree.insert(ndx_or_npos_if_append, value, num_rows); // Throws
+    m_tree.insert(index_or_npos_if_append, value, num_rows); // Throws
 
     if (has_search_index()) {
-        row_ndx = is_append ? size : row_ndx;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        row_index = is_append ? size : row_index;
+        m_search_index->insert(row_index, value, num_rows, is_append); // Throws
     }
 }
 
 template <class T, bool N>
-void Column<T,N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
+void Column<T,N>::insert(std::size_t row_index, null, std::size_t num_rows)
 {
     std::size_t size = this->size(); // Slow
-    bool is_append = row_ndx == size || row_ndx == npos;
-    std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
+    bool is_append = row_index == size || row_index == npos;
+    std::size_t index_or_npos_if_append = is_append ? npos : row_index;
 
-    m_tree.insert(ndx_or_npos_if_append, null{}, num_rows); // Throws
+    m_tree.insert(index_or_npos_if_append, null{}, num_rows); // Throws
 
     if (has_search_index()) {
-        row_ndx = is_append ? size : row_ndx;
-        m_search_index->insert(row_ndx, null{}, num_rows, is_append); // Throws
+        row_index = is_append ? size : row_index;
+        m_search_index->insert(row_index, null{}, num_rows, is_append); // Throws
     }
 }
 
 template <class T, bool N>
-void Column<T,N>::erase_without_updating_index(std::size_t row_ndx, bool is_last)
+void Column<T,N>::erase_without_updating_index(std::size_t row_index, bool is_last)
 {
-    m_tree.erase(row_ndx, is_last);
+    m_tree.erase(row_index, is_last);
 }
 
 template <class T, bool N>
-void Column<T,N>::erase(size_t row_ndx)
+void Column<T,N>::erase(size_t row_index)
 {
     REALM_ASSERT(size() >= 1);
-    size_t last_row_ndx = size() - 1; // Note that size() is slow
-    bool is_last = (row_ndx == last_row_ndx);
-    erase(row_ndx, is_last); // Throws
+    size_t last_row_index = size() - 1; // Note that size() is slow
+    bool is_last = (row_index == last_row_index);
+    erase(row_index, is_last); // Throws
 }
 
 template <class T, bool N>
-void Column<T,N>::erase(size_t row_ndx, bool is_last)
+void Column<T,N>::erase(size_t row_index, bool is_last)
 {
     size_t num_rows_to_erase = 1;
-    do_erase(row_ndx, num_rows_to_erase, is_last); // Throws
+    do_erase(row_index, num_rows_to_erase, is_last); // Throws
 }
 
 template <class T, bool N>
-void Column<T, N>::move_last_over_without_updating_index(std::size_t row_ndx, std::size_t last_row_ndx)
+void Column<T, N>::move_last_over_without_updating_index(std::size_t row_index, std::size_t last_row_index)
 {
-    m_tree.move_last_over(row_ndx, last_row_ndx);
+    m_tree.move_last_over(row_index, last_row_index);
 }
 
 template <class T, bool N>
-void Column<T,N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
+void Column<T,N>::move_last_over(std::size_t row_index, std::size_t last_row_index)
 {
-    REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
-    REALM_ASSERT_DEBUG(last_row_ndx + 1 == size());
+    REALM_ASSERT_3(row_index, <=, last_row_index);
+    REALM_ASSERT_DEBUG(last_row_index + 1 == size());
 
     if (has_search_index()) {
         // remove the value to be overwritten from index
         bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
+        m_search_index->erase<StringData>(row_index, is_last); // Throws
 
         // update index to point to new location
-        if (row_ndx != last_row_ndx) {
-            int_fast64_t moved_value = get(last_row_ndx);
-            m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
+        if (row_index != last_row_index) {
+            int_fast64_t moved_value = get(last_row_index);
+            m_search_index->update_ref(moved_value, last_row_index, row_index); // Throws
         }
     }
 
-    move_last_over_without_updating_index(row_ndx, last_row_ndx);
+    move_last_over_without_updating_index(row_index, last_row_index);
 }
 
 template <class T, bool N>
@@ -1200,46 +1200,46 @@ void Column<T,N>::clear()
 
 // Implementing pure virtual method of ColumnBase.
 template <class T, bool N>
-void Column<T,N>::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
+void Column<T,N>::insert_rows(size_t row_index, size_t num_rows_to_insert, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(row_index <= prior_num_rows);
 
-    size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
+    size_t row_index_2 = (row_index == prior_num_rows ? realm::npos : row_index);
     T value{};
-    insert(row_ndx_2, value, num_rows_to_insert); // Throws
+    insert(row_index_2, value, num_rows_to_insert); // Throws
 
     if (N) {
         // Default value for nullable columns is NULL.
         // FIXME: Make faster with an insert_null method.
         for (size_t i = 0; i < num_rows_to_insert; ++i) {
-            set_null(row_ndx + i);
+            set_null(row_index + i);
         }
     }
 }
 
 // Implementing pure virtual method of ColumnBase.
 template <class T, bool N>
-void Column<T,N>::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+void Column<T,N>::erase_rows(size_t row_index, size_t num_rows_to_erase, size_t prior_num_rows,
                               bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
-    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+    REALM_ASSERT(row_index <= prior_num_rows - num_rows_to_erase);
 
-    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
-    do_erase(row_ndx, num_rows_to_erase, is_last); // Throws
+    bool is_last = (row_index + num_rows_to_erase == prior_num_rows);
+    do_erase(row_index, num_rows_to_erase, is_last); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
 template <class T, bool N>
-void Column<T,N>::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
+void Column<T,N>::move_last_row_over(size_t row_index, size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx < prior_num_rows);
+    REALM_ASSERT(row_index < prior_num_rows);
 
-    size_t last_row_ndx = prior_num_rows - 1;
-    move_last_over(row_ndx, last_row_ndx); // Throws
+    size_t last_row_index = prior_num_rows - 1;
+    move_last_over(row_index, last_row_index); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
@@ -1276,14 +1276,14 @@ std::size_t Column<T,N>::find_gte(T target, size_t start) const
 {
     // fixme: slow reference implementation. See Array::find_gte for faster version
     size_t ref = 0;
-    size_t idx;
-    for (idx = start; idx < size(); ++idx) {
-        if (get(idx) >= target) {
-            ref = idx;
+    size_t index;
+    for (index = start; index < size(); ++index) {
+        if (get(index) >= target) {
+            ref = index;
             break;
         }
     }
-    if (idx == size())
+    if (index == size())
         ref = not_found;
 
     return ref;
@@ -1334,24 +1334,24 @@ ref_type Column<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
 }
 
 template <class T, bool N>
-void Column<T,N>::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
+void Column<T,N>::refresh_accessor_tree(size_t new_column_index, const Spec& spec)
 {
     m_tree.init_from_parent();
-    ColumnBaseWithIndex::refresh_accessor_tree(new_col_ndx, spec);
+    ColumnBaseWithIndex::refresh_accessor_tree(new_column_index, spec);
 }
 
 template <class T, bool N>
-void Column<T,N>::do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last)
+void Column<T,N>::do_erase(size_t row_index, size_t num_rows_to_erase, bool is_last)
 {
     if (has_search_index()) {
         for (size_t i = num_rows_to_erase; i > 0; --i) {
-            size_t row_ndx_2 = row_ndx + i - 1;
-            m_search_index->erase<T>(row_ndx_2, is_last); // Throws
+            size_t row_index_2 = row_index + i - 1;
+            m_search_index->erase<T>(row_index_2, is_last); // Throws
         }
     }
     for (size_t i = num_rows_to_erase; i > 0; --i) {
-        size_t row_ndx_2 = row_ndx + i - 1;
-        erase_without_updating_index(row_ndx_2, is_last); // Throws
+        size_t row_index_2 = row_index + i - 1;
+        erase_without_updating_index(row_index_2, is_last); // Throws
     }
 }
 
@@ -1383,10 +1383,10 @@ void Column<T,N>::tree_to_dot(std::ostream& out) const
 }
 
 template <class T, bool N>
-void Column<T,N>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
+void Column<T,N>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t index_in_parent,
                          std::ostream& out) const
 {
-    BpTree<T,N>::leaf_to_dot(leaf_mem, parent, ndx_in_parent, out, get_alloc());
+    BpTree<T,N>::leaf_to_dot(leaf_mem, parent, index_in_parent, out, get_alloc());
 }
 
 template <class T, bool N>

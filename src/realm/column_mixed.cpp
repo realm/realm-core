@@ -24,7 +24,7 @@ void MixedColumn::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
         m_binary_data->update_from_parent(old_baseline);
 }
 
-void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
+void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t column_index)
 {
     std::unique_ptr<Array> top;
     std::unique_ptr<IntegerColumn> types;
@@ -37,7 +37,7 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     ref_type data_ref  = top->get_as_ref(1);
     types.reset(new IntegerColumn(alloc, types_ref)); // Throws
     types->set_parent(&*top, 0);
-    data.reset(new RefsColumn(alloc, data_ref, table, column_ndx)); // Throws
+    data.reset(new RefsColumn(alloc, data_ref, table, column_index)); // Throws
     data->set_parent(&*top, 1);
     REALM_ASSERT_3(types->size(), ==, data->size());
 
@@ -69,91 +69,91 @@ void MixedColumn::ensure_binary_data_column()
 }
 
 
-MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType new_type)
+MixedColumn::MixedColType MixedColumn::clear_value(size_t row_index, MixedColType new_type)
 {
-    REALM_ASSERT_3(row_ndx, <, m_types->size());
+    REALM_ASSERT_3(row_index, <, m_types->size());
 
-    MixedColType old_type = MixedColType(m_types->get(row_ndx));
+    MixedColType old_type = MixedColType(m_types->get(row_index));
     switch (old_type) {
-        case mixcol_Int:
-        case mixcol_IntNeg:
-        case mixcol_Bool:
-        case mixcol_Date:
-        case mixcol_Float:
-        case mixcol_Double:
-        case mixcol_DoubleNeg:
+        case mixcolumn_Int:
+        case mixcolumn_IntNeg:
+        case mixcolumn_Bool:
+        case mixcolumn_Date:
+        case mixcolumn_Float:
+        case mixcolumn_Double:
+        case mixcolumn_DoubleNeg:
             goto carry_on;
-        case mixcol_String:
-        case mixcol_Binary: {
+        case mixcolumn_String:
+        case mixcolumn_Binary: {
             // If item is in middle of the column, we just clear it to avoid
             // having to adjust refs to following items
             //
             // FIXME: this is a leak. We should adjust
-            size_t data_ndx = size_t(uint64_t(m_data->get(row_ndx)) >> 1);
-            if (data_ndx == m_binary_data->size()-1) {
+            size_t data_index = size_t(uint64_t(m_data->get(row_index)) >> 1);
+            if (data_index == m_binary_data->size()-1) {
                 bool is_last = true;
-                m_binary_data->erase(data_ndx, is_last);
+                m_binary_data->erase(data_index, is_last);
             }
             else {
                 // FIXME: But this will lead to unbounded in-file leaking in
                 // for(;;) { insert_binary(i, ...); erase(i); }
-                m_binary_data->set(data_ndx, BinaryData());
+                m_binary_data->set(data_index, BinaryData());
             }
             goto carry_on;
         }
-        case mixcol_Table: {
+        case mixcolumn_Table: {
             // Delete entire table
-            ref_type ref = m_data->get_as_ref(row_ndx);
+            ref_type ref = m_data->get_as_ref(row_index);
             Array::destroy_deep(ref, m_data->get_alloc());
             goto carry_on;
         }
-        case mixcol_Mixed:
+        case mixcolumn_Mixed:
             break;
     }
     REALM_ASSERT(false);
 
   carry_on:
     if (old_type != new_type)
-        m_types->set(row_ndx, new_type);
-    m_data->set(row_ndx, 0);
+        m_types->set(row_index, new_type);
+    m_data->set(row_index, 0);
 
     return old_type;
 }
 
 
-void MixedColumn::do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows)
+void MixedColumn::do_erase(size_t row_index, size_t num_rows_to_erase, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
-    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+    REALM_ASSERT(row_index <= prior_num_rows - num_rows_to_erase);
 
-    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    bool is_last = (row_index + num_rows_to_erase == prior_num_rows);
     for (size_t i = num_rows_to_erase; i > 0; --i) {
-        size_t row_ndx_2 = row_ndx + i - 1;
+        size_t row_index_2 = row_index + i - 1;
         // Remove refs or binary data
-        clear_value(row_ndx_2, mixcol_Int); // Throws
-        m_types->erase(row_ndx, is_last); // Throws
+        clear_value(row_index_2, mixcolumn_Int); // Throws
+        m_types->erase(row_index, is_last); // Throws
     }
 
     bool broken_reciprocal_backlinks = false; // Ignored
-    m_data->erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+    m_data->erase_rows(row_index, num_rows_to_erase, prior_num_rows,
                        broken_reciprocal_backlinks); // Throws
 }
 
 
-void MixedColumn::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
+void MixedColumn::do_move_last_over(size_t row_index, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx < prior_num_rows);
+    REALM_ASSERT(row_index < prior_num_rows);
 
     // Remove refs or binary data
-    clear_value(row_ndx, mixcol_Int); // Throws
+    clear_value(row_index, mixcolumn_Int); // Throws
 
-    size_t last_row_ndx = prior_num_rows - 1;
-    m_types->move_last_over(row_ndx, last_row_ndx); // Throws
+    size_t last_row_index = prior_num_rows - 1;
+    m_types->move_last_over(row_index, last_row_index); // Throws
 
     bool broken_reciprocal_backlinks = false; // Ignored
-    m_data->move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
+    m_data->move_last_row_over(row_index, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
@@ -169,81 +169,81 @@ void MixedColumn::do_clear(size_t num_rows)
 }
 
 
-DataType MixedColumn::get_type(size_t ndx) const REALM_NOEXCEPT
+DataType MixedColumn::get_type(size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, m_types->size());
-    MixedColType coltype = MixedColType(m_types->get(ndx));
+    REALM_ASSERT_3(index, <, m_types->size());
+    MixedColType coltype = MixedColType(m_types->get(index));
     switch (coltype) {
-        case mixcol_IntNeg:    return type_Int;
-        case mixcol_DoubleNeg: return type_Double;
+        case mixcolumn_IntNeg:    return type_Int;
+        case mixcolumn_DoubleNeg: return type_Double;
         default: return DataType(coltype);   // all others must be in sync with ColumnType
     }
 }
 
 
-void MixedColumn::set_string(size_t ndx, StringData value)
+void MixedColumn::set_string(size_t index, StringData value)
 {
-    REALM_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(index, <, m_types->size());
     ensure_binary_data_column();
 
-    MixedColType type = MixedColType(m_types->get(ndx));
+    MixedColType type = MixedColType(m_types->get(index));
 
     // See if we can reuse data position
-    if (type == mixcol_String) {
-        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
-        m_binary_data->set_string(data_ndx, value);
+    if (type == mixcolumn_String) {
+        size_t data_index = size_t(uint64_t(m_data->get(index)) >> 1);
+        m_binary_data->set_string(data_index, value);
     }
-    else if (type == mixcol_Binary) {
-        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
-        m_binary_data->set_string(data_ndx, value);
-        m_types->set(ndx, mixcol_String);
+    else if (type == mixcolumn_Binary) {
+        size_t data_index = size_t(uint64_t(m_data->get(index)) >> 1);
+        m_binary_data->set_string(data_index, value);
+        m_types->set(index, mixcolumn_String);
     }
     else {
         // Remove refs or binary data
-        clear_value_and_discard_subtab_acc(ndx, mixcol_String); // Throws
+        clear_value_and_discard_subtab_acc(index, mixcolumn_String); // Throws
 
         // Add value to data column
-        size_t data_ndx = m_binary_data->size();
+        size_t data_index = m_binary_data->size();
         m_binary_data->add_string(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
-        int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
+        int64_t v = int64_t((uint64_t(data_index) << 1) + 1);
 
-        m_types->set(ndx, mixcol_String);
-        m_data->set(ndx, v);
+        m_types->set(index, mixcolumn_String);
+        m_data->set(index, v);
     }
 }
 
-void MixedColumn::set_binary(size_t ndx, BinaryData value)
+void MixedColumn::set_binary(size_t index, BinaryData value)
 {
-    REALM_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(index, <, m_types->size());
     ensure_binary_data_column();
 
-    MixedColType type = MixedColType(m_types->get(ndx));
+    MixedColType type = MixedColType(m_types->get(index));
 
     // See if we can reuse data position
-    if (type == mixcol_String) {
-        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
-        m_binary_data->set(data_ndx, value);
-        m_types->set(ndx, mixcol_Binary);
+    if (type == mixcolumn_String) {
+        size_t data_index = size_t(uint64_t(m_data->get(index)) >> 1);
+        m_binary_data->set(data_index, value);
+        m_types->set(index, mixcolumn_Binary);
     }
-    else if (type == mixcol_Binary) {
-        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
-        m_binary_data->set(data_ndx, value);
+    else if (type == mixcolumn_Binary) {
+        size_t data_index = size_t(uint64_t(m_data->get(index)) >> 1);
+        m_binary_data->set(data_index, value);
     }
     else {
         // Remove refs or binary data
-        clear_value_and_discard_subtab_acc(ndx, mixcol_Binary); // Throws
+        clear_value_and_discard_subtab_acc(index, mixcolumn_Binary); // Throws
 
         // Add value to data column
-        size_t data_ndx = m_binary_data->size();
+        size_t data_index = m_binary_data->size();
         m_binary_data->add(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
-        int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
+        int64_t v = int64_t((uint64_t(data_index) << 1) + 1);
 
-        m_types->set(ndx, mixcol_Binary);
-        m_data->set(ndx, v);
+        m_types->set(index, mixcolumn_Binary);
+        m_data->set(index, v);
     }
 }
 
@@ -309,7 +309,7 @@ ref_type MixedColumn::create(Allocator& alloc, size_t size)
     top.create(Array::type_HasRefs); // Throws
 
     {
-        int_fast64_t v = mixcol_Int;
+        int_fast64_t v = mixcolumn_Int;
         ref_type ref = IntegerColumn::create(alloc, Array::type_Normal, size, v); // Throws
         v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
@@ -393,9 +393,9 @@ void MixedColumn::verify() const
     do_verify(0,0);
 }
 
-void MixedColumn::verify(const Table& table, size_t col_ndx) const
+void MixedColumn::verify(const Table& table, size_t column_index) const
 {
-    do_verify(&table, col_ndx);
+    do_verify(&table, column_index);
 
     // Verify each sub-table
     size_t n = size();
@@ -409,12 +409,12 @@ void MixedColumn::verify(const Table& table, size_t col_ndx) const
     }
 }
 
-void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
+void MixedColumn::do_verify(const Table* table, size_t column_index) const
 {
     m_array->verify();
     m_types->verify();
     if (table) {
-        m_data->verify(*table, col_ndx);
+        m_data->verify(*table, column_index);
     }
     else {
         m_data->verify();
@@ -447,7 +447,7 @@ void MixedColumn::to_dot(std::ostream& out, StringData title) const
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
         MixedColType type = MixedColType(m_types->get(i));
-        if (type != mixcol_Table)
+        if (type != mixcolumn_Table)
             continue;
         ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         subtable->to_dot(out);

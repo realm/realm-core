@@ -41,26 +41,26 @@ public:
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
     bool is_nullable() const REALM_NOEXCEPT override;
 
-    BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT override;
+    BinaryData get(std::size_t index) const REALM_NOEXCEPT;
+    bool is_null(std::size_t index) const REALM_NOEXCEPT override;
     StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT final;
 
     void add(BinaryData value);
-    void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void set_null(std::size_t ndx) override;
-    void insert(std::size_t ndx, BinaryData value);
-    void erase(std::size_t row_ndx);
-    void erase(std::size_t row_ndx, bool is_last);
-    void move_last_over(std::size_t row_ndx);
+    void set(std::size_t index, BinaryData value, bool add_zero_term = false);
+    void set_null(std::size_t index) override;
+    void insert(std::size_t index, BinaryData value);
+    void erase(std::size_t row_index);
+    void erase(std::size_t row_index, bool is_last);
+    void move_last_over(std::size_t row_index);
     void clear();
     size_t find_first(BinaryData value) const;
 
     // Requires that the specified entry was inserted as StringData.
-    StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_string(std::size_t index) const REALM_NOEXCEPT;
 
     void add_string(StringData value);
-    void set_string(std::size_t ndx, StringData value) override;
-    void insert_string(std::size_t ndx, StringData value);
+    void set_string(std::size_t index, StringData value) override;
+    void insert_string(std::size_t index, StringData value);
 
     /// Compare two binary columns for equality.
     bool compare_binary(const BinaryColumn&) const;
@@ -87,13 +87,13 @@ public:
 #endif
 
 private:
-    /// \param row_ndx Must be `realm::npos` if appending.
-    void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
+    /// \param row_index Must be `realm::npos` if appending.
+    void do_insert(std::size_t row_index, BinaryData value, bool add_zero_term,
                    std::size_t num_rows);
 
     // Called by Array::bptree_insert().
-    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
-                                Allocator&, std::size_t insert_ndx,
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t index_in_parent,
+                                Allocator&, std::size_t insert_index,
                                 Array::TreeInsert<BinaryColumn>& state);
 
     struct InsertState: Array::TreeInsert<BinaryColumn> {
@@ -104,7 +104,7 @@ private:
     class CreateHandler;
     class SliceHandler;
 
-    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_move_last_over(std::size_t row_index, std::size_t last_row_index);
     void do_clear();
 
     /// Root must be a leaf. Upgrades the root leaf if
@@ -115,7 +115,7 @@ private:
     bool m_nullable = false;
 
 #ifdef REALM_DEBUG
-    void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+    void leaf_to_dot(MemRef, ArrayParent*, std::size_t index_in_parent,
                      std::ostream&) const override;
 #endif
 
@@ -175,55 +175,55 @@ inline void BinaryColumn::update_from_parent(std::size_t old_baseline) REALM_NOE
     m_array->update_from_parent(old_baseline);
 }
 
-inline BinaryData BinaryColumn::get(std::size_t ndx) const REALM_NOEXCEPT
+inline BinaryData BinaryColumn::get(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG(index < size());
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
-            return leaf->get(ndx);
+            return leaf->get(index);
         }
         // Big blobs root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-        return leaf->get(ndx);
+        return leaf->get(index);
     }
 
     // Non-leaf root
-    std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
+    std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(index);
     const char* leaf_header = p.first.m_addr;
-    std::size_t ndx_in_leaf = p.second;
+    std::size_t index_in_leaf = p.second;
     Allocator& alloc = m_array->get_alloc();
     bool is_big = Array::get_context_flag_from_header(leaf_header);
     if (!is_big) {
         // Small blobs
-        return ArrayBinary::get(leaf_header, ndx_in_leaf, alloc);
+        return ArrayBinary::get(leaf_header, index_in_leaf, alloc);
     }
     // Big blobs
-    return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, alloc);
+    return ArrayBigBlobs::get(leaf_header, index_in_leaf, alloc);
 }
 
-inline bool BinaryColumn::is_null(std::size_t ndx) const REALM_NOEXCEPT
+inline bool BinaryColumn::is_null(std::size_t index) const REALM_NOEXCEPT
 {
-    return get(ndx).is_null();
+    return get(index).is_null();
 }
 
-inline StringData BinaryColumn::get_string(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData BinaryColumn::get_string(std::size_t index) const REALM_NOEXCEPT
 {
-    BinaryData bin = get(ndx);
+    BinaryData bin = get(index);
     REALM_ASSERT_3(0, <, bin.size());
     return StringData(bin.data(), bin.size()-1);
 }
 
-inline void BinaryColumn::set_string(std::size_t ndx, StringData value)
+inline void BinaryColumn::set_string(std::size_t index, StringData value)
 {
     if (value.is_null() && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
-    set(ndx, bin, add_zero_term);
+    set(index, bin, add_zero_term);
 }
 
 inline void BinaryColumn::add(BinaryData value)
@@ -231,28 +231,28 @@ inline void BinaryColumn::add(BinaryData value)
     if (value.is_null() && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
-    std::size_t row_ndx = realm::npos;
+    std::size_t row_index = realm::npos;
     bool add_zero_term = false;
     std::size_t num_rows = 1;
-    do_insert(row_ndx, value, add_zero_term, num_rows); // Throws
+    do_insert(row_index, value, add_zero_term, num_rows); // Throws
 }
 
-inline void BinaryColumn::insert(std::size_t row_ndx, BinaryData value)
+inline void BinaryColumn::insert(std::size_t row_index, BinaryData value)
 {
     if (value.is_null() && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
     std::size_t size = this->size(); // Slow
-    REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
+    REALM_ASSERT_3(row_index, <=, size);
+    std::size_t row_index_2 = row_index == size ? realm::npos : row_index;
     bool add_zero_term = false;
     std::size_t num_rows = 1;
-    do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
+    do_insert(row_index_2, value, add_zero_term, num_rows); // Throws
 }
 
-inline void BinaryColumn::set_null(std::size_t row_ndx)
+inline void BinaryColumn::set_null(std::size_t row_index)
 {
-    set(row_ndx, BinaryData{});
+    set(row_index, BinaryData{});
 }
 
 inline size_t BinaryColumn::find_first(BinaryData value) const
@@ -265,17 +265,17 @@ inline size_t BinaryColumn::find_first(BinaryData value) const
 }
 
 
-inline void BinaryColumn::erase(std::size_t row_ndx)
+inline void BinaryColumn::erase(std::size_t row_index)
 {
-    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
-    bool is_last = row_ndx == last_row_ndx;
-    erase(row_ndx, is_last); // Throws
+    std::size_t last_row_index = size() - 1; // Note that size() is slow
+    bool is_last = row_index == last_row_index;
+    erase(row_index, is_last); // Throws
 }
 
-inline void BinaryColumn::move_last_over(std::size_t row_ndx)
+inline void BinaryColumn::move_last_over(std::size_t row_index)
 {
-    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
-    do_move_last_over(row_ndx, last_row_ndx); // Throws
+    std::size_t last_row_index = size() - 1; // Note that size() is slow
+    do_move_last_over(row_index, last_row_index); // Throws
 }
 
 inline void BinaryColumn::clear()
@@ -284,41 +284,41 @@ inline void BinaryColumn::clear()
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void BinaryColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
+inline void BinaryColumn::insert_rows(size_t row_index, size_t num_rows_to_insert,
                                       size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(row_index <= prior_num_rows);
 
-    size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
+    size_t row_index_2 = (row_index == prior_num_rows ? realm::npos : row_index);
     BinaryData value = m_nullable ? BinaryData() : BinaryData("", 0);
     bool add_zero_term = false;
-    do_insert(row_ndx_2, value, add_zero_term, num_rows_to_insert); // Throws
+    do_insert(row_index_2, value, add_zero_term, num_rows_to_insert); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void BinaryColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+inline void BinaryColumn::erase_rows(size_t row_index, size_t num_rows_to_erase,
                                      size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
-    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+    REALM_ASSERT(row_index <= prior_num_rows - num_rows_to_erase);
 
-    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    bool is_last = (row_index + num_rows_to_erase == prior_num_rows);
     for (size_t i = num_rows_to_erase; i > 0; --i) {
-        size_t row_ndx_2 = row_ndx + i - 1;
-        erase(row_ndx_2, is_last); // Throws
+        size_t row_index_2 = row_index + i - 1;
+        erase(row_index_2, is_last); // Throws
     }
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void BinaryColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
+inline void BinaryColumn::move_last_row_over(size_t row_index, size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx < prior_num_rows);
+    REALM_ASSERT(row_index < prior_num_rows);
 
-    size_t last_row_ndx = prior_num_rows - 1;
-    do_move_last_over(row_ndx, last_row_ndx); // Throws
+    size_t last_row_index = prior_num_rows - 1;
+    do_move_last_over(row_index, last_row_index); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
@@ -329,22 +329,22 @@ inline void BinaryColumn::clear(std::size_t, bool)
 
 inline void BinaryColumn::add_string(StringData value)
 {
-    std::size_t row_ndx = realm::npos;
+    std::size_t row_index = realm::npos;
     BinaryData value_2(value.data(), value.size());
     bool add_zero_term = true;
     std::size_t num_rows = 1;
-    do_insert(row_ndx, value_2, add_zero_term, num_rows); // Throws
+    do_insert(row_index, value_2, add_zero_term, num_rows); // Throws
 }
 
-inline void BinaryColumn::insert_string(std::size_t row_ndx, StringData value)
+inline void BinaryColumn::insert_string(std::size_t row_index, StringData value)
 {
     std::size_t size = this->size(); // Slow
-    REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
+    REALM_ASSERT_3(row_index, <=, size);
+    std::size_t row_index_2 = row_index == size ? realm::npos : row_index;
     BinaryData value_2(value.data(), value.size());
     bool add_zero_term = false;
     std::size_t num_rows = 1;
-    do_insert(row_ndx_2, value_2, add_zero_term, num_rows); // Throws
+    do_insert(row_index_2, value_2, add_zero_term, num_rows); // Throws
 }
 
 inline std::size_t BinaryColumn::get_size_from_ref(ref_type root_ref,

@@ -31,7 +31,7 @@ class Table;
 class LinkColumnBase: public IntegerColumn {
 public:
     // Create unattached root array aaccessor.
-    LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx);
+    LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_index);
     ~LinkColumnBase() REALM_NOEXCEPT override;
 
     StringIndex* create_search_index() override;
@@ -44,9 +44,9 @@ public:
     BacklinkColumn& get_backlink_column() const REALM_NOEXCEPT;
     void set_backlink_column(BacklinkColumn&) REALM_NOEXCEPT;
 
-    virtual void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) = 0;
-    virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                                std::size_t new_target_row_ndx) = 0;
+    virtual void do_nullify_link(std::size_t row_index, std::size_t old_target_row_index) = 0;
+    virtual void do_update_link(std::size_t row_index, std::size_t old_target_row_index,
+                                std::size_t new_target_row_index) = 0;
 
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
@@ -65,7 +65,7 @@ protected:
     Table* const m_table;
 
     // The index of this column within m_table.m_cols.
-    std::size_t m_column_ndx;
+    std::size_t m_column_index;
 
     TableRef m_target_table;
     BacklinkColumn* m_backlink_column = nullptr;
@@ -74,7 +74,7 @@ protected:
     /// Call Table::cascade_break_backlinks_to() for the specified target row if
     /// it is not already in \a state.rows, and the number of strong links to it
     /// has dropped to zero.
-    void check_cascade_break_backlinks_to(std::size_t target_table_ndx, std::size_t target_row_ndx,
+    void check_cascade_break_backlinks_to(std::size_t target_table_index, std::size_t target_row_index,
                                           CascadeState& state);
 };
 
@@ -83,10 +83,10 @@ protected:
 
 // Implementation
 
-inline LinkColumnBase::LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx):
+inline LinkColumnBase::LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_index):
     IntegerColumn(alloc, ref), // Throws
     m_table(table),
-    m_column_ndx(column_ndx)
+    m_column_index(column_index)
 {
 }
 
@@ -130,27 +130,27 @@ inline void LinkColumnBase::set_backlink_column(BacklinkColumn& column) REALM_NO
     m_backlink_column = &column;
 }
 
-inline void LinkColumnBase::adj_acc_insert_rows(std::size_t row_ndx,
+inline void LinkColumnBase::adj_acc_insert_rows(std::size_t row_index,
                                                 std::size_t num_rows) REALM_NOEXCEPT
 {
-    IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
+    IntegerColumn::adj_acc_insert_rows(row_index, num_rows);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);
 }
 
-inline void LinkColumnBase::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+inline void LinkColumnBase::adj_acc_erase_row(size_t row_index) REALM_NOEXCEPT
 {
-    IntegerColumn::adj_acc_erase_row(row_ndx);
+    IntegerColumn::adj_acc_erase_row(row_index);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);
 }
 
-inline void LinkColumnBase::adj_acc_move_over(std::size_t from_row_ndx,
-                                              std::size_t to_row_ndx) REALM_NOEXCEPT
+inline void LinkColumnBase::adj_acc_move_over(std::size_t from_row_index,
+                                              std::size_t to_row_index) REALM_NOEXCEPT
 {
-    IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
+    IntegerColumn::adj_acc_move_over(from_row_index, to_row_index);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);

@@ -50,10 +50,10 @@ void ColumnBase::set_string(size_t, StringData)
     throw LogicError(LogicError::type_mismatch);
 }
 
-void ColumnBaseWithIndex::set_ndx_in_parent(size_t ndx) REALM_NOEXCEPT
+void ColumnBaseWithIndex::set_index_in_parent(size_t index) REALM_NOEXCEPT
 {
     if (m_search_index) {
-        m_search_index->set_ndx_in_parent(ndx + 1);
+        m_search_index->set_index_in_parent(index + 1);
     }
 }
 
@@ -64,10 +64,10 @@ void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
     }
 }
 
-void ColumnBaseWithIndex::refresh_accessor_tree(std::size_t new_col_ndx, const realm::Spec& spec)
+void ColumnBaseWithIndex::refresh_accessor_tree(std::size_t new_column_index, const realm::Spec& spec)
 {
     if (m_search_index) {
-        m_search_index->refresh_accessor_tree(new_col_ndx, spec);
+        m_search_index->refresh_accessor_tree(new_column_index, spec);
     }
 }
 
@@ -104,8 +104,8 @@ void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
 {
     // FIXME: Duplicated from bptree.cpp.
     ArrayParent* parent = m_array->get_parent();
-    std::size_t ndx_in_parent = m_array->get_ndx_in_parent();
-    leaf->set_parent(parent, ndx_in_parent);
+    std::size_t index_in_parent = m_array->get_index_in_parent();
+    leaf->set_parent(parent, index_in_parent);
     leaf->update_parent(); // Throws
     m_array = std::move(leaf);
 }
@@ -124,40 +124,40 @@ struct GetSizeFromRef {
     }
 };
 
-template<class Op> void col_type_deleg(Op& op, ColumnType type)
+template<class Op> void column_type_deleg(Op& op, ColumnType type)
 {
     switch (type) {
-        case col_type_Int:
-        case col_type_Bool:
-        case col_type_DateTime:
-        case col_type_Link:
+        case column_type_Int:
+        case column_type_Bool:
+        case column_type_DateTime:
+        case column_type_Link:
             op.template call<IntegerColumn>();
             return;
-        case col_type_String:
+        case column_type_String:
             op.template call<StringColumn>();
             return;
-        case col_type_StringEnum:
+        case column_type_StringEnum:
             op.template call<StringEnumColumn>();
             return;
-        case col_type_Binary:
+        case column_type_Binary:
             op.template call<BinaryColumn>();
             return;
-        case col_type_Table:
+        case column_type_Table:
             op.template call<SubtableColumn>();
             return;
-        case col_type_Mixed:
+        case column_type_Mixed:
             op.template call<MixedColumn>();
             return;
-        case col_type_Float:
+        case column_type_Float:
             op.template call<FloatColumn>();
             return;
-        case col_type_Double:
+        case column_type_Double:
             op.template call<DoubleColumn>();
             return;
-        case col_type_Reserved1:
-        case col_type_Reserved4:
-        case col_type_LinkList:
-        case col_type_BackLink:
+        case column_type_Reserved1:
+        case column_type_Reserved4:
+        case column_type_LinkList:
+        case column_type_BackLink:
             break;
     }
     REALM_ASSERT_DEBUG(false);
@@ -343,7 +343,7 @@ size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
                                               Allocator& alloc) REALM_NOEXCEPT
 {
     GetSizeFromRef op(ref, alloc);
-    col_type_deleg(op, type);
+    column_type_deleg(op, type);
     return op.m_size;
 }
 
@@ -431,7 +431,7 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
     Allocator& alloc = get_alloc();
     std::unique_ptr<Array> new_root(new Array(alloc)); // Throws
     new_root->create(Array::type_InnerBptreeNode); // Throws
-    new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
+    new_root->set_parent(orig_root->get_parent(), orig_root->get_index_in_parent());
     new_root->update_parent(); // Throws
     bool compact_form =
         is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
@@ -556,10 +556,10 @@ void ColumnBaseWithIndex::destroy_search_index() REALM_NOEXCEPT
 }
 
 void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent,
-    size_t ndx_in_parent, bool allow_duplicate_valaues)
+    size_t index_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
+    m_search_index.reset(new StringIndex(ref, parent, index_in_parent, this,
         !allow_duplicate_valaues, get_alloc())); // Throws
 }
 
@@ -570,10 +570,10 @@ class ColumnBase::LeafToDot: public Array::ToDotHandler {
 public:
     const ColumnBase& m_column;
     LeafToDot(const ColumnBase& column): m_column(column) {}
-    void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
+    void to_dot(MemRef mem, ArrayParent* parent, size_t index_in_parent,
                 ostream& out) override
     {
-        m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);
+        m_column.leaf_to_dot(mem, parent, index_in_parent, out);
     }
 };
 

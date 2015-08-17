@@ -82,28 +82,28 @@ public:
 
     //@}
 
-    static Table* get_subtable_ptr(Table*, std::size_t column_ndx, std::size_t row_ndx);
-    static const Table* get_subtable_ptr(const Table*, std::size_t column_ndx,
-                                         std::size_t row_ndx);
+    static Table* get_subtable_ptr(Table*, std::size_t column_index, std::size_t row_index);
+    static const Table* get_subtable_ptr(const Table*, std::size_t column_index,
+                                         std::size_t row_index);
 
     // FIXME: This is an 'oddball', do we really need it? If we do,
     // please provide a comment that explains why it is needed!
-    static Table* get_subtable_ptr_during_insert(Table*, std::size_t col_ndx,
-                                                 std::size_t row_ndx);
+    static Table* get_subtable_ptr_during_insert(Table*, std::size_t column_index,
+                                                 std::size_t row_index);
 
-    static Table* get_subtable_ptr(TableView*, std::size_t column_ndx, std::size_t row_ndx);
-    static const Table* get_subtable_ptr(const TableView*, std::size_t column_ndx,
-                                         std::size_t row_ndx);
-    static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_ndx,
-                                         std::size_t row_ndx);
+    static Table* get_subtable_ptr(TableView*, std::size_t column_index, std::size_t row_index);
+    static const Table* get_subtable_ptr(const TableView*, std::size_t column_index,
+                                         std::size_t row_index);
+    static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_index,
+                                         std::size_t row_index);
 
-    /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source). Note
+    /// Calls parent.set_mixed_subtable(column_index, row_index, &source). Note
     /// that the source table must have a descriptor that is
     /// compatible with the target subtable column.
-    static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+    static void set_mixed_subtable(Table& parent, std::size_t column_index, std::size_t row_index,
                                    const Table& source);
 
-    static LinkView* get_linklist_ptr(Row&, std::size_t col_ndx);
+    static LinkView* get_linklist_ptr(Row&, std::size_t column_index);
     static void unbind_linklist_ptr(LinkView*);
 
     //@{
@@ -216,8 +216,8 @@ inline Table* LangBindHelper::new_table()
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = tf::create_empty_table(alloc); // Throws
     Table::Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
-    Table* table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
+    std::size_t index_in_parent = 0;
+    Table* table = tf::create_accessor(alloc, ref, parent, index_in_parent); // Throws
     tf::bind_ref(*table);
     return table;
 }
@@ -228,44 +228,44 @@ inline Table* LangBindHelper::copy_table(const Table& table)
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = tf::clone(table, alloc); // Throws
     Table::Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
-    Table* copy_of_table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
+    std::size_t index_in_parent = 0;
+    Table* copy_of_table = tf::create_accessor(alloc, ref, parent, index_in_parent); // Throws
     tf::bind_ref(*copy_of_table);
     return copy_of_table;
 }
 
-inline Table* LangBindHelper::get_subtable_ptr(Table* t, std::size_t column_ndx,
-                                               std::size_t row_ndx)
+inline Table* LangBindHelper::get_subtable_ptr(Table* t, std::size_t column_index,
+                                               std::size_t row_index)
 {
-    Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
+    Table* subtab = t->get_subtable_ptr(column_index, row_index); // Throws
     subtab->bind_ref();
     return subtab;
 }
 
-inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, std::size_t column_ndx,
-                                                     std::size_t row_ndx)
+inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, std::size_t column_index,
+                                                     std::size_t row_index)
 {
-    const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
+    const Table* subtab = t->get_subtable_ptr(column_index, row_index); // Throws
     subtab->bind_ref();
     return subtab;
 }
 
-inline Table* LangBindHelper::get_subtable_ptr(TableView* tv, std::size_t column_ndx,
-                                               std::size_t row_ndx)
+inline Table* LangBindHelper::get_subtable_ptr(TableView* tv, std::size_t column_index,
+                                               std::size_t row_index)
 {
-    return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
+    return get_subtable_ptr(&tv->get_parent(), column_index, tv->get_source_index(row_index));
 }
 
-inline const Table* LangBindHelper::get_subtable_ptr(const TableView* tv, std::size_t column_ndx,
-                                                     std::size_t row_ndx)
+inline const Table* LangBindHelper::get_subtable_ptr(const TableView* tv, std::size_t column_index,
+                                                     std::size_t row_index)
 {
-    return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
+    return get_subtable_ptr(&tv->get_parent(), column_index, tv->get_source_index(row_index));
 }
 
 inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv,
-                                                     std::size_t column_ndx, std::size_t row_ndx)
+                                                     std::size_t column_index, std::size_t row_index)
 {
-    return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
+    return get_subtable_ptr(&tv->get_parent(), column_index, tv->get_source_index(row_index));
 }
 
 inline Table* LangBindHelper::get_table(Group& group, std::size_t index_in_group)
@@ -328,15 +328,15 @@ inline void LangBindHelper::bind_table_ptr(const Table* t) REALM_NOEXCEPT
    t->bind_ref();
 }
 
-inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_ndx,
-                                               std::size_t row_ndx, const Table& source)
+inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t column_index,
+                                               std::size_t row_index, const Table& source)
 {
-    parent.set_mixed_subtable(col_ndx, row_ndx, &source);
+    parent.set_mixed_subtable(column_index, row_index, &source);
 }
 
-inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, std::size_t col_ndx)
+inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, std::size_t column_index)
 {
-    LinkViewRef link_view = row.get_linklist(col_ndx);
+    LinkViewRef link_view = row.get_linklist(column_index);
     link_view->bind_ref();
     return &*link_view;
 }

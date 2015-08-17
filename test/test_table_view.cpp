@@ -72,12 +72,12 @@ TEST(TableView_Json)
     Table table;
     table.add_column(type_Int, "first");
 
-    size_t ndx = table.add_empty_row();
-    table.set_int(0, ndx, 1);
-    ndx = table.add_empty_row();
-    table.set_int(0, ndx, 2);
-    ndx = table.add_empty_row();
-    table.set_int(0, ndx, 3);
+    size_t index = table.add_empty_row();
+    table.set_int(0, index, 1);
+    index = table.add_empty_row();
+    table.set_int(0, index, 2);
+    index = table.add_empty_row();
+    table.set_int(0, index, 3);
 
     TableView v = table.where().find_all(1);
     std::stringstream ss;
@@ -98,13 +98,13 @@ TEST(TableView_DateMaxMin)
     ttd.add(DateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
-    size_t ndx = not_found;
+    size_t index = not_found;
 
-    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum(&ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum(&index));
+    CHECK_EQUAL(2, index);
 
-    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum(&ndx));
-    CHECK_EQUAL(1, ndx);
+    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum(&index));
+    CHECK_EQUAL(1, index);
 }
 
 TEST(TableView_GetSetInteger)
@@ -135,9 +135,9 @@ TEST(TableView_GetSetInteger)
 
 namespace {
 REALM_TABLE_3(TableFloats,
-                col_float, Float,
-                col_double, Double,
-                col_int, Int)
+                column_float, Float,
+                column_double, Double,
+                column_int, Int)
 }
 
 TEST(TableView_FloatsGetSet)
@@ -155,28 +155,28 @@ TEST(TableView_FloatsGetSet)
     table.add();
     CHECK_EQUAL(6, table.size());
     for (size_t i=0; i<6; ++i) {
-        CHECK_EQUAL(f_val[i], table.column().col_float[i]);
-        CHECK_EQUAL(d_val[i], table.column().col_double[i]);
+        CHECK_EQUAL(f_val[i], table.column().column_float[i]);
+        CHECK_EQUAL(d_val[i], table.column().column_double[i]);
     }
 
     TableFloats::View v; // Test empty construction
-    v = table.column().col_float.find_all(2.1f); // Test assignment
+    v = table.column().column_float.find_all(2.1f); // Test assignment
     CHECK_EQUAL(2, v.size());
 
     TableFloats::View v2(v);
 
 
     // Test of Get
-    CHECK_EQUAL(2.1f, v[0].col_float);
-    CHECK_EQUAL(2.1f, v[1].col_float);
-    CHECK_EQUAL(2.2, v[0].col_double);
-    CHECK_EQUAL(2.3, v[1].col_double);
+    CHECK_EQUAL(2.1f, v[0].column_float);
+    CHECK_EQUAL(2.1f, v[1].column_float);
+    CHECK_EQUAL(2.2, v[0].column_double);
+    CHECK_EQUAL(2.3, v[1].column_double);
 
     // Test of Set
-    v[0].col_float = 123.321f;
-    CHECK_EQUAL(123.321f, v[0].col_float);
-    v[0].col_double = 123.3219;
-    CHECK_EQUAL(123.3219, v[0].col_double);
+    v[0].column_float = 123.321f;
+    CHECK_EQUAL(123.321f, v[0].column_float);
+    v[0].column_double = 123.3219;
+    CHECK_EQUAL(123.3219, v[0].column_double);
 }
 
 TEST(TableView_FloatsFindAndAggregations)
@@ -194,22 +194,22 @@ TEST(TableView_FloatsFindAndAggregations)
     }
 
     // Test find_all()
-    TableFloats::View v_all = table.column().col_int.find_all(1);
+    TableFloats::View v_all = table.column().column_int.find_all(1);
     CHECK_EQUAL(6, v_all.size());
 
-    TableFloats::View v_some = table.column().col_double.find_all(-1.2);
+    TableFloats::View v_some = table.column().column_double.find_all(-1.2);
     CHECK_EQUAL(2, v_some.size());
-    CHECK_EQUAL(0, v_some.get_source_ndx(0));
-    CHECK_EQUAL(3, v_some.get_source_ndx(1));
+    CHECK_EQUAL(0, v_some.get_source_index(0));
+    CHECK_EQUAL(3, v_some.get_source_index(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2) );
-    CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0) );
-    CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2) );
+    CHECK_EQUAL(0, v_all.column().column_double.find_first(-1.2) );
+    CHECK_EQUAL(5, v_all.column().column_double.find_first(0.0) );
+    CHECK_EQUAL(2, v_all.column().column_double.find_first(3.2) );
 
-    CHECK_EQUAL(1, v_all.column().col_float.find_first(2.1f) );
-    CHECK_EQUAL(5, v_all.column().col_float.find_first(0.0f) );
-    CHECK_EQUAL(2, v_all.column().col_float.find_first(3.1f) );
+    CHECK_EQUAL(1, v_all.column().column_float.find_first(2.1f) );
+    CHECK_EQUAL(5, v_all.column().column_float.find_first(0.0f) );
+    CHECK_EQUAL(2, v_all.column().column_float.find_first(3.1f) );
 
     // TODO: add for float as well
 
@@ -217,71 +217,71 @@ TEST(TableView_FloatsFindAndAggregations)
 
     // Test sum
     CHECK_APPROXIMATELY_EQUAL(sum_d,
-                              v_all.column().col_double.sum(),  10*epsilon);
+                              v_all.column().column_double.sum(),  10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(sum_f,
-                              v_all.column().col_float.sum(),   10*epsilon);
+                              v_all.column().column_float.sum(),   10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2,
-                              v_some.column().col_double.sum(), 10*epsilon);
+                              v_some.column().column_double.sum(), 10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f),
-                              v_some.column().col_float.sum(),  10*epsilon);
+                              v_some.column().column_float.sum(),  10*epsilon);
 
-    size_t ndx = not_found;
+    size_t index = not_found;
 
     // Test max
-    CHECK_EQUAL(3.2, v_all.column().col_double.maximum(&ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.2, v_all.column().column_double.maximum(&index));
+    CHECK_EQUAL(2, index);
 
-    CHECK_EQUAL(-1.2, v_some.column().col_double.maximum(&ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.column().column_double.maximum(&index));
+    CHECK_EQUAL(0, index);
 
-    CHECK_EQUAL(3.1f, v_all.column().col_float.maximum(&ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.1f, v_all.column().column_float.maximum(&index));
+    CHECK_EQUAL(2, index);
 
-    CHECK_EQUAL(1.2f, v_some.column().col_float.maximum(&ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(1.2f, v_some.column().column_float.maximum(&index));
+    CHECK_EQUAL(0, index);
 
     // Max without ret_index
-    CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
-    CHECK_EQUAL(-1.2, v_some.column().col_double.maximum());
-    CHECK_EQUAL(3.1f, v_all.column().col_float.maximum());
-    CHECK_EQUAL(1.2f, v_some.column().col_float.maximum());
+    CHECK_EQUAL(3.2, v_all.column().column_double.maximum());
+    CHECK_EQUAL(-1.2, v_some.column().column_double.maximum());
+    CHECK_EQUAL(3.1f, v_all.column().column_float.maximum());
+    CHECK_EQUAL(1.2f, v_some.column().column_float.maximum());
 
     // Test min
-    CHECK_EQUAL(-1.2, v_all.column().col_double.minimum());
-    CHECK_EQUAL(-1.2, v_some.column().col_double.minimum());
-    CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum());
-    CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
+    CHECK_EQUAL(-1.2, v_all.column().column_double.minimum());
+    CHECK_EQUAL(-1.2, v_some.column().column_double.minimum());
+    CHECK_EQUAL(-1.1f, v_all.column().column_float.minimum());
+    CHECK_EQUAL(-1.1f, v_some.column().column_float.minimum());
 
-    // min with ret_ndx
-    CHECK_EQUAL(-1.2, v_all.column().col_double.minimum(&ndx));
-    CHECK_EQUAL(0, ndx);
+    // min with ret_index
+    CHECK_EQUAL(-1.2, v_all.column().column_double.minimum(&index));
+    CHECK_EQUAL(0, index);
 
-    CHECK_EQUAL(-1.2, v_some.column().col_double.minimum(&ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.column().column_double.minimum(&index));
+    CHECK_EQUAL(0, index);
 
-    CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum(&ndx));
-    CHECK_EQUAL(3, ndx);
+    CHECK_EQUAL(-1.1f, v_all.column().column_float.minimum(&index));
+    CHECK_EQUAL(3, index);
 
-    CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum(&ndx));
-    CHECK_EQUAL(1, ndx);
+    CHECK_EQUAL(-1.1f, v_some.column().column_float.minimum(&index));
+    CHECK_EQUAL(1, index);
 
     // Test avg
     CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0,
-                              v_all.column().col_double.average(),  10*epsilon);
+                              v_all.column().column_double.average(),  10*epsilon);
     CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0,
-                              v_some.column().col_double.average(), 10*epsilon);
+                              v_some.column().column_double.average(), 10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0,
-                              v_all.column().col_float.average(),   10*epsilon);
+                              v_all.column().column_float.average(),   10*epsilon);
     CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2,
-                              v_some.column().col_float.average(), 10*epsilon);
+                              v_some.column().column_float.average(), 10*epsilon);
 
-    CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
-    CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
-    CHECK_EQUAL(2, v_some.column().col_int.count(1));
+    CHECK_EQUAL(1, v_some.column().column_float.count(1.2f));
+    CHECK_EQUAL(2, v_some.column().column_double.count(-1.2));
+    CHECK_EQUAL(2, v_some.column().column_int.count(1));
 
-    CHECK_EQUAL(2, v_all.column().col_float.count(2.1f));
-    CHECK_EQUAL(2, v_all.column().col_double.count(-1.2));
-    CHECK_EQUAL(6, v_all.column().col_int.count(1));
+    CHECK_EQUAL(2, v_all.column().column_float.count(2.1f));
+    CHECK_EQUAL(2, v_all.column().column_double.count(-1.2));
+    CHECK_EQUAL(6, v_all.column().column_int.count(1));
 }
 
 TEST(TableView_Sum)
@@ -390,10 +390,10 @@ TEST(TableView_Min)
     int64_t min = v.column().first.minimum();
     CHECK_EQUAL(-1, min);
 
-    size_t ndx = not_found;
-    min = v.column().first.minimum(&ndx);
+    size_t index = not_found;
+    min = v.column().first.minimum(&index);
     CHECK_EQUAL(-1, min);
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(0, index);
 }
 
 TEST(TableView_Min2)
@@ -412,10 +412,10 @@ TEST(TableView_Min2)
     int64_t min = v.column().first.minimum();
     CHECK_EQUAL(-3, min);
 
-    size_t ndx = not_found;
-    min = v.column().first.minimum(&ndx);
+    size_t index = not_found;
+    min = v.column().first.minimum(&index);
     CHECK_EQUAL(-3, min);
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(2, index);
 
 }
 
@@ -532,8 +532,8 @@ TEST(TableView_SyncAfterCopy) {
     CHECK_EQUAL(1, v2.size());
 
     // make a change
-    size_t ndx2 = table.add_empty_row();
-    table.set_int(0, ndx2, 1);
+    size_t index2 = table.add_empty_row();
+    table.set_int(0, index2, 1);
 
     // verify that the copied view sees the change
     v2.sync_if_needed();
@@ -557,8 +557,8 @@ TEST(TableView_FindAll)
     // todo, add creation to wrapper function in table.h
     TestTableInt::View v2 = v.column().first.find_all(4);
     CHECK_EQUAL(2, v2.size());
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
-    CHECK_EQUAL(2, v2.get_source_ndx(1));
+    CHECK_EQUAL(1, v2.get_source_index(0));
+    CHECK_EQUAL(2, v2.get_source_index(1));
 }
 
 namespace {
@@ -583,8 +583,8 @@ TEST(TableView_FindAllString)
 
     // todo, add creation to wrapper function in table.h
     TestTableString::View v2 = v.column().first.find_all("bar");
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
-    CHECK_EQUAL(2, v2.get_source_ndx(1));
+    CHECK_EQUAL(1, v2.get_source_index(0));
+    CHECK_EQUAL(2, v2.get_source_index(1));
 }
 
 
@@ -772,8 +772,8 @@ TEST(TableView_Delete)
 
     v.remove(1);
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(0, v.get_source_ndx(0));
-    CHECK_EQUAL(3, v.get_source_ndx(1));
+    CHECK_EQUAL(0, v.get_source_index(0));
+    CHECK_EQUAL(3, v.get_source_index(1));
 
     CHECK_EQUAL(4, table.size());
     CHECK_EQUAL(1, table[0].first);
@@ -783,7 +783,7 @@ TEST(TableView_Delete)
 
     v.remove(0);
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_index(0));
 
     CHECK_EQUAL(3, table.size());
     CHECK_EQUAL(2, table[0].first);
@@ -870,7 +870,7 @@ TEST(TableView_FindAllStacked)
     CHECK_EQUAL(1, v2.size());
     CHECK_EQUAL(0, v2[0].first);
     CHECK_EQUAL(2, v2[0].second);
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
+    CHECK_EQUAL(1, v2.get_source_index(0));
 }
 
 
@@ -944,14 +944,14 @@ TEST(TableView_LowLevelSubtables)
 
         view.clear_subtable(2, i_1); // Mixed
         TableRef subtab_mix = view.get_subtable(2, i_1);
-        std::vector<size_t> subcol_path;
+        std::vector<size_t> subcolumn_path;
         subtab_mix->add_column(type_Bool,  "enable");
         subtab_mix->add_column(type_Table, "subtab");
         subtab_mix->add_column(type_Mixed, "mixed");
-        subcol_path.push_back(1);
-        subtab_mix->add_subcolumn(subcol_path, type_Bool,  "enable");
-        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
-        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
+        subcolumn_path.push_back(1);
+        subtab_mix->add_subcolumn(subcolumn_path, type_Bool,  "enable");
+        subtab_mix->add_subcolumn(subcolumn_path, type_Table, "subtab");
+        subtab_mix->add_subcolumn(subcolumn_path, type_Mixed, "mixed");
         subtab_mix->add_empty_row(2 * (3 + i_1));
         for (int i_2 = 0; i_2 != 2 * (3 + i_1); ++i_2)
             subtab_mix->set_bool(0, i_2, i_2 % 2 == 1);
@@ -1280,8 +1280,8 @@ TEST(TableView_RefCounting)
 TEST(TableView_DynPivot)
 {
     TableRef table = Table::create();
-    size_t column_ndx_sex = table->add_column(type_String, "sex");
-    size_t column_ndx_age = table->add_column(type_Int,    "age");
+    size_t column_index_sex = table->add_column(type_String, "sex");
+    size_t column_index_age = table->add_column(type_Int,    "age");
     table->add_column(type_Bool, "hired");
 
     size_t count = 5000;
@@ -1304,23 +1304,23 @@ TEST(TableView_DynPivot)
     CHECK_EQUAL(half, result_count.get_int(1, 1));
 
     Table result_sum;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_sum, result_sum);
+    tv.aggregate(column_index_sex, column_index_age, Table::aggr_sum, result_sum);
 
     Table result_avg;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_avg, result_avg);
+    tv.aggregate(column_index_sex, column_index_age, Table::aggr_avg, result_avg);
 
     Table result_min;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_min, result_min);
+    tv.aggregate(column_index_sex, column_index_age, Table::aggr_min, result_min);
 
     Table result_max;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_max, result_max);
+    tv.aggregate(column_index_sex, column_index_age, Table::aggr_max, result_max);
 
 
     // Test with enumerated strings
     table->optimize();
 
     Table result_count2;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_count, result_count2);
+    tv.aggregate(column_index_sex, column_index_age, Table::aggr_count, result_count2);
     CHECK_EQUAL(2, result_count2.get_column_count());
     CHECK_EQUAL(2, result_count2.size());
     CHECK_EQUAL(half, result_count2.get_int(1, 0));
@@ -1344,7 +1344,7 @@ TEST(TableView_RowAccessor)
     CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
-TEST(TableView_FindBySourceNdx)
+TEST(TableView_FindBySourceindex)
 {
     Table table;
     table.add_column(type_Int, "");
@@ -1356,9 +1356,9 @@ TEST(TableView_FindBySourceNdx)
     table[2].set_int(0, 2);
     TableView tv = table.where().find_all();
     tv.sort(0, false);
-    CHECK_EQUAL(0, tv.find_by_source_ndx(2));
-    CHECK_EQUAL(1, tv.find_by_source_ndx(1));
-    CHECK_EQUAL(2, tv.find_by_source_ndx(0));
+    CHECK_EQUAL(0, tv.find_by_source_index(2));
+    CHECK_EQUAL(1, tv.find_by_source_index(1));
+    CHECK_EQUAL(2, tv.find_by_source_index(0));
 }
 
 TEST(TableView_MultiColSort)

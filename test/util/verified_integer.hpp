@@ -41,11 +41,11 @@ public:
     VerifiedInteger(Random&);
     ~VerifiedInteger();
     void add(int64_t value);
-    void insert(std::size_t ndx, int64_t value);
-    void insert(std::size_t ndx, const char *value);
-    int64_t get(std::size_t ndx);
-    void set(std::size_t ndx, int64_t value);
-    void erase(std::size_t ndx);
+    void insert(std::size_t index, int64_t value);
+    void insert(std::size_t index, const char *value);
+    int64_t get(std::size_t index);
+    void set(std::size_t index, int64_t value);
+    void erase(std::size_t index);
     void clear();
     size_t find_first(int64_t value);
     void find_all(IntegerColumn &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
@@ -55,7 +55,7 @@ public:
     int64_t minimum(std::size_t start = 0, std::size_t end = -1);
     bool verify();
     bool occasional_verify();
-    void verify_neighbours(std::size_t ndx);
+    void verify_neighbours(std::size_t index);
 
 private:
     std::vector<int64_t> v;

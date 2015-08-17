@@ -364,8 +364,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
+        ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), column_ref);
 
         c.add("foobar");
         c.add("bar abc");
@@ -389,8 +389,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
+        ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), column_ref);
 
         c.add("foobar");
         c.add("bar abc");
@@ -415,8 +415,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
+        ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), column_ref);
 
         c.add("40 chars  40 chars  40 chars  40 chars  ");
         c.add("baz");
@@ -436,8 +436,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
+        ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), column_ref);
 
         c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         c.add("baz");
@@ -908,8 +908,8 @@ TEST_TYPES(ColumnString_FindAllExpand, non_nullable, nullable)
     ref_type asc_ref = StringColumn::create(Allocator::get_default());
     StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), col_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), column_ref);
 
     asc.add("HEJ");
     asc.add("sdfsd");
@@ -957,8 +957,8 @@ TEST_TYPES(ColumnString_FindAllRangesLong, non_nullable, nullable)
     ref_type asc_ref = StringColumn::create(Allocator::get_default());
     StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), col_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), column_ref);
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -1016,8 +1016,8 @@ TEST_TYPES(ColumnString_FindAllRanges, non_nullable, nullable)
     ref_type asc_ref = StringColumn::create(Allocator::get_default());
     StringColumn asc(Allocator::get_default(), asc_ref, nullable);
 
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), col_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), column_ref);
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -1082,8 +1082,8 @@ TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, non_nullable, nullable)
 
     col.create_search_index();
 
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn res(Allocator::get_default(), col_ref);
+    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn res(Allocator::get_default(), column_ref);
     col.find_all(res, "a", 0, npos);
 
     CHECK_EQUAL(1, res.size());
@@ -1164,12 +1164,12 @@ TEST_TYPES(ColumnString_Index, non_nullable, nullable)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    const StringIndex& ndx = *asc.create_search_index();
+    const StringIndex& index = *asc.create_search_index();
     CHECK(asc.has_search_index());
 #ifdef REALM_DEBUG
-    ndx.verify_entries(asc);
+    index.verify_entries(asc);
 #else
-    static_cast<void>(ndx);
+    static_cast<void>(index);
 #endif
 
     size_t count0 = asc.count("HEJ");
@@ -1181,14 +1181,14 @@ TEST_TYPES(ColumnString_Index, non_nullable, nullable)
     CHECK_EQUAL(1, count2);
     CHECK_EQUAL(1, count3);
 
-    size_t ndx0 = asc.find_first("HEJS");
-    size_t ndx1 = asc.find_first("HEJSA");
-    size_t ndx2 = asc.find_first("1");
-    size_t ndx3 = asc.find_first("15");
-    CHECK_EQUAL(not_found, ndx0);
-    CHECK_EQUAL(0, ndx1);
-    CHECK_EQUAL(1, ndx2);
-    CHECK_EQUAL(15, ndx3);
+    size_t index0 = asc.find_first("HEJS");
+    size_t index1 = asc.find_first("HEJSA");
+    size_t index2 = asc.find_first("1");
+    size_t index3 = asc.find_first("15");
+    CHECK_EQUAL(not_found, index0);
+    CHECK_EQUAL(0, index1);
+    CHECK_EQUAL(1, index2);
+    CHECK_EQUAL(15, index3);
 
     // Set some values
     asc.set(1, "one");

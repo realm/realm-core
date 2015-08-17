@@ -31,8 +31,8 @@ struct TableView_Handover_patch;
 
 struct LinkView_Handover_patch {
     std::size_t m_table_num;
-    std::size_t m_col_num;
-    std::size_t m_row_ndx;
+    std::size_t m_column_num;
+    std::size_t m_row_index;
 };
 
 struct Query_Handover_patch {
@@ -55,7 +55,7 @@ struct TableView_Handover_patch {
 
 struct RowBase_Handover_patch {
     std::size_t table_num;
-    std::size_t row_ndx;
+    std::size_t row_index;
 };
 
 

@@ -181,12 +181,12 @@ void AESCryptor::set_file_size(off_t new_size)
 
 iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT
 {
-    size_t idx = data_pos / block_size;
-    if (idx < m_iv_buffer.size())
-        return m_iv_buffer[idx];
+    size_t index = data_pos / block_size;
+    if (index < m_iv_buffer.size())
+        return m_iv_buffer[index];
 
     size_t old_size = m_iv_buffer.size();
-    size_t new_block_count = 1 + idx / blocks_per_metadata_block;
+    size_t new_block_count = 1 + index / blocks_per_metadata_block;
     REALM_ASSERT(new_block_count * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
     m_iv_buffer.resize(new_block_count * blocks_per_metadata_block);
 
@@ -196,7 +196,7 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT
             break; // rest is zero-filled by resize()
     }
 
-    return m_iv_buffer[idx];
+    return m_iv_buffer[index];
 }
 
 bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) const
@@ -544,12 +544,12 @@ void EncryptedFileMapping::handle_access(void* addr) REALM_NOEXCEPT
 {
     size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
 
-    size_t idx = accessed_page - m_first_page;
-    if (!m_read_pages[idx]) {
-        read_page(idx);
+    size_t index = accessed_page - m_first_page;
+    if (!m_read_pages[index]) {
+        read_page(index);
     }
     else if (m_access == File::access_ReadWrite) {
-        write_page(idx);
+        write_page(index);
     }
     else {
         REALM_TERMINATE("Attempt to write to read-only memory");

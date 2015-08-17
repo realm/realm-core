@@ -35,14 +35,14 @@ public:
     ~ArrayInteger() REALM_NOEXCEPT override {}
 
     void add(int64_t value);
-    void set(std::size_t ndx, int64_t value);
-    void set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT;
-    int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
-    uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
-    static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
+    void set(std::size_t index, int64_t value);
+    void set_uint(std::size_t index, uint64_t value) REALM_NOEXCEPT;
+    int64_t get(std::size_t index) const REALM_NOEXCEPT;
+    uint64_t get_uint(std::size_t index) const REALM_NOEXCEPT;
+    static int64_t get(const char* header, std::size_t index) REALM_NOEXCEPT;
 
     /// Add \a diff to the element at the specified index.
-    void adjust(std::size_t ndx, int_fast64_t diff);
+    void adjust(std::size_t index, int_fast64_t diff);
 
     /// Add \a diff to all the elements in the specified index range.
     void adjust(std::size_t begin, std::size_t end, int_fast64_t diff);
@@ -51,7 +51,7 @@ public:
     /// limit.
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
-    int64_t operator[](std::size_t ndx) const REALM_NOEXCEPT { return get(ndx); }
+    int64_t operator[](std::size_t index) const REALM_NOEXCEPT { return get(index); }
     int64_t front() const REALM_NOEXCEPT;
     int64_t back() const REALM_NOEXCEPT;
 
@@ -87,25 +87,25 @@ public:
     std::size_t size() const REALM_NOEXCEPT;
     bool is_empty() const REALM_NOEXCEPT;
 
-    void insert(std::size_t ndx, int_fast64_t value);
-    void insert(std::size_t ndx, null);
+    void insert(std::size_t index, int_fast64_t value);
+    void insert(std::size_t index, null);
     void add(int64_t value);
     void add(null);
-    void set(std::size_t ndx, int64_t value) REALM_NOEXCEPT;
-    void set(std::size_t ndx, null) REALM_NOEXCEPT;
-    void set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT;
-    int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
-    uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
-    static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
+    void set(std::size_t index, int64_t value) REALM_NOEXCEPT;
+    void set(std::size_t index, null) REALM_NOEXCEPT;
+    void set_uint(std::size_t index, uint64_t value) REALM_NOEXCEPT;
+    int64_t get(std::size_t index) const REALM_NOEXCEPT;
+    uint64_t get_uint(std::size_t index) const REALM_NOEXCEPT;
+    static int64_t get(const char* header, std::size_t index) REALM_NOEXCEPT;
 
-    void set_null(std::size_t ndx) REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
+    void set_null(std::size_t index) REALM_NOEXCEPT;
+    bool is_null(std::size_t index) const REALM_NOEXCEPT;
     int64_t null_value() const REALM_NOEXCEPT;
 
-    int64_t operator[](std::size_t ndx) const REALM_NOEXCEPT;
+    int64_t operator[](std::size_t index) const REALM_NOEXCEPT;
     int64_t front() const REALM_NOEXCEPT;
     int64_t back() const REALM_NOEXCEPT;
-    void erase(std::size_t ndx);
+    void erase(std::size_t index);
     void erase(std::size_t begin, std::size_t end);
     void truncate(std::size_t size);
     void clear();
@@ -120,9 +120,9 @@ public:
     int64_t sum(std::size_t start = 0, std::size_t end = npos) const;
     std::size_t count(int64_t value) const REALM_NOEXCEPT;
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = npos,
-        std::size_t* return_ndx = nullptr) const;
+        std::size_t* return_index = nullptr) const;
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = npos,
-                 std::size_t* return_ndx = nullptr) const;
+                 std::size_t* return_index = nullptr) const;
 
     bool find(int cond, Action action, int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state) const;
@@ -160,15 +160,15 @@ public:
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = npos) const;
 
-    void find_all(IntegerColumn* result, int64_t value, std::size_t col_offset = 0,
+    void find_all(IntegerColumn* result, int64_t value, std::size_t column_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     std::size_t find_first(int64_t value, std::size_t begin = 0,
                            std::size_t end = npos) const;
 
     // Overwrite Array::bptree_leaf_insert to correctly split nodes.
-    ref_type bptree_leaf_insert(std::size_t ndx, int64_t value, TreeInsertBase& state);
-    ref_type bptree_leaf_insert(std::size_t ndx, null, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t index, int64_t value, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t index, null, TreeInsertBase& state);
 
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
@@ -181,7 +181,7 @@ protected:
 private:
     template<bool find_max>
     bool minmax_helper(int64_t& result, std::size_t start = 0, std::size_t end = npos,
-                         std::size_t* return_ndx = nullptr) const;
+                         std::size_t* return_index = nullptr) const;
 
     int_fast64_t choose_random_null(int64_t incoming);
     void replace_nulls_with(int64_t new_null);
@@ -206,27 +206,27 @@ inline void ArrayInteger::add(int64_t value)
     Array::add(value);
 }
 
-inline int64_t ArrayInteger::get(size_t ndx) const REALM_NOEXCEPT
+inline int64_t ArrayInteger::get(size_t index) const REALM_NOEXCEPT
 {
-    return Array::get(ndx);
+    return Array::get(index);
 }
 
-inline uint64_t ArrayInteger::get_uint(std::size_t ndx) const REALM_NOEXCEPT
+inline uint64_t ArrayInteger::get_uint(std::size_t index) const REALM_NOEXCEPT
 {
-    return get(ndx);
+    return get(index);
 }
 
-inline int64_t ArrayInteger::get(const char* header, size_t ndx) REALM_NOEXCEPT
+inline int64_t ArrayInteger::get(const char* header, size_t index) REALM_NOEXCEPT
 {
-    return Array::get(header, ndx);
+    return Array::get(header, index);
 }
 
-inline void ArrayInteger::set(size_t ndx, int64_t value)
+inline void ArrayInteger::set(size_t index, int64_t value)
 {
-    Array::set(ndx, value);
+    Array::set(index, value);
 }
 
-inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value) REALM_NOEXCEPT
+inline void ArrayInteger::set_uint(std::size_t index, uint_fast64_t value) REALM_NOEXCEPT
 {
     // When a value of a signed type is converted to an unsigned type, the C++
     // standard guarantees that negative values are converted from the native
@@ -235,7 +235,7 @@ inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value) REALM_N
     // standard. `realm::util::from_twos_compl()` is used here to perform the
     // correct opposite unsigned-to-signed conversion, which reduces to a no-op
     // when 2's complement is the native representation of negative values.
-    set(ndx, util::from_twos_compl<int_fast64_t>(value));
+    set(index, util::from_twos_compl<int_fast64_t>(value));
 }
 
 
@@ -249,9 +249,9 @@ inline int64_t ArrayInteger::back() const REALM_NOEXCEPT
     return Array::back();
 }
 
-inline void ArrayInteger::adjust(std::size_t ndx, int_fast64_t diff)
+inline void ArrayInteger::adjust(std::size_t index, int_fast64_t diff)
 {
-    Array::adjust(ndx, diff);
+    Array::adjust(index, diff);
 }
 
 inline void ArrayInteger::adjust(std::size_t begin, std::size_t end, int_fast64_t diff)
@@ -310,16 +310,16 @@ bool ArrayIntNull::is_empty() const REALM_NOEXCEPT
 }
 
 inline
-void ArrayIntNull::insert(std::size_t ndx, int_fast64_t value)
+void ArrayIntNull::insert(std::size_t index, int_fast64_t value)
 {
     avoid_null_collision(value);
-    Array::insert(ndx + 1, value);
+    Array::insert(index + 1, value);
 }
 
 inline
-void ArrayIntNull::insert(std::size_t ndx, null)
+void ArrayIntNull::insert(std::size_t index, null)
 {
-    Array::insert(ndx + 1, null_value());
+    Array::insert(index + 1, null_value());
 }
 
 inline
@@ -336,53 +336,53 @@ void ArrayIntNull::add(null)
 }
 
 inline
-void ArrayIntNull::set(std::size_t ndx, int64_t value) REALM_NOEXCEPT
+void ArrayIntNull::set(std::size_t index, int64_t value) REALM_NOEXCEPT
 {
     avoid_null_collision(value);
-    Array::set(ndx + 1, value);
+    Array::set(index + 1, value);
 }
 
 inline
-void ArrayIntNull::set(std::size_t ndx, null) REALM_NOEXCEPT
+void ArrayIntNull::set(std::size_t index, null) REALM_NOEXCEPT
 {
-    Array::set(ndx + 1, null_value());
+    Array::set(index + 1, null_value());
 }
 
 inline
-void ArrayIntNull::set_null(std::size_t ndx) REALM_NOEXCEPT
+void ArrayIntNull::set_null(std::size_t index) REALM_NOEXCEPT
 {
-    Array::set(ndx + 1, null_value());
+    Array::set(index + 1, null_value());
 }
 
 inline
-void ArrayIntNull::set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT
+void ArrayIntNull::set_uint(std::size_t index, uint64_t value) REALM_NOEXCEPT
 {
     avoid_null_collision(value);
-    Array::set(ndx + 1, value);
+    Array::set(index + 1, value);
 }
 
 inline
-int64_t ArrayIntNull::get(std::size_t ndx) const REALM_NOEXCEPT
+int64_t ArrayIntNull::get(std::size_t index) const REALM_NOEXCEPT
 {
-    return Array::get(ndx + 1);
+    return Array::get(index + 1);
 }
 
 inline
-uint64_t ArrayIntNull::get_uint(std::size_t ndx) const REALM_NOEXCEPT
+uint64_t ArrayIntNull::get_uint(std::size_t index) const REALM_NOEXCEPT
 {
-    return Array::get(ndx + 1);
+    return Array::get(index + 1);
 }
 
 inline
-int64_t ArrayIntNull::get(const char* header, std::size_t ndx) REALM_NOEXCEPT
+int64_t ArrayIntNull::get(const char* header, std::size_t index) REALM_NOEXCEPT
 {
-    return Array::get(header, ndx + 1);
+    return Array::get(header, index + 1);
 }
 
 inline
-bool ArrayIntNull::is_null(std::size_t ndx) const REALM_NOEXCEPT
+bool ArrayIntNull::is_null(std::size_t index) const REALM_NOEXCEPT
 {
-    return Array::get(ndx + 1) == null_value();
+    return Array::get(index + 1) == null_value();
 }
 
 inline
@@ -392,9 +392,9 @@ int64_t ArrayIntNull::null_value() const REALM_NOEXCEPT
 }
 
 inline
-int64_t ArrayIntNull::operator[](std::size_t ndx) const REALM_NOEXCEPT
+int64_t ArrayIntNull::operator[](std::size_t index) const REALM_NOEXCEPT
 {
-    return get(ndx);
+    return get(index);
 }
 
 inline
@@ -410,9 +410,9 @@ int64_t ArrayIntNull::back() const REALM_NOEXCEPT
 }
 
 inline
-void ArrayIntNull::erase(std::size_t ndx)
+void ArrayIntNull::erase(std::size_t index)
 {
-    Array::erase(ndx + 1);
+    Array::erase(index + 1);
 }
 
 inline
@@ -500,7 +500,7 @@ std::size_t ArrayIntNull::count(int64_t value) const REALM_NOEXCEPT
 // FIXME: Optimize!
 template<bool find_max>
 inline
-bool ArrayIntNull::minmax_helper(int64_t& result, std::size_t start, std::size_t end, std::size_t* return_ndx) const
+bool ArrayIntNull::minmax_helper(int64_t& result, std::size_t start, std::size_t end, std::size_t* return_index) const
 {
     size_t best_index = 1;
 
@@ -518,8 +518,8 @@ bool ArrayIntNull::minmax_helper(int64_t& result, std::size_t start, std::size_t
     }
 
     if (m_width == 0) {
-        if (return_ndx)
-            *return_ndx = best_index - 1;
+        if (return_index)
+            *return_index = best_index - 1;
         result = 0;
         return true;
     }
@@ -539,22 +539,22 @@ bool ArrayIntNull::minmax_helper(int64_t& result, std::size_t start, std::size_t
     }
 
     result = m;
-    if (return_ndx) {
-        *return_ndx = best_index - 1;
+    if (return_index) {
+        *return_index = best_index - 1;
     }
     return true;
 }
 
 inline
-bool ArrayIntNull::maximum(int64_t& result, std::size_t start, std::size_t end, std::size_t* return_ndx) const
+bool ArrayIntNull::maximum(int64_t& result, std::size_t start, std::size_t end, std::size_t* return_index) const
 {
-    return minmax_helper<true>(result, start, end, return_ndx);
+    return minmax_helper<true>(result, start, end, return_index);
 }
 
 inline
-bool ArrayIntNull::minimum(int64_t& result, std::size_t start, std::size_t end, std::size_t* return_ndx) const
+bool ArrayIntNull::minimum(int64_t& result, std::size_t start, std::size_t end, std::size_t* return_index) const
 {
-    return minmax_helper<false>(result, start, end, return_ndx);
+    return minmax_helper<false>(result, start, end, return_index);
 }
 
 inline

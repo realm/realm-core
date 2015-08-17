@@ -276,9 +276,9 @@ public:
         return put_pos.load(std::memory_order_acquire);
     }
 
-    const ReadCount& get(uint_fast32_t idx) const  REALM_NOEXCEPT
+    const ReadCount& get(uint_fast32_t index) const  REALM_NOEXCEPT
     {
-        return data[idx];
+        return data[index];
     }
 
     const ReadCount& get_last() const  REALM_NOEXCEPT
@@ -293,14 +293,14 @@ public:
 
     bool is_full() const  REALM_NOEXCEPT
     {
-        uint_fast32_t idx = get(last()).next;
-        return idx == old_pos.load(std::memory_order_relaxed);
+        uint_fast32_t index = get(last()).next;
+        return index == old_pos.load(std::memory_order_relaxed);
     }
 
     uint_fast32_t next() const  REALM_NOEXCEPT
     { // do not call this if the buffer is full!
-        uint_fast32_t idx = get(last()).next;
-        return idx;
+        uint_fast32_t index = get(last()).next;
+        return index;
     }
 
     ReadCount& get_next()  REALM_NOEXCEPT
@@ -1131,19 +1131,19 @@ void SharedGroup::do_async_commits()
 
 SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
 {
-    return VersionID(m_readlock.m_version, m_readlock.m_reader_idx);
+    return VersionID(m_readlock.m_version, m_readlock.m_reader_index);
 }
 
 void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before)
 {
     for (;;) {
         SharedInfo* r_info = m_reader_map.get_addr();
-        readlock.m_reader_idx = r_info->readers.last();
-        if (grow_reader_mapping(readlock.m_reader_idx)) { // Throws
+        readlock.m_reader_index = r_info->readers.last();
+        if (grow_reader_mapping(readlock.m_reader_index)) { // Throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
-        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_index);
         // if the entry is stale and has been cleared by the cleanup process,
         // we need to start all over again. This is extremely unlikely, but possible.
         if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
@@ -1161,12 +1161,12 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
 {
     for (;;) {
         SharedInfo* r_info = m_reader_map.get_addr();
-        readlock.m_reader_idx = specific_version.index;
-        if (grow_reader_mapping(readlock.m_reader_idx)) { // Throws
+        readlock.m_reader_index = specific_version.index;
+        if (grow_reader_mapping(readlock.m_reader_index)) { // Throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
-        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_index);
 
         // if the entry is stale and has been cleared by the cleanup process,
         // the requested version is no longer available
@@ -1388,7 +1388,7 @@ Replication::version_type SharedGroup::do_commit()
 void SharedGroup::release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT
 {
     SharedInfo* r_info = m_reader_map.get_addr();
-    const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+    const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_index);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
 }
 

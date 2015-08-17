@@ -447,7 +447,7 @@ CATEGORIES  :
                  Get the name of a table.
       CONST    : true
       PARAMS:
-      - NAME   : table_ndx
+      - NAME   : table_index
         TYPES  : size_t
         DESCR  : &g_group_get_table_name_parm1_descr
                  Table index.

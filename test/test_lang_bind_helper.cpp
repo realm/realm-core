@@ -2313,15 +2313,15 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             DescriptorRef subdesc = parent_w->get_subdescriptor(0);
             subdesc->add_column(type_Int, "regular");
             parent_w->add_empty_row(5);
-            for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
-                TableRef regular_w = parent_w->get_subtable(0, row_ndx);
+            for (int row_index = 0; row_index < 5; ++row_index) {
+                TableRef regular_w = parent_w->get_subtable(0, row_index);
                 regular_w->add_empty_row();
-                regular_w->set_int(0, 0, 10 + row_ndx);
-                parent_w->set_mixed(1, row_ndx, Mixed::subtable_tag());
-                TableRef mixed_w = parent_w->get_subtable(1, row_ndx);
+                regular_w->set_int(0, 0, 10 + row_index);
+                parent_w->set_mixed(1, row_index, Mixed::subtable_tag());
+                TableRef mixed_w = parent_w->get_subtable(1, row_index);
                 mixed_w->add_column(type_Int, "mixed");
                 mixed_w->add_empty_row();
-                mixed_w->set_int(0, 0, 20 + row_ndx);
+                mixed_w->set_int(0, 0, 20 + row_index);
             }
         }
         wt.commit();
@@ -5689,8 +5689,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         WriteTransaction wt(sg_w);
         TableRef table_2_w = wt.get_table("table_2");
         TableRef table_3_w = wt.get_table("table_3");
-        table_2_w->add_column_link(type_Link,     "col_1", *table_3_w);
-        table_3_w->add_column_link(type_LinkList, "col_2", *table_2_w);
+        table_2_w->add_column_link(type_Link,     "column_1", *table_3_w);
+        table_3_w->add_column_link(type_LinkList, "column_2", *table_2_w);
         table_2_w->add_empty_row();
         table_3_w->add_empty_row();
         table_2_w->set_link(0,0,0);
@@ -6376,16 +6376,16 @@ private:
 public:
     void parse_complete() { }
 
-    bool select_table(size_t group_level_ndx, int, const size_t*)
+    bool select_table(size_t group_level_index, int, const size_t*)
     {
-        m_current_table = group_level_ndx;
+        m_current_table = group_level_index;
         return true;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    bool select_link_list(size_t column_index, size_t row_index)
     {
-        m_current_linkview_col = col_ndx;
-        m_current_linkview_row = row_ndx;
+        m_current_linkview_col = column_index;
+        m_current_linkview_row = row_index;
         return true;
     }
 
@@ -6520,13 +6520,13 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
             std::size_t expected_table = 0;
 
-            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
+            bool insert_empty_rows(size_t row_index, size_t num_rows_to_insert,
                                    size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 ++expected_table;
 
-                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(0, row_index);
                 CHECK_EQUAL(1, num_rows_to_insert);
                 CHECK_EQUAL(0, prior_num_rows);
                 CHECK(!unordered);
@@ -6560,31 +6560,31 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+            bool erase_rows(size_t row_index, size_t num_rows_to_erase,
                             size_t prior_num_rows, bool unordered)
             {
-                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(0, row_index);
                 CHECK_EQUAL(1, num_rows_to_erase);
                 CHECK_EQUAL(1, prior_num_rows);
                 CHECK(unordered);
                 return true;
             }
 
-            bool link_list_nullify(std::size_t ndx)
+            bool link_list_nullify(std::size_t index)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
                 CHECK_EQUAL(0, get_current_linkview().second);
 
-                CHECK_EQUAL(0, ndx);
+                CHECK_EQUAL(0, index);
                 return true;
             }
 
-            bool nullify_link(std::size_t col_ndx, std::size_t row_ndx)
+            bool nullify_link(std::size_t column_index, std::size_t row_index)
             {
                 CHECK_EQUAL(2, get_current_table());
-                CHECK_EQUAL(0, col_ndx);
-                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(0, column_index);
+                CHECK_EQUAL(0, row_index);
                 return true;
             }
         } parser(test_results);
@@ -6957,15 +6957,15 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
             DescriptorRef subdesc = parent_w->get_subdescriptor(0);
             subdesc->add_column(type_Int, "regular");
             parent_w->add_empty_row(5);
-            for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
-                TableRef regular_w = parent_w->get_subtable(0, row_ndx);
+            for (int row_index = 0; row_index < 5; ++row_index) {
+                TableRef regular_w = parent_w->get_subtable(0, row_index);
                 regular_w->add_empty_row();
-                regular_w->set_int(0, 0, 10 + row_ndx);
-                parent_w->set_mixed(1, row_ndx, Mixed::subtable_tag());
-                TableRef mixed_w = parent_w->get_subtable(1, row_ndx);
+                regular_w->set_int(0, 0, 10 + row_index);
+                parent_w->set_mixed(1, row_index, Mixed::subtable_tag());
+                TableRef mixed_w = parent_w->get_subtable(1, row_index);
                 mixed_w->add_column(type_Int, "mixed");
                 mixed_w->add_empty_row();
-                mixed_w->set_int(0, 0, 20 + row_ndx);
+                mixed_w->set_int(0, 0, 20 + row_index);
             }
         }
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -7153,13 +7153,13 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
             std::size_t expected_table = 1;
 
-            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+            bool erase_rows(size_t row_index, size_t num_rows_to_erase,
                             size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 --expected_table;
 
-                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(0, row_index);
                 CHECK_EQUAL(1, num_rows_to_erase);
                 CHECK_EQUAL(1, prior_num_rows);
                 CHECK_NOT(unordered);
@@ -7198,37 +7198,37 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
             bool link_list_insert_called = false;
             bool set_link_called = false;
 
-            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
+            bool insert_empty_rows(size_t row_index, size_t num_rows_to_insert,
                                    size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 --expected_table;
 
-                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(0, row_index);
                 CHECK_EQUAL(1, num_rows_to_insert);
                 CHECK_EQUAL(0, prior_num_rows);
                 CHECK(unordered);
                 return true;
             }
 
-            bool link_list_insert(std::size_t ndx, std::size_t value)
+            bool link_list_insert(std::size_t index, std::size_t value)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
                 CHECK_EQUAL(0, get_current_linkview().second);
 
-                CHECK_EQUAL(0, ndx);
+                CHECK_EQUAL(0, index);
                 CHECK_EQUAL(0, value);
 
                 link_list_insert_called = true;
                 return true;
             }
 
-            bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t value)
+            bool set_link(std::size_t column_index, std::size_t row_index, std::size_t value)
             {
                 CHECK_EQUAL(2, get_current_table());
-                CHECK_EQUAL(0, col_ndx);
-                CHECK_EQUAL(0, row_ndx);
+                CHECK_EQUAL(0, column_index);
+                CHECK_EQUAL(0, row_index);
                 CHECK_EQUAL(0, value);
 
                 set_link_called = true;
@@ -7261,21 +7261,21 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
         struct foo: NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            std::size_t list_ndx = 0;
+            std::size_t list_index = 0;
 
-            bool link_list_insert(std::size_t ndx, std::size_t)
+            bool link_list_insert(std::size_t index, std::size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
                 CHECK_EQUAL(0, get_current_linkview().second);
 
-                CHECK_EQUAL(list_ndx, ndx);
-                ++list_ndx;
+                CHECK_EQUAL(list_index, index);
+                ++list_index;
                 return true;
             }
         } parser(test_results);
         LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
-        CHECK_EQUAL(parser.list_ndx, 3);
+        CHECK_EQUAL(parser.list_index, 3);
     }
 }
 
@@ -7360,13 +7360,13 @@ void multiple_trackers_writer_thread(std::string path)
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
-        size_t idx = 1 + random.draw_int_mod(tr->size()-1);
+        size_t index = 1 + random.draw_int_mod(tr->size()-1);
 
-        if (tr[idx].first == 42) {
+        if (tr[index].first == 42) {
             // do nothing
         }
         else {
-            tr->insert(idx, 0);
+            tr->insert(index, 0);
         }
         wt.commit();
         sched_yield();
@@ -7383,8 +7383,8 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string 
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
     Query q = tr->where().equal(0, 42);
-    size_t row_ndx = q.find();
-    Row row = tr->get(row_ndx);
+    size_t row_index = q.find();
+    Row row = tr->get(row_index);
     TableView tv = q.find_all();
     LangBindHelper::promote_to_write(sg, *hist);
     tr->set_int(0, 0, 1 + tr->get_int(0, 0));
@@ -7451,8 +7451,8 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
         Query q = tr->where().equal(0, 42);
-        size_t idx = q.find();
-        tr->set_int(0, idx, 43);
+        size_t index = q.find();
+        tr->set_int(0, index, 43);
         wt.commit();
     }
     // Wait for all reader threads to complete
@@ -7548,8 +7548,8 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
         Query q = tr->where().equal(0, 42);
-        int idx = q.find();
-        tr->set_int(0, idx, 43);
+        int index = q.find();
+        tr->set_int(0, index, 43);
         wt.commit();
     }
 
@@ -7615,9 +7615,9 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
 
     LangBindHelper::promote_to_write(sg, *hist);
     for (int i = 0; i < 10; ++i) {
-        size_t row_ndx = random.draw_int_mod(table->size());
-        int_fast64_t value = table->get_int(0, row_ndx);
-        table->move_last_over(row_ndx);
+        size_t row_index = random.draw_int_mod(table->size());
+        int_fast64_t value = table->get_int(0, row_index);
+        table->move_last_over(row_index);
         CHECK_EQUAL(realm::not_found, table->find_first_int(0, value));
         for (int j = 0; j < 10; ++j) {
             bool should_be_attached = table->find_first_int(0, j) != realm::not_found;
@@ -8469,14 +8469,14 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         table1->set_int(0, 2, 200);
         table1->set_string(1, 2, "beta");
 
-        size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+        size_t column_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
         table2->add_empty_row();
         table2->add_empty_row();
 
         LinkViewRef lvr;
 
-        lvr = table2->get_linklist(col_link2, 0);
+        lvr = table2->get_linklist(column_link2, 0);
         lvr->clear();
         lvr->add(0);
         lvr->add(1);
@@ -8502,8 +8502,8 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover)) ); // <-- import tv
 
         CHECK_EQUAL(2, tv->size());
-        CHECK_EQUAL(0, tv->get_source_ndx(0));
-        CHECK_EQUAL(2, tv->get_source_ndx(1));
+        CHECK_EQUAL(0, tv->get_source_index(0));
+        CHECK_EQUAL(2, tv->get_source_index(1));
     }
 }
 TEST(LangBindHelper_HandoverLinkView)
@@ -8543,14 +8543,14 @@ TEST(LangBindHelper_HandoverLinkView)
         table1->set_int(0, 2, 200);
         table1->set_string(1, 2, "beta");
 
-        size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+        size_t column_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
         table2->add_empty_row();
         table2->add_empty_row();
 
         LinkViewRef lvr;
 
-        lvr = table2->get_linklist(col_link2, 0);
+        lvr = table2->get_linklist(column_link2, 0);
         lvr->clear();
         lvr->add(0);
         lvr->add(1);
@@ -8578,8 +8578,8 @@ TEST(LangBindHelper_HandoverLinkView)
 
 
         CHECK_EQUAL(2, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
-        CHECK_EQUAL(2, tv.get_source_ndx(1));
+        CHECK_EQUAL(0, tv.get_source_index(0));
+        CHECK_EQUAL(2, tv.get_source_index(1));
     }
 }
 

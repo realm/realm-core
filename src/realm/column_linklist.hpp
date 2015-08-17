@@ -51,16 +51,16 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    bool has_links(std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t get_link_count(std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool has_links(std::size_t row_index) const REALM_NOEXCEPT;
+    std::size_t get_link_count(std::size_t row_index) const REALM_NOEXCEPT;
 
-    ConstLinkViewRef get(std::size_t row_ndx) const;
-    LinkViewRef get(std::size_t row_ndx);
+    ConstLinkViewRef get(std::size_t row_index) const;
+    LinkViewRef get(std::size_t row_index);
 
     /// Compare two columns for equality.
     bool compare_link_list(const LinkListColumn&) const;
 
-    void to_json_row(std::size_t row_ndx, std::ostream& out) const;
+    void to_json_row(std::size_t row_index, std::ostream& out) const;
 
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
@@ -85,42 +85,42 @@ protected:
 
 private:
     struct list_entry {
-        std::size_t m_row_ndx;
+        std::size_t m_row_index;
         LinkView* m_list;
     };
     mutable std::vector<list_entry> m_list_accessors;
 
-    LinkView* get_ptr(std::size_t row_ndx) const;
+    LinkView* get_ptr(std::size_t row_index) const;
 
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
-    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx) override;
+    void do_nullify_link(std::size_t row_index, std::size_t old_target_row_index) override;
+    void do_update_link(std::size_t row_index, std::size_t old_target_row_index,
+                        std::size_t new_target_row_index) override;
 
     void unregister_linkview(const LinkView& view);
-    ref_type get_row_ref(std::size_t row_ndx) const REALM_NOEXCEPT;
-    void set_row_ref(std::size_t row_ndx, ref_type new_ref);
+    ref_type get_row_ref(std::size_t row_index) const REALM_NOEXCEPT;
+    void set_row_ref(std::size_t row_index, ref_type new_ref);
     void add_backlink(std::size_t target_row, std::size_t source_row);
     void remove_backlink(std::size_t target_row, std::size_t source_row);
 
     // ArrayParent overrides
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
-    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT override;
+    void update_child_ref(std::size_t child_index, ref_type new_ref) override;
+    ref_type get_child_ref(std::size_t child_index) const REALM_NOEXCEPT override;
 
     // These helpers are needed because of the way the B+-tree of links is
     // traversed in cascade_break_backlinks_to() and
     // cascade_break_backlinks_to_all_rows().
-    void cascade_break_backlinks_to__leaf(std::size_t row_ndx, const Array& link_list_leaf,
+    void cascade_break_backlinks_to__leaf(std::size_t row_index, const Array& link_list_leaf,
                                           CascadeState&);
     void cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState&);
 
     void discard_child_accessors() REALM_NOEXCEPT;
 
-    template<bool fix_ndx_in_parent>
-    void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT;
-    template<bool fix_ndx_in_parent>
-    void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT;
-    template<bool fix_ndx_in_parent>
-    void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT;
+    template<bool fix_index_in_parent>
+    void adj_insert_rows(size_t row_index, size_t num_rows_inserted) REALM_NOEXCEPT;
+    template<bool fix_index_in_parent>
+    void adj_erase_rows(size_t row_index, size_t num_rows_erased) REALM_NOEXCEPT;
+    template<bool fix_index_in_parent>
+    void adj_move_over(size_t from_row_index, size_t to_row_index) REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
@@ -147,29 +147,29 @@ inline ref_type LinkListColumn::create(Allocator& alloc, std::size_t size)
     return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
-inline bool LinkListColumn::has_links(std::size_t row_ndx) const REALM_NOEXCEPT
+inline bool LinkListColumn::has_links(std::size_t row_index) const REALM_NOEXCEPT
 {
-    ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
+    ref_type ref = LinkColumnBase::get_as_ref(row_index);
     return (ref != 0);
 }
 
-inline std::size_t LinkListColumn::get_link_count(std::size_t row_ndx) const REALM_NOEXCEPT
+inline std::size_t LinkListColumn::get_link_count(std::size_t row_index) const REALM_NOEXCEPT
 {
-    ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
+    ref_type ref = LinkColumnBase::get_as_ref(row_index);
     if (ref == 0)
         return 0;
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-inline ConstLinkViewRef LinkListColumn::get(std::size_t row_ndx) const
+inline ConstLinkViewRef LinkListColumn::get(std::size_t row_index) const
 {
-    LinkView* link_list = get_ptr(row_ndx); // Throws
+    LinkView* link_list = get_ptr(row_index); // Throws
     return ConstLinkViewRef(link_list);
 }
 
-inline LinkViewRef LinkListColumn::get(std::size_t row_ndx)
+inline LinkViewRef LinkListColumn::get(std::size_t row_index)
 {
-    LinkView* link_list = get_ptr(row_ndx); // Throws
+    LinkView* link_list = get_ptr(row_index); // Throws
     return LinkViewRef(link_list);
 }
 
@@ -189,14 +189,14 @@ inline void LinkListColumn::unregister_linkview(const LinkView& list)
     }
 }
 
-inline ref_type LinkListColumn::get_row_ref(std::size_t row_ndx) const REALM_NOEXCEPT
+inline ref_type LinkListColumn::get_row_ref(std::size_t row_index) const REALM_NOEXCEPT
 {
-    return LinkColumnBase::get_as_ref(row_ndx);
+    return LinkColumnBase::get_as_ref(row_index);
 }
 
-inline void LinkListColumn::set_row_ref(std::size_t row_ndx, ref_type new_ref)
+inline void LinkListColumn::set_row_ref(std::size_t row_index, ref_type new_ref)
 {
-    LinkColumnBase::set(row_ndx, new_ref); // Throws
+    LinkColumnBase::set(row_index, new_ref); // Throws
 }
 
 inline void LinkListColumn::add_backlink(std::size_t target_row, std::size_t source_row)

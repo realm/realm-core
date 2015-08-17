@@ -27,7 +27,7 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
-void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id)
+void ParentNode::aggregate_local_prepare(Action TAction, DataType column_id)
 {
     if (TAction == act_ReturnFirst)
         m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
@@ -35,33 +35,33 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id)
     else if (TAction == act_Count)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Count, IntegerColumn>;
 
-    else if (TAction == act_Sum && col_id == type_Int)
+    else if (TAction == act_Sum && column_id == type_Int)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, IntegerColumn>;
 
-    else if (TAction == act_Sum && col_id == type_Float)
+    else if (TAction == act_Sum && column_id == type_Float)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<float>>;
-    else if (TAction == act_Sum && col_id == type_Double)
+    else if (TAction == act_Sum && column_id == type_Double)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<double>>;
 
-    else if (TAction == act_Max && col_id == type_Int)
+    else if (TAction == act_Max && column_id == type_Int)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Max, IntegerColumn>;
-    else if (TAction == act_Max && col_id == type_Float)
+    else if (TAction == act_Max && column_id == type_Float)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<float>>;
-    else if (TAction == act_Max && col_id == type_Double)
+    else if (TAction == act_Max && column_id == type_Double)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<double>>;
 
-    else if (TAction == act_Min && col_id == type_Int)
+    else if (TAction == act_Min && column_id == type_Int)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Min, IntegerColumn>;
-    else if (TAction == act_Min && col_id == type_Float)
+    else if (TAction == act_Min && column_id == type_Float)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<float>>;
-    else if (TAction == act_Min && col_id == type_Double)
+    else if (TAction == act_Min && column_id == type_Double)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<double>>;
 
     else if (TAction == act_FindAll)
         m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
 
-    else if (TAction == act_CallbackIdx)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, IntegerColumn>;
+    else if (TAction == act_Callbackindex)
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Callbackindex, IntegerColumn>;
 
     else {
         REALM_ASSERT(false);
@@ -135,9 +135,9 @@ size_t NotNode::find_first_local(size_t start, size_t end)
     }
 }
 
-bool NotNode::evaluate_at(size_t rowndx)
+bool NotNode::evaluate_at(size_t rowindex)
 {
-    return m_cond->find_first(rowndx, rowndx+1) == not_found;
+    return m_cond->find_first(rowindex, rowindex+1) == not_found;
 }
 
 void NotNode::update_known(size_t start, size_t end, size_t first)

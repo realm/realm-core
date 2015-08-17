@@ -45,181 +45,181 @@ public:
             *m_log << std::boolalpha;
     }
 
-    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    bool set_int(size_t column_index, size_t row_index, int_fast64_t value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_int("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_int("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_int(col_ndx, row_ndx, value); // Throws
+            m_table->set_int(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
+    bool set_bool(size_t column_index, size_t row_index, bool value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_bool("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_bool("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_bool(col_ndx, row_ndx, value); // Throws
+            m_table->set_bool(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_float(size_t col_ndx, size_t row_ndx, float value)
+    bool set_float(size_t column_index, size_t row_index, float value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_float("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_float("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_float(col_ndx, row_ndx, value); // Throws
+            m_table->set_float(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_double(size_t col_ndx, size_t row_ndx, double value)
+    bool set_double(size_t column_index, size_t row_index, double value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_double("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_double("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_double(col_ndx, row_ndx, value); // Throws
+            m_table->set_double(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
+    bool set_string(size_t column_index, size_t row_index, StringData value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_string("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_string("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_string(col_ndx, row_ndx, value); // Throws
+            m_table->set_string(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
+    bool set_binary(size_t column_index, size_t row_index, BinaryData value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_binary("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_binary("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_binary(col_ndx, row_ndx, value); // Throws
+            m_table->set_binary(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
+    bool set_date_time(size_t column_index, size_t row_index, DateTime value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_datetime("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_datetime("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_datetime(col_ndx, row_ndx, value); // Throws
+            m_table->set_datetime(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx)
+    bool set_table(size_t column_index, size_t row_index)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->clear_subtable("<<col_ndx<<", "<<row_ndx<<")\n";
+                *m_log << "table->clear_subtable("<<column_index<<", "<<row_index<<")\n";
 #endif
-            m_table->clear_subtable(col_ndx, row_ndx); // Throws
+            m_table->clear_subtable(column_index, row_index); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
+    bool set_mixed(size_t column_index, size_t row_index, const Mixed& value)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_mixed("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+                *m_log << "table->set_mixed("<<column_index<<", "<<row_index<<", "<<value<<")\n";
 #endif
-            m_table->set_mixed(col_ndx, row_ndx, value); // Throws
+            m_table->set_mixed(column_index, row_index, value); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_null(size_t col_ndx, size_t row_ndx)
+    bool set_null(size_t column_index, size_t row_index)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->set_null("<<col_ndx<<", "<<row_ndx<<")\n";
+                *m_log << "table->set_null("<<column_index<<", "<<row_index<<")\n";
 #endif
-            m_table->set_null(col_ndx, row_ndx); // Throws
+            m_table->set_null(column_index, row_index); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
+    bool set_link(size_t column_index, size_t row_index, size_t target_row_index)
     {
-        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+        if (REALM_LIKELY(check_set_cell(column_index, row_index))) {
 #ifdef REALM_DEBUG
             if (m_log) {
-                if (target_row_ndx == realm::npos) {
-                    *m_log << "table->nullify_link("<<col_ndx<<", "<<row_ndx<<")\n";
+                if (target_row_index == realm::npos) {
+                    *m_log << "table->nullify_link("<<column_index<<", "<<row_index<<")\n";
                 }
                 else {
-                    *m_log << "table->set_link("<<col_ndx<<", "<<row_ndx<<", "<<target_row_ndx<<")\n";
+                    *m_log << "table->set_link("<<column_index<<", "<<row_index<<", "<<target_row_index<<")\n";
                 }
             }
 #endif
             typedef _impl::TableFriend tf;
-            tf::do_set_link(*m_table, col_ndx, row_ndx, target_row_ndx); // Throws
+            tf::do_set_link(*m_table, column_index, row_index, target_row_index); // Throws
             return true;
         }
         return false;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+    bool insert_empty_rows(size_t row_index, size_t num_rows_to_insert, size_t prior_num_rows,
                            bool unordered)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
-        if (REALM_UNLIKELY(row_ndx > prior_num_rows))
+        if (REALM_UNLIKELY(row_index > prior_num_rows))
             return false;
         if (REALM_UNLIKELY(prior_num_rows != m_table->size()))
             return false;
-        if (REALM_UNLIKELY(unordered && row_ndx != prior_num_rows))
+        if (REALM_UNLIKELY(unordered && row_index != prior_num_rows))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "table->insert_empty_row("<<row_ndx<<", "<<num_rows_to_insert<<")\n";
+            *m_log << "table->insert_empty_row("<<row_index<<", "<<num_rows_to_insert<<")\n";
 #endif
-        m_table->insert_empty_row(row_ndx, num_rows_to_insert); // Throws
+        m_table->insert_empty_row(row_index, num_rows_to_insert); // Throws
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+    bool erase_rows(size_t row_index, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool unordered)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
-        if (REALM_UNLIKELY(row_ndx >= prior_num_rows))
+        if (REALM_UNLIKELY(row_index >= prior_num_rows))
             return false;
         if (REALM_UNLIKELY(num_rows_to_erase != 1))
             return false;
@@ -229,48 +229,48 @@ public:
         if (unordered) {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->move_last_over("<<row_ndx<<")\n";
+                *m_log << "table->move_last_over("<<row_index<<")\n";
 #endif
-            tf::do_move_last_over(*m_table, row_ndx); // Throws
+            tf::do_move_last_over(*m_table, row_index); // Throws
         }
         else {
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table->remove("<<row_ndx<<")\n";
+                *m_log << "table->remove("<<row_index<<")\n";
 #endif
-            tf::do_remove(*m_table, row_ndx); // Throws
+            tf::do_remove(*m_table, row_index); // Throws
         }
         return true;
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t* path)
+    bool select_table(size_t group_level_index, int levels, const size_t* path)
     {
-        if (REALM_UNLIKELY(group_level_ndx >= m_group.size()))
+        if (REALM_UNLIKELY(group_level_index >= m_group.size()))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "table = group->get_table("<<group_level_ndx<<")\n";
+            *m_log << "table = group->get_table("<<group_level_index<<")\n";
 #endif
         m_desc.reset();
-        m_table = m_group.get_table(group_level_ndx); // Throws
+        m_table = m_group.get_table(group_level_index); // Throws
         for (int i = 0; i < levels; ++i) {
-            size_t col_ndx = path[2*i + 0];
-            size_t row_ndx = path[2*i + 1];
-            if (REALM_UNLIKELY(col_ndx >= m_table->get_column_count()))
+            size_t column_index = path[2*i + 0];
+            size_t row_index = path[2*i + 1];
+            if (REALM_UNLIKELY(column_index >= m_table->get_column_count()))
                 return false;
-            if (REALM_UNLIKELY(row_ndx >= m_table->size()))
+            if (REALM_UNLIKELY(row_index >= m_table->size()))
                 return false;
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "table = table->get_subtable("<<col_ndx<<", "<<row_ndx<<")\n";
+                *m_log << "table = table->get_subtable("<<column_index<<", "<<row_index<<")\n";
 #endif
-            DataType type = m_table->get_column_type(col_ndx);
+            DataType type = m_table->get_column_type(column_index);
             switch (type) {
                 case type_Table:
-                    m_table = m_table->get_subtable(col_ndx, row_ndx); // Throws
+                    m_table = m_table->get_subtable(column_index, row_index); // Throws
                     break;
                 case type_Mixed:
-                    m_table = m_table->get_subtable(col_ndx, row_ndx); // Throws
+                    m_table = m_table->get_subtable(column_index, row_index); // Throws
                     if (REALM_UNLIKELY(!m_table))
                         return false;
                     break;
@@ -295,16 +295,16 @@ public:
         return false;
     }
 
-    bool add_search_index(size_t col_ndx)
+    bool add_search_index(size_t column_index)
     {
         if (REALM_LIKELY(m_table)) {
             if (REALM_LIKELY(!m_table->has_shared_type())) {
-                if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
+                if (REALM_LIKELY(column_index < m_table->get_column_count())) {
 #ifdef REALM_DEBUG
                     if (m_log)
-                        *m_log << "table->add_search_index("<<col_ndx<<")\n";
+                        *m_log << "table->add_search_index("<<column_index<<")\n";
 #endif
-                    m_table->add_search_index(col_ndx); // Throws
+                    m_table->add_search_index(column_index); // Throws
                     return true;
                 }
             }
@@ -312,16 +312,16 @@ public:
         return false;
     }
 
-    bool remove_search_index(size_t col_ndx)
+    bool remove_search_index(size_t column_index)
     {
         if (REALM_LIKELY(m_table)) {
             if (REALM_LIKELY(!m_table->has_shared_type())) {
-                if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
+                if (REALM_LIKELY(column_index < m_table->get_column_count())) {
 #ifdef REALM_DEBUG
                     if (m_log)
-                        *m_log << "table->remove_search_index("<<col_ndx<<")\n";
+                        *m_log << "table->remove_search_index("<<column_index<<")\n";
 #endif
-                    m_table->remove_search_index(col_ndx); // Throws
+                    m_table->remove_search_index(column_index); // Throws
                     return true;
                 }
             }
@@ -329,18 +329,18 @@ public:
         return false;
     }
 
-    bool add_primary_key(size_t col_ndx)
+    bool add_primary_key(size_t column_index)
     {
         if (REALM_LIKELY(m_table)) {
             if (REALM_LIKELY(!m_table->has_shared_type())) {
-                if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
+                if (REALM_LIKELY(column_index < m_table->get_column_count())) {
 #ifdef REALM_DEBUG
                     if (m_log)
-                        *m_log << "table->add_primary_key("<<col_ndx<<")\n";
+                        *m_log << "table->add_primary_key("<<column_index<<")\n";
 #endif
                     // Fails if there are duplicate values, but given valid
                     // transaction logs, there never will be.
-                    bool success = m_table->try_add_primary_key(col_ndx); // Throws
+                    bool success = m_table->try_add_primary_key(column_index); // Throws
                     return success;
                 }
             }
@@ -363,106 +363,106 @@ public:
         return false;
     }
 
-    bool set_link_type(size_t col_ndx, LinkType link_type)
+    bool set_link_type(size_t column_index, LinkType link_type)
     {
         if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(col_ndx < m_desc->get_column_count())) {
+            if (REALM_LIKELY(column_index < m_desc->get_column_count())) {
 #ifdef REALM_DEBUG
                 if (m_log)
-                    *m_log << "table->set_link_type("<<col_ndx<<", "
+                    *m_log << "table->set_link_type("<<column_index<<", "
                         "\""<<link_type_to_str(link_type)<<"\")\n";
 #endif
                 typedef _impl::TableFriend tf;
-                tf::set_link_type(*m_table, col_ndx, link_type); // Throws
+                tf::set_link_type(*m_table, column_index, link_type); // Throws
                 return true;
             }
         }
         return false;
     }
 
-    bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
+    bool insert_column(size_t column_index, DataType type, StringData name, bool nullable)
     {
         if (REALM_LIKELY(m_desc)) {
-            if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
+            if (REALM_LIKELY(column_index <= m_desc->get_column_count())) {
                 typedef _impl::TableFriend tf;
 #ifdef REALM_DEBUG
                 if (m_log) {
-                    *m_log << "desc->insert_column("<<col_ndx<<", "<<data_type_to_str(type)<<", "
+                    *m_log << "desc->insert_column("<<column_index<<", "<<data_type_to_str(type)<<", "
                         "\""<<name<< "\", "<<nullable<<")\n";
                 }
 #endif
                 Table* link_target_table = nullptr;
-                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
+                tf::insert_column(*m_desc, column_index, type, name, link_target_table, nullable); // Throws
                 return true;
             }
         }
         return false;
     }
 
-    bool insert_link_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx, size_t)
+    bool insert_link_column(size_t column_index, DataType type, StringData name,
+                       size_t link_target_table_index, size_t)
     {
         if (REALM_LIKELY(m_desc)) {
-            if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
+            if (REALM_LIKELY(column_index <= m_desc->get_column_count())) {
                 typedef _impl::TableFriend tf;
 #ifdef REALM_DEBUG
                 if (m_log) {
-                    *m_log << "desc->insert_column_link("<<col_ndx<<", "
+                    *m_log << "desc->insert_column_link("<<column_index<<", "
                         ""<<data_type_to_str(type)<<", \""<<name<<"\", "
-                        "group->get_table("<<link_target_table_ndx<<"))\n";
+                        "group->get_table("<<link_target_table_index<<"))\n";
                 }
 #endif
                 typedef _impl::GroupFriend gf;
-                Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
-                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
+                Table* link_target_table = &gf::get_table(m_group, link_target_table_index); // Throws
+                tf::insert_column(*m_desc, column_index, type, name, link_target_table); // Throws
                 return true;
             }
         }
         return false;
     }
 
-    bool erase_column(size_t col_ndx)
+    bool erase_column(size_t column_index)
     {
         if (REALM_LIKELY(m_desc)) {
-            if (REALM_LIKELY(col_ndx < m_desc->get_column_count())) {
+            if (REALM_LIKELY(column_index < m_desc->get_column_count())) {
 #ifdef REALM_DEBUG
                 if (m_log)
-                    *m_log << "desc->remove_column("<<col_ndx<<")\n";
+                    *m_log << "desc->remove_column("<<column_index<<")\n";
 #endif
                 typedef _impl::TableFriend tf;
-                tf::erase_column(*m_desc, col_ndx); // Throws
+                tf::erase_column(*m_desc, column_index); // Throws
                 return true;
             }
         }
         return false;
     }
 
-    bool erase_link_column(size_t col_ndx, size_t, size_t)
+    bool erase_link_column(size_t column_index, size_t, size_t)
     {
         if (REALM_LIKELY(m_desc)) {
-            if (REALM_LIKELY(col_ndx < m_desc->get_column_count())) {
+            if (REALM_LIKELY(column_index < m_desc->get_column_count())) {
 #ifdef REALM_DEBUG
                 if (m_log)
-                    *m_log << "desc->remove_column("<<col_ndx<<")\n";
+                    *m_log << "desc->remove_column("<<column_index<<")\n";
 #endif
                 typedef _impl::TableFriend tf;
-                tf::erase_column(*m_desc, col_ndx); // Throws
+                tf::erase_column(*m_desc, column_index); // Throws
                 return true;
             }
         }
         return false;
     }
 
-    bool rename_column(size_t col_ndx, StringData name)
+    bool rename_column(size_t column_index, StringData name)
     {
         if (REALM_LIKELY(m_desc)) {
-            if (REALM_LIKELY(col_ndx < m_desc->get_column_count())) {
+            if (REALM_LIKELY(column_index < m_desc->get_column_count())) {
 #ifdef REALM_DEBUG
                 if (m_log)
-                    *m_log << "desc->rename_column("<<col_ndx<<", \""<<name<<"\")\n";
+                    *m_log << "desc->rename_column("<<column_index<<", \""<<name<<"\")\n";
 #endif
                 typedef _impl::TableFriend tf;
-                tf::rename_column(*m_desc, col_ndx, name); // Throws
+                tf::rename_column(*m_desc, column_index, name); // Throws
                 return true;
             }
         }
@@ -481,21 +481,21 @@ public:
 #endif
         m_desc = m_table->get_descriptor(); // Throws
         for (int i = 0; i < levels; ++i) {
-            size_t col_ndx = path[i];
-            if (REALM_UNLIKELY(col_ndx >= m_desc->get_column_count()))
+            size_t column_index = path[i];
+            if (REALM_UNLIKELY(column_index >= m_desc->get_column_count()))
                 return false;
 #ifdef REALM_DEBUG
             if (m_log)
-                *m_log << "desc = desc->get_subdescriptor("<<col_ndx<<")\n";
+                *m_log << "desc = desc->get_subdescriptor("<<column_index<<")\n";
 #endif
-            m_desc = m_desc->get_subdescriptor(col_ndx);
+            m_desc = m_desc->get_subdescriptor(column_index);
         }
         return true;
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name)
+    bool insert_group_level_table(size_t table_index, size_t num_tables, StringData name)
     {
-        if (REALM_UNLIKELY(table_ndx != num_tables))
+        if (REALM_UNLIKELY(table_index != num_tables))
             return false;
         if (REALM_UNLIKELY(num_tables != m_group.size()))
             return false;
@@ -509,25 +509,25 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(std::size_t table_ndx, size_t num_tables) REALM_NOEXCEPT
+    bool erase_group_level_table(std::size_t table_index, size_t num_tables) REALM_NOEXCEPT
     {
         if (REALM_UNLIKELY(num_tables != m_group.size()))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "group->remove_table("<<table_ndx<<")\n";
+            *m_log << "group->remove_table("<<table_index<<")\n";
 #endif
-        m_group.remove_table(table_ndx);
+        m_group.remove_table(table_index);
         return true;
     }
 
-    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) REALM_NOEXCEPT
+    bool rename_group_level_table(std::size_t table_index, StringData new_name) REALM_NOEXCEPT
     {
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "group->rename_table("<<table_ndx<<", \""<<new_name<<"\")\n";
+            *m_log << "group->rename_table("<<table_index<<", \""<<new_name<<"\")\n";
 #endif
-        m_group.rename_table(table_ndx, new_name);
+        m_group.rename_table(table_index, new_name);
         return true;
     }
 
@@ -546,98 +546,98 @@ public:
         return false;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    bool select_link_list(size_t column_index, size_t row_index)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
-        if (REALM_UNLIKELY(col_ndx >= m_table->get_column_count()))
+        if (REALM_UNLIKELY(column_index >= m_table->get_column_count()))
             return false;
-        DataType type = m_table->get_column_type(col_ndx);
+        DataType type = m_table->get_column_type(column_index);
         if (REALM_UNLIKELY(type != type_LinkList))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "link_list = table->get_link_list("<<col_ndx<<", "<<row_ndx<<")\n";
+            *m_log << "link_list = table->get_link_list("<<column_index<<", "<<row_index<<")\n";
 #endif
-        m_link_list = m_table->get_linklist(col_ndx, row_ndx); // Throws
+        m_link_list = m_table->get_linklist(column_index, row_index); // Throws
         return true;
     }
 
-    bool link_list_set(size_t link_ndx, size_t value)
+    bool link_list_set(size_t link_index, size_t value)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;
-        if (REALM_UNLIKELY(link_ndx >= m_link_list->size()))
+        if (REALM_UNLIKELY(link_index >= m_link_list->size()))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "link_list->set("<<link_ndx<<", "<<value<<")\n";
+            *m_log << "link_list->set("<<link_index<<", "<<value<<")\n";
 #endif
         typedef _impl::LinkListFriend llf;
-        llf::do_set(*m_link_list, link_ndx, value); // Throws
+        llf::do_set(*m_link_list, link_index, value); // Throws
         return true;
     }
 
-    bool link_list_insert(size_t link_ndx, size_t value)
+    bool link_list_insert(size_t link_index, size_t value)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;
-        if (REALM_UNLIKELY(link_ndx > m_link_list->size()))
+        if (REALM_UNLIKELY(link_index > m_link_list->size()))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "link_list->insert("<<link_ndx<<", "<<value<<")\n";
+            *m_log << "link_list->insert("<<link_index<<", "<<value<<")\n";
 #endif
-        m_link_list->insert(link_ndx, value); // Throws
+        m_link_list->insert(link_index, value); // Throws
         return true;
     }
 
-    bool link_list_move(size_t old_link_ndx, size_t new_link_ndx)
+    bool link_list_move(size_t old_link_index, size_t new_link_index)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;
         size_t num_links = m_link_list->size();
-        if (REALM_UNLIKELY(old_link_ndx >= num_links))
+        if (REALM_UNLIKELY(old_link_index >= num_links))
             return false;
-        if (REALM_UNLIKELY(new_link_ndx >= num_links))
+        if (REALM_UNLIKELY(new_link_index >= num_links))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "link_list->move("<<old_link_ndx<<", "<<new_link_ndx<<")\n";
+            *m_log << "link_list->move("<<old_link_index<<", "<<new_link_index<<")\n";
 #endif
-        m_link_list->move(old_link_ndx, new_link_ndx); // Throws
+        m_link_list->move(old_link_index, new_link_index); // Throws
         return true;
     }
 
-    bool link_list_swap(size_t link1_ndx, size_t link2_ndx)
+    bool link_list_swap(size_t link1_index, size_t link2_index)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;
         size_t num_links = m_link_list->size();
-        if (REALM_UNLIKELY(link1_ndx >= num_links))
+        if (REALM_UNLIKELY(link1_index >= num_links))
             return false;
-        if (REALM_UNLIKELY(link2_ndx >= num_links))
+        if (REALM_UNLIKELY(link2_index >= num_links))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "link_list->swap("<<link1_ndx<<", "<<link2_ndx<<")\n";
+            *m_log << "link_list->swap("<<link1_index<<", "<<link2_index<<")\n";
 #endif
-        m_link_list->swap(link1_ndx, link2_ndx); // Throws
+        m_link_list->swap(link1_index, link2_index); // Throws
         return true;
     }
 
-    bool link_list_erase(size_t link_ndx)
+    bool link_list_erase(size_t link_index)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;
-        if (REALM_UNLIKELY(link_ndx >= m_link_list->size()))
+        if (REALM_UNLIKELY(link_index >= m_link_list->size()))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
-            *m_log << "link_list->remove("<<link_ndx<<")\n";
+            *m_log << "link_list->remove("<<link_index<<")\n";
 #endif
         typedef _impl::LinkListFriend llf;
-        llf::do_remove(*m_link_list, link_ndx); // Throws
+        llf::do_remove(*m_link_list, link_index); // Throws
         return true;
     }
 
@@ -671,22 +671,22 @@ private:
     LinkViewRef m_link_list;
     std::ostream* m_log;
 
-    bool check_set_cell(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+    bool check_set_cell(size_t column_index, size_t row_index) REALM_NOEXCEPT
     {
         if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
-                if (REALM_LIKELY(row_ndx < m_table->size()))
+            if (REALM_LIKELY(column_index < m_table->get_column_count())) {
+                if (REALM_LIKELY(row_index < m_table->size()))
                     return true;
             }
         }
         return false;
     }
 
-    bool check_insert_cell(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+    bool check_insert_cell(size_t column_index, size_t row_index) REALM_NOEXCEPT
     {
         if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
-                if (REALM_LIKELY(row_ndx <= m_table->size()))
+            if (REALM_LIKELY(column_index < m_table->get_column_count())) {
+                if (REALM_LIKELY(row_index <= m_table->size()))
                     return true;
             }
         }

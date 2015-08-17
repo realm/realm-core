@@ -73,13 +73,13 @@ public:
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    DataType get_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
+    DataType get_column_type(std::size_t column_index) const REALM_NOEXCEPT;
 
     /// Get the name of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    StringData get_column_name(std::size_t column_ndx) const REALM_NOEXCEPT;
+    StringData get_column_name(std::size_t column_index) const REALM_NOEXCEPT;
 
     /// Search for a column with the specified name.
     ///
@@ -140,12 +140,12 @@ public:
 
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
 
-    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+    void insert_column(std::size_t column_index, DataType type, StringData name,
                        DescriptorRef* subdesc = 0, bool nullable = false);
 
     std::size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
-    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
+    void insert_column_link(std::size_t column_index, DataType type, StringData name, Table& target,
                             LinkType = link_Weak);
     //@}
 
@@ -169,7 +169,7 @@ public:
     ///
     /// \sa is_root()
     /// \sa Table::remove_column()
-    void remove_column(std::size_t column_ndx);
+    void remove_column(std::size_t column_index);
 
     /// Rename the specified column.
     ///
@@ -184,7 +184,7 @@ public:
     ///
     /// \sa is_root()
     /// \sa Table::rename_column()
-    void rename_column(std::size_t column_ndx, StringData new_name);
+    void rename_column(std::size_t column_index, StringData new_name);
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
     /// that implies ownership, i.e., that the origin row (parent) owns the
@@ -243,17 +243,17 @@ public:
     /// be cascade-removed. This can lead to obscure bugs in some applications,
     /// such as in the following case:
     ///
-    ///     table.set_link(col_ndx_1, row_ndx, ...);
-    ///     table.set_int(col_ndx_2, row_ndx, ...); // Oops, `row_ndx` may no longer refer to the same row
+    ///     table.set_link(column_index_1, row_index, ...);
+    ///     table.set_int(column_index_2, row_index, ...); // Oops, `row_index` may no longer refer to the same row
     ///
     /// To be safe, applications, that may encounter cycles, are advised to
     /// adopt the following pattern:
     ///
-    ///     Row row = table[row_ndx];
-    ///     row.set_link(col_ndx_1, ...);
+    ///     Row row = table[row_index];
+    ///     row.set_link(column_index_1, ...);
     ///     if (row)
-    ///         row.set_int(col_ndx_2, ...); // Ok, because we check whether the row has disappeared
-    void set_link_type(std::size_t column_ndx, LinkType);
+    ///         row.set_int(column_index_2, ...); // Ok, because we check whether the row has disappeared
+    void set_link_type(std::size_t column_index, LinkType);
 
     //@{
     /// Get the descriptor for the specified subtable column.
@@ -271,8 +271,8 @@ public:
     /// first getting access to the subtable itself.
     ///
     /// \sa is_root()
-    DescriptorRef get_subdescriptor(std::size_t column_ndx);
-    ConstDescriptorRef get_subdescriptor(std::size_t column_ndx) const;
+    DescriptorRef get_subdescriptor(std::size_t column_index);
+    ConstDescriptorRef get_subdescriptor(std::size_t column_index) const;
     //@}
 
     //@{
@@ -356,7 +356,7 @@ public:
     /// this function returns the number of unique values currently
     /// stored. Otherwise it returns zero. This function is mainly intended for
     /// debugging purposes.
-    std::size_t get_num_unique_values(std::size_t column_ndx) const;
+    std::size_t get_num_unique_values(std::size_t column_index) const;
 
     ~Descriptor() REALM_NOEXCEPT;
 
@@ -377,9 +377,9 @@ private:
     // It also enables the necessary recursive detaching of descriptor
     // objects.
     struct subdesc_entry {
-        std::size_t m_column_ndx;
+        std::size_t m_column_index;
         Descriptor* m_subdesc;
-        subdesc_entry(std::size_t column_ndx, Descriptor*);
+        subdesc_entry(std::size_t column_index, Descriptor*);
     };
     typedef std::vector<subdesc_entry> subdesc_map;
     mutable subdesc_map m_subdesc_map;
@@ -448,10 +448,10 @@ private:
     // Returns a pointer to the accessor of the specified
     // subdescriptor if that accessor exists, otherwise this function
     // return null.
-    Descriptor* get_subdesc_accessor(std::size_t column_ndx) REALM_NOEXCEPT;
+    Descriptor* get_subdesc_accessor(std::size_t column_index) REALM_NOEXCEPT;
 
-    void adj_insert_column(std::size_t col_ndx) REALM_NOEXCEPT;
-    void adj_erase_column(std::size_t col_ndx) REALM_NOEXCEPT;
+    void adj_insert_column(std::size_t column_index) REALM_NOEXCEPT;
+    void adj_erase_column(std::size_t column_index) REALM_NOEXCEPT;
 
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
@@ -469,16 +469,16 @@ inline std::size_t Descriptor::get_column_count() const REALM_NOEXCEPT
     return m_spec->get_public_column_count();
 }
 
-inline StringData Descriptor::get_column_name(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData Descriptor::get_column_name(std::size_t index) const REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
-    return m_spec->get_column_name(ndx);
+    return m_spec->get_column_name(index);
 }
 
-inline DataType Descriptor::get_column_type(std::size_t ndx) const REALM_NOEXCEPT
+inline DataType Descriptor::get_column_type(std::size_t index) const REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
-    return m_spec->get_public_column_type(ndx);
+    return m_spec->get_public_column_type(index);
 }
 
 inline std::size_t Descriptor::get_column_index(StringData name) const REALM_NOEXCEPT
@@ -489,78 +489,78 @@ inline std::size_t Descriptor::get_column_index(StringData name) const REALM_NOE
 
 inline std::size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
 {
-    std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column(column_ndx, type, name, subdesc, nullable); // Throws
-    return column_ndx;
+    std::size_t column_index = m_spec->get_public_column_count();
+    insert_column(column_index, type, name, subdesc, nullable); // Throws
+    return column_index;
 }
 
-inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, StringData name,
+inline void Descriptor::insert_column(std::size_t column_index, DataType type, StringData name,
                                       DescriptorRef* subdesc, bool nullable)
 {
     typedef _impl::TableFriend tf;
     REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
+    REALM_ASSERT_3(column_index, <=, get_column_count());
     REALM_ASSERT(!tf::is_link_type(ColumnType(type)));
 
     Table* link_target_table = nullptr;
-    tf::insert_column(*this, column_ndx, type, name, link_target_table, nullable); // Throws
-    adj_insert_column(column_ndx);
+    tf::insert_column(*this, column_index, type, name, link_target_table, nullable); // Throws
+    adj_insert_column(column_index);
     if (subdesc && type == type_Table)
-        *subdesc = get_subdescriptor(column_ndx);
+        *subdesc = get_subdescriptor(column_index);
 }
 
 inline std::size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
                                                LinkType link_type)
 {
-    std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column_link(column_ndx, type, name, target, link_type); // Throws
-    return column_ndx;
+    std::size_t column_index = m_spec->get_public_column_count();
+    insert_column_link(column_index, type, name, target, link_type); // Throws
+    return column_index;
 }
 
-inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type, StringData name,
+inline void Descriptor::insert_column_link(std::size_t column_index, DataType type, StringData name,
                                            Table& target, LinkType link_type)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
+    REALM_ASSERT_3(column_index, <=, get_column_count());
     typedef _impl::TableFriend tf;
     REALM_ASSERT(tf::is_link_type(ColumnType(type)));
     // Both origin and target must be group-level tables
     REALM_ASSERT(is_root() && get_root_table()->is_group_level());
     REALM_ASSERT(target.is_group_level());
 
-    tf::insert_column(*this, column_ndx, type, name, &target); // Throws
-    adj_insert_column(column_ndx);
+    tf::insert_column(*this, column_index, type, name, &target); // Throws
+    adj_insert_column(column_index);
 
-    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
+    tf::set_link_type(*get_root_table(), column_index, link_type); // Throws
 }
 
-inline void Descriptor::remove_column(std::size_t column_ndx)
+inline void Descriptor::remove_column(std::size_t column_index)
 {
     REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
-    tf::erase_column(*this, column_ndx); // Throws
-    adj_erase_column(column_ndx);
+    tf::erase_column(*this, column_index); // Throws
+    adj_erase_column(column_index);
 }
 
-inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
+inline void Descriptor::rename_column(std::size_t column_index, StringData name)
 {
     REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
-    tf::rename_column(*this, column_ndx, name); // Throws
+    tf::rename_column(*this, column_index, name); // Throws
 }
 
-inline void Descriptor::set_link_type(std::size_t column_ndx, LinkType link_type)
+inline void Descriptor::set_link_type(std::size_t column_index, LinkType link_type)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
+    REALM_ASSERT_3(column_index, <=, get_column_count());
     typedef _impl::TableFriend tf;
-    REALM_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_ndx))));
-    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
+    REALM_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_index))));
+    tf::set_link_type(*get_root_table(), column_index, link_type); // Throws
 }
 
-inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) const
+inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_index) const
 {
-    return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
+    return const_cast<Descriptor*>(this)->get_subdescriptor(column_index);
 }
 
 inline DescriptorRef Descriptor::get_parent() REALM_NOEXCEPT
@@ -618,7 +618,7 @@ inline bool Descriptor::is_attached() const REALM_NOEXCEPT
 }
 
 inline Descriptor::subdesc_entry::subdesc_entry(std::size_t n, Descriptor* d):
-    m_column_ndx(n),
+    m_column_index(n),
     m_subdesc(d)
 {
 }
@@ -681,20 +681,20 @@ public:
         return desc.record_subdesc_path(begin, end);
     }
 
-    static Descriptor* get_subdesc_accessor(Descriptor& desc, std::size_t column_ndx)
+    static Descriptor* get_subdesc_accessor(Descriptor& desc, std::size_t column_index)
         REALM_NOEXCEPT
     {
-        return desc.get_subdesc_accessor(column_ndx);
+        return desc.get_subdesc_accessor(column_index);
     }
 
-    static void adj_insert_column(Descriptor& desc, std::size_t col_ndx) REALM_NOEXCEPT
+    static void adj_insert_column(Descriptor& desc, std::size_t column_index) REALM_NOEXCEPT
     {
-        desc.adj_insert_column(col_ndx);
+        desc.adj_insert_column(column_index);
     }
 
-    static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) REALM_NOEXCEPT
+    static void adj_erase_column(Descriptor& desc, std::size_t column_index) REALM_NOEXCEPT
     {
-        desc.adj_erase_column(col_ndx);
+        desc.adj_erase_column(column_index);
     }
 };
 
