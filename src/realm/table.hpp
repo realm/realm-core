@@ -726,7 +726,7 @@ public:
     /// equal.
     ///
     /// For a particular row and column, if the two values are themselves tables
-    /// (subtable and mixed columns) value equality implies a recusive
+    /// (subtable and mixed columns) value equality implies a recursive
     /// invocation of `Table::operator==()`.
     bool operator==(const Table&) const;
 

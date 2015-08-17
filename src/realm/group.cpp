@@ -328,7 +328,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
     // Whenever a table has a link column, the column accessor must be set up to
     // refer to the target table accessor, so the target table accessor needs to
     // be created too, if it does not already exist. This, of course, applies
-    // recusively, and it applies to the opposide direction of links too (from
+    // recursively, and it applies to the opposide direction of links too (from
     // target side to origin side). This means that whenever we create a table
     // accessor, we actually need to create the entire cluster of table
     // accessors, that is reachable in zero or more steps along links, or
@@ -701,7 +701,7 @@ void Group::commit()
 
     out.commit(top_ref); // Throws
 
-    // Recusively update refs in all active tables (columns, arrays..)
+    // Recursively update refs in all active tables (columns, arrays..)
     update_refs(top_ref, old_baseline);
 }
 
