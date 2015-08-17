@@ -312,6 +312,14 @@ inline void BasicColumn<T>::insert_rows(size_t row_ndx, size_t num_rows_to_inser
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     T value = T();
     do_insert(row_ndx_2, value, num_rows_to_insert); // Throws
+
+    if (is_nullable()) {
+        // Default value for nullable columns is NULL.
+        // FIXME: Make faster with an insert_null method.
+        for (size_t i = 0; i < num_rows_to_insert; ++i) {
+            set_null(row_ndx + i);
+        }
+    }
 }
 
 // Implementing pure virtual method of ColumnBase.

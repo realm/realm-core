@@ -6176,7 +6176,7 @@ TEST(Query_64BitValues)
 }
 
 
-TEST(Query_NullShowcase)
+ONLY(Query_NullShowcase)
 {
 /*
 Here we show how comparisons and arithmetic with null works in queries. Basic rules:
@@ -6219,8 +6219,13 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->insert_column(5, type_DateTime, "Delivery date", true);
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
 
-    // Default values for nullable float and double columns is null
+    // Default values for all nullable columns
+    CHECK(table->is_null(0, 0));
     CHECK(table->is_null(1, 0));
+    CHECK(table->is_null(2, 0));
+    CHECK(table->is_null(3, 0));
+    CHECK(table->is_null(4, 0));
+    CHECK(table->is_null(5, 0));
 
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
@@ -6412,7 +6417,6 @@ NOTE NOTE: There is currently only very little syntax checking.
     CHECK(!table->is_null(1, 1));
 
     // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
-
 }
 
 #endif // TEST_QUERY
