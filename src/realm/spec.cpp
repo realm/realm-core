@@ -466,8 +466,8 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
             {
                 // Sub tables must be compared recursively
                 const size_t subspec_index = get_subspec_ndx(col_ndx);
-                const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
-                const Spec rhs = Spec(const_cast<Spec&>(spec).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
+                const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index));
+                const Spec rhs = Spec(const_cast<Spec&>(spec).get_subspec_by_ndx(subspec_index));
                 if (lhs != rhs)
                     return false;
                 break;
