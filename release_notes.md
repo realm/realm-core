@@ -16,7 +16,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Modifying `Descriptor` methods now throw `LogicError` when appropriate (rather
+  than asserting).
 
 -----------
 
