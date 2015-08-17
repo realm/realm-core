@@ -449,8 +449,7 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
 
     // check each column's type
     const size_t column_count = get_column_count();
-    for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx)
-    {
+    for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
         switch (m_types.get(col_ndx))
         {
             case col_type_String:
@@ -475,9 +474,10 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
             case col_type_Link:
             case col_type_LinkList:
             {
-                // In addition to name and attributes, the link target type must also be compared
-                const size_t subspec_index = get_subspec_ndx(col_ndx);
-                if (m_subspecs.get(subspec_index) != spec.m_subspecs.get(subspec_index))
+                // In addition to name and attributes, the link target table must also be compared
+                const size_t lhs_table_ndx = get_opposite_link_table_ndx(col_ndx);
+                const size_t rhs_table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
+                if (lhs_table_ndx != rhs_table_ndx)
                     return false;
                 break;
             }
