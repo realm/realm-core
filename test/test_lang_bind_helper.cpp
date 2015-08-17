@@ -8266,7 +8266,7 @@ struct StealingInfo {
 };
 
 
-void stealing_querier(HandoverControl<StealingInfo>* control, 
+void stealing_querier(HandoverControl<StealingInfo>* control,
                       TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
@@ -8302,7 +8302,7 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
     sg.end_read();
 }
 
-void stealing_verifier(HandoverControl<StealingInfo>* control, 
+void stealing_verifier(HandoverControl<StealingInfo>* control,
                        TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
@@ -8340,15 +8340,17 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
             sg.commit();
             control->signal_feedback();
             break;
-        } 
+        }
         else
             sg.end_read();
     }
 }
 
-}
+} // anonymous namespace
 
-TEST(LangBindHelper_HandoverStealing)
+// Disabled as it frequently gets into an indefinite hang. Unknown whether this
+// is a bug in core or in the unit test.
+TEST_IF(LangBindHelper_HandoverStealing, false)
 {
     SHARED_GROUP_TEST_PATH(p);
     std::string path(p);
