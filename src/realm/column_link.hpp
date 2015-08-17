@@ -39,6 +39,8 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
+    bool is_nullable() const REALM_NOEXCEPT override;
+
     //@{
 
     /// is_null_link() is shorthand for `get_link() == realm::npos`,
@@ -48,8 +50,10 @@ public:
     /// `realm::npos` indicating that it was null.
 
     std::size_t get_link(std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool is_null(std::size_t row_ndx) const REALM_NOEXCEPT override;
     bool is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT;
     std::size_t set_link(std::size_t row_ndx, std::size_t target_row_ndx);
+    void set_null(std::size_t row_ndx) override;
     void nullify_link(std::size_t row_ndx);
     void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
     void insert_null_link(std::size_t row_ndx);
@@ -84,9 +88,20 @@ inline LinkColumn::~LinkColumn() REALM_NOEXCEPT
 {
 }
 
+inline bool LinkColumn::is_nullable() const REALM_NOEXCEPT
+{
+    return true;
+}
+
 inline ref_type LinkColumn::create(Allocator& alloc, std::size_t size)
 {
     return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
+}
+
+inline bool LinkColumn::is_null(std::size_t row_ndx) const REALM_NOEXCEPT
+{
+    // Null is represented by zero
+    return LinkColumnBase::get(row_ndx) == 0;
 }
 
 inline std::size_t LinkColumn::get_link(std::size_t row_ndx) const REALM_NOEXCEPT
@@ -97,8 +112,7 @@ inline std::size_t LinkColumn::get_link(std::size_t row_ndx) const REALM_NOEXCEP
 
 inline bool LinkColumn::is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT
 {
-    // Null is represented by zero
-    return LinkColumnBase::get(row_ndx) == 0;
+    return is_null(row_ndx);
 }
 
 inline std::size_t LinkColumn::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
@@ -117,9 +131,14 @@ inline std::size_t LinkColumn::set_link(std::size_t row_ndx, std::size_t target_
     return old_target_row_ndx;
 }
 
-inline void LinkColumn::nullify_link(size_t row_ndx)
+inline void LinkColumn::set_null(size_t row_ndx)
 {
     set_link(row_ndx, realm::npos); // Throws
+}
+
+inline void LinkColumn::nullify_link(size_t row_ndx)
+{
+    set_null(row_ndx); // Throws
 }
 
 inline void LinkColumn::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)

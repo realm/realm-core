@@ -51,11 +51,16 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
+    bool is_nullable() const REALM_NOEXCEPT final;
+
     bool has_links(std::size_t row_ndx) const REALM_NOEXCEPT;
     std::size_t get_link_count(std::size_t row_ndx) const REALM_NOEXCEPT;
 
     ConstLinkViewRef get(std::size_t row_ndx) const;
     LinkViewRef get(std::size_t row_ndx);
+
+    bool is_null(std::size_t row_ndx) const REALM_NOEXCEPT final;
+    void set_null(std::size_t row_ndx) final;
 
     /// Compare two columns for equality.
     bool compare_link_list(const LinkListColumn&) const;
@@ -147,6 +152,11 @@ inline ref_type LinkListColumn::create(Allocator& alloc, std::size_t size)
     return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
+inline bool LinkListColumn::is_nullable() const REALM_NOEXCEPT
+{
+    return false;
+}
+
 inline bool LinkListColumn::has_links(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
@@ -171,6 +181,16 @@ inline LinkViewRef LinkListColumn::get(std::size_t row_ndx)
 {
     LinkView* link_list = get_ptr(row_ndx); // Throws
     return LinkViewRef(link_list);
+}
+
+inline bool LinkListColumn::is_null(std::size_t) const REALM_NOEXCEPT
+{
+    return false;
+}
+
+inline void LinkListColumn::set_null(std::size_t)
+{
+    throw LogicError{LogicError::column_not_nullable};
 }
 
 inline void LinkListColumn::do_discard_child_accessors() REALM_NOEXCEPT

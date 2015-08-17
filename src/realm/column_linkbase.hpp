@@ -34,6 +34,10 @@ public:
     LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx);
     ~LinkColumnBase() REALM_NOEXCEPT override;
 
+    bool is_nullable() const REALM_NOEXCEPT override = 0;
+    void set_null(std::size_t) override = 0;
+    bool is_null(std::size_t) const REALM_NOEXCEPT override = 0;
+
     StringIndex* create_search_index() override;
 
     bool get_weak_links() const REALM_NOEXCEPT;
