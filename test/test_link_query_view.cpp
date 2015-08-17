@@ -40,26 +40,26 @@ TEST(LinkList_Basic1)
     table1->set_int(0, 2, 300);
     table1->set_string(1, 2, "bar");
 
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    size_t column_link2 = table2->add_column_link(type_Link, "link", *table1);
     table2->add_empty_row();
     table2->add_empty_row();
 
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 1, 2);
+    table2->set_link(column_link2, 0, 1);
+    table2->set_link(column_link2, 1, 2);
 
-    Query q = table2->link(col_link2).column<String>(1) == "!";
+    Query q = table2->link(column_link2).column<String>(1) == "!";
     TableView tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv[0].get_index(), 0);
 
-    Query q2 = table2->link(col_link2).column<Int>(0) == 200;
+    Query q2 = table2->link(column_link2).column<Int>(0) == 200;
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(tv2.size(), 1);
     CHECK_EQUAL(tv2[0].get_index(), 0);
 
     // Just a few tests for the new string conditions to see if they work with links too.
     // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp 
-    Query q3 = table2->link(col_link2).column<String>(1).contains("A", false);
+    Query q3 = table2->link(column_link2).column<String>(1).contains("A", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(tv3.size(), 1);
     CHECK_EQUAL(tv3[0].get_index(), 1); // "bar" contained an "A"
@@ -68,7 +68,7 @@ TEST(LinkList_Basic1)
     table2->set_string(1, 0, "A");
     table2->set_string(1, 1, "A");
 
-    Query q4 = table2->link(col_link2).column<String>(1).contains(table2->column<String>(1), false);
+    Query q4 = table2->link(column_link2).column<String>(1).contains(table2->column<String>(1), false);
     TableView tv4 = q4.find_all();
     CHECK_EQUAL(tv4.size(), 1);
     CHECK_EQUAL(tv4[0].get_index(), 1); // "bar" contained an "A"
@@ -98,16 +98,16 @@ TEST(LinkList_MissingDeepCopy)
     table1->set_int(0, 2, 300);
     table1->set_string(1, 2, "bar");
 
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    size_t column_link2 = table2->add_column_link(type_Link, "link", *table1);
     table2->add_empty_row();
     table2->add_empty_row();
 
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 1, 2);
+    table2->set_link(column_link2, 0, 1);
+    table2->set_link(column_link2, 1, 2);
 
     char* c = new char[10000000]; 
     c[10000000 - 1] = '!';
-    Query q = table2->link(col_link2).column<String>(1) == StringData(&c[10000000 - 1], 1);
+    Query q = table2->link(column_link2).column<String>(1) == StringData(&c[10000000 - 1], 1);
 
     delete[] c;
     // If this segfaults, Query hasn't made its own deep copy of "!"
@@ -150,22 +150,22 @@ TEST(LinkList_Basic2)
     table2->set_int(0, 2, 600);
     table2->set_string(1, 2, "!");
 
-    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+    size_t column_link2 = table1->add_column_link(type_LinkList, "link", *table2);
 
     // set some links
     LinkViewRef links1;
 
-    links1 = table1->get_linklist(col_link2, 0);
+    links1 = table1->get_linklist(column_link2, 0);
     links1->add(1);
 
-    links1 = table1->get_linklist(col_link2, 1);
+    links1 = table1->get_linklist(column_link2, 1);
     links1->add(1);
     links1->add(2);
 
 
     size_t match;
 
-    match = (table1->link(col_link2).column<Int>(0) > 550).find();
+    match = (table1->link(column_link2).column<Int>(0) > 550).find();
     CHECK_EQUAL(1, match);
 
 
@@ -175,29 +175,29 @@ TEST(LinkList_Basic2)
     match = (table2->column<Int>(0) == 500).find();
     CHECK_EQUAL(1, match);
 
-    match = (table1->link(col_link2).column<String>(1) == "!").find();
+    match = (table1->link(column_link2).column<String>(1) == "!").find();
     CHECK_EQUAL(1, match);
 
-    match = (table1->link(col_link2).column<Int>(0) == 600).find();
+    match = (table1->link(column_link2).column<Int>(0) == 600).find();
     CHECK_EQUAL(1, match);
 
-    match = (table1->link(col_link2).column<String>(1) == "world").find();
+    match = (table1->link(column_link2).column<String>(1) == "world").find();
     CHECK_EQUAL(0, match);
 
-    match = (table1->link(col_link2).column<Int>(0) == 500).find();
+    match = (table1->link(column_link2).column<Int>(0) == 500).find();
     CHECK_EQUAL(0, match);
 
-    match = (table1->link(col_link2).column<String>(1) == "world").find(1);
+    match = (table1->link(column_link2).column<String>(1) == "world").find(1);
     CHECK_EQUAL(1, match);
 
-    match = (table1->link(col_link2).column<Int>(0) == 500).find(1);
+    match = (table1->link(column_link2).column<Int>(0) == 500).find(1);
     CHECK_EQUAL(1, match);
 
     // Test link lists with 0 entries (3'rd row has no links)
-    match = (table1->link(col_link2).column<String>(1) == "foobar").find();
+    match = (table1->link(column_link2).column<String>(1) == "foobar").find();
     CHECK_EQUAL(not_found, match);
 
-    match = (table1->link(col_link2).column<String>(1) == table1->column<String>(1)).find();
+    match = (table1->link(column_link2).column<String>(1) == table1->column<String>(1)).find();
     CHECK_EQUAL(1, match);
 }
 
@@ -238,23 +238,23 @@ TEST(LinkList_QuerySingle)
     table2->set_int(0, 2, 600);
     table2->set_string(1, 2, "!");
 
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    size_t column_link2 = table1->add_column_link(type_Link, "link", *table2);
 
     // set some links
 
-    table1->set_link(col_link2, 0, 1);
-    table1->set_link(col_link2, 1, 2);
+    table1->set_link(column_link2, 0, 1);
+    table1->set_link(column_link2, 1, 2);
 
     size_t match;
 
-    match = (table1->link(col_link2).column<Int>(0) > 450).find();
+    match = (table1->link(column_link2).column<Int>(0) > 450).find();
     CHECK_EQUAL(0, match);
 
-    match = (table1->link(col_link2).column<String>(1) == "!").find();
+    match = (table1->link(column_link2).column<String>(1) == "!").find();
     CHECK_EQUAL(1, match);
 
     // See if NULL-link can be handled (3'rd row doesn't have any link)
-    match = (table1->link(col_link2).column<String>(1) == "foobar").find();
+    match = (table1->link(column_link2).column<String>(1) == "foobar").find();
     CHECK_EQUAL(not_found, match);
 }
 
@@ -281,15 +281,15 @@ TEST(LinkList_TableViewTracking)
     table1->set_int(0, 2, 300);
     table1->set_string(1, 2, "bar");
 
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    size_t column_link2 = table2->add_column_link(type_Link, "link", *table1);
     table2->add_empty_row();
     table2->add_empty_row();
     table2->add_empty_row();
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 1, 2);
-    table2->set_link(col_link2, 2, 0);
+    table2->set_link(column_link2, 0, 1);
+    table2->set_link(column_link2, 1, 2);
+    table2->set_link(column_link2, 2, 0);
 
-    TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
+    TableView tv = (table2->link(column_link2).column<String>(1) == "!").find_all();
     CHECK_EQUAL(1, tv.size());
 
     // make entry NOT satisfy criteria, validate that sync removes entry from view
@@ -337,14 +337,14 @@ TEST(LinkList_ClearView1)
         table1->set_int(0, 2, 100);
         table1->set_string(1, 2, "bar");
 
-        size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+        size_t column_link2 = table2->add_column_link(type_Link, "link", *table1);
         table2->add_empty_row();
         table2->add_empty_row();
 
-        table2->set_link(col_link2, 0, 1);
-        table2->set_link(col_link2, 1, 2);
+        table2->set_link(column_link2, 0, 1);
+        table2->set_link(column_link2, 1, 2);
 
-        TableView tv = (table2->link(col_link2).column<String>(1) != "!").find_all();
+        TableView tv = (table2->link(column_link2).column<String>(1) != "!").find_all();
 
         tv.clear();
         CHECK_EQUAL(1, table2->size());
@@ -375,22 +375,22 @@ TEST(LinkList_ClearView1)
         table1->set_int(0, 2, 100);
         table1->set_string(1, 2, "bar");
 
-        size_t col_link2 = table2->add_column_link(type_LinkList, "link", *table1);
+        size_t column_link2 = table2->add_column_link(type_LinkList, "link", *table1);
         table2->add_empty_row();
         table2->add_empty_row();
         table2->add_empty_row();
 
         LinkViewRef links1;
 
-        links1 = table2->get_linklist(col_link2, 0);
+        links1 = table2->get_linklist(column_link2, 0);
         links1->add(0);
         links1->add(1);
 
-        links1 = table2->get_linklist(col_link2, 2);
+        links1 = table2->get_linklist(column_link2, 2);
         links1->add(1);
         links1->add(2);
 
-        TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
+        TableView tv = (table2->link(column_link2).column<String>(1) == "!").find_all();
 
         tv.clear();
         CHECK_EQUAL(1, table2->size());
@@ -422,17 +422,17 @@ TEST(LinkList_ClearView1)
         table1->set_int(0, 2, 100);
         table1->set_string(1, 2, "bar");
 
-        size_t col_link2 = table2->add_column_link(type_LinkList, "link", *table1);
+        size_t column_link2 = table2->add_column_link(type_LinkList, "link", *table1);
         table2->add_empty_row();
         table2->add_empty_row();
 
         LinkViewRef links1;
 
-        links1 = table2->get_linklist(col_link2, 0);
+        links1 = table2->get_linklist(column_link2, 0);
         links1->add(0);
         links1->add(1);
 
-        links1 = table2->get_linklist(col_link2, 1);
+        links1 = table2->get_linklist(column_link2, 1);
         links1->add(1);
         links1->add(2);
 
@@ -483,21 +483,21 @@ TEST(LinkList_QueryFindLinkTarget)
     table2->set_int(0, 3, 700);
     table2->set_string(1, 3, "!!");
 
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
-    size_t col_link3 = table1->add_column_link(type_LinkList, "link", *table2);
+    size_t column_link2 = table1->add_column_link(type_Link, "link", *table2);
+    size_t column_link3 = table1->add_column_link(type_LinkList, "link", *table2);
 
     // set some links
 
-    table1->set_link(col_link2, 0, 1);
-    table1->set_link(col_link2, 1, 2);
+    table1->set_link(column_link2, 0, 1);
+    table1->set_link(column_link2, 1, 2);
 
     LinkViewRef lvr;
 
-    lvr = table1->get_linklist(col_link3, 0);
+    lvr = table1->get_linklist(column_link3, 0);
     lvr->add(0);
     lvr->add(1);
 
-    lvr = table1->get_linklist(col_link3, 1);
+    lvr = table1->get_linklist(column_link3, 1);
     lvr->add(1);
     lvr->add(2);
 
@@ -506,23 +506,23 @@ TEST(LinkList_QueryFindLinkTarget)
     // First we test find_*_link on Table
 
     // find on Link
-    match = table1->link(col_link2).find_first_link(1);
+    match = table1->link(column_link2).find_first_link(1);
     CHECK_EQUAL(0, match);
 
-    match = table1->link(col_link2).find_first_link(2);
+    match = table1->link(column_link2).find_first_link(2);
     CHECK_EQUAL(1, match);
 
-    match = table1->link(col_link2).find_first_link(3);
+    match = table1->link(column_link2).find_first_link(3);
     CHECK_EQUAL(not_found, match);
 
     // find on LinkList
-    match = table1->link(col_link3).find_first_link(1);
+    match = table1->link(column_link3).find_first_link(1);
     CHECK_EQUAL(0, match);
 
-    match = table1->link(col_link3).find_first_link(2);
+    match = table1->link(column_link3).find_first_link(2);
     CHECK_EQUAL(1, match);
 
-    match = table1->link(col_link3).find_first_link(3);
+    match = table1->link(column_link3).find_first_link(3);
     CHECK_EQUAL(not_found, match);
 
 
@@ -530,76 +530,76 @@ TEST(LinkList_QueryFindLinkTarget)
 
     TableView tv;
 
-    tv = table1->link(col_link2).find_all_link(2);
+    tv = table1->link(column_link2).find_all_link(2);
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = table1->link(col_link2).find_all_link(1);
+    tv = table1->link(column_link2).find_all_link(1);
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = table1->link(col_link2).find_all_link(3);
+    tv = table1->link(column_link2).find_all_link(3);
     CHECK_EQUAL(0, tv.size());
 
     // find_all on LinkList
-    tv = table1->link(col_link3).find_all_link(2);
+    tv = table1->link(column_link3).find_all_link(2);
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = table1->link(col_link3).find_all_link(1);
+    tv = table1->link(column_link3).find_all_link(1);
     CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-    CHECK_EQUAL(1, tv.get_source_ndx(1));
+    CHECK_EQUAL(0, tv.get_source_index(0));
+    CHECK_EQUAL(1, tv.get_source_index(1));
 
-    tv = table1->link(col_link3).find_all_link(3);
+    tv = table1->link(column_link3).find_all_link(3);
     CHECK_EQUAL(0, tv.size());
 
 
     // find on query with Link
-    match = table1->where().links_to(col_link2, 1).find();
+    match = table1->where().links_to(column_link2, 1).find();
     CHECK_EQUAL(0, match);
 
-    match = table1->where().links_to(col_link2, 2).find();
+    match = table1->where().links_to(column_link2, 2).find();
     CHECK_EQUAL(1, match);
 
-    match = table1->where().links_to(col_link2, 3).find();
+    match = table1->where().links_to(column_link2, 3).find();
     CHECK_EQUAL(not_found, match);
 
 
     // find_all on query with Link
-    tv = table1->where().links_to(col_link2, 2).find_all();
+    tv = table1->where().links_to(column_link2, 2).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = table1->where().links_to(col_link2, 1).find_all();
+    tv = table1->where().links_to(column_link2, 1).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = table1->where().links_to(col_link2, 3).find_all();
+    tv = table1->where().links_to(column_link2, 3).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
     // find on query with LinkList
-    match = table1->where().links_to(col_link3, 1).find();
+    match = table1->where().links_to(column_link3, 1).find();
     CHECK_EQUAL(0, match);
 
-    match = table1->where().links_to(col_link3, 2).find();
+    match = table1->where().links_to(column_link3, 2).find();
     CHECK_EQUAL(1, match);
 
-    match = table1->where().links_to(col_link3, 3).find();
+    match = table1->where().links_to(column_link3, 3).find();
     CHECK_EQUAL(not_found, match);
 
     // find_all on query with LinkList
-    tv = table1->where().links_to(col_link3, 2).find_all();
+    tv = table1->where().links_to(column_link3, 2).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = table1->where().links_to(col_link3, 1).find_all();
+    tv = table1->where().links_to(column_link3, 1).find_all();
     CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-    CHECK_EQUAL(1, tv.get_source_ndx(1));
+    CHECK_EQUAL(0, tv.get_source_index(0));
+    CHECK_EQUAL(1, tv.get_source_index(1));
 
-    tv = table1->where().links_to(col_link3, 3).find_all();
+    tv = table1->where().links_to(column_link3, 3).find_all();
     CHECK_EQUAL(0, tv.size());
 }
 
@@ -614,11 +614,11 @@ TEST(LinkList_MultiLinkQuery)
     TableRef table3 = group.add_table("table3");
     TableRef table4 = group.add_table("table4");
 
-    size_t col_linklist2 = table1->add_column_link(type_LinkList, "link", *table2);
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    size_t column_linklist2 = table1->add_column_link(type_LinkList, "link", *table2);
+    size_t column_link2 = table1->add_column_link(type_Link, "link", *table2);
 
-    size_t col_link3 = table2->add_column_link(type_Link, "link", *table3);
-    size_t col_linklist3 = table2->add_column_link(type_LinkList, "link", *table3);
+    size_t column_link3 = table2->add_column_link(type_Link, "link", *table3);
+    size_t column_linklist3 = table2->add_column_link(type_LinkList, "link", *table3);
 
     table4->add_column(type_Int, "int");
     table4->add_empty_row();
@@ -630,8 +630,8 @@ TEST(LinkList_MultiLinkQuery)
     table3->add_column(type_String, "string");
     table3->add_column(type_Float, "string");
 
-    size_t col_link4 = table3->add_column_link(type_Link, "link", *table4);
-    size_t col_linklist4 = table3->add_column_link(type_LinkList, "link", *table4);
+    size_t column_link4 = table3->add_column_link(type_Link, "link", *table4);
+    size_t column_linklist4 = table3->add_column_link(type_LinkList, "link", *table4);
 
     // add some rows
     table3->add_empty_row();
@@ -652,33 +652,33 @@ TEST(LinkList_MultiLinkQuery)
     LinkViewRef lvr;
 
     table3->add_empty_row();
-    table3->set_link(col_link4, 0, 0);
-    lvr = table3->get_linklist(col_linklist4, 0);
+    table3->set_link(column_link4, 0, 0);
+    lvr = table3->get_linklist(column_linklist4, 0);
     lvr->add(0);
     lvr->add(1);
 
     table2->add_empty_row();
-    table2->set_link(col_link3, 0, 0);
-    lvr = table2->get_linklist(col_linklist3, 0);
+    table2->set_link(column_link3, 0, 0);
+    lvr = table2->get_linklist(column_linklist3, 0);
     lvr->add(0);
     lvr->add(1);
 
     table2->add_empty_row();
-    table2->set_link(col_link3, 1, 2);
-    lvr = table2->get_linklist(col_linklist3, 1);
+    table2->set_link(column_link3, 1, 2);
+    lvr = table2->get_linklist(column_linklist3, 1);
     lvr->add(2);
 
     table2->add_empty_row();
 
     table1->add_empty_row();
-    table1->set_link(col_link2, 0, 1);
-    lvr = table1->get_linklist(col_linklist2, 0);
+    table1->set_link(column_link2, 0, 1);
+    lvr = table1->get_linklist(column_linklist2, 0);
     lvr->add(0);
     lvr->add(1);
 
     table1->add_empty_row();
-    table1->set_link(col_link2, 1, 0);
-    lvr = table1->get_linklist(col_linklist2, 1);
+    table1->set_link(column_link2, 1, 0);
+    lvr = table1->get_linklist(column_linklist2, 1);
     lvr->add(2);
 
     table1->add_empty_row();
@@ -686,147 +686,147 @@ TEST(LinkList_MultiLinkQuery)
     TableView tv;
 
     // Link -> Link
-    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<Int>(0) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 100).find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<Int>(0) == 100).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 200).find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<Int>(0) == 200).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<String>(1) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "foo").find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<String>(1) == "foo").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "bar").find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<String>(1) == "bar").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 300.).find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<Float>(2) == 300.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 100.).find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<Float>(2) == 100.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 200.).find_all();
+    tv = (table1->link(column_link2).link(column_link3).column<Float>(2) == 200.).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
     // Link -> LinkList
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(column_link2).link(column_linklist3).column<Int>(0) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) < 300).find_all();
+    tv = (table1->link(column_link2).link(column_linklist3).column<Int>(0) < 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == 400).find_all();
+    tv = (table1->link(column_link2).link(column_linklist3).column<Int>(0) == 400).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(column_link2).link(column_linklist3).column<String>(1) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_linklist3).column<String>(1) == "none").find_all();
+    tv = (table1->link(column_link2).link(column_linklist3).column<String>(1) == "none").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
     // LinkList -> Link
-    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(column_linklist2).link(column_link3).column<Int>(0) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 100).find_all();
+    tv = (table1->link(column_linklist2).link(column_link3).column<Int>(0) == 100).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 200).find_all();
+    tv = (table1->link(column_linklist2).link(column_link3).column<Int>(0) == 200).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(column_linklist2).link(column_link3).column<String>(1) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "foo").find_all();
+    tv = (table1->link(column_linklist2).link(column_link3).column<String>(1) == "foo").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "bar").find_all();
+    tv = (table1->link(column_linklist2).link(column_link3).column<String>(1) == "bar").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
     // LinkList -> LinkList
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 100).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Int>(0) == 100).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 200).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Int>(0) == 200).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 300).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Int>(0) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 400).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Int>(0) == 400).find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "foo").find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<String>(1) == "foo").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "bar").find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<String>(1) == "bar").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "baz").find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<String>(1) == "baz").find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "none").find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<String>(1) == "none").find_all();
     CHECK_EQUAL(0, tv.size());
 
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 100.).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Float>(2) == 100.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 200.).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Float>(2) == 200.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 300.).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Float>(2) == 300.).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 400.).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).column<Float>(2) == 400.).find_all();
     CHECK_EQUAL(0, tv.size());
 
     // 3 levels of links
-    tv = (table1->link(col_linklist2).link(col_linklist3).link(col_linklist4).column<Int>(0) > 0).find_all();
+    tv = (table1->link(column_linklist2).link(column_linklist3).link(column_linklist4).column<Int>(0) > 0).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(0) == 1000).find_all();
+    tv = (table1->link(column_link2).link(column_link3).link(column_link4).column<Int>(0) == 1000).find_all();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_index(0));
 
-    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(0) == 2000).find_all();
+    tv = (table1->link(column_link2).link(column_link3).link(column_link4).column<Int>(0) == 2000).find_all();
     CHECK_EQUAL(0, tv.size());
 }
 
@@ -867,14 +867,14 @@ TEST(LinkList_SortLinkView)
     table1->set_double(3, 2, 200.);
     table1->set_string(4, 2, "alfa");
 
-    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+    size_t column_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();
     table2->add_empty_row();
 
     LinkViewRef lvr;
     TableView tv;
 
-    lvr = table2->get_linklist(col_link2, 0);
+    lvr = table2->get_linklist(column_link2, 0);
     lvr->clear();
     lvr->add(0);
     lvr->add(1);
@@ -889,7 +889,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
 
-    lvr = table2->get_linklist(col_link2, 1);
+    lvr = table2->get_linklist(column_link2, 1);
     lvr->clear();
     lvr->add(2);
     lvr->add(1);
@@ -904,7 +904,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
 
-    lvr = table2->get_linklist(col_link2, 1);
+    lvr = table2->get_linklist(column_link2, 1);
     lvr->clear();
     lvr->add(2);
     lvr->add(0);
@@ -921,7 +921,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(2).get_index(), 1);
 
     // Floats
-    lvr = table2->get_linklist(col_link2, 1);
+    lvr = table2->get_linklist(column_link2, 1);
     lvr->clear();
     lvr->add(2);
     lvr->add(0);
@@ -938,7 +938,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(2).get_index(), 1);
 
     // Doubles
-    lvr = table2->get_linklist(col_link2, 1);
+    lvr = table2->get_linklist(column_link2, 1);
     lvr->clear();
     lvr->add(2);
     lvr->add(0);
@@ -955,7 +955,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(2).get_index(), 1);
 
     // String
-    lvr = table2->get_linklist(col_link2, 1);
+    lvr = table2->get_linklist(column_link2, 1);
     lvr->clear();
     lvr->add(2);
     lvr->add(0);
@@ -1059,26 +1059,26 @@ TEST(Link_FindNullLink)
     table1->set_int(0, 2, 300);
     table1->set_string(1, 2, "bar");
 
-    size_t col_link1 = table1->add_column_link(type_Link, "link", *table1);
-    table1->set_link(col_link1, 0, 0);
-    table1->set_link(col_link1, 2, 0);
+    size_t column_link1 = table1->add_column_link(type_Link, "link", *table1);
+    table1->set_link(column_link1, 0, 0);
+    table1->set_link(column_link1, 2, 0);
 
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
-    size_t col_linklist2 = table2->add_column_link(type_LinkList, "link", *table1);
+    size_t column_link2 = table2->add_column_link(type_Link, "link", *table1);
+    size_t column_linklist2 = table2->add_column_link(type_LinkList, "link", *table1);
     table2->add_empty_row();
     table2->add_empty_row();
     table2->add_empty_row();
     table2->add_empty_row();
 
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 2, 2);
+    table2->set_link(column_link2, 0, 1);
+    table2->set_link(column_link2, 2, 2);
 
     LinkViewRef lvr;
 
-    lvr = table2->get_linklist(col_linklist2, 0);
+    lvr = table2->get_linklist(column_linklist2, 0);
     lvr->add(0);
     lvr->add(1);
-    lvr = table2->get_linklist(col_linklist2, 2);
+    lvr = table2->get_linklist(column_linklist2, 2);
     lvr->add(0);
 
     /*
@@ -1093,33 +1093,33 @@ TEST(Link_FindNullLink)
     */
 
     // Test find_all on Link
-    Query q3 = table2->column<Link>(col_link2).is_null();
+    Query q3 = table2->column<Link>(column_link2).is_null();
     TableView tv = q3.find_all();
     CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
-    CHECK_EQUAL(3, tv.get_source_ndx(1));
+    CHECK_EQUAL(1, tv.get_source_index(0));
+    CHECK_EQUAL(3, tv.get_source_index(1));
 
     // Test find() on Link
-    match = table2->column<Link>(col_link2).is_null().find();
+    match = table2->column<Link>(column_link2).is_null().find();
     CHECK_EQUAL(1, match);
-    match = table2->column<Link>(col_link2).is_null().find(2);
+    match = table2->column<Link>(column_link2).is_null().find(2);
     CHECK_EQUAL(3, match);
 
     // Test find_all() on LinkList
-    Query q4 = table2->column<LinkList>(col_linklist2).is_null();
+    Query q4 = table2->column<LinkList>(column_linklist2).is_null();
     TableView tv2 = q4.find_all();
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(1, tv2.get_source_ndx(0));
-    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+    CHECK_EQUAL(1, tv2.get_source_index(0));
+    CHECK_EQUAL(3, tv2.get_source_index(1));
 
     // Test find() on LinkList
-    match = table2->column<LinkList>(col_linklist2).is_null().find();
+    match = table2->column<LinkList>(column_linklist2).is_null().find();
     CHECK_EQUAL(1, match);
-    match = table2->column<LinkList>(col_linklist2).is_null().find(2);
+    match = table2->column<LinkList>(column_linklist2).is_null().find(2);
     CHECK_EQUAL(3, match);
 
     // We have not yet defined behaviour of finding realm::null()-links in a linked-to table, so we just throw. Todo.
-    CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
+    CHECK_THROW_ANY(table2->link(column_linklist2).column<Link>(column_link1).is_null());
 }
 
 
@@ -1246,7 +1246,7 @@ TEST(LinkList_QueryOnLinkList)
     table1->set_int(0, 2, 200);
     table1->set_string(1, 2, "beta");
 
-    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+    size_t column_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     table2->add_empty_row();
     table2->add_empty_row();
@@ -1254,7 +1254,7 @@ TEST(LinkList_QueryOnLinkList)
     LinkViewRef lvr;
     TableView tv;
 
-    lvr = table2->get_linklist(col_link2, 0);
+    lvr = table2->get_linklist(column_link2, 0);
     lvr->clear();
     lvr->add(0);
     lvr->add(1);
@@ -1272,13 +1272,13 @@ TEST(LinkList_QueryOnLinkList)
     TableView tv2 = lvr->get_sorted_view(0);
 
     CHECK_EQUAL(3, tv2.size());
-    CHECK_EQUAL(1, tv2.get_source_ndx(0));
-    CHECK_EQUAL(2, tv2.get_source_ndx(1));
-    CHECK_EQUAL(0, tv2.get_source_ndx(2));
+    CHECK_EQUAL(1, tv2.get_source_index(0));
+    CHECK_EQUAL(2, tv2.get_source_index(1));
+    CHECK_EQUAL(0, tv2.get_source_index(2));
 
     CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-    CHECK_EQUAL(2, tv.get_source_ndx(1));
+    CHECK_EQUAL(0, tv.get_source_index(0));
+    CHECK_EQUAL(2, tv.get_source_index(1));
 
     // Should of course work even if nothing has changed
     tv.sync_if_needed();
@@ -1288,19 +1288,19 @@ TEST(LinkList_QueryOnLinkList)
     tv.sync_if_needed();
     
     CHECK_EQUAL(1, tv.size()); // fail
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
     
     // Now test if changes in linked-to table bumps the version of the linked-from table and that 
     // the query of 'tv' is re-run
     table1->set_int(0, 2, 50); // exclude row 2 from tv because of the '> 100' condition in Query
     tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_index(0));
 
     // See if we can keep a LinkView alive for the lifetime of a Query (used by objc lang. binding)
     Query query2;
     {
-        LinkViewRef lvr2 = table2->get_linklist(col_link2, 1);
+        LinkViewRef lvr2 = table2->get_linklist(column_link2, 1);
         query2 = table1->where(lvr2);
         // lvr2 goes out of scope now but should be kept alive
     }

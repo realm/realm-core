@@ -107,7 +107,7 @@ TEST(File_NoSpuriousTryLockFailures)
         }
     };
 
-    auto slave = [&](int ndx, std::string path) {
+    auto slave = [&](int index, std::string path) {
         try {
             File file(path, File::mode_Write);
             for (int i = 0; i != num_rounds; ++i) {
@@ -120,12 +120,12 @@ TEST(File_NoSpuriousTryLockFailures)
                         ++num_good_locks;
                     ++num_slaves_ready;
                     cond.notify_all();
-                    while (!slaves_run[ndx]) {
+                    while (!slaves_run[index]) {
                         if (terminate)
                             return;
                         cond.wait(l);
                     }
-                    slaves_run[ndx] = false;
+                    slaves_run[index] = false;
                 }
             }
         }

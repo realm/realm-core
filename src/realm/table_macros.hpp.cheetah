@@ -81,7 +81,7 @@ name${j+1}%slurp
  {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
 %for $j in range($num_cols)
         names[$j] = realm::StringData(#name${j+1}, sizeof #name${j+1} - 1); \

@@ -186,7 +186,7 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
     }
 }
 
-void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
+void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t column_offset, std::size_t begin, std::size_t end) const
 {
     // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
     // in the result column. Since find_all may be invoked many times for different leaves in the
@@ -199,7 +199,7 @@ void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t co
     
     for (size_t i = begin; i < end; ++i) {
         if (get(i) == value) {
-            result->add(col_offset + i);
+            result->add(column_offset + i);
         }
     }
 }
@@ -209,26 +209,26 @@ namespace {
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
     template <class T>
-    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, std::size_t ndx, T value, Array::TreeInsertBase& state)
+    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, std::size_t index, T value, Array::TreeInsertBase& state)
     {
         size_t leaf_size = self.size();
         REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
-        if (leaf_size < ndx)
-            ndx = leaf_size;
+        if (leaf_size < index)
+            index = leaf_size;
         if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-            self.insert(ndx, value); // Throws
+            self.insert(index, value); // Throws
             return 0; // Leaf was not split
         }
 
         // Split leaf node
         ArrayIntNull new_leaf(alloc);
         new_leaf.create(Array::type_Normal); // Throws
-        if (ndx == leaf_size) {
+        if (index == leaf_size) {
             new_leaf.add(value); // Throws
-            state.m_split_offset = ndx;
+            state.m_split_offset = index;
         }
         else {
-            for (size_t i = ndx; i < leaf_size; ++i) {
+            for (size_t i = index; i < leaf_size; ++i) {
                 if (self.is_null(i)) {
                     new_leaf.add(null{}); // Throws
                 }
@@ -236,9 +236,9 @@ struct ArrayIntNullLeafInserter {
                     new_leaf.add(self.get(i)); // Throws
                 }
             }
-            self.truncate(ndx); // Throws
+            self.truncate(index); // Throws
             self.add(value); // Throws
-            state.m_split_offset = ndx + 1;
+            state.m_split_offset = index + 1;
         }
         state.m_split_size = leaf_size + 1;
         return new_leaf.get_ref();
@@ -247,14 +247,14 @@ struct ArrayIntNullLeafInserter {
 
 } // anonymous namespace
 
-ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, int64_t value, Array::TreeInsertBase& state)
+ref_type ArrayIntNull::bptree_leaf_insert(std::size_t index, int64_t value, Array::TreeInsertBase& state)
 {
-    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, value, state);
+    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, index, value, state);
 }
 
-ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, null, Array::TreeInsertBase& state)
+ref_type ArrayIntNull::bptree_leaf_insert(std::size_t index, null, Array::TreeInsertBase& state)
 {
-    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, null{}, state);
+    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, index, null{}, state);
 }
 
 MemRef ArrayIntNull::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const

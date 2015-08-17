@@ -74,10 +74,10 @@ int main()
 
 
     // @@Example: simple_seach @@
-    size_t row_ndx;
-    row_ndx = table.column().name.find_first("Philip");  // => not_found (-1)
-    row_ndx = table.column().name.find_first("Mary");    // => 1
-    static_cast<void>(row_ndx);
+    size_t row_index;
+    row_index = table.column().name.find_first("Philip");  // => not_found (-1)
+    row_index = table.column().name.find_first("Mary");    // => 1
+    static_cast<void>(row_index);
 
     MyTable::View view = table.column().age.find_all(21);
     size_t cnt = view.size();         // cnt => 2

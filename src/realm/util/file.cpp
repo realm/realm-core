@@ -980,12 +980,12 @@ bool File::is_same_file(const File& f) const
     BY_HANDLE_FILE_INFORMATION file_info;
     if (GetFileInformationByHandle(m_handle, &file_info)) {
         DWORD vol_serial_num = file_info.dwVolumeSerialNumber;
-        DWORD file_ndx_high  = file_info.nFileIndexHigh;
-        DWORD file_ndx_low   = file_info.nFileIndexLow;
+        DWORD file_index_high  = file_info.nFileIndexHigh;
+        DWORD file_index_low   = file_info.nFileIndexLow;
         if (GetFileInformationByHandle(f.m_handle, &file_info)) {
             return vol_serial_num == file_info.dwVolumeSerialNumber &&
-                file_ndx_high == file_info.nFileIndexHigh &&
-                file_ndx_low  == file_info.nFileIndexLow;
+                file_index_high == file_info.nFileIndexHigh &&
+                file_index_low  == file_info.nFileIndexLow;
         }
     }
 

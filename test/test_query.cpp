@@ -91,13 +91,13 @@ namespace {
         photo, Binary)
 
         REALM_TABLE_2(FloatTable,
-        col_float, Float,
-        col_double, Double)
+        column_float, Float,
+        column_double, Double)
 
         REALM_TABLE_3(FloatTable3,
-        col_float, Float,
-        col_double, Double,
-        col_int, Int)
+        column_float, Float,
+        column_double, Double,
+        column_int, Int)
 
         REALM_TABLE_3(PHPMinimumCrash,
         firstname, String,
@@ -105,9 +105,9 @@ namespace {
         salary, Int)
 
         REALM_TABLE_3(TableViewSum,
-        col_float, Float,
-        col_double, Double,
-        col_int, Int)
+        column_float, Float,
+        column_double, Double,
+        column_int, Int)
 
         REALM_TABLE_5(GATable,
         user_id, String,
@@ -806,7 +806,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_0.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -818,7 +818,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_1.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -831,7 +831,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_2.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_2.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -844,7 +844,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
-                CHECK_EQUAL(r, tv_8.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_8.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -857,7 +857,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_7.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -870,7 +870,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_10.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -885,7 +885,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 || table.get_int(0, r) == 2 || table.get_int(0, r) == 1 || table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -898,7 +898,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
-                CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -910,7 +910,7 @@ TEST(Query_NextGenSyntaxMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
-                CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1139,7 +1139,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_0.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1151,7 +1151,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_1.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1163,7 +1163,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_2.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_2.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1175,7 +1175,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_3.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_3.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1188,7 +1188,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_4.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_4.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1202,7 +1202,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_5.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_5.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1216,7 +1216,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 && table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_6.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_6.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1229,7 +1229,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_7.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1244,7 +1244,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
-                CHECK_EQUAL(r, tv_8.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_8.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1261,7 +1261,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
-                CHECK_EQUAL(r, tv_9.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_9.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1278,7 +1278,7 @@ TEST(Query_MergeQueriesMonkey)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0) {
-                CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_10.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1319,7 +1319,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_0.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1332,7 +1332,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_10.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1348,7 +1348,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_1.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1359,7 +1359,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
-                CHECK_EQUAL(r, tv_20.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_20.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1373,7 +1373,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_3.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_3.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1387,7 +1387,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
             if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
-                CHECK_EQUAL(r, tv_30.get_source_ndx(tvpos));
+                CHECK_EQUAL(r, tv_30.get_source_index(tvpos));
                 tvpos++;
             }
         }
@@ -1708,84 +1708,84 @@ TEST(Query_LimitUntyped2)
     sumd = q.sum_double(2, nullptr, 0, 2, 3);
     CHECK_EQUAL(40000., sumd);
 
-    size_t ndx = not_found;
+    size_t index = not_found;
 
     // max, limited by 'limit'
     sum = q.maximum_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
+    q.maximum_int(0, nullptr, 0, -1, 1, &index);
+    CHECK_EQUAL(0, index);
 
     sum = q.maximum_int(0, nullptr, 0, -1, 2);
     CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q.maximum_int(0, nullptr, 0, -1, 2, &index);
+    CHECK_EQUAL(1, index);
 
     sum = q.maximum_int(0, nullptr, 0, -1);
     CHECK_EQUAL(40000, sum);
-    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
+    q.maximum_int(0, nullptr, 0, -1, -1, &index);
+    CHECK_EQUAL(2, index);
 
     sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
+    q.maximum_float(1, nullptr, 0, -1, 1, &index);
+    CHECK_EQUAL(0, index);
 
     sumf = q.maximum_float(1, nullptr, 0, -1, 2);
     CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q.maximum_float(1, nullptr, 0, -1, 2, &index);
+    CHECK_EQUAL(1, index);
 
     sumf = q.maximum_float(1, nullptr, 0, -1);
     CHECK_EQUAL(40000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
+    q.maximum_float(1, nullptr, 0, -1, -1, &index);
+    CHECK_EQUAL(2, index);
 
     sumd = q.maximum_double(2, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
+    q.maximum_double(2, nullptr, 0, -1, 1, &index);
+    CHECK_EQUAL(0, index);
 
     sumd = q.maximum_double(2, nullptr, 0, -1, 2);
     CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q.maximum_double(2, nullptr, 0, -1, 2, &index);
+    CHECK_EQUAL(1, index);
 
     sumd = q.maximum_double(2, nullptr, 0, -1);
     CHECK_EQUAL(40000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
+    q.maximum_double(2, nullptr, 0, -1, -1, &index);
+    CHECK_EQUAL(2, index);
 
     // max, limited by 'end', but still having 'limit' specified
     sum = q.maximum_int(0, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
+    q.maximum_int(0, nullptr, 0, 1, 3, &index);
+    CHECK_EQUAL(0, index);
 
     sum = q.maximum_int(0, nullptr, 0, 2, 3);
     CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q.maximum_int(0, nullptr, 0, 2, 3, &index);
+    CHECK_EQUAL(1, index);
 
     sumf = q.maximum_float(1, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
+    q.maximum_float(1, nullptr, 0, 1, 3, &index);
+    CHECK_EQUAL(0, index);
 
     sumf = q.maximum_float(1, nullptr, 0, 2, 3);
     CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q.maximum_float(1, nullptr, 0, 2, 3, &index);
+    CHECK_EQUAL(1, index);
 
     sumd = q.maximum_double(2, nullptr, 0, 1, 3);
     CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
+    q.maximum_double(2, nullptr, 0, 1, 3, &index);
+    CHECK_EQUAL(0, index);
 
     sumd = q.maximum_double(2, nullptr, 0, 2, 3);
     CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q.maximum_double(2, nullptr, 0, 2, 3, &index);
+    CHECK_EQUAL(1, index);
 
 
     // avg
@@ -1939,23 +1939,23 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
 
     CHECK_EQUAL(ints1.size(), t1.size());
     for (size_t t = 0; t < ints1.size(); t++)
-        CHECK_EQUAL(ints1[t], t1.get_source_ndx(t));
+        CHECK_EQUAL(ints1[t], t1.get_source_index(t));
 
     CHECK_EQUAL(ints2.size(), t2.size());
     for (size_t t = 0; t < ints2.size(); t++)
-        CHECK_EQUAL(ints2[t], t2.get_source_ndx(t));
+        CHECK_EQUAL(ints2[t], t2.get_source_index(t));
 
     CHECK_EQUAL(ints3.size(), t3.size());
     for (size_t t = 0; t < ints3.size(); t++)
-        CHECK_EQUAL(ints3[t], t3.get_source_ndx(t));
+        CHECK_EQUAL(ints3[t], t3.get_source_index(t));
 
     CHECK_EQUAL(floats.size(), t4.size());
     for (size_t t = 0; t < floats.size(); t++)
-        CHECK_EQUAL(floats[t], t4.get_source_ndx(t));
+        CHECK_EQUAL(floats[t], t4.get_source_index(t));
 
     CHECK_EQUAL(doubles.size(), t5.size());
     for (size_t t = 0; t < doubles.size(); t++)
-        CHECK_EQUAL(doubles[t], t5.get_source_ndx(t));
+        CHECK_EQUAL(doubles[t], t5.get_source_index(t));
 }
 
 TEST(Query_TwoColsVaryOperators)
@@ -2407,14 +2407,14 @@ TEST(Query_StrIndex3)
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
-            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+            CHECK_EQUAL(vec[t], v.get_source_index(t));
         v.clear();
         vec.clear();
 
         v = ttt.where().first.equal(0).second.equal("AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
-            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+            CHECK_EQUAL(vec[t], v.get_source_index(t));
         v.clear();
         vec.clear();
 
@@ -2424,14 +2424,14 @@ TEST(Query_StrIndex3)
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
-            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+            CHECK_EQUAL(vec[t], v.get_source_index(t));
         v.clear();
         vec.clear();
 
         v = ttt.where().first.equal(0).second.equal("AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
-            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+            CHECK_EQUAL(vec[t], v.get_source_index(t));
         v.clear();
         vec.clear();
 
@@ -2441,14 +2441,14 @@ TEST(Query_StrIndex3)
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
-            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+            CHECK_EQUAL(vec[t], v.get_source_index(t));
         v.clear();
         vec.clear();
 
         v = ttt.where().first.equal(0).second.equal("AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
-            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+            CHECK_EQUAL(vec[t], v.get_source_index(t));
         v.clear();
         vec.clear();
     }
@@ -2598,36 +2598,36 @@ TEST(Query_Float3)
     t.add(float(1.8), double(2.8), 8);
     t.add(float(1.9), double(2.9), 9);
 
-    FloatTable3::Query q1 = t.where().col_float.greater(1.35f).col_double.less(2.65);
-    int64_t a1 = q1.col_int.sum();
+    FloatTable3::Query q1 = t.where().column_float.greater(1.35f).column_double.less(2.65);
+    int64_t a1 = q1.column_int.sum();
     CHECK_EQUAL(15, a1);
 
-    FloatTable3::Query q2 = t.where().col_double.less(2.65).col_float.greater(1.35f);
-    int64_t a2 = q2.col_int.sum();
+    FloatTable3::Query q2 = t.where().column_double.less(2.65).column_float.greater(1.35f);
+    int64_t a2 = q2.column_int.sum();
     CHECK_EQUAL(15, a2);
 
-    FloatTable3::Query q3 = t.where().col_double.less(2.65).col_float.greater(1.35f);
-    double a3 = q3.col_float.sum();
+    FloatTable3::Query q3 = t.where().column_double.less(2.65).column_float.greater(1.35f);
+    double a3 = q3.column_float.sum();
     double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
     CHECK_EQUAL(sum3, a3);
 
-    FloatTable3::Query q4 = t.where().col_float.greater(1.35f).col_double.less(2.65);
-    double a4 = q4.col_float.sum();
+    FloatTable3::Query q4 = t.where().column_float.greater(1.35f).column_double.less(2.65);
+    double a4 = q4.column_float.sum();
     CHECK_EQUAL(sum3, a4);
 
-    FloatTable3::Query q5 = t.where().col_int.greater_equal(4).col_double.less(2.65);
-    double a5 = q5.col_float.sum();
+    FloatTable3::Query q5 = t.where().column_int.greater_equal(4).column_double.less(2.65);
+    double a5 = q5.column_float.sum();
     CHECK_EQUAL(sum3, a5);
 
-    FloatTable3::Query q6 = t.where().col_double.less(2.65).col_int.greater_equal(4);
-    double a6 = q6.col_float.sum();
+    FloatTable3::Query q6 = t.where().column_double.less(2.65).column_int.greater_equal(4);
+    double a6 = q6.column_float.sum();
     CHECK_EQUAL(sum3, a6);
 
-    FloatTable3::Query q7 = t.where().col_int.greater(3).col_int.less(7);
-    int64_t a7 = q7.col_int.sum();
+    FloatTable3::Query q7 = t.where().column_int.greater(3).column_int.less(7);
+    int64_t a7 = q7.column_int.sum();
     CHECK_EQUAL(15, a7);
-    FloatTable3::Query q8 = t.where().col_int.greater(3).col_int.less(7);
-    int64_t a8 = q8.col_int.sum();
+    FloatTable3::Query q8 = t.where().column_int.greater(3).column_int.less(7);
+    int64_t a8 = q8.column_int.sum();
     CHECK_EQUAL(15, a8);
 }
 
@@ -2648,36 +2648,36 @@ TEST(Query_Float3_where)
 
     FloatTable3::View v = t.where().find_all();
 
-    FloatTable3::Query q1 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
-    int64_t a1 = q1.col_int.sum();
+    FloatTable3::Query q1 = t.where(&v).column_float.greater(1.35f).column_double.less(2.65);
+    int64_t a1 = q1.column_int.sum();
     CHECK_EQUAL(15, a1);
 
-    FloatTable3::Query q2 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
-    int64_t a2 = q2.col_int.sum();
+    FloatTable3::Query q2 = t.where(&v).column_double.less(2.65).column_float.greater(1.35f);
+    int64_t a2 = q2.column_int.sum();
     CHECK_EQUAL(15, a2);
 
-    FloatTable3::Query q3 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
-    double a3 = q3.col_float.sum();
+    FloatTable3::Query q3 = t.where(&v).column_double.less(2.65).column_float.greater(1.35f);
+    double a3 = q3.column_float.sum();
     double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
     CHECK_EQUAL(sum3, a3);
 
-    FloatTable3::Query q4 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
-    double a4 = q4.col_float.sum();
+    FloatTable3::Query q4 = t.where(&v).column_float.greater(1.35f).column_double.less(2.65);
+    double a4 = q4.column_float.sum();
     CHECK_EQUAL(sum3, a4);
 
-    FloatTable3::Query q5 = t.where(&v).col_int.greater_equal(4).col_double.less(2.65);
-    double a5 = q5.col_float.sum();
+    FloatTable3::Query q5 = t.where(&v).column_int.greater_equal(4).column_double.less(2.65);
+    double a5 = q5.column_float.sum();
     CHECK_EQUAL(sum3, a5);
 
-    FloatTable3::Query q6 = t.where(&v).col_double.less(2.65).col_int.greater_equal(4);
-    double a6 = q6.col_float.sum();
+    FloatTable3::Query q6 = t.where(&v).column_double.less(2.65).column_int.greater_equal(4);
+    double a6 = q6.column_float.sum();
     CHECK_EQUAL(sum3, a6);
 
-    FloatTable3::Query q7 = t.where(&v).col_int.greater(3).col_int.less(7);
-    int64_t a7 = q7.col_int.sum();
+    FloatTable3::Query q7 = t.where(&v).column_int.greater(3).column_int.less(7);
+    int64_t a7 = q7.column_int.sum();
     CHECK_EQUAL(15, a7);
-    FloatTable3::Query q8 = t.where(&v).col_int.greater(3).col_int.less(7);
-    int64_t a8 = q8.col_int.sum();
+    FloatTable3::Query q8 = t.where(&v).column_int.greater(3).column_int.less(7);
+    int64_t a8 = q8.column_int.sum();
     CHECK_EQUAL(15, a8);
 }
 
@@ -2696,9 +2696,9 @@ TEST(Query_TableViewSum)
     ttt.add(9.0, 9.0, 9);
     ttt.add(10.0, 10.0, 10);
 
-    TableViewSum::Query q1 = ttt.where().col_int.between(5, 9);
+    TableViewSum::Query q1 = ttt.where().column_int.between(5, 9);
     TableViewSum::View tv1 = q1.find_all();
-    int64_t s = tv1.column().col_int.sum();
+    int64_t s = tv1.column().column_int.sum();
     CHECK_EQUAL(5 + 6 + 7 + 8 + 9, s);
 }
 
@@ -2729,15 +2729,15 @@ TEST(Query_Float4)
     t.add(12345.0, 12345.0, 11111);
 
     FloatTable3::Query q1 = t.where();
-    float a1 = q1.col_float.maximum();
-    double a2 = q1.col_double.maximum();
+    float a1 = q1.column_float.maximum();
+    double a2 = q1.column_double.maximum();
     CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
     CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
 
 
     FloatTable3::Query q2 = t.where();
-    float a3 = q1.col_float.minimum();
-    double a4 = q1.col_double.minimum();
+    float a3 = q1.column_float.minimum();
+    double a4 = q1.column_double.minimum();
     CHECK_EQUAL(12345.0, a3);
     CHECK_EQUAL(12345.0, a4);
 }
@@ -2753,139 +2753,139 @@ TEST(Query_Float)
     t.add(1.20f, 3.20);
 
     // Test find_all()
-    FloatTable::View v = t.where().col_float.equal(1.13f).find_all();
+    FloatTable::View v = t.where().column_float.equal(1.13f).find_all();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1.13f, v[0].col_float.get());
-    CHECK_EQUAL(1.13f, v[1].col_float.get());
+    CHECK_EQUAL(1.13f, v[0].column_float.get());
+    CHECK_EQUAL(1.13f, v[1].column_float.get());
 
-    FloatTable::View v2 = t.where().col_double.equal(3.2).find_all();
+    FloatTable::View v2 = t.where().column_double.equal(3.2).find_all();
     CHECK_EQUAL(1, v2.size());
-    CHECK_EQUAL(3.2, v2[0].col_double.get());
+    CHECK_EQUAL(3.2, v2[0].column_double.get());
 
     // Test operators (and count)
-    CHECK_EQUAL(2, t.where().col_float.equal(1.13f).count());
-    CHECK_EQUAL(3, t.where().col_float.not_equal(1.13f).count());
-    CHECK_EQUAL(3, t.where().col_float.greater(1.1f).count());
-    CHECK_EQUAL(3, t.where().col_float.greater_equal(1.13f).count());
-    CHECK_EQUAL(4, t.where().col_float.less_equal(1.13f).count());
-    CHECK_EQUAL(2, t.where().col_float.less(1.13f).count());
-    CHECK_EQUAL(3, t.where().col_float.between(1.13f, 1.2f).count());
+    CHECK_EQUAL(2, t.where().column_float.equal(1.13f).count());
+    CHECK_EQUAL(3, t.where().column_float.not_equal(1.13f).count());
+    CHECK_EQUAL(3, t.where().column_float.greater(1.1f).count());
+    CHECK_EQUAL(3, t.where().column_float.greater_equal(1.13f).count());
+    CHECK_EQUAL(4, t.where().column_float.less_equal(1.13f).count());
+    CHECK_EQUAL(2, t.where().column_float.less(1.13f).count());
+    CHECK_EQUAL(3, t.where().column_float.between(1.13f, 1.2f).count());
 
-    CHECK_EQUAL(2, t.where().col_double.equal(2.20).count());
-    CHECK_EQUAL(3, t.where().col_double.not_equal(2.20).count());
-    CHECK_EQUAL(2, t.where().col_double.greater(2.21).count());
-    CHECK_EQUAL(3, t.where().col_double.greater_equal(2.21).count());
-    CHECK_EQUAL(4, t.where().col_double.less_equal(2.22).count());
-    CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
-    CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
+    CHECK_EQUAL(2, t.where().column_double.equal(2.20).count());
+    CHECK_EQUAL(3, t.where().column_double.not_equal(2.20).count());
+    CHECK_EQUAL(2, t.where().column_double.greater(2.21).count());
+    CHECK_EQUAL(3, t.where().column_double.greater_equal(2.21).count());
+    CHECK_EQUAL(4, t.where().column_double.less_equal(2.22).count());
+    CHECK_EQUAL(3, t.where().column_double.less(2.22).count());
+    CHECK_EQUAL(4, t.where().column_double.between(2.20, 2.22).count());
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // ------ Test sum()
     // ... NO conditions
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
-    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().col_double.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().column_double.sum(), 10 * epsilon);
 
     // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
-    double res = t.where().col_float.sum();
+    double res = t.where().column_float.sum();
     CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10 * epsilon);
 
     // ... with conditions
     double sum2_f = double(1.13f) + double(1.20f);
     double sum2_d = 2.21 + 3.20;
-    FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
-    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.col_float.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.col_double.sum(), 10 * epsilon);
+    FloatTable::Query q2 = t.where().column_float.between(1.13f, 1.20f).column_double.not_equal(2.22);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.column_float.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.column_double.sum(), 10 * epsilon);
 
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().col_float.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().col_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().column_float.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().column_double.average(), 10 * epsilon);
     // ... with conditions
-    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.col_float.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.col_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.column_float.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.column_double.average(), 10 * epsilon);
 
     // -------- Test minimum(), maximum()
 
-    size_t ndx = not_found;
+    size_t index = not_found;
 
     // ... NO conditions
-    CHECK_EQUAL(1.20f, t.where().col_float.maximum());
-    t.where().col_float.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(4, ndx);
+    CHECK_EQUAL(1.20f, t.where().column_float.maximum());
+    t.where().column_float.maximum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(4, index);
 
-    CHECK_EQUAL(1.10f, t.where().col_float.minimum());
-    t.where().col_float.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(1.10f, t.where().column_float.minimum());
+    t.where().column_float.minimum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
-    CHECK_EQUAL(3.20, t.where().col_double.maximum());
-    CHECK_EQUAL(3.20, t.where().col_double.maximum(nullptr, 0, not_found, not_found, &ndx));
+    CHECK_EQUAL(3.20, t.where().column_double.maximum());
+    CHECK_EQUAL(3.20, t.where().column_double.maximum(nullptr, 0, not_found, not_found, &index));
 
-    CHECK_EQUAL(2.20, t.where().col_double.minimum());
-    t.where().col_double.minimum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(2.20, t.where().column_double.minimum());
+    t.where().column_double.minimum(nullptr, 0, not_found, not_found, &index);
 
     // ... with conditions
-    CHECK_EQUAL(1.20f, q2.col_float.maximum());
-    q2.col_float.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(4, ndx);
+    CHECK_EQUAL(1.20f, q2.column_float.maximum());
+    q2.column_float.maximum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(4, index);
 
-    CHECK_EQUAL(1.13f, q2.col_float.minimum());
-    q2.col_float.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(1, ndx);
+    CHECK_EQUAL(1.13f, q2.column_float.minimum());
+    q2.column_float.minimum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(1, index);
 
-    CHECK_EQUAL(3.20, q2.col_double.maximum());
-    q2.col_double.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(4, ndx);
+    CHECK_EQUAL(3.20, q2.column_double.maximum());
+    q2.column_double.maximum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(4, index);
 
-    CHECK_EQUAL(2.21, q2.col_double.minimum());
-    q2.col_double.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(1, ndx);
+    CHECK_EQUAL(2.21, q2.column_double.minimum());
+    q2.column_double.minimum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(1, index);
 
     size_t count = 0;
     // ... NO conditions
-    CHECK_EQUAL(1.20f, t.where().col_float.maximum(&count));
+    CHECK_EQUAL(1.20f, t.where().column_float.maximum(&count));
     CHECK_EQUAL(5, count);
-    t.where().col_float.maximum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(4, ndx);
+    t.where().column_float.maximum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(4, index);
 
-    CHECK_EQUAL(1.10f, t.where().col_float.minimum(&count));
+    CHECK_EQUAL(1.10f, t.where().column_float.minimum(&count));
     CHECK_EQUAL(5, count);
-    t.where().col_float.minimum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    t.where().column_float.minimum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
-    CHECK_EQUAL(3.20, t.where().col_double.maximum(&count));
+    CHECK_EQUAL(3.20, t.where().column_double.maximum(&count));
     CHECK_EQUAL(5, count);
-    t.where().col_double.maximum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(4, ndx);
+    t.where().column_double.maximum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(4, index);
 
-    CHECK_EQUAL(2.20, t.where().col_double.minimum(&count));
+    CHECK_EQUAL(2.20, t.where().column_double.minimum(&count));
     CHECK_EQUAL(5, count);
-    t.where().col_double.minimum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    t.where().column_double.minimum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     // ... with conditions
-    CHECK_EQUAL(1.20f, q2.col_float.maximum(&count));
+    CHECK_EQUAL(1.20f, q2.column_float.maximum(&count));
     CHECK_EQUAL(2, count);
-    q2.col_float.maximum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(4, ndx);
+    q2.column_float.maximum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(4, index);
 
-    CHECK_EQUAL(1.13f, q2.col_float.minimum(&count));
+    CHECK_EQUAL(1.13f, q2.column_float.minimum(&count));
     CHECK_EQUAL(2, count);
-    q2.col_float.minimum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q2.column_float.minimum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(1, index);
 
-    CHECK_EQUAL(3.20, q2.col_double.maximum(&count));
+    CHECK_EQUAL(3.20, q2.column_double.maximum(&count));
     CHECK_EQUAL(2, count);
-    q2.col_double.maximum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(4, ndx);
+    q2.column_double.maximum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(4, index);
 
-    CHECK_EQUAL(2.21, q2.col_double.minimum(&count));
+    CHECK_EQUAL(2.21, q2.column_double.minimum(&count));
     CHECK_EQUAL(2, count);
-    q2.col_double.minimum(&count, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(1, ndx);
+    q2.column_double.minimum(&count, 0, not_found, not_found, &index);
+    CHECK_EQUAL(1, index);
 }
 
 
@@ -3017,18 +3017,18 @@ TEST(Query_FindAllContains2_2)
     TupleTableType::Query q1 = ttt.where().second.contains("foO", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
-    CHECK_EQUAL(1, tv1.get_source_ndx(1));
-    CHECK_EQUAL(2, tv1.get_source_ndx(2));
-    CHECK_EQUAL(3, tv1.get_source_ndx(3));
-    CHECK_EQUAL(4, tv1.get_source_ndx(4));
-    CHECK_EQUAL(5, tv1.get_source_ndx(5));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
+    CHECK_EQUAL(1, tv1.get_source_index(1));
+    CHECK_EQUAL(2, tv1.get_source_index(2));
+    CHECK_EQUAL(3, tv1.get_source_index(3));
+    CHECK_EQUAL(4, tv1.get_source_index(4));
+    CHECK_EQUAL(5, tv1.get_source_index(5));
     TupleTableType::Query q2 = ttt.where().second.contains("foO", true);
     TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(3, tv2.size());
-    CHECK_EQUAL(3, tv2.get_source_ndx(0));
-    CHECK_EQUAL(4, tv2.get_source_ndx(1));
-    CHECK_EQUAL(5, tv2.get_source_ndx(2));
+    CHECK_EQUAL(3, tv2.get_source_index(0));
+    CHECK_EQUAL(4, tv2.get_source_index(1));
+    CHECK_EQUAL(5, tv2.get_source_index(2));
 }
 
 TEST(Query_SumNewAggregates)
@@ -3144,7 +3144,7 @@ TEST(Query_FindAllRangeOrMonkey2)
         CHECK_EQUAL(s1, s2);
         for (size_t t = 0; t < a.size(); t++) {
             size_t i1 = to_size_t(a.get(t));
-            size_t i2 = tv1.get_source_ndx(t);
+            size_t i2 = tv1.get_source_index(t);
             CHECK_EQUAL(i1, i2);
         }
         a.destroy();
@@ -3306,7 +3306,7 @@ TEST(Query_Simple)
 
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
 }
 
 TEST(Query_Not2)
@@ -3321,7 +3321,7 @@ TEST(Query_Not2)
 
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+    CHECK_EQUAL(2, tv1.get_source_index(0));
 }
 
 TEST(Query_SimpleBugDetect)
@@ -3334,7 +3334,7 @@ TEST(Query_SimpleBugDetect)
 
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
 
     TupleTableType::View resView = tv1.column().second.find_all("Foo");
 
@@ -3412,7 +3412,7 @@ TEST(Query_Subtable)
     q1.end_subtable();
     TableView t1 = q1.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t1.size());
-    CHECK_EQUAL(1, t1.get_source_ndx(0));
+    CHECK_EQUAL(1, t1.get_source_index(0));
 
     Query q2 = table->where();
     q2.subtable(2);
@@ -3422,7 +3422,7 @@ TEST(Query_Subtable)
     q2.end_subtable();
     TableView t2 = q2.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t2.size());
-    CHECK_EQUAL(0, t2.get_source_ndx(0));
+    CHECK_EQUAL(0, t2.get_source_index(0));
 
     Query q3 = table->where();
     q3.subtable(2);
@@ -3433,7 +3433,7 @@ TEST(Query_Subtable)
     q3.less(0, val300);
     TableView t3 = q3.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t3.size());
-    CHECK_EQUAL(0, t3.get_source_ndx(0));
+    CHECK_EQUAL(0, t3.get_source_index(0));
 
 
     Query q4 = table->where();
@@ -3446,8 +3446,8 @@ TEST(Query_Subtable)
     q4.end_subtable();
     TableView t4 = q4.find_all(0, size_t(-1));
     CHECK_EQUAL(2, t4.size());
-    CHECK_EQUAL(0, t4.get_source_ndx(0));
-    CHECK_EQUAL(2, t4.get_source_ndx(1));
+    CHECK_EQUAL(0, t4.get_source_index(0));
+    CHECK_EQUAL(2, t4.get_source_index(1));
 }
 
 TEST(Query_SubtableBug)
@@ -3512,7 +3512,7 @@ TEST(Query_Sort1)
     ttt.add(8, "a"); // 7
     ttt.add(7, "X"); // 8
 
-    // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
+    // tv.get_source_index()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
@@ -3607,9 +3607,9 @@ TEST(Query_SortDates)
 
     TableView tv = table.where().find_all();
     CHECK(tv.size() == 3);
-    CHECK(tv.get_source_ndx(0) == 0);
-    CHECK(tv.get_source_ndx(1) == 1);
-    CHECK(tv.get_source_ndx(2) == 2);
+    CHECK(tv.get_source_index(0) == 0);
+    CHECK(tv.get_source_index(1) == 1);
+    CHECK(tv.get_source_index(2) == 2);
 
     tv.sort(0);
 
@@ -3656,7 +3656,7 @@ TEST(Query_Sort_And_Requery_Typed1)
     ttt.add(8, "a"); // 7 *
     ttt.add(7, "X"); // 8
 
-    // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
+    // tv.get_source_index()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
@@ -3768,7 +3768,7 @@ TEST(Query_Sort_And_Requery_Untyped2)
     table.set_int(0, 8, 7);
     table.set_string(1, 8, "X");
 
-    // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
+    // tv.get_source_index()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
@@ -3877,7 +3877,7 @@ TEST(Query_Sort_And_Requery_Untyped1)
     table.set_string(1, 8, "X");
 
 
-    // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
+    // tv.get_source_index()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
@@ -3957,8 +3957,8 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         b = 0;
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv2.size(); t++) {
-            size_t a = tv2.get_source_ndx(t);
-            while (a != tv.get_source_ndx(b)) {
+            size_t a = tv2.get_source_index(t);
+            while (a != tv.get_source_index(b)) {
                 b++;
             }
         }
@@ -3976,8 +3976,8 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         b = 0;
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv3.size(); t++) {
-            size_t a = tv3.get_source_ndx(t);
-            while (a != tv2.get_source_ndx(b)) {
+            size_t a = tv3.get_source_index(t);
+            while (a != tv2.get_source_index(b)) {
                 b++;
                 CHECK(b < tv2.size());
             }
@@ -3991,14 +3991,14 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         TableView tv5 = q5.find_all();
 
         for (size_t t = 0; t < tv5.size() - 1; t++) {
-            CHECK(tv5.get_source_ndx(t) < tv5.get_source_ndx(t + 1));
+            CHECK(tv5.get_source_index(t) < tv5.get_source_index(t + 1));
         }
 
         // Test that tv5 is ordered the same way as tv4 (tv5 is subset of tv4)
         size_t foreignindex = 0;
         for (size_t t = 0; t < tv5.size(); t++) {
             size_t foreignindex2 = 0;
-            while (tv4.get_source_ndx(foreignindex2) != tv5.get_source_ndx(t))
+            while (tv4.get_source_index(foreignindex2) != tv5.get_source_index(t))
                 foreignindex2++;
 
             CHECK(foreignindex2 >= foreignindex);
@@ -4016,7 +4016,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         foreignindex = 0;
         for (size_t t = 0; t < tv5.size(); t++) {
             size_t foreignindex2 = 0;
-            while (tv4.get_source_ndx(foreignindex2) != tv5.get_source_ndx(t))
+            while (tv4.get_source_index(foreignindex2) != tv5.get_source_index(t))
                 foreignindex2++;
 
             CHECK(foreignindex2 >= foreignindex);
@@ -4030,7 +4030,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         foreignindex = 0;
         for (size_t t = 0; t < tv5.size(); t++) {
             size_t foreignindex2 = 0;
-            while (tv4.get_source_ndx(foreignindex2) != tv5.get_source_ndx(t))
+            while (tv4.get_source_index(foreignindex2) != tv5.get_source_index(t))
                 foreignindex2++;
 
             CHECK(foreignindex2 >= foreignindex);
@@ -4066,7 +4066,7 @@ TEST(Query_Threads)
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
         const size_t expected = i * 7 * 10 + 14 + 1;
-        const size_t actual = tv.get_source_ndx(i);
+        const size_t actual = tv.get_source_index(i);
         CHECK_EQUAL(expected, actual);
     }
 }
@@ -4098,7 +4098,7 @@ TEST(Query_LongString)
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
         const size_t expected = i * 7 * 10 + 14 + 1;
-        const size_t actual = tv.get_source_ndx(i);
+        const size_t actual = tv.get_source_index(i);
         CHECK_EQUAL(expected, actual);
     }
 }
@@ -4131,7 +4131,7 @@ TEST(Query_LongEnum)
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
         const size_t expected = i * 7 * 10 + 14 + 1;
-        const size_t actual = tv.get_source_ndx(i);
+        const size_t actual = tv.get_source_index(i);
         CHECK_EQUAL(expected, actual);
     }
 }
@@ -4169,9 +4169,9 @@ TEST(Query_Simple2)
     TupleTableType::Query q1 = ttt.where().first.equal(2);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
-    CHECK_EQUAL(4, tv1.get_source_ndx(1));
-    CHECK_EQUAL(7, tv1.get_source_ndx(2));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
+    CHECK_EQUAL(4, tv1.get_source_index(1));
+    CHECK_EQUAL(7, tv1.get_source_index(2));
 }
 
 
@@ -4199,17 +4199,17 @@ TEST(Query_Limit)
 
     TupleTableType::View tv1 = q1.find_all(0, size_t(-1), 2);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
-    CHECK_EQUAL(4, tv1.get_source_ndx(1));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
+    CHECK_EQUAL(4, tv1.get_source_index(1));
 
-    TupleTableType::View tv2 = q1.find_all(tv1.get_source_ndx(tv1.size() - 1) + 1, size_t(-1), 2);
+    TupleTableType::View tv2 = q1.find_all(tv1.get_source_index(tv1.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(7, tv2.get_source_ndx(0));
-    CHECK_EQUAL(10, tv2.get_source_ndx(1));
+    CHECK_EQUAL(7, tv2.get_source_index(0));
+    CHECK_EQUAL(10, tv2.get_source_index(1));
 
-    TupleTableType::View tv3 = q1.find_all(tv2.get_source_ndx(tv2.size() - 1) + 1, size_t(-1), 2);
+    TupleTableType::View tv3 = q1.find_all(tv2.get_source_index(tv2.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(13, tv3.get_source_ndx(0));
+    CHECK_EQUAL(13, tv3.get_source_index(0));
 
 
     TupleTableType::Query q2 = ttt.where();
@@ -4346,12 +4346,12 @@ TEST(Query_FindAll1)
 
     TupleTableType::Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
     TupleTableType::View tv1 = q1.find_all();
-    CHECK_EQUAL(4, tv1.get_source_ndx(0));
+    CHECK_EQUAL(4, tv1.get_source_index(0));
 
     TupleTableType::Query q2 = ttt.where().second.equal("X").first.greater(4);
     TupleTableType::View tv2 = q2.find_all();
-    CHECK_EQUAL(5, tv2.get_source_ndx(0));
-    CHECK_EQUAL(6, tv2.get_source_ndx(1));
+    CHECK_EQUAL(5, tv2.get_source_index(0));
+    CHECK_EQUAL(6, tv2.get_source_index(1));
 
 }
 
@@ -4369,7 +4369,7 @@ TEST(Query_FindAll2)
 
     TupleTableType::Query q2 = ttt.where().second.not_equal("a").first.less(3);
     TupleTableType::View tv2 = q2.find_all();
-    CHECK_EQUAL(6, tv2.get_source_ndx(0));
+    CHECK_EQUAL(6, tv2.get_source_index(0));
 }
 
 TEST(Query_FindAllBetween)
@@ -4386,10 +4386,10 @@ TEST(Query_FindAllBetween)
 
     TupleTableType::Query q2 = ttt.where().first.between(3, 5);
     TupleTableType::View tv2 = q2.find_all();
-    CHECK_EQUAL(2, tv2.get_source_ndx(0));
-    CHECK_EQUAL(3, tv2.get_source_ndx(1));
-    CHECK_EQUAL(4, tv2.get_source_ndx(2));
-    CHECK_EQUAL(6, tv2.get_source_ndx(3));
+    CHECK_EQUAL(2, tv2.get_source_index(0));
+    CHECK_EQUAL(3, tv2.get_source_index(1));
+    CHECK_EQUAL(4, tv2.get_source_index(2));
+    CHECK_EQUAL(6, tv2.get_source_index(3));
 }
 
 
@@ -4403,7 +4403,7 @@ TEST(Query_FindAllRange)
 
     TupleTableType::Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
     TupleTableType::View tv1 = q1.find_all(1, 2);
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
 }
 
 
@@ -4423,9 +4423,9 @@ TEST(Query_FindAllOr)
     TupleTableType::Query q1 = ttt.where().first.equal(5).Or().second.equal("X");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(2, tv1.get_source_ndx(0));
-    CHECK_EQUAL(4, tv1.get_source_ndx(1));
-    CHECK_EQUAL(6, tv1.get_source_ndx(2));
+    CHECK_EQUAL(2, tv1.get_source_index(0));
+    CHECK_EQUAL(4, tv1.get_source_index(1));
+    CHECK_EQUAL(6, tv1.get_source_index(2));
 }
 
 
@@ -4445,7 +4445,7 @@ TEST(Query_FindAllParens1)
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().second.equal("X").end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(6, tv1.get_source_ndx(0));
+    CHECK_EQUAL(6, tv1.get_source_index(0));
 }
 
 
@@ -4466,9 +4466,9 @@ TEST(Query_FindAllOrParan)
     TupleTableType::Query q1 = ttt.where().group().first.equal(5).Or().second.equal("X").first.greater(2).end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(2, tv1.get_source_ndx(0));
-    CHECK_EQUAL(4, tv1.get_source_ndx(1));
-    CHECK_EQUAL(6, tv1.get_source_ndx(2));
+    CHECK_EQUAL(2, tv1.get_source_index(0));
+    CHECK_EQUAL(4, tv1.get_source_index(1));
+    CHECK_EQUAL(6, tv1.get_source_index(2));
 }
 
 
@@ -4489,8 +4489,8 @@ TEST(Query_FindAllOrNested0)
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(5, tv1.get_source_ndx(0));
-    CHECK_EQUAL(6, tv1.get_source_ndx(1));
+    CHECK_EQUAL(5, tv1.get_source_index(0));
+    CHECK_EQUAL(6, tv1.get_source_index(1));
 }
 
 TEST(Query_FindAllOrNested)
@@ -4509,9 +4509,9 @@ TEST(Query_FindAllOrNested)
     // first > 3 && (first == 5 || second == X || second == Y)
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").Or().second.equal("Y").end_group();
     TupleTableType::View tv1 = q1.find_all();
-    CHECK_EQUAL(5, tv1.get_source_ndx(0));
-    CHECK_EQUAL(6, tv1.get_source_ndx(1));
-    CHECK_EQUAL(7, tv1.get_source_ndx(2));
+    CHECK_EQUAL(5, tv1.get_source_index(0));
+    CHECK_EQUAL(6, tv1.get_source_index(1));
+    CHECK_EQUAL(7, tv1.get_source_index(2));
 }
 
 TEST(Query_FindAllOrNestedInnerGroup)
@@ -4530,9 +4530,9 @@ TEST(Query_FindAllOrNestedInnerGroup)
     // first > 3 && (first == 5 || (second == X || second == Y))
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().group().second.equal("X").Or().second.equal("Y").end_group().end_group();
     TupleTableType::View tv1 = q1.find_all();
-    CHECK_EQUAL(5, tv1.get_source_ndx(0));
-    CHECK_EQUAL(6, tv1.get_source_ndx(1));
-    CHECK_EQUAL(7, tv1.get_source_ndx(2));
+    CHECK_EQUAL(5, tv1.get_source_index(0));
+    CHECK_EQUAL(6, tv1.get_source_index(1));
+    CHECK_EQUAL(7, tv1.get_source_index(2));
 }
 
 TEST(Query_FindAllOrPHP)
@@ -4546,7 +4546,7 @@ TEST(Query_FindAllOrPHP)
     // (second == Jim || second == Joe) && first = 1
     TupleTableType::Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(1);
     TupleTableType::View tv1 = q1.find_all();
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
 }
 
 TEST(Query_FindAllOr2)
@@ -4560,7 +4560,7 @@ TEST(Query_FindAllOr2)
     // (second == Jim || second == Joe) && first = 1
     TupleTableType::Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(3);
     TupleTableType::View tv1 = q1.find_all();
-    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+    CHECK_EQUAL(2, tv1.get_source_index(0));
 }
 
 
@@ -4583,9 +4583,9 @@ TEST(Query_FindAllParens2)
     TupleTableType::Query q1 = ttt.where().group().end_group().group().group().first.greater(3).group().end_group().end_group().group().group().end_group().end_group().end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(4, tv1.get_source_ndx(0));
-    CHECK_EQUAL(5, tv1.get_source_ndx(1));
-    CHECK_EQUAL(6, tv1.get_source_ndx(2));
+    CHECK_EQUAL(4, tv1.get_source_index(0));
+    CHECK_EQUAL(5, tv1.get_source_index(1));
+    CHECK_EQUAL(6, tv1.get_source_index(2));
 }
 
 TEST(Query_FindAllParens4)
@@ -4618,13 +4618,13 @@ TEST(Query_FindAllBool)
 
     BoolTupleTable::Query q1 = btt.where().second.equal(true);
     BoolTupleTable::View tv1 = q1.find_all();
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
-    CHECK_EQUAL(2, tv1.get_source_ndx(1));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
+    CHECK_EQUAL(2, tv1.get_source_index(1));
 
     BoolTupleTable::Query q2 = btt.where().second.equal(false);
     BoolTupleTable::View tv2 = q2.find_all();
-    CHECK_EQUAL(1, tv2.get_source_ndx(0));
-    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+    CHECK_EQUAL(1, tv2.get_source_index(0));
+    CHECK_EQUAL(3, tv2.get_source_index(1));
 }
 
 TEST(Query_FindAllBegins)
@@ -4638,8 +4638,8 @@ TEST(Query_FindAllBegins)
     TupleTableType::Query q1 = ttt.where().second.begins_with("foo");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
-    CHECK_EQUAL(2, tv1.get_source_ndx(1));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
+    CHECK_EQUAL(2, tv1.get_source_index(1));
 }
 
 TEST(Query_FindAllEnds)
@@ -4654,7 +4654,7 @@ TEST(Query_FindAllEnds)
     TupleTableType::Query q1 = ttt.where().second.ends_with("foo");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
 }
 
 
@@ -4673,10 +4673,10 @@ TEST(Query_FindAllContains)
     TupleTableType::Query q1 = ttt.where().second.contains("foo");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
-    CHECK_EQUAL(1, tv1.get_source_ndx(1));
-    CHECK_EQUAL(2, tv1.get_source_ndx(2));
-    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
+    CHECK_EQUAL(1, tv1.get_source_index(1));
+    CHECK_EQUAL(2, tv1.get_source_index(2));
+    CHECK_EQUAL(3, tv1.get_source_index(3));
 }
 
 TEST(Query_Binary)
@@ -4734,8 +4734,8 @@ TEST(Query_Binary)
     {
         TupleTableTypeBin::View tv = t.where().second.equal(BinaryData(bin + 0, 32)).find_all();
         if (tv.size() == 2) {
-            CHECK_EQUAL(1, tv.get_source_ndx(0));
-            CHECK_EQUAL(8, tv.get_source_ndx(1));
+            CHECK_EQUAL(1, tv.get_source_index(0));
+            CHECK_EQUAL(8, tv.get_source_index(1));
         }
         else CHECK(false);
     }
@@ -4743,10 +4743,10 @@ TEST(Query_Binary)
     {
         TupleTableTypeBin::View tv = t.where().second.contains(BinaryData(bin + 24, 16)).find_all();
         if (tv.size() == 4) {
-            CHECK_EQUAL(2, tv.get_source_ndx(0));
-            CHECK_EQUAL(3, tv.get_source_ndx(1));
-            CHECK_EQUAL(4, tv.get_source_ndx(2));
-            CHECK_EQUAL(7, tv.get_source_ndx(3));
+            CHECK_EQUAL(2, tv.get_source_index(0));
+            CHECK_EQUAL(3, tv.get_source_index(1));
+            CHECK_EQUAL(4, tv.get_source_index(2));
+            CHECK_EQUAL(7, tv.get_source_index(3));
         }
         else CHECK(false);
     }
@@ -4771,11 +4771,11 @@ TEST(Query_Enums)
     TupleTableType::View tv1 = q1.find_all();
 
     CHECK_EQUAL(5, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
-    CHECK_EQUAL(6, tv1.get_source_ndx(1));
-    CHECK_EQUAL(11, tv1.get_source_ndx(2));
-    CHECK_EQUAL(16, tv1.get_source_ndx(3));
-    CHECK_EQUAL(21, tv1.get_source_ndx(4));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
+    CHECK_EQUAL(6, tv1.get_source_index(1));
+    CHECK_EQUAL(11, tv1.get_source_index(2));
+    CHECK_EQUAL(16, tv1.get_source_index(3));
+    CHECK_EQUAL(21, tv1.get_source_index(4));
 }
 
 
@@ -4800,7 +4800,7 @@ TEST(Query_CaseSensitivity)
     TupleTableType::Query q1 = ttt.where().second.equal("blaabaerGROED", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
 }
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
@@ -4817,19 +4817,19 @@ TEST(Query_Unicode2)
     TupleTableType::Query q1 = ttt.where().second.equal(uY, false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
-    CHECK_EQUAL(2, tv1.get_source_ndx(1));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
+    CHECK_EQUAL(2, tv1.get_source_index(1));
 
     TupleTableType::Query q2 = ttt.where().second.equal(uYd, false);
     TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(1, tv2.get_source_ndx(0));
-    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+    CHECK_EQUAL(1, tv2.get_source_index(0));
+    CHECK_EQUAL(3, tv2.get_source_index(1));
 
     TupleTableType::Query q3 = ttt.where().second.equal(uYd, true);
     TupleTableType::View tv3 = q3.find_all();
     CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(1, tv3.get_source_ndx(0));
+    CHECK_EQUAL(1, tv3.get_source_index(0));
 }
 
 TEST(Query_Unicode3)
@@ -4844,26 +4844,26 @@ TEST(Query_Unicode3)
     TupleTableType::Query q1 = ttt.where().second.equal(uA, false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
-    CHECK_EQUAL(2, tv1.get_source_ndx(1));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
+    CHECK_EQUAL(2, tv1.get_source_index(1));
 
     TupleTableType::Query q2 = ttt.where().second.equal(ua, false);
     TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(0, tv2.get_source_ndx(0));
-    CHECK_EQUAL(2, tv2.get_source_ndx(1));
+    CHECK_EQUAL(0, tv2.get_source_index(0));
+    CHECK_EQUAL(2, tv2.get_source_index(1));
 
 
     TupleTableType::Query q3 = ttt.where().second.equal(uad, false);
     TupleTableType::View tv3 = q3.find_all();
     CHECK_EQUAL(2, tv3.size());
-    CHECK_EQUAL(1, tv3.get_source_ndx(0));
-    CHECK_EQUAL(3, tv3.get_source_ndx(1));
+    CHECK_EQUAL(1, tv3.get_source_index(0));
+    CHECK_EQUAL(3, tv3.get_source_index(1));
 
     TupleTableType::Query q4 = ttt.where().second.equal(uad, true);
     TupleTableType::View tv4 = q4.find_all();
     CHECK_EQUAL(1, tv4.size());
-    CHECK_EQUAL(3, tv4.get_source_ndx(0));
+    CHECK_EQUAL(3, tv4.get_source_index(0));
 }
 
 #endif
@@ -4879,8 +4879,8 @@ TEST(Query_FindAllBeginsUnicode)
     TupleTableType::Query q1 = ttt.where().second.begins_with(uad "foo");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
-    CHECK_EQUAL(2, tv1.get_source_ndx(1));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
+    CHECK_EQUAL(2, tv1.get_source_index(1));
 }
 
 
@@ -4895,12 +4895,12 @@ TEST(Query_FindAllEndsUnicode)
     TupleTableType::Query q1 = ttt.where().second.ends_with("foo" uad);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_index(0));
 
     TupleTableType::Query q2 = ttt.where().second.ends_with("foo" uAd, false);
     TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.size());
-    CHECK_EQUAL(1, tv2.get_source_ndx(0));
+    CHECK_EQUAL(1, tv2.get_source_index(0));
 }
 
 
@@ -4919,18 +4919,18 @@ TEST(Query_FindAllContainsUnicode)
     TupleTableType::Query q1 = ttt.where().second.contains(uad "foo");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
-    CHECK_EQUAL(1, tv1.get_source_ndx(1));
-    CHECK_EQUAL(2, tv1.get_source_ndx(2));
-    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+    CHECK_EQUAL(0, tv1.get_source_index(0));
+    CHECK_EQUAL(1, tv1.get_source_index(1));
+    CHECK_EQUAL(2, tv1.get_source_index(2));
+    CHECK_EQUAL(3, tv1.get_source_index(3));
 
     TupleTableType::Query q2 = ttt.where().second.contains(uAd "foo", false);
     TupleTableType::View tv2 = q1.find_all();
     CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(0, tv2.get_source_ndx(0));
-    CHECK_EQUAL(1, tv2.get_source_ndx(1));
-    CHECK_EQUAL(2, tv2.get_source_ndx(2));
-    CHECK_EQUAL(3, tv2.get_source_ndx(3));
+    CHECK_EQUAL(0, tv2.get_source_index(0));
+    CHECK_EQUAL(1, tv2.get_source_index(1));
+    CHECK_EQUAL(2, tv2.get_source_index(2));
+    CHECK_EQUAL(3, tv2.get_source_index(3));
 }
 
 TEST(Query_SyntaxCheck)
@@ -5448,37 +5448,37 @@ TEST(Query_AllTypesDynamicallyTyped)
 
     Query query = table.where().equal(0, false);
 
-    size_t ndx = not_found;
+    size_t index = not_found;
 
     CHECK_EQUAL(54, query.minimum_int(1));
-    query.minimum_int(1, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.minimum_int(1, nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(54, query.maximum_int(1));
-    query.maximum_int(1, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.maximum_int(1, nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(54, query.sum_int(1));
     CHECK_EQUAL(54, query.average_int(1));
 
     CHECK_EQUAL(0.7f, query.minimum_float(2));
-    query.minimum_float(2, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.minimum_float(2, nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.7f, query.maximum_float(2));
-    query.maximum_float(2, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.maximum_float(2, nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.7f, query.sum_float(2));
     CHECK_EQUAL(0.7f, query.average_float(2));
 
     CHECK_EQUAL(0.8, query.minimum_double(3));
-    query.minimum_double(3, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.minimum_double(3, nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.8, query.maximum_double(3));
-    query.maximum_double(3, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.maximum_double(3, nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.8, query.sum_double(3));
     CHECK_EQUAL(0.8, query.average_double(3));
@@ -5548,37 +5548,37 @@ TEST(Query_AllTypesStaticallyTyped)
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
 
-    size_t ndx = not_found;
+    size_t index = not_found;
 
     CHECK_EQUAL(54, query.int_col.minimum());
-    query.int_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.int_col.minimum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(54, query.int_col.maximum());
-    query.int_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.int_col.maximum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(54, query.int_col.sum());
     CHECK_EQUAL(54, query.int_col.average());
 
     CHECK_EQUAL(0.7f, query.float_col.minimum());
-    query.float_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.float_col.minimum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.7f, query.float_col.maximum());
-    query.float_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.float_col.maximum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.7f, query.float_col.sum());
     CHECK_EQUAL(0.7f, query.float_col.average());
 
     CHECK_EQUAL(0.8, query.double_col.minimum());
-    query.double_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.double_col.minimum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.8, query.double_col.maximum());
-    query.double_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+    query.double_col.maximum(nullptr, 0, not_found, not_found, &index);
+    CHECK_EQUAL(0, index);
 
     CHECK_EQUAL(0.8, query.double_col.sum());
     CHECK_EQUAL(0.8, query.double_col.average());
@@ -5827,25 +5827,25 @@ TEST(Query_NullStrings)
     q = table.column<StringData>(0) == realm::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_source_ndx(0));
+    CHECK_EQUAL(1, v.get_source_index(0));
 
     q = table.column<StringData>(0) != realm::null();
     v = q.find_all();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(0, v.get_source_ndx(0));
-    CHECK_EQUAL(2, v.get_source_ndx(1));
+    CHECK_EQUAL(0, v.get_source_index(0));
+    CHECK_EQUAL(2, v.get_source_index(1));
 
     // contrary to SQL, comparisons with realm::null() can be true in Realm (todo, discuss if we want this behaviour)
     q = table.column<StringData>(0) != StringData("Albertslund");
     v = q.find_all();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1, v.get_source_ndx(0));
-    CHECK_EQUAL(2, v.get_source_ndx(1));
+    CHECK_EQUAL(1, v.get_source_index(0));
+    CHECK_EQUAL(2, v.get_source_index(1));
 
     q = table.column<StringData>(0) == "";
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_index(0));
 
     // Medium strings (16+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
@@ -5853,24 +5853,24 @@ TEST(Query_NullStrings)
     q = table.column<StringData>(0) == realm::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_source_ndx(0));
+    CHECK_EQUAL(1, v.get_source_index(0));
 
     q = table.column<StringData>(0) == "";
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_index(0));
 
     // Long strings (64+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
     q = table.column<StringData>(0) == realm::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_source_ndx(0));
+    CHECK_EQUAL(1, v.get_source_index(0));
 
     q = table.column<StringData>(0) == "";
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_index(0));
     
 }
 
@@ -6002,25 +6002,25 @@ TEST(Query_BinaryNull)
     TableView t;
 
     t = table.where().equal(0, BinaryData()).find_all();
-    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(0, t.get_source_index(0));
     CHECK_EQUAL(1, t.size());
 
     t = table.where().equal(0, BinaryData("", 0)).find_all();
-    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(1, t.get_source_index(0));
     CHECK_EQUAL(1, t.size());
 
     t = table.where().equal(0, BinaryData("foo")).find_all();
-    CHECK_EQUAL(2, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_index(0));
     CHECK_EQUAL(1, t.size());
 
     t = table.where().not_equal(0, BinaryData()).find_all();
-    CHECK_EQUAL(1, t.get_source_ndx(0));
-    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(1, t.get_source_index(0));
+    CHECK_EQUAL(2, t.get_source_index(1));
     CHECK_EQUAL(2, t.size());
 
     t = table.where().not_equal(0, BinaryData("", 0)).find_all();
-    CHECK_EQUAL(0, t.get_source_ndx(0));
-    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(0, t.get_source_index(0));
+    CHECK_EQUAL(2, t.get_source_index(1));
     CHECK_EQUAL(2, t.size());
 
     t = table.where().begins_with(0, BinaryData()).find_all();
@@ -6028,24 +6028,24 @@ TEST(Query_BinaryNull)
 
     t = table.where().begins_with(0, BinaryData("", 0)).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(1, t.get_source_ndx(0));
-    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(1, t.get_source_index(0));
+    CHECK_EQUAL(2, t.get_source_index(1));
 
     t = table.where().begins_with(0, BinaryData("foo")).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(2, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_index(0));
 
     t = table.where().ends_with(0, BinaryData()).find_all();
     CHECK_EQUAL(3, t.size());
 
     t = table.where().ends_with(0, BinaryData("", 0)).find_all();
     CHECK_EQUAL(2, t.size());
-    CHECK_EQUAL(1, t.get_source_ndx(0));
-    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(1, t.get_source_index(0));
+    CHECK_EQUAL(2, t.get_source_index(1));
 
     t = table.where().ends_with(0, BinaryData("foo")).find_all();
     CHECK_EQUAL(1, t.size());
-    CHECK_EQUAL(2, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_index(0));
 }
 
 #endif

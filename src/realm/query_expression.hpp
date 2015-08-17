@@ -980,7 +980,7 @@ public:
         for (size_t t = 0; t < columns.size(); t++) {
             // Link column can be either LinkList or single Link
             ColumnType type = table->get_real_column_type(columns[t]);
-            if (type == col_type_LinkList) {
+            if (type == column_type_LinkList) {
                 LinkListColumn& cll = table->get_column_link_list(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
@@ -1628,7 +1628,7 @@ private:
     TRight& m_right;
 
     // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in 
-    // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this 
+    // Query q = table2->link(column_link2).column<String>(1) == "foo") so that we can delete it when this 
     // Compare object is destructed and the copy is no longer needed. 
     const char* m_compare_string;
 };

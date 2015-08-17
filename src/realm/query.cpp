@@ -231,207 +231,207 @@ Query& Query::expression(Expression* compare)
 }
 
 // Binary
-Query& Query::equal(size_t column_ndx, BinaryData b)
+Query& Query::equal(size_t column_index, BinaryData b)
 {
-    ParentNode* const p = new BinaryNode<Equal>(b, column_ndx);
+    ParentNode* const p = new BinaryNode<Equal>(b, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::not_equal(size_t column_ndx, BinaryData b)
+Query& Query::not_equal(size_t column_index, BinaryData b)
 {
-    ParentNode* const p = new BinaryNode<NotEqual>(b, column_ndx);
+    ParentNode* const p = new BinaryNode<NotEqual>(b, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::begins_with(size_t column_ndx, BinaryData b)
+Query& Query::begins_with(size_t column_index, BinaryData b)
 {
-    ParentNode* p = new BinaryNode<BeginsWith>(b, column_ndx);
+    ParentNode* p = new BinaryNode<BeginsWith>(b, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::ends_with(size_t column_ndx, BinaryData b)
+Query& Query::ends_with(size_t column_index, BinaryData b)
 {
-    ParentNode* p = new BinaryNode<EndsWith>(b, column_ndx);
+    ParentNode* p = new BinaryNode<EndsWith>(b, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::contains(size_t column_ndx, BinaryData b)
+Query& Query::contains(size_t column_index, BinaryData b)
 {
-    ParentNode* p = new BinaryNode<Contains>(b, column_ndx);
+    ParentNode* p = new BinaryNode<Contains>(b, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
 
 // Generic 'simple type' condition
 template <typename T, class N>
-Query& Query::add_condition(size_t column_ndx, T value)
+Query& Query::add_condition(size_t column_index, T value)
 {
-    ParentNode* const parent = new N(value, column_ndx);
+    ParentNode* const parent = new N(value, column_index);
     update_pointers(parent, &parent->m_child);
     return *this;
 }
 
 
-template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::equal(size_t column_index1, size_t column_index2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, Equal>(column_index1, column_index2);
     update_pointers(p, &p->m_child);
     return *this;
 }
 
 // Two column methods, any type
-template <class ColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::less(size_t column_index1, size_t column_index2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, Less>(column_index1, column_index2);
     update_pointers(p, &p->m_child);
     return *this;
 }
-template <class ColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::less_equal(size_t column_index1, size_t column_index2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, LessEqual>(column_index1, column_index2);
     update_pointers(p, &p->m_child);
     return *this;
 }
-template <class ColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::greater(size_t column_index1, size_t column_index2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, Greater>(column_index1, column_index2);
     update_pointers(p, &p->m_child);
     return *this;
 }
-template <class ColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::greater_equal(size_t column_index1, size_t column_index2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, GreaterEqual>(column_index1, column_index2);
     update_pointers(p, &p->m_child);
     return *this;
 }
-template <class ColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
+template <class ColumnType> Query& Query::not_equal(size_t column_index1, size_t column_index2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2);
+    ParentNode* const p = new TwoColumnsNode<ColumnType, NotEqual>(column_index1, column_index2);
     update_pointers(p, &p->m_child);
     return *this;
 }
 
 // column vs column, integer
-Query& Query::equal_int(size_t column_ndx1, size_t column_ndx2)
+Query& Query::equal_int(size_t column_index1, size_t column_index2)
 {
-    return equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return equal<IntegerColumn>(column_index1, column_index2);
 }
 
-Query& Query::not_equal_int(size_t column_ndx1, size_t column_ndx2)
+Query& Query::not_equal_int(size_t column_index1, size_t column_index2)
 {
-    return not_equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return not_equal<IntegerColumn>(column_index1, column_index2);
 }
 
-Query& Query::less_int(size_t column_ndx1, size_t column_ndx2)
+Query& Query::less_int(size_t column_index1, size_t column_index2)
 {
-    return less<IntegerColumn>(column_ndx1, column_ndx2);
+    return less<IntegerColumn>(column_index1, column_index2);
 }
 
-Query& Query::greater_equal_int(size_t column_ndx1, size_t column_ndx2)
+Query& Query::greater_equal_int(size_t column_index1, size_t column_index2)
 {
-    return greater_equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return greater_equal<IntegerColumn>(column_index1, column_index2);
 }
 
-Query& Query::less_equal_int(size_t column_ndx1, size_t column_ndx2)
+Query& Query::less_equal_int(size_t column_index1, size_t column_index2)
 {
-    return less_equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return less_equal<IntegerColumn>(column_index1, column_index2);
 }
 
-Query& Query::greater_int(size_t column_ndx1, size_t column_ndx2)
+Query& Query::greater_int(size_t column_index1, size_t column_index2)
 {
-    return greater<IntegerColumn>(column_ndx1, column_ndx2);
+    return greater<IntegerColumn>(column_index1, column_index2);
 }
 
 
 // column vs column, float
-Query& Query::not_equal_float(size_t column_ndx1, size_t column_ndx2)
+Query& Query::not_equal_float(size_t column_index1, size_t column_index2)
 {
-    return not_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return not_equal<BasicColumn<float>>(column_index1, column_index2);
 }
 
-Query& Query::less_float(size_t column_ndx1, size_t column_ndx2)
+Query& Query::less_float(size_t column_index1, size_t column_index2)
 {
-    return less<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return less<BasicColumn<float>>(column_index1, column_index2);
 }
 
-Query& Query::greater_float(size_t column_ndx1, size_t column_ndx2)
+Query& Query::greater_float(size_t column_index1, size_t column_index2)
 {
-    return greater<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return greater<BasicColumn<float>>(column_index1, column_index2);
 }
 
-Query& Query::greater_equal_float(size_t column_ndx1, size_t column_ndx2)
+Query& Query::greater_equal_float(size_t column_index1, size_t column_index2)
 {
-    return greater_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return greater_equal<BasicColumn<float>>(column_index1, column_index2);
 }
 
-Query& Query::less_equal_float(size_t column_ndx1, size_t column_ndx2)
+Query& Query::less_equal_float(size_t column_index1, size_t column_index2)
 {
-    return less_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return less_equal<BasicColumn<float>>(column_index1, column_index2);
 }
 
-Query& Query::equal_float(size_t column_ndx1, size_t column_ndx2)
+Query& Query::equal_float(size_t column_index1, size_t column_index2)
 {
-    return equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return equal<BasicColumn<float>>(column_index1, column_index2);
 }
 
 // column vs column, double
-Query& Query::equal_double(size_t column_ndx1, size_t column_ndx2)
+Query& Query::equal_double(size_t column_index1, size_t column_index2)
 {
-    return equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return equal<BasicColumn<double>>(column_index1, column_index2);
 }
 
-Query& Query::less_equal_double(size_t column_ndx1, size_t column_ndx2)
+Query& Query::less_equal_double(size_t column_index1, size_t column_index2)
 {
-    return less_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return less_equal<BasicColumn<double>>(column_index1, column_index2);
 }
 
-Query& Query::greater_equal_double(size_t column_ndx1, size_t column_ndx2)
+Query& Query::greater_equal_double(size_t column_index1, size_t column_index2)
 {
-    return greater_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return greater_equal<BasicColumn<double>>(column_index1, column_index2);
 }
-Query& Query::greater_double(size_t column_ndx1, size_t column_ndx2)
+Query& Query::greater_double(size_t column_index1, size_t column_index2)
 {
-    return greater<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return greater<BasicColumn<double>>(column_index1, column_index2);
 }
-Query& Query::less_double(size_t column_ndx1, size_t column_ndx2)
+Query& Query::less_double(size_t column_index1, size_t column_index2)
 {
-    return less<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return less<BasicColumn<double>>(column_index1, column_index2);
 }
 
-Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
+Query& Query::not_equal_double(size_t column_index1, size_t column_index2)
 {
-    return not_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return not_equal<BasicColumn<double>>(column_index1, column_index2);
 }
 
 
 // int constant vs column (we need those because '1234' is ambiguous, can convert to float/double/int64_t)
-Query& Query::equal(size_t column_ndx, int value)
+Query& Query::equal(size_t column_index, int value)
 {
-    return equal(column_ndx, static_cast<int64_t>(value));
+    return equal(column_index, static_cast<int64_t>(value));
 }
-Query& Query::not_equal(size_t column_ndx, int value)
+Query& Query::not_equal(size_t column_index, int value)
 {
-    return not_equal(column_ndx, static_cast<int64_t>(value));
+    return not_equal(column_index, static_cast<int64_t>(value));
 }
-Query& Query::greater(size_t column_ndx, int value)
+Query& Query::greater(size_t column_index, int value)
 {
-    return greater(column_ndx, static_cast<int64_t>(value));
+    return greater(column_index, static_cast<int64_t>(value));
 }
-Query& Query::greater_equal(size_t column_ndx, int value)
+Query& Query::greater_equal(size_t column_index, int value)
 {
-    return greater_equal(column_ndx, static_cast<int64_t>(value));
+    return greater_equal(column_index, static_cast<int64_t>(value));
 }
-Query& Query::less_equal(size_t column_ndx, int value)
+Query& Query::less_equal(size_t column_index, int value)
 {
-    return less_equal(column_ndx, static_cast<int64_t>(value));
+    return less_equal(column_index, static_cast<int64_t>(value));
 }
-Query& Query::less(size_t column_ndx, int value)
+Query& Query::less(size_t column_index, int value)
 {
-    return less(column_ndx, static_cast<int64_t>(value));
+    return less(column_index, static_cast<int64_t>(value));
 }
-Query& Query::between(size_t column_ndx, int from, int to)
+Query& Query::between(size_t column_index, int from, int to)
 {
-    return between(column_ndx, static_cast<int64_t>(from), static_cast<int64_t>(to));
+    return between(column_index, static_cast<int64_t>(from), static_cast<int64_t>(to));
 }
 
 Query& Query::links_to(size_t origin_column, size_t target_row)
@@ -442,128 +442,128 @@ Query& Query::links_to(size_t origin_column, size_t target_row)
 }
 
 // int64 constant vs column
-Query& Query::equal(size_t column_ndx, int64_t value)
+Query& Query::equal(size_t column_index, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::not_equal(size_t column_ndx, int64_t value)
+Query& Query::not_equal(size_t column_index, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, NotEqual>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, NotEqual>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::greater(size_t column_ndx, int64_t value)
+Query& Query::greater(size_t column_index, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Greater>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Greater>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::greater_equal(size_t column_ndx, int64_t value)
+Query& Query::greater_equal(size_t column_index, int64_t value)
 {
     if (value > LLONG_MIN) {
-        ParentNode* const p = new IntegerNode<int64_t, Greater>(value - 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, Greater>(value - 1, column_index);
         update_pointers(p, &p->m_child);
     }
     // field >= LLONG_MIN has no effect
     return *this;
 }
-Query& Query::less_equal(size_t column_ndx, int64_t value)
+Query& Query::less_equal(size_t column_index, int64_t value)
 {
     if (value < LLONG_MAX) {
-        ParentNode* const p = new IntegerNode<int64_t, Less>(value + 1, column_ndx);
+        ParentNode* const p = new IntegerNode<int64_t, Less>(value + 1, column_index);
         update_pointers(p, &p->m_child);
     }
     // field <= LLONG_MAX has no effect
     return *this;
 }
-Query& Query::less(size_t column_ndx, int64_t value)
+Query& Query::less(size_t column_index, int64_t value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Less>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Less>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
+Query& Query::between(size_t column_index, int64_t from, int64_t to)
 {
     group();
-    greater_equal(column_ndx, from);
-    less_equal(column_ndx, to);
+    greater_equal(column_index, from);
+    less_equal(column_index, to);
     end_group();
     return *this;
 }
-Query& Query::equal(size_t column_ndx, bool value)
+Query& Query::equal(size_t column_index, bool value)
 {
-    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
 
 // ------------- float
-Query& Query::equal(size_t column_ndx, float value)
+Query& Query::equal(size_t column_index, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Equal>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Equal>>(column_index, value);
 }
-Query& Query::not_equal(size_t column_ndx, float value)
+Query& Query::not_equal(size_t column_index, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, NotEqual>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, NotEqual>>(column_index, value);
 }
-Query& Query::greater(size_t column_ndx, float value)
+Query& Query::greater(size_t column_index, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Greater>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Greater>>(column_index, value);
 }
-Query& Query::greater_equal(size_t column_ndx, float value)
+Query& Query::greater_equal(size_t column_index, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, GreaterEqual>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, GreaterEqual>>(column_index, value);
 }
-Query& Query::less_equal(size_t column_ndx, float value)
+Query& Query::less_equal(size_t column_index, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, LessEqual>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, LessEqual>>(column_index, value);
 }
-Query& Query::less(size_t column_ndx, float value)
+Query& Query::less(size_t column_index, float value)
 {
-    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Less>>(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<BasicColumn<float>, Less>>(column_index, value);
 }
-Query& Query::between(size_t column_ndx, float from, float to)
+Query& Query::between(size_t column_index, float from, float to)
 {
     group();
-    greater_equal(column_ndx, from);
-    less_equal(column_ndx, to);
+    greater_equal(column_index, from);
+    less_equal(column_index, to);
     end_group();
     return *this;
 }
 
 
 // ------------- double
-Query& Query::equal(size_t column_ndx, double value)
+Query& Query::equal(size_t column_index, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Equal>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Equal>>(column_index, value);
 }
-Query& Query::not_equal(size_t column_ndx, double value)
+Query& Query::not_equal(size_t column_index, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, NotEqual>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, NotEqual>>(column_index, value);
 }
-Query& Query::greater(size_t column_ndx, double value)
+Query& Query::greater(size_t column_index, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Greater>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Greater>>(column_index, value);
 }
-Query& Query::greater_equal(size_t column_ndx, double value)
+Query& Query::greater_equal(size_t column_index, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, GreaterEqual>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, GreaterEqual>>(column_index, value);
 }
-Query& Query::less_equal(size_t column_ndx, double value)
+Query& Query::less_equal(size_t column_index, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, LessEqual>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, LessEqual>>(column_index, value);
 }
-Query& Query::less(size_t column_ndx, double value)
+Query& Query::less(size_t column_index, double value)
 {
-    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Less>>(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<BasicColumn<double>, Less>>(column_index, value);
 }
-Query& Query::between(size_t column_ndx, double from, double to)
+Query& Query::between(size_t column_index, double from, double to)
 {
     group();
-    greater_equal(column_ndx, from);
-    less_equal(column_ndx, to);
+    greater_equal(column_index, from);
+    less_equal(column_index, to);
     end_group();
     return *this;
 }
@@ -571,53 +571,53 @@ Query& Query::between(size_t column_ndx, double from, double to)
 
 // Strings, StringData()
 
-Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
+Query& Query::equal(size_t column_index, StringData value, bool case_sensitive)
 {
     ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<Equal>(value, column_ndx);
+        p = new StringNode<Equal>(value, column_index);
     else
-        p = new StringNode<EqualIns>(value, column_ndx);
+        p = new StringNode<EqualIns>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::begins_with(size_t column_ndx, StringData value, bool case_sensitive)
+Query& Query::begins_with(size_t column_index, StringData value, bool case_sensitive)
 {
     ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<BeginsWith>(value, column_ndx);
+        p = new StringNode<BeginsWith>(value, column_index);
     else
-        p = new StringNode<BeginsWithIns>(value, column_ndx);
+        p = new StringNode<BeginsWithIns>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::ends_with(size_t column_ndx, StringData value, bool case_sensitive)
+Query& Query::ends_with(size_t column_index, StringData value, bool case_sensitive)
 {
     ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<EndsWith>(value, column_ndx);
+        p = new StringNode<EndsWith>(value, column_index);
     else
-        p = new StringNode<EndsWithIns>(value, column_ndx);
+        p = new StringNode<EndsWithIns>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::contains(size_t column_ndx, StringData value, bool case_sensitive)
+Query& Query::contains(size_t column_index, StringData value, bool case_sensitive)
 {
     ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<Contains>(value, column_ndx);
+        p = new StringNode<Contains>(value, column_index);
     else
-        p = new StringNode<ContainsIns>(value, column_ndx);
+        p = new StringNode<ContainsIns>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
-Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive)
+Query& Query::not_equal(size_t column_index, StringData value, bool case_sensitive)
 {
     ParentNode* p;
     if (case_sensitive)
-        p = new StringNode<NotEqual>(value, column_ndx);
+        p = new StringNode<NotEqual>(value, column_index);
     else
-        p = new StringNode<NotEqualIns>(value, column_ndx);
+        p = new StringNode<NotEqualIns>(value, column_index);
     update_pointers(p, &p->m_child);
     return *this;
 }
@@ -644,9 +644,9 @@ size_t Query::peek_tableview(size_t tv_index) const
 
 template <Action action, typename T, typename R, class ColType>
     R Query::aggregate(R(ColType::*aggregateMethod)(size_t start, size_t end, size_t limit,
-                                                    size_t* return_ndx) const,
-                       size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-                       size_t* return_ndx) const
+                                                    size_t* return_index) const,
+                       size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit, 
+                       size_t* return_index) const
 {
     if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
@@ -658,7 +658,7 @@ template <Action action, typename T, typename R, class ColType>
         end = m_view ? m_view->size() : m_table->size();
 
     const ColType& column =
-        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
+        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_index);
 
     if ((first.size() == 0 || first[0] == 0) && !m_view) {
 
@@ -669,7 +669,7 @@ template <Action action, typename T, typename R, class ColType>
             *resultcount = limit < (end - start) ? limit : (end - start);
         }
         // direct aggregate on the column
-        return (column.*aggregateMethod)(start, end, limit, return_ndx);
+        return (column.*aggregateMethod)(start, end, limit, return_index);
     }
     else {
 
@@ -678,7 +678,7 @@ template <Action action, typename T, typename R, class ColType>
         QueryState<R> st;
         st.init(action, nullptr, limit);
 
-        SequentialGetter<ColType> source_column(*m_table, column_ndx);
+        SequentialGetter<ColType> source_column(*m_table, column_index);
 
         if (!m_view) {
             aggregate_internal(action, ColumnTypeTraits<T>::id, first[0], &st, start, end, &source_column);
@@ -695,8 +695,8 @@ template <Action action, typename T, typename R, class ColType>
             *resultcount = st.m_match_count;
         }
 
-        if (return_ndx) {
-            *return_ndx = st.m_minmax_index;
+        if (return_index) {
+            *return_index = st.m_minmax_index;
         }
 
         return st.m_state;
@@ -757,76 +757,76 @@ template <Action action, typename T, typename R, class ColType>
 
 // Sum
 
-int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::sum_int(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_index, resultcount, start, end, limit);
 }
-double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::sum_float(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, float>(&FloatColumn::sum, column_index, resultcount, start, end, limit);
 }
-double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::sum_double(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_index, resultcount, start, end, limit);
 }
 
 // Maximum
 
-int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-                           size_t* return_ndx) const
+int64_t Query::maximum_int(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit, 
+                           size_t* return_index) const
 {
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_index, resultcount, start, end, limit, return_index);
 }
 
-DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
-                                 size_t limit, size_t* return_ndx) const
+DateTime Query::maximum_datetime(size_t column_index, size_t* resultcount, size_t start, size_t end, 
+                                 size_t limit, size_t* return_index) const
 {
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_index, resultcount, start, end, limit, return_index);
 }
 
-float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
-                           size_t limit, size_t* return_ndx) const
+float Query::maximum_float(size_t column_index, size_t* resultcount, size_t start, size_t end, 
+                           size_t limit, size_t* return_index) const
 {
-    return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, float>(&FloatColumn::maximum, column_index, resultcount, start, end, limit, return_index);
 }
-double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
-                             size_t limit, size_t* return_ndx) const
+double Query::maximum_double(size_t column_index, size_t* resultcount, size_t start, size_t end,
+                             size_t limit, size_t* return_index) const
 {
-    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, resultcount, start, end, limit,
-                                      return_ndx);
+    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_index, resultcount, start, end, limit,
+                                      return_index);
 }
 
 
 // Minimum
 
-int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
-                           size_t limit, size_t* return_ndx) const
+int64_t Query::minimum_int(size_t column_index, size_t* resultcount, size_t start, size_t end, 
+                           size_t limit, size_t* return_index) const
 {
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_index, resultcount, start, end, limit, return_index);
 }
-float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                           size_t* return_ndx) const
+float Query::minimum_float(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit,
+                           size_t* return_index) const
 {
-    return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, float>(&FloatColumn::minimum, column_index, resultcount, start, end, limit, return_index);
 }
-double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-                             size_t* return_ndx) const
+double Query::minimum_double(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit, 
+                             size_t* return_index) const
 {
-    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit, 
-                                      return_ndx);
+    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_index, resultcount, start, end, limit, 
+                                      return_index);
 }
 
-DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                                 size_t* return_ndx) const
+DateTime Query::minimum_datetime(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit,
+                                 size_t* return_index) const
 {
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_index, resultcount, start, end, limit, return_index);
 }
 
 
 // Average
 
 template <typename T>
-double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
@@ -837,7 +837,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     size_t resultcount2 = 0;
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::sum_type SumType;
-    const SumType sum1 = aggregate<act_Sum, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
+    const SumType sum1 = aggregate<act_Sum, T>(&ColType::sum, column_index, &resultcount2, start, end, limit);
     double avg1 = 0;
     if (resultcount2 != 0)
         avg1 = static_cast<double>(sum1) / resultcount2;
@@ -846,17 +846,17 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     return avg1;
 }
 
-double Query::average_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average_int(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return average<int64_t>(column_ndx, resultcount, start, end, limit);
+    return average<int64_t>(column_index, resultcount, start, end, limit);
 }
-double Query::average_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average_float(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return average<float>(column_ndx, resultcount, start, end, limit);
+    return average<float>(column_index, resultcount, start, end, limit);
 }
-double Query::average_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average_double(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    return average<double>(column_ndx, resultcount, start, end, limit);
+    return average<double>(column_index, resultcount, start, end, limit);
 }
 
 

@@ -319,20 +319,20 @@ TEST(Json_LinkList1)
     table3->set_int(0, 2, 900);
     table3->set_string(1, 2, "hi");
 
-    size_t col_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
-    size_t col_link3 = table1->add_column_link(type_LinkList, "linkB", *table3);
+    size_t column_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
+    size_t column_link3 = table1->add_column_link(type_LinkList, "linkB", *table3);
 
     // set some links
     LinkViewRef links1;
 
-    links1 = table1->get_linklist(col_link2, 0);
+    links1 = table1->get_linklist(column_link2, 0);
     links1->add(1);
 
-    links1 = table1->get_linklist(col_link2, 1);
+    links1 = table1->get_linklist(column_link2, 1);
     links1->add(1);
     links1->add(2);
 
-    links1 = table1->get_linklist(col_link3, 0);
+    links1 = table1->get_linklist(column_link3, 0);
     links1->add(0);
     links1->add(2);
 
@@ -387,17 +387,17 @@ TEST(Json_LinkListCycle)
     table2->add_empty_row(1);
     table2->set_string(0, 0, "foo");
 
-    size_t col_link1 = table1->add_column_link(type_LinkList, "linkA", *table2);
-    size_t col_link2 = table2->add_column_link(type_LinkList, "linkB", *table1);
+    size_t column_link1 = table1->add_column_link(type_LinkList, "linkA", *table2);
+    size_t column_link2 = table2->add_column_link(type_LinkList, "linkB", *table1);
 
     // set some links
     LinkViewRef links1;
     LinkViewRef links2;
 
-    links1 = table1->get_linklist(col_link1, 0);
+    links1 = table1->get_linklist(column_link1, 0);
     links1->add(0);
 
-    links2 = table2->get_linklist(col_link2, 0);
+    links2 = table2->get_linklist(column_link2, 0);
     links2->add(0);
 
     // create json
@@ -449,12 +449,12 @@ TEST(Json_LinkCycles)
     table2->add_empty_row(1);
     table2->set_string(0, 0, "foo");
 
-    size_t col_link1 = table1->add_column_link(type_Link, "linkA", *table2);
-    size_t col_link2 = table2->add_column_link(type_Link, "linkB", *table1);
+    size_t column_link1 = table1->add_column_link(type_Link, "linkA", *table2);
+    size_t column_link2 = table2->add_column_link(type_Link, "linkB", *table1);
 
     // set some links
-    table1->set_link(col_link1, 0, 0);
-    table2->set_link(col_link2, 0, 0);
+    table1->set_link(column_link1, 0, 0);
+    table2->set_link(column_link2, 0, 0);
 
     std::stringstream ss;
 

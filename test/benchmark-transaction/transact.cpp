@@ -297,7 +297,7 @@ static void *realm_reader(void *arg)
 static void *sqlite_writer(void *arg)
 {
     sqlite3 *db;
-    long int randx, randy;
+    long int raindex, randy;
     char *errmsg;
     char sql[128];
     struct timespec ts_1, ts_2;
@@ -322,9 +322,9 @@ static void *sqlite_writer(void *arg)
 
         // execute transaction
         sqlite3_exec(db, "BEGIN EXCLUSIVE TRANSACTION", NULL, NULL, &errmsg);
-        randx = random() % 1000;
+        raindex = random() % 1000;
         randy = random() % 1000;
-        sqlite3_bind_int(s, 1, randx);
+        sqlite3_bind_int(s, 1, raindex);
         sqlite3_bind_int(s, 2, randy);
         sqlite3_step(s);
         sqlite3_free(errmsg);
@@ -345,7 +345,7 @@ static void *sqlite_writer(void *arg)
 static void *mysql_writer(void *arg)
 {
     struct timespec ts_1, ts_2;
-    long int randx, randy;
+    long int raindex, randy;
     char sql[128];
     MYSQL *db;
 
@@ -369,9 +369,9 @@ static void *mysql_writer(void *arg)
         if (mysql_query(db, "START TRANSACTION;")) {
             std::cout << "MySQL error: " << mysql_errno(db) << std::endl;
         }
-        randx = random() % 1000;
+        raindex = random() % 1000;
         randy = random() % 1000;
-        sprintf(sql, "UPDATE %s SET x=%ld WHERE y = %ld", tinfo->datfile, randx, randy);
+        sprintf(sql, "UPDATE %s SET x=%ld WHERE y = %ld", tinfo->datfile, raindex, randy);
         if (mysql_query(db, sql)) {
             std::cout << "MySQL error in " << sql << ": " << mysql_errno(db) << std::endl;
         }
@@ -406,11 +406,11 @@ static void *realm_writer(void *arg)
         {
             WriteTransaction wt(sg);
             BasicTableRef<TestTable> t = wt.get_or_add_table<TestTable>("test");
-            long randx = random() % 1000;
+            long raindex = random() % 1000;
             long randy = random() % 1000;
             TestTable::View tv = t->where().y.equal(randy).find_all();
             for(size_t j=0; j<tv.size(); ++j) {
-                tv[j].x = randx;
+                tv[j].x = raindex;
             }
             wt.commit();
         }
@@ -425,7 +425,7 @@ static void *realm_writer(void *arg)
 void sqlite_create(const char *f, long n, bool wal)
 {
     int      i;
-    long     randx, randy;
+    long     raindex, randy;
     char     sql[128];
     sqlite3 *db;
     char    *errmsg;
@@ -446,9 +446,9 @@ void sqlite_create(const char *f, long n, bool wal)
     }
     sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errmsg);
     for(i=0; i<n; ++i) {
-        randx = random() % 1000;
+        raindex = random() % 1000;
         randy = random() % 1000;
-        sprintf(sql, "INSERT INTO test VALUES (%ld, %ld)", randx, randy);
+        sprintf(sql, "INSERT INTO test VALUES (%ld, %ld)", raindex, randy);
         sqlite3_exec(db, sql, NULL, NULL, &errmsg);
     }
     sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errmsg);
@@ -458,7 +458,7 @@ void sqlite_create(const char *f, long n, bool wal)
 void mysql_create(const char *f, long n)
 {
     int      i;
-    long     randx, randy;
+    long     raindex, randy;
     char     sql[128];
     MYSQL    *db;
 
@@ -473,9 +473,9 @@ void mysql_create(const char *f, long n)
         std::cout << "MySQL error: " << mysql_errno(db) << std::endl;
     }
     for(i=0; i<n; ++i) {
-        randx = random() % 1000;
+        raindex = random() % 1000;
         randy = random() % 1000;
-        sprintf(sql, "INSERT INTO %s VALUES (%ld, %ld)", f, randx, randy);
+        sprintf(sql, "INSERT INTO %s VALUES (%ld, %ld)", f, raindex, randy);
         mysql_query(db, sql);
     }
     if (mysql_query(db, "COMMIT;")) {
@@ -495,9 +495,9 @@ void realm_create(const char *f, long n)
 
         srandom(1);
         for(int i=0; i<n; ++i) {
-            long randx = random() % 1000;
+            long raindex = random() % 1000;
             long randy = random() % 1000;
-            t->add(randx, randy);
+            t->add(raindex, randy);
         }
         wt.commit();
     }

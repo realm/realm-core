@@ -81,12 +81,12 @@ public:
     bool is_empty() const REALM_NOEXCEPT;
     std::size_t size() const REALM_NOEXCEPT;
 
-    BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
+    BinaryData get(std::size_t index) const REALM_NOEXCEPT;
 
     void add(BinaryData value, bool add_zero_term = false);
-    void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void erase(std::size_t ndx);
+    void set(std::size_t index, BinaryData value, bool add_zero_term = false);
+    void insert(std::size_t index, BinaryData value, bool add_zero_term = false);
+    void erase(std::size_t index);
     void truncate(std::size_t size);
     void clear();
     void destroy();
@@ -95,9 +95,9 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static BinaryData get(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
+    static BinaryData get(const char* header, std::size_t index, Allocator&) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
+    ref_type bptree_leaf_insert(std::size_t index, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
 
     static std::size_t get_size_from_header(const char*, Allocator&) REALM_NOEXCEPT;
@@ -181,16 +181,16 @@ inline std::size_t ArrayBinary::size() const REALM_NOEXCEPT
     return m_offsets.size();
 }
 
-inline BinaryData ArrayBinary::get(std::size_t ndx) const REALM_NOEXCEPT
+inline BinaryData ArrayBinary::get(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(index, <, m_offsets.size());
 
-    if (!legacy_array_type() && m_nulls.get(ndx)) {
+    if (!legacy_array_type() && m_nulls.get(index)) {
         return BinaryData();
     }
     else {
-        std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-        std::size_t end = to_size_t(m_offsets.get(ndx));
+        std::size_t begin = index ? to_size_t(m_offsets.get(index - 1)) : 0;
+        std::size_t end = to_size_t(m_offsets.get(index));
 
         BinaryData bd = BinaryData(m_blob.get(begin), end - begin);
         // Old database file (non-nullable column should never return null)

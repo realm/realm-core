@@ -47,64 +47,64 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         m_nulls.add(value.is_null());
 }
 
-void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
+void ArrayBinary::set(size_t index, BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(index, <, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    size_t current_end = to_size_t(m_offsets.get(ndx));
+    size_t start = index ? to_size_t(m_offsets.get(index-1)) : 0;
+    size_t current_end = to_size_t(m_offsets.get(index));
     size_t stored_size = value.size();
     if (add_zero_term)
         ++stored_size;
     ssize_t diff =  (start + stored_size) - current_end;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
-    m_offsets.adjust(ndx, m_offsets.size(), diff);
+    m_offsets.adjust(index, m_offsets.size(), diff);
 
     if (!legacy_array_type())
-        m_nulls.set(ndx, value.is_null());
+        m_nulls.set(index, value.is_null());
 }
 
-void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
+void ArrayBinary::insert(size_t index, BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT_3(ndx, <=, m_offsets.size());
+    REALM_ASSERT_3(index, <=, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
 
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = index ? to_size_t(m_offsets.get(index-1)) : 0;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
     size_t stored_size = value.size();
     if (add_zero_term)
         ++stored_size;
-    m_offsets.insert(ndx, pos + stored_size);
-    m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
+    m_offsets.insert(index, pos + stored_size);
+    m_offsets.adjust(index+1, m_offsets.size(), stored_size);
 
     if (!legacy_array_type())
-        m_nulls.insert(ndx, value.is_null());
+        m_nulls.insert(index, value.is_null());
 }
 
-void ArrayBinary::erase(size_t ndx)
+void ArrayBinary::erase(size_t index)
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(index, <, m_offsets.size());
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    size_t end = to_size_t(m_offsets.get(ndx));
+    size_t start = index ? to_size_t(m_offsets.get(index-1)) : 0;
+    size_t end = to_size_t(m_offsets.get(index));
 
     m_blob.erase(start, end);
-    m_offsets.erase(ndx);
-    m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
+    m_offsets.erase(index);
+    m_offsets.adjust(index, m_offsets.size(), int64_t(start) - end);
 
     if(!legacy_array_type())
-        m_nulls.erase(ndx);
+        m_nulls.erase(index);
 }
 
-BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
+BinaryData ArrayBinary::get(const char* header, size_t index, Allocator& alloc) REALM_NOEXCEPT
 {
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
     // See comment in legacy_array_type() and also in array_binary.hpp.
@@ -114,11 +114,11 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) RE
     if (siz == 3) {
         std::pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
-        int64_t n = ArrayInteger::get(nulls_header, ndx);
+        int64_t n = ArrayInteger::get(nulls_header, index);
         // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
         REALM_ASSERT_3(n == 1, ||, n == 0);
         bool null = (n != 0);
-        ArrayInteger::get(nulls_header, ndx);
+        ArrayInteger::get(nulls_header, index);
         if (null)
             return BinaryData(0, 0);        
     }
@@ -127,45 +127,45 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) RE
     const char* offsets_header = alloc.translate(to_ref(p.first));
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
-    if (ndx) {
-        p = get_two(offsets_header, ndx-1);
+    if (index) {
+        p = get_two(offsets_header, index-1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }
     else {
         begin = 0;
-        end   = to_size_t(Array::get(offsets_header, ndx));
+        end   = to_size_t(Array::get(offsets_header, index));
     }
     BinaryData bd = BinaryData(ArrayBlob::get(blob_header, begin), end - begin);
     return bd;
 }
 
 // FIXME: Not exception safe (leaks are possible).
-ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term,
+ref_type ArrayBinary::bptree_leaf_insert(size_t index, BinaryData value, bool add_zero_term,
                                          TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
+    if (leaf_size < index)
+        index = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value, add_zero_term); // Throws
+        insert(index, value, add_zero_term); // Throws
         return 0; // Leaf was not split
     }
 
     // Split leaf node
     ArrayBinary new_leaf(get_alloc());
     new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
+    if (index == leaf_size) {
         new_leaf.add(value, add_zero_term); // Throws
-        state.m_split_offset = ndx;
+        state.m_split_offset = index;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i)
+        for (size_t i = index; i != leaf_size; ++i)
             new_leaf.add(get(i)); // Throws
-        truncate(ndx); // Throws
+        truncate(index); // Throws
         add(value, add_zero_term); // Throws
-        state.m_split_offset = ndx + 1;
+        state.m_split_offset = index + 1;
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();

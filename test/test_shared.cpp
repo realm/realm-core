@@ -845,10 +845,10 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
 
 namespace {
 
-void add_int(Table& table, size_t col_ndx, int_fast64_t diff)
+void add_int(Table& table, size_t column_index, int_fast64_t diff)
 {
     for (size_t i = 0; i < table.size(); ++i) {
-        table.set_int(col_ndx, i, table.get_int(col_ndx, i) + diff);
+        table.set_int(column_index, i, table.get_int(column_index, i) + diff);
     }
 }
 
@@ -1159,7 +1159,7 @@ TEST(Shared_WritesSpecialOrder)
 
 namespace  {
 
-void writer_threads_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
+void writer_threads_thread(TestResults* test_results_ptr, std::string path, size_t row_index)
 {
     TestResults& test_results = *test_results_ptr;
 
@@ -1172,7 +1172,7 @@ void writer_threads_thread(TestResults* test_results_ptr, std::string path, size
             WriteTransaction wt(sg);
             wt.get_group().verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[row_ndx].first += 1;
+            t1[row_index].first += 1;
             // FIXME: For some reason this takes ages when running
             // inside valgrind, it is probably due to the "extreme
             // overallocation" bug. The 1000 transactions performed
@@ -1189,7 +1189,7 @@ void writer_threads_thread(TestResults* test_results_ptr, std::string path, size
             rt.get_group().verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
-            int64_t v = t[row_ndx].first;
+            int64_t v = t[row_index].first;
             int64_t expected = i+1;
             CHECK_EQUAL(expected, v);
         }
@@ -1788,7 +1788,7 @@ namespace  {
 
 #define multiprocess_increments 100
 
-void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
+void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t row_index)
 {
     TestResults& test_results = *test_results_ptr;
 
@@ -1803,7 +1803,7 @@ void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t
             WriteTransaction wt(sg);
             wt.get_group().verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[row_ndx].first += 1;
+            t1[row_index].first += 1;
             // FIXME: For some reason this takes ages when running
             // inside valgrind, it is probably due to the "extreme
             // overallocation" bug. The 1000 transactions performed
@@ -1819,7 +1819,7 @@ void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t
             rt.get_group().verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
-            int64_t v = t[row_ndx].first;
+            int64_t v = t[row_index].first;
             int64_t expected = i+1;
             CHECK_EQUAL(expected, v);
         }
@@ -2736,8 +2736,8 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
-        size_t row_ndx = max_node_size_squared - max_node_size - max_node_size/2;
-        table->insert_empty_row(row_ndx);
+        size_t row_index = max_node_size_squared - max_node_size - max_node_size/2;
+        table->insert_empty_row(row_index);
         wt.commit();
     }
 }

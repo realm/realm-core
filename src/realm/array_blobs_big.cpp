@@ -27,13 +27,13 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 }
 
 
-void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
+void ArrayBigBlobs::set(std::size_t index, BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT_3(ndx, <, size());
+    REALM_ASSERT_3(index, <, size());
     REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
     ArrayBlob blob(m_alloc);
-    ref_type ref = get_as_ref(ndx);
+    ref_type ref = get_as_ref(index);
 
     if (ref == 0 && value.is_null()) {
         return;
@@ -43,39 +43,39 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
         new_blob.create(); // Throws
         new_blob.add(value.data(), value.size(), add_zero_term); // Throws
         ref = new_blob.get_ref();
-        Array::set_as_ref(ndx, ref);
+        Array::set_as_ref(index, ref);
         return;
     }
     else if (ref != 0 && value.data() != nullptr) {
         blob.init_from_ref(ref);
-        blob.set_parent(this, ndx);
+        blob.set_parent(this, index);
         blob.clear(); // Throws
         blob.add(value.data(), value.size(), add_zero_term); // Throws
         return;
     }
     else if (ref != 0 && value.is_null()) {
         Array::destroy(ref, get_alloc()); // Shallow
-        Array::set(ndx, 0);
+        Array::set(index, 0);
         return;
     }
     REALM_ASSERT(false);
 }
 
 
-void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
+void ArrayBigBlobs::insert(size_t index, BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT_3(ndx, <=, size());
+    REALM_ASSERT_3(index, <=, size());
     REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
     if (value.is_null()) {
-        Array::insert(ndx, 0); // Throws
+        Array::insert(index, 0); // Throws
     }
     else {
         ArrayBlob new_blob(m_alloc);
         new_blob.create(); // Throws
         new_blob.add(value.data(), value.size(), add_zero_term); // Throws
 
-        Array::insert(ndx, int64_t(new_blob.get_ref())); // Throws
+        Array::insert(index, int64_t(new_blob.get_ref())); // Throws
     }
 }
 
@@ -87,11 +87,11 @@ size_t ArrayBigBlobs::count(BinaryData value, bool is_string,
 
     size_t begin_2 = begin;
     for (;;) {
-        size_t ndx = find_first(value, is_string, begin_2, end);
-        if (ndx == not_found)
+        size_t index = find_first(value, is_string, begin_2, end);
+        if (index == not_found)
             break;
         ++num_matches;
-        begin_2 = ndx + 1;
+        begin_2 = index + 1;
     }
 
     return num_matches;
@@ -141,42 +141,42 @@ void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_st
 {
     size_t begin_2 = begin;
     for (;;) {
-        size_t ndx = find_first(value, is_string, begin_2, end);
-        if (ndx == not_found)
+        size_t index = find_first(value, is_string, begin_2, end);
+        if (index == not_found)
             break;
-        result.add(add_offset + ndx); // Throws
-        begin_2 = ndx + 1;
+        result.add(add_offset + index); // Throws
+        begin_2 = index + 1;
     }
 }
 
 
-ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term,
+ref_type ArrayBigBlobs::bptree_leaf_insert(size_t index, BinaryData value, bool add_zero_term,
                                            TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
+    if (leaf_size < index)
+        index = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value, add_zero_term);
+        insert(index, value, add_zero_term);
         return 0; // Leaf was not split
     }
 
     // Split leaf node
     ArrayBigBlobs new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
+    if (index == leaf_size) {
         new_leaf.add(value, add_zero_term);
-        state.m_split_offset = ndx;
+        state.m_split_offset = index;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i) {
+        for (size_t i = index; i != leaf_size; ++i) {
             ref_type blob_ref = Array::get_as_ref(i);
             new_leaf.Array::add(blob_ref);
         }
-        Array::truncate(ndx); // Avoiding destruction of transferred blobs
+        Array::truncate(index); // Avoiding destruction of transferred blobs
         add(value, add_zero_term);
-        state.m_split_offset = ndx + 1;
+        state.m_split_offset = index + 1;
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();

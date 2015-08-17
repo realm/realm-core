@@ -28,122 +28,122 @@
 using namespace realm;
 
 
-void LinkListColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
+void LinkListColumn::insert_rows(size_t row_index, size_t num_rows_to_insert, size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(row_index <= prior_num_rows);
 
     // Update backlinks to the moved origin rows
-    size_t num_rows_moved = prior_num_rows - row_ndx;
+    size_t num_rows_moved = prior_num_rows - row_index;
     for (size_t i = num_rows_moved; i > 0; --i) {
-        size_t old_origin_row_ndx = row_ndx + i - 1;
-        size_t new_origin_row_ndx = row_ndx + num_rows_to_insert + i - 1;
-        if (ref_type ref = get_as_ref(old_origin_row_ndx)) {
+        size_t old_origin_row_index = row_index + i - 1;
+        size_t new_origin_row_index = row_index + num_rows_to_insert + i - 1;
+        if (ref_type ref = get_as_ref(old_origin_row_index)) {
             IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
-                size_t target_row_ndx = to_size_t(value);
-                m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                                   new_origin_row_ndx); // Throws
+                size_t target_row_index = to_size_t(value);
+                m_backlink_column->update_backlink(target_row_index, old_origin_row_index,
+                                                   new_origin_row_index); // Throws
             }
         }
     }
 
-    LinkColumnBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows); // Throws
+    LinkColumnBase::insert_rows(row_index, num_rows_to_insert, prior_num_rows); // Throws
 
     if (num_rows_moved > 0) {
-        const bool fix_ndx_in_parent = true;
-        adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_insert);
+        const bool fix_index_in_parent = true;
+        adj_insert_rows<fix_index_in_parent>(row_index, num_rows_to_insert);
     }
 }
 
 
-void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+void LinkListColumn::erase_rows(size_t row_index, size_t num_rows_to_erase, size_t prior_num_rows,
                                 bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
-    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+    REALM_ASSERT(row_index <= prior_num_rows - num_rows_to_erase);
 
     // Remove backlinks to the removed origin rows
     if (!broken_reciprocal_backlinks) {
         for (size_t i = 0; i < num_rows_to_erase; ++i) {
-            if (ref_type ref = get_as_ref(row_ndx+1)) {
+            if (ref_type ref = get_as_ref(row_index+1)) {
                 IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
-                    size_t target_row_ndx = to_size_t(link_list.get(j));
-                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+1);
+                    size_t target_row_index = to_size_t(link_list.get(j));
+                    m_backlink_column->remove_one_backlink(target_row_index, row_index+1);
                 }
             }
         }
     }
 
     // Update backlinks to the moved origin rows
-    size_t num_rows_moved = prior_num_rows - (row_ndx + num_rows_to_erase);
+    size_t num_rows_moved = prior_num_rows - (row_index + num_rows_to_erase);
     for (size_t i = 0; i < num_rows_moved; ++i) {
-        size_t old_origin_row_ndx = row_ndx + num_rows_to_erase + i;
-        size_t new_origin_row_ndx = row_ndx + i;
-        if (ref_type ref = get_as_ref(old_origin_row_ndx)) {
+        size_t old_origin_row_index = row_index + num_rows_to_erase + i;
+        size_t new_origin_row_index = row_index + i;
+        if (ref_type ref = get_as_ref(old_origin_row_index)) {
             IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
-                size_t target_row_ndx = to_size_t(value);
-                m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                                   new_origin_row_ndx); // Throws
+                size_t target_row_index = to_size_t(value);
+                m_backlink_column->update_backlink(target_row_index, old_origin_row_index,
+                                                   new_origin_row_index); // Throws
             }
         }
     }
 
-    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
+    LinkColumnBase::erase_rows(row_index, num_rows_to_erase, prior_num_rows,
                                broken_reciprocal_backlinks); // Throws
 
-    const bool fix_ndx_in_parent = true;
-    adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
+    const bool fix_index_in_parent = true;
+    adj_erase_rows<fix_index_in_parent>(row_index, num_rows_to_erase);
 }
 
 
-void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+void LinkListColumn::move_last_row_over(size_t row_index, size_t prior_num_rows,
                                         bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(row_index <= prior_num_rows);
 
     // Remove backlinks to the removed origin row
     if (!broken_reciprocal_backlinks) {
-        if (ref_type ref = get_as_ref(row_ndx)) {
+        if (ref_type ref = get_as_ref(row_index)) {
             IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
-                size_t target_row_ndx = to_size_t(link_list.get(i));
-                m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
+                size_t target_row_index = to_size_t(link_list.get(i));
+                m_backlink_column->remove_one_backlink(target_row_index, row_index);
             }
         }
     }
 
     // Update backlinks to the moved origin row
-    size_t last_row_ndx = prior_num_rows - 1;
-    if (row_ndx != last_row_ndx) {
-        if (ref_type ref = get_as_ref(last_row_ndx)) {
+    size_t last_row_index = prior_num_rows - 1;
+    if (row_index != last_row_index) {
+        if (ref_type ref = get_as_ref(last_row_index)) {
             IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
-                size_t target_row_ndx = to_size_t(link_list.get(i));
-                m_backlink_column->update_backlink(target_row_ndx, last_row_ndx, row_ndx);
+                size_t target_row_index = to_size_t(link_list.get(i));
+                m_backlink_column->update_backlink(target_row_index, last_row_index, row_index);
             }
         }
     }
 
     // Do the actual delete and move
     bool clear_value = false;
-    destroy_subtree(row_ndx, clear_value);
-    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
+    destroy_subtree(row_index, clear_value);
+    LinkColumnBase::move_last_row_over(row_index, prior_num_rows,
                                        broken_reciprocal_backlinks); // Throws
 
-    const bool fix_ndx_in_parent = true;
-    adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
+    const bool fix_index_in_parent = true;
+    adj_move_over<fix_index_in_parent>(last_row_index, row_index);
 }
 
 
@@ -165,48 +165,48 @@ void LinkListColumn::clear(size_t, bool broken_reciprocal_backlinks)
 }
 
 
-void LinkListColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
+void LinkListColumn::cascade_break_backlinks_to(size_t row_index, CascadeState& state)
 {
-    if (row_ndx == state.stop_on_link_list_row_ndx && this == state.stop_on_link_list_column)
+    if (row_index == state.stop_on_link_list_row_index && this == state.stop_on_link_list_column)
         return;
 
     // Avoid the construction of both a LinkView and a IntegerColumn instance,
     // since both would involve heap allocations.
-    ref_type ref = get_as_ref(row_ndx);
+    ref_type ref = get_as_ref(row_index);
     if (ref == 0)
         return;
     Array root(get_alloc());
     root.init_from_ref(ref);
 
     if (!root.is_inner_bptree_node()) {
-        cascade_break_backlinks_to__leaf(row_ndx, root, state); // Throws
+        cascade_break_backlinks_to__leaf(row_index, root, state); // Throws
         return;
     }
 
     Array leaf(get_alloc());
-    size_t link_ndx = 0;
+    size_t link_index = 0;
     size_t num_links = root.get_bptree_size();
-    while (link_ndx < num_links) {
-        std::pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
+    while (link_index < num_links) {
+        std::pair<MemRef, size_t> p = root.get_bptree_leaf(link_index);
         MemRef leaf_mem = p.first;
         leaf.init_from_mem(leaf_mem);
-        cascade_break_backlinks_to__leaf(row_ndx, leaf, state); // Throws
-        link_ndx += leaf.size();
+        cascade_break_backlinks_to__leaf(row_index, leaf, state); // Throws
+        link_index += leaf.size();
     }
 }
 
 
-void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf,
+void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_index, const Array& link_list_leaf,
                                                       CascadeState& state)
 {
-    size_t target_table_ndx = m_target_table->get_index_in_group();
+    size_t target_table_index = m_target_table->get_index_in_group();
 
     size_t num_links = link_list_leaf.size();
     for (size_t i = 0; i < num_links; ++i) {
-        size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
+        size_t target_row_index = to_size_t(link_list_leaf.get(i));
 
-        // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
-        m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
+        // Remove the reciprocal backlink at target_row_index that points to row_index
+        m_backlink_column->remove_one_backlink(target_row_index, row_index);
 
         if (m_weak_links)
             continue;
@@ -214,7 +214,7 @@ void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_ndx, const Arra
             continue;
 
         // Recurse on target row when appropriate
-        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+        check_cascade_break_backlinks_to(target_table_index, target_row_index, state); // Throws
     }
 }
 
@@ -243,14 +243,14 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
             continue;
         }
 
-        size_t link_ndx = 0;
+        size_t link_index = 0;
         size_t num_links = root.get_bptree_size();
-        while (link_ndx < num_links) {
-            std::pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
+        while (link_index < num_links) {
+            std::pair<MemRef, size_t> p = root.get_bptree_leaf(link_index);
             MemRef leaf_mem = p.first;
             leaf.init_from_mem(leaf_mem);
             cascade_break_backlinks_to_all_rows__leaf(leaf, state); // Throws
-            link_ndx += leaf.size();
+            link_index += leaf.size();
         }
     }
 }
@@ -259,14 +259,14 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
                                                                CascadeState& state)
 {
-    size_t target_table_ndx = m_target_table->get_index_in_group();
+    size_t target_table_index = m_target_table->get_index_in_group();
 
     size_t num_links = link_list_leaf.size();
     for (size_t i = 0; i < num_links; ++i) {
-        size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
+        size_t target_row_index = to_size_t(link_list_leaf.get(i));
 
         // Recurse on target row when appropriate
-        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+        check_cascade_break_backlinks_to(target_table_index, target_row_index, state); // Throws
     }
 }
 
@@ -284,55 +284,55 @@ bool LinkListColumn::compare_link_list(const LinkListColumn& c) const
 }
 
 
-void LinkListColumn::do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx)
+void LinkListColumn::do_nullify_link(std::size_t row_index, std::size_t old_target_row_index)
 {
-    LinkViewRef links = get(row_ndx);
-    links->do_nullify_link(old_target_row_ndx);
+    LinkViewRef links = get(row_index);
+    links->do_nullify_link(old_target_row_index);
 }
 
 
-void LinkListColumn::do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx)
+void LinkListColumn::do_update_link(size_t row_index, size_t old_target_row_index, size_t new_target_row_index)
 {
-    LinkViewRef links = get(row_ndx);
-    links->do_update_link(old_target_row_ndx, new_target_row_ndx);
+    LinkViewRef links = get(row_index);
+    links->do_update_link(old_target_row_index, new_target_row_index);
 }
 
 
-LinkView* LinkListColumn::get_ptr(size_t row_ndx) const
+LinkView* LinkListColumn::get_ptr(size_t row_index) const
 {
-    REALM_ASSERT_3(row_ndx, <, size());
+    REALM_ASSERT_3(row_index, <, size());
 
     // Check if we already have a linkview for this row
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i) {
-        if (i->m_row_ndx == row_ndx)
+        if (i->m_row_index == row_index)
             return i->m_list;
     }
 
     m_list_accessors.reserve(m_list_accessors.size() + 1); // Throws
     list_entry entry;
-    entry.m_row_ndx = row_ndx;
-    entry.m_list = new LinkView(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
+    entry.m_row_index = row_index;
+    entry.m_list = new LinkView(m_table, const_cast<LinkListColumn&>(*this), row_index); // Throws
     m_list_accessors.push_back(entry); // Not throwing due to space reservation
     return entry.m_list;
 }
 
 
-void LinkListColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
+void LinkListColumn::update_child_ref(size_t child_index, ref_type new_ref)
 {
-    LinkColumnBase::set(child_ndx, new_ref);
+    LinkColumnBase::set(child_index, new_ref);
 }
 
 
-ref_type LinkListColumn::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
+ref_type LinkListColumn::get_child_ref(size_t child_index) const REALM_NOEXCEPT
 {
-    return LinkColumnBase::get_as_ref(child_ndx);
+    return LinkColumnBase::get_as_ref(child_index);
 }
 
 
-void LinkListColumn::to_json_row(size_t row_ndx, std::ostream& out) const
+void LinkListColumn::to_json_row(size_t row_index, std::ostream& out) const
 {
-    LinkViewRef links1 = const_cast<LinkListColumn*>(this)->get(row_ndx);
+    LinkViewRef links1 = const_cast<LinkListColumn*>(this)->get(row_index);
     for (size_t t = 0; t < links1->size(); t++) {
         if (t > 0)
             out << ", ";
@@ -351,70 +351,70 @@ void LinkListColumn::discard_child_accessors() REALM_NOEXCEPT
 }
 
 
-void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+void LinkListColumn::refresh_accessor_tree(size_t column_index, const Spec& spec)
 {
-    LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
-    m_column_ndx = col_ndx;
+    LinkColumnBase::refresh_accessor_tree(column_index, spec); // Throws
+    m_column_index = column_index;
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i)
-        i->m_list->refresh_accessor_tree(i->m_row_ndx);
+        i->m_list->refresh_accessor_tree(i->m_row_index);
 }
 
 
-void LinkListColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_insert_rows(size_t row_index, size_t num_rows_inserted) REALM_NOEXCEPT
 {
-    LinkColumnBase::adj_acc_insert_rows(row_ndx, num_rows_inserted);
+    LinkColumnBase::adj_acc_insert_rows(row_index, num_rows_inserted);
 
-    const bool fix_ndx_in_parent = false;
-    adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows_inserted);
+    const bool fix_index_in_parent = false;
+    adj_insert_rows<fix_index_in_parent>(row_index, num_rows_inserted);
 }
 
 
-void LinkListColumn::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_erase_row(size_t row_index) REALM_NOEXCEPT
 {
-    LinkColumnBase::adj_acc_erase_row(row_ndx);
+    LinkColumnBase::adj_acc_erase_row(row_index);
 
-    const bool fix_ndx_in_parent = false;
+    const bool fix_index_in_parent = false;
     size_t num_rows_erased = 1;
-    adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_erased);
+    adj_erase_rows<fix_index_in_parent>(row_index, num_rows_erased);
 }
 
 
-void LinkListColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_move_over(size_t from_row_index, size_t to_row_index) REALM_NOEXCEPT
 {
-    LinkColumnBase::adj_acc_move_over(from_row_ndx, to_row_ndx);
+    LinkColumnBase::adj_acc_move_over(from_row_index, to_row_index);
 
-    const bool fix_ndx_in_parent = false;
-    adj_move_over<fix_ndx_in_parent>(from_row_ndx, to_row_ndx);
+    const bool fix_index_in_parent = false;
+    adj_move_over<fix_index_in_parent>(from_row_index, to_row_index);
 }
 
 
-template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
+template<bool fix_index_in_parent>
+void LinkListColumn::adj_insert_rows(size_t row_index, size_t num_rows_inserted) REALM_NOEXCEPT
 {
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i) {
-        if (i->m_row_ndx >= row_ndx) {
-            i->m_row_ndx += num_rows_inserted;
-            if (fix_ndx_in_parent)
-                i->m_list->set_origin_row_index(i->m_row_ndx);
+        if (i->m_row_index >= row_index) {
+            i->m_row_index += num_rows_inserted;
+            if (fix_index_in_parent)
+                i->m_list->set_origin_row_index(i->m_row_index);
         }
     }
 }
 
 
-template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT
+template<bool fix_index_in_parent>
+void LinkListColumn::adj_erase_rows(size_t row_index, size_t num_rows_erased) REALM_NOEXCEPT
 {
     auto end = m_list_accessors.end();
     auto i = m_list_accessors.begin();
     while (i != end) {
-        if (i->m_row_ndx >= row_ndx + num_rows_erased) {
-            i->m_row_ndx -= num_rows_erased;
-            if (fix_ndx_in_parent)
-                i->m_list->set_origin_row_index(i->m_row_ndx);
+        if (i->m_row_index >= row_index + num_rows_erased) {
+            i->m_row_index -= num_rows_erased;
+            if (fix_index_in_parent)
+                i->m_list->set_origin_row_index(i->m_row_index);
         }
-        else if (i->m_row_ndx >= row_ndx) {
+        else if (i->m_row_index >= row_index) {
             // Must hold a counted reference while detaching
             LinkViewRef list(i->m_list);
             list->detach();
@@ -429,13 +429,13 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REAL
 }
 
 
-template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
+template<bool fix_index_in_parent>
+void LinkListColumn::adj_move_over(size_t from_row_index, size_t to_row_index) REALM_NOEXCEPT
 {
     size_t i = 0, n = m_list_accessors.size();
     while (i < n) {
         list_entry& e = m_list_accessors[i];
-        if (REALM_UNLIKELY(e.m_row_ndx == to_row_ndx)) {
+        if (REALM_UNLIKELY(e.m_row_index == to_row_index)) {
             // Must hold a counted reference while detaching
             LinkViewRef list(e.m_list);
             list->detach();
@@ -445,10 +445,10 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM
             m_list_accessors.pop_back();
         }
         else {
-            if (REALM_UNLIKELY(e.m_row_ndx == from_row_ndx)) {
-                e.m_row_ndx = to_row_ndx;
-                if (fix_ndx_in_parent)
-                    e.m_list->set_origin_row_index(to_row_ndx);
+            if (REALM_UNLIKELY(e.m_row_index == from_row_index)) {
+                e.m_row_index = to_row_index;
+                if (fix_index_in_parent)
+                    e.m_list->set_origin_row_index(to_row_index);
             }
             ++i;
         }
@@ -501,18 +501,18 @@ void LinkListColumn::verify() const
 }
 
 
-void LinkListColumn::verify(const Table& table, size_t col_ndx) const
+void LinkListColumn::verify(const Table& table, size_t column_index) const
 {
-    LinkColumnBase::verify(table, col_ndx);
+    LinkColumnBase::verify(table, column_index);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
     m_backlink_column->get_backlinks(pairs);
 
     // For each link list, verify the accessor, then check that the contents of
     // the list is in agreement with the corresponding backlinks. A forward link
-    // (origin_row_ndx -> target_row_ndx) with multiplicity N must exists if,
-    // and only if there exists a backward link (target_row_ndx ->
-    // origin_row_ndx) with multiplicity N.
+    // (origin_row_index -> target_row_index) with multiplicity N must exists if,
+    // and only if there exists a backward link (target_row_index ->
+    // origin_row_index) with multiplicity N.
     size_t backlinks_seen = 0;
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
@@ -524,10 +524,10 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
             links_1.insert(link_list->get(j).get_index());
         typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
         BacklinkColumn::VerifyPair search_value;
-        search_value.origin_row_ndx = i;
+        search_value.origin_row_index = i;
         std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         for (iter j = range.first; j != range.second; ++j)
-            links_2.insert(j->target_row_ndx);
+            links_2.insert(j->target_row_index);
         REALM_ASSERT(links_1 == links_2);
         backlinks_seen += links_2.size();
     }
@@ -537,9 +537,9 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 }
 
 
-std::pair<ref_type, size_t> LinkListColumn::get_to_dot_parent(size_t ndx_in_parent) const
+std::pair<ref_type, size_t> LinkListColumn::get_to_dot_parent(size_t index_in_parent) const
 {
-    std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
+    std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(index_in_parent);
     return std::make_pair(p.first.m_ref, p.second);
 }
 

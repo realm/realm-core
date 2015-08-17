@@ -8,8 +8,8 @@ void BpTreeBase::replace_root(std::unique_ptr<Array> leaf)
     if (m_root) {
         // Maintain parent.
         ArrayParent* parent = m_root->get_parent();
-        std::size_t ndx_in_parent = m_root->get_ndx_in_parent();
-        leaf->set_parent(parent, ndx_in_parent);
+        std::size_t index_in_parent = m_root->get_index_in_parent();
+        leaf->set_parent(parent, index_in_parent);
         leaf->update_parent(); // Throws
     }
     m_root = std::move(leaf);
@@ -28,7 +28,7 @@ void BpTreeBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     Allocator& alloc = get_alloc();
     std::unique_ptr<Array> new_root(new Array(alloc)); // Throws
     new_root->create(Array::type_InnerBptreeNode); // Throws
-    new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
+    new_root->set_parent(orig_root->get_parent(), orig_root->get_index_in_parent());
     new_root->update_parent(); // Throws
     bool compact_form =
         is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);

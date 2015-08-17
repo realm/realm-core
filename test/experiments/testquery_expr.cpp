@@ -15,7 +15,7 @@ struct MySubtableSpec: realm::SpecBase {
         ColNames(Init i): alpha(i), beta(i) {}
     };
 
-    static const char* const* dyn_col_names()
+    static const char* const* dyn_column_names()
     {
         static const char* l[] = { "alpha", "beta" };
         return l;
@@ -39,7 +39,7 @@ struct MyTableSpec: realm::SpecBase {
         ColNames(Init i): foo(i), bar(i), baz(i) {}
     };
 
-    static const char* const* dyn_col_names()
+    static const char* const* dyn_column_names()
     {
         static const char* l[] = { "foo", "bar", "baz" };
         return l;

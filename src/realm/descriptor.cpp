@@ -6,22 +6,22 @@ using namespace realm;
 using namespace realm::util;
 
 
-DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
+DescriptorRef Descriptor::get_subdescriptor(size_t column_index)
 {
     DescriptorRef subdesc;
 
     // Reuse the the descriptor accessor if it is already in the map
-    if (Descriptor* d = get_subdesc_accessor(column_ndx)) {
+    if (Descriptor* d = get_subdesc_accessor(column_index)) {
         subdesc.reset(d);
         goto out;
     }
 
     // Create a new descriptor accessor
     {
-        SubspecRef subspec_ref = m_spec->get_subtable_spec(column_ndx);
+        SubspecRef subspec_ref = m_spec->get_subtable_spec(column_index);
         std::unique_ptr<Spec> subspec(new Spec(subspec_ref)); // Throws
         subdesc.reset(new Descriptor); // Throws
-        m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc.get())); // Throws
+        m_subdesc_map.push_back(subdesc_entry(column_index, subdesc.get())); // Throws
         subdesc->attach(m_root_table.get(), this, subspec.get());
         subspec.release();
     }
@@ -31,13 +31,13 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 }
 
 
-size_t Descriptor::get_num_unique_values(size_t column_ndx) const
+size_t Descriptor::get_num_unique_values(size_t column_index) const
 {
     REALM_ASSERT(is_attached());
-    ColumnType col_type = m_spec->get_column_type(column_ndx);
-    if (col_type != col_type_StringEnum)
+    ColumnType column_type = m_spec->get_column_type(column_index);
+    if (column_type != column_type_StringEnum)
         return 0;
-    ref_type ref = m_spec->get_enumkeys_ref(column_ndx);
+    ref_type ref = m_spec->get_enumkeys_ref(column_index);
     StringColumn col(m_spec->get_alloc(), ref); // Throws
     return col.size();
 }
@@ -110,50 +110,50 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const REALM_
         if (REALM_UNLIKELY(begin_2 == begin))
             return 0; // Not enough space in path buffer
         const Descriptor* parent = desc->m_parent.get();
-        size_t column_ndx = not_found;
+        size_t column_index = not_found;
         typedef subdesc_map::iterator iter;
         iter end = parent->m_subdesc_map.end();
         for (iter i = parent->m_subdesc_map.begin(); i != end; ++i) {
             if (i->m_subdesc == desc) {
-                column_ndx = i->m_column_ndx;
+                column_index = i->m_column_index;
                 break;
             }
         }
-        REALM_ASSERT_3(column_ndx, !=, not_found);
-        *--begin_2 = column_ndx;
+        REALM_ASSERT_3(column_index, !=, not_found);
+        *--begin_2 = column_index;
         desc = parent;
     }
 }
 
 
-Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) REALM_NOEXCEPT
+Descriptor* Descriptor::get_subdesc_accessor(size_t column_index) REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
 
     typedef subdesc_map::iterator iter;
     iter end = m_subdesc_map.end();
     for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx == column_ndx)
+        if (i->m_column_index == column_index)
             return i->m_subdesc;
     }
     return 0;
 }
 
 
-void Descriptor::adj_insert_column(size_t col_ndx) REALM_NOEXCEPT
+void Descriptor::adj_insert_column(size_t column_index) REALM_NOEXCEPT
 {
     // Adjust the column indexes of subdescriptor accessors at higher
     // column indexes.
     typedef subdesc_map::iterator iter;
     iter end = m_subdesc_map.end();
     for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx >= col_ndx)
-            ++i->m_column_ndx;
+        if (i->m_column_index >= column_index)
+            ++i->m_column_index;
     }
 }
 
 
-void Descriptor::adj_erase_column(size_t col_ndx) REALM_NOEXCEPT
+void Descriptor::adj_erase_column(size_t column_index) REALM_NOEXCEPT
 {
     // If it exists, remove and detach the subdescriptor accessor
     // associated with the removed column. Also adjust the column
@@ -162,14 +162,14 @@ void Descriptor::adj_erase_column(size_t col_ndx) REALM_NOEXCEPT
     iter end = m_subdesc_map.end();
     iter erase = end;
     for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx == col_ndx) {
+        if (i->m_column_index == column_index) {
             // Must hold a reliable reference count while detaching
             DescriptorRef desc(i->m_subdesc);
             desc->detach();
             erase = i;
         }
-        else if (i->m_column_ndx > col_ndx) {
-            --i->m_column_ndx; // Account for the removed column
+        else if (i->m_column_index > column_index) {
+            --i->m_column_index; // Account for the removed column
         }
     }
     if (erase != end)

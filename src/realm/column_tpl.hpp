@@ -89,7 +89,7 @@ struct FindInLeaf<Column<int64_t, Nullable>> {
 
 template <class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
-            std::size_t limit, std::size_t* return_ndx)
+            std::size_t limit, std::size_t* return_index)
 {
     if (end == npos)
         end = column.size();
@@ -107,8 +107,8 @@ R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
         s = sg.m_leaf_start + end2;
     }
 
-    if (return_ndx)
-        *return_ndx = state.m_minmax_index;
+    if (return_index)
+        *return_index = state.m_minmax_index;
 
     return state.m_state;
 }

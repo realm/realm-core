@@ -229,15 +229,15 @@ CATEGORIES:
   - g_typed_table_operator_brackets_const:
       NAMES    : ["operator[]", "operator[]"]
       SIGNATURE: |
-                 RowAccessor      operator[](size_t row_ndx)
-                 ConstRowAccessor operator[](size_t row_ndx) const
+                 RowAccessor      operator[](size_t row_index)
+                 ConstRowAccessor operator[](size_t row_index) const
       SUMMARY  : &g_typed_table_operator_brackets_summary
                  Access rows.
       DESCR    : &g_typed_table_operator_brackets_descr
                  Access rows.
 #TODO: Describe what you can with the operator
       PARAMS:
-      - NAME   : row_ndx
+      - NAME   : row_index
         TYPES  : size_t
         DESCR  : &g_typed_table_operator_brackets_parm1_descr
                  Row index.
@@ -321,7 +321,7 @@ CATEGORIES:
 
   - g_typed_table_insert:
       NAME     : insert
-      SIGNATURE: RowAccesor insert(size_t row_ndx, values, ...)
+      SIGNATURE: RowAccesor insert(size_t row_index, values, ...)
       SUMMARY  : &g_typed_table_insert_summary
                  Insert a new row at the specified position.
       DESCR    : &g_typed_table_insert_descr
@@ -331,7 +331,7 @@ CATEGORIES:
                  The types of the parameters must match the
                  types of the columns in the table definition.
       PARAMS:
-      - NAME   : row_ndx
+      - NAME   : row_index
         TYPES  : size_t
         DESCR  : &g_typed_table_insert_position_descr
                  Insert position.
@@ -353,9 +353,9 @@ CATEGORIES:
                  The values of the cells in the new row will be assigned default
                  value of the type of the cell/column.
       DESCR    : Insert empty rows.
-      SIGNATURE: void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
+      SIGNATURE: void insert_empty_row(size_t row_index, size_t num_rows = 1)
       PARAMS:
-      - NAME   : row_ndx
+      - NAME   : row_index
         TYPES  : size_t
         DESCR  : *g_typed_table_insert_position_descr
       - NAME   : num_rows
@@ -371,9 +371,9 @@ CATEGORIES:
                  Delete row.
       DESCR    : &g_typed_table_remove_row_descr
                  This method deletes a row at a given position.
-      SIGNATURE: void remove(size_t row_ndx);
+      SIGNATURE: void remove(size_t row_index);
       PARAMS:
-      - NAME   : row_ndx
+      - NAME   : row_index
         TYPES  : size_t
         DESCR  : &g_typed_table_delete_position_descr
                  Position of row to delete.

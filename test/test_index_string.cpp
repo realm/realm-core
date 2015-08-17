@@ -107,9 +107,9 @@ TEST_TYPES(StringIndex_IsEmpty, non_nullable, nullable)
     StringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
-    CHECK(ndx.is_empty());
+    CHECK(index.is_empty());
 
     // Clean up
     col.destroy();
@@ -132,14 +132,14 @@ TEST_TYPES(StringIndex_BuildIndex, non_nullable, nullable)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
-    const size_t r1 = ndx.find_first(s1);
-    const size_t r2 = ndx.find_first(s2);
-    const size_t r3 = ndx.find_first(s3);
-    const size_t r4 = ndx.find_first(s4);
-    const size_t r5 = ndx.find_first(s5);
-    const size_t r6 = ndx.find_first(s6);
+    const size_t r1 = index.find_first(s1);
+    const size_t r2 = index.find_first(s2);
+    const size_t r3 = index.find_first(s3);
+    const size_t r4 = index.find_first(s4);
+    const size_t r5 = index.find_first(s5);
+    const size_t r6 = index.find_first(s6);
 
     CHECK_EQUAL(0, r1);
     CHECK_EQUAL(1, r2);
@@ -169,7 +169,7 @@ TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
     // Delete all entries
     // (reverse order to avoid ref updates)
@@ -181,9 +181,9 @@ TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
     col.erase(1);
     col.erase(0);
 #ifdef REALM_DEBUG
-    CHECK(ndx.is_empty());
+    CHECK(index.is_empty());
 #else
-    static_cast<void>(ndx);
+    static_cast<void>(index);
 #endif
 
     // Re-insert values
@@ -205,9 +205,9 @@ TEST_TYPES(StringIndex_DeleteAll, non_nullable, nullable)
     col.erase(0);
     col.erase(0);
 #ifdef REALM_DEBUG
-    CHECK(ndx.is_empty());
+    CHECK(index.is_empty());
 #else
-    static_cast<void>(ndx);
+    static_cast<void>(index);
 #endif
 
     // Clean up
@@ -229,7 +229,7 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
     // Delete first item (in index)
     col.erase(1);
@@ -237,7 +237,7 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     CHECK_EQUAL(0, col.find_first(s1));
     CHECK_EQUAL(1, col.find_first(s3));
     CHECK_EQUAL(2, col.find_first(s4));
-    CHECK_EQUAL(not_found, ndx.find_first(s2));
+    CHECK_EQUAL(not_found, index.find_first(s2));
 
     // Delete last item (in index)
     col.erase(2);
@@ -259,7 +259,7 @@ TEST_TYPES(StringIndex_Delete, non_nullable, nullable)
     col.erase(0);
     col.erase(0);
 #ifdef REALM_DEBUG
-    CHECK(ndx.is_empty());
+    CHECK(index.is_empty());
 #endif
 
     // Clean up
@@ -347,14 +347,14 @@ TEST_TYPES(StringIndex_ClearEmpty, non_nullable, nullable)
     StringColumn col(Allocator::get_default(), ref, nullable);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
     // Clear to remove all entries
     col.clear();
 #ifdef REALM_DEBUG
-    CHECK(ndx.is_empty());
+    CHECK(index.is_empty());
 #else
-    static_cast<void>(ndx);
+    static_cast<void>(index);
 #endif
 
     // Clean up
@@ -378,14 +378,14 @@ TEST_TYPES(StringIndex_Clear, non_nullable, nullable)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
     // Clear to remove all entries
     col.clear();
 #ifdef REALM_DEBUG
-    CHECK(ndx.is_empty());
+    CHECK(index.is_empty());
 #else
-    static_cast<void>(ndx);
+    static_cast<void>(index);
 #endif
 
     // Re-insert values
@@ -397,12 +397,12 @@ TEST_TYPES(StringIndex_Clear, non_nullable, nullable)
     col.add(s5); // common prefix
     col.add(s6); // common prefix
 
-    const size_t r1 = ndx.find_first(s1);
-    const size_t r2 = ndx.find_first(s2);
-    const size_t r3 = ndx.find_first(s3);
-    const size_t r4 = ndx.find_first(s4);
-    const size_t r5 = ndx.find_first(s5);
-    const size_t r6 = ndx.find_first(s6);
+    const size_t r1 = index.find_first(s1);
+    const size_t r2 = index.find_first(s2);
+    const size_t r3 = index.find_first(s3);
+    const size_t r4 = index.find_first(s4);
+    const size_t r5 = index.find_first(s5);
+    const size_t r6 = index.find_first(s6);
 
     CHECK_EQUAL(0, r1);
     CHECK_EQUAL(1, r2);
@@ -440,7 +440,7 @@ TEST_TYPES(StringIndex_Insert, non_nullable, nullable)
     CHECK_EQUAL(2, col.find_first(s2));
     CHECK_EQUAL(3, col.find_first(s3));
     CHECK_EQUAL(4, col.find_first(s4));
-    //CHECK_EQUAL(5, ndx.find_first(s1)); // duplicate
+    //CHECK_EQUAL(5, index.find_first(s1)); // duplicate
 
     // Append item in end of column
     col.insert(6, s6);
@@ -576,13 +576,13 @@ TEST_TYPES(StringIndex_Distinct, non_nullable, nullable)
     col.add(s4);
 
     // Create a new index on column
-    StringIndex& ndx = *col.create_search_index();
+    StringIndex& index = *col.create_search_index();
 
     // Get view of unique values
     // (sorted in alphabetical order, each ref to first match)
     ref_type results_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn results(Allocator::get_default(), results_ref);
-    ndx.distinct(results);
+    index.distinct(results);
 
     CHECK_EQUAL(4, results.size());
     CHECK_EQUAL(1, results.get(0)); // s2 = Brian
@@ -615,17 +615,17 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
     col.add(s4);
 
     // Create a new index on column
-    StringIndex& ndx = *col.create_search_index();
+    StringIndex& index = *col.create_search_index();
 
     size_t ref_2 = not_found;
-    FindRes res1 = ndx.find_all(StringData("not there"), ref_2);
+    FindRes res1 = index.find_all(StringData("not there"), ref_2);
     CHECK_EQUAL(FindRes_not_found, res1);
 
-    FindRes res2 = ndx.find_all(s1, ref_2);
+    FindRes res2 = index.find_all(s1, ref_2);
     CHECK_EQUAL(FindRes_single, res2);
     CHECK_EQUAL(0, ref_2);
 
-    FindRes res3 = ndx.find_all(s4, ref_2);
+    FindRes res3 = index.find_all(s4, ref_2);
     CHECK_EQUAL(FindRes_column, res3);
     const IntegerColumn results(Allocator::get_default(), ref_type(ref_2));
     CHECK_EQUAL(4, results.size());
@@ -650,11 +650,11 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *col.get_search_index();
+    StringIndex& index = *col.get_search_index();
     size_t results = not_found;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        FindRes res = ndx.find_all(ints[t], results);
+        FindRes res = index.find_all(ints[t], results);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
@@ -691,10 +691,10 @@ TEST(StringIndex_Count_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *col.get_search_index();
+    StringIndex& index = *col.get_search_index();
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        size_t count = ndx.count(ints[t]);
+        size_t count = index.count(ints[t]);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
@@ -722,12 +722,12 @@ TEST(StringIndex_Distinct_Int)
     col.create_search_index();
 
 
-    StringIndex& ndx = *col.get_search_index();
+    StringIndex& index = *col.get_search_index();
 
     ref_type results_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn results(Allocator::get_default(), results_ref);
 
-    ndx.distinct(results);
+    index.distinct(results);
 
     std::set<int64_t> s;
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
@@ -754,25 +754,25 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *col.get_search_index();
+    StringIndex& index = *col.get_search_index();
 
-    size_t f = ndx.find_first(int64_t(2));
+    size_t f = index.find_first(int64_t(2));
     CHECK_EQUAL(1, f);
 
     col.set(1, 5);
 
-    f = ndx.find_first(int64_t(2));
+    f = index.find_first(int64_t(2));
     CHECK_EQUAL(3, f);
 
     col.erase(1);
 
-    f = ndx.find_first(int64_t(2));
+    f = index.find_first(int64_t(2));
     CHECK_EQUAL(2, f);
 
     col.insert(1, 5);
     CHECK_EQUAL(col.get(1), 5);
 
-    f = ndx.find_first(int64_t(2));
+    f = index.find_first(int64_t(2));
     CHECK_EQUAL(3, f);
 
     col.add(7);
@@ -780,15 +780,15 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
     col.set(4, 10);
     CHECK_EQUAL(col.get(4), 10);
 
-    f = ndx.find_first(int64_t(10));
+    f = index.find_first(int64_t(10));
     CHECK_EQUAL(col.size() - 1, f);
 
     col.add(9);
-    f = ndx.find_first(int64_t(9));
+    f = index.find_first(int64_t(9));
     CHECK_EQUAL(col.size() - 1, f);
 
     col.clear();
-    f = ndx.find_first(int64_t(2));
+    f = index.find_first(int64_t(2));
     CHECK_EQUAL(not_found, f);
 
     // Clean up
@@ -849,7 +849,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     // String index
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, nullable);
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
     const size_t MAX_LENGTH = 16; // Test medium
     char tmp[MAX_LENGTH]; // this is a bit of a hack, that relies on the string being copied in column.add()
@@ -869,7 +869,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
             const size_t combinations = 1 << l;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData needle = create_string_with_nuls(i, l, tmp, random);
-                CHECK_EQUAL(ndx.find_first(needle), expected_index);
+                CHECK_EQUAL(index.find_first(needle), expected_index);
                 CHECK(strncmp(col.get(expected_index).data(), needle.data(), l) == 0);
                 CHECK_EQUAL(col.get(expected_index).size(), needle.size());
                 expected_index++;
@@ -889,7 +889,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     // String index
     ref_type ref2 = StringColumn::create(Allocator::get_default());
     StringColumn col2(Allocator::get_default(), ref2, nullable);
-    const StringIndex& ndx2 = *col2.create_search_index();
+    const StringIndex& index2 = *col2.create_search_index();
 
 #if REALM_NULL_STRINGS == 1
     // FIXME: re-enable once embedded nuls work
@@ -899,15 +899,15 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     col2.add(StringData("\0\1", 2));
     col2.add(StringData("\1\0", 2));
 
-    CHECK_EQUAL(ndx2.find_first(StringData("\0", 1)), 0);
-    CHECK_EQUAL(ndx2.find_first(StringData("\1", 1)), 1);
-    CHECK_EQUAL(ndx2.find_first(StringData("\2", 1)), not_found);
-    CHECK_EQUAL(ndx2.find_first(StringData("\0\0", 2)), 2);
-    CHECK_EQUAL(ndx2.find_first(StringData("\0\1", 2)), 3);
-    CHECK_EQUAL(ndx2.find_first(StringData("\1\0", 2)), 4);
-    CHECK_EQUAL(ndx2.find_first(StringData("\1\0\0", 3)), not_found);
+    CHECK_EQUAL(index2.find_first(StringData("\0", 1)), 0);
+    CHECK_EQUAL(index2.find_first(StringData("\1", 1)), 1);
+    CHECK_EQUAL(index2.find_first(StringData("\2", 1)), not_found);
+    CHECK_EQUAL(index2.find_first(StringData("\0\0", 2)), 2);
+    CHECK_EQUAL(index2.find_first(StringData("\0\1", 2)), 3);
+    CHECK_EQUAL(index2.find_first(StringData("\1\0", 2)), 4);
+    CHECK_EQUAL(index2.find_first(StringData("\1\0\0", 3)), not_found);
 #else
-    static_cast<void>(ndx2);
+    static_cast<void>(index2);
     CHECK_THROW_ANY(col2.add(StringData("\0", 1)));
 #endif
 
@@ -917,8 +917,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     IntegerColumn col(Allocator::get_default(), ref);
     col.create_search_index();
     col.add(1ULL << 40);
-    StringIndex& ndx = *col.get_search_index();
-    size_t f = ndx.find_first(v);
+    StringIndex& index = *col.get_search_index();
+    size_t f = index.find_first(v);
     CHECK_EQUAL(f, not_found);
 
     col.destroy();
@@ -935,9 +935,9 @@ TEST(StringIndex_Null)
     col.add("");
     col.add(realm::null());
 
-    const StringIndex& ndx = *col.create_search_index();
+    const StringIndex& index = *col.create_search_index();
 
-    const size_t r1 = ndx.find_first(realm::null());
+    const size_t r1 = index.find_first(realm::null());
     CHECK_EQUAL(r1, 1);
 
     col.destroy();

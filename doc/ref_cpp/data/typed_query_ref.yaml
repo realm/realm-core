@@ -478,9 +478,9 @@ CATEGORIES :
                  Calculate sum.
       CONST    : true
       SIGNATURE: |
-                 int64_t sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 int64_t sum(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double sum_float(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double sum_double(size_t column_index, size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
         DESCR  : &g_typed_query_number_of_rows_descr

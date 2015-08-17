@@ -67,7 +67,7 @@ const char* DataTypeToText(DataType t)
     }
 }
 
-void print_col_names(Table& table)
+void print_column_names(Table& table)
 {
     std::cout << "\n";
     for(size_t t = 0; t < table.get_column_count(); t++) {
@@ -638,7 +638,7 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *sch
         table.add_column(scheme[t], StringData(header[t]).data());
 
     if(!Quiet)
-        print_col_names(table);
+        print_column_names(table);
 
     size_t imported_rows = 0;
 

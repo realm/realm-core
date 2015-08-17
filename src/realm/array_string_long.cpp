@@ -40,66 +40,66 @@ void ArrayStringLong::add(StringData value)
         m_nulls.add(!value.is_null());
 }
 
-void ArrayStringLong::set(size_t ndx, StringData value)
+void ArrayStringLong::set(size_t index, StringData value)
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(index, <, m_offsets.size());
 
-    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    size_t end   = to_size_t(m_offsets.get(ndx));
+    size_t begin = 0 < index ? to_size_t(m_offsets.get(index-1)) : 0;
+    size_t end   = to_size_t(m_offsets.get(index));
     bool add_zero_term = true;
     m_blob.replace(begin, end, value.data(), value.size(), add_zero_term);
 
     size_t new_end = begin + value.size() + 1;
     int64_t diff =  int64_t(new_end) - int64_t(end);
-    m_offsets.adjust(ndx, m_offsets.size(), diff);
+    m_offsets.adjust(index, m_offsets.size(), diff);
     if (m_nullable)
-        m_nulls.set(ndx, !value.is_null());
+        m_nulls.set(index, !value.is_null());
 }
 
-void ArrayStringLong::insert(size_t ndx, StringData value)
+void ArrayStringLong::insert(size_t index, StringData value)
 {
-    REALM_ASSERT_3(ndx, <=, m_offsets.size());
+    REALM_ASSERT_3(index, <=, m_offsets.size());
 
-    size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = 0 < index ? to_size_t(m_offsets.get(index-1)) : 0;
     bool add_zero_term = true;
 
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
-    m_offsets.insert(ndx, pos + value.size() + 1);
-    m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
+    m_offsets.insert(index, pos + value.size() + 1);
+    m_offsets.adjust(index+1, m_offsets.size(), value.size() + 1);
     if (m_nullable)
-        m_nulls.insert(ndx, !value.is_null());
+        m_nulls.insert(index, !value.is_null());
 }
 
-void ArrayStringLong::erase(size_t ndx)
+void ArrayStringLong::erase(size_t index)
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(index, <, m_offsets.size());
 
-    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    size_t end   = to_size_t(m_offsets.get(ndx));
+    size_t begin = 0 < index ? to_size_t(m_offsets.get(index-1)) : 0;
+    size_t end   = to_size_t(m_offsets.get(index));
 
     m_blob.erase(begin, end);
-    m_offsets.erase(ndx);
-    m_offsets.adjust(ndx, m_offsets.size(), int64_t(begin) - int64_t(end));
+    m_offsets.erase(index);
+    m_offsets.adjust(index, m_offsets.size(), int64_t(begin) - int64_t(end));
     if (m_nullable)
-        m_nulls.erase(ndx);
+        m_nulls.erase(index);
 }
 
-bool ArrayStringLong::is_null(size_t ndx) const
+bool ArrayStringLong::is_null(size_t index) const
 {
     if (m_nullable) {
-        REALM_ASSERT_3(ndx, <, m_nulls.size());
-        return !m_nulls.get(ndx);
+        REALM_ASSERT_3(index, <, m_nulls.size());
+        return !m_nulls.get(index);
     }
     else {
         return false;
     }
 }
 
-void ArrayStringLong::set_null(size_t ndx)
+void ArrayStringLong::set_null(size_t index)
 {
     if (m_nullable) {
-        REALM_ASSERT_3(ndx, <, m_nulls.size());
-        m_nulls.set(ndx, false);
+        REALM_ASSERT_3(index, <, m_nulls.size());
+        m_nulls.set(index, false);
     }
 }
 
@@ -110,11 +110,11 @@ size_t ArrayStringLong::count(StringData value, size_t begin,
 
     size_t begin_2 = begin;
     for (;;) {
-        size_t ndx = find_first(value, begin_2, end);
-        if (ndx == not_found)
+        size_t index = find_first(value, begin_2, end);
+        if (index == not_found)
             break;
         ++num_matches;
-        begin_2 = ndx + 1;
+        begin_2 = index + 1;
     }
 
     return num_matches;
@@ -143,16 +143,16 @@ void ArrayStringLong::find_all(IntegerColumn& result, StringData value, size_t a
 {
     size_t begin_2 = begin;
     for (;;) {
-        size_t ndx = find_first(value, begin_2, end);
-        if (ndx == not_found)
+        size_t index = find_first(value, begin_2, end);
+        if (index == not_found)
             break;
-        result.add(add_offset + ndx); // Throws
-        begin_2 = ndx + 1;
+        result.add(add_offset + index); // Throws
+        begin_2 = index + 1;
     }
 }
 
 
-StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc, bool nullable) REALM_NOEXCEPT
+StringData ArrayStringLong::get(const char* header, size_t index, Allocator& alloc, bool nullable) REALM_NOEXCEPT
 {
     ref_type offsets_ref;
     ref_type blob_ref;
@@ -161,7 +161,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     if (nullable) {
         get_three(header, 0, offsets_ref, blob_ref, nulls_ref);
         const char* nulls_header = alloc.translate(nulls_ref);
-        if (Array::get(nulls_header, ndx) == 0)
+        if (Array::get(nulls_header, index) == 0)
             return realm::null();
     }
     else {
@@ -172,8 +172,8 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
 
     const char* offsets_header = alloc.translate(offsets_ref);
     size_t begin, end;
-    if (0 < ndx) {
-        std::pair<int64_t, int64_t> p = get_two(offsets_header, ndx - 1);
+    if (0 < index) {
+        std::pair<int64_t, int64_t> p = get_two(offsets_header, index - 1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }
@@ -191,30 +191,30 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
 
 
 // FIXME: Not exception safe (leaks are possible).
-ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
+ref_type ArrayStringLong::bptree_leaf_insert(size_t index, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
+    if (leaf_size < index)
+        index = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value); // Throws
+        insert(index, value); // Throws
         return 0; // Leaf was not split
     }
 
     // Split leaf node
     ArrayStringLong new_leaf(get_alloc(), m_nullable);
     new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
+    if (index == leaf_size) {
         new_leaf.add(value); // Throws
-        state.m_split_offset = ndx;
+        state.m_split_offset = index;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i)
+        for (size_t i = index; i != leaf_size; ++i)
             new_leaf.add(get(i)); // Throws
-        truncate(ndx); // Throws
+        truncate(index); // Throws
         add(value); // Throws
-        state.m_split_offset = ndx + 1;
+        state.m_split_offset = index + 1;
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();

@@ -43,7 +43,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
     } \
@@ -83,7 +83,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -126,7 +126,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -172,7 +172,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -221,7 +221,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -273,7 +273,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -328,7 +328,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -386,7 +386,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -447,7 +447,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -511,7 +511,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -578,7 +578,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -648,7 +648,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -721,7 +721,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -797,7 +797,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -876,7 +876,7 @@ struct Table##Spec: ::realm::SpecBase { \
         ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i), name15(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_column_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \

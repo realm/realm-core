@@ -119,10 +119,10 @@ const int ITER1 =    2000;
 const int READERS1 =   10;
 const int WRITERS1 =   10;
 
-void write_thread(TestResults* test_results_ptr, std::string path, int thread_ndx)
+void write_thread(TestResults* test_results_ptr, std::string path, int thread_index)
 {
     TestResults& test_results = *test_results_ptr;
-    int_least64_t w = thread_ndx;
+    int_least64_t w = thread_index;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     SharedGroup sg(path);
 
@@ -383,10 +383,10 @@ const int READERS4 =   20;
 const int WRITERS4 =   20;
 volatile bool terminate4 = false;
 
-void write_thread4(TestResults* test_results_ptr, std::string path, int thread_ndx)
+void write_thread4(TestResults* test_results_ptr, std::string path, int thread_index)
 {
     TestResults& test_results = *test_results_ptr;
-    int_least64_t w = thread_ndx;
+    int_least64_t w = thread_index;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     SharedGroup sg(path);
 

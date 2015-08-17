@@ -18,7 +18,7 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
 }
 
-bool TransactLogEncoder::select_table(size_t group_level_ndx, size_t levels, const size_t* path)
+bool TransactLogEncoder::select_table(size_t group_level_index, size_t levels, const size_t* path)
 {
     const size_t* p = path;
     const size_t* end = path + (levels * 2);
@@ -30,7 +30,7 @@ bool TransactLogEncoder::select_table(size_t group_level_ndx, size_t levels, con
 
     *buf++ = char(instr_SelectTable);
     buf = encode_int(buf, levels);
-    buf = encode_int(buf, group_level_ndx);
+    buf = encode_int(buf, group_level_index);
 
     if (p == end)
         goto good;
@@ -118,9 +118,9 @@ void TransactLogConvenientEncoder::do_select_desc(const Descriptor& desc)
     m_selected_spec = &df::get_spec(desc);
 }
 
-bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx)
+bool TransactLogEncoder::select_link_list(size_t column_index, size_t row_index)
 {
-    simple_cmd(instr_SelectLinkList, util::tuple(col_ndx, row_ndx)); // Throws
+    simple_cmd(instr_SelectLinkList, util::tuple(column_index, row_index)); // Throws
     return true;
 }
 
@@ -128,9 +128,9 @@ bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx)
 void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
 {
     select_table(list.m_origin_table.get());
-    size_t col_ndx = list.m_origin_column.m_column_ndx;
-    size_t row_ndx = list.get_origin_row_index();
-    m_encoder.select_link_list(col_ndx, row_ndx); // Throws
+    size_t column_index = list.m_origin_column.m_column_index;
+    size_t row_index = list.get_origin_row_index();
+    m_encoder.select_link_list(column_index, row_index); // Throws
     m_selected_link_list = &list;
 }
 

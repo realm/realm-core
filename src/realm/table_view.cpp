@@ -98,55 +98,55 @@ void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
 
 // find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
 
-size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
+size_t TableViewBase::find_first_integer(size_t column_index, int64_t value) const
 {
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_int(column_ndx, i) == value)
+        if (is_row_attached(i) && get_int(column_index, i) == value)
             return i;
     return size_t(-1);
 }
 
-size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
+size_t TableViewBase::find_first_float(size_t column_index, float value) const
 {
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_float(column_ndx, i) == value)
+        if (is_row_attached(i) && get_float(column_index, i) == value)
             return i;
     return size_t(-1);
 }
 
-size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
+size_t TableViewBase::find_first_double(size_t column_index, double value) const
 {
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_double(column_ndx, i) == value)
+        if (is_row_attached(i) && get_double(column_index, i) == value)
             return i;
     return size_t(-1);
 }
 
-size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) const
+size_t TableViewBase::find_first_string(size_t column_index, StringData value) const
 {
     check_cookie();
 
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
+    REALM_ASSERT_COLUMN_AND_TYPE(column_index, type_String);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_string(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_string(column_index, i) == value) return i;
     return size_t(-1);
 }
 
-size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) const
+size_t TableViewBase::find_first_binary(size_t column_index, BinaryData value) const
 {
     check_cookie();
 
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
+    REALM_ASSERT_COLUMN_AND_TYPE(column_index, type_Binary);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_binary(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_binary(column_index, i) == value) return i;
     return size_t(-1);
 }
 
@@ -156,26 +156,26 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
 template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
+R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_index, T count_target, size_t* return_index) const
 {
     check_cookie();
 
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
+    REALM_ASSERT_COLUMN_AND_TYPE(column_index, ColumnTypeTraits<T>::id);
     REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
     REALM_ASSERT(m_table);
-    REALM_ASSERT(column_ndx < m_table->get_column_count());
+    REALM_ASSERT(column_index < m_table->get_column_count());
     if ((m_row_indexes.size() - m_num_detached_refs) == 0)
         return 0;
 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
-    const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
+    const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_index));
 
     if (m_num_detached_refs == 0 && m_row_indexes.size() == column->size()) {
         // direct aggregate on the column
         if(function == act_Count)
             return static_cast<R>(column->count(count_target));
         else
-            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
+            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_index); // end == limit == -1
     }
 
     // Array object instantiation must NOT allocate initial memory (capacity)
@@ -185,13 +185,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     const ArrType* arrp = nullptr;
     size_t leaf_start = 0;
     size_t leaf_end = 0;
-    size_t row_ndx;
+    size_t row_index;
 
     R res = static_cast<R>(0);
     T first = column->get(to_size_t(m_row_indexes.get(0)));
 
-    if (return_ndx)
-        *return_ndx = 0;
+    if (return_index)
+        *return_index = 0;
 
     if(function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
@@ -199,32 +199,32 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         res = static_cast<R>(first);
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
-        row_ndx = to_size_t(m_row_indexes.get(ss));
+        row_index = to_size_t(m_row_indexes.get(ss));
 
         // skip detached references:
-        if (row_ndx == detached_ref) continue;
+        if (row_index == detached_ref) continue;
 
-        if (row_ndx < leaf_start || row_ndx >= leaf_end) {
-            size_t ndx_in_leaf;
+        if (row_index < leaf_start || row_index >= leaf_end) {
+            size_t index_in_leaf;
             typename ColType::LeafInfo leaf { &arrp, &arr };
-            column->get_leaf(row_ndx, ndx_in_leaf, leaf);
-            leaf_start = row_ndx - ndx_in_leaf;
+            column->get_leaf(row_index, index_in_leaf, leaf);
+            leaf_start = row_index - index_in_leaf;
             leaf_end = leaf_start + arrp->size();
         }
 
-        T v = arrp->get(row_ndx - leaf_start);
+        T v = arrp->get(row_index - leaf_start);
 
         if (function == act_Sum)
             res += static_cast<R>(v);
         else if (function == act_Max && v > static_cast<T>(res)) {
             res = static_cast<R>(v);
-            if (return_ndx)
-                *return_ndx = ss;
+            if (return_index)
+                *return_index = ss;
         }
         else if (function == act_Min && v < static_cast<T>(res)) {
             res = static_cast<R>(v);
-            if (return_ndx)
-                *return_ndx = ss;
+            if (return_index)
+                *return_index = ss;
         }
         else if (function == act_Count && v == count_target)
             res++;
@@ -236,86 +236,86 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
 // sum
 
-int64_t TableViewBase::sum_int(size_t column_ndx) const
+int64_t TableViewBase::sum_int(size_t column_index) const
 {
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
+    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_index, 0);
 }
-double TableViewBase::sum_float(size_t column_ndx) const
+double TableViewBase::sum_float(size_t column_index) const
 {
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, float>(&FloatColumn::sum, column_index, 0.0);
 }
-double TableViewBase::sum_double(size_t column_ndx) const
+double TableViewBase::sum_double(size_t column_index) const
 {
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_index, 0.0);
 }
 
 // Maximum
 
-int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
+int64_t TableViewBase::maximum_int(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_index, 0, return_index);
 }
-float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
+float TableViewBase::maximum_float(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, float>(&FloatColumn::maximum, column_index, 0.0, return_index);
 }
-double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) const
+double TableViewBase::maximum_double(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_index, 0.0, return_index);
 }
-DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
+DateTime TableViewBase::maximum_datetime(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_index, 0, return_index);
 }
 
 // Minimum
 
-int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
+int64_t TableViewBase::minimum_int(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_index, 0, return_index);
 }
-float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
+float TableViewBase::minimum_float(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, float>(&FloatColumn::minimum, column_index, 0.0, return_index);
 }
-double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) const
+double TableViewBase::minimum_double(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_index, 0.0, return_index);
 }
-DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
+DateTime TableViewBase::minimum_datetime(size_t column_index, size_t* return_index) const
 {
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_index, 0, return_index);
 }
 
 // Average
 
-double TableViewBase::average_int(size_t column_ndx) const
+double TableViewBase::average_int(size_t column_index) const
 {
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
+    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_index, 0) / static_cast<double>(num_attached_rows());
 }
-double TableViewBase::average_float(size_t column_ndx) const
+double TableViewBase::average_float(size_t column_index) const
 {
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0)
+    return aggregate<act_Sum, float>(&FloatColumn::sum, column_index, 0.0)
         / static_cast<double>(num_attached_rows());
 }
-double TableViewBase::average_double(size_t column_ndx) const
+double TableViewBase::average_double(size_t column_index) const
 {
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0)
+    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_index, 0.0)
         / static_cast<double>(num_attached_rows());
 }
 
 // Count
-size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
+size_t TableViewBase::count_int(size_t column_index, int64_t target) const
 {
-    return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
+    return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_index, target);
 }
-size_t TableViewBase::count_float(size_t column_ndx, float target) const
+size_t TableViewBase::count_float(size_t column_index, float target) const
 {
-    return aggregate<act_Count, float, size_t, FloatColumn>(nullptr, column_ndx, target);
+    return aggregate<act_Count, float, size_t, FloatColumn>(nullptr, column_index, target);
 }
-size_t TableViewBase::count_double(size_t column_ndx, double target) const
+size_t TableViewBase::count_double(size_t column_index, double target) const
 {
-    return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_ndx, target);
+    return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_index, target);
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
@@ -333,7 +333,7 @@ void TableViewBase::to_json(std::ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        const size_t real_row_index = get_source_ndx(r);
+        const size_t real_row_index = get_source_index(r);
         if (real_row_index != detached_ref) {
             if (r > 0)
                 out << ",";
@@ -362,7 +362,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     size_t i = 0;
     size_t count = out_count;
     while (count) {
-        const size_t real_row_index = get_source_ndx(i);
+        const size_t real_row_index = get_source_index(i);
         if (real_row_index != detached_ref) {
             m_table->to_string_row(real_row_index, out, widths);
             --count;
@@ -376,20 +376,20 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     }
 }
 
-void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
+void TableViewBase::row_to_string(size_t row_index, std::ostream& out) const
 {
     check_cookie();
 
-    REALM_ASSERT(row_ndx < m_row_indexes.size());
+    REALM_ASSERT(row_index < m_row_indexes.size());
 
     // Print header (will also calculate widths)
     std::vector<size_t> widths;
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    size_t real_ndx = get_source_ndx(row_ndx);
-    REALM_ASSERT(real_ndx != detached_ref);
-    m_table->to_string_row(real_ndx, out, widths);
+    size_t real_index = get_source_index(row_index);
+    REALM_ASSERT(real_index != detached_ref);
+    m_table->to_string_row(real_index, out, widths);
 }
 
 uint64_t TableViewBase::outside_version() const
@@ -435,44 +435,44 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 
 
 
-void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_insert_rows(std::size_t row_index, std::size_t num_rows) REALM_NOEXCEPT
 {
-    m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
+    m_row_indexes.adjust_ge(int_fast64_t(row_index), num_rows);
 }
 
 
-void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_erase_row(std::size_t row_index) REALM_NOEXCEPT
 {
     std::size_t it = 0;
     for (;;) {
-        it = m_row_indexes.find_first(row_ndx, it);
+        it = m_row_indexes.find_first(row_index, it);
         if (it == not_found)
             break;
         ++m_num_detached_refs;
         m_row_indexes.set(it, -1);
     }
-    m_row_indexes.adjust_ge(int_fast64_t(row_ndx)+1, -1);
+    m_row_indexes.adjust_ge(int_fast64_t(row_index)+1, -1);
 }
 
 
-void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_move_over(std::size_t from_row_index, std::size_t to_row_index) REALM_NOEXCEPT
 {
     std::size_t it = 0;
-    // kill any refs to the target row ndx
+    // kill any refs to the target row index
     for (;;) {
-        it = m_row_indexes.find_first(to_row_ndx, it);
+        it = m_row_indexes.find_first(to_row_index, it);
         if (it == not_found)
             break;
         ++m_num_detached_refs;
         m_row_indexes.set(it, -1);
     }
-    // adjust any refs to the source row ndx to point to the target row ndx.
+    // adjust any refs to the source row index to point to the target row index.
     it = 0;
     for (;;) {
-        it = m_row_indexes.find_first(from_row_ndx, it);
+        it = m_row_indexes.find_first(from_row_index, it);
         if (it == not_found)
             break;
-        m_row_indexes.set(it, to_row_ndx);
+        m_row_indexes.set(it, to_row_index);
     }
 }
 
@@ -481,18 +481,18 @@ void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t 
 
 
 // O(n) for n = this->size()
-void TableView::remove(size_t ndx)
+void TableView::remove(size_t index)
 {
     check_cookie();
 
     REALM_ASSERT(m_table);
-    REALM_ASSERT(ndx < m_row_indexes.size());
+    REALM_ASSERT(index < m_row_indexes.size());
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
     // Delete row in source table
-    const size_t real_ndx = size_t(m_row_indexes.get(ndx));
-    m_table->remove(real_ndx);
+    const size_t real_index = size_t(m_row_indexes.get(index));
+    m_table->remove(real_index);
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -500,7 +500,7 @@ void TableView::remove(size_t ndx)
         m_last_seen_version = outside_version();
 
     // Update refs
-    m_row_indexes.erase(ndx);
+    m_row_indexes.erase(index);
 
     // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
@@ -520,7 +520,7 @@ void TableView::clear()
     bool is_ordered = true;
     for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
         ColumnType t = m_table->m_spec.get_column_type(c);
-        if (t == col_type_Link || t == col_type_LinkList || t == col_type_BackLink) {
+        if (t == column_type_Link || t == column_type_LinkList || t == column_type_BackLink) {
             is_ordered = false;
             break;
         }

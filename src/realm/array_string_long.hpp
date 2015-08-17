@@ -51,19 +51,19 @@ public:
     bool is_empty() const REALM_NOEXCEPT;
     std::size_t size() const REALM_NOEXCEPT;
 
-    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get(std::size_t index) const REALM_NOEXCEPT;
 
 
     void add(StringData value);
-    void set(std::size_t ndx, StringData value);
-    void insert(std::size_t ndx, StringData value);
-    void erase(std::size_t ndx);
+    void set(std::size_t index, StringData value);
+    void insert(std::size_t index, StringData value);
+    void erase(std::size_t index);
     void truncate(std::size_t size);
     void clear();
     void destroy();
 
-    bool is_null(size_t ndx) const;
-    void set_null(size_t ndx);
+    bool is_null(size_t index) const;
+    void set_null(size_t index);
 
     std::size_t count(StringData value, std::size_t begin = 0,
                       std::size_t end = npos) const REALM_NOEXCEPT;
@@ -76,9 +76,9 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static StringData get(const char* header, std::size_t ndx, Allocator&, bool nullable) REALM_NOEXCEPT;
+    static StringData get(const char* header, std::size_t index, Allocator&, bool nullable) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
+    ref_type bptree_leaf_insert(std::size_t index, StringData, TreeInsertBase&);
 
     static std::size_t get_size_from_header(const char*, Allocator&) REALM_NOEXCEPT;
 
@@ -147,20 +147,20 @@ inline std::size_t ArrayStringLong::size() const REALM_NOEXCEPT
     return m_offsets.size();
 }
 
-inline StringData ArrayStringLong::get(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData ArrayStringLong::get(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
+    REALM_ASSERT_3(index, <, m_offsets.size());
 
-    if (m_nullable && m_nulls.get(ndx) == 0)
+    if (m_nullable && m_nulls.get(index) == 0)
         return realm::null();
 
     std::size_t begin, end;
-    if (0 < ndx) {
+    if (0 < index) {
         // FIXME: Consider how much of a performance problem it is,
         // that we have to issue two separate calls to read two
         // consecutive values from an array.
-        begin = to_size_t(m_offsets.get(ndx-1));
-        end   = to_size_t(m_offsets.get(ndx));
+        begin = to_size_t(m_offsets.get(index-1));
+        end   = to_size_t(m_offsets.get(index));
     }
     else {
         begin = 0;

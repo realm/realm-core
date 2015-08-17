@@ -43,10 +43,10 @@ int main(int argc, char* argv [])
                     
                     TableRef t = trx.get_table("test");
                     
-                    size_t ndx = rand() % 1000000;
+                    size_t index = rand() % 1000000;
                     
-                    int v = t->get_int(0, ndx);
-                    t->set_int(0, ndx, v + 1);
+                    int v = t->get_int(0, index);
+                    t->set_int(0, index, v + 1);
                     trx.commit();
                 }
                 else {
@@ -54,9 +54,9 @@ int main(int argc, char* argv [])
                     
                     ConstTableRef t = trx.get_table("test");
                     
-                    size_t ndx = rand() % 1000000;
+                    size_t index = rand() % 1000000;
                     volatile int v;
-                    v = t->get_int(0, ndx);
+                    v = t->get_int(0, index);
                     (void) v;
                 }
             }

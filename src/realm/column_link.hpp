@@ -47,12 +47,12 @@ public:
     /// `insert_link(realm::npos)`. set_link() returns the original link, with
     /// `realm::npos` indicating that it was null.
 
-    std::size_t get_link(std::size_t row_ndx) const REALM_NOEXCEPT;
-    bool is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t set_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void nullify_link(std::size_t row_ndx);
-    void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void insert_null_link(std::size_t row_ndx);
+    std::size_t get_link(std::size_t row_index) const REALM_NOEXCEPT;
+    bool is_null_link(std::size_t row_index) const REALM_NOEXCEPT;
+    std::size_t set_link(std::size_t row_index, std::size_t target_row_index);
+    void nullify_link(std::size_t row_index);
+    void insert_link(std::size_t row_index, std::size_t target_row_index);
+    void insert_null_link(std::size_t row_index);
 
     //@}
 
@@ -69,12 +69,12 @@ public:
 
 protected:
     friend class BacklinkColumn;
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
-    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx) override;
+    void do_nullify_link(std::size_t row_index, std::size_t old_target_row_index) override;
+    void do_update_link(std::size_t row_index, std::size_t old_target_row_index,
+                        std::size_t new_target_row_index) override;
 
 private:
-    void remove_backlinks(std::size_t row_ndx);
+    void remove_backlinks(std::size_t row_index);
 };
 
 
@@ -89,58 +89,58 @@ inline ref_type LinkColumn::create(Allocator& alloc, std::size_t size)
     return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
 }
 
-inline std::size_t LinkColumn::get_link(std::size_t row_ndx) const REALM_NOEXCEPT
+inline std::size_t LinkColumn::get_link(std::size_t row_index) const REALM_NOEXCEPT
 {
     // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
-    return to_size_t(LinkColumnBase::get(row_ndx)) - size_t(1);
+    return to_size_t(LinkColumnBase::get(row_index)) - size_t(1);
 }
 
-inline bool LinkColumn::is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT
+inline bool LinkColumn::is_null_link(std::size_t row_index) const REALM_NOEXCEPT
 {
     // Null is represented by zero
-    return LinkColumnBase::get(row_ndx) == 0;
+    return LinkColumnBase::get(row_index) == 0;
 }
 
-inline std::size_t LinkColumn::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
+inline std::size_t LinkColumn::set_link(std::size_t row_index, std::size_t target_row_index)
 {
-    int_fast64_t old_value = LinkColumnBase::get(row_ndx);
-    std::size_t old_target_row_ndx = to_size_t(old_value) - size_t(1);
+    int_fast64_t old_value = LinkColumnBase::get(row_index);
+    std::size_t old_target_row_index = to_size_t(old_value) - size_t(1);
     if (old_value != 0)
-        m_backlink_column->remove_one_backlink(old_target_row_ndx, row_ndx); // Throws
+        m_backlink_column->remove_one_backlink(old_target_row_index, row_index); // Throws
 
-    int_fast64_t new_value = int_fast64_t(size_t(1) + target_row_ndx);
-    LinkColumnBase::set(row_ndx, new_value); // Throws
+    int_fast64_t new_value = int_fast64_t(size_t(1) + target_row_index);
+    LinkColumnBase::set(row_index, new_value); // Throws
 
-    if (target_row_ndx != realm::npos)
-        m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
+    if (target_row_index != realm::npos)
+        m_backlink_column->add_backlink(target_row_index, row_index); // Throws
 
-    return old_target_row_ndx;
+    return old_target_row_index;
 }
 
-inline void LinkColumn::nullify_link(size_t row_ndx)
+inline void LinkColumn::nullify_link(size_t row_index)
 {
-    set_link(row_ndx, realm::npos); // Throws
+    set_link(row_index, realm::npos); // Throws
 }
 
-inline void LinkColumn::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)
+inline void LinkColumn::insert_link(std::size_t row_index, std::size_t target_row_index)
 {
-    int_fast64_t value = int_fast64_t(size_t(1) + target_row_ndx);
-    LinkColumnBase::insert(row_ndx, value); // Throws
+    int_fast64_t value = int_fast64_t(size_t(1) + target_row_index);
+    LinkColumnBase::insert(row_index, value); // Throws
 
-    if (target_row_ndx != realm::npos)
-        m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
+    if (target_row_index != realm::npos)
+        m_backlink_column->add_backlink(target_row_index, row_index); // Throws
 }
 
-inline void LinkColumn::insert_null_link(size_t row_ndx)
+inline void LinkColumn::insert_null_link(size_t row_index)
 {
-    insert_link(row_ndx, realm::npos); // Throws
+    insert_link(row_index, realm::npos); // Throws
 }
 
-inline void LinkColumn::do_update_link(std::size_t row_ndx, std::size_t,
-                                       std::size_t new_target_row_ndx)
+inline void LinkColumn::do_update_link(std::size_t row_index, std::size_t,
+                                       std::size_t new_target_row_index)
 {
     // Row pos is offset by one, to allow null refs
-    LinkColumnBase::set(row_ndx, new_target_row_ndx + 1);
+    LinkColumnBase::set(row_index, new_target_row_index + 1);
 }
 
 } //namespace realm

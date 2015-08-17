@@ -36,23 +36,23 @@ size_t round_up(size_t size)
 
 } // anonymous namespace
 
-bool ArrayString::is_null(size_t ndx) const
+bool ArrayString::is_null(size_t index) const
 {
-    REALM_ASSERT_3(ndx, <, m_size);
-    StringData sd = get(ndx);
+    REALM_ASSERT_3(index, <, m_size);
+    StringData sd = get(index);
     return sd.is_null();
 }
 
-void ArrayString::set_null(size_t ndx)
+void ArrayString::set_null(size_t index)
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(index, <, m_size);
     StringData sd = realm::null();
-    set(ndx, sd);
+    set(index, sd);
 }
 
-void ArrayString::set(size_t ndx, StringData value)
+void ArrayString::set(size_t index, StringData value)
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(index, <, m_size);
     REALM_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
@@ -118,7 +118,7 @@ void ArrayString::set(size_t ndx, StringData value)
     REALM_ASSERT_3(0, <, m_width);
 
     // Set the value
-    char* begin = m_data + (ndx * m_width);
+    char* begin = m_data + (index * m_width);
     char* end = begin + (m_width - 1);
     begin = std::copy(value.data(), value.data() + value.size(), begin);
     std::fill(begin, end, 0); // Pad with zero bytes
@@ -135,9 +135,9 @@ void ArrayString::set(size_t ndx, StringData value)
 }
 
 
-void ArrayString::insert(size_t ndx, StringData value)
+void ArrayString::insert(size_t index, StringData value)
 {
-    REALM_ASSERT_3(ndx, <=, m_size);
+    REALM_ASSERT_3(index, <=, m_size);
     REALM_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
@@ -151,25 +151,25 @@ void ArrayString::insert(size_t ndx, StringData value)
     alloc(m_size + 1, m_width); // Throws
 
     // Make gap for new value
-    memmove(m_data + m_width * (ndx + 1), m_data + m_width * ndx, m_width * (m_size - ndx));
+    memmove(m_data + m_width * (index + 1), m_data + m_width * index, m_width * (m_size - index));
 
     m_size++;
 
     // Set new value
-    set(ndx, value);
+    set(index, value);
     return;
 }
 
-void ArrayString::erase(size_t ndx)
+void ArrayString::erase(size_t index)
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(index, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
     // move data backwards after deletion
-    if (ndx < m_size - 1) {
-        char* new_begin = m_data + ndx*m_width;
+    if (index < m_size - 1) {
+        char* new_begin = m_data + index*m_width;
         char* old_begin = new_begin + m_width;
         char* old_end = m_data + m_size*m_width;
         std::copy(old_begin, old_end, new_begin);
@@ -202,11 +202,11 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const REAL
 
     size_t begin_2 = begin;
     for (;;) {
-        size_t ndx = find_first(value, begin_2, end);
-        if (ndx == not_found)
+        size_t index = find_first(value, begin_2, end);
+        if (index == not_found)
             break;
         ++num_matches;
-        begin_2 = ndx + 1;
+        begin_2 = index + 1;
     }
 
     return num_matches;
@@ -271,11 +271,11 @@ void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_o
 {
     size_t begin_2 = begin;
     for (;;) {
-        size_t ndx = find_first(value, begin_2, end);
-        if (ndx == not_found)
+        size_t index = find_first(value, begin_2, end);
+        if (index == not_found)
             break;
-        result.add(add_offset + ndx); // Throws
-        begin_2 = ndx + 1;
+        result.add(add_offset + index); // Throws
+        begin_2 = index + 1;
     }
 }
 
@@ -292,29 +292,29 @@ bool ArrayString::compare_string(const ArrayString& c) const REALM_NOEXCEPT
     return true;
 }
 
-ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
+ref_type ArrayString::bptree_leaf_insert(size_t index, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx) ndx = leaf_size;
+    if (leaf_size < index) index = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value); // Throws
+        insert(index, value); // Throws
         return 0; // Leaf was not split
     }
 
     // Split leaf node
     ArrayString new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
+    if (index == leaf_size) {
         new_leaf.add(value); // Throws
-        state.m_split_offset = ndx;
+        state.m_split_offset = index;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i)
+        for (size_t i = index; i != leaf_size; ++i)
             new_leaf.add(get(i)); // Throws
-        truncate(ndx); // Throws
+        truncate(index); // Throws
         add(value); // Throws
-        state.m_split_offset = ndx + 1;
+        state.m_split_offset = index + 1;
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();

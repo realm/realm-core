@@ -32,11 +32,11 @@ public:
     explicit BasicArray(no_prealloc_tag) REALM_NOEXCEPT;
     ~BasicArray() REALM_NOEXCEPT override {}
 
-    T get(std::size_t ndx) const REALM_NOEXCEPT;
+    T get(std::size_t index) const REALM_NOEXCEPT;
     void add(T value);
-    void set(std::size_t ndx, T value);
-    void insert(std::size_t ndx, T value);
-    void erase(std::size_t ndx);
+    void set(std::size_t index, T value);
+    void insert(std::size_t index, T value);
+    void erase(std::size_t index);
     void truncate(std::size_t size);
     void clear();
 
@@ -55,9 +55,9 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static T get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
+    static T get(const char* header, std::size_t index) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t index, T, TreeInsertBase& state);
 
     std::size_t lower_bound(T value) const REALM_NOEXCEPT;
     std::size_t upper_bound(T value) const REALM_NOEXCEPT;

@@ -317,7 +317,7 @@ public:
 
     bool has_table(StringData name) const REALM_NOEXCEPT;
     std::size_t find_table(StringData name) const REALM_NOEXCEPT;
-    StringData get_table_name(std::size_t table_ndx) const;
+    StringData get_table_name(std::size_t table_index) const;
 
     TableRef get_table(std::size_t index);
     ConstTableRef get_table(std::size_t index) const;
@@ -421,10 +421,10 @@ public:
             size_t is_ordered_removal : 1;
 
             /// Index within group of a group-level table.
-            size_t table_ndx : std::numeric_limits<size_t>::digits - 1;
+            size_t table_index : std::numeric_limits<size_t>::digits - 1;
 
             /// Row index which will be removed.
-            size_t row_ndx;
+            size_t row_index;
 
             row(): is_ordered_removal(0) {}
 
@@ -437,12 +437,12 @@ public:
 
         struct link {
             const Table* origin_table; ///< A group-level table.
-            std::size_t origin_col_ndx; ///< Link column being nullified.
-            std::size_t origin_row_ndx; ///< Row in column being nullified.
+            std::size_t origin_column_index; ///< Link column being nullified.
+            std::size_t origin_row_index; ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
             /// valid for Link.
-            std::size_t old_target_row_ndx;
+            std::size_t old_target_row_index;
         };
 
         /// A sorted list of rows which will be removed by the current operation.
@@ -575,8 +575,8 @@ private:
     typedef void (*DescSetter)(Table&);
     typedef bool (*DescMatcher)(const Spec&);
 
-    Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher);
-    const Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher) const;
+    Table* do_get_table(size_t table_index, DescMatcher desc_matcher);
+    const Table* do_get_table(size_t table_index, DescMatcher desc_matcher) const;
     Table* do_get_table(StringData name, DescMatcher desc_matcher);
     const Table* do_get_table(StringData name, DescMatcher desc_matcher) const;
     Table* do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name);
@@ -585,7 +585,7 @@ private:
                                DescSetter desc_setter, bool* was_added);
 
     std::size_t create_table(StringData name); // Returns index of new table
-    Table* create_table_accessor(std::size_t table_ndx);
+    Table* create_table_accessor(std::size_t table_index);
 
     void detach_table_accessors() REALM_NOEXCEPT; // Idempotent
 
@@ -606,7 +606,7 @@ private:
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const override;
+    get_to_dot_parent(std::size_t index_in_parent) const override;
 #endif
 
     void send_cascade_notification(const CascadeNotification& notification) const;
@@ -715,17 +715,17 @@ inline std::size_t Group::size() const
     return m_table_names.size();
 }
 
-inline StringData Group::get_table_name(std::size_t table_ndx) const
+inline StringData Group::get_table_name(std::size_t table_index) const
 {
-    if (table_ndx >= size())
+    if (table_index >= size())
         throw LogicError(LogicError::table_index_out_of_range);
-    return m_table_names.get(table_ndx);
+    return m_table_names.get(table_index);
 }
 
 inline bool Group::has_table(StringData name) const REALM_NOEXCEPT
 {
-    size_t ndx = find_table(name);
-    return ndx != not_found;
+    size_t index = find_table(name);
+    return index != not_found;
 }
 
 inline std::size_t Group::find_table(StringData name) const REALM_NOEXCEPT
@@ -733,25 +733,25 @@ inline std::size_t Group::find_table(StringData name) const REALM_NOEXCEPT
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     REALM_ASSERT(m_table_names.is_attached());
-    size_t ndx = m_table_names.find_first(name);
-    return ndx;
+    size_t index = m_table_names.find_first(name);
+    return index;
 }
 
-inline TableRef Group::get_table(std::size_t table_ndx)
+inline TableRef Group::get_table(std::size_t table_index)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr; // Do not check descriptor
-    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    Table* table = do_get_table(table_index, desc_matcher); // Throws
     return TableRef(table);
 }
 
-inline ConstTableRef Group::get_table(std::size_t table_ndx) const
+inline ConstTableRef Group::get_table(std::size_t table_index) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr; // Do not check descriptor
-    const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    const Table* table = do_get_table(table_index, desc_matcher); // Throws
     return ConstTableRef(table);
 }
 
@@ -792,23 +792,23 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     return TableRef(table);
 }
 
-template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx)
+template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_index)
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = &T::matches_dynamic_type;
-    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    Table* table = do_get_table(table_index, desc_matcher); // Throws
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t table_ndx) const
+template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t table_index) const
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = &T::matches_dynamic_type;
-    const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    const Table* table = do_get_table(table_index, desc_matcher); // Throws
     return BasicTableRef<const T>(static_cast<const T*>(table));
 }
 
@@ -890,19 +890,19 @@ inline void Group::init_array_parents() REALM_NOEXCEPT
     m_tables.set_parent(&m_top, 1);
 }
 
-inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
+inline void Group::update_child_ref(std::size_t child_index, ref_type new_ref)
 {
-    m_tables.set(child_ndx, new_ref);
+    m_tables.set(child_index, new_ref);
 }
 
-inline ref_type Group::get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT
+inline ref_type Group::get_child_ref(std::size_t child_index) const REALM_NOEXCEPT
 {
-    return m_tables.get_as_ref(child_ndx);
+    return m_tables.get_as_ref(child_index);
 }
 
-inline StringData Group::get_child_name(std::size_t child_ndx) const REALM_NOEXCEPT
+inline StringData Group::get_child_name(std::size_t child_index) const REALM_NOEXCEPT
 {
-    return m_table_names.get(child_ndx);
+    return m_table_names.get(child_index);
 }
 
 inline void Group::child_accessor_destroyed(Table*) REALM_NOEXCEPT
@@ -933,9 +933,9 @@ public:
     virtual ~TableWriter() REALM_NOEXCEPT {}
 };
 
-inline const Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher) const
+inline const Table* Group::do_get_table(size_t table_index, DescMatcher desc_matcher) const
 {
-    return const_cast<Group*>(this)->do_get_table(table_ndx, desc_matcher); // Throws
+    return const_cast<Group*>(this)->do_get_table(table_index, desc_matcher); // Throws
 }
 
 inline const Table* Group::do_get_table(StringData name, DescMatcher desc_matcher) const
@@ -962,17 +962,17 @@ inline void Group::set_replication(Replication* repl) REALM_NOEXCEPT
 // not all of the non-public parts of the Group class.
 class _impl::GroupFriend {
 public:
-    static Table& get_table(Group& group, std::size_t ndx_in_group)
+    static Table& get_table(Group& group, std::size_t index_in_group)
     {
         Group::DescMatcher desc_matcher = 0; // Do not check descriptor
-        Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
+        Table* table = group.do_get_table(index_in_group, desc_matcher); // Throws
         return *table;
     }
 
-    static const Table& get_table(const Group& group, std::size_t ndx_in_group)
+    static const Table& get_table(const Group& group, std::size_t index_in_group)
     {
         Group::DescMatcher desc_matcher = 0; // Do not check descriptor
-        const Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
+        const Table* table = group.do_get_table(index_in_group, desc_matcher); // Throws
         return *table;
     }
 
@@ -1062,14 +1062,14 @@ struct CascadeState: Group::CascadeNotification {
 
     /// If non-null, then Table::cascade_break_backlinks_to() will skip the
     /// removal of reciprocal backlinks for the link list at
-    /// stop_on_link_list_row_ndx in this column, and no recursion will happen
+    /// stop_on_link_list_row_index in this column, and no recursion will happen
     /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
     ///
     /// Must never be set concurrently with stop_on_table.
     LinkListColumn* stop_on_link_list_column = nullptr;
 
     /// Is ignored if stop_on_link_list_column is null.
-    std::size_t stop_on_link_list_row_ndx = 0;
+    std::size_t stop_on_link_list_row_index = 0;
 
     /// If false, the links field is not needed, so any work done just for that
     /// can be skipped.
@@ -1078,7 +1078,7 @@ struct CascadeState: Group::CascadeNotification {
 
 inline bool Group::CascadeNotification::row::operator==(const row& r) const REALM_NOEXCEPT
 {
-    return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
+    return table_index == r.table_index && row_index == r.row_index;
 }
 
 inline bool Group::CascadeNotification::row::operator!=(const row& r) const REALM_NOEXCEPT
@@ -1088,7 +1088,7 @@ inline bool Group::CascadeNotification::row::operator!=(const row& r) const REAL
 
 inline bool Group::CascadeNotification::row::operator<(const row& r) const REALM_NOEXCEPT
 {
-    return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
+    return table_index < r.table_index || (table_index == r.table_index && row_index < r.row_index);
 }
 
 } // namespace realm

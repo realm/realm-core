@@ -155,7 +155,7 @@ public:
     StringData get_name() const REALM_NOEXCEPT;
 
     // Whether or not elements can be null.
-    bool is_nullable(size_t col_ndx) const;
+    bool is_nullable(size_t column_index) const;
 
     //@{
     /// Conventience functions for inspecting the dynamic table type.
@@ -163,8 +163,8 @@ public:
     /// These functions behave as if they were called on the descriptor returned
     /// by get_descriptor().
     std::size_t get_column_count() const REALM_NOEXCEPT;
-    DataType    get_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
-    StringData  get_column_name(std::size_t column_ndx) const REALM_NOEXCEPT;
+    DataType    get_column_type(std::size_t column_index) const REALM_NOEXCEPT;
+    StringData  get_column_name(std::size_t column_index) const REALM_NOEXCEPT;
     std::size_t get_column_index(StringData name) const REALM_NOEXCEPT;
     //@}
 
@@ -191,7 +191,7 @@ public:
     /// \sa get_descriptor()
 
     std::size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = 0);
-    void insert_column(std::size_t column_ndx, DataType type, StringData name, bool nullable = false,
+    void insert_column(std::size_t column_index, DataType type, StringData name, bool nullable = false,
                        DescriptorRef* subdesc = 0);
 
     // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error
@@ -200,16 +200,16 @@ public:
     {
         return add_column(type, name, false, subdesc);
     }
-    void insert_column(std::size_t column_ndx, DataType type, StringData name, DescriptorRef* subdesc)
+    void insert_column(std::size_t column_index, DataType type, StringData name, DescriptorRef* subdesc)
     {
-        insert_column(column_ndx, type, name, false, subdesc);
+        insert_column(column_index, type, name, false, subdesc);
     }
 
     std::size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
-    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
+    void insert_column_link(std::size_t column_index, DataType type, StringData name, Table& target,
                             LinkType link_type = link_Weak);
-    void remove_column(std::size_t column_ndx);
-    void rename_column(std::size_t column_ndx, StringData new_name);
+    void remove_column(std::size_t column_index);
+    void rename_column(std::size_t column_index, StringData new_name);
     //@}
 
     //@{
@@ -245,14 +245,14 @@ public:
     /// column of type 'mixed' are all examples of root tables. See add_column()
     /// for more on this.
     ///
-    /// \param column_ndx The index of a column of this table.
+    /// \param column_index The index of a column of this table.
 
-    bool has_search_index(std::size_t column_ndx) const REALM_NOEXCEPT;
-//    void remove_search_index(size_t col_ndx);
-    void add_search_index(std::size_t column_ndx);
-    void remove_search_index(std::size_t column_ndx);
+    bool has_search_index(std::size_t column_index) const REALM_NOEXCEPT;
+//    void remove_search_index(size_t column_index);
+    void add_search_index(std::size_t column_index);
+    void remove_search_index(std::size_t column_index);
     bool has_primary_key() const REALM_NOEXCEPT;
-    bool try_add_primary_key(std::size_t column_ndx);
+    bool try_add_primary_key(std::size_t column_index);
     void remove_primary_key();
 
     //@}
@@ -276,10 +276,10 @@ public:
     /// Get the dynamic type descriptor for the column with the
     /// specified index. That column must have type 'table'.
     ///
-    /// This is merely a shorthand for calling `get_subdescriptor(column_ndx)`
+    /// This is merely a shorthand for calling `get_subdescriptor(column_index)`
     /// on the descriptor returned by `get_descriptor()`.
-    DescriptorRef get_subdescriptor(std::size_t column_ndx);
-    ConstDescriptorRef get_subdescriptor(std::size_t column_ndx) const;
+    DescriptorRef get_subdescriptor(std::size_t column_index);
+    ConstDescriptorRef get_subdescriptor(std::size_t column_index) const;
     //@}
 
     //@{
@@ -308,10 +308,10 @@ public:
     /// \sa Descriptor::add_column()
     /// \sa has_shared_type()
     std::size_t add_subcolumn(const path_vec& path, DataType type, StringData name);
-    void insert_subcolumn(const path_vec& path, std::size_t column_ndx,
+    void insert_subcolumn(const path_vec& path, std::size_t column_index,
                           DataType type, StringData name);
-    void remove_subcolumn(const path_vec& path, std::size_t column_ndx);
-    void rename_subcolumn(const path_vec& path, std::size_t column_ndx, StringData new_name);
+    void remove_subcolumn(const path_vec& path, std::size_t column_index);
+    void rename_subcolumn(const path_vec& path, std::size_t column_index, StringData new_name);
     //@}
 
     /// Does this table share its type with other tables?
@@ -348,8 +348,8 @@ public:
     typedef BasicRowExpr<Table> RowExpr;
     typedef BasicRowExpr<const Table> ConstRowExpr;
 
-    RowExpr get(std::size_t row_ndx) REALM_NOEXCEPT;
-    ConstRowExpr get(std::size_t row_ndx) const REALM_NOEXCEPT;
+    RowExpr get(std::size_t row_index) REALM_NOEXCEPT;
+    ConstRowExpr get(std::size_t row_index) const REALM_NOEXCEPT;
 
     RowExpr front() REALM_NOEXCEPT;
     ConstRowExpr front() const REALM_NOEXCEPT;
@@ -357,8 +357,8 @@ public:
     RowExpr back() REALM_NOEXCEPT;
     ConstRowExpr back() const REALM_NOEXCEPT;
 
-    RowExpr operator[](std::size_t row_ndx) REALM_NOEXCEPT;
-    ConstRowExpr operator[](std::size_t row_ndx) const REALM_NOEXCEPT;
+    RowExpr operator[](std::size_t row_index) REALM_NOEXCEPT;
+    ConstRowExpr operator[](std::size_t row_index) const REALM_NOEXCEPT;
 
 
     //@{
@@ -387,37 +387,37 @@ public:
     /// unspecified.
 
     std::size_t add_empty_row(std::size_t num_rows = 1);
-    void insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
-    void remove(std::size_t row_ndx);
+    void insert_empty_row(std::size_t row_index, std::size_t num_rows = 1);
+    void remove(std::size_t row_index);
     void remove_last();
-    void move_last_over(std::size_t row_ndx);
+    void move_last_over(std::size_t row_index);
     void clear();
 
     //@}
 
     // Get cell values
-    int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    bool        get_bool(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    DateTime    get_datetime(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    float       get_float(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    double      get_double(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    StringData  get_string(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    BinaryData  get_binary(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
-    ConstLinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx) const;
-    std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t column_ndx, std::size_t row_ndx) const REALM_NOEXCEPT;
+    int64_t     get_int(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    bool        get_bool(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    DateTime    get_datetime(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    float       get_float(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    double      get_double(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    StringData  get_string(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    BinaryData  get_binary(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    Mixed       get_mixed(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    DataType    get_mixed_type(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    std::size_t get_link(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    bool is_null_link(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    LinkViewRef get_linklist(std::size_t column_index, std::size_t row_index);
+    ConstLinkViewRef get_linklist(std::size_t column_index, std::size_t row_index) const;
+    std::size_t get_link_count(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    bool linklist_is_empty(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
+    bool is_null(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT;
 
-    TableRef get_link_target(std::size_t column_ndx) REALM_NOEXCEPT;
-    ConstTableRef get_link_target(std::size_t column_ndx) const REALM_NOEXCEPT;
+    TableRef get_link_target(std::size_t column_index) REALM_NOEXCEPT;
+    ConstTableRef get_link_target(std::size_t column_index) const REALM_NOEXCEPT;
 
     template<class T>
-    typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
+    typename T::RowAccessor get_link_accessor(std::size_t column_index, std::size_t row_index);
 
     //@{
 
@@ -436,18 +436,18 @@ public:
     static const std::size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const std::size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
-    void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
-    void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
-    void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
-    template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
-    void set_float(std::size_t column_ndx, std::size_t row_ndx, float value);
-    void set_double(std::size_t column_ndx, std::size_t row_ndx, double value);
-    void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
-    void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
-    void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
-    void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-    void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
-    void set_null(std::size_t column_ndx, std::size_t row_ndx);
+    void set_int(std::size_t column_index, std::size_t row_index, int_fast64_t value);
+    void set_bool(std::size_t column_index, std::size_t row_index, bool value);
+    void set_datetime(std::size_t column_index, std::size_t row_index, DateTime value);
+    template<class E> void set_enum(std::size_t column_index, std::size_t row_index, E value);
+    void set_float(std::size_t column_index, std::size_t row_index, float value);
+    void set_double(std::size_t column_index, std::size_t row_index, double value);
+    void set_string(std::size_t column_index, std::size_t row_index, StringData value);
+    void set_binary(std::size_t column_index, std::size_t row_index, BinaryData value);
+    void set_mixed(std::size_t column_index, std::size_t row_index, Mixed value);
+    void set_link(std::size_t column_index, std::size_t row_index, std::size_t target_row_index);
+    void nullify_link(std::size_t column_index, std::size_t row_index);
+    void set_null(std::size_t column_index, std::size_t row_index);
 
     //@}
 
@@ -457,25 +457,25 @@ public:
     /// number of columns must be the same, and corresponding columns
     /// must have identical data types (as returned by
     /// get_column_type()).
-    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-    void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+    void set_subtable(std::size_t column_index, std::size_t row_index, const Table*);
+    void set_mixed_subtable(std::size_t column_index, std::size_t row_index, const Table*);
 
 
     // Sub-tables (works on columns whose type is either 'subtable' or
     // 'mixed', for a value in a mixed column that is not a subtable,
     // get_subtable() returns null, get_subtable_size() returns zero,
     // and clear_subtable() replaces the value with an empty table.)
-    TableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx);
-    ConstTableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx) const;
-    std::size_t get_subtable_size(std::size_t column_ndx, std::size_t row_ndx)
+    TableRef get_subtable(std::size_t column_index, std::size_t row_index);
+    ConstTableRef get_subtable(std::size_t column_index, std::size_t row_index) const;
+    std::size_t get_subtable_size(std::size_t column_index, std::size_t row_index)
         const REALM_NOEXCEPT;
-    void clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
+    void clear_subtable(std::size_t column_index, std::size_t row_index);
 
     // Backlinks
-    std::size_t get_backlink_count(std::size_t row_ndx, const Table& origin,
-                                   std::size_t origin_col_ndx) const REALM_NOEXCEPT;
-    std::size_t get_backlink(std::size_t row_ndx, const Table& origin,
-                             std::size_t origin_col_ndx, std::size_t backlink_ndx) const
+    std::size_t get_backlink_count(std::size_t row_index, const Table& origin,
+                                   std::size_t origin_column_index) const REALM_NOEXCEPT;
+    std::size_t get_backlink(std::size_t row_index, const Table& origin,
+                             std::size_t origin_column_index, std::size_t backlink_index) const
         REALM_NOEXCEPT;
 
 
@@ -490,14 +490,14 @@ public:
     /// group-level tables), get_parent_table() returns null and
     /// get_parent_row_index() returns realm::npos.
     ///
-    /// If this accessor is attached to a subtable, and \a column_ndx_out is
-    /// specified, then `*column_ndx_out` is set to the index of the column of
+    /// If this accessor is attached to a subtable, and \a column_index_out is
+    /// specified, then `*column_index_out` is set to the index of the column of
     /// the parent table in which the subtable resides. If this accessor is not
-    /// attached to a subtable, then `*column_ndx_out` will retain its original
+    /// attached to a subtable, then `*column_index_out` will retain its original
     /// value upon return.
 
-    TableRef get_parent_table(std::size_t* column_ndx_out = 0) REALM_NOEXCEPT;
-    ConstTableRef get_parent_table(std::size_t* column_ndx_out = 0) const REALM_NOEXCEPT;
+    TableRef get_parent_table(std::size_t* column_index_out = 0) REALM_NOEXCEPT;
+    ConstTableRef get_parent_table(std::size_t* column_index_out = 0) const REALM_NOEXCEPT;
     std::size_t get_parent_row_index() const REALM_NOEXCEPT;
 
     //@}
@@ -512,65 +512,65 @@ public:
     std::size_t get_index_in_group() const REALM_NOEXCEPT;
 
     // Aggregate functions
-    std::size_t count_int(std::size_t column_ndx, int64_t value) const;
-    std::size_t count_string(std::size_t column_ndx, StringData value) const;
-    std::size_t count_float(std::size_t column_ndx, float value) const;
-    std::size_t count_double(std::size_t column_ndx, double value) const;
+    std::size_t count_int(std::size_t column_index, int64_t value) const;
+    std::size_t count_string(std::size_t column_index, StringData value) const;
+    std::size_t count_float(std::size_t column_index, float value) const;
+    std::size_t count_double(std::size_t column_index, double value) const;
 
-    int64_t sum_int(std::size_t column_ndx) const;
-    double  sum_float(std::size_t column_ndx) const;
-    double  sum_double(std::size_t column_ndx) const;
-    int64_t maximum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    float   maximum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    double  maximum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
-    int64_t minimum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    float   minimum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    double  minimum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
-    double  average_int(std::size_t column_ndx) const;
-    double  average_float(std::size_t column_ndx) const;
-    double  average_double(std::size_t column_ndx) const;
+    int64_t sum_int(std::size_t column_index) const;
+    double  sum_float(std::size_t column_index) const;
+    double  sum_double(std::size_t column_index) const;
+    int64_t maximum_int(std::size_t column_index, std::size_t* return_index = 0) const;
+    float   maximum_float(std::size_t column_index, std::size_t* return_index = 0) const;
+    double  maximum_double(std::size_t column_index, std::size_t* return_index = 0) const;
+    DateTime maximum_datetime(size_t column_index, size_t* return_index = 0) const;
+    int64_t minimum_int(std::size_t column_index, std::size_t* return_index = 0) const;
+    float   minimum_float(std::size_t column_index, std::size_t* return_index = 0) const;
+    double  minimum_double(std::size_t column_index, std::size_t* return_index = 0) const;
+    DateTime minimum_datetime(size_t column_index, size_t* return_index = 0) const;
+    double  average_int(std::size_t column_index) const;
+    double  average_float(std::size_t column_index) const;
+    double  average_double(std::size_t column_index) const;
 
     // Searching
     std::size_t    find_first_link(std::size_t target_row_index) const;
-    std::size_t    find_first_int(std::size_t column_ndx, int64_t value) const;
-    std::size_t    find_first_bool(std::size_t column_ndx, bool value) const;
-    std::size_t    find_first_datetime(std::size_t column_ndx, DateTime value) const;
-    std::size_t    find_first_float(std::size_t column_ndx, float value) const;
-    std::size_t    find_first_double(std::size_t column_ndx, double value) const;
-    std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
-    std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
-    std::size_t    find_first_null(std::size_t column_ndx) const;
+    std::size_t    find_first_int(std::size_t column_index, int64_t value) const;
+    std::size_t    find_first_bool(std::size_t column_index, bool value) const;
+    std::size_t    find_first_datetime(std::size_t column_index, DateTime value) const;
+    std::size_t    find_first_float(std::size_t column_index, float value) const;
+    std::size_t    find_first_double(std::size_t column_index, double value) const;
+    std::size_t    find_first_string(std::size_t column_index, StringData value) const;
+    std::size_t    find_first_binary(std::size_t column_index, BinaryData value) const;
+    std::size_t    find_first_null(std::size_t column_index) const;
 
     TableView      find_all_link(size_t target_row_index);
     ConstTableView find_all_link(size_t target_row_index) const;
-    TableView      find_all_int(std::size_t column_ndx, int64_t value);
-    ConstTableView find_all_int(std::size_t column_ndx, int64_t value) const;
-    TableView      find_all_bool(std::size_t column_ndx, bool value);
-    ConstTableView find_all_bool(std::size_t column_ndx, bool value) const;
-    TableView      find_all_datetime(std::size_t column_ndx, DateTime value);
-    ConstTableView find_all_datetime(std::size_t column_ndx, DateTime value) const;
-    TableView      find_all_float(std::size_t column_ndx, float value);
-    ConstTableView find_all_float(std::size_t column_ndx, float value) const;
-    TableView      find_all_double(std::size_t column_ndx, double value);
-    ConstTableView find_all_double(std::size_t column_ndx, double value) const;
-    TableView      find_all_string(std::size_t column_ndx, StringData value);
-    ConstTableView find_all_string(std::size_t column_ndx, StringData value) const;
-    TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
-    ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
-    TableView      find_all_null(std::size_t column_ndx);
-    ConstTableView find_all_null(std::size_t column_ndx) const;
+    TableView      find_all_int(std::size_t column_index, int64_t value);
+    ConstTableView find_all_int(std::size_t column_index, int64_t value) const;
+    TableView      find_all_bool(std::size_t column_index, bool value);
+    ConstTableView find_all_bool(std::size_t column_index, bool value) const;
+    TableView      find_all_datetime(std::size_t column_index, DateTime value);
+    ConstTableView find_all_datetime(std::size_t column_index, DateTime value) const;
+    TableView      find_all_float(std::size_t column_index, float value);
+    ConstTableView find_all_float(std::size_t column_index, float value) const;
+    TableView      find_all_double(std::size_t column_index, double value);
+    ConstTableView find_all_double(std::size_t column_index, double value) const;
+    TableView      find_all_string(std::size_t column_index, StringData value);
+    ConstTableView find_all_string(std::size_t column_index, StringData value) const;
+    TableView      find_all_binary(std::size_t column_index, BinaryData value);
+    ConstTableView find_all_binary(std::size_t column_index, BinaryData value) const;
+    TableView      find_all_null(std::size_t column_index);
+    ConstTableView find_all_null(std::size_t column_index) const;
 
     /// The following column types are supported: String, Integer, DateTime, Bool
-    TableView      get_distinct_view(std::size_t column_ndx);
-    ConstTableView get_distinct_view(std::size_t column_ndx) const;
+    TableView      get_distinct_view(std::size_t column_index);
+    ConstTableView get_distinct_view(std::size_t column_index) const;
 
-    TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
-    ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
+    TableView      get_sorted_view(std::size_t column_index, bool ascending = true);
+    ConstTableView get_sorted_view(std::size_t column_index, bool ascending = true) const;
 
-    TableView      get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending);
-    ConstTableView get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending) const;
+    TableView      get_sorted_view(std::vector<size_t> column_index, std::vector<bool> ascending);
+    ConstTableView get_sorted_view(std::vector<size_t> column_index, std::vector<bool> ascending) const;
 
     TableView      get_range_view(std::size_t begin, std::size_t end);
     ConstTableView get_range_view(std::size_t begin, std::size_t end) const;
@@ -607,8 +607,8 @@ public:
 
 
 private:
-    template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
-    template <class T> TableView find_all(size_t column_ndx, T value);
+    template <class T> std::size_t find_first(std::size_t column_index, T value) const; // called by above methods
+    template <class T> TableView find_all(size_t column_index, T value);
 public:
 
 
@@ -641,16 +641,16 @@ public:
     ///
     /// The string versions assume that the column is sorted according
     /// to StringData::operator<().
-    std::size_t lower_bound_int(std::size_t column_ndx, int64_t value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_int(std::size_t column_ndx, int64_t value) const REALM_NOEXCEPT;
-    std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_bool(std::size_t column_ndx, bool value) const REALM_NOEXCEPT;
-    std::size_t lower_bound_float(std::size_t column_ndx, float value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_float(std::size_t column_ndx, float value) const REALM_NOEXCEPT;
-    std::size_t lower_bound_double(std::size_t column_ndx, double value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_double(std::size_t column_ndx, double value) const REALM_NOEXCEPT;
-    std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_int(std::size_t column_index, int64_t value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_int(std::size_t column_index, int64_t value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_bool(std::size_t column_index, bool value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_bool(std::size_t column_index, bool value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_float(std::size_t column_index, float value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_float(std::size_t column_index, float value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_double(std::size_t column_index, double value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_double(std::size_t column_index, double value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_string(std::size_t column_index, StringData value) const REALM_NOEXCEPT;
+    std::size_t upper_bound_string(std::size_t column_index, StringData value) const REALM_NOEXCEPT;
     //@}
 
     // Queries
@@ -707,7 +707,7 @@ public:
     void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string,
                  std::string>* renames = 0) const;
     void to_string(std::ostream& out, std::size_t limit = 500) const;
-    void row_to_string(std::size_t row_ndx, std::ostream& out) const;
+    void row_to_string(std::size_t row_index, std::ostream& out) const;
 
     // Get a reference to this table
     TableRef get_table_ref() { return TableRef(this); }
@@ -751,17 +751,17 @@ protected:
     ///
     /// The returned table pointer must **always** end up being
     /// wrapped in some instantiation of BasicTableRef<>.
-    Table* get_subtable_ptr(std::size_t col_ndx, std::size_t row_ndx);
+    Table* get_subtable_ptr(std::size_t column_index, std::size_t row_index);
 
     /// See non-const get_subtable_ptr().
-    const Table* get_subtable_ptr(std::size_t col_ndx, std::size_t row_ndx) const;
+    const Table* get_subtable_ptr(std::size_t column_index, std::size_t row_index) const;
 
     /// Compare the rows of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column
     /// index (as expressed through the DataType enum).
     bool compare_rows(const Table&) const;
 
-    void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+    void set_into_mixed(Table* parent, std::size_t column_index, std::size_t row_index) const;
 
 private:
     class SliceWriter;
@@ -845,12 +845,12 @@ private:
 
     mutable uint_fast64_t m_version;
 
-    void erase_row(size_t row_ndx, bool is_move_last_over);
+    void erase_row(size_t row_index, bool is_move_last_over);
     void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
-    void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
-    void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
+    void do_remove(size_t row_index, bool broken_reciprocal_backlinks);
+    void do_move_last_over(size_t row_index, bool broken_reciprocal_backlinks);
     void do_clear(bool broken_reciprocal_backlinks);
-    std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+    std::size_t do_set_link(std::size_t column_index, std::size_t row_index, std::size_t target_row_index);
 
     void upgrade_file_format();
 
@@ -894,33 +894,33 @@ private:
     /// counting.
     Table(ref_count_tag, Allocator&);
 
-    void init(ref_type top_ref, ArrayParent*, std::size_t ndx_in_parent,
+    void init(ref_type top_ref, ArrayParent*, std::size_t index_in_parent,
               bool skip_create_column_accessors = false);
     void init(ConstSubspecRef shared_spec, ArrayParent* parent_column,
-              std::size_t parent_row_ndx);
+              std::size_t parent_row_index);
 
     void reveal_primary_key() const;
     std::size_t do_find_pkey_int(int_fast64_t) const;
     std::size_t do_find_pkey_string(StringData) const;
 
-    static void do_insert_column(Descriptor&, std::size_t col_ndx, DataType type,
+    static void do_insert_column(Descriptor&, std::size_t column_index, DataType type,
                                  StringData name, Table* link_target_table, bool nullable = false);
-    static void do_erase_column(Descriptor&, std::size_t col_ndx);
-    static void do_rename_column(Descriptor&, std::size_t col_ndx, StringData name);
+    static void do_erase_column(Descriptor&, std::size_t column_index);
+    static void do_rename_column(Descriptor&, std::size_t column_index, StringData name);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
-    void insert_root_column(std::size_t col_ndx, DataType type, StringData name,
+    void insert_root_column(std::size_t column_index, DataType type, StringData name,
                             Table* link_target_table, bool nullable = false);
-    void erase_root_column(std::size_t col_ndx);
-    void do_insert_root_column(std::size_t col_ndx, ColumnType, StringData name, bool nullable = false);
-    void do_erase_root_column(std::size_t col_ndx);
-    void do_set_link_type(std::size_t col_ndx, LinkType);
-    void insert_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
-    void erase_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
-    void update_link_target_tables(std::size_t old_col_ndx_begin, std::size_t new_col_ndx_begin);
+    void erase_root_column(std::size_t column_index);
+    void do_insert_root_column(std::size_t column_index, ColumnType, StringData name, bool nullable = false);
+    void do_erase_root_column(std::size_t column_index);
+    void do_set_link_type(std::size_t column_index, LinkType);
+    void insert_backlink_column(std::size_t origin_table_index, std::size_t origin_column_index);
+    void erase_backlink_column(std::size_t origin_table_index, std::size_t origin_column_index);
+    void update_link_target_tables(std::size_t old_column_index_begin, std::size_t new_column_index_begin);
 
     struct SubtableUpdater {
         virtual void update(const SubtableColumn&, Array& subcolumns) = 0;
@@ -928,7 +928,7 @@ private:
         virtual ~SubtableUpdater() {}
     };
     static void update_subtables(Descriptor&, SubtableUpdater*);
-    void update_subtables(const std::size_t* col_path_begin, const std::size_t* col_path_end,
+    void update_subtables(const std::size_t* column_path_begin, const std::size_t* column_path_end,
                           SubtableUpdater*);
 
     struct AccessorUpdater {
@@ -936,11 +936,11 @@ private:
         virtual void update_parent(Table&) = 0;
         virtual ~AccessorUpdater() {}
     };
-    void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
+    void update_accessors(const std::size_t* column_path_begin, const std::size_t* column_path_end,
                           AccessorUpdater&);
 
     void create_degen_subtab_columns();
-    ColumnBase* create_column_accessor(ColumnType, std::size_t col_ndx, std::size_t ndx_in_parent);
+    ColumnBase* create_column_accessor(ColumnType, std::size_t column_index, std::size_t index_in_parent);
     void destroy_column_accessors() REALM_NOEXCEPT;
 
     /// Called in the context of Group::commit() to ensure that
@@ -952,15 +952,15 @@ private:
 
     // Support function for conversions
     void to_string_header(std::ostream& out, std::vector<std::size_t>& widths) const;
-    void to_string_row(std::size_t row_ndx, std::ostream& out,
+    void to_string_row(std::size_t row_index, std::ostream& out,
                        const std::vector<std::size_t>& widths) const;
 
     // recursive methods called by to_json, to follow links
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
         std::vector<ref_type>& followed) const;
-    void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth,
+    void to_json_row(std::size_t row_index, std::ostream& out, size_t link_depth,
         std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
-    void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth = 0,
+    void to_json_row(std::size_t row_index, std::ostream& out, size_t link_depth = 0,
         std::map<std::string, std::string>* renames = nullptr) const;
 
     // Detach accessor from underlying table. Caller must ensure that
@@ -1009,53 +1009,53 @@ private:
 
     class UnbindGuard;
 
-    ColumnType get_real_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
+    ColumnType get_real_column_type(std::size_t column_index) const REALM_NOEXCEPT;
 
     /// If this table is a group-level table, the parent group is returned,
     /// otherwise null is returned.
     Group* get_parent_group() const REALM_NOEXCEPT;
 
-    const ColumnBase& get_column_base(std::size_t column_ndx) const REALM_NOEXCEPT;
-    ColumnBase& get_column_base(std::size_t column_ndx);
-    template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
-    template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
-    IntegerColumn& get_column(std::size_t column_ndx);
-    const IntegerColumn& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
-    IntNullColumn& get_column_int_null(std::size_t column_ndx);
-    const IntNullColumn& get_column_int_null(std::size_t column_ndx) const REALM_NOEXCEPT;
-    FloatColumn& get_column_float(std::size_t column_ndx);
-    const FloatColumn& get_column_float(std::size_t column_ndx) const REALM_NOEXCEPT;
-    DoubleColumn& get_column_double(std::size_t column_ndx);
-    const DoubleColumn& get_column_double(std::size_t column_ndx) const REALM_NOEXCEPT;
-    StringColumn& get_column_string(std::size_t column_ndx);
-    const StringColumn& get_column_string(std::size_t column_ndx) const REALM_NOEXCEPT;
-    BinaryColumn& get_column_binary(std::size_t column_ndx);
-    const BinaryColumn& get_column_binary(std::size_t column_ndx) const REALM_NOEXCEPT;
-    StringEnumColumn& get_column_string_enum(std::size_t column_ndx);
-    const StringEnumColumn& get_column_string_enum(std::size_t column_ndx) const REALM_NOEXCEPT;
-    SubtableColumn& get_column_table(std::size_t column_ndx);
-    const SubtableColumn& get_column_table(std::size_t column_ndx) const REALM_NOEXCEPT;
-    MixedColumn& get_column_mixed(std::size_t column_ndx);
-    const MixedColumn& get_column_mixed(std::size_t column_ndx) const REALM_NOEXCEPT;
-    const LinkColumnBase& get_column_link_base(std::size_t ndx) const REALM_NOEXCEPT;
-    LinkColumnBase& get_column_link_base(std::size_t ndx);
-    const LinkColumn& get_column_link(std::size_t ndx) const REALM_NOEXCEPT;
-    LinkColumn& get_column_link(std::size_t ndx);
-    const LinkListColumn& get_column_link_list(std::size_t ndx) const REALM_NOEXCEPT;
-    LinkListColumn& get_column_link_list(std::size_t ndx);
-    const BacklinkColumn& get_column_backlink(std::size_t ndx) const REALM_NOEXCEPT;
-    BacklinkColumn& get_column_backlink(std::size_t ndx);
+    const ColumnBase& get_column_base(std::size_t column_index) const REALM_NOEXCEPT;
+    ColumnBase& get_column_base(std::size_t column_index);
+    template <class T, ColumnType column_type> T& get_column(std::size_t index);
+    template <class T, ColumnType column_type> const T& get_column(std::size_t index) const REALM_NOEXCEPT;
+    IntegerColumn& get_column(std::size_t column_index);
+    const IntegerColumn& get_column(std::size_t column_index) const REALM_NOEXCEPT;
+    IntNullColumn& get_column_int_null(std::size_t column_index);
+    const IntNullColumn& get_column_int_null(std::size_t column_index) const REALM_NOEXCEPT;
+    FloatColumn& get_column_float(std::size_t column_index);
+    const FloatColumn& get_column_float(std::size_t column_index) const REALM_NOEXCEPT;
+    DoubleColumn& get_column_double(std::size_t column_index);
+    const DoubleColumn& get_column_double(std::size_t column_index) const REALM_NOEXCEPT;
+    StringColumn& get_column_string(std::size_t column_index);
+    const StringColumn& get_column_string(std::size_t column_index) const REALM_NOEXCEPT;
+    BinaryColumn& get_column_binary(std::size_t column_index);
+    const BinaryColumn& get_column_binary(std::size_t column_index) const REALM_NOEXCEPT;
+    StringEnumColumn& get_column_string_enum(std::size_t column_index);
+    const StringEnumColumn& get_column_string_enum(std::size_t column_index) const REALM_NOEXCEPT;
+    SubtableColumn& get_column_table(std::size_t column_index);
+    const SubtableColumn& get_column_table(std::size_t column_index) const REALM_NOEXCEPT;
+    MixedColumn& get_column_mixed(std::size_t column_index);
+    const MixedColumn& get_column_mixed(std::size_t column_index) const REALM_NOEXCEPT;
+    const LinkColumnBase& get_column_link_base(std::size_t index) const REALM_NOEXCEPT;
+    LinkColumnBase& get_column_link_base(std::size_t index);
+    const LinkColumn& get_column_link(std::size_t index) const REALM_NOEXCEPT;
+    LinkColumn& get_column_link(std::size_t index);
+    const LinkListColumn& get_column_link_list(std::size_t index) const REALM_NOEXCEPT;
+    LinkListColumn& get_column_link_list(std::size_t index);
+    const BacklinkColumn& get_column_backlink(std::size_t index) const REALM_NOEXCEPT;
+    BacklinkColumn& get_column_backlink(std::size_t index);
 
     void instantiate_before_change();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type,
-                              std::size_t ndx) const;
+                              std::size_t index) const;
 
     static std::size_t get_size_from_ref(ref_type top_ref, Allocator&) REALM_NOEXCEPT;
     static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
                                          Allocator&) REALM_NOEXCEPT;
 
-    const Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) const REALM_NOEXCEPT;
-    Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) REALM_NOEXCEPT;
+    const Table* get_parent_table_ptr(std::size_t* column_index_out = 0) const REALM_NOEXCEPT;
+    Table* get_parent_table_ptr(std::size_t* column_index_out = 0) REALM_NOEXCEPT;
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
@@ -1078,20 +1078,20 @@ private:
     /// new top array.
     ref_type clone(Allocator&) const;
 
-    /// True for `col_type_Link` and `col_type_LinkList`.
+    /// True for `column_type_Link` and `column_type_LinkList`.
     static bool is_link_type(ColumnType) REALM_NOEXCEPT;
 
-    void connect_opposite_link_columns(std::size_t link_col_ndx, Table& target_table,
-                                       std::size_t backlink_col_ndx) REALM_NOEXCEPT;
+    void connect_opposite_link_columns(std::size_t link_column_index, Table& target_table,
+                                       std::size_t backlink_column_index) REALM_NOEXCEPT;
 
-    std::size_t get_num_strong_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT;
+    std::size_t get_num_strong_backlinks(std::size_t row_index) const REALM_NOEXCEPT;
 
     //@{
 
     /// Cascading removal of strong links.
     ///
     /// cascade_break_backlinks_to() removes all backlinks pointing to the row
-    /// at \a row_ndx. Additionally, if this causes the number of **strong**
+    /// at \a row_index. Additionally, if this causes the number of **strong**
     /// backlinks originating from a particular opposite row (target row of
     /// corresponding forward link) to drop to zero, and that row is not already
     /// in \a state.rows, then that row is added to \a state.rows, and
@@ -1159,14 +1159,14 @@ private:
     /// It is immaterial which table remove_backlink_broken_rows() is called on,
     /// as long it that table is in the same group as the removed rows.
 
-    void cascade_break_backlinks_to(size_t row_ndx, CascadeState& state);
+    void cascade_break_backlinks_to(size_t row_index, CascadeState& state);
     void cascade_break_backlinks_to_all_rows(CascadeState& state);
     void remove_backlink_broken_rows(const CascadeState&);
 
     //@}
 
     /// Remove the specified row by the 'move last over' method.
-    void do_move_last_over(std::size_t row_ndx);
+    void do_move_last_over(std::size_t row_index);
 
     // Precondition: 1 <= end - begin
     std::size_t* record_subtable_path(std::size_t* begin,
@@ -1177,11 +1177,11 @@ private:
     /// that the specified column index in a valid index into `m_cols` but does
     /// not otherwise assume more than minimal accessor consistency (see
     /// AccessorConsistencyLevels.)
-    Table* get_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) REALM_NOEXCEPT;
+    Table* get_subtable_accessor(std::size_t column_index, std::size_t row_index) REALM_NOEXCEPT;
 
     /// Unless the column accessor is missing, this function returns the
     /// accessor for the target table of the specified link-type column. The
-    /// column accessor is said to be missing if `m_cols[col_ndx]` is null, and
+    /// column accessor is said to be missing if `m_cols[column_index]` is null, and
     /// this can happen only during certain operations such as the updating of
     /// the accessor tree when a read transaction is advanced. Note that for
     /// link type columns, the target table accessor exists when, and only when
@@ -1189,24 +1189,24 @@ private:
     /// specified column index in a valid index into `m_cols` and that the
     /// column is a link-type column. Beyond that, it assume nothing more than
     /// minimal accessor consistency (see AccessorConsistencyLevels.)
-    Table* get_link_target_table_accessor(std::size_t col_ndx) REALM_NOEXCEPT;
+    Table* get_link_target_table_accessor(std::size_t column_index) REALM_NOEXCEPT;
 
-    void discard_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) REALM_NOEXCEPT;
+    void discard_subtable_accessor(std::size_t column_index, std::size_t row_index) REALM_NOEXCEPT;
 
-    void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
-    void adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
+    void adj_acc_insert_rows(std::size_t row_index, std::size_t num_rows) REALM_NOEXCEPT;
+    void adj_acc_erase_row(std::size_t row_index) REALM_NOEXCEPT;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
     ///
     /// First, any row, subtable, or link list accessors registered as being at
-    /// \a to_row_ndx will be detached, as that row is assumed to have been
+    /// \a to_row_index will be detached, as that row is assumed to have been
     /// replaced. Next, any row, subtable, or link list accessors registered as
-    /// being at \a from_row_ndx, will be reregistered as being at \a
-    /// to_row_ndx, as the row at \a from_row_ndx is assumed to have been moved
-    /// to \a to_row_ndx.
+    /// being at \a from_row_index, will be reregistered as being at \a
+    /// to_row_index, as the row at \a from_row_index is assumed to have been moved
+    /// to \a to_row_index.
     ///
-    /// Crucially, if \a to_row_ndx is equal to \a from_row_ndx, then row,
+    /// Crucially, if \a to_row_index is equal to \a from_row_index, then row,
     /// subtable, or link list accessors at that row are **still detached**.
     ///
     /// Additionally, this function causes all link-adjacent tables to be marked
@@ -1215,41 +1215,41 @@ private:
     /// relations in both directions, but only to a depth of one.
     ///
     /// When this function is used in connection with move_last_over(), set \a
-    /// to_row_ndx to the index of the row to be removed, and set \a
-    /// from_row_ndx to the index of the last row in the table. As mentioned
+    /// to_row_index to the index of the row to be removed, and set \a
+    /// from_row_index to the index of the last row in the table. As mentioned
     /// earlier, this function can also be used in connection with the **inverse
     /// of** move_last_over(), which is an operation that vacates a row by
     /// moving its contents into a new last row of the table. In that case, set
-    /// \a to_row_ndx to one plus the index of the last row in the table, and
-    /// set \a from_row_ndx to the index of the row to be vacated.
+    /// \a to_row_index to one plus the index of the last row in the table, and
+    /// set \a from_row_index to the index of the row to be vacated.
     ///
     /// This function is used as part of Table::refresh_accessor_tree() to
     /// promote the state of the accessors from Minimal Consistency into
     /// Structural Correspondence, so it must be able to execute without
     /// accessing the underlying array nodes.
-    void adj_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT;
+    void adj_acc_move_over(std::size_t from_row_index, std::size_t to_row_index) REALM_NOEXCEPT;
 
     void adj_acc_clear_root_table() REALM_NOEXCEPT;
     void adj_acc_clear_nonroot_table() REALM_NOEXCEPT;
-    void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT;
-    void adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT;
+    void adj_row_acc_insert_rows(std::size_t row_index, std::size_t num_rows) REALM_NOEXCEPT;
+    void adj_row_acc_erase_row(std::size_t row_index) REALM_NOEXCEPT;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
-    void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT;
+    void adj_row_acc_move_over(std::size_t from_row_index, std::size_t to_row_index) REALM_NOEXCEPT;
 
-    void adj_insert_column(std::size_t col_ndx);
-    void adj_erase_column(std::size_t col_ndx) REALM_NOEXCEPT;
+    void adj_insert_column(std::size_t column_index);
+    void adj_erase_column(std::size_t column_index) REALM_NOEXCEPT;
 
     bool is_marked() const REALM_NOEXCEPT;
     void mark() REALM_NOEXCEPT;
     void unmark() REALM_NOEXCEPT;
     void recursive_mark() REALM_NOEXCEPT;
-    void mark_link_target_tables(std::size_t col_ndx_begin) REALM_NOEXCEPT;
+    void mark_link_target_tables(std::size_t column_index_begin) REALM_NOEXCEPT;
     void mark_opposite_link_tables() REALM_NOEXCEPT;
 
     Replication* get_repl() REALM_NOEXCEPT;
 
-    void set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT;
+    void set_index_in_parent(std::size_t index_in_parent) REALM_NOEXCEPT;
 
     /// Refresh the part of the accessor tree that is rooted at this
     /// table. Subtable accessors will be refreshed only if they are marked
@@ -1286,7 +1286,7 @@ private:
     ///    root ref is stored in the parent (see AccessorConsistencyLevels).
     void refresh_accessor_tree();
 
-    void refresh_column_accessors(std::size_t col_ndx_begin = 0);
+    void refresh_column_accessors(std::size_t column_index_begin = 0);
 
     bool is_cross_table_link_target() const REALM_NOEXCEPT;
 
@@ -1319,7 +1319,7 @@ public:
     ~Parent() REALM_NOEXCEPT override {}
 
 protected:
-    virtual StringData get_child_name(std::size_t child_ndx) const REALM_NOEXCEPT;
+    virtual StringData get_child_name(std::size_t child_index) const REALM_NOEXCEPT;
 
     /// If children are group-level tables, then this function returns the
     /// group. Otherwise it returns null.
@@ -1328,15 +1328,15 @@ protected:
     /// If children are subtables, then this function returns the
     /// parent table. Otherwise it returns null.
     ///
-    /// If \a column_ndx_out is not null, this function must assign the index of
-    /// the column within the parent table to `*column_ndx_out` when , and only
+    /// If \a column_index_out is not null, this function must assign the index of
+    /// the column within the parent table to `*column_index_out` when , and only
     /// when this table parent is a column in a parent table.
-    virtual Table* get_parent_table(std::size_t* column_ndx_out = 0) REALM_NOEXCEPT;
+    virtual Table* get_parent_table(std::size_t* column_index_out = 0) REALM_NOEXCEPT;
 
     /// Must be called whenever a child table accessor is about to be destroyed.
     ///
     /// Note that the argument is a pointer to the child Table rather than its
-    /// `ndx_in_parent` property. This is because only minimal accessor
+    /// `index_in_parent` property. This is because only minimal accessor
     /// consistency can be assumed by this function.
     virtual void child_accessor_destroyed(Table* child) REALM_NOEXCEPT = 0;
 
@@ -1379,16 +1379,16 @@ inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
     }
 }
 
-inline void Table::remove(size_t row_ndx)
+inline void Table::remove(size_t row_index)
 {
     bool is_move_last_over = false;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_index, is_move_last_over); // Throws;
 }
 
-inline void Table::move_last_over(size_t row_ndx)
+inline void Table::move_last_over(size_t row_index)
 {
     bool is_move_last_over = true;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_index, is_move_last_over); // Throws;
 }
 
 inline void Table::remove_last()
@@ -1426,7 +1426,7 @@ inline StringData Table::get_name() const REALM_NOEXCEPT
     ArrayParent* parent = real_top.get_parent();
     if (!parent)
         return StringData("");
-    std::size_t index_in_parent = real_top.get_ndx_in_parent();
+    std::size_t index_in_parent = real_top.get_index_in_parent();
     REALM_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->get_child_name(index_in_parent);
 }
@@ -1437,10 +1437,10 @@ inline std::size_t Table::get_column_count() const REALM_NOEXCEPT
     return m_spec.get_public_column_count();
 }
 
-inline StringData Table::get_column_name(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData Table::get_column_name(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, get_column_count());
-    return m_spec.get_column_name(ndx);
+    REALM_ASSERT_3(index, <, get_column_count());
+    return m_spec.get_column_name(index);
 }
 
 inline std::size_t Table::get_column_index(StringData name) const REALM_NOEXCEPT
@@ -1449,34 +1449,34 @@ inline std::size_t Table::get_column_index(StringData name) const REALM_NOEXCEPT
     return m_spec.get_column_index(name);
 }
 
-inline ColumnType Table::get_real_column_type(std::size_t ndx) const REALM_NOEXCEPT
+inline ColumnType Table::get_real_column_type(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
-    return m_spec.get_column_type(ndx);
+    REALM_ASSERT_3(index, <, m_spec.get_column_count());
+    return m_spec.get_column_type(index);
 }
 
-inline DataType Table::get_column_type(std::size_t ndx) const REALM_NOEXCEPT
+inline DataType Table::get_column_type(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
-    return m_spec.get_public_column_type(ndx);
+    REALM_ASSERT_3(index, <, m_spec.get_column_count());
+    return m_spec.get_public_column_type(index);
 }
 
-template<class Col, ColumnType col_type> inline Col& Table::get_column(std::size_t ndx)
+template<class Col, ColumnType column_type> inline Col& Table::get_column(std::size_t index)
 {
-    ColumnBase& col = get_column_base(ndx);
+    ColumnBase& col = get_column_base(index);
 #ifdef REALM_DEBUG
-    validate_column_type(col, col_type, ndx);
+    validate_column_type(col, column_type, index);
 #endif
     REALM_ASSERT(typeid(Col) == typeid(col));
     return static_cast<Col&>(col);
 }
 
-template<class Col, ColumnType col_type>
-inline const Col& Table::get_column(std::size_t ndx) const REALM_NOEXCEPT
+template<class Col, ColumnType column_type>
+inline const Col& Table::get_column(std::size_t index) const REALM_NOEXCEPT
 {
-    const ColumnBase& col = get_column_base(ndx);
+    const ColumnBase& col = get_column_base(index);
 #ifdef REALM_DEBUG
-    validate_column_type(col, col_type, ndx);
+    validate_column_type(col, column_type, index);
 #endif
     REALM_ASSERT(typeid(Col) == typeid(col));
     return static_cast<const Col&>(col);
@@ -1538,8 +1538,8 @@ inline Table::Table(Allocator& alloc):
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
-    init(ref, parent, ndx_in_parent);
+    std::size_t index_in_parent = 0;
+    init(ref, parent, index_in_parent);
 }
 
 inline Table::Table(const Table& t, Allocator& alloc):
@@ -1552,8 +1552,8 @@ inline Table::Table(const Table& t, Allocator& alloc):
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
-    init(ref, parent, ndx_in_parent);
+    std::size_t index_in_parent = 0;
+    init(ref, parent, index_in_parent);
 }
 
 inline Table::Table(ref_count_tag, Allocator& alloc):
@@ -1575,8 +1575,8 @@ inline TableRef Table::create(Allocator& alloc)
     std::unique_ptr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
-    table->init(ref, parent, ndx_in_parent); // Throws
+    std::size_t index_in_parent = 0;
+    table->init(ref, parent, index_in_parent); // Throws
     return table.release()->get_table_ref();
 }
 
@@ -1585,8 +1585,8 @@ inline TableRef Table::copy(Allocator& alloc) const
     std::unique_ptr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
     ref_type ref = clone(alloc); // Throws
     Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
-    table->init(ref, parent, ndx_in_parent); // Throws
+    std::size_t index_in_parent = 0;
+    table->init(ref, parent, index_in_parent); // Throws
     return table.release()->get_table_ref();
 }
 
@@ -1618,16 +1618,16 @@ inline std::size_t Table::size() const REALM_NOEXCEPT
     return m_size;
 }
 
-inline Table::RowExpr Table::get(std::size_t row_ndx) REALM_NOEXCEPT
+inline Table::RowExpr Table::get(std::size_t row_index) REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(row_ndx, <, size());
-    return RowExpr(this, row_ndx);
+    REALM_ASSERT_3(row_index, <, size());
+    return RowExpr(this, row_index);
 }
 
-inline Table::ConstRowExpr Table::get(std::size_t row_ndx) const REALM_NOEXCEPT
+inline Table::ConstRowExpr Table::get(std::size_t row_index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(row_ndx, <, size());
-    return ConstRowExpr(this, row_ndx);
+    REALM_ASSERT_3(row_index, <, size());
+    return ConstRowExpr(this, row_index);
 }
 
 inline Table::RowExpr Table::front() REALM_NOEXCEPT
@@ -1650,67 +1650,67 @@ inline Table::ConstRowExpr Table::back() const REALM_NOEXCEPT
     return get(m_size-1);
 }
 
-inline Table::RowExpr Table::operator[](std::size_t row_ndx) REALM_NOEXCEPT
+inline Table::RowExpr Table::operator[](std::size_t row_index) REALM_NOEXCEPT
 {
-    return get(row_ndx);
+    return get(row_index);
 }
 
-inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const REALM_NOEXCEPT
+inline Table::ConstRowExpr Table::operator[](std::size_t row_index) const REALM_NOEXCEPT
 {
-    return get(row_ndx);
+    return get(row_index);
 }
 
 inline std::size_t Table::add_empty_row(std::size_t num_rows)
 {
-    std::size_t row_ndx = m_size;
-    insert_empty_row(row_ndx, num_rows); // Throws
-    return row_ndx; // Return index of first new row
+    std::size_t row_index = m_size;
+    insert_empty_row(row_index, num_rows); // Throws
+    return row_index; // Return index of first new row
 }
 
-inline const Table* Table::get_subtable_ptr(std::size_t col_ndx, std::size_t row_ndx) const
+inline const Table* Table::get_subtable_ptr(std::size_t column_index, std::size_t row_index) const
 {
-    return const_cast<Table*>(this)->get_subtable_ptr(col_ndx, row_ndx); // Throws
+    return const_cast<Table*>(this)->get_subtable_ptr(column_index, row_index); // Throws
 }
 
-inline bool Table::is_null_link(std::size_t col_ndx, std::size_t row_ndx) const REALM_NOEXCEPT
+inline bool Table::is_null_link(std::size_t column_index, std::size_t row_index) const REALM_NOEXCEPT
 {
-    return get_link(col_ndx, row_ndx) == realm::npos;
+    return get_link(column_index, row_index) == realm::npos;
 }
 
-inline ConstTableRef Table::get_link_target(std::size_t col_ndx) const REALM_NOEXCEPT
+inline ConstTableRef Table::get_link_target(std::size_t column_index) const REALM_NOEXCEPT
 {
-    return const_cast<Table*>(this)->get_link_target(col_ndx);
+    return const_cast<Table*>(this)->get_link_target(column_index);
 }
 
 template<class E>
-inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
+inline void Table::set_enum(std::size_t column_index, std::size_t row_index, E value)
 {
-    set_int(column_ndx, row_ndx, value);
+    set_int(column_index, row_index, value);
 }
 
-inline void Table::nullify_link(std::size_t col_ndx, std::size_t row_ndx)
+inline void Table::nullify_link(std::size_t column_index, std::size_t row_index)
 {
-    set_link(col_ndx, row_ndx, realm::npos);
+    set_link(column_index, row_index, realm::npos);
 }
 
-inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
+inline TableRef Table::get_subtable(std::size_t column_index, std::size_t row_index)
 {
-    return TableRef(get_subtable_ptr(column_ndx, row_ndx));
+    return TableRef(get_subtable_ptr(column_index, row_index));
 }
 
-inline ConstTableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx) const
+inline ConstTableRef Table::get_subtable(std::size_t column_index, std::size_t row_index) const
 {
-    return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
+    return ConstTableRef(get_subtable_ptr(column_index, row_index));
 }
 
-inline ConstTableRef Table::get_parent_table(std::size_t* column_ndx_out) const REALM_NOEXCEPT
+inline ConstTableRef Table::get_parent_table(std::size_t* column_index_out) const REALM_NOEXCEPT
 {
-    return ConstTableRef(get_parent_table_ptr(column_ndx_out));
+    return ConstTableRef(get_parent_table_ptr(column_index_out));
 }
 
-inline TableRef Table::get_parent_table(std::size_t* column_ndx_out) REALM_NOEXCEPT
+inline TableRef Table::get_parent_table(std::size_t* column_index_out) REALM_NOEXCEPT
 {
-    return TableRef(get_parent_table_ptr(column_ndx_out));
+    return TableRef(get_parent_table_ptr(column_index_out));
 }
 
 inline bool Table::is_group_level() const REALM_NOEXCEPT
@@ -1721,37 +1721,37 @@ inline bool Table::is_group_level() const REALM_NOEXCEPT
 inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
 {
     Table* table = nullptr;
-    std::size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
+    std::size_t row_index = do_find_pkey_int(value); // Throws
+    if (row_index != realm::not_found)
         table = this;
-    return RowExpr(table, row_ndx);
+    return RowExpr(table, row_index);
 }
 
 inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
 {
     const Table* table = nullptr;
-    std::size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
+    std::size_t row_index = do_find_pkey_int(value); // Throws
+    if (row_index != realm::not_found)
         table = this;
-    return ConstRowExpr(table, row_ndx);
+    return ConstRowExpr(table, row_index);
 }
 
 inline Table::RowExpr Table::find_pkey_string(StringData value)
 {
     Table* table = nullptr;
-    std::size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
+    std::size_t row_index = do_find_pkey_string(value); // Throws
+    if (row_index != realm::not_found)
         table = this;
-    return RowExpr(table, row_ndx);
+    return RowExpr(table, row_index);
 }
 
 inline Table::ConstRowExpr Table::find_pkey_string(StringData value) const
 {
     const Table* table = nullptr;
-    std::size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
+    std::size_t row_index = do_find_pkey_string(value); // Throws
+    if (row_index != realm::not_found)
         table = this;
-    return ConstRowExpr(table, row_ndx);
+    return ConstRowExpr(table, row_index);
 }
 
 inline bool Table::operator==(const Table& t) const
@@ -1769,9 +1769,9 @@ inline bool Table::is_degenerate() const REALM_NOEXCEPT
     return !m_columns.is_attached();
 }
 
-inline void Table::set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
+inline void Table::set_into_mixed(Table* parent, std::size_t column_index, std::size_t row_index) const
 {
-    parent->set_mixed_subtable(col_ndx, row_ndx, this);
+    parent->set_mixed_subtable(column_index, row_index, this);
 }
 
 inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) REALM_NOEXCEPT
@@ -1782,22 +1782,22 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     return get_size_from_ref(spec_ref, columns_ref, alloc);
 }
 
-inline Table* Table::get_parent_table_ptr(std::size_t* column_ndx_out) REALM_NOEXCEPT
+inline Table* Table::get_parent_table_ptr(std::size_t* column_index_out) REALM_NOEXCEPT
 {
-    const Table* parent = const_cast<const Table*>(this)->get_parent_table_ptr(column_ndx_out);
+    const Table* parent = const_cast<const Table*>(this)->get_parent_table_ptr(column_index_out);
     return const_cast<Table*>(parent);
 }
 
-inline bool Table::is_link_type(ColumnType col_type) REALM_NOEXCEPT
+inline bool Table::is_link_type(ColumnType column_type) REALM_NOEXCEPT
 {
-    return col_type == col_type_Link || col_type == col_type_LinkList;
+    return column_type == column_type_Link || column_type == column_type_LinkList;
 }
 
 inline std::size_t* Table::record_subtable_path(std::size_t* begin,
                                                 std::size_t* end) const REALM_NOEXCEPT
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
-    std::size_t index_in_parent = real_top.get_ndx_in_parent();
+    std::size_t index_in_parent = real_top.get_index_in_parent();
     REALM_ASSERT_3(begin, <, end);
     *begin++ = index_in_parent;
     ArrayParent* parent = real_top.get_parent();
@@ -1813,10 +1813,10 @@ inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
 }
 
 template<class T>
-typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::size_t row_ndx)
+typename T::RowAccessor Table::get_link_accessor(std::size_t column_index, std::size_t row_index)
 {
-    size_t row_pos_in_target = get_link(column_ndx, row_ndx);
-    TableRef target_table = get_link_target(column_ndx);
+    size_t row_pos_in_target = get_link(column_index, row_index);
+    TableRef target_table = get_link_target(column_index);
 
     Table* table = &*target_table;
     T* typed_table = reinterpret_cast<T*>(table);
@@ -1843,15 +1843,15 @@ inline Replication* Table::get_repl() REALM_NOEXCEPT
     return m_top.get_alloc().get_replication();
 }
 
-inline void Table::set_ndx_in_parent(std::size_t ndx_in_parent) REALM_NOEXCEPT
+inline void Table::set_index_in_parent(std::size_t index_in_parent) REALM_NOEXCEPT
 {
     if (m_top.is_attached()) {
         // Root table (independent descriptor)
-        m_top.set_ndx_in_parent(ndx_in_parent);
+        m_top.set_index_in_parent(index_in_parent);
     }
     else {
         // Subtable with shared descriptor
-        m_columns.set_ndx_in_parent(ndx_in_parent);
+        m_columns.set_index_in_parent(index_in_parent);
     }
 }
 
@@ -1878,29 +1878,29 @@ public:
     }
 
     static Table* create_accessor(Allocator& alloc, ref_type top_ref,
-                                  Table::Parent* parent, std::size_t ndx_in_parent)
+                                  Table::Parent* parent, std::size_t index_in_parent)
     {
         std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
-        table->init(top_ref, parent, ndx_in_parent); // Throws
+        table->init(top_ref, parent, index_in_parent); // Throws
         return table.release();
     }
 
     static Table* create_accessor(ConstSubspecRef shared_spec, Table::Parent* parent_column,
-                                  std::size_t parent_row_ndx)
+                                  std::size_t parent_row_index)
     {
         Allocator& alloc = shared_spec.get_alloc();
         std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
-        table->init(shared_spec, parent_column, parent_row_ndx); // Throws
+        table->init(shared_spec, parent_column, parent_row_index); // Throws
         return table.release();
     }
 
     // Intended to be used only by Group::create_table_accessor()
     static Table* create_incomplete_accessor(Allocator& alloc, ref_type top_ref,
-                                             Table::Parent* parent, std::size_t ndx_in_parent)
+                                             Table::Parent* parent, std::size_t index_in_parent)
     {
         std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
         bool skip_create_column_accessors = true;
-        table->init(top_ref, parent, ndx_in_parent, skip_create_column_accessors); // Throws
+        table->init(top_ref, parent, index_in_parent, skip_create_column_accessors); // Throws
         return table.release();
     }
 
@@ -1911,9 +1911,9 @@ public:
     }
 
     static void set_top_parent(Table& table, ArrayParent* parent,
-                               std::size_t ndx_in_parent) REALM_NOEXCEPT
+                               std::size_t index_in_parent) REALM_NOEXCEPT
     {
-        table.m_top.set_parent(parent, ndx_in_parent);
+        table.m_top.set_parent(parent, index_in_parent);
     }
 
     static void update_from_parent(Table& table, std::size_t old_baseline) REALM_NOEXCEPT
@@ -1936,10 +1936,10 @@ public:
         table.discard_child_accessors();
     }
 
-    static void discard_subtable_accessor(Table& table, std::size_t col_ndx, std::size_t row_ndx)
+    static void discard_subtable_accessor(Table& table, std::size_t column_index, std::size_t row_index)
         REALM_NOEXCEPT
     {
-        table.discard_subtable_accessor(col_ndx, row_ndx);
+        table.discard_subtable_accessor(column_index, row_index);
     }
 
     static void bind_ref(Table& table) REALM_NOEXCEPT
@@ -1978,21 +1978,21 @@ public:
         return table.m_spec;
     }
 
-    static ColumnBase& get_column(const Table& table, std::size_t col_ndx)
+    static ColumnBase& get_column(const Table& table, std::size_t column_index)
     {
-        return *table.m_cols[col_ndx];
+        return *table.m_cols[column_index];
     }
 
-    static void do_remove(Table& table, std::size_t row_ndx)
+    static void do_remove(Table& table, std::size_t row_index)
     {
         bool broken_reciprocal_backlinks = false;
-        table.do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
+        table.do_remove(row_index, broken_reciprocal_backlinks); // Throws
     }
 
-    static void do_move_last_over(Table& table, std::size_t row_ndx)
+    static void do_move_last_over(Table& table, std::size_t row_index)
     {
         bool broken_reciprocal_backlinks = false;
-        table.do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
+        table.do_move_last_over(row_index, broken_reciprocal_backlinks); // Throws
     }
 
     static void do_clear(Table& table)
@@ -2001,22 +2001,22 @@ public:
         table.do_clear(broken_reciprocal_backlinks); // Throws
     }
 
-    static void do_set_link(Table& table, std::size_t col_ndx, std::size_t row_ndx,
-                            std::size_t target_row_ndx)
+    static void do_set_link(Table& table, std::size_t column_index, std::size_t row_index,
+                            std::size_t target_row_index)
     {
-        table.do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
+        table.do_set_link(column_index, row_index, target_row_index); // Throws
     }
 
     static std::size_t get_num_strong_backlinks(const Table& table,
-                                                std::size_t row_ndx) REALM_NOEXCEPT
+                                                std::size_t row_index) REALM_NOEXCEPT
     {
-        return table.get_num_strong_backlinks(row_ndx);
+        return table.get_num_strong_backlinks(row_index);
     }
 
-    static void cascade_break_backlinks_to(Table& table, std::size_t row_ndx,
+    static void cascade_break_backlinks_to(Table& table, std::size_t row_index,
                                            CascadeState& state)
     {
-        table.cascade_break_backlinks_to(row_ndx, state); // Throws
+        table.cascade_break_backlinks_to(row_index, state); // Throws
     }
 
     static void remove_backlink_broken_rows(Table& table, const CascadeState& rows)
@@ -2030,25 +2030,25 @@ public:
         return table.record_subtable_path(begin, end);
     }
 
-    static void insert_column(Descriptor& desc, std::size_t column_ndx, DataType type,
+    static void insert_column(Descriptor& desc, std::size_t column_index, DataType type,
                               StringData name, Table* link_target_table, bool nullable = false)
     {
-        Table::do_insert_column(desc, column_ndx, type, name, link_target_table, nullable); // Throws
+        Table::do_insert_column(desc, column_index, type, name, link_target_table, nullable); // Throws
     }
 
-    static void erase_column(Descriptor& desc, std::size_t column_ndx)
+    static void erase_column(Descriptor& desc, std::size_t column_index)
     {
-        Table::do_erase_column(desc, column_ndx); // Throws
+        Table::do_erase_column(desc, column_index); // Throws
     }
 
-    static void rename_column(Descriptor& desc, std::size_t column_ndx, StringData name)
+    static void rename_column(Descriptor& desc, std::size_t column_index, StringData name)
     {
-        Table::do_rename_column(desc, column_ndx, name); // Throws
+        Table::do_rename_column(desc, column_index, name); // Throws
     }
 
-    static void set_link_type(Table& table, std::size_t column_ndx, LinkType link_type)
+    static void set_link_type(Table& table, std::size_t column_index, LinkType link_type)
     {
-        table.do_set_link_type(column_ndx, link_type); // Throws
+        table.do_set_link_type(column_index, link_type); // Throws
     }
 
     static void clear_root_table_desc(const Table& root_table) REALM_NOEXCEPT
@@ -2057,38 +2057,38 @@ public:
         root_table.m_descriptor = nullptr;
     }
 
-    static Table* get_subtable_accessor(Table& table, std::size_t col_ndx,
-                                        std::size_t row_ndx) REALM_NOEXCEPT
+    static Table* get_subtable_accessor(Table& table, std::size_t column_index,
+                                        std::size_t row_index) REALM_NOEXCEPT
     {
-        return table.get_subtable_accessor(col_ndx, row_ndx);
+        return table.get_subtable_accessor(column_index, row_index);
     }
 
     static const Table* get_link_target_table_accessor(const Table& table,
-                                                       std::size_t col_ndx) REALM_NOEXCEPT
+                                                       std::size_t column_index) REALM_NOEXCEPT
     {
-        return const_cast<Table&>(table).get_link_target_table_accessor(col_ndx);
+        return const_cast<Table&>(table).get_link_target_table_accessor(column_index);
     }
 
-    static Table* get_link_target_table_accessor(Table& table, std::size_t col_ndx) REALM_NOEXCEPT
+    static Table* get_link_target_table_accessor(Table& table, std::size_t column_index) REALM_NOEXCEPT
     {
-        return table.get_link_target_table_accessor(col_ndx);
+        return table.get_link_target_table_accessor(column_index);
     }
 
-    static void adj_acc_insert_rows(Table& table, std::size_t row_ndx,
+    static void adj_acc_insert_rows(Table& table, std::size_t row_index,
                                     std::size_t num_rows) REALM_NOEXCEPT
     {
-        table.adj_acc_insert_rows(row_ndx, num_rows);
+        table.adj_acc_insert_rows(row_index, num_rows);
     }
 
-    static void adj_acc_erase_row(Table& table, std::size_t row_ndx) REALM_NOEXCEPT
+    static void adj_acc_erase_row(Table& table, std::size_t row_index) REALM_NOEXCEPT
     {
-        table.adj_acc_erase_row(row_ndx);
+        table.adj_acc_erase_row(row_index);
     }
 
-    static void adj_acc_move_over(Table& table, std::size_t from_row_ndx,
-                                  std::size_t to_row_ndx) REALM_NOEXCEPT
+    static void adj_acc_move_over(Table& table, std::size_t from_row_index,
+                                  std::size_t to_row_index) REALM_NOEXCEPT
     {
-        table.adj_acc_move_over(from_row_ndx, to_row_ndx);
+        table.adj_acc_move_over(from_row_index, to_row_index);
     }
 
     static void adj_acc_clear_root_table(Table& table) REALM_NOEXCEPT
@@ -2101,9 +2101,9 @@ public:
         table.adj_acc_clear_nonroot_table();
     }
 
-    static void adj_insert_column(Table& table, std::size_t col_ndx)
+    static void adj_insert_column(Table& table, std::size_t column_index)
     {
-        table.adj_insert_column(col_ndx); // Throws
+        table.adj_insert_column(column_index); // Throws
     }
 
     static void adj_add_column(Table& table)
@@ -2112,9 +2112,9 @@ public:
         table.adj_insert_column(num_cols); // Throws
     }
 
-    static void adj_erase_column(Table& table, std::size_t col_ndx) REALM_NOEXCEPT
+    static void adj_erase_column(Table& table, std::size_t column_index) REALM_NOEXCEPT
     {
-        table.adj_erase_column(col_ndx);
+        table.adj_erase_column(column_index);
     }
 
     static bool is_marked(const Table& table) REALM_NOEXCEPT
@@ -2137,9 +2137,9 @@ public:
         table.recursive_mark();
     }
 
-    static void mark_link_target_tables(Table& table, std::size_t col_ndx_begin) REALM_NOEXCEPT
+    static void mark_link_target_tables(Table& table, std::size_t column_index_begin) REALM_NOEXCEPT
     {
-        table.mark_link_target_tables(col_ndx_begin);
+        table.mark_link_target_tables(column_index_begin);
     }
 
     static void mark_opposite_link_tables(Table& table) REALM_NOEXCEPT
@@ -2153,10 +2153,10 @@ public:
     }
 
     typedef Table::AccessorUpdater AccessorUpdater;
-    static void update_accessors(Table& table, const std::size_t* col_path_begin,
-                                 const std::size_t* col_path_end, AccessorUpdater& updatder)
+    static void update_accessors(Table& table, const std::size_t* column_path_begin,
+                                 const std::size_t* column_path_end, AccessorUpdater& updatder)
     {
-        table.update_accessors(col_path_begin, col_path_end, updatder); // Throws
+        table.update_accessors(column_path_begin, column_path_end, updatder); // Throws
     }
 
     static void refresh_accessor_tree(Table& table)
@@ -2164,15 +2164,15 @@ public:
         table.refresh_accessor_tree(); // Throws
     }
 
-    static void set_ndx_in_parent(Table& table, std::size_t ndx_in_parent) REALM_NOEXCEPT
+    static void set_index_in_parent(Table& table, std::size_t index_in_parent) REALM_NOEXCEPT
     {
-        table.set_ndx_in_parent(ndx_in_parent);
+        table.set_index_in_parent(index_in_parent);
     }
 
-    static void set_shared_subspec_ndx_in_parent(Table& table, std::size_t spec_ndx_in_parent)
+    static void set_shared_subspec_index_in_parent(Table& table, std::size_t spec_index_in_parent)
         REALM_NOEXCEPT
     {
-        table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
+        table.m_spec.set_index_in_parent(spec_index_in_parent);
     }
 
     static bool is_link_type(ColumnType type) REALM_NOEXCEPT

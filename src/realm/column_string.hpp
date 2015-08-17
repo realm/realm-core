@@ -58,16 +58,16 @@ public:
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT final;
-    void set_null(std::size_t ndx) final;
-    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
-    void set(std::size_t ndx, StringData);
+    bool is_null(std::size_t index) const REALM_NOEXCEPT final;
+    void set_null(std::size_t index) final;
+    StringData get(std::size_t index) const REALM_NOEXCEPT;
+    void set(std::size_t index, StringData);
     void add();
     void add(StringData value);
-    void insert(std::size_t ndx);
-    void insert(std::size_t ndx, StringData value);
-    void erase(std::size_t row_ndx);
-    void move_last_over(std::size_t row_ndx);
+    void insert(std::size_t index);
+    void insert(std::size_t index, StringData value);
+    void erase(std::size_t row_index);
+    void move_last_over(std::size_t row_index);
     void clear();
 
     std::size_t count(StringData value) const;
@@ -93,7 +93,7 @@ public:
     bool is_nullable() const REALM_NOEXCEPT final;
 
     // Search index
-    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT final;
+    StringData get_index_data(std::size_t index, char* buffer) const REALM_NOEXCEPT final;
     bool has_search_index() const REALM_NOEXCEPT override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
@@ -120,7 +120,7 @@ public:
         leaf_type_Big     ///< ArrayBigBlobs
     };
 
-    std::unique_ptr<const ArrayParent> get_leaf(std::size_t ndx, std::size_t& out_ndx_in_parent,
+    std::unique_ptr<const ArrayParent> get_leaf(std::size_t index, std::size_t& out_index_in_parent,
                       LeafType& out_leaf_type) const;
 
     static ref_type create(Allocator&, std::size_t size = 0);
@@ -154,38 +154,38 @@ private:
     std::unique_ptr<StringIndex> m_search_index;
     bool m_nullable;
 
-    LeafType get_block(std::size_t ndx, ArrayParent**, std::size_t& off,
+    LeafType get_block(std::size_t index, ArrayParent**, std::size_t& off,
                       bool use_retval = false) const;
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
     /// one is fine.
     ///
-    /// \param row_ndx Must be `realm::npos` if appending.
-    void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows);
+    /// \param row_index Must be `realm::npos` if appending.
+    void do_insert(std::size_t row_index, StringData value, std::size_t num_rows);
 
     /// If you are appending and you do not have the size of the column readily
     /// available, call the 3 argument version instead. If you are not
     /// appending, either one is fine.
     ///
-    /// \param is_append Must be true if, and only if `row_ndx` is equal to the
+    /// \param is_append Must be true if, and only if `row_index` is equal to the
     /// size of the column (before insertion).
-    void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows, bool is_append);
+    void do_insert(std::size_t row_index, StringData value, std::size_t num_rows, bool is_append);
 
-    /// \param row_ndx Must be `realm::npos` if appending.
-    void bptree_insert(std::size_t row_ndx, StringData value, std::size_t num_rows);
+    /// \param row_index Must be `realm::npos` if appending.
+    void bptree_insert(std::size_t row_index, StringData value, std::size_t num_rows);
 
     // Called by Array::bptree_insert().
-    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
-                                Allocator&, std::size_t insert_ndx,
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t index_in_parent,
+                                Allocator&, std::size_t insert_index,
                                 Array::TreeInsert<StringColumn>& state);
 
     class EraseLeafElem;
     class CreateHandler;
     class SliceHandler;
 
-    void do_erase(std::size_t row_ndx, bool is_last);
-    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_erase(std::size_t row_index, bool is_last);
+    void do_move_last_over(std::size_t row_index, std::size_t last_row_index);
     void do_clear();
 
     /// Root must be a leaf. Upgrades the root leaf as
@@ -196,7 +196,7 @@ private:
     void refresh_root_accessor();
 
 #ifdef REALM_DEBUG
-    void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+    void leaf_to_dot(MemRef, ArrayParent*, std::size_t index_in_parent,
                      std::ostream&) const override;
 #endif
 
@@ -236,9 +236,9 @@ inline std::size_t StringColumn::size() const REALM_NOEXCEPT
 inline void StringColumn::add(StringData value)
 {
     REALM_ASSERT(!(value.is_null() && !m_nullable));
-    std::size_t row_ndx = realm::npos;
+    std::size_t row_index = realm::npos;
     std::size_t num_rows = 1;
-    do_insert(row_ndx, value, num_rows); // Throws
+    do_insert(row_index, value, num_rows); // Throws
 }
 
 inline void StringColumn::add()
@@ -246,32 +246,32 @@ inline void StringColumn::add()
     add(m_nullable ? realm::null() : StringData(""));
 }
 
-inline void StringColumn::insert(std::size_t row_ndx, StringData value)
+inline void StringColumn::insert(std::size_t row_index, StringData value)
 {
     REALM_ASSERT(!(value.is_null() && !m_nullable));
     std::size_t size = this->size();
-    REALM_ASSERT_3(row_ndx, <=, size);
+    REALM_ASSERT_3(row_index, <=, size);
     std::size_t num_rows = 1;
-    bool is_append = row_ndx == size;
-    do_insert(row_ndx, value, num_rows, is_append); // Throws
+    bool is_append = row_index == size;
+    do_insert(row_index, value, num_rows, is_append); // Throws
 }
 
-inline void StringColumn::insert(std::size_t row_ndx)
+inline void StringColumn::insert(std::size_t row_index)
 {
-    insert(row_ndx, m_nullable ? realm::null() : StringData(""));
+    insert(row_index, m_nullable ? realm::null() : StringData(""));
 }
 
-inline void StringColumn::erase(std::size_t row_ndx)
+inline void StringColumn::erase(std::size_t row_index)
 {
-    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
-    bool is_last = row_ndx == last_row_ndx;
-    do_erase(row_ndx, is_last); // Throws
+    std::size_t last_row_index = size() - 1; // Note that size() is slow
+    bool is_last = row_index == last_row_index;
+    do_erase(row_index, is_last); // Throws
 }
 
-inline void StringColumn::move_last_over(std::size_t row_ndx)
+inline void StringColumn::move_last_over(std::size_t row_index)
 {
-    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
-    do_move_last_over(row_ndx, last_row_ndx); // Throws
+    std::size_t last_row_index = size() - 1; // Note that size() is slow
+    do_move_last_over(row_index, last_row_index); // Throws
 }
 
 inline void StringColumn::clear()
@@ -296,10 +296,10 @@ inline int StringColumn::compare_values(std::size_t row1, std::size_t row2) cons
     return utf8_compare(a, b) ? 1 : -1;
 }
 
-inline void StringColumn::set_string(std::size_t row_ndx, StringData value)
+inline void StringColumn::set_string(std::size_t row_index, StringData value)
 {
     REALM_ASSERT(!(value.is_null() && !m_nullable));
-    set(row_ndx, value); // Throws
+    set(row_index, value); // Throws
 }
 
 inline bool StringColumn::has_search_index() const REALM_NOEXCEPT
@@ -345,40 +345,40 @@ inline bool StringColumn::is_string_col() const REALM_NOEXCEPT
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void StringColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
+inline void StringColumn::insert_rows(size_t row_index, size_t num_rows_to_insert,
                                       size_t prior_num_rows)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(row_index <= prior_num_rows);
 
     StringData value = m_nullable ? realm::null() : StringData("");
-    bool is_append = (row_ndx == prior_num_rows);
-    do_insert(row_ndx, value, num_rows_to_insert, is_append); // Throws
+    bool is_append = (row_index == prior_num_rows);
+    do_insert(row_index, value, num_rows_to_insert, is_append); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void StringColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
+inline void StringColumn::erase_rows(size_t row_index, size_t num_rows_to_erase,
                                      size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
-    REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
+    REALM_ASSERT(row_index <= prior_num_rows - num_rows_to_erase);
 
-    bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
+    bool is_last = (row_index + num_rows_to_erase == prior_num_rows);
     for (size_t i = num_rows_to_erase; i > 0; --i) {
-        size_t row_ndx_2 = row_ndx + i - 1;
-        do_erase(row_ndx_2, is_last); // Throws
+        size_t row_index_2 = row_index + i - 1;
+        do_erase(row_index_2, is_last); // Throws
     }
 }
 
 // Implementing pure virtual method of ColumnBase.
-inline void StringColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool)
+inline void StringColumn::move_last_row_over(size_t row_index, size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
-    REALM_ASSERT(row_ndx < prior_num_rows);
+    REALM_ASSERT(row_index < prior_num_rows);
 
-    size_t last_row_ndx = prior_num_rows - 1;
-    do_move_last_over(row_ndx, last_row_ndx); // Throws
+    size_t last_row_index = prior_num_rows - 1;
+    do_move_last_over(row_index, last_row_index); // Throws
 }
 
 // Implementing pure virtual method of ColumnBase.

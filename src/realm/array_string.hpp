@@ -49,14 +49,14 @@ public:
     explicit ArrayString(no_prealloc_tag) REALM_NOEXCEPT;
     ~ArrayString() REALM_NOEXCEPT override {}
 
-    bool is_null(size_t ndx) const;
-    void set_null(size_t ndx);
-    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
+    bool is_null(size_t index) const;
+    void set_null(size_t index);
+    StringData get(std::size_t index) const REALM_NOEXCEPT;
     void add();
     void add(StringData value);
-    void set(std::size_t ndx, StringData value);
-    void insert(std::size_t ndx, StringData value);
-    void erase(std::size_t ndx);
+    void set(std::size_t index, StringData value);
+    void insert(std::size_t index, StringData value);
+    void erase(std::size_t index);
 
     std::size_t count(StringData value, std::size_t begin = 0,
                       std::size_t end = npos) const REALM_NOEXCEPT;
@@ -72,9 +72,9 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static StringData get(const char* header, std::size_t ndx, bool nullable) REALM_NOEXCEPT;
+    static StringData get(const char* header, std::size_t index, bool nullable) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t index, StringData, TreeInsertBase& state);
 
     /// Construct a string array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
@@ -139,13 +139,13 @@ inline MemRef ArrayString::create_array(std::size_t size, Allocator& alloc)
     return Array::create(type_Normal, context_flag, wtype_Multiply, size, value, alloc); // Throws
 }
 
-inline StringData ArrayString::get(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData ArrayString::get(std::size_t index) const REALM_NOEXCEPT
 {
-    REALM_ASSERT_3(ndx, <, m_size);
+    REALM_ASSERT_3(index, <, m_size);
     if (m_width == 0)
         return m_nullable ? realm::null() : StringData("");
 
-    const char* data = m_data + (ndx * m_width);
+    const char* data = m_data + (index * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];
 
     if (size == static_cast<size_t>(-1))
@@ -166,11 +166,11 @@ inline void ArrayString::add()
     add(m_nullable ? realm::null() : StringData("")); // Throws
 }
 
-inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nullable) REALM_NOEXCEPT
+inline StringData ArrayString::get(const char* header, std::size_t index, bool nullable) REALM_NOEXCEPT
 {
-    REALM_ASSERT(ndx < get_size_from_header(header));
+    REALM_ASSERT(index < get_size_from_header(header));
     std::size_t width = get_width_from_header(header);
-    const char* data = get_data_from_header(header) + (ndx * width);
+    const char* data = get_data_from_header(header) + (index * width);
 
     if (width == 0)
         return nullable ? realm::null() : StringData("");
