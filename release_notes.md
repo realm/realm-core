@@ -18,7 +18,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added `Descriptor::get_link_target()`, for completeness.
 
 -----------
 

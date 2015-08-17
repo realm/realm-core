@@ -730,7 +730,9 @@ public:
     /// invocation of `Table::operator==()`.
     bool operator==(const Table&) const;
 
-    /// Compare two tables for inequality. See operator==().
+    /// \brief Compare two tables for inequality.
+    ///
+    /// See operator==().
     bool operator!=(const Table& t) const;
 
     /// A subtable in a column of type 'table' (which shares descriptor with

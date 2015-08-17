@@ -1,4 +1,5 @@
 #include <realm/descriptor.hpp>
+#include <realm/group.hpp>
 
 #include "test.hpp"
 
@@ -467,4 +468,16 @@ TEST(Descriptor_DeeplyNested)
         CHECK_EQUAL(desc, subdesc->get_parent());
         desc = subdesc;
     }
+}
+
+
+TEST(Descriptor_Links)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_Link, "link", *target);
+    CHECK_EQUAL(target, origin->get_link_target(0));
+    ConstTableRef const_origin = origin;
+    CHECK_EQUAL(target, const_origin->get_link_target(0));
 }
