@@ -2190,6 +2190,11 @@ public:
         return table.is_cross_table_link_target();
     }
 
+    static Group* get_parent_group(const Table& table) REALM_NOEXCEPT
+    {
+        return table.get_parent_group();
+    }
+
     static Replication* get_repl(Table& table) REALM_NOEXCEPT
     {
         return table.get_repl();
