@@ -14,7 +14,7 @@
 #include <realm/alloc_slab.hpp>
 
 // needed for mprotect - this has to be moved into File and generalised to work on win32
-#include <sys/mman.h>
+//#include <sys/mman.h>
 
 using namespace realm;
 using namespace realm::util;

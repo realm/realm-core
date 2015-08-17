@@ -136,7 +136,7 @@ inline int log2(std::size_t x) {
 inline int log2(std::size_t x) {
     if (x) {
         unsigned long index;
-        unsigned char c = _BitScanReverse64(&index, value);
+        unsigned char c = _BitScanReverse64(&index, x);
         return index;
     }
     else
