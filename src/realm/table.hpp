@@ -1595,7 +1595,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 
 // For use by queries
 template<class T> inline Columns<T> Table::column(std::size_t column)
-{   
+{
     std::vector<size_t> tmp = m_link_chain;
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
         tmp.push_back(column);

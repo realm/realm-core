@@ -99,7 +99,7 @@ struct NotEqual {
 
     template<class T> bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const 
     { 
-        if(!v1null && !v2null) 
+        if (!v1null && !v2null) 
             return v1 != v2; 
 
         if (v1null && v2null)

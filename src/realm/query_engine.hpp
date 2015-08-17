@@ -1021,7 +1021,7 @@ public:
         };
 
         // This will inline the second case but no the first. Todo, use templated lambda when switching to c++14
-        if(m_table->is_nullable(m_condition_column_idx))
+        if (m_table->is_nullable(m_condition_column_idx))
             return find(true);
         else
             return find(false);

@@ -345,7 +345,7 @@ TEST(ArrayIntNull_Find)
     CHECK_EQUAL(0x33, t4);
 
     int64_t t5;
-     a.maximum(t5);
+    a.maximum(t5);
     CHECK_EQUAL(0x100, t5);
 
     int64_t t6;

@@ -32,7 +32,7 @@ public:
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
-    /// Fixme, see if we can make this private again. Required by query_expression.hpp
+    /// FIXME: See if we can make this private again. Required by query_expression.hpp
     DateTime(int_fast64_t d) REALM_NOEXCEPT : m_time(d) {}
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.

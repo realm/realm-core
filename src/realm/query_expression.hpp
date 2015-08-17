@@ -463,7 +463,7 @@ public:
     // Compare, right side constant
     Query operator > (R right)
     {
-        if(std::is_same<R, null>::value)
+        if (std::is_same<R, null>::value)
             throw(realm::LogicError::type_mismatch);
         return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
@@ -688,8 +688,9 @@ template <class T, size_t prealloc = 8> struct NullableVector
 
         // If value collides with magic null value, then switch to a new unique representation for null
         if (REALM_UNLIKELY(value == m_null)) {
-            int64_t cand = m_null + 0xfffffffbULL; // adding a prime will generate 2^64 unique values
-            while (std::find(m_first, m_first + m_size, cand) != m_first + m_size)
+            // adding a prime will generate 2^64 unique values. Todo: Only works on 2's complement architecture
+            uint64_t cand = static_cast<uint64_t>(m_null) + 0xfffffffbULL;
+            while (std::find(m_first, m_first + m_size, static_cast<int64_t>(cand)) != m_first + m_size)
                 cand += 0xfffffffbULL;
             std::replace_if(m_first, m_first + m_size, [&](int64_t v) { return v == m_null; }, cand);
         }
@@ -947,7 +948,7 @@ public:
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
-        else if (std::is_same<T, bool>::value)            
+        else if (std::is_same<T, bool>::value)
             source.export_bool(*this);
         else if (std::is_same<T, float>::value)
             source.export_float(*this);
@@ -1637,7 +1638,7 @@ public:
                 sg = new SequentialGetter<ColType>();
         }
 
-        if(m_nullable)
+        if (m_nullable)
             static_cast<SequentialGetter<ColTypeN>*>(sg)->init(  (ColTypeN*) (c)); // todo, c cast
         else
             static_cast<SequentialGetter<ColType>*>(sg)->init( (ColType*)(c));

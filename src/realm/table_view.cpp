@@ -174,7 +174,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
     if (m_num_detached_refs == 0 && m_row_indexes.size() == column->size()) {
         // direct aggregate on the column
-        if(function == act_Count)
+        if (function == act_Count)
             return static_cast<R>(column->count(count_target));
         else
             return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
@@ -195,7 +195,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     if (return_ndx)
         *return_ndx = 0;
 
-    if(function == act_Count)
+    if (function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
     else
         res = static_cast<R>(first);
@@ -265,7 +265,7 @@ double TableViewBase::sum_double(size_t column_ndx) const
 
 int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    if(m_table->is_nullable(column_ndx))
+    if (m_table->is_nullable(column_ndx))
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
     else
         return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);

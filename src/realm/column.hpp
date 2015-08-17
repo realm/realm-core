@@ -383,7 +383,7 @@ class Column : public ColumnBaseWithIndex, public ColumnTemplate<T> {
 public:
     using value_type = T;
     using LeafInfo = typename BpTree<T, Nullable>::LeafInfo;
-	using LeafType = typename BpTree<T, Nullable>::LeafType;
+    using LeafType = typename BpTree<T, Nullable>::LeafType;
     static const bool nullable = Nullable;
 
     struct unattached_root_tag {};
@@ -746,7 +746,7 @@ std::size_t Column<T, N>::count(T target) const
 template <class T, bool N>
 T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
 {
-    if(N)
+    if (N)
         return aggregate<T, T, act_Sum, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
     else
         return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
@@ -760,7 +760,7 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
     size_t size = end - start;
 
     // fixme, doesn't look correct
-    if(limit < size)
+    if (limit < size)
         size = limit;
 
     auto s = sum(start, end, limit, return_ndx);
