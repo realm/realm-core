@@ -106,7 +106,7 @@ namespace {
         // Increment by a prime number. This guarantees that we will
         // eventually hit every possible integer in the 2^64 range.
         x += 0xfffffffbULL;
-        return static_cast<int64_t>(x);
+        return util::from_twos_compl<int64_t>(x);
     }
 }
 
