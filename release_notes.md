@@ -13,12 +13,14 @@
     * `Group`;
     * `Query`;
     * `StringIndex`.
-* Several functions renamed in `realm/util/utf8.hpp` for clarity. For instance,
-  `Utf8x16<>::to_utf16()` was renamed to `Utf8x16<>::utf8_to_utf16()`.
+* Several functions renamed in `<realm/util/utf8.hpp>` for clarity. For
+  instance, `Utf8x16<>::to_utf16()` was renamed to `Utf8x16<>::utf8_to_utf16()`.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added `Utf8x16<>::utf8_skip_utf16()` in `<realm/util/utf8.hpp>`. This is
+  expected to be needed by some bindings in connection with new substring
+  operations.
 
 -----------
 

@@ -76,6 +76,27 @@ template<class Char16, class Traits16 = std::char_traits<Char16>> struct Utf8x16
     /// only detect a few UTF-16 validity issues, and can therefore not be used
     /// for general UTF-16 validation.
     static size_t utf16_find_utf8_buf_size(const Char16*& in_begin, const Char16* in_end);
+
+    /// \brief Skip UTF-8 encoded characters bounded by the number of
+    /// corresponding UTF-16 elements.
+    ///
+    /// In the specified UTF-8 buffer, skip over the longest prefix of complete,
+    /// validly encoded Unicode characters whose corresponding UTF-16 encoding
+    /// would fit in an output buffer with space for \a utf16_skip UTF-16
+    /// elements.
+    ///
+    /// This function is more efficient than, but semantically identical
+    /// to,
+    ///
+    ///    Char16* utf16_begin = buffer;
+    ///    Char16* utf16_end   = buffer + utf16_skip;
+    ///    bool complete = utf8_to_utf16(utf8_begin, utf8_end, utf16_begin, utf16_end);
+    ///    utf16_skip -= utf16_begin - buffer;
+    ///    return complete;
+    ///
+    /// as long as `buffer` is a sufficiently large buffer.
+    static bool utf8_skip_utf16(const char*& utf8_begin, const char* utf8_end,
+                                size_t& utf16_skip);
 };
 
 
@@ -369,6 +390,127 @@ inline size_t Utf8x16<Char16, Traits16>::utf16_find_utf8_buf_size(const Char16*&
     }
     in_begin  = in;
     return num_out;
+}
+
+
+template<class Char16, class Traits16>
+inline bool Utf8x16<Char16, Traits16>::utf8_skip_utf16(const char*& utf8_begin,
+                                                       const char* utf8_end,
+                                                       size_t& utf16_skip)
+{
+    typedef std::char_traits<char> traits8;
+    bool invalid = false;
+    const char* in = utf8_begin;
+    const char* in_end = utf8_end;
+    size_t skip = utf16_skip;
+    while (in != in_end) {
+        if (REALM_UNLIKELY(skip == 0)) {
+            break; // All UTF-16 elements skipped
+        }
+        uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
+        if (REALM_LIKELY(v1 < 0x80)) { // One byte
+            // UTF-8 layout: 0xxxxxxx
+            skip -= 1;
+            in += 1;
+            continue;
+        }
+        if (REALM_UNLIKELY(v1 < 0xC0)) {
+            invalid = true;
+            break; // Invalid first byte of UTF-8 sequence
+        }
+        if (REALM_LIKELY(v1 < 0xE0)) { // Two bytes
+            if (REALM_UNLIKELY(in_end - in < 2)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
+            // UTF-8 layout: 110xxxxx 10xxxxxx
+            if (REALM_UNLIKELY((v2 & 0xC0) != 0x80)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast16_t v = uint_fast16_t(((v1 & 0x1F) << 6) |
+                                            ((v2 & 0x3F) << 0));
+            if (REALM_UNLIKELY(v < 0x80)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            skip -= 1;
+            in += 2;
+            continue;
+        }
+        if (REALM_LIKELY(v1 < 0xF0)) { // Three bytes
+            if (REALM_UNLIKELY(in_end - in < 3)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
+            uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2]));
+            // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
+            if (REALM_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast16_t v = uint_fast16_t(((v1 & 0x0F) << 12) |
+                                            ((v2 & 0x3F) <<  6) |
+                                            ((v3 & 0x3F) <<  0));
+            if (REALM_UNLIKELY(v < 0x800)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            if (REALM_UNLIKELY(0xD800 <= v && v < 0xE000)) {
+                invalid = true;
+                break; // Illegal code point range (reserved for UTF-16 surrogate pairs)
+            }
+            skip -= 1;
+            in += 3;
+            continue;
+        }
+        if (REALM_UNLIKELY(skip == 1)) {
+            // Surrogate pair requires skipping two UTF-16 elements, but only
+            // one more may be skipped, so stop.
+            break;
+        }
+        if (REALM_LIKELY(v1 < 0xF8)) { // Four bytes
+            if (REALM_UNLIKELY(in_end - in < 4)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast32_t w1 = uint_fast32_t(v1); // 16 bit -> 32 bit
+            uint_fast32_t v2 = uint_fast32_t(traits8::to_int_type(in[1])); // 32 bit intended
+            uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2])); // 16 bit intended
+            uint_fast16_t v4 = uint_fast16_t(traits8::to_int_type(in[3])); // 16 bit intended
+            // UTF-8 layout: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+            if (REALM_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80 ||
+                               (v4 & 0xC0) != 0x80)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast32_t v =
+                uint_fast32_t(((w1 & 0x07) << 18) | // Parenthesis is 32 bit partial result
+                              ((v2 & 0x3F) << 12) | // Parenthesis is 32 bit partial result
+                              ((v3 & 0x3F) <<  6) | // Parenthesis is 16 bit partial result
+                              ((v4 & 0x3F) <<  0)); // Parenthesis is 16 bit partial result
+            if (REALM_UNLIKELY(v < 0x10000)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            if (REALM_UNLIKELY(0x110000 <= v)) {
+                invalid = true;
+                break; // Code point too big for UTF-16
+            }
+            skip -= 2;
+            in += 4;
+            continue;
+        }
+        // Invalid first byte of UTF-8 sequence, or code point too big for UTF-16
+        invalid = true;
+        break;
+    }
+
+    utf8_begin = in;
+    utf16_skip = skip;
+    return !invalid;
 }
 
 } // namespace util
