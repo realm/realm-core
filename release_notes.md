@@ -13,6 +13,8 @@
     * `Group`;
     * `Query`;
     * `StringIndex`.
+* Several functions renamed in `realm/util/utf8.hpp` for clarity. For instance,
+  `Utf8x16<>::to_utf16()` was renamed to `Utf8x16<>::utf8_to_utf16()`.
 
 ### Enhancements:
 
