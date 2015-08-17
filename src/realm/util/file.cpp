@@ -861,11 +861,11 @@ void File::protect(void* addr, size_t size, Protection prot)
 #ifdef _WIN32 // Windows version
 
     if (prot == Protection::RO) {
-        if (VirtualProtect(addr, size, PAGE_READONLY)
+        if (VirtualProtect(addr, size, PAGE_READONLY))
             return;
     }
     else if (prot == Protection::RW) {
-        if (VirtualProtect(addr, size, PAGE_READWRITE)
+        if (VirtualProtect(addr, size, PAGE_READWRITE))
             return;
     }
     throw std::runtime_error("FlushViewOfFile() failed");
