@@ -6029,4 +6029,20 @@ TEST(Table_TwoStringColumnTypesEquality)
 
 }
 
+TEST(TEST_TableLinkEquality)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+    TableRef t4 = g.add_table("t4");
+    t1->add_column(type_String, "str");
+    t2->add_column(type_Int, "int");
+
+    t3->add_column_link(type_Link, "link", *t1, link_Strong);
+    t4->add_column_link(type_Link, "link", *t2, link_Strong);
+
+    CHECK(*t3->get_descriptor() != *t4->get_descriptor());
+}
+
 #endif // TEST_TABLE
