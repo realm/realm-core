@@ -447,7 +447,7 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
     if (!m_names.compare_string(spec.m_names))
         return false;
 
-    // check each column's type, also comparing sub tables
+    // check each column's type
     const size_t column_count = get_column_count();
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx)
     {
@@ -456,6 +456,7 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
             case col_type_String:
             case col_type_StringEnum:
             {
+                // These types are considered equal as col_type_StringEnum is used for an internal optimization only
                 const int64_t rhs_type = spec.m_types.get(col_ndx);
                 if (rhs_type != col_type_String && rhs_type != col_type_StringEnum)
                     return false;
@@ -463,6 +464,7 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
             }
             case col_type_Table:
             {
+                // Sub tables must be compared recursively
                 const size_t subspec_index = get_subspec_ndx(col_ndx);
                 const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
                 const Spec rhs = Spec(const_cast<Spec&>(spec).get_subspec_by_ndx(subspec_index)); // supposedly safe const_cast
@@ -472,6 +474,7 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
             }
             case col_type_Link:
             {
+                // In addition to name and attributes, the link target type must also be compared
                 const size_t subspec_index = get_subspec_ndx(col_ndx);
                 if (m_subspecs.get(subspec_index) != spec.m_subspecs.get(subspec_index))
                     return false;
@@ -488,6 +491,7 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
             case col_type_Reserved4:
             case col_type_LinkList:
             case col_type_BackLink:
+                // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;
                 break;
