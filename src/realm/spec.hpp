@@ -104,9 +104,11 @@ public:
     /// well.
     std::size_t get_column_ndx_in_parent(std::size_t column_ndx) const;
 
+    //@{
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const REALM_NOEXCEPT;
     bool operator!=(const Spec&) const REALM_NOEXCEPT;
+    //@}
 
     void destroy() REALM_NOEXCEPT;
 
