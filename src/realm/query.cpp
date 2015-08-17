@@ -118,8 +118,6 @@ void Query::copy_nodes(const Query& source)
             first[t] = node_mapping[first[t]];
         }
 
-
-
         if (first[0]) {
             ParentNode* node_to_update = first[0];
             while (node_to_update->m_child) {
