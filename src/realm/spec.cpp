@@ -477,7 +477,17 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
                     return false;
                 break;
             }
-            default:
+            case col_type_Int:
+            case col_type_Bool:
+            case col_type_Binary:
+            case col_type_Mixed:
+            case col_type_DateTime:
+            case col_type_Reserved1:
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Reserved4:
+            case col_type_LinkList:
+            case col_type_BackLink:
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;
                 break;
