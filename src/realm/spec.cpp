@@ -470,6 +470,13 @@ bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
                     return false;
                 break;
             }
+            case col_type_Link:
+            {
+                const size_t subspec_index = get_subspec_ndx(col_ndx);
+                if (m_subspecs.get(subspec_index) != spec.m_subspecs.get(subspec_index))
+                    return false;
+                break;
+            }
             default:
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;
