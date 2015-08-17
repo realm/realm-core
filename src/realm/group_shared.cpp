@@ -683,23 +683,24 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
             // proceed to initialize versioning and other metadata information related to
             // the database. Also create the database if we're beginning a new session
             bool begin_new_session = info->num_participants == 0;
-            bool is_shared = true;
-            bool read_only = false;
-            bool skip_validate = !begin_new_session;
+            SlabAlloc::Config cfg;
+            cfg.session_initiator = begin_new_session;
+            cfg.is_shared = true;
+            cfg.read_only = false;
+            cfg.skip_validate = !begin_new_session;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
-            bool no_create = begin_new_session ? no_create_file : true;
+            cfg.no_create = begin_new_session ? no_create_file : true;
 
             // If replication is enabled, we need to ask it whether we're in server-sync mode
             // and check that the database is operated in the same mode.
-            bool server_sync_mode = false;
+            cfg.server_sync_mode = false;
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl)
-                server_sync_mode = repl->is_in_server_synchronization_mode();
-            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
-                                                 no_create, skip_validate, encryption_key, 
-                                                 server_sync_mode, begin_new_session); // Throws
+                cfg.server_sync_mode = repl->is_in_server_synchronization_mode();
+            cfg.encryption_key = encryption_key;
+            ref_type top_ref = alloc.attach_file(path, cfg); // Throws
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
@@ -715,7 +716,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
                     if (top.size() <= 5) {
                         // the database wasn't written by shared group, so no versioning info
                         version = 1;
-                        REALM_ASSERT(! server_sync_mode);
+                        REALM_ASSERT(! cfg.server_sync_mode);
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
@@ -875,15 +876,13 @@ bool SharedGroup::compact()
 
     // close and reopen the database file.
     alloc.detach();
-    bool skip_validate = false;
-    bool no_create = true;
-    bool read_only = false;
-    bool is_shared = true;
-    bool server_sync_mode = false;
-    bool is_session_initiator = true;
-    ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create, 
-                                         skip_validate, m_key, server_sync_mode,
-                                         is_session_initiator); // Throws
+    SlabAlloc::Config cfg;
+    cfg.skip_validate = true;
+    cfg.no_create = true;
+    cfg.is_shared = true;
+    cfg.session_initiator = true;
+    cfg.encryption_key = m_key;
+    ref_type top_ref = alloc.attach_file(m_db_path, cfg);
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match

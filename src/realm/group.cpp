@@ -59,15 +59,11 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     if (is_attached() || m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
 
-    bool read_only = mode == mode_ReadOnly;
-    bool no_create = mode == mode_ReadWriteNoCreate;
-    bool skip_validate = false;
-    bool server_sync_mode = false;
-    bool is_session_initiator = false;
-    bool is_shared = false;
-    ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
-                                           skip_validate, encryption_key, server_sync_mode,
-                                           is_session_initiator); // Throws
+    SlabAlloc::Config cfg;
+    cfg.read_only = mode == mode_ReadOnly;
+    cfg.no_create = mode == mode_ReadWriteNoCreate;
+    cfg.encryption_key = encryption_key;
+    ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
 
     // Make all dynamically allocated memory (space beyond the attached file) as
     // available free-space.

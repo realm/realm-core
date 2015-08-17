@@ -76,6 +76,9 @@ public:
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
     ///
+    /// Except for \param path, the parameters are passed in through a
+    /// configuration object.
+    ///
     /// \param is_shared Must be true if, and only if we are called on
     /// behalf of SharedGroup.
     ///
@@ -107,9 +110,17 @@ public:
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
-    ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate, const char* encryption_key, bool server_sync_mode, 
-                         bool session_initiator);
+    struct Config {
+        bool is_shared = false;
+        bool read_only = false;
+        bool no_create = false;
+        bool skip_validate = false;
+        bool server_sync_mode = false;
+        bool session_initiator = false;
+        const char* encryption_key = 0;
+    };
+
+    ref_type attach_file(const std::string& path, Config& cfg);
 
     /// Attach this allocator to the specified memory buffer.
     ///
