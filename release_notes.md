@@ -21,7 +21,7 @@
 ### Enhancements:
 
 * Added `Descriptor::get_link_target()`, for completeness.
-* Added extra `alloc_file_format_upgrade` argument to `SharedGroup::open()`.
+* Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
 
 -----------
 
