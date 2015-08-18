@@ -63,7 +63,7 @@ public:
     ///
     ///   2   FIXME: Does anybody remember what happened here?
     ///
-    ///   3   FIXME: Lasse, please fill in this entry
+    ///   3   Supporting null on string columns broke the file format
     ///
 #if REALM_NULL_STRINGS == 1
     // Bumped to 3 because of null support of String columns and because of new format of index
