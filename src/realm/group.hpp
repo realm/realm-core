@@ -106,9 +106,6 @@ public:
 
     ~Group() REALM_NOEXCEPT override;
 
-    void upgrade_file_format();
-    unsigned char get_file_format() const;
-
     /// Attach this Group instance to the specified database file.
     ///
     /// By default, the specified file is opened in read-only mode
@@ -602,7 +599,12 @@ private:
                           _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
 
-    bool file_format_upgrade_required() const;
+    int get_file_format() const REALM_NOEXCEPT;
+    void set_file_format(int) REALM_NOEXCEPT;
+    int get_committed_file_format() const REALM_NOEXCEPT;
+
+    /// Must be called from within a write transaction
+    void upgrade_file_format();
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
@@ -650,12 +652,6 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     init_array_parents();
 
     open(file, key, mode); // Throws
-
-    // Fixme / Review: We assume that database files opened with read-only access are using Group and that
-    // read/write access makes the language binding use SharedGroup instead (which will perform the auto-upgrade)
-    if (m_alloc.get_file_format() < default_file_format_version)
-        throw std::runtime_error("You attempted to open a database file of an older format. Please open it with \
-        write access flags and make sure it resides on writable storage in order for it to be auto-upgraded");
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):

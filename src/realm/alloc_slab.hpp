@@ -31,13 +31,6 @@
 
 namespace realm {
 
-#if REALM_NULL_STRINGS == 1
-    // Bumped to 3 because of null support of String columns and because of new format of index
-    const int default_file_format_version = 3;
-#else
-    const int default_file_format_version = 2;
-#endif
-
 // Pre-declarations
 class Group;
 class GroupWriter;
@@ -64,6 +57,21 @@ struct InvalidDatabase;
 /// of slabs.
 class SlabAlloc: public Allocator {
 public:
+    /// File format versions:
+    ///
+    ///   1   Initial file format version
+    ///
+    ///   2   FIXME: Does anybody remember what happened here?
+    ///
+    ///   3   Supporting null on string columns broke the file format
+    ///
+#if REALM_NULL_STRINGS == 1
+    // Bumped to 3 because of null support of String columns and because of new format of index
+    static constexpr int library_file_format = 3;
+#else
+    static constexpr int library_file_format = 2;
+#endif
+
     ~SlabAlloc() REALM_NOEXCEPT override;
 
     /// Attach this allocator to the specified file.
@@ -116,7 +124,9 @@ public:
     /// \throw InvalidDatabase
     ref_type attach_buffer(char* data, std::size_t size);
 
-    unsigned char get_file_format() const;
+    /// Reads file format from file header. Must be called from within a write
+    /// transaction.
+    int get_committed_file_format() const REALM_NOEXCEPT;
 
     /// Attach this allocator to an empty buffer.
     ///
@@ -292,7 +302,7 @@ private:
         uint64_t m_top_ref[2]; // 2 * 8 bytes
         // Info-block 8-bytes
         uint8_t m_mnemonic[4]; // "T-DB"
-        uint8_t m_file_format_version[2];
+        uint8_t m_file_format[2]; // See `library_file_format`
         uint8_t m_reserved;
         // bit 0 of m_flags is used to select between the two top refs.
         // bit 1 of m_flags is to be set for persistent commit-logs (Sync support).
@@ -345,7 +355,10 @@ private:
     /// less padding between members due to alignment requirements.
     FeeeSpaceState m_free_space_state = free_space_Clean;
 
-    unsigned char m_file_format_version = default_file_format_version;
+    /// File format fetched from header during attach. If less than
+    /// `library_file_format`, it will be updated later during SharedGroup
+    /// construction as part of a file format upgrade.
+    int m_file_format;
 
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;
@@ -363,7 +376,9 @@ private:
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This
     /// function will not detect all forms of corruption, though.
-    void validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
+    ///
+    /// Initializes `m_file_on_streaming_form`.
+    void validate_buffer(const char* data, std::size_t len, ref_type& top_ref, bool is_shared);
 
     void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
