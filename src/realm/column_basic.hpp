@@ -61,7 +61,7 @@ public:
     using LeafType = typename GetLeafType<T, false>::type;
     using value_type = T;
 
-    // All float and double columns are nullable internally, even if they are marked non-nullable by the user
+    // The FloatColumn and DoubleColumn only exists as class types that support null
     static const bool nullable = true;
     
     BasicColumn(Allocator&, ref_type, bool nullable);

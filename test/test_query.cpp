@@ -6421,7 +6421,6 @@ NOTE NOTE: There is currently only very little syntax checking.
 
 TEST(Query_Null_DefaultsAndErrorhandling)
 {
-
     // Non-nullable columns: Tests is_nullable() and set_null()
     {
         Group g;

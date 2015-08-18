@@ -75,20 +75,22 @@ TEST(ColumnBasic_LowerUpperBound)
     // Clean up
     col.destroy();
 }
+
 /*
+// fixme, do these tests make sense? Since only IntegerColumn and IntNullColumn should be used
 TEST(ColumnBasic_NullOperations)
 {
     ref_type ref = BasicColumn<int64_t>::create(Allocator::get_default());
-    BasicColumn<int64_t> c(Allocator::get_default(), ref);
+    BasicColumn<int64_t> c(Allocator::get_default(), ref, false);
 
     CHECK(!c.is_nullable());
     c.destroy();
 }
 
-TEST(ColumnBasic_NullErrorHandling)
+ONLY(ColumnBasic_NullErrorHandling)
 {
     ref_type ref = BasicColumn<int64_t>::create(Allocator::get_default());
-    BasicColumn<int64_t> c(Allocator::get_default(), ref);
+    BasicColumn<int64_t> c(Allocator::get_default(), ref, false);
 
     c.add(0);
     CHECK_THROW_ANY(c.set_null(0), LogicError::column_not_nullable);
