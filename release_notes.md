@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
+  handles attributes (nullability etc), sub tables, optimized string columns
+  and target link types correctly.
 
 ### API breaking changes:
 
@@ -16,7 +18,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added `Descriptor::get_link_target()`, for completeness.
 
 -----------
 
