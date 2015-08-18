@@ -92,8 +92,10 @@ public:
 template<class T>
 void BasicColumn<T>::set(std::size_t ndx, T value)
 {
+    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this. 
+    T normalized = null::to_realm(value);
     if (!m_array->is_inner_bptree_node()) {
-        static_cast<BasicArray<T>*>(m_array.get())->set(ndx, value); // Throws
+        static_cast<BasicArray<T>*>(m_array.get())->set(ndx, normalized); // Throws
         return;
     }
 
@@ -110,6 +112,8 @@ template<class T> inline void BasicColumn<T>::add(T value)
 
 template<class T> inline void BasicColumn<T>::insert(std::size_t row_ndx, T value)
 {
+    REALM_ASSERT((std::is_same<T, float>::value || std::is_same<T, double>::value));
+
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
@@ -577,6 +581,10 @@ double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t l
 template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, std::size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
+
+    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this. 
+    T normalized = null::to_realm(value);
+
     ref_type new_sibling_ref;
     Array::TreeInsert<BasicColumn<T>> state;
     for (std::size_t i = 0; i != num_rows; ++i) {
@@ -584,10 +592,10 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, s
         if (root_is_leaf()) {
             REALM_ASSERT(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array.get());
-            new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state);
+            new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, normalized, state);
         }
         else {
-            state.m_value = value;
+            state.m_value = normalized;
             if (row_ndx_2 == realm::npos) {
                 new_sibling_ref = m_array->bptree_append(state); // Throws
             }

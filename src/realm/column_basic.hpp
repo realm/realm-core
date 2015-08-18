@@ -86,7 +86,12 @@ public:
     void set_null(size_t index)
     {
         REALM_ASSERT(m_nullable);
-        set(index, null::get_null_float<T>()); 
+        if (!m_array->is_inner_bptree_node()) {
+            static_cast<BasicArray<T>*>(m_array.get())->set(index, null::get_null_float<T>()); // Throws
+            return;
+        }
+        SetLeafElem set_leaf_elem(m_array->get_alloc(), null::get_null_float<T>());
+        m_array->update_bptree_elem(index, set_leaf_elem); // Throws
     }
 
     struct LeafInfo {

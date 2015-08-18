@@ -6176,7 +6176,7 @@ TEST(Query_64BitValues)
 }
 
 
-ONLY(Query_NullShowcase)
+TEST(Query_NullShowcase)
 {
 /*
 Here we show how comparisons and arithmetic with null works in queries. Basic rules:
@@ -6432,7 +6432,7 @@ NOTE NOTE: There is currently only very little syntax checking.
     // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
 }
 
-ONLY(Query_Null_DefaultsAndErrorhandling)
+TEST(Query_Null_DefaultsAndErrorhandling)
 {
     // Non-nullable columns: Tests is_nullable() and set_null()
     {
