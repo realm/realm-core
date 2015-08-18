@@ -1742,9 +1742,8 @@ class ExpressionNode: public ParentNode {
 public:
     ~ExpressionNode() REALM_NOEXCEPT { }
 
-    ExpressionNode(Expression* compare, bool auto_delete)
+    ExpressionNode(Expression* compare)
     {
-        m_auto_delete = auto_delete;
         m_child = nullptr;
         m_compare = util::SharedPtr<Expression>(compare);
         m_dD = 10.0;
@@ -1776,7 +1775,6 @@ public:
         m_child = from.m_child;
     }
 
-    bool m_auto_delete;
     util::SharedPtr<Expression> m_compare;
 };
 
