@@ -106,9 +106,6 @@ public:
 
     ~Group() REALM_NOEXCEPT override;
 
-    /// Must be called from within a write transaction
-    void upgrade_file_format();
-
     /// Attach this Group instance to the specified database file.
     ///
     /// By default, the specified file is opened in read-only mode
@@ -473,7 +470,7 @@ public:
     bool operator!=(const Group& g) const { return !(*this == g); }
 
 #ifdef REALM_DEBUG
-    void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
+    void verify() const;
     void print() const;
     void print_free() const;
     MemStats stats();
@@ -482,7 +479,7 @@ public:
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
 #else
-    void Verify() const {}
+    void verify() const {}
 #endif
 
 private:
@@ -603,6 +600,11 @@ private:
     void refresh_dirty_accessors();
 
     int get_file_format() const REALM_NOEXCEPT;
+    void set_file_format(int) REALM_NOEXCEPT;
+    int get_committed_file_format() const REALM_NOEXCEPT;
+
+    /// Must be called from within a write transaction
+    void upgrade_file_format();
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>

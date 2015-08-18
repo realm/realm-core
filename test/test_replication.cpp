@@ -179,8 +179,8 @@ TEST(Replication_General)
     {
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
-        rt_1.get_group().Verify();
-        rt_2.get_group().Verify();
+        rt_1.get_group().verify();
+        rt_2.get_group().verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
         MyTable::ConstRef table = rt_2.get_table<MyTable>("my_table");
         CHECK_EQUAL(6, table->size());
@@ -220,8 +220,8 @@ TEST(Replication_Links)
     {
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
-        rt_1.get_group().Verify();
-        rt_2.get_group().Verify();
+        rt_1.get_group().verify();
+        rt_2.get_group().verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
         ConstTableRef origin = rt_2.get_table("origin");
         if (CHECK_EQUAL(2, origin->get_column_count())) {
@@ -249,8 +249,8 @@ TEST(Replication_Links)
     {
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
-        rt_1.get_group().Verify();
-        rt_2.get_group().Verify();
+        rt_1.get_group().verify();
+        rt_2.get_group().verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
     }
 }
@@ -260,8 +260,8 @@ TEST(Replication_Links)
 void check(TestResults& test_results, SharedGroup& sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
-    rt_1.get_group().Verify();
-    rt_2.get_group().Verify();
+    rt_1.get_group().verify();
+    rt_2.get_group().verify();
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
 
@@ -552,7 +552,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
         sg.end_read();
         repl.replay_transacts(sg, replay_log);
         const Group& group = sg.begin_read();
-        group.Verify();
+        group.verify();
 
         target = group.get_table("target");
         if (target->size() > 0)
@@ -657,7 +657,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
         sg.end_read();
         repl.replay_transacts(sg, replay_log);
         const Group& group = sg.begin_read();
-        group.Verify();
+        group.verify();
 
         target = group.get_table("target");
         if (target->size() > 0)

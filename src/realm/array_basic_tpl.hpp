@@ -211,19 +211,19 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 
 
 template<class T>
-std::size_t BasicArray<T>::CalcByteLen(std::size_t size, std::size_t) const
+std::size_t BasicArray<T>::calc_byte_len(std::size_t size, std::size_t) const
 {
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that CalcByteLen() is supposed to return
+    // instead. Note however, that calc_byte_len() is supposed to return
     // the unaligned byte size. It is probably the case that no harm
     // is done by returning the aligned version, and most callers of
-    // CalcByteLen() will actually benefit if CalcByteLen() was
+    // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
     return header_size + size * sizeof (T); // FIXME: Prone to overflow
 }
 
 template<class T>
-std::size_t BasicArray<T>::CalcItemCount(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
+std::size_t BasicArray<T>::calc_item_count(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
 {
     // FIXME: ??? what about width = 0? return -1?
 

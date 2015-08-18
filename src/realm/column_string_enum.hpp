@@ -129,15 +129,15 @@ public:
     void update_from_parent(std::size_t) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
-    std::size_t GetKeyNdx(StringData value) const;
-    std::size_t GetKeyNdxOrAdd(StringData value);
+    std::size_t get_key_ndx(StringData value) const;
+    std::size_t get_key_ndx_or_add(StringData value);
 
     StringColumn& get_keys();
     const StringColumn& get_keys() const;
 
 #ifdef REALM_DEBUG
-    void Verify() const override;
-    void Verify(const Table&, std::size_t) const override;
+    void verify() const override;
+    void verify(const Table&, std::size_t) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
     void to_dot(std::ostream&, StringData title) const override;
 #endif

@@ -77,14 +77,14 @@ void StringEnumColumn::set(size_t ndx, StringData value)
         m_search_index->set(ndx, value);
     }
 
-    size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = get_key_ndx_or_add(value);
     set_without_updating_index(ndx, key_ndx);
 }
 
 
 void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
-    size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = get_key_ndx_or_add(value);
     int64_t value_2 = int64_t(key_ndx);
     insert_without_updating_index(row_ndx, value_2, num_rows); // Throws
 
@@ -98,7 +98,7 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
 
 void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
 {
-    size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = get_key_ndx_or_add(value);
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     int64_t value_2 = int64_t(key_ndx);
     insert_without_updating_index(row_ndx_2, value_2, num_rows); // Throws
@@ -219,12 +219,12 @@ size_t StringEnumColumn::find_first(StringData value, size_t begin, size_t end) 
     return IntegerColumn::find_first(key_ndx, begin, end);
 }
 
-size_t StringEnumColumn::GetKeyNdx(StringData value) const
+size_t StringEnumColumn::get_key_ndx(StringData value) const
 {
     return m_keys.find_first(value);
 }
 
-size_t StringEnumColumn::GetKeyNdxOrAdd(StringData value)
+size_t StringEnumColumn::get_key_ndx_or_add(StringData value)
 {
     size_t res = m_keys.find_first(value);
     if (res != realm::not_found)
@@ -326,26 +326,26 @@ void StringEnumColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
 #ifdef REALM_DEBUG
 
-void StringEnumColumn::Verify() const
+void StringEnumColumn::verify() const
 {
-    m_keys.Verify();
-    IntegerColumn::Verify();
+    m_keys.verify();
+    IntegerColumn::verify();
 
     if (m_search_index) {
-        m_search_index->Verify();
+        m_search_index->verify();
         // FIXME: Verify search index contents in a way similar to what is done
-        // in StringColumn::Verify().
+        // in StringColumn::verify().
     }
 }
 
 
-void StringEnumColumn::Verify(const Table& table, size_t col_ndx) const
+void StringEnumColumn::verify(const Table& table, size_t col_ndx) const
 {
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
     REALM_ASSERT_3(m_keys.get_root_array()->get_ndx_in_parent(), ==, spec.get_enumkeys_ndx(col_ndx));
 
-    IntegerColumn::Verify(table, col_ndx);
+    IntegerColumn::verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     bool has_search_index = (attr & col_attr_Indexed) != 0;

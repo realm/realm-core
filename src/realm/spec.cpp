@@ -442,17 +442,69 @@ Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const REALM_NOEXCEPT
 
 bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
 {
-    if (!m_types.compare_int(spec.m_types))
+    if (!m_attr.compare_int(spec.m_attr))
         return false;
     if (!m_names.compare_string(spec.m_names))
         return false;
+
+    // check each column's type
+    const size_t column_count = get_column_count();
+    for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
+        switch (m_types.get(col_ndx))
+        {
+            case col_type_String:
+            case col_type_StringEnum:
+            {
+                // These types are considered equal as col_type_StringEnum is used for an internal optimization only
+                const int64_t rhs_type = spec.m_types.get(col_ndx);
+                if (rhs_type != col_type_String && rhs_type != col_type_StringEnum)
+                    return false;
+                break;
+            }
+            case col_type_Table:
+            {
+                // Sub tables must be compared recursively
+                const size_t subspec_index = get_subspec_ndx(col_ndx);
+                const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index));
+                const Spec rhs = Spec(const_cast<Spec&>(spec).get_subspec_by_ndx(subspec_index));
+                if (lhs != rhs)
+                    return false;
+                break;
+            }
+            case col_type_Link:
+            case col_type_LinkList:
+            {
+                // In addition to name and attributes, the link target table must also be compared
+                const size_t lhs_table_ndx = get_opposite_link_table_ndx(col_ndx);
+                const size_t rhs_table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
+                if (lhs_table_ndx != rhs_table_ndx)
+                    return false;
+                break;
+            }
+            case col_type_Int:
+            case col_type_Bool:
+            case col_type_Binary:
+            case col_type_Mixed:
+            case col_type_DateTime:
+            case col_type_Reserved1:
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Reserved4:
+            case col_type_BackLink:
+                // All other column types are compared as before
+                if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
+                    return false;
+                break;
+        }
+    }
+
     return true;
 }
 
 
 #ifdef REALM_DEBUG
 
-void Spec::Verify() const
+void Spec::verify() const
 {
     REALM_ASSERT(m_names.size() == get_public_column_count());
     REALM_ASSERT(m_types.size()  == get_column_count());

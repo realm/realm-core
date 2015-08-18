@@ -2,21 +2,33 @@
 
 ### Bugfixes:
 
-* Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the same file if opened from two places simultaneously)
+* Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
+  same file if opened from two places simultaneously)
+* `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
+  handles attributes (nullability etc), sub tables, optimized string columns
+  and target link types correctly.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* A number of methods in the following classes have been renamed to match the
+  coding guidelines (lowercase, underscore separation):
+    * `Array`, `ArrayBlob`, `ArrayInteger`, `ArrayString`, `BasicArray<T>`;
+    * `Column<T, N>`, `IntegerColumn`, `StringColumn`, `StringEnumColumn`;
+    * `Group`;
+    * `Query`;
+    * `StringIndex`.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added `Descriptor::get_link_target()`, for completeness.
+* Added extra `alloc_file_format_upgrade` argument to `SharedGroup::open()`.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Added argument to SharedGroup to prevent automatic file format upgrade. If an
+  upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
 
 ----------------------------------------------
 
@@ -27,14 +39,6 @@
 * Reverted prelinking of static libraries on Apple platforms as it caused
   `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
   when sorting by integer or floating point columns.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
 
 -----------
 
@@ -47,7 +51,6 @@
 * Removed conditional compilation of replication features.
 * More information from `InvalidDatabase::what()`.
 * Disabled support for the async daemon on iOS and watchOS.
-
 
 ----------------------------------------------
 

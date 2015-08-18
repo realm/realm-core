@@ -38,20 +38,15 @@ void Group::upgrade_file_format()
 #if REALM_NULL_STRINGS == 1
     REALM_ASSERT(is_attached());
 
-    if (m_alloc.get_committed_file_format() != SlabAlloc::library_file_format) {
+    // SlabAlloc::validate_buffer() ensures this
+    REALM_ASSERT_RELEASE(m_alloc.get_committed_file_format() == 2);
+    REALM_ASSERT_RELEASE(m_alloc.m_file_format == 2);
+    REALM_ASSERT_RELEASE(SlabAlloc::library_file_format == 3);
 
-        // SlabAlloc::validate_buffer() ensures this
-        REALM_ASSERT_RELEASE(m_alloc.get_committed_file_format() == 2);
-        REALM_ASSERT_RELEASE(m_alloc.m_file_format == 2);
-        REALM_ASSERT_RELEASE(SlabAlloc::library_file_format == 3);
-
-        for (size_t t = 0; t < m_tables.size(); t++) {
-            TableRef table = get_table(t);
-            table->upgrade_file_format();
-        }
+    for (size_t t = 0; t < m_tables.size(); t++) {
+        TableRef table = get_table(t);
+        table->upgrade_file_format();
     }
-
-    m_alloc.m_file_format = SlabAlloc::library_file_format;
 #endif
 }
 
@@ -59,6 +54,18 @@ void Group::upgrade_file_format()
 int Group::get_file_format() const REALM_NOEXCEPT
 {
     return m_alloc.m_file_format;
+}
+
+
+void Group::set_file_format(int file_format) REALM_NOEXCEPT
+{
+    m_alloc.m_file_format = file_format;
+}
+
+
+int Group::get_committed_file_format() const REALM_NOEXCEPT
+{
+    return m_alloc.get_committed_file_format();
 }
 
 
@@ -342,7 +349,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
     // Whenever a table has a link column, the column accessor must be set up to
     // refer to the target table accessor, so the target table accessor needs to
     // be created too, if it does not already exist. This, of course, applies
-    // recusively, and it applies to the opposide direction of links too (from
+    // recursively, and it applies to the opposide direction of links too (from
     // target side to origin side). This means that whenever we create a table
     // accessor, we actually need to create the entire cluster of table
     // accessors, that is reachable in zero or more steps along links, or
@@ -714,7 +721,7 @@ void Group::commit()
 
     out.commit(top_ref); // Throws
 
-    // Recusively update refs in all active tables (columns, arrays..)
+    // Recursively update refs in all active tables (columns, arrays..)
     update_refs(top_ref, old_baseline);
 }
 
@@ -1613,11 +1620,11 @@ private:
 
 } // anonymous namespace
 
-void Group::Verify() const
+void Group::verify() const
 {
     REALM_ASSERT(is_attached());
 
-    m_alloc.Verify();
+    m_alloc.verify();
 
     // Verify tables
     {
@@ -1625,7 +1632,7 @@ void Group::Verify() const
         for (size_t i = 0; i != n; ++i) {
             ConstTableRef table = get_table(i);
             REALM_ASSERT_3(table->get_index_in_group(), ==, i);
-            table->Verify();
+            table->verify();
         }
     }
 

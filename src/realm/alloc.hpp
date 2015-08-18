@@ -107,7 +107,7 @@ public:
     virtual ~Allocator() REALM_NOEXCEPT;
 
 #ifdef REALM_DEBUG
-    virtual void Verify() const = 0;
+    virtual void verify() const = 0;
 
     /// Terminate the program precisely when the specified 'ref' is
     /// freed (or reallocated). You can use this to detect whether the

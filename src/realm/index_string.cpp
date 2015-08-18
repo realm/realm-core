@@ -73,7 +73,7 @@ void StringIndex::set_target(ColumnBase* target_column) REALM_NOEXCEPT
 }
 
 
-StringIndex::key_type StringIndex::GetLastKey() const
+StringIndex::key_type StringIndex::get_last_key() const
 {
     Array offsets(m_array->get_alloc());
     get_child(*m_array, 0, offsets);
@@ -89,7 +89,7 @@ void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t of
 }
 
 
-void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
+void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
@@ -125,30 +125,30 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 
 void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
 {
-    NodeChange nc = DoInsert(row_ndx, key, offset, value);
+    NodeChange nc = do_insert(row_ndx, key, offset, value);
     switch (nc.type) {
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.NodeAddKey(nc.ref1);
-            new_node.NodeAddKey(get_ref());
+            new_node.node_add_key(nc.ref1);
+            new_node.node_add_key(get_ref());
             m_array->init_from_ref(new_node.get_ref());
             m_array->update_parent();
             return;
         }
         case NodeChange::insert_after: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.NodeAddKey(get_ref());
-            new_node.NodeAddKey(nc.ref1);
+            new_node.node_add_key(get_ref());
+            new_node.node_add_key(nc.ref1);
             m_array->init_from_ref(new_node.get_ref());
             m_array->update_parent();
             return;
         }
         case NodeChange::split: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
-            new_node.NodeAddKey(nc.ref1);
-            new_node.NodeAddKey(nc.ref2);
+            new_node.node_add_key(nc.ref1);
+            new_node.node_add_key(nc.ref2);
             m_array->init_from_ref(new_node.get_ref());
             m_array->update_parent();
             return;
@@ -158,7 +158,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
 }
 
 
-StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
+StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, size_t offset, StringData value)
 {
     Allocator& alloc = m_array->get_alloc();
     if (m_array->is_inner_bptree_node()) {
@@ -181,10 +181,10 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
                            m_deny_duplicate_values, alloc);
 
         // Insert item
-        NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
+        NodeChange nc = target.do_insert(row_ndx, key, offset, value);
         if (nc.type ==  NodeChange::none) {
             // update keys
-            key_type last_key = target.GetLastKey();
+            key_type last_key = target.get_last_key();
             offsets.set(node_ndx, last_key);
             return NodeChange::none; // no new nodes
         }
@@ -197,10 +197,10 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         // If there is room, just update node directly
         if (offsets.size() < REALM_MAX_BPNODE_SIZE) {
             if (nc.type == NodeChange::split) {
-                NodeInsertSplit(node_ndx, nc.ref2);
+                node_insert_split(node_ndx, nc.ref2);
             }
             else {
-                NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+                node_insert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
             }
             return NodeChange::none;
         }
@@ -209,15 +209,15 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         StringIndex new_node(inner_node_tag(), alloc);
         if (nc.type == NodeChange::split) {
             // update offset for left node
-            key_type last_key = target.GetLastKey();
+            key_type last_key = target.get_last_key();
             offsets.set(node_ndx, last_key);
 
-            new_node.NodeAddKey(nc.ref2);
+            new_node.node_add_key(nc.ref2);
             ++node_ndx;
             ++refs_ndx;
         }
         else {
-            new_node.NodeAddKey(nc.ref1);
+            new_node.node_add_key(nc.ref1);
         }
 
         switch (node_ndx) {
@@ -232,7 +232,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
                 size_t len = m_array->size();
                 for (size_t i = refs_ndx; i < len; ++i) {
                     ref_type ref = m_array->get_as_ref(i);
-                    new_node.NodeAddKey(ref);
+                    new_node.node_add_key(ref);
                 }
                 offsets.truncate(node_ndx);
                 m_array->truncate(refs_ndx);
@@ -250,13 +250,13 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
-        if (LeafInsert(row_ndx, key, offset, value, noextend))
+        if (leaf_insert(row_ndx, key, offset, value, noextend))
             return NodeChange::none;
 
         // Create new list for item (a leaf)
         StringIndex new_list(m_target_column, m_array->get_alloc());
 
-        new_list.LeafInsert(row_ndx, key, offset, value);
+        new_list.leaf_insert(row_ndx, key, offset, value);
 
         size_t ndx = old_offsets.lower_bound_int(key);
 
@@ -290,7 +290,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
 }
 
 
-void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
+void StringIndex::node_insert_split(size_t ndx, size_t new_ref)
 {
     REALM_ASSERT(m_array->is_inner_bptree_node());
     REALM_ASSERT(new_ref);
@@ -312,17 +312,17 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
                         m_deny_duplicate_values, alloc);
 
     // Update original key
-    key_type last_key = orig_col.GetLastKey();
+    key_type last_key = orig_col.get_last_key();
     offsets.set(ndx, last_key);
 
     // Insert new ref
-    key_type new_key = new_col.GetLastKey();
+    key_type new_key = new_col.get_last_key();
     offsets.insert(ndx+1, new_key);
     m_array->insert(ndx+2, new_ref);
 }
 
 
-void StringIndex::NodeInsert(size_t ndx, size_t ref)
+void StringIndex::node_insert(size_t ndx, size_t ref)
 {
     REALM_ASSERT(ref);
     REALM_ASSERT(m_array->is_inner_bptree_node());
@@ -337,14 +337,14 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
 
     StringIndex col(ref, 0, 0, m_target_column,
                     m_deny_duplicate_values, alloc);
-    key_type last_key = col.GetLastKey();
+    key_type last_key = col.get_last_key();
 
     offsets.insert(ndx, last_key);
     m_array->insert(ndx+1, ref);
 }
 
 
-bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, StringData value, bool noextend)
+bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, StringData value, bool noextend)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node());
 
@@ -444,7 +444,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         }
         else {
             StringIndex subindex(m_target_column, m_array->get_alloc());
-            subindex.InsertRowList(sub.get_ref(), suboffset, v2);
+            subindex.insert_row_list(sub.get_ref(), suboffset, v2);
             subindex.insert_with_offset(row_ndx, value, suboffset);
             m_array->set(ins_pos_refs, subindex.get_ref());
         }
@@ -565,7 +565,7 @@ void StringIndex::clear()
 }
 
 
-void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
+void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
 {
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
@@ -583,7 +583,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
         ref_type ref = m_array->get_as_ref(pos_refs);
         StringIndex node(ref, m_array.get(), pos_refs, m_target_column,
                          m_deny_duplicate_values, alloc);
-        node.DoDelete(row_ndx, value, offset);
+        node.do_delete(row_ndx, value, offset);
 
         // Update the ref
         if (node.is_empty()) {
@@ -592,7 +592,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
             node.destroy();
         }
         else {
-            key_type max_val = node.GetLastKey();
+            key_type max_val = node.get_last_key();
             if (max_val != key_type(values.get(pos)))
                 values.set(pos, max_val);
         }
@@ -609,7 +609,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
             if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.DoDelete(row_ndx, value, offset+4);
+                subindex.do_delete(row_ndx, value, offset+4);
 
                 if (subindex.is_empty()) {
                     values.erase(pos);
@@ -759,7 +759,7 @@ bool StringIndex::is_empty() const
 }
 
 
-void StringIndex::NodeAddKey(ref_type ref)
+void StringIndex::node_add_key(ref_type ref)
 {
     REALM_ASSERT(ref);
     REALM_ASSERT(m_array->is_inner_bptree_node());
@@ -784,11 +784,11 @@ void StringIndex::NodeAddKey(ref_type ref)
 
 #ifdef REALM_DEBUG
 
-void StringIndex::Verify() const
+void StringIndex::verify() const
 {
-    m_array->Verify();
+    m_array->verify();
 
-    // FIXME: Extend verification along the lines of IntegerColumn::Verify().
+    // FIXME: Extend verification along the lines of IntegerColumn::verify().
 }
 
 

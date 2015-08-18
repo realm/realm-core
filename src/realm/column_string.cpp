@@ -1191,12 +1191,12 @@ std::unique_ptr<const ArrayParent> StringColumn::get_leaf(size_t ndx, size_t& ou
 {
     size_t off;
     ArrayParent* ap = nullptr;
-    out_leaf_type = GetBlock(ndx, &ap, off, false);
+    out_leaf_type = get_block(ndx, &ap, off, false);
     out_ndx_in_leaf = ndx - off;
     return std::unique_ptr<const ArrayParent>(ap);
 }
 
-StringColumn::LeafType StringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off,
+StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, size_t& off,
                                               bool use_retval) const
 {
     static_cast<void>(use_retval);
@@ -1451,7 +1451,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
         // Small strings
         ArrayString leaf(alloc, false);
         leaf.init_from_mem(mem);
-        leaf.Verify();
+        leaf.verify();
         return leaf.size();
     }
     bool is_big = Array::get_context_flag_from_header(mem.m_addr);
@@ -1459,38 +1459,38 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
         // Medium strings
         ArrayStringLong leaf(alloc, false);
         leaf.init_from_mem(mem);
-        leaf.Verify();
+        leaf.verify();
         return leaf.size();
     }
     // Big strings
     ArrayBigBlobs leaf(alloc, false);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     return leaf.size();
 }
 
 } // anonymous namespace
 
-void StringColumn::Verify() const
+void StringColumn::verify() const
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
             ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
-            leaf->Verify();
+            leaf->verify();
         }
         else {
             bool is_big = m_array->get_context_flag();
             if (!is_big) {
                 // Medium strings root leaf
                 ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
-                leaf->Verify();
+                leaf->verify();
             }
             else {
                 // Big strings root leaf
                 ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-                leaf->Verify();
+                leaf->verify();
             }
         }
     }
@@ -1500,15 +1500,15 @@ void StringColumn::Verify() const
     }
 
     if (m_search_index) {
-        m_search_index->Verify();
+        m_search_index->verify();
         m_search_index->verify_entries(*this);
     }
 }
 
 
-void StringColumn::Verify(const Table& table, size_t col_ndx) const
+void StringColumn::verify(const Table& table, size_t col_ndx) const
 {
-    ColumnBase::Verify(table, col_ndx);
+    ColumnBase::verify(table, col_ndx);
 
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
