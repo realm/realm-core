@@ -2,7 +2,11 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
+  same file if opened from two places simultaneously)
+* `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
+  handles attributes (nullability etc), sub tables, optimized string columns
+  and target link types correctly.
 
 ### API breaking changes:
 
@@ -18,6 +22,8 @@
 
 ### Enhancements:
 
+* Added `Descriptor::get_link_target()`, for completeness.
+* Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
 * Added `Utf8x16<>::utf8_skip_utf16()` in `<realm/util/utf8.hpp>`. This is
   expected to be needed by some bindings in connection with new substring
   operations.
@@ -38,14 +44,6 @@
 * Reverted prelinking of static libraries on Apple platforms as it caused
   `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
   when sorting by integer or floating point columns.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
 
 -----------
 
