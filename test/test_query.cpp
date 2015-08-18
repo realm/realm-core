@@ -6176,7 +6176,7 @@ TEST(Query_64BitValues)
 }
 
 
-TEST(Query_NullShowcase)
+ONLY(Query_NullShowcase)
 {
 /*
 Here we show how comparisons and arithmetic with null works in queries. Basic rules:
@@ -6257,7 +6257,7 @@ NOTE NOTE: There is currently only very little syntax checking.
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
 
-    // int/double type mismatch
+    // check int/double type mismatch error handling
     Columns<Int> dummy1;
     CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
 
@@ -6409,17 +6409,30 @@ NOTE NOTE: There is currently only very little syntax checking.
 
     table->set_float(1, 0, std::numeric_limits<float>::signaling_NaN());
     table->set_float(1, 1, std::numeric_limits<float>::quiet_NaN());
-
+    
+    // Realm may return a signalling/quiet NaN that is different from the signalling/quiet NaN you stored 
+    // (the IEEE standard defines a sequence of bits in the NaN that can have custom contents). Realm does 
+    // not preserve these bits.
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
-
+    CHECK(null::is_signaling(table->get_float(1, 0)));
+    CHECK(!null::is_signaling(table->get_float(1, 1)));
     CHECK(!table->is_null(1, 0));
     CHECK(!table->is_null(1, 1));
+
+    table->set_double(3, 0, std::numeric_limits<double>::signaling_NaN());
+    table->set_double(3, 1, std::numeric_limits<double>::quiet_NaN());
+    CHECK(std::isnan(table->get_double(3, 0)));
+    CHECK(std::isnan(table->get_double(3, 1)));
+    CHECK(null::is_signaling(table->get_double(3, 0)));
+    CHECK(!null::is_signaling(table->get_double(3, 1)));
+    CHECK(!table->is_null(3, 0));
+    CHECK(!table->is_null(3, 1));
 
     // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
 }
 
-TEST(Query_Null_DefaultsAndErrorhandling)
+ONLY(Query_Null_DefaultsAndErrorhandling)
 {
     // Non-nullable columns: Tests is_nullable() and set_null()
     {
@@ -6492,6 +6505,14 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         CHECK(table->is_null(4, 0));
         CHECK(table->is_null(5, 0));
 
+        // calling get() on a numeric column must return following:
+        CHECK_EQUAL(table->get_int(0, 0), 0);
+        CHECK_EQUAL(table->get_float(1, 0), 0.0f);
+        CHECK_EQUAL(table->get_double(3, 0), 0.0);
+        CHECK_EQUAL(table->get_bool(4, 0), false);
+        CHECK_EQUAL(table->get_datetime(5, 0), DateTime(0));
+
+        // Set everything to non-null values
         table->set_int(0, 0, 0);
         table->set_float(1, 0, 0.f);
         table->set_string(2, 0, StringData("", 0));

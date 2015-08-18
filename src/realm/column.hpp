@@ -1069,13 +1069,27 @@ bool Column<T,N>::is_nullable() const REALM_NOEXCEPT
 template <class T, bool N>
 T Column<T,N>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    return m_tree.get(ndx);
+    // TODO: This can be speed optimized by letting .get() do the null check
+    if (N)
+        if (m_tree.is_null(ndx)) {
+            // Float, double and integer columns must return 0 for null entries
+            return static_cast<T>(0);
+        }
+        else {
+            return m_tree.get(ndx);
+        }
+    else {
+        return m_tree.get(ndx);
+    }
 }
 
 template <class T, bool N>
 bool Column<T,N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
 {
-    return m_tree.is_null(ndx);
+    if (N)
+        return m_tree.is_null(ndx);
+    else
+        return false;
 }
 
 template <class T, bool N>
