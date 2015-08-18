@@ -34,7 +34,7 @@ template<class T> class SequentialGetter;
 
 
 template<class T>
-BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref)
+BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);

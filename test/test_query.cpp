@@ -6214,7 +6214,7 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->insert_column(0, type_Int, "Price", true);
     table->insert_column(1, type_Float, "Shipping", true);
     table->insert_column(2, type_String, "Description", true);
-    table->insert_column(3, type_Double, "Rating");
+    table->insert_column(3, type_Double, "Rating", true);
     table->insert_column(4, type_Bool, "Stock", true);
     table->insert_column(5, type_DateTime, "Delivery date", true);
     table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
@@ -6419,4 +6419,110 @@ NOTE NOTE: There is currently only very little syntax checking.
     // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
 }
 
+TEST(Query_Null_DefaultsAndErrorhandling)
+{
+
+    // Non-nullable columns: Tests is_nullable() and set_null()
+    {
+        Group g;
+        TableRef table = g.add_table("Inventory");
+        table->insert_column(0, type_Int, "Price");
+        table->insert_column(1, type_Float, "Shipping");
+        table->insert_column(2, type_String, "Description");
+        table->insert_column(3, type_Double, "Rating");
+        table->insert_column(4, type_Bool, "Stock");
+        table->insert_column(5, type_DateTime, "Delivery date");
+        table->add_empty_row(1);
+
+        CHECK(!table->is_nullable(0));
+        CHECK(!table->is_nullable(1));
+        CHECK(!table->is_nullable(2));
+        CHECK(!table->is_nullable(3));
+        CHECK(!table->is_nullable(4));
+        CHECK(!table->is_nullable(5));
+
+        // is_null() on non-nullable column returns false. If you want it to throw, then do so
+        // in the language binding
+        CHECK(!table->is_null(0, 0));
+        CHECK(!table->is_null(1, 0));
+        CHECK(!table->is_null(2, 0));
+        CHECK(!table->is_null(3, 0));
+        CHECK(!table->is_null(4, 0));
+        CHECK(!table->is_null(5, 0));
+
+        CHECK_THROW_ANY(table->set_null(0, 0));
+        CHECK_THROW_ANY(table->set_null(1, 0));
+        CHECK_THROW_ANY(table->set_null(2, 0));
+        CHECK_THROW_ANY(table->set_null(3, 0));
+        CHECK_THROW_ANY(table->set_null(4, 0));
+        CHECK_THROW_ANY(table->set_null(5, 0));
+
+        // verify that set_null() did not have any side effects
+        CHECK(!table->is_null(0, 0));
+        CHECK(!table->is_null(1, 0));
+        CHECK(!table->is_null(2, 0));
+        CHECK(!table->is_null(3, 0));
+        CHECK(!table->is_null(4, 0));
+        CHECK(!table->is_null(5, 0));
+    }
+
+    // Nullable columns: Tests that default value is null, and tests is_nullable() and set_null()
+    {
+        Group g;
+        TableRef table = g.add_table("Inventory");
+        table->insert_column(0, type_Int, "Price", true);
+        table->insert_column(1, type_Float, "Shipping", true);
+        table->insert_column(2, type_String, "Description", true);
+        table->insert_column(3, type_Double, "Rating", true);
+        table->insert_column(4, type_Bool, "Stock", true);
+        table->insert_column(5, type_DateTime, "Delivery date", true);
+        table->add_empty_row(1);
+
+        CHECK(table->is_nullable(0));
+        CHECK(table->is_nullable(1));
+        CHECK(table->is_nullable(2));
+        CHECK(table->is_nullable(3));
+        CHECK(table->is_nullable(4));
+        CHECK(table->is_nullable(5));
+
+        // default values should be null
+        CHECK(table->is_null(0, 0));
+        CHECK(table->is_null(1, 0));
+        CHECK(table->is_null(2, 0));
+        CHECK(table->is_null(3, 0));
+        CHECK(table->is_null(4, 0));
+        CHECK(table->is_null(5, 0));
+
+        table->set_int(0, 0, 0);
+        table->set_float(1, 0, 0.f);
+        table->set_string(2, 0, StringData("", 0));
+        table->set_double(3, 0, 0.);
+        table->set_bool(4, 0, false);
+        table->set_datetime(5, 0, DateTime(0));
+
+        CHECK(!table->is_null(0, 0));
+        CHECK(!table->is_null(1, 0));
+        CHECK(!table->is_null(2, 0));
+        CHECK(!table->is_null(3, 0));
+        CHECK(!table->is_null(4, 0));
+        CHECK(!table->is_null(5, 0));
+
+        table->set_null(0, 0);
+        table->set_null(1, 0);
+        table->set_null(2, 0);
+        table->set_null(3, 0);
+        table->set_null(4, 0);
+        table->set_null(5, 0);
+
+        CHECK(table->is_null(0, 0));
+        CHECK(table->is_null(1, 0));
+        CHECK(table->is_null(2, 0));
+        CHECK(table->is_null(3, 0));
+        CHECK(table->is_null(4, 0));
+        CHECK(table->is_null(5, 0));
+    }
+
+}
+
 #endif // TEST_QUERY
+

@@ -62,25 +62,25 @@ public:
     using value_type = T;
 
     // All float and double columns are nullable internally, even if they are marked non-nullable by the user
-    static const bool nullable = false;
+    static const bool nullable = true;
     
-    BasicColumn(Allocator&, ref_type);
+    BasicColumn(Allocator&, ref_type, bool nullable);
 
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
     bool is_nullable() const REALM_NOEXCEPT
     {
-        return true;
+        return m_nullable;
     }
     bool is_null(size_t index) const REALM_NOEXCEPT
     {
-        return null::is_null(get(index));
+        return null::is_null_float(get(index));
     }
 
     void set_null(size_t index)
     {
-        set(index, null::get_null<T>()); 
+        set(index, null::get_null_float<T>()); 
     }
 
     struct LeafInfo {
@@ -167,6 +167,8 @@ private:
 
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void do_clear();
+
+    bool m_nullable;
 
 #ifdef REALM_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);

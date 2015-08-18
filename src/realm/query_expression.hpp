@@ -752,23 +752,23 @@ template<> inline void NullableVector<double>::set(size_t index, double value)
 
 template<> inline bool NullableVector<double>::is_null(size_t index) const
 {
-    return null::is_null(m_first[index]);
+    return null::is_null_float(m_first[index]);
 }
 
 template<> inline void NullableVector<double>::set_null(size_t index)
 {
-    m_first[index] = null::get_null<double>();
+    m_first[index] = null::get_null_float<double>();
 } 
 
 // Float
 template<> inline bool NullableVector<float>::is_null(size_t index) const
 {
-    return null::is_null(m_first[index]);
+    return null::is_null_float(m_first[index]);
 }
 
 template<> inline void NullableVector<float>::set_null(size_t index)
 {
-    m_first[index] = null::get_null<float>();
+    m_first[index] = null::get_null_float<float>();
 }
 
 template<> inline void NullableVector<float>::set(size_t index, float value)

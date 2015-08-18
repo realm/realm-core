@@ -1218,10 +1218,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             }
             break;
         case col_type_Float:
-            col = new FloatColumn(alloc, ref); // Throws
+            col = new FloatColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Double:
-            col = new DoubleColumn(alloc, ref); // Throws
+            col = new DoubleColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_String:
             col = new StringColumn(alloc, ref, nullable); // Throws
@@ -2807,6 +2807,8 @@ size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEP
 
 bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
+    if (!is_nullable(col_ndx))
+        return false;
     auto& col = get_column_base(col_ndx);
     return col.is_null(row_ndx);
 }
@@ -2815,7 +2817,7 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 void Table::set_null(size_t col_ndx, size_t row_ndx)
 {
     auto& col = get_column_base(col_ndx);
-    if (!col.is_nullable()) {
+    if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
     col.set_null(row_ndx);

@@ -324,7 +324,6 @@ least 1 `x` must be 1. If `S` is 1, it's a quiet NaN, else it's a signaling NaN.
 A NaN doubule is the same as above, but for `s eeeeeeeeeee S xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 
 The `S` bit is at position 22 (float) or 51 (double).
-
 */
 
 struct null {
@@ -341,13 +340,13 @@ struct null {
     template <class T> bool operator < (const T&) const { REALM_ASSERT(false); return false; }
 
     /// Returns whether `v` bitwise equals the null bit-pattern
-    template <class T> static bool is_null(T v) {
-        T i = null::get_null<T>();
+    template <class T> static bool is_null_float(T v) {
+        T i = null::get_null_float<T>();
         return std::memcmp(&i, &v, sizeof(T)) == 0;
     }
 
     /// Returns 0xffffffff (if float) or 0xffffffffffffffff (if double). These are quiet NaNs.
-    template <class T> static T get_null() {
+    template <class T> static T get_null_float() {
         typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i = ~0;
         T d = type_punning<T, decltype(i)>(i);
         REALM_ASSERT_DEBUG(std::isnan(static_cast<double>(d)));

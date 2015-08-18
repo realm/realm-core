@@ -2644,16 +2644,6 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
     return;
 }
 
-/*
-bool Array::find(int cond, Action action, null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
-{
-    if (cond == cond_Equal) {
-        if (action == act_ReturnFirst) {
-            return false;
-        }
-    }
-}
-*/
 
 bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool array_nullable, bool value_null) const
 {

@@ -76,7 +76,7 @@ template <class C>
 void BasicColumn_IsEmpty(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false);
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0U, c.size());
@@ -96,7 +96,7 @@ template <class C, typename T>
 void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false);
 
     for (size_t i = 0; i < num_values; ++i) {
         c.add(values[i]);
@@ -123,7 +123,7 @@ template <class C, typename T>
 void BasicColumn_Clear(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false);
 
     CHECK(c.is_empty());
 
@@ -150,7 +150,7 @@ template <class C, typename T>
 void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false);
 
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
@@ -185,7 +185,7 @@ void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values
     static_cast<void>(num_values);
 
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false);
 
     // Insert in empty column
     c.insert(0, values[0]);
@@ -242,7 +242,7 @@ void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_va
     static_cast<void>(values);
 
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false);
 
 //    double sum = c.sum();
 //    CHECK_EQUAL(0, sum);
@@ -266,7 +266,7 @@ template <class C, typename T>
 void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false);
 
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
