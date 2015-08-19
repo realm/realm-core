@@ -2366,16 +2366,24 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
 // Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
 // for each match. Break and return if find_action() returns false or 'end' is reached.
+
+// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the 
+// first entry and compare correctly against null, etc.
+//
+// If value_null is set, it means that we search for a null. In that case, `value` is ignored. If value_null is set, 
+// then nullable_array must be set too.
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool value_null) const
 {
+    REALM_ASSERT(!(value_null && !nullable_array));
+
     cond2 c;
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     if (end == npos)
         end = nullable_array ? size() - 1 : size();
 
-    // We cannot just test if `this` is an ArrayIntNull with dynamic_cast, because sometimes we want non-nullable
-    // behaviour of Array::find()
     if (nullable_array) {
+        // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme: 
+        // Huge speed optimizations are possible here! This is a very simple generic method.
         for (; start < end; start++) {
             int64_t v = get<bitwidth>(start + 1);
             if (c(v, value, v == get(0), value_null)) {
@@ -2859,15 +2867,6 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 {
     REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback, array_nullable, value_null));
 }
-
-/*
-template<class cond, Action action, class Callback>
-bool Array::find(null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback) const
-{
-    return find<cond, action>(null{}, start, end, baseindex, state, std::forward<Callback>(callback));
-}
-*/
 
 template<class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
