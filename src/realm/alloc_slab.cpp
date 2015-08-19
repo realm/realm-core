@@ -512,7 +512,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
-            header = writable_map.get_addr();
+            Header* header = writable_map.get_addr();
             header->m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
             header = reinterpret_cast<Header*>(map.get_addr());
         }
