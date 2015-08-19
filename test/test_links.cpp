@@ -1365,6 +1365,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
         CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1374,6 +1375,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
         CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1382,6 +1384,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
         CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        f.group.verify();
     }
 
     // Break links by removal from list
@@ -1394,6 +1397,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
         CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1404,6 +1408,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
         CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
+        f.group.verify();
     }
 
     // Break links by reassign
@@ -1417,6 +1422,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
         CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1428,6 +1434,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
         CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
+        f.group.verify();
     }
 
     // Avoid breaking links by reassigning self
@@ -1441,6 +1448,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
         CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.group.verify();
     }
 
     // Break links by explicit ordered row removal
@@ -1456,6 +1464,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
         CHECK_EQUAL(0, f.origin_row_1.get_index());
         CHECK_EQUAL(1, f.origin_row_2.get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1468,6 +1477,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
         CHECK_EQUAL(0, f.origin_row_0.get_index());
         CHECK_EQUAL(1, f.origin_row_2.get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1479,6 +1489,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
         CHECK_EQUAL(0, f.origin_row_0.get_index());
         CHECK_EQUAL(1, f.origin_row_1.get_index());
+        f.group.verify();
     }
 
     // Break links by explicit unordered row removal
@@ -1494,6 +1505,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
         CHECK_EQUAL(1, f.origin_row_1.get_index());
         CHECK_EQUAL(0, f.origin_row_2.get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1506,6 +1518,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
         CHECK_EQUAL(0, f.origin_row_0.get_index());
         CHECK_EQUAL(1, f.origin_row_2.get_index());
+        f.group.verify();
     }
     {
         Fixture f;
@@ -1517,6 +1530,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
         CHECK_EQUAL(0, f.origin_row_0.get_index());
         CHECK_EQUAL(1, f.origin_row_1.get_index());
+        f.group.verify();
     }
 
     // Break link by clearing table
@@ -1524,6 +1538,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         Fixture f;
         f.origin->clear();
         CHECK(!f.target_row_0 && !f.target_row_1 && !f.target_row_2);
+        f.group.verify();
     }
 }
 
@@ -1535,6 +1550,110 @@ TEST(Links_CascadeRemove_MultiLevel)
 
 TEST(Links_CascadeRemove_Cycles)
 {
+}
+
+
+TEST(Links_OrderedRowRemoval)
+{
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_LinkList, "link_list", *table);
+        table->add_empty_row();
+        table->add_empty_row();
+        table->get_linklist(0,0)->add(0);
+        table->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_LinkList, "link_list", *table);
+        table->add_empty_row();
+        table->add_empty_row();
+        table->get_linklist(0,0)->add(1);
+        table->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_LinkList, "link_list", *table);
+        table->add_empty_row();
+        table->add_empty_row();
+        table->get_linklist(0,0)->add(0);
+        table->get_linklist(0,1)->add(0);
+        table->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_LinkList, "link_list", *table);
+        table->add_empty_row();
+        table->add_empty_row();
+        table->get_linklist(0,0)->add(1);
+        table->get_linklist(0,1)->add(1);
+        table->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_LinkList, "link_list", *table);
+        table->add_empty_row();
+        table->add_empty_row();
+        table->get_linklist(0,0)->add(0);
+        table->get_linklist(0,1)->add(1);
+        table->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_LinkList, "link_list", *table);
+        table->add_empty_row();
+        table->add_empty_row();
+        table->get_linklist(0,0)->add(1);
+        table->get_linklist(0,1)->add(0);
+        table->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef origin = group.add_table("origin");
+        TableRef target = group.add_table("target");
+        origin->add_column_link(type_LinkList, "", *target);
+        origin->add_empty_row();
+        target->add_empty_row();
+        origin->get_linklist(0, 0)->add(0);
+        origin->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef origin = group.add_table("origin");
+        TableRef target = group.add_table("target");
+        origin->add_column_link(type_LinkList, "", *target);
+        target->add_column(type_Int, "");
+        origin->add_empty_row();
+        target->add_empty_row();
+        origin->get_linklist(0, 0)->add(0);
+        origin->remove(0);
+        group.verify();
+    }
+    {
+        Group group;
+        TableRef origin = group.add_table("origin");
+        TableRef target = group.add_table("target");
+        origin->add_column_link(type_LinkList, "", *target);
+        target->add_column(type_Int, "");
+        origin->add_empty_row();
+        target->add_empty_row();
+        origin->get_linklist(0, 0)->add(0);
+        target->remove(0);
+        group.verify();
+    }
 }
 
 #endif // TEST_LINKS

@@ -481,26 +481,27 @@ void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t 
 
 
 // O(n) for n = this->size()
-void TableView::remove(size_t ndx)
+void TableView::remove(size_t row_ndx)
 {
     check_cookie();
 
     REALM_ASSERT(m_table);
-    REALM_ASSERT(ndx < m_row_indexes.size());
+    REALM_ASSERT(row_ndx < m_row_indexes.size());
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    // Delete row in source table
-    const size_t real_ndx = size_t(m_row_indexes.get(ndx));
-    m_table->remove(real_ndx);
+    size_t origin_row_ndx = size_t(m_row_indexes.get(row_ndx));
+
+    // Update refs
+    m_row_indexes.erase(row_ndx);
+
+    // Delete row in origin table
+    m_table->remove(origin_row_ndx);
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
         m_last_seen_version = outside_version();
-
-    // Update refs
-    m_row_indexes.erase(ndx);
 
     // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual

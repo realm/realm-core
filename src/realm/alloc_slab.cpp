@@ -37,7 +37,7 @@ public:
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
     { 0, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
-    { default_file_format_version, default_file_format_version },
+    { library_file_format, library_file_format },
     0, // reserved
     0  // select bit
 };
@@ -45,7 +45,7 @@ const SlabAlloc::Header SlabAlloc::empty_file_header = {
 const SlabAlloc::Header SlabAlloc::streaming_header = {
     { 0xFFFFFFFFFFFFFFFFULL, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
-    { default_file_format_version, default_file_format_version },
+    { library_file_format, library_file_format },
     0, // reserved
     0  // select bit
 };
@@ -374,6 +374,13 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
     return i->addr + (ref - slab_ref);
 }
 
+int SlabAlloc::get_committed_file_format() const REALM_NOEXCEPT
+{
+    Header* header = reinterpret_cast<Header*>(m_data);
+    int select_field = header->m_flags & SlabAlloc::flags_SelectBit;
+    int file_format = header->m_file_format[select_field];
+    return file_format;
+}
 
 ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool read_only,
                                 bool no_create, bool skip_validate,
@@ -445,20 +452,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            validate_buffer(map.get_addr(), size, top_ref); // Throws
+            validate_buffer(map.get_addr(), size, top_ref, is_shared); // Throws
         }
-
-        Header* header;
 
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
-            header = writable_map.get_addr();
+            Header* header = writable_map.get_addr();
             header->m_flags |= server_sync_mode ? flags_ServerSyncMode : 0x0;
-            header = reinterpret_cast<Header*>(map.get_addr());
             REALM_ASSERT(server_sync_mode == ((header->m_flags & flags_ServerSyncMode) != 0));
         }
         else {
-            header = reinterpret_cast<Header*>(map.get_addr());
+            const Header* header = reinterpret_cast<const Header*>(map.get_addr());
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode &&  !stored_server_sync_mode)
                 throw InvalidDatabase("Specified Realm file was not created with support for "
@@ -468,9 +472,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
                                       "synchronization");
         }
 
-        int select_field = header->m_flags;
-        select_field = select_field & SlabAlloc::flags_SelectBit;
-        m_file_format_version = header->m_file_format_version[select_field];
+        {
+            const Header* header = reinterpret_cast<const Header*>(map.get_addr());
+            int select_field = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+            m_file_format = header->m_file_format[select_field];
+        }
 
         m_data        = map.release();
         m_baseline    = size;
@@ -489,11 +495,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     return top_ref;
 }
 
-unsigned char SlabAlloc::get_file_format() const
-{
-    return m_file_format_version;
-}
-
 ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in
@@ -504,7 +505,14 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     // Verify the data structures
     m_file_on_streaming_form = false; // May be updated by validate_buffer()
     ref_type top_ref;
-    validate_buffer(data, size, top_ref); // Throws
+    bool is_shared = false;
+    validate_buffer(data, size, top_ref, is_shared); // Throws
+
+    {
+        const Header* header = reinterpret_cast<const Header*>(data);
+        int select_field = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+        m_file_format = header->m_file_format[select_field];
+    }
 
     m_data        = data;
     m_baseline    = size;
@@ -533,7 +541,7 @@ void SlabAlloc::attach_empty()
     m_baseline = sizeof (Header);
 }
 
-void SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref)
+void SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref, bool is_shared)
 {
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof (Header) || size % 8 != 0))
@@ -554,14 +562,16 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
     // Last bit in info block indicates which top_ref block is valid
     int valid_part = file_header[16 + 7] & 0x1;
 
-    // FIXME: How can it be that we allow the file format version to be anything
-    // less than, or qual to default_file_format_version? As far as I can see,
-    // core is not prepared to handle file format version 1. See
-    // https://github.com/realm/realm-core/issues/975.
-
     // Byte 4 and 5 (depending on valid_part) in the info block is version
-    int version = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
-    if (REALM_UNLIKELY(version > default_file_format_version))
+    int file_format = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
+    bool bad_file_format = (file_format != library_file_format);
+
+    // As a special case, allow upgrading from version 2 to 3, but only when
+    // accessed through SharedGroup.
+    if (file_format == 2 && library_file_format == 3 && is_shared)
+        bad_file_format = false;
+
+    if (REALM_UNLIKELY(bad_file_format))
         throw InvalidDatabase("Unsupported Realm file format version");
 
     // Top_ref should always point within buffer

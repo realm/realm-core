@@ -461,8 +461,6 @@ public:
     void set_uint(std::size_t ndx, uint64_t value);
     void set_as_ref(std::size_t ndx, ref_type value);
 
-    void destroy_subtree(std::size_t ndx, bool clear_value);
-
     template <class U>
     void adjust(std::size_t ndx, U diff);
     template <class U>
@@ -771,32 +769,6 @@ template <class T, bool N>
 T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
     return aggregate<T, T, act_Max, None>(*this, 0, start, end, limit, return_ndx);
-}
-
-template <class T, bool N>
-void Column<T,N>::destroy_subtree(size_t ndx, bool clear_value)
-{
-    static_assert(std::is_same<T, int_fast64_t>::value && !N,
-        "destroy_subtree only makes sense on non-nullable integer columns");
-    int_fast64_t value = get(ndx);
-
-    // Null-refs indicate empty subtrees
-    if (value == 0)
-        return;
-
-    // A ref is always 8-byte aligned, so the lowest bit
-    // cannot be set. If it is, it means that it should not be
-    // interpreted as a ref.
-    if (value % 2 != 0)
-        return;
-
-    // Delete subtree
-    ref_type ref = to_ref(value);
-    Allocator& alloc = get_alloc();
-    Array::destroy_deep(ref, alloc);
-
-    if (clear_value)
-        set(ndx, 0); // Throws
 }
 
 template <class T, bool N>

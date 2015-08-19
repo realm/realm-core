@@ -2088,7 +2088,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
 void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         size_t num_rows_to_erase = 1;
         column.erase_rows(row_ndx, num_rows_to_erase, m_size,
