@@ -24,6 +24,8 @@
 
 * Added argument to SharedGroup to prevent automatic file format upgrade. If an
   upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
+* Let `LinkColumn` and `LinkListColumn` adhere to the same nullability interface
+  as the rest of the column types.
 
 ----------------------------------------------
 
