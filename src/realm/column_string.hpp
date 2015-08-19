@@ -131,8 +131,6 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const override;
 
-    bool is_string_col() const REALM_NOEXCEPT override;
-
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
@@ -337,11 +335,6 @@ inline std::size_t StringColumn::get_size_from_ref(ref_type root_ref,
         return ArrayBigBlobs::get_size_from_header(root_header);
     }
     return Array::get_bptree_size_from_header(root_header);
-}
-
-inline bool StringColumn::is_string_col() const REALM_NOEXCEPT
-{
-    return true;
 }
 
 // Implementing pure virtual method of ColumnBase.
