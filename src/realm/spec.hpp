@@ -104,8 +104,11 @@ public:
     /// well.
     std::size_t get_column_ndx_in_parent(std::size_t column_ndx) const;
 
+    //@{
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const REALM_NOEXCEPT;
+    bool operator!=(const Spec&) const REALM_NOEXCEPT;
+    //@}
 
     void destroy() REALM_NOEXCEPT;
 
@@ -420,6 +423,11 @@ inline bool Spec::has_backlinks() const REALM_NOEXCEPT
     // Fixme: It's bad design that backlinks are stored and recognized like this. Backlink columns
     // should be a column type like any other, and we should find another way to hide them away from
     // the user.
+}
+
+inline bool Spec::operator!=(const Spec &s) const REALM_NOEXCEPT
+{
+    return !(*this == s);
 }
 
 

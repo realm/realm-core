@@ -296,25 +296,6 @@ TEST(Array_General)
     CHECK_EQUAL(c.get(6), 65536);
 
 
-    // TEST(Array_Index1)
-
-/*
-    // Create index
-    IntegerColumn index;
-    c.BuildIndex(index);
-
-    CHECK_EQUAL(0, c.FindWithIndex(256));
-    CHECK_EQUAL(1, c.FindWithIndex(0));
-    CHECK_EQUAL(2, c.FindWithIndex(1));
-    CHECK_EQUAL(3, c.FindWithIndex(16));
-    CHECK_EQUAL(4, c.FindWithIndex(2));
-    CHECK_EQUAL(5, c.FindWithIndex(3));
-    CHECK_EQUAL(6, c.FindWithIndex(65536));
-
-    c.ClearIndex();
-*/
-
-
     // TEST(Array_Delete1)
 
     // Delete from middle

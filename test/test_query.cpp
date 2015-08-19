@@ -6269,7 +6269,7 @@ NOTE NOTE: There is currently only very little syntax checking.
     tv = (price != null()).find_all();
     check(tv, { 1, 2}, __LINE__);
 
-    // Note that this returns rows with null, which may not be wanted and differs from SQL! Todo, discuss.
+    // Note that this returns rows with null, which differs from SQL!
     tv = (price == shipping).find_all();
     check(tv, { 0 }, __LINE__); // null == null
 
@@ -6415,8 +6415,15 @@ NOTE NOTE: There is currently only very little syntax checking.
     // not preserve these bits.
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
+
+#ifndef _WIN32 // signaling_NaN() broken in VS2015
     CHECK(null::is_signaling(table->get_float(1, 0)));
+#endif
+
+#ifndef _WIN32 // signaling_NaN() broken in VS2015
     CHECK(!null::is_signaling(table->get_float(1, 1)));
+#endif 
+
     CHECK(!table->is_null(1, 0));
     CHECK(!table->is_null(1, 1));
 
@@ -6424,8 +6431,12 @@ NOTE NOTE: There is currently only very little syntax checking.
     table->set_double(3, 1, std::numeric_limits<double>::quiet_NaN());
     CHECK(std::isnan(table->get_double(3, 0)));
     CHECK(std::isnan(table->get_double(3, 1)));
+
+#ifndef _WIN32 // signaling_NaN() broken in VS2015
     CHECK(null::is_signaling(table->get_double(3, 0)));
     CHECK(!null::is_signaling(table->get_double(3, 1)));
+#endif 
+
     CHECK(!table->is_null(3, 0));
     CHECK(!table->is_null(3, 1));
 

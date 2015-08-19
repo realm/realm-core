@@ -34,7 +34,6 @@
 #define TEST_FILE
 #define TEST_FILE_LOCKS
 #define TEST_GROUP
-//#define TEST_INDEX // not implemented yet
 #define TEST_INDEX_STRING
 #define TEST_LANG_BIND_HELPER
 #define TEST_QUERY

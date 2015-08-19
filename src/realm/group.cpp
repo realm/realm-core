@@ -37,20 +37,35 @@ void Group::upgrade_file_format()
 {
 #if REALM_NULL_STRINGS == 1
     REALM_ASSERT(is_attached());
-    if (file_format_upgrade_required()) {
-        for (size_t t = 0; t < m_tables.size(); t++) {
-            TableRef table = get_table(t);
-            table->upgrade_file_format();
-        }
 
-        m_alloc.m_file_format_version = default_file_format_version;
+    // SlabAlloc::validate_buffer() ensures this
+    REALM_ASSERT_RELEASE(m_alloc.get_committed_file_format() == 2);
+    REALM_ASSERT_RELEASE(m_alloc.m_file_format == 2);
+    REALM_ASSERT_RELEASE(SlabAlloc::library_file_format == 3);
+
+    for (size_t t = 0; t < m_tables.size(); t++) {
+        TableRef table = get_table(t);
+        table->upgrade_file_format();
     }
 #endif
 }
 
-unsigned char Group::get_file_format() const
+
+int Group::get_file_format() const REALM_NOEXCEPT
 {
-    return m_alloc.get_file_format();
+    return m_alloc.m_file_format;
+}
+
+
+void Group::set_file_format(int file_format) REALM_NOEXCEPT
+{
+    m_alloc.m_file_format = file_format;
+}
+
+
+int Group::get_committed_file_format() const REALM_NOEXCEPT
+{
+    return m_alloc.get_committed_file_format();
 }
 
 
@@ -73,6 +88,9 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     SlabAlloc::DetachGuard dg(m_alloc);
     attach(top_ref); // Throws
     dg.release(); // Do not detach allocator from file
+
+    // SlabAlloc::validate_buffer() ensures this.
+    REALM_ASSERT_RELEASE(m_alloc.m_file_format == SlabAlloc::library_file_format);
 }
 
 
@@ -99,6 +117,9 @@ void Group::open(BinaryData buffer, bool take_ownership)
     dg.release(); // Do not detach allocator from file
     if (take_ownership)
         m_alloc.own_buffer();
+
+    // SlabAlloc::validate_buffer() ensures this.
+    REALM_ASSERT_RELEASE(m_alloc.m_file_format == SlabAlloc::library_file_format);
 }
 
 
@@ -328,7 +349,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
     // Whenever a table has a link column, the column accessor must be set up to
     // refer to the target table accessor, so the target table accessor needs to
     // be created too, if it does not already exist. This, of course, applies
-    // recusively, and it applies to the opposide direction of links too (from
+    // recursively, and it applies to the opposide direction of links too (from
     // target side to origin side). This means that whenever we create a table
     // accessor, we actually need to create the entire cluster of table
     // accessors, that is reachable in zero or more steps along links, or
@@ -671,7 +692,6 @@ void Group::commit()
         throw LogicError(LogicError::detached_accessor);
     if (m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
-     REALM_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     GroupWriter out(*this); // Throws
 
@@ -701,7 +721,7 @@ void Group::commit()
 
     out.commit(top_ref); // Throws
 
-    // Recusively update refs in all active tables (columns, arrays..)
+    // Recursively update refs in all active tables (columns, arrays..)
     update_refs(top_ref, old_baseline);
 }
 
@@ -1493,11 +1513,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     m_top.detach(); // Soft detach
     attach(new_top_ref); // Throws
     refresh_dirty_accessors(); // Throws
-}
-
-bool Group::file_format_upgrade_required() const
-{
-    return m_alloc.get_file_format() < default_file_format_version;
 }
 
 

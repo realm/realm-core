@@ -302,6 +302,14 @@ public:
     ConstTableRef get_root_table() const REALM_NOEXCEPT;
     //@}
 
+    //@{
+    /// Get the target table associated with the specified link column. This
+    /// descriptor must be a root descriptor (is_root()), and the specified column must be a
+    /// link column (`type_Link` or `type_LinkList`).
+    TableRef get_link_target(size_t col_ndx) REALM_NOEXCEPT;
+    ConstTableRef get_link_target(size_t col_ndx) const REALM_NOEXCEPT;
+    //@}
+
     /// Is this a root descriptor?
     ///
     /// Descriptors of tables with independent dynamic type are root
@@ -348,9 +356,18 @@ public:
     bool is_attached() const REALM_NOEXCEPT;
 
     //@{
-    /// Compare two table descriptors. Two descriptors are equal if,
-    /// and only if they contain the same number of columns, and each
-    /// corresponding pair of columns have the same name and type.
+    /// \brief Compare two table descriptors.
+    ///
+    /// Two table descriptors are equal if they have the same number of columns,
+    /// and for each column index, the two columns have the same name, data
+    /// type, and set of attributes.
+    ///
+    /// For link columns (`type_Link` and `type_LinkList`), the target table
+    /// (get_link_target()) of the two columns must be the same.
+    ///
+    /// For subtable columns (`type_Table`), the two corresponding
+    /// subdescriptors must themselves be equal, as if by a recursive call to
+    /// operator==().
     ///
     /// The consequences of comparing a detached descriptor are
     /// undefined.
@@ -593,6 +610,20 @@ inline TableRef Descriptor::get_root_table() REALM_NOEXCEPT
 inline ConstTableRef Descriptor::get_root_table() const REALM_NOEXCEPT
 {
     return const_cast<Descriptor*>(this)->get_root_table();
+}
+
+inline TableRef Descriptor::get_link_target(size_t col_ndx) REALM_NOEXCEPT
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(is_root());
+    return get_root_table()->get_link_target(col_ndx);
+}
+
+inline ConstTableRef Descriptor::get_link_target(size_t col_ndx) const REALM_NOEXCEPT
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(is_root());
+    return get_root_table()->get_link_target(col_ndx);
 }
 
 inline bool Descriptor::is_root() const REALM_NOEXCEPT

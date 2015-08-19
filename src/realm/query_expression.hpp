@@ -1469,7 +1469,7 @@ class UnaryLinkCompare : public Expression
 public:
     UnaryLinkCompare(LinkMap lm) : m_link_map(lm)
     {
-        Query::expression(this, true);
+        Query::expression(this);
         Table* t = const_cast<Table*>(get_table());
         Query::m_table = t->get_table_ref();
     }
@@ -1839,7 +1839,7 @@ public:
             m_left(left), m_right(const_cast<TRight&>(right)), m_compare_string(compare_string)
     {
         m_auto_delete = auto_delete;
-        Query::expression(this, auto_delete);
+        Query::expression(this);
         Table* t = const_cast<Table*>(get_table()); // todo, const
 
         if (t)
