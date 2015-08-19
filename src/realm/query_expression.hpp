@@ -1190,6 +1190,19 @@ struct MakeLinkVector : public LinkMapFunction
     std::vector<size_t> &m_links;
 };
 
+struct CountLinks : public LinkMapFunction
+{
+    bool consume(size_t) override
+    {
+        m_link_count++;
+        return true;
+    }
+
+    size_t result() const { return m_link_count; }
+
+    size_t m_link_count = 0;
+};
+
 
 /*
 The LinkMap and LinkMapFunction classes are used for query conditions on links themselves (contrary to conditions on
@@ -1239,6 +1252,13 @@ public:
         std::vector<size_t> res;
         get_links(index, res);
         return res;
+    }
+
+    size_t count_links(size_t row)
+    {
+        CountLinks counter;
+        map_links(row, counter);
+        return counter.result();
     }
 
     void map_links(size_t row, LinkMapFunction& lm)
@@ -1511,6 +1531,32 @@ private:
     mutable LinkMap m_link_map;
 };
 
+class LinkCount : public Subexpr2<Int> {
+public:
+    LinkCount(LinkMap link_map) : m_link_map(link_map) { }
+
+    Subexpr& clone() override
+    {
+        return *new LinkCount(*this);
+    }
+
+    const Table* get_table() override
+    {
+        return m_link_map.m_tables[0];
+    }
+
+    void set_table() override { }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        size_t count = m_link_map.count_links(index);
+        destination.import(Value<Int>(false, 1, count));
+    }
+
+private:
+    LinkMap m_link_map;
+};
+
 // This is for LinkList too because we have 'typedef List LinkList'
 template <> class Columns<Link> : public Subexpr2<Link>
 {
@@ -1520,6 +1566,11 @@ public:
             throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return *new UnaryLinkCompare(m_link_map);
+    }
+
+    LinkCount count() const
+    {
+        return LinkCount(m_link_map);
     }
 
 private:
