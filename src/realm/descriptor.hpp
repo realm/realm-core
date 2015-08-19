@@ -114,7 +114,7 @@ public:
     /// or `type_LinkList`. A link-type column is associated with a particular
     /// target table. All links in a link-type column refer to rows in the
     /// target table of that column. The target table must also be a group-level
-    /// table.
+    /// table, and it must belong to the same group as the origin table.
     ///
     /// \param name Name of new column. All strings are valid column names as
     /// long as they are valid UTF-8 encodings and the number of bytes does not
@@ -128,6 +128,11 @@ public:
     /// subtable column, and stores a reference to its accessor in
     /// `*subdesc`.
     ///
+    /// \param col_ndx Insert the new column at this index. Preexisting columns
+    /// at indexes equal to, or greater than `col_ndx` will be shifted to the
+    /// next higher index. It is an error to specify an index that is greater
+    /// than the number of columns prior to the insertion.
+    ///
     /// \param link_type See set_link_type().
     ///
     /// \sa Table::add_column()
@@ -140,12 +145,12 @@ public:
 
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
 
-    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+    void insert_column(std::size_t col_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0, bool nullable = false);
 
     std::size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
-    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
+    void insert_column_link(std::size_t col_ndx, DataType type, StringData name, Table& target,
                             LinkType = link_Weak);
     //@}
 
@@ -167,9 +172,13 @@ public:
     /// table will remain attached. The root table is the table
     /// associated with the root descriptor.
     ///
+    /// \param col_ndx The index of the column to be removed. It is an error to
+    /// specify an index that is greater than, or equal to the number of
+    /// columns.
+    ///
     /// \sa is_root()
     /// \sa Table::remove_column()
-    void remove_column(std::size_t column_ndx);
+    void remove_column(std::size_t col_ndx);
 
     /// Rename the specified column.
     ///
@@ -182,9 +191,13 @@ public:
     /// attached. The root table is the table associated with the root
     /// descriptor.
     ///
+    /// \param col_ndx The index of the column to be renamed. It is an error to
+    /// specify an index that is greater than, or equal to the number of
+    /// columns.
+    ///
     /// \sa is_root()
     /// \sa Table::rename_column()
-    void rename_column(std::size_t column_ndx, StringData new_name);
+    void rename_column(std::size_t col_ndx, StringData new_name);
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
     /// that implies ownership, i.e., that the origin row (parent) owns the
@@ -253,7 +266,12 @@ public:
     ///     row.set_link(col_ndx_1, ...);
     ///     if (row)
     ///         row.set_int(col_ndx_2, ...); // Ok, because we check whether the row has disappeared
-    void set_link_type(std::size_t column_ndx, LinkType);
+    ///
+    /// \param col_ndx The index of the link column (`type_Link` or
+    /// `type_LinkList`) to be modified. It is an error to specify an index that
+    /// is greater than, or equal to the number of columns, or to specify the
+    /// index of a non-link column.
+    void set_link_type(std::size_t col_ndx, LinkType);
 
     //@{
     /// Get the descriptor for the specified subtable column.
