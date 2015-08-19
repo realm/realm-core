@@ -2375,19 +2375,21 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool value_null) const
 {
     REALM_ASSERT(!(value_null && !nullable_array));
-
-    cond2 c;
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+
+    size_t start2 = start;
+    cond2 c;
+
     if (end == npos)
         end = nullable_array ? size() - 1 : size();
 
     if (nullable_array) {
         // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme: 
         // Huge speed optimizations are possible here! This is a very simple generic method.
-        for (; start < end; start++) {
-            int64_t v = get<bitwidth>(start + 1);
+        for (; start2 < end; start2++) {
+            int64_t v = get<bitwidth>(start2 + 1);
             if (c(v, value, v == get(0), value_null)) {
-                if (!find_action<action, Callback>(start + baseindex, v, state, callback))
+                if (!find_action<action, Callback>(start2 + baseindex, v, state, callback))
                     return false; // tell caller to stop aggregating/search
             }
         }
@@ -2396,37 +2398,37 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
 
     // Test first few items with no initial time overhead
-    if (start > 0) {
-        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
+    if (start2 > 0) {
+        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
+            if (!find_action<action, Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
-        ++start;
+        ++start2;
 
-        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
+        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
+            if (!find_action<action, Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
-        ++start;
+        ++start2;
 
-        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
+        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
+            if (!find_action<action, Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
-        ++start;
+        ++start2;
 
-        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
+        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
+            if (!find_action<action, Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
-        ++start;
+        ++start2;
     }
 
-    if (!(m_size > start && start < end))
+    if (!(m_size > start2 && start2 < end))
         return true;
 
     if (end == std::size_t(-1))
@@ -2445,28 +2447,28 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         else {
             REALM_ASSERT_DEBUG(state->m_match_count < state->m_limit);
             size_t process = state->m_limit - state->m_match_count;
-            end2 = end - start > process ? start + process : end;
+            end2 = end - start2 > process ? start2 + process : end;
         }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
             size_t res_ndx = 0;
             if (action == act_Sum)
-                res = Array::sum(start, end2);
+                res = Array::sum(start2, end2);
             if (action == act_Max)
-                Array::maximum(res, start, end2, &res_ndx);
+                Array::maximum(res, start2, end2, &res_ndx);
             if (action == act_Min)
-                Array::minimum(res, start, end2, &res_ndx);
+                Array::minimum(res, start2, end2, &res_ndx);
 
             find_action<action, Callback>(res_ndx + baseindex, res, state, callback);
-            state->m_match_count += end2 - start;
+            state->m_match_count += end2 - start2;
 
         }
         else if (action == act_Count) {
-            state->m_state += end2 - start;
+            state->m_state += end2 - start2;
         }
         else {
-            for (; start < end2; start++)
-                if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
+            for (; start2 < end2; start2++)
+                if (!find_action<action, Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
                     return false;
         }
         return true;
@@ -2478,14 +2480,14 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 #if defined(REALM_COMPILER_SSE)
     // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support 
     // Less-than comparison for 64-bit values. 
-    if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start >= sizeof(__m128i) && m_width >= 8 &&
+    if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start2 >= sizeof(__m128i) && m_width >= 8 &&
         (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
 
-        // find_sse() must start at 16-byte boundary, so search area before that using compare_equality()
-        __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
+        // find_sse() must start2 at 16-byte boundary, so search area before that using compare_equality()
+        __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start2 * bitwidth / 8, sizeof (__m128i)));
         __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
 
-        if (!compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
+        if (!compare<cond2, action, bitwidth, Callback>(value, start2, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
             return false;
 
         // Search aligned area with SSE
@@ -2508,10 +2510,10 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         return true;
     }
     else {
-        return compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+        return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
     }
 #else
-return compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
 #endif
 }
 

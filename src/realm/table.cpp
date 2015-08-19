@@ -2488,10 +2488,11 @@ float Table::get_float(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_size);
 
     const FloatColumn& column = get_column_float(col_ndx);
-    if (column.is_nullable() && column.is_null(ndx))
-        return 0.0;
+    float f = column.get(ndx);
+    if (null::is_null_float(f))
+        return 0.0f;
     else
-        return column.get(ndx);
+        return f;
 }
 
 
@@ -2515,10 +2516,12 @@ double Table::get_double(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_size);
 
     const DoubleColumn& column = get_column_double(col_ndx);
-    if (column.is_nullable() && column.is_null(ndx))
+    double d = column.get(ndx);
+    if (null::is_null_float(d))
         return 0.0;
     else
-        return column.get(ndx);
+        return d;
+
 }
 
 

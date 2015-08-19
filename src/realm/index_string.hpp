@@ -300,8 +300,6 @@ template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_
 
 template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 {
-   // validate_value(new_value); // Throws
-
     char buffer[sizeof(T)];
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);

@@ -650,6 +650,15 @@ template <class T, size_t prealloc = 8> struct NullableVector
 
     NullableVector() {};
 
+    NullableVector& operator= (const NullableVector& other)
+    {
+        init(other.m_size);
+        for (size_t t = 0; t < other.m_size; t++) {
+            set(t, other[t]);
+        }
+        return *this;
+    }
+
     NullableVector(const NullableVector<T, prealloc>& other)
     {
         other.init(m_size);

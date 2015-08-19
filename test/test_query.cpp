@@ -6555,5 +6555,73 @@ TEST(Query_Null_DefaultsAndErrorhandling)
 
 }
 
+TEST(Query_Null_Query_Conditions)
+{
+    // Tests all the condition objects in query_conditions.hpp
+
+    // Work in progress
+
+    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
+    {
+        test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
+        for (auto it = indexes.begin(); it != indexes.end(); ++it)
+            test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
+    };
+
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    table->insert_column(0, type_Int, "Price", true);
+    table->insert_column(1, type_Float, "Shipping", true);
+    table->insert_column(2, type_String, "Description", true);
+    table->insert_column(3, type_Double, "Rating", true);
+    table->insert_column(4, type_Bool, "Stock", true);
+    table->insert_column(5, type_DateTime, "Delivery date", true);
+    table->add_empty_row(3);
+
+    table->set_null(0, 0);
+    table->set_int(0, 1, 10);
+    table->set_int(0, 2, 20);
+
+    table->set_null(1, 0);
+    table->set_null(1, 1);
+    table->set_float(1, 2, 30.f);
+
+    table->set_string(2, 0, null());
+    table->set_string(2, 1, "foo");
+    table->set_string(2, 2, "bar");
+
+    table->set_double(3, 0, 1.1);
+    table->set_double(3, 1, 2.2);
+    table->set_double(3, 2, 3.3);
+
+    table->set_bool(4, 0, true);
+    table->set_null(4, 1);
+    table->set_bool(4, 2, false);
+
+    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_null(5, 1);
+    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+
+    Columns<Int> price = table->column<Int>(0);
+    Columns<Float> shipping = table->column<Float>(1);
+    Columns<Double> rating = table->column<Double>(3);
+    Columns<Bool> stock = table->column<Bool>(4);
+    Columns<DateTime> delivery = table->column<DateTime>(5);
+
+    TableView tv;
+
+    /*
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    ----------------------------------------------------------------------------------------------------------------
+    0   null            null                null                    1.1                 true          2016-2-2
+    1   10              null                "foo"                   2.2                 null          null
+    2   20              30.0                "bar"                   3.3                 false         2016-6-6
+    */
+
+//    tv = table->where().contains()
+//    check(tv, { 0, 1 }, __LINE__);
+
+}
+
 #endif // TEST_QUERY
 
