@@ -1,3 +1,12 @@
+# 0.89.7 Release notes
+
+### Bugfixes:
+
+* A stackoverflow issue in encrypted_file_mapping. Allocing 4k bytes on the
+  stack would cause some random crashes on small stack size configurations.
+
+----------------------------------------------
+
 # 0.89.6 Release notes
 
 ### Bugfixes:
