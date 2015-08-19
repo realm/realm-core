@@ -554,6 +554,23 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 
+void SharedGroup::do_open_1(const std::string& path, bool no_create_file, DurabilityLevel durability,
+                            bool is_backend, const char* encryption_key, bool allow_upgrafe_file_format)
+{
+    // Exception safety: Since do_open_1() is called from constructors, if it
+    // throws, it must leave the file closed.
+
+    do_open_2(path, no_create_file, durability, is_backend, encryption_key); // Throws
+    try {
+        upgrade_file_format(allow_upgrafe_file_format); // Throws
+    }
+    catch (...) {
+        close();
+        throw;
+    }
+}
+
+
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process-sharing example' in the POSIX man page
@@ -572,9 +589,14 @@ void spawn_daemon(const std::string& file)
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityLevel durability,
-                       bool is_backend, const char* encryption_key)
+void SharedGroup::do_open_2(const std::string& path, bool no_create_file, DurabilityLevel durability,
+                            bool is_backend, const char* encryption_key)
 {
+    // Exception safety: Since do_open_2() is called from constructors, if it
+    // throws, it must leave the file closed.
+
+    // FIXME: Asses the exception safety of this function.
+
     REALM_ASSERT(!is_attached());
 
 #ifndef REALM_ASYNC_DAEMON
@@ -832,6 +854,7 @@ void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityL
 #endif
 }
 
+
 bool SharedGroup::compact()
 {
     // FIXME: ExcetionSafety: This function must be rewritten with exception
@@ -899,17 +922,6 @@ uint_fast64_t SharedGroup::get_number_of_versions()
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
     return info->number_of_versions;
-}
-
-void SharedGroup::open(Replication& repl, DurabilityLevel durability, const char* encryption_key)
-{
-    REALM_ASSERT(!is_attached());
-    std::string file = repl.get_database_path();
-    bool no_create   = false;
-    bool is_backend  = false;
-    typedef _impl::GroupFriend gf;
-    gf::set_replication(m_group, &repl);
-    open(file, no_create, durability, is_backend, encryption_key); // Throws
 }
 
 SharedGroup::~SharedGroup() REALM_NOEXCEPT

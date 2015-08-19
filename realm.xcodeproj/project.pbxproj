@@ -18,7 +18,6 @@
 		3647E10E1420E69400D56FD7 /* test_array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04A14209CE600D56FD7 /* test_array.cpp */; };
 		3647E10F1420E69400D56FD7 /* test_array_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04B14209CE600D56FD7 /* test_array_string.cpp */; };
 		3647E1101420E69400D56FD7 /* test_column.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04C14209CE600D56FD7 /* test_column.cpp */; };
-		3647E1111420E69400D56FD7 /* test_index.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04D14209CE600D56FD7 /* test_index.cpp */; };
 		3647E1121420E69400D56FD7 /* test_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04E14209CE600D56FD7 /* test_table.cpp */; };
 		3658CE6E19209EDD009A7085 /* column_link.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3658CE6C19209EDD009A7085 /* column_link.hpp */; };
 		3658CE711921AC6F009A7085 /* column_backlink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3658CE6F1921AC6F009A7085 /* column_backlink.cpp */; };
@@ -475,7 +474,6 @@
 		F45013ED1B01027F00CD4A7E /* test_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B3D17D4E84700DD22CC /* test_file.cpp */; };
 		F45013EE1B01027F00CD4A7E /* test_file_locks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB618E73A4700A22716 /* test_file_locks.cpp */; };
 		F45013EF1B01027F00CD4A7E /* test_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 368063361445AD9200283774 /* test_group.cpp */; };
-		F45013F01B01027F00CD4A7E /* test_index.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04D14209CE600D56FD7 /* test_index.cpp */; };
 		F45013F11B01027F00CD4A7E /* test_index_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E67FCD15A2EDFB00D131FB /* test_index_string.cpp */; };
 		F45013F21B01027F00CD4A7E /* test_json.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F2F619640A4100EC86A5 /* test_json.cpp */; };
 		F45013F31B01027F00CD4A7E /* test_lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B3F17D4E85A00DD22CC /* test_lang_bind_helper.cpp */; };
@@ -683,7 +681,6 @@
 		3647E04A14209CE600D56FD7 /* test_array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_array.cpp; sourceTree = "<group>"; };
 		3647E04B14209CE600D56FD7 /* test_array_string.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_array_string.cpp; sourceTree = "<group>"; };
 		3647E04C14209CE600D56FD7 /* test_column.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_column.cpp; sourceTree = "<group>"; };
-		3647E04D14209CE600D56FD7 /* test_index.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_index.cpp; sourceTree = "<group>"; };
 		3647E04E14209CE600D56FD7 /* test_table.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_table.cpp; sourceTree = "<group>"; };
 		3647E0E714209E6B00D56FD7 /* librealm.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = librealm.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		3647E1031420E4D800D56FD7 /* realm_unit_tests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = realm_unit_tests; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1238,7 +1235,6 @@
 				52A32B3D17D4E84700DD22CC /* test_file.cpp */,
 				52807FB618E73A4700A22716 /* test_file_locks.cpp */,
 				368063361445AD9200283774 /* test_group.cpp */,
-				3647E04D14209CE600D56FD7 /* test_index.cpp */,
 				36E67FCD15A2EDFB00D131FB /* test_index_string.cpp */,
 				4222F2F619640A4100EC86A5 /* test_json.cpp */,
 				52A32B3F17D4E85A00DD22CC /* test_lang_bind_helper.cpp */,
@@ -2156,7 +2152,6 @@
 				52A32B3E17D4E84700DD22CC /* test_file.cpp in Sources */,
 				52807FB718E73A4800A22716 /* test_file_locks.cpp in Sources */,
 				368063381445AF9B00283774 /* test_group.cpp in Sources */,
-				3647E1111420E69400D56FD7 /* test_index.cpp in Sources */,
 				36E67FCE15A2EDFB00D131FB /* test_index_string.cpp in Sources */,
 				4222F2F719640A4100EC86A5 /* test_json.cpp in Sources */,
 				52A32B4017D4E85A00DD22CC /* test_lang_bind_helper.cpp in Sources */,
@@ -2374,7 +2369,6 @@
 				65F35E101B32FC5E006AE5A9 /* test_optional.cpp in Sources */,
 				F45013EE1B01027F00CD4A7E /* test_file_locks.cpp in Sources */,
 				F45013EF1B01027F00CD4A7E /* test_group.cpp in Sources */,
-				F45013F01B01027F00CD4A7E /* test_index.cpp in Sources */,
 				F45013F11B01027F00CD4A7E /* test_index_string.cpp in Sources */,
 				F45013F21B01027F00CD4A7E /* test_json.cpp in Sources */,
 				F45013F31B01027F00CD4A7E /* test_lang_bind_helper.cpp in Sources */,

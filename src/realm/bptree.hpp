@@ -60,10 +60,6 @@ public:
     void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append);
     void replace_root(std::unique_ptr<Array> leaf);
 
-    // FIXME: This is only applicable for linklist columns, which
-    // derive from the integer Column.
-    void destroy_subtree(std::size_t ndx, bool clear_value);
-
 protected:
     explicit BpTreeBase(std::unique_ptr<Array> root);
     explicit BpTreeBase(BpTreeBase&&) = default;
