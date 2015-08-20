@@ -7052,7 +7052,7 @@ TEST(Query_Link_Maximum)
     CHECK_EQUAL(not_found, match);
 }
 
-TEST(Query_Link_Average)
+TEST(Query_Link_Sum)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
@@ -7136,7 +7136,7 @@ TEST(Query_Link_Average)
     CHECK_EQUAL(not_found, match);
 }
 
-TEST(Query_Link_Sum)
+TEST(Query_Link_Average)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
