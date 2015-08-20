@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_COLUMN_TRAITS_HPP
-#define REALM_COLUMN_TRAITS_HPP
+#ifndef REALM_COLUMN_TYPE_TRAITS_HPP
+#define REALM_COLUMN_TYPE_TRAITS_HPP
 
 #include <realm/column_fwd.hpp>
 
@@ -76,4 +76,4 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
 
 }
 
-#endif // REALM_COLUMN_TRAITS_HPP
+#endif // REALM_COLUMN_TYPE_TRAITS_HPP
