@@ -1511,6 +1511,8 @@ private:
     mutable LinkMap m_link_map;
 };
 
+template <typename T> class SubColumns;
+
 // This is for LinkList too because we have 'typedef List LinkList'
 template <> class Columns<Link> : public Subexpr2<Link>
 {
@@ -1520,6 +1522,12 @@ public:
             throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return *new UnaryLinkCompare(m_link_map);
+    }
+
+    template <typename C>
+    SubColumns<C> column(size_t column) const
+    {
+        return SubColumns<C>(Columns<C>(column, m_link_map.m_table), m_link_map);
     }
 
 private:
@@ -1744,6 +1752,205 @@ public:
     bool m_nullable;
 };
 
+template <typename T, typename Operation> class SubColumnAggregate;
+namespace aggregate_operations {
+    template <typename T> class Minimum;
+    template <typename T> class Maximum;
+    template <typename T> class Sum;
+    template <typename T> class Average;
+}
+
+template <typename T>
+class SubColumns : public Subexpr {
+public:
+    SubColumns(Columns<T> column, LinkMap link_map)
+        : m_column(column)
+        , m_link_map(link_map)
+    {
+    }
+
+    Subexpr& clone() override
+    {
+        return *new SubColumns<T>(*this);
+    }
+
+    const Table* get_table() override
+    {
+        return m_column.get_table();
+    }
+
+    void set_table() override
+    {
+        m_column.set_table();
+    }
+
+    void evaluate(size_t, ValueBase&) override
+    {
+        REALM_ASSERT(false && "SubColumns can only be used in an expression in conjunction with its aggregate methods (min, max, sum, average).");
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Minimum<T>>(m_column, m_link_map);
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Maximum<T>>(m_column, m_link_map);
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Sum<T>>(m_column, m_link_map);
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Average<T>> average() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Average<T>>(m_column, m_link_map);
+    }
+
+private:
+    Columns<T> m_column;
+    LinkMap m_link_map;
+};
+
+template <typename  T, typename Operation>
+class SubColumnAggregate : public Subexpr2<typename Operation::ResultType>
+{
+public:
+    SubColumnAggregate(Columns<T> column, LinkMap link_map)
+        : m_column(column)
+        , m_link_map(link_map)
+    {
+    }
+
+    Subexpr& clone() override
+    {
+        return *new SubColumnAggregate<T, Operation>(*this);
+    }
+
+    const Table* get_table() override
+    {
+        return m_column.get_table();
+    }
+
+    void set_table() override
+    {
+        m_column.set_table();
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        std::vector<size_t> links = m_link_map.get_links(index);
+        std::sort(links.begin(), links.end());
+
+        Operation op;
+        for (size_t link_index = 0; link_index < links.size(); ) {
+            Value<T> value;
+            size_t link = links[link_index];
+            m_column.evaluate(link, value);
+
+            // Columns<T>::evaluate fetches values in chunks of ValueBase::default_size. Process all values
+            // within the chunk that came from rows that we link to.
+            const auto& value_storage = value.m_storage;
+            for (size_t value_index = 0; value_index < value.m_values; ) {
+                op.accumulate(value_storage[value_index]);
+                if (++link_index >= links.size()) {
+                    break;
+                }
+
+                size_t previous_link = link;
+                link = links[link_index];
+                value_index += link - previous_link;
+            }
+        }
+        destination.import(Value<typename Operation::ResultType>(false, 1, op.result()));
+    }
+
+private:
+    Columns<T> m_column;
+    LinkMap m_link_map;
+};
+
+namespace aggregate_operations {
+    template <typename T>
+    class NumericTypeIsRequired {
+        static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
+                      "Numeric aggregates can only be used with subcolumns of numeric types");
+    };
+
+    template <typename T>
+    class Minimum : private NumericTypeIsRequired<T> {
+    public:
+        using ResultType = T;
+
+        void accumulate(T value)
+        {
+            if (value < m_minimum)
+                m_minimum = value;
+        }
+
+        T result() const { return m_minimum; }
+
+    private:
+        T m_minimum = std::numeric_limits<T>::max();
+    };
+
+    template <typename T>
+    class Maximum : private NumericTypeIsRequired<T> {
+    public:
+        using ResultType = T;
+
+        void accumulate(T value)
+        {
+            if (value > m_maximum)
+                m_maximum = value;
+        }
+
+        T result() const { return m_maximum; }
+
+    private:
+        T m_maximum = std::numeric_limits<T>::min();
+    };
+
+    template <typename T>
+    class Sum : private NumericTypeIsRequired<T> {
+    public:
+        using ResultType = T;
+
+        void accumulate(T value)
+        {
+            m_total += value;
+        }
+
+        T result() const { return m_total; }
+
+    private:
+        T m_total = 0;
+    };
+
+    template <typename T>
+    class Average : private NumericTypeIsRequired<T> {
+    public:
+        using ResultType = double;
+
+        void accumulate(T value)
+        {
+            m_total += value;
+            m_count++;
+        }
+
+        double result() const {
+            if (!m_count)
+                return 0;
+            return m_total / m_count;
+        }
+
+    private:
+        size_t m_count = 0;
+        double m_total = 0;
+    };
+}
 
 template <class oper, class TLeft> class UnaryOperator : public Subexpr2<typename oper::type>
 {

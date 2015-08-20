@@ -6870,5 +6870,361 @@ TEST(Query_Null_ManyRows)
     CHECK(equals(tv, non_nulls));
 }
 
-#endif // TEST_QUERY
+TEST(Query_Link_Minimum)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Float, "float");
+    table1->add_column(type_Double, "double");
 
+    table1->add_empty_row();
+    table1->set_int(0, 0, 789);
+    table1->set_float(1, 0, 789.0f);
+    table1->set_double(2, 0, 789.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 456);
+    table1->set_float(1, 1, 456.0f);
+    table1->set_double(2, 1, 456.0);
+    table1->add_empty_row();
+    table1->set_int(0, 2, 123);
+    table1->set_float(1, 2, 123.0f);
+    table1->set_double(2, 2, 123.0);
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_int = table2->add_column(type_Int, "int");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 1, 1);
+    table2->set_link(col_link, 1, 1);
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 2, 2);
+    table2->set_link(col_link, 2, 2);
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    Query q;
+    size_t match;
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == 123;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // FIXME: Ideally this result wouldn't be user-visible? Somehow the comparison should return false if Columns<LinkList>.count() == 0.
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == std::numeric_limits<Int>::max();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).min() == 123.0f;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).min() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).min() == 123.0;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).min() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+TEST(Query_Link_Maximum)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Float, "float");
+    table1->add_column(type_Double, "double");
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 123);
+    table1->set_float(1, 0, 123.0f);
+    table1->set_double(2, 0, 123.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 456);
+    table1->set_float(1, 1, 456.0f);
+    table1->set_double(2, 1, 456.0);
+    table1->add_empty_row();
+    table1->set_int(0, 2, 789);
+    table1->set_float(1, 2, 789.0f);
+    table1->set_double(2, 2, 789.0);
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_int = table2->add_column(type_Int, "int");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 1, 1);
+    table2->set_link(col_link, 1, 1);
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 2, 2);
+    table2->set_link(col_link, 2, 2);
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    Query q;
+    size_t match;
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == 789;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // FIXME: Ideally this result wouldn't be user-visible? Somehow the comparison should return false if Columns<LinkList>.count() == 0.
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == std::numeric_limits<Int>::min();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).max() == 789.0f;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).max() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).max() == 789.0;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).max() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+TEST(Query_Link_Average)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Float, "float");
+    table1->add_column(type_Double, "double");
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 123);
+    table1->set_float(1, 0, 123.0f);
+    table1->set_double(2, 0, 123.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 456);
+    table1->set_float(1, 1, 456.0f);
+    table1->set_double(2, 1, 456.0);
+    table1->add_empty_row();
+    table1->set_int(0, 2, 789);
+    table1->set_float(1, 2, 789.0f);
+    table1->set_double(2, 2, 789.0);
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_int = table2->add_column(type_Int, "int");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 1, 1);
+    table2->set_link(col_link, 1, 1);
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 2, 2);
+    table2->set_link(col_link, 2, 2);
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    Query q;
+    size_t match;
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 1245;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).sum() == 1245.0f;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).sum() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).sum() == 1245.0;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).sum() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+TEST(Query_Link_Sum)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Float, "float");
+    table1->add_column(type_Double, "double");
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 123);
+    table1->set_float(1, 0, 123.0f);
+    table1->set_double(2, 0, 123.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 456);
+    table1->set_float(1, 1, 456.0f);
+    table1->set_double(2, 1, 456.0);
+    table1->add_empty_row();
+    table1->set_int(0, 2, 789);
+    table1->set_float(1, 2, 789.0f);
+    table1->set_double(2, 2, 789.0);
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_int = table2->add_column(type_Int, "int");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 1, 1);
+    table2->set_link(col_link, 1, 1);
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 2, 2);
+    table2->set_link(col_link, 2, 2);
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    Query q;
+    size_t match;
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 622.5;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 0;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).average() == 622.5;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).average() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).average() == 622.5;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).average() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+}
+
+#endif // TEST_QUERY
