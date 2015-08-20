@@ -253,7 +253,7 @@ public:
     template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) REALM_NOEXCEPT;
     //@}
 
-    using Table::Verify;
+    using Table::verify;
 
 #ifdef REALM_DEBUG
     using Table::print;

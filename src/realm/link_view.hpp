@@ -138,7 +138,7 @@ private:
     friend class _impl::TransactLogConvenientEncoder;
 
 #ifdef REALM_DEBUG
-    void Verify(std::size_t row_ndx) const;
+    void verify(std::size_t row_ndx) const;
 #endif
 
     friend class _impl::LinkListFriend;

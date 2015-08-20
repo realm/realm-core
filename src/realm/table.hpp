@@ -713,15 +713,26 @@ public:
     TableRef get_table_ref() { return TableRef(this); }
     ConstTableRef get_table_ref() const { return ConstTableRef(this); }
 
-    /// Compare two tables for equality. Two tables are equal if, and
-    /// only if, they contain the same columns and rows in the same
-    /// order, that is, for each value V of type T at column index C
-    /// and row index R in one of the tables, there is a value of type
-    /// T at column index C and row index R in the other table that
-    /// is equal to V.
+    /// \brief Compare two tables for equality.
+    ///
+    /// Two tables are equal if they have equal descriptors
+    /// (`Descriptor::operator==()`) and equal contents. Equal descriptors imply
+    /// that the two tables have the same columns in the same order. Equal
+    /// contents means that the two tables must have the same number of rows,
+    /// and that for each row index, the two rows must have the same values in
+    /// each column.
+    ///
+    /// In mixed columns, both the value types and the values are required to be
+    /// equal.
+    ///
+    /// For a particular row and column, if the two values are themselves tables
+    /// (subtable and mixed columns) value equality implies a recursive
+    /// invocation of `Table::operator==()`.
     bool operator==(const Table&) const;
 
-    /// Compare two tables for inequality. See operator==().
+    /// \brief Compare two tables for inequality.
+    ///
+    /// See operator==().
     bool operator!=(const Table& t) const;
 
     /// A subtable in a column of type 'table' (which shares descriptor with
@@ -733,14 +744,14 @@ public:
 
     // Debug
 #ifdef REALM_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
     void dump_node_structure() const; // To std::cerr (for GDB)
     void dump_node_structure(std::ostream&, int level) const;
 #else
-    void Verify() const {}
+    void verify() const {}
 #endif
 
     class Parent;
@@ -1385,13 +1396,13 @@ inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
 inline void Table::remove(size_t row_ndx)
 {
     bool is_move_last_over = false;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_ndx, is_move_last_over); // Throws
 }
 
 inline void Table::move_last_over(size_t row_ndx)
 {
     bool is_move_last_over = true;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_ndx, is_move_last_over); // Throws
 }
 
 inline void Table::remove_last()
@@ -2201,6 +2212,11 @@ public:
     static bool is_cross_table_link_target(const Table& table)
     {
         return table.is_cross_table_link_target();
+    }
+
+    static Group* get_parent_group(const Table& table) REALM_NOEXCEPT
+    {
+        return table.get_parent_group();
     }
 
     static Replication* get_repl(Table& table) REALM_NOEXCEPT

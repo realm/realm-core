@@ -42,9 +42,9 @@ void LinkColumnBase::check_cascade_break_backlinks_to(size_t target_table_ndx, s
 
 #ifdef REALM_DEBUG
 
-void LinkColumnBase::Verify(const Table& table, size_t col_ndx) const
+void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 {
-    IntegerColumn::Verify(table, col_ndx);
+    IntegerColumn::verify(table, col_ndx);
 
     // Check that the backlink column specifies the right origin
     REALM_ASSERT(&m_backlink_column->get_origin_table() == &table);

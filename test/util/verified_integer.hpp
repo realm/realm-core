@@ -53,7 +53,7 @@ public:
     int64_t sum(std::size_t start = 0, std::size_t end = -1);
     int64_t maximum(std::size_t start = 0, std::size_t end = -1);
     int64_t minimum(std::size_t start = 0, std::size_t end = -1);
-    bool Verify();
+    bool verify();
     bool occasional_verify();
     void verify_neighbours(std::size_t ndx);
 

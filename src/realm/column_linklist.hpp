@@ -76,8 +76,8 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify() const override;
-    void Verify(const Table&, std::size_t) const override;
+    void verify() const override;
+    void verify(const Table&, std::size_t) const override;
 #endif
 
 protected:

@@ -67,16 +67,17 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     REALM_ASSERT(row_ndx <= prior_num_rows - num_rows_to_erase);
 
     // Remove backlinks to the removed origin rows
-    if (!broken_reciprocal_backlinks) {
-        for (size_t i = 0; i < num_rows_to_erase; ++i) {
-            if (ref_type ref = get_as_ref(row_ndx+1)) {
+    for (size_t i = 0; i < num_rows_to_erase; ++i) {
+        if (ref_type ref = get_as_ref(row_ndx+i)) {
+            if (!broken_reciprocal_backlinks) {
                 IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
                     size_t target_row_ndx = to_size_t(link_list.get(j));
-                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+1);
+                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+i);
                 }
             }
+            Array::destroy_deep(ref, get_alloc());
         }
     }
 
@@ -112,8 +113,8 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     REALM_ASSERT(row_ndx <= prior_num_rows);
 
     // Remove backlinks to the removed origin row
-    if (!broken_reciprocal_backlinks) {
-        if (ref_type ref = get_as_ref(row_ndx)) {
+    if (ref_type ref = get_as_ref(row_ndx)) {
+        if (!broken_reciprocal_backlinks) {
             IntegerColumn link_list(get_alloc(), ref);
             size_t n = link_list.size();
             for (size_t i = 0; i < n; ++i) {
@@ -121,6 +122,7 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
                 m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
             }
         }
+        Array::destroy_deep(ref, get_alloc());
     }
 
     // Update backlinks to the moved origin row
@@ -137,8 +139,6 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     }
 
     // Do the actual delete and move
-    bool clear_value = false;
-    destroy_subtree(row_ndx, clear_value);
     LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
                                        broken_reciprocal_backlinks); // Throws
 
@@ -488,17 +488,17 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     REALM_ASSERT(leaf.has_refs());
     return leaf.size();
 }
 
 } // anonymous namespace
 
-void LinkListColumn::Verify() const
+void LinkListColumn::verify() const
 {
     if (root_is_leaf()) {
-        get_root_array()->Verify();
+        get_root_array()->verify();
         REALM_ASSERT(get_root_array()->has_refs());
         return;
     }
@@ -507,9 +507,9 @@ void LinkListColumn::Verify() const
 }
 
 
-void LinkListColumn::Verify(const Table& table, size_t col_ndx) const
+void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 {
-    LinkColumnBase::Verify(table, col_ndx);
+    LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
     m_backlink_column->get_backlinks(pairs);
@@ -523,7 +523,7 @@ void LinkListColumn::Verify(const Table& table, size_t col_ndx) const
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
         ConstLinkViewRef link_list = get(i);
-        link_list->Verify(i);
+        link_list->verify(i);
         std::multiset<size_t> links_1, links_2;
         size_t m = link_list->size();
         for (size_t j = 0; j < m; ++j)

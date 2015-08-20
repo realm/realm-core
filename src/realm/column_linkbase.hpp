@@ -34,6 +34,8 @@ public:
     LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx);
     ~LinkColumnBase() REALM_NOEXCEPT override;
 
+    StringIndex* create_search_index() override;
+
     bool get_weak_links() const REALM_NOEXCEPT;
     void set_weak_links(bool) REALM_NOEXCEPT;
 
@@ -56,8 +58,8 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
-    void Verify(const Table&, std::size_t) const override;
-    using IntegerColumn::Verify;
+    void verify(const Table&, std::size_t) const override;
+    using IntegerColumn::verify;
 #endif
 
 protected:
@@ -92,6 +94,11 @@ inline LinkColumnBase::LinkColumnBase(Allocator& alloc, ref_type ref, Table* tab
 
 inline LinkColumnBase::~LinkColumnBase() REALM_NOEXCEPT
 {
+}
+
+inline StringIndex* LinkColumnBase::create_search_index()
+{
+    return nullptr;
 }
 
 inline bool LinkColumnBase::get_weak_links() const REALM_NOEXCEPT

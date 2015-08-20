@@ -75,7 +75,6 @@
     <ClCompile Include="..\..\test\test_descriptor.cpp" />
     <ClCompile Include="..\..\test\test_file_locks.cpp" />
     <ClCompile Include="..\..\test\test_group.cpp" />
-    <ClCompile Include="..\..\test\test_index.cpp" />
     <ClCompile Include="..\..\test\test_index_string.cpp" />
     <ClCompile Include="..\..\test\test_lang_bind_helper.cpp" />
     <ClCompile Include="..\..\test\test_self.cpp" />

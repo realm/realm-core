@@ -140,7 +140,7 @@ public:
     /// - \a row_ndx_1 and \a row_ndx_2 point to the same value
     virtual void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) = 0;
 
-    virtual bool IsIntColumn() const REALM_NOEXCEPT { return false; }
+    virtual bool is_int_column() const REALM_NOEXCEPT { return false; }
 
     // Returns true if, and only if this column is an StringColumn.
     virtual bool is_string_col() const REALM_NOEXCEPT;
@@ -267,8 +267,8 @@ public:
 
 #ifdef REALM_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
-    virtual void Verify() const = 0;
-    virtual void Verify(const Table&, std::size_t col_ndx) const;
+    virtual void verify() const = 0;
+    virtual void verify(const Table&, std::size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
@@ -421,7 +421,7 @@ public:
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column<T, Nullable>&);
-    bool IsIntColumn() const REALM_NOEXCEPT override;
+    bool is_int_column() const REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -469,8 +469,6 @@ public:
     ref_type get_as_ref(std::size_t ndx) const REALM_NOEXCEPT;
     void set_uint(std::size_t ndx, uint64_t value);
     void set_as_ref(std::size_t ndx, ref_type value);
-
-    void destroy_subtree(std::size_t ndx, bool clear_value);
 
     template <class U>
     void adjust(std::size_t ndx, U diff);
@@ -542,8 +540,8 @@ public:
     void insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows);
 
 #ifdef REALM_DEBUG
-    void Verify() const override;
-    using ColumnBase::Verify;
+    void verify() const override;
+    using ColumnBase::verify;
     void to_dot(std::ostream&, StringData title) const override;
     void tree_to_dot(std::ostream&) const;
     MemStats stats() const;
@@ -800,32 +798,6 @@ T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_nd
 }
 
 template <class T, bool N>
-void Column<T,N>::destroy_subtree(size_t ndx, bool clear_value)
-{
-    static_assert(std::is_same<T, int_fast64_t>::value && !N,
-        "destroy_subtree only makes sense on non-nullable integer columns");
-    int_fast64_t value = get(ndx);
-
-    // Null-refs indicate empty subtrees
-    if (value == 0)
-        return;
-
-    // A ref is always 8-byte aligned, so the lowest bit
-    // cannot be set. If it is, it means that it should not be
-    // interpreted as a ref.
-    if (value % 2 != 0)
-        return;
-
-    // Delete subtree
-    ref_type ref = to_ref(value);
-    Allocator& alloc = get_alloc();
-    Array::destroy_deep(ref, alloc);
-
-    if (clear_value)
-        set(ndx, 0); // Throws
-}
-
-template <class T, bool N>
 void Column<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
                              typename BpTree<T,N>::LeafInfo& inout_leaf_info) const REALM_NOEXCEPT
 {
@@ -998,7 +970,7 @@ void Column<T,N>::move_assign(Column<T,N>& col)
 }
 
 template <class T, bool N>
-bool Column<T,N>::IsIntColumn() const REALM_NOEXCEPT
+bool Column<T,N>::is_int_column() const REALM_NOEXCEPT
 {
     return std::is_integral<T>::value;
 }
@@ -1411,7 +1383,7 @@ void Column<T,N>::do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_las
 #ifdef REALM_DEBUG
 
 template <class T, bool N>
-void Column<T,N>::Verify() const
+void Column<T,N>::verify() const
 {
     m_tree.verify();
 }

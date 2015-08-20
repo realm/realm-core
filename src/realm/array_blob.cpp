@@ -51,7 +51,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 
 #ifdef REALM_DEBUG
 
-void ArrayBlob::Verify() const
+void ArrayBlob::verify() const
 {
     REALM_ASSERT(!has_refs());
 }

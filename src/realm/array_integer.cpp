@@ -46,7 +46,7 @@ bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t *min
 }
 
 
-std::vector<int64_t> ArrayInteger::ToVector() const
+std::vector<int64_t> ArrayInteger::to_vector() const
 {
     std::vector<int64_t> v;
     const size_t count = size();
@@ -82,12 +82,12 @@ void ArrayIntNull::init_from_ref(ref_type ref) REALM_NOEXCEPT
 void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
 {
     Array::init_from_mem(mem);
-    
+
     if (m_size == 0) {
         // This can only happen when mem is being reused from another
         // array (which happens when shrinking the B+tree), so we need
         // to add the "magic" null value to the beginning.
-        
+
         // Since init_* functions are noexcept, but insert() isn't, we
         // need to ensure that insert() will not allocate.
         REALM_ASSERT(m_capacity != 0);
@@ -106,7 +106,7 @@ namespace {
         // Increment by a prime number. This guarantees that we will
         // eventually hit every possible integer in the 2^64 range.
         x += 0xfffffffbULL;
-        return static_cast<int64_t>(x);
+        return util::from_twos_compl<int64_t>(x);
     }
 }
 
@@ -192,11 +192,11 @@ void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t co
     // in the result column. Since find_all may be invoked many times for different leaves in the
     // B+tree with the same result column, we also can't simply adjust indices after finding them
     // (because then the first indices would be adjusted multiple times for each subsequent leaf)
-    
+
     if (end == npos) {
         end = size();
     }
-    
+
     for (size_t i = begin; i < end; ++i) {
         if (get(i) == value) {
             result->add(col_offset + i);
@@ -205,7 +205,7 @@ void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t co
 }
 
 namespace {
-    
+
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
     template <class T>

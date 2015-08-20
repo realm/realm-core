@@ -59,6 +59,18 @@ public:
 };
 
 
+/// The \c FileFormatUpgradeRequired exception can be thrown by the \c
+/// SharedGroup constructor when opening a database that uses a deprecated file
+/// format, and the user has indicated he does not want automatic upgrades to
+/// be performed. This exception indicates that until an upgrade of the file
+/// format is performed, the database will be unavailable for read or write
+/// operations.
+class FileFormatUpgradeRequired: public std::exception {
+public:
+    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+};
+
+
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
 /// been stated) in the documentation of the public API, and only in cases
@@ -102,6 +114,7 @@ public:
         row_index_out_of_range,
         column_index_out_of_range,
         bad_version,
+        illegal_type,
 
         /// Indicates that an argument has a value that is illegal in combination
         /// with another argument, or with the state of an involved object.
@@ -111,8 +124,17 @@ public:
         /// called and the type of the primary key is not `type_Int`.
         type_mismatch,
 
-        /// Indicates that an involved table is of the wrong kind, i.e., if it is a
-        /// subtable, and the function requires a root table.
+        /// Indicates that two involved tables are not in the same group.
+        group_mismatch,
+
+        /// Indicates that an involved descriptor is of the wrong kind, i.e., if
+        /// it is a subtable descriptor, and the function requires a root table
+        /// descriptor.
+        wrong_kind_of_descriptor,
+
+        /// Indicates that an involved table is of the wrong kind, i.e., if it
+        /// is a subtable, and the function requires a root table, or if it is a
+        /// free-standing table, and the function requires a group-level table.
         wrong_kind_of_table,
 
         /// Indicates that an involved accessor is was detached, i.e., was not
@@ -184,6 +206,11 @@ inline const char* CrossTableLinkTarget::what() const REALM_NOEXCEPT_OR_NOTHROW
 inline const char* DescriptorMismatch::what() const REALM_NOEXCEPT_OR_NOTHROW
 {
     return "Table descriptor mismatch";
+}
+
+inline const char* FileFormatUpgradeRequired::what() const REALM_NOEXCEPT_OR_NOTHROW
+{
+    return "Database upgrade required but prohibited";
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):

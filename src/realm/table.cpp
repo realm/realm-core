@@ -2088,7 +2088,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
 void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         size_t num_rows_to_erase = 1;
         column.erase_rows(row_ndx, num_rows_to_erase, m_size,
@@ -5011,16 +5011,16 @@ bool Table::is_cross_table_link_target() const REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-void Table::Verify() const
+void Table::verify() const
 {
     REALM_ASSERT(is_attached());
     if (!m_columns.is_attached())
         return; // Accessor for degenerate subtable
 
     if (m_top.is_attached())
-        m_top.Verify();
-    m_columns.Verify();
-    m_spec.Verify();
+        m_top.verify();
+    m_columns.verify();
+    m_spec.verify();
 
 
     // Verify row accessors
@@ -5042,7 +5042,7 @@ void Table::Verify() const
             const ColumnBase& column = get_column_base(i);
             std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
             REALM_ASSERT_3(ndx_in_parent, ==, column.get_ndx_in_parent());
-            column.Verify(*this, i);
+            column.verify(*this, i);
             REALM_ASSERT_3(column.size(), ==, m_size);
         }
     }

@@ -69,7 +69,7 @@ public:
 
     Query& operator = (const Query& source);
 
-    Query& expression(Expression* compare, bool auto_delete = false);
+    Query& expression(Expression* compare);
     Expression* get_expression();
 
     // Find links that point to a specific target row 
@@ -255,14 +255,14 @@ public:
 protected:
     Query(Table& table, TableViewBase* tv = nullptr);
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
-    void Create();
+    void create();
 
-    void   Init(const Table& table) const;
+    void   init(const Table& table) const;
     bool   is_initialized() const;
-    size_t FindInternal(size_t start = 0, size_t end=size_t(-1)) const;
+    size_t find_internal(size_t start = 0, size_t end=size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;
-    void   UpdatePointers(ParentNode* p, ParentNode** newnode);
-    void HandlePendingNot();
+    void   update_pointers(ParentNode* p, ParentNode** newnode);
+    void handle_pending_not();
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
 

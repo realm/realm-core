@@ -60,10 +60,6 @@ public:
     void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append);
     void replace_root(std::unique_ptr<Array> leaf);
 
-    // FIXME: This is only applicable for linklist columns, which
-    // derive from the integer Column.
-    void destroy_subtree(std::size_t ndx, bool clear_value);
-
 protected:
     explicit BpTreeBase(std::unique_ptr<Array> root);
     explicit BpTreeBase(BpTreeBase&&) = default;
@@ -874,7 +870,7 @@ std::size_t BpTree<T, N>::verify_leaf(MemRef mem, Allocator& alloc)
 {
     LeafType leaf(alloc);
     leaf.init_from_mem(mem);
-    leaf.Verify();
+    leaf.verify();
     return leaf.size();
 }
 
@@ -882,7 +878,7 @@ template <class T, bool N>
 void BpTree<T, N>::verify() const
 {
     if (root_is_leaf()) {
-        root_as_leaf().Verify();
+        root_as_leaf().verify();
     }
     else {
         root().verify_bptree(&verify_leaf);
