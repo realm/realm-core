@@ -4855,7 +4855,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // If the current column accessor is StringColumn, but the underlying
         // column has been upgraded to an enumerated strings column, then we
         // need to replace the accessor with an instance of StringEnumColumn.
-        if (col && col->is_string_col()) {
+        if (dynamic_cast<StringColumn*>(col) != nullptr) {
             ColumnType col_type = m_spec.get_column_type(col_ndx);
             if (col_type == col_type_StringEnum) {
                 delete col;
