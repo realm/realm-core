@@ -121,6 +121,8 @@ Caveats, notes and todos
 #ifndef REALM_QUERY_EXPRESSION_HPP
 #define REALM_QUERY_EXPRESSION_HPP
 
+#include <realm/column_type_traits.hpp>
+
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
 // unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
@@ -129,7 +131,7 @@ Caveats, notes and todos
 
 #define REALM_OLDQUERY_FALLBACK
 
-// namespace realm {
+namespace realm {
 
 template <class T> T minimum(T a, T b)
 {
@@ -1633,7 +1635,6 @@ private:
     const char* m_compare_string;
 };
 
-
-//}
+}
 #endif // REALM_QUERY_EXPRESSION_HPP
 
