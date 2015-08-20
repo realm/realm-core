@@ -1154,6 +1154,7 @@
     <ClInclude Include="..\..\src\realm\column_tpl.hpp" />
     <ClInclude Include="..\..\src\realm\data_type.hpp" />
     <ClInclude Include="..\..\src\realm\column_type.hpp" />
+    <ClInclude Include="..\..\src\realm\column_type_traits.hpp" />
     <ClInclude Include="..\..\src\realm\util\features.h" />
     <ClInclude Include="..\..\src\realm\datetime.hpp" />
     <ClInclude Include="..\..\src\realm\group.hpp" />

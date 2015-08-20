@@ -101,12 +101,14 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/column_string_enum.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_basic.hpp>
+#include <realm/column_type_traits.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/array_string.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_link.hpp>
 #include <realm/link_view.hpp>
+#include <realm/query_expression.hpp>
 
 #include <iostream>
 #include <map>
@@ -144,56 +146,6 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
-
-template<class T> struct ColumnTypeTraits;
-
-template<> struct ColumnTypeTraits<int64_t> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
-    static const DataType id = type_Int;
-};
-template<> struct ColumnTypeTraits<bool> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
-    static const DataType id = type_Bool;
-};
-template<> struct ColumnTypeTraits<float> {
-    typedef FloatColumn column_type;
-    typedef ArrayFloat array_type;
-    typedef double sum_type;
-    static const DataType id = type_Float;
-};
-template<> struct ColumnTypeTraits<double> {
-    typedef DoubleColumn column_type;
-    typedef ArrayDouble array_type;
-    typedef double sum_type;
-    static const DataType id = type_Double;
-};
-template<> struct ColumnTypeTraits<DateTime> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
-    static const DataType id = type_DateTime;
-};
-
-template<> struct ColumnTypeTraits<StringData> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
-    static const DataType id = type_String;
-};
-
-// Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
-template<class T, Action A> struct ColumnTypeTraitsSum {
-    typedef T sum_type;
-};
-
-template<> struct ColumnTypeTraitsSum<float, act_Sum> {
-    typedef double sum_type;
-};
-
 
 class SequentialGetterBase {
 public:
@@ -1731,9 +1683,6 @@ protected:
     SequentialGetter<ColType> m_getter1;
     SequentialGetter<ColType> m_getter2;
 };
-
-// todo, fixme: move this up! There are just some annoying compiler errors that need to be resolved when doing this
-#include "query_expression.hpp"
 
 
 // For Next-Generation expressions like col1 / col2 + 123 > col4 * 100.
