@@ -289,7 +289,7 @@ public:
     // Used to access schema while building query:
     std::vector<size_t> m_subtable_path;
     ConstDescriptorRef m_current_descriptor;
-    void update_current_descriptor();
+    void fetch_descriptor();
 
     virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
                                                       ConstSourcePayload mode) const

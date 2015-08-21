@@ -2645,144 +2645,144 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
 }
 
 
-bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool array_nullable, bool value_null) const
+bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool nullable_array, bool find_null) const
 {
     if (cond == cond_Equal) {
         if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, Equal, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Equal, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Min) {
-            REALM_TEMPEX3(return find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Max) {
-            REALM_TEMPEX3(return find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Count) {
-            REALM_TEMPEX3(return find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
     }
     if (cond == cond_NotEqual) {
         if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, NotEqual, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotEqual, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Min) {
-            REALM_TEMPEX3(return find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Max) {
-            REALM_TEMPEX3(return find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Count) {
-            REALM_TEMPEX3(return find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
     }
     if (cond == cond_Greater) {
         if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, Greater, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Greater, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Min) {
-            REALM_TEMPEX3(return find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Max) {
-            REALM_TEMPEX3(return find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Count) {
-            REALM_TEMPEX3(return find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
     }
     if (cond == cond_Less) {
         if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, Less, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Less, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Min) {
-            REALM_TEMPEX3(return find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Max) {
-            REALM_TEMPEX3(return find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Count) {
-            REALM_TEMPEX3(return find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
     }
     if (cond == cond_None) {
         if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, None, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, None, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Min) {
-            REALM_TEMPEX3(return find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Max) {
-            REALM_TEMPEX3(return find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Count) {
-            REALM_TEMPEX3(return find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
     }
     else if (cond == cond_LeftNotNull) {
         if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, LeftNotNull, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotNull, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, LeftNotNull, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotNull, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Min) {
-            REALM_TEMPEX3(return find, LeftNotNull, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotNull, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Max) {
-            REALM_TEMPEX3(return find, LeftNotNull, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotNull, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_Count) {
-            REALM_TEMPEX3(return find, LeftNotNull, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotNull, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, LeftNotNull, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotNull, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
         else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, LeftNotNull, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), array_nullable, value_null))
+            REALM_TEMPEX3(return find, NotNull, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
         }
     }
     REALM_ASSERT_DEBUG(false);

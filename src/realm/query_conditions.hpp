@@ -284,7 +284,7 @@ struct None {
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
 };
 
-struct LeftNotNull {
+struct NotNull {
     template<class T> bool operator()(const T&, const T&, bool v = false, bool = false) const { return !v; }
     static const int condition = cond_LeftNotNull;
     template <class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }

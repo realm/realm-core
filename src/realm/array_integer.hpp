@@ -578,33 +578,43 @@ bool ArrayIntNull::minimum(int64_t& result, std::size_t start, std::size_t end, 
 inline
 bool ArrayIntNull::find(int cond, Action action, int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    return Array::find(cond, action, value, start, end, baseindex, state, true, false);
+    return Array::find(cond, action, value, start, end, baseindex, state, 
+                       true /*treat as nullable array*/, 
+                       false /*search parameter given in 'value' argument*/);
 }
 
 inline
 bool ArrayIntNull::find(int cond, Action action, null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    return Array::find(cond, action, 0 /* unused dummy*/, start, end, baseindex, state, true, true);
+    return Array::find(cond, action, 0 /* unused dummy*/, start, end, baseindex, state,
+                       true /*treat as nullable array*/,
+                       true /*search for null, ignore value argument*/);
 }
 
 
 template<class cond, Action action, std::size_t bitwidth, class Callback>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback), true, false);
+    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback),
+                                     true /*treat as nullable array*/,
+                                     false /*search parameter given in 'value' argument*/);
 }
 
 template<class cond, Action action, std::size_t bitwidth, class Callback>
 bool ArrayIntNull::find(null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return Array::find<cond, action>(0 /* unused dummy*/, start, end, baseindex, state, std::forward<Callback>(callback), true, true);
+    return Array::find<cond, action>(0 /*ignored*/, start, end, baseindex, state, std::forward<Callback>(callback),
+                                     true /*treat as nullable array*/,
+                                     true /*search for null, ignore value argument*/);
 }
 
 
 template<class cond, Action action, std::size_t bitwidth>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    return Array::find<cond, action>(value, start, end, baseindex, state, true, false);
+    return Array::find<cond, action>(value, start, end, baseindex, state,
+                                     true /*treat as nullable array*/,
+                                     false /*search parameter given in 'value' argument*/);
 }
 
 
@@ -641,7 +651,9 @@ template<class cond> std::size_t ArrayIntNull::find_first(null, std::size_t star
 {
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, nullptr, 1);
-    Array::find<cond, act_ReturnFirst>(0 /*dummy*/, start, end, 0, &state, Array::CallbackDummy(), true, true);
+    Array::find<cond, act_ReturnFirst>(0 /*ignored*/, start, end, 0, &state, Array::CallbackDummy(),
+                                       true /*treat as nullable array*/,
+                                       true /*search for null, ignore value argument*/);
     if (state.m_match_count > 0)
         return state.m_state;
     else
@@ -652,7 +664,9 @@ template<class cond> std::size_t ArrayIntNull::find_first(int64_t value, std::si
 {
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, nullptr, 1);
-    Array::find<cond, act_ReturnFirst>(value, start, end, 0, &state, Array::CallbackDummy(), true, false);
+    Array::find<cond, act_ReturnFirst>(value, start, end, 0, &state, Array::CallbackDummy(),
+                                       true /*treat as nullable array*/,
+                                       false /*search parameter given in 'value' argument*/);
     if (state.m_match_count > 0)
         return state.m_state;
     else
@@ -668,9 +682,6 @@ inline std::size_t ArrayIntNull::find_first(int64_t value, std::size_t begin, st
 {
     return find_first<Equal>(value, begin, end);
 }
-
-
-
 
 }
 

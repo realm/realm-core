@@ -60,7 +60,7 @@ void Query::create()
     pending_not.push_back(false);
     do_delete = true;
     if (m_table)
-        update_current_descriptor();
+        fetch_descriptor();
 }
 
 // FIXME: Try to remove this
@@ -366,7 +366,7 @@ ParentNode* make_condition_node(const Descriptor& descriptor, size_t column_ndx,
 
 } // anonymous namespace
 
-void Query::update_current_descriptor()
+void Query::fetch_descriptor()
 {
     ConstDescriptorRef desc = m_table->get_descriptor();
     for (size_t i = 0; i < m_subtable_path.size(); ++i) {
@@ -1108,7 +1108,7 @@ Query& Query::subtable(size_t column)
     // once subtable conditions have been evaluated, resume evaluation from m_child2
     subtables.push_back(&p->m_child2);
     m_subtable_path.push_back(column);
-    update_current_descriptor();
+    fetch_descriptor();
     group();
     return *this;
 }
@@ -1127,7 +1127,7 @@ Query& Query::end_subtable()
 
     subtables.pop_back();
     m_subtable_path.pop_back();
-    update_current_descriptor();
+    fetch_descriptor();
     return *this;
 }
 

@@ -1177,7 +1177,7 @@ private:
     //@}
 
     /// Used by query. Follows chain of link columns and returns final target table
-    Table* get_link_chain_target(std::vector<size_t> link_chain);
+    Table* get_link_chain_target(const std::vector<size_t>& link_chain);
 
     /// Remove the specified row by the 'move last over' method.
     void do_move_last_over(std::size_t row_ndx);

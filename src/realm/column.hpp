@@ -747,7 +747,7 @@ template <class T, bool N>
 T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
 {
     if (N)
-        return aggregate<T, T, act_Sum, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
+        return aggregate<T, T, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
     else
         return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
 }
@@ -764,7 +764,7 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
         size = limit;
 
     auto s = sum(start, end, limit, return_ndx);
-    size_t cnt = aggregate<T, int64_t, act_Count, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
+    size_t cnt = aggregate<T, int64_t, act_Count, NotNull>(*this, 0, start, end, limit, return_ndx);
     double avg = double(s) / (cnt == 0 ? 1 : cnt);
     return avg;
 }
@@ -772,13 +772,13 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
 template <class T, bool N>
 T Column<T,N>::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Min, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
 T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Max, LeftNotNull>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Max, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>

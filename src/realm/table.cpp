@@ -3316,7 +3316,7 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
 
-Table* Table::get_link_chain_target(std::vector<size_t> link_chain)
+Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
 {
     Table* table = this;
     for (size_t t = 0; t < link_chain.size(); t++) {

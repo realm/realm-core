@@ -6202,6 +6202,8 @@ NOTE NOTE: There is currently only very little syntax checking.
 2   20              30.0                "bar"                   3.3                 false         2016-6-6
 */
 
+// todo, create new test with at least 8 rows to trigger Array*::get_chunk
+
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
     {
         test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
@@ -6211,13 +6213,13 @@ NOTE NOTE: There is currently only very little syntax checking.
 
     Group g;
     TableRef table = g.add_table("Inventory");
-    table->insert_column(0, type_Int, "Price", true);
-    table->insert_column(1, type_Float, "Shipping", true);
-    table->insert_column(2, type_String, "Description", true);
-    table->insert_column(3, type_Double, "Rating", true);
-    table->insert_column(4, type_Bool, "Stock", true);
-    table->insert_column(5, type_DateTime, "Delivery date", true);
-    table->add_empty_row(3); // todo, create new test with at least 8 rows to trigger Array*::get_chunk
+    table->insert_column(0, type_Int, "Price", true);               // nullable = true
+    table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
+    table->insert_column(2, type_String, "Description", true);      // nullable = true
+    table->insert_column(3, type_Double, "Rating", true);           // nullable = true
+    table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
+    table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
+    table->add_empty_row(3); 
 
     // Default values for all nullable columns
     CHECK(table->is_null(0, 0));
@@ -6493,12 +6495,12 @@ TEST(Query_Null_DefaultsAndErrorhandling)
     {
         Group g;
         TableRef table = g.add_table("Inventory");
-        table->insert_column(0, type_Int, "Price", true);
-        table->insert_column(1, type_Float, "Shipping", true);
-        table->insert_column(2, type_String, "Description", true);
-        table->insert_column(3, type_Double, "Rating", true);
-        table->insert_column(4, type_Bool, "Stock", true);
-        table->insert_column(5, type_DateTime, "Delivery date", true);
+        table->insert_column(0, type_Int, "Price", true);               // nullable = true
+        table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
+        table->insert_column(2, type_String, "Description", true);      // nullable = true
+        table->insert_column(3, type_Double, "Rating", true);           // nullable = true
+        table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
+        table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
         table->add_empty_row(1);
 
         CHECK(table->is_nullable(0));
@@ -6570,12 +6572,12 @@ TEST(Query_Null_Query_Conditions)
 
     Group g;
     TableRef table = g.add_table("Inventory");
-    table->insert_column(0, type_Int, "Price", true);
-    table->insert_column(1, type_Float, "Shipping", true);
-    table->insert_column(2, type_String, "Description", true);
-    table->insert_column(3, type_Double, "Rating", true);
-    table->insert_column(4, type_Bool, "Stock", true);
-    table->insert_column(5, type_DateTime, "Delivery date", true);
+    table->insert_column(0, type_Int, "Price", true);               // nullable = true
+    table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
+    table->insert_column(2, type_String, "Description", true);      // nullable = true
+    table->insert_column(3, type_Double, "Rating", true);           // nullable = true
+    table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
+    table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
     table->add_empty_row(3);
 
     table->set_null(0, 0);
