@@ -40,11 +40,9 @@ using namespace realm;
 
 TEST(ColumnBasic_LowerUpperBound)
 {
-    bool nullable = true;
-
     // Create column with sorted members
     ref_type ref = BasicColumn<int64_t>::create(Allocator::get_default());
-    BasicColumn<int64_t> col(Allocator::get_default(), ref, nullable);
+    BasicColumn<int64_t> col(Allocator::get_default(), ref, true /* nullable */);
 
     col.add(5);
     for (int i = 5; i < 100; i += 5)
