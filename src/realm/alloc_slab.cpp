@@ -566,13 +566,15 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1;
         REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
-        File::protect(header, sizeof(Header), File::Protection::RW);
-        header->m_top_ref[1] = footer->m_top_ref;
-        File::sync_map(header, sizeof(Header));
-        header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
-        m_file_on_streaming_form = false;
-        File::sync_map(header, sizeof(Header));
-        File::protect(header, sizeof(Header), File::Protection::RO);
+        {
+            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
+            Header* writable_header = writable_map.get_addr();
+            writable_header->m_top_ref[1] = footer->m_top_ref;
+            writable_map.sync();
+            writable_header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
+            m_file_on_streaming_form = false;
+            writable_map.sync();
+        }
     }
 
     fcg.release(); // Do not close

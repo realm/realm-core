@@ -860,10 +860,11 @@ void File::sync_map(void* addr, size_t size)
 void File::protect(void* addr, size_t size, Protection prot)
 {
 #ifdef _WIN32 // Windows version
-	char* start = (char*)addr;
-	volatile char sum = 0;
-	for (char* p = start; p < start + size; ++p) sum += *++p;
-	DWORD oldprot;
+    // This currently fails at runtime on windows so protect() is not used.
+    char* start = (char*)addr;
+    volatile char sum = 0;
+    for (char* p = start; p < start + size; ++p) sum += *++p;
+    DWORD oldprot;
     if (prot == Protection::RO) {
         if (VirtualProtect(addr, size, PAGE_READONLY, &oldprot))
             return;
@@ -872,16 +873,16 @@ void File::protect(void* addr, size_t size, Protection prot)
         if (VirtualProtect(addr, size, PAGE_READWRITE, &oldprot))
             return;
     }
-	DWORD err = GetLastError(); // Eliminate any risk of clobbering
-	std::string msg = get_last_error_msg("VirtualProtect() failed: ", err);
-	throw std::runtime_error(msg);
+    DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    std::string msg = get_last_error_msg("VirtualProtect() failed: ", err);
+    throw std::runtime_error(msg);
 
 #else // POSIX version
     if (prot == Protection::RO)
         ::mprotect(addr, size, PROT_READ);
     else if (prot == Protection::RW)
         ::mprotect(addr, size, PROT_READ | PROT_WRITE);
-    else 
+    else
         REALM_ASSERT(false);
 #endif
 }
