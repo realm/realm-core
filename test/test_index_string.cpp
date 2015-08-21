@@ -638,7 +638,9 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
     col.destroy();
 }
 
-
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
 TEST(StringIndex_FindAllNoCopy2_Int)
 {
     // Create a column with duplcate values
@@ -679,6 +681,9 @@ TEST(StringIndex_FindAllNoCopy2_Int)
     col.destroy();
 }
 
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
 TEST(StringIndex_FindAllNoCopy2_IntNull)
 {
     // Create a column with duplcate values
