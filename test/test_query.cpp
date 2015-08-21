@@ -6570,6 +6570,8 @@ TEST(Query_Null_Query_Conditions)
             test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
     };
 
+    static_cast<void>(check);
+
     Group g;
     TableRef table = g.add_table("Inventory");
     table->insert_column(0, type_Int, "Price", true);               // nullable = true

@@ -1177,7 +1177,7 @@ private:
     //@}
 
     /// Used by query. Follows chain of link columns and returns final target table
-    Table* get_link_chain_target(const std::vector<size_t>& link_chain);
+    const Table* get_link_chain_target(const std::vector<size_t>& link_chain) const;
 
     /// Remove the specified row by the 'move last over' method.
     void do_move_last_over(std::size_t row_ndx);
@@ -1614,7 +1614,7 @@ template<class T> inline Columns<T> Table::column(std::size_t column)
 
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our 
     // type traits (all the is_same() cases below).
-    Table* table = get_link_chain_target(m_link_chain);
+    const Table* table = get_link_chain_target(m_link_chain);
 
     realm::DataType ct = table->get_column_type(column);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
