@@ -565,7 +565,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         REALM_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
 
         StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1;
-        // TODO: move to File abstraction and implement mprotect handling for windows there
         REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
         File::protect(header, sizeof(Header), File::Protection::RW);
         header->m_top_ref[1] = footer->m_top_ref;

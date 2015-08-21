@@ -59,7 +59,8 @@ size_t get_page_size()
 #ifdef _WIN32
     SYSTEM_INFO sysinfo;
     GetNativeSystemInfo(&sysinfo);
-    DWORD size = sysinfo.dwPageSize;
+    //DWORD size = sysinfo.dwPageSize;
+	DWORD size = sysinfo.dwAllocationGranularity;
 #else
     long size = sysconf(_SC_PAGESIZE);
 #endif
@@ -777,7 +778,7 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
             break;
     }
     LARGE_INTEGER large_int;
-    if (int_cast_with_overflow_detect(size, large_int.QuadPart))
+    if (int_cast_with_overflow_detect(offset+size, large_int.QuadPart))
         throw std::runtime_error("Map size is too large");
     HANDLE map_handle =
         CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
@@ -793,9 +794,9 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
     }
     if (REALM_LIKELY(addr))
         return addr;
-    DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    std::string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
-    throw std::runtime_error(msg);
+	DWORD err = GetLastError(); // Eliminate any risk of clobbering
+	std::string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
+	throw std::runtime_error(msg);
 
 #else // POSIX version
 
@@ -859,16 +860,21 @@ void File::sync_map(void* addr, size_t size)
 void File::protect(void* addr, size_t size, Protection prot)
 {
 #ifdef _WIN32 // Windows version
-
+	char* start = (char*)addr;
+	volatile char sum = 0;
+	for (char* p = start; p < start + size; ++p) sum += *++p;
+	DWORD oldprot;
     if (prot == Protection::RO) {
-        if (VirtualProtect(addr, size, PAGE_READONLY, 0))
+        if (VirtualProtect(addr, size, PAGE_READONLY, &oldprot))
             return;
     }
     else if (prot == Protection::RW) {
-        if (VirtualProtect(addr, size, PAGE_READWRITE, 0))
+        if (VirtualProtect(addr, size, PAGE_READWRITE, &oldprot))
             return;
     }
-    throw std::runtime_error("FlushViewOfFile() failed");
+	DWORD err = GetLastError(); // Eliminate any risk of clobbering
+	std::string msg = get_last_error_msg("VirtualProtect() failed: ", err);
+	throw std::runtime_error(msg);
 
 #else // POSIX version
     if (prot == Protection::RO)

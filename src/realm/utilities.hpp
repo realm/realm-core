@@ -128,7 +128,11 @@ uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 #if defined(__GNUC__)
 inline int log2(std::size_t x) {
     if (x)
-        return 63 - __builtin_clzll(x);
+#ifdef REALM_PTR_64
+		return 63 - __builtin_clzll(x);
+#else
+		return 31 - __builtin_clz(x);
+#endif
     else
         return -1;
 }
@@ -136,7 +140,11 @@ inline int log2(std::size_t x) {
 inline int log2(std::size_t x) {
     if (x) {
         unsigned long index;
-        unsigned char c = _BitScanReverse64(&index, x);
+#ifdef REALM_PTR_64
+		unsigned char c = _BitScanReverse64(&index, x);
+#else
+		unsigned char c = _BitScanReverse(&index, x);
+#endif
         return index;
     }
     else
