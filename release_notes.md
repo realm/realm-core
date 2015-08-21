@@ -19,7 +19,8 @@
     * `StringIndex`.
 
 ### Enhancements:
-
+* Full null support everywhere and on all column types. See TEST(Query_NullShowcase)
+  in test_query.cpp in core repo.
 * Added `Descriptor::get_link_target()`, for completeness.
 * Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
 * Modifying `Descriptor` methods now throw `LogicError` when appropriate (rather
@@ -56,37 +57,7 @@
 
 ----------------------------------------------
 
-<<<<<<< HEAD
-# 0.91.0 Release notes
-
-### Bugfixes:
-
-* Fixed assertion when tests are run with `REALM_OLDQUERY_FALLBACK` disabled by
-  updating Value::import to work with DateTime
-* Fix incorrect results when querying for < or <= on ints which requires 64 bits
-  to represent with a CPU that supports SSE 4.2.
-
-### API breaking changes:
-
-* Named exception UnreachableVersion replaced by "unspecified" LogicError
-  exception.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
-
-----------------------------------------------
-
-# 0.91.2 Release notes
-=======
 # 0.92.0 Release notes
->>>>>>> 5597186c6c0ae3f08d9a316a7fda8fb78bb8a359
 
 ### Bugfixes:
 
