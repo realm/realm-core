@@ -477,11 +477,7 @@ void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t 
 }
 
 
-
-
-
-// O(n) for n = this->size()
-void TableView::remove(size_t row_ndx)
+void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
 {
     check_cookie();
 
@@ -496,7 +492,9 @@ void TableView::remove(size_t row_ndx)
     m_row_indexes.erase(row_ndx);
 
     // Delete row in origin table
-    m_table->remove(origin_row_ndx);
+    using tf = _impl::TableFriend;
+    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
+    tf::erase_row(*m_table, origin_row_ndx, is_move_last_over); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -509,34 +507,23 @@ void TableView::remove(size_t row_ndx)
 }
 
 
-void TableView::clear()
+void TableView::clear(RemoveMode underlying_mode)
 {
     REALM_ASSERT(m_table);
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
-    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered
-    // tables with no links - and then this test will break.
-    bool is_ordered = true;
-    for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
-        ColumnType t = m_table->m_spec.get_column_type(c);
-        if (t == col_type_Link || t == col_type_LinkList || t == col_type_BackLink) {
-            is_ordered = false;
-            break;
-        }
-    }
-
     // Temporarily unregister this view so that it's not pointlessly updated
     // for the row removals
-    m_table->unregister_view(this);
+    using tf = _impl::TableFriend;
+    tf::unregister_view(*m_table, this);
 
-    bool is_move_last_over = !is_ordered;
-    m_table->batch_erase_rows(m_row_indexes, is_move_last_over);
+    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
+    tf::batch_erase_rows(*m_table, m_row_indexes, is_move_last_over); // Throws
 
     m_row_indexes.clear();
     m_num_detached_refs = 0;
-    m_table->register_view(this);
+    tf::register_view(*m_table, this); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:

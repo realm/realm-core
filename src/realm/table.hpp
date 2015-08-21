@@ -1311,7 +1311,6 @@ private:
     template<class> friend class util::bind_ptr;
     friend class LangBindHelper;
     friend class TableViewBase;
-    friend class TableView;
     template<class T> friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
@@ -2062,6 +2061,17 @@ public:
         table.do_set_link_type(column_ndx, link_type); // Throws
     }
 
+    static void erase_row(Table& table, size_t row_ndx, bool is_move_last_over)
+    {
+        table.erase_row(row_ndx, is_move_last_over); // Throws
+    }
+
+    static void batch_erase_rows(Table& table, const IntegerColumn& row_indexes,
+                                 bool is_move_last_over)
+    {
+        table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
+    }
+
     static void clear_root_table_desc(const Table& root_table) REALM_NOEXCEPT
     {
         REALM_ASSERT(!root_table.has_shared_type());
@@ -2209,6 +2219,16 @@ public:
     static Replication* get_repl(Table& table) REALM_NOEXCEPT
     {
         return table.get_repl();
+    }
+
+    static void register_view(Table& table, const TableViewBase* view)
+    {
+        table.register_view(view); // Throws
+    }
+
+    static void unregister_view(Table& table, const TableViewBase* view) REALM_NOEXCEPT
+    {
+        table.unregister_view(view);
     }
 };
 
