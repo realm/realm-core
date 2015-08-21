@@ -36,7 +36,7 @@ public:
 SlabAlloc::SlabAlloc()
 {
     m_initial_section_size = page_size();
-    m_section_shifts = 1 + log2(m_initial_section_size);
+    m_section_shifts = log2(m_initial_section_size);
     std::size_t max = std::numeric_limits<std::size_t>::max();
     m_num_section_bases = 1 + get_section_index(max);
     m_section_bases.reset( new std::size_t[m_num_section_bases] );
