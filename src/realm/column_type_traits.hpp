@@ -25,72 +25,72 @@
 
 namespace realm {
 
-    template <class T, bool Nullable> struct ColumnTypeTraits;
+template <class T, bool Nullable> struct ColumnTypeTraits;
 
-    template <bool Nullable> struct ColumnTypeTraits<int64_t, Nullable> {
-        using column_type = Column<int64_t, Nullable>;
-        using leaf_type = typename column_type::LeafType;
-        using sum_type = int64_t;
-        static const DataType id = type_Int;
-    };
+template <bool Nullable> struct ColumnTypeTraits<int64_t, Nullable> {
+    using column_type = Column<int64_t, Nullable>;
+    using leaf_type = typename column_type::LeafType;
+    using sum_type = int64_t;
+    static const DataType id = type_Int;
+};
 
-    template <bool Nullable> struct ColumnTypeTraits<bool, Nullable> :
-        ColumnTypeTraits<int64_t, Nullable>
-    {
-        static const DataType id = type_Bool;
-    };
+template <bool Nullable> struct ColumnTypeTraits<bool, Nullable> :
+    ColumnTypeTraits<int64_t, Nullable>
+{
+    static const DataType id = type_Bool;
+};
 
-    template <bool N> struct ColumnTypeTraits<float, N> {
-        using column_type = FloatColumn;
-        using leaf_type = ArrayFloat;
-        using sum_type = double;
-        static const DataType id = type_Float;
-    };
+template <bool N> struct ColumnTypeTraits<float, N> {
+    using column_type = FloatColumn;
+    using leaf_type = ArrayFloat;
+    using sum_type = double;
+    static const DataType id = type_Float;
+};
 
-    template <bool N> struct ColumnTypeTraits<double, N> {
-        using column_type = DoubleColumn;
-        using leaf_type = ArrayDouble;
-        using sum_type = double;
-        static const DataType id = type_Double;
-    };
+template <bool N> struct ColumnTypeTraits<double, N> {
+    using column_type = DoubleColumn;
+    using leaf_type = ArrayDouble;
+    using sum_type = double;
+    static const DataType id = type_Double;
+};
 
-    template <bool N> struct ColumnTypeTraits<DateTime, N> :
-        ColumnTypeTraits<int64_t, N>
-    {
-        static const DataType id = type_DateTime;
-    };
+template <bool N> struct ColumnTypeTraits<DateTime, N> :
+    ColumnTypeTraits<int64_t, N>
+{
+    static const DataType id = type_DateTime;
+};
 
-    template <bool N> struct ColumnTypeTraits<StringData, N> {
-        using column_type = StringEnumColumn;
-        using leaf_type = StringEnumColumn::LeafType;
-        using sum_type = int64_t;
-        static const DataType id = type_String;
-    };
+template <bool N> struct ColumnTypeTraits<StringData, N> {
+    using column_type = StringEnumColumn;
+    using leaf_type = StringEnumColumn::LeafType;
+    using sum_type = int64_t;
+    static const DataType id = type_String;
+};
 
-    template <DataType, bool Nullable> struct GetColumnType;
-    template <> struct GetColumnType<type_Int, false> {
-        using type = IntegerColumn;
-    };
-    template <> struct GetColumnType<type_Int, true> {
-        using type = IntNullColumn;
-    };
-    template <bool N> struct GetColumnType<type_Float, N> {
-        // FIXME: Null definition
-        using type = FloatColumn;
-    };
-    template <bool N> struct GetColumnType<type_Double, N> {
-        // FIXME: Null definition
-        using type = DoubleColumn;
-    };
+template <DataType, bool Nullable> struct GetColumnType;
+template <> struct GetColumnType<type_Int, false> {
+    using type = IntegerColumn;
+};
+template <> struct GetColumnType<type_Int, true> {
+    using type = IntNullColumn;
+};
+template <bool N> struct GetColumnType<type_Float, N> {
+    // FIXME: Null definition
+    using type = FloatColumn;
+};
+template <bool N> struct GetColumnType<type_Double, N> {
+    // FIXME: Null definition
+    using type = DoubleColumn;
+};
 
-    // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
-    template<class T, Action A> struct ColumnTypeTraitsSum {
-        typedef T sum_type;
-    };
+// Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
+template<class T, Action A> struct ColumnTypeTraitsSum {
+    typedef T sum_type;
+};
 
-    template<> struct ColumnTypeTraitsSum<float, act_Sum> {
-        typedef double sum_type;
-    };
+template<> struct ColumnTypeTraitsSum<float, act_Sum> {
+    typedef double sum_type;
+};
 
 }
 
