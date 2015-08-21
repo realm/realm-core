@@ -77,6 +77,10 @@ public:
     // Find links that point to a specific target row 
     Query& links_to(size_t column_ndx, size_t target_row);
 
+    // Conditions: null
+    Query& equal(size_t column_ndx, null);
+    Query& not_equal(size_t column_ndx, null);
+
     // Conditions: int64_t
     Query& equal(size_t column_ndx, int64_t value);
     Query& not_equal(size_t column_ndx, int64_t value);
@@ -282,6 +286,11 @@ public:
     std::vector<bool> pending_not;
     typedef Query_Handover_patch Handover_patch;
 
+    // Used to access schema while building query:
+    std::vector<size_t> m_subtable_path;
+    ConstDescriptorRef m_current_descriptor;
+    void fetch_descriptor();
+
     virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
                                                       ConstSourcePayload mode) const
     {
@@ -318,9 +327,9 @@ private:
     template <class ColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
     template <class ColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
 
-    template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
+    template <typename TConditionFunction, class T> Query& add_condition(size_t column_ndx, T value);
 
-    template<typename T> double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
+    template<typename T, bool Nullable> double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
                                         size_t end=size_t(-1), size_t limit = size_t(-1)) const;
 
     template <Action action, typename T, typename R, class ColClass>
@@ -328,7 +337,7 @@ private:
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
                     size_t* return_ndx = nullptr) const;
 
-    void aggregate_internal(Action TAction, DataType TSourceColumn,
+    void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
                             ParentNode* pn, QueryStateBase* st, 
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 

@@ -204,6 +204,12 @@ void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t co
     }
 }
 
+
+void ArrayIntNull::get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
+{
+    Array::get_chunk(ndx + 1, res);
+}
+
 namespace {
 
 // FIXME: Move this logic to BpTree.

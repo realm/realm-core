@@ -25,44 +25,62 @@
 
 namespace realm {
 
-template<class T> struct ColumnTypeTraits;
+template <class T, bool Nullable> struct ColumnTypeTraits;
 
-template<> struct ColumnTypeTraits<int64_t> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+template <bool Nullable> struct ColumnTypeTraits<int64_t, Nullable> {
+    using column_type = Column<int64_t, Nullable>;
+    using leaf_type = typename column_type::LeafType;
+    using sum_type = int64_t;
     static const DataType id = type_Int;
 };
-template<> struct ColumnTypeTraits<bool> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+
+template <bool Nullable> struct ColumnTypeTraits<bool, Nullable> :
+    ColumnTypeTraits<int64_t, Nullable>
+{
     static const DataType id = type_Bool;
 };
-template<> struct ColumnTypeTraits<float> {
-    typedef FloatColumn column_type;
-    typedef ArrayFloat array_type;
-    typedef double sum_type;
+
+template <bool N> struct ColumnTypeTraits<float, N> {
+    using column_type = FloatColumn;
+    using leaf_type = ArrayFloat;
+    using sum_type = double;
     static const DataType id = type_Float;
 };
-template<> struct ColumnTypeTraits<double> {
-    typedef DoubleColumn column_type;
-    typedef ArrayDouble array_type;
-    typedef double sum_type;
+
+template <bool N> struct ColumnTypeTraits<double, N> {
+    using column_type = DoubleColumn;
+    using leaf_type = ArrayDouble;
+    using sum_type = double;
     static const DataType id = type_Double;
 };
-template<> struct ColumnTypeTraits<DateTime> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+
+template <bool N> struct ColumnTypeTraits<DateTime, N> :
+    ColumnTypeTraits<int64_t, N>
+{
     static const DataType id = type_DateTime;
 };
 
-template<> struct ColumnTypeTraits<StringData> {
-    typedef IntegerColumn column_type;
-    typedef ArrayInteger array_type;
-    typedef int64_t sum_type;
+template <bool N> struct ColumnTypeTraits<StringData, N> {
+    using column_type = StringEnumColumn;
+    using leaf_type = StringEnumColumn::LeafType;
+    using sum_type = int64_t;
     static const DataType id = type_String;
+};
+
+template <DataType, bool Nullable> struct GetColumnType;
+template <> struct GetColumnType<type_Int, false> {
+    using type = IntegerColumn;
+};
+template <> struct GetColumnType<type_Int, true> {
+    using type = IntNullColumn;
+};
+template <bool N> struct GetColumnType<type_Float, N> {
+    // FIXME: Null definition
+    using type = FloatColumn;
+};
+template <bool N> struct GetColumnType<type_Double, N> {
+    // FIXME: Null definition
+    using type = DoubleColumn;
 };
 
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)

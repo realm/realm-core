@@ -43,7 +43,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
     m_offsets.add(offset);
 
-    if(!legacy_array_type())
+    if (!legacy_array_type())
         m_nulls.add(value.is_null());
 }
 
@@ -100,7 +100,7 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 
-    if(!legacy_array_type())
+    if (!legacy_array_type())
         m_nulls.erase(ndx);
 }
 
