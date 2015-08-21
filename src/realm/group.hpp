@@ -154,6 +154,9 @@ public:
         std::vector<link> links;
     };
 
+    /// \brief FIXME: Add documentation
+    static const std::size_t max_table_name_length = 63;
+
     /// \name Constructors and destructors
     /// @{
 
@@ -185,9 +188,11 @@ public:
     /// behavior.
     Group(unattached_tag) REALM_NOEXCEPT;
 
+    /// \brief FIXME: Add documentation
     // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&) = delete;
 
+    /// \brief FIXME: Add documentation
     ~Group() REALM_NOEXCEPT override;
 
     /// @} constructors and destructors
@@ -265,8 +270,11 @@ public:
     /// memory will have been allocated using std::malloc().
     BinaryData write_to_mem() const;
 
+    /// \brief FIXME: Add documentation
     template<class S>
     void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
+
+    /// \brief FIXME: Add documentation
     void to_string(std::ostream& out) const;
 
     /// @} serializers and converters
@@ -565,8 +573,6 @@ public:
 
     /// @} modifiers
 
-    static const std::size_t max_table_name_length = 63;
-
     /// \name Table accessors
     /// @{
 
@@ -756,6 +762,7 @@ public:
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
 #else
+    /// \brief FIXME: Add documentation
     void verify() const {}
 #endif
     /// @} debug
