@@ -132,11 +132,6 @@ public:
     /// should ignore this argument.
     virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
-    virtual bool is_int_column() const REALM_NOEXCEPT { return false; }
-
-    // Returns true if, and only if this column is an StringColumn.
-    virtual bool is_string_col() const REALM_NOEXCEPT;
-
     virtual void destroy() REALM_NOEXCEPT = 0;
     void move_assign(ColumnBase& col) REALM_NOEXCEPT;
 
@@ -413,7 +408,6 @@ public:
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column<T, Nullable>&);
-    bool is_int_column() const REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -461,8 +455,6 @@ public:
     ref_type get_as_ref(std::size_t ndx) const REALM_NOEXCEPT;
     void set_uint(std::size_t ndx, uint64_t value);
     void set_as_ref(std::size_t ndx, ref_type value);
-
-    void destroy_subtree(std::size_t ndx, bool clear_value);
 
     template <class U>
     void adjust(std::size_t ndx, U diff);
@@ -578,11 +570,6 @@ private:
 
 
 // Implementation:
-
-inline bool ColumnBase::is_string_col() const REALM_NOEXCEPT
-{
-    return false;
-}
 
 inline bool ColumnBase::has_search_index() const REALM_NOEXCEPT
 {
@@ -782,32 +769,6 @@ T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_nd
 }
 
 template <class T, bool N>
-void Column<T,N>::destroy_subtree(size_t ndx, bool clear_value)
-{
-    static_assert(std::is_same<T, int_fast64_t>::value && !N,
-        "destroy_subtree only makes sense on non-nullable integer columns");
-    int_fast64_t value = get(ndx);
-
-    // Null-refs indicate empty subtrees
-    if (value == 0)
-        return;
-
-    // A ref is always 8-byte aligned, so the lowest bit
-    // cannot be set. If it is, it means that it should not be
-    // interpreted as a ref.
-    if (value % 2 != 0)
-        return;
-
-    // Delete subtree
-    ref_type ref = to_ref(value);
-    Allocator& alloc = get_alloc();
-    Array::destroy_deep(ref, alloc);
-
-    if (clear_value)
-        set(ndx, 0); // Throws
-}
-
-template <class T, bool N>
 void Column<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
                              typename BpTree<T,N>::LeafInfo& inout_leaf_info) const REALM_NOEXCEPT
 {
@@ -984,12 +945,6 @@ void Column<T,N>::move_assign(Column<T,N>& col)
 {
     ColumnBaseWithIndex::move_assign(col);
     m_tree = std::move(col.m_tree);
-}
-
-template <class T, bool N>
-bool Column<T,N>::is_int_column() const REALM_NOEXCEPT
-{
-    return std::is_integral<T>::value;
 }
 
 template <class T, bool N>

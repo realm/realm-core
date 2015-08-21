@@ -2090,7 +2090,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
 void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         size_t num_rows_to_erase = 1;
         column.erase_rows(row_ndx, num_rows_to_erase, m_size,
@@ -4894,7 +4894,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // If the current column accessor is StringColumn, but the underlying
         // column has been upgraded to an enumerated strings column, then we
         // need to replace the accessor with an instance of StringEnumColumn.
-        if (col && col->is_string_col()) {
+        if (dynamic_cast<StringColumn*>(col) != nullptr) {
             ColumnType col_type = m_spec.get_column_type(col_ndx);
             if (col_type == col_type_StringEnum) {
                 delete col;

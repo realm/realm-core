@@ -1414,7 +1414,6 @@ TEST(TableView_MultiColSort)
     CHECK_EQUAL(tv.get_float(1, 2), 1.f);
 }
 
-
 TEST(TableView_QueryCopy)
 {
     Table table;
@@ -1447,7 +1446,6 @@ TEST(TableView_QueryCopy)
 
     CHECK_EQUAL(t, 2);
 }
-
 
 TEST(TableView_SortEnum)
 {

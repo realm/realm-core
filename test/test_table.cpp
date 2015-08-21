@@ -5866,7 +5866,7 @@ TEST(Table_Nulls)
         Table t;
         TableView tv;
         t.add_column(type_String, "str", true);
-        
+
         if (round == 1)
             t.add_search_index(0);
         else if (round == 2)
@@ -5977,6 +5977,6 @@ TEST(Table_Nulls)
         CHECK(t.is_null(2, 1));
     }
 }
-#endif 
+#endif
 
 #endif // TEST_TABLE

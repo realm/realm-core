@@ -120,7 +120,7 @@ public:
     /// or `type_LinkList`. A link-type column is associated with a particular
     /// target table. All links in a link-type column refer to rows in the
     /// target table of that column. The target table must also be a group-level
-    /// table.
+    /// table, and it must belong to the same group as the origin table.
     ///
     /// \param name Name of new column. All strings are valid column names as
     /// long as they are valid UTF-8 encodings and the number of bytes does not
@@ -134,6 +134,11 @@ public:
     /// subtable column, and stores a reference to its accessor in
     /// `*subdesc`.
     ///
+    /// \param col_ndx Insert the new column at this index. Preexisting columns
+    /// at indexes equal to, or greater than `col_ndx` will be shifted to the
+    /// next higher index. It is an error to specify an index that is greater
+    /// than the number of columns prior to the insertion.
+    ///
     /// \param link_type See set_link_type().
     ///
     /// \sa Table::add_column()
@@ -146,12 +151,12 @@ public:
 
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
 
-    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+    void insert_column(std::size_t col_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0, bool nullable = false);
 
     std::size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
-    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
+    void insert_column_link(std::size_t col_ndx, DataType type, StringData name, Table& target,
                             LinkType = link_Weak);
     //@}
 
@@ -173,9 +178,13 @@ public:
     /// table will remain attached. The root table is the table
     /// associated with the root descriptor.
     ///
+    /// \param col_ndx The index of the column to be removed. It is an error to
+    /// specify an index that is greater than, or equal to the number of
+    /// columns.
+    ///
     /// \sa is_root()
     /// \sa Table::remove_column()
-    void remove_column(std::size_t column_ndx);
+    void remove_column(std::size_t col_ndx);
 
     /// Rename the specified column.
     ///
@@ -188,9 +197,13 @@ public:
     /// attached. The root table is the table associated with the root
     /// descriptor.
     ///
+    /// \param col_ndx The index of the column to be renamed. It is an error to
+    /// specify an index that is greater than, or equal to the number of
+    /// columns.
+    ///
     /// \sa is_root()
     /// \sa Table::rename_column()
-    void rename_column(std::size_t column_ndx, StringData new_name);
+    void rename_column(std::size_t col_ndx, StringData new_name);
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
     /// that implies ownership, i.e., that the origin row (parent) owns the
@@ -259,7 +272,12 @@ public:
     ///     row.set_link(col_ndx_1, ...);
     ///     if (row)
     ///         row.set_int(col_ndx_2, ...); // Ok, because we check whether the row has disappeared
-    void set_link_type(std::size_t column_ndx, LinkType);
+    ///
+    /// \param col_ndx The index of the link column (`type_Link` or
+    /// `type_LinkList`) to be modified. It is an error to specify an index that
+    /// is greater than, or equal to the number of columns, or to specify the
+    /// index of a non-link column.
+    void set_link_type(std::size_t col_ndx, LinkType);
 
     //@{
     /// Get the descriptor for the specified subtable column.
@@ -516,75 +534,105 @@ inline std::size_t Descriptor::get_column_index(StringData name) const REALM_NOE
     return m_spec->get_column_index(name);
 }
 
-inline std::size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
+inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc,
+                                     bool nullable)
 {
-    std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column(column_ndx, type, name, subdesc, nullable); // Throws
-    return column_ndx;
+    size_t col_ndx = m_spec->get_public_column_count();
+    insert_column(col_ndx, type, name, subdesc, nullable); // Throws
+    return col_ndx;
 }
 
-inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, StringData name,
+inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData name,
                                       DescriptorRef* subdesc, bool nullable)
 {
     typedef _impl::TableFriend tf;
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
-    REALM_ASSERT(!tf::is_link_type(ColumnType(type)));
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx > get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(tf::is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
 
     Table* link_target_table = nullptr;
-    tf::insert_column(*this, column_ndx, type, name, link_target_table, nullable); // Throws
-    adj_insert_column(column_ndx);
+    tf::insert_column(*this, col_ndx, type, name, link_target_table, nullable); // Throws
+    adj_insert_column(col_ndx);
     if (subdesc && type == type_Table)
-        *subdesc = get_subdescriptor(column_ndx);
+        *subdesc = get_subdescriptor(col_ndx);
 }
 
-inline std::size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
-                                               LinkType link_type)
+inline size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
+                                          LinkType link_type)
 {
-    std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column_link(column_ndx, type, name, target, link_type); // Throws
-    return column_ndx;
+    size_t col_ndx = m_spec->get_public_column_count();
+    insert_column_link(col_ndx, type, name, target, link_type); // Throws
+    return col_ndx;
 }
 
-inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type, StringData name,
+inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, StringData name,
                                            Table& target, LinkType link_type)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
-    REALM_ASSERT(tf::is_link_type(ColumnType(type)));
-    // Both origin and target must be group-level tables
-    REALM_ASSERT(is_root() && get_root_table()->is_group_level());
-    REALM_ASSERT(target.is_group_level());
 
-    tf::insert_column(*this, column_ndx, type, name, &target); // Throws
-    adj_insert_column(column_ndx);
+    if (REALM_UNLIKELY(!is_attached() || !target.is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx > get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(!tf::is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
+    if (REALM_UNLIKELY(!is_root()))
+        throw LogicError(LogicError::wrong_kind_of_descriptor);
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = tf::get_parent_group(*get_root_table());
+    Group* target_group = tf::get_parent_group(target);
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
 
-    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
+    tf::insert_column(*this, col_ndx, type, name, &target); // Throws
+    adj_insert_column(col_ndx);
+
+    tf::set_link_type(*get_root_table(), col_ndx, link_type); // Throws
 }
 
-inline void Descriptor::remove_column(std::size_t column_ndx)
+inline void Descriptor::remove_column(size_t col_ndx)
 {
-    REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
-    tf::erase_column(*this, column_ndx); // Throws
-    adj_erase_column(column_ndx);
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx >= get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    tf::erase_column(*this, col_ndx); // Throws
+    adj_erase_column(col_ndx);
 }
 
-inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
+inline void Descriptor::rename_column(size_t col_ndx, StringData name)
 {
-    REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
-    tf::rename_column(*this, column_ndx, name); // Throws
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx >= get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    tf::rename_column(*this, col_ndx, name); // Throws
 }
 
-inline void Descriptor::set_link_type(std::size_t column_ndx, LinkType link_type)
+inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
-    REALM_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_ndx))));
-    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx >= get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(!tf::is_link_type(ColumnType(get_column_type(col_ndx)))))
+        throw LogicError(LogicError::illegal_type);
+
+    tf::set_link_type(*get_root_table(), col_ndx, link_type); // Throws
 }
 
 inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) const

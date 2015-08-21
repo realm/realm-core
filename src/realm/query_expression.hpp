@@ -139,6 +139,8 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #ifndef REALM_QUERY_EXPRESSION_HPP
 #define REALM_QUERY_EXPRESSION_HPP
 
+#include <realm/column_type_traits.hpp>
+
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
 // unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
@@ -147,12 +149,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 
 #define REALM_OLDQUERY_FALLBACK
 
-#include <cmath>
-#include <cfloat>
-
-//#define REALM_OLDQUERY_FALLBACK
-
-// namespace realm {
+namespace realm {
 
 template <class T> T minimum(T a, T b)
 {
@@ -678,7 +675,6 @@ template <class T, size_t prealloc = 8> struct NullableVector
         return m_first[index];
     }
 
-
     inline bool is_null(size_t index) const
     {
         REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
@@ -698,10 +694,10 @@ template <class T, size_t prealloc = 8> struct NullableVector
         // If value collides with magic null value, then switch to a new unique representation for null
         if (REALM_UNLIKELY(value == m_null)) {
             // adding a prime will generate 2^64 unique values. Todo: Only works on 2's complement architecture
-            uint64_t cand = static_cast<uint64_t>(m_null) + 0xfffffffbULL;
-            while (std::find(m_first, m_first + m_size, static_cast<int64_t>(cand)) != m_first + m_size)
-                cand += 0xfffffffbULL;
-            std::replace_if(m_first, m_first + m_size, [&](int64_t v) { return v == m_null; }, cand);
+            uint64_t candidate = static_cast<uint64_t>(m_null) + 0xfffffffbULL;
+            while (std::find(m_first, m_first + m_size, static_cast<int64_t>(candidate)) != m_first + m_size)
+                candidate += 0xfffffffbULL;
+            std::replace(m_first, m_first + m_size, m_null, static_cast<int64_t>(candidate));
         }
         m_first[index] = value;
     }
@@ -1917,7 +1913,6 @@ private:
     const char* m_compare_string;
 };
 
-
-//}
+}
 #endif // REALM_QUERY_EXPRESSION_HPP
 
