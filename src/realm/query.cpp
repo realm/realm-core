@@ -52,7 +52,7 @@ Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
 void Query::create()
 {
     // fixme, hack that prevents 'first' from relocating; this limits queries to 16 nested levels of group/end_group
-    first.reserve(16);
+    first.reserve(64);
     update.push_back(0);
     update_override.push_back(0);
     REALM_ASSERT_3(first.capacity(), >, first.size()); // see above fixme
