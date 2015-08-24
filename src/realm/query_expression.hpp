@@ -1650,8 +1650,8 @@ public:
     }
 
 
-    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
-    // binds it to a Query at a later time
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression 
+    // and binds it to a Query at a later time
     virtual const Table* get_table()
     {
         return m_table;
@@ -1687,13 +1687,17 @@ public:
             sgc->cache_next(index); 
             size_t colsize = sgc->m_column->size();
 
-            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer leaf, then it
-            // contains the method get_chunk() which copies these values in a super fast way (first case of the `if` below. 
-            // Otherwise, copy the values one by one in a for-loop (the `else` case).
+            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer 
+            // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first 
+            // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
             if (std::is_same<T, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
                 Value<T> v;
-                REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
-                sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
+
+                // If you want to modify 'default_size' then update Array::get_chunk()
+                REALM_ASSERT_3(ValueBase::default_size, ==, 8); 
+                
+                sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, 
+                    static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
 
                 if (m_nullable)
                    v.m_storage.m_null = ((ArrayIntNull*)(sgc->m_leaf_ptr))->null_value();
@@ -1702,19 +1706,21 @@ public:
             }
             else          
             {
-                // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
-                // if an unconditional zero out is faster
+                // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo,
+                // benchmark if an unconditional zero out is faster
                 size_t rows = colsize - index;
                 if (rows > ValueBase::default_size)
                     rows = ValueBase::default_size;
                 Value<T> v(false, rows);
 
-                for (size_t t = 0; t < rows; t++) {
+                for (size_t t = 0; t < rows; t++)
                     v.m_storage.set(t, sgc->get_next(index + t));
-                }
 
-                if (m_nullable && (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value || std::is_same<T, realm::DateTime>::value))
+                if (m_nullable && (std::is_same<T, int64_t>::value ||
+                                   std::is_same<T, bool>::value ||
+                                   std::is_same<T, realm::DateTime>::value)) {
                     v.m_storage.m_null = reinterpret_cast<const ArrayIntNull*>(sgc->m_leaf_ptr)->null_value();
+                }
 
                 destination.import(v);
             }
@@ -1723,7 +1729,8 @@ public:
 
     const Table* m_table_linked_from;
 
-    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
+    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class 
+    // dependency/entanglement
     const Table* m_table;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
