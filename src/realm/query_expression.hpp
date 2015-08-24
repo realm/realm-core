@@ -1578,7 +1578,7 @@ public:
     using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
     Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr), 
-                                                                            m_table(nullptr), sg(nullptr),
+                                                                            m_table(nullptr), m_sg(nullptr),
                                                                             m_column(column)
     {
         m_link_map.init(const_cast<Table*>(table), links);
@@ -1586,7 +1586,7 @@ public:
         m_nullable = m_link_map.m_table->is_nullable(m_column);
     }
 
-    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
+    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), m_sg(nullptr),
                                                  m_column(column)
     {
         m_table = table;
@@ -1594,14 +1594,14 @@ public:
     }
 
 
-    Columns() : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr) { }
+    Columns() : m_table_linked_from(nullptr), m_table(nullptr), m_sg(nullptr) { }
 
-    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
+    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), m_sg(nullptr),
                                       m_column(column) {}
 
     ~Columns()
     {
-        delete sg;
+        delete m_sg;
     }
 
     template<class C> Subexpr& clone()
@@ -1609,7 +1609,7 @@ public:
         Columns<T>& n = *new Columns<T>();
         n = *this;
         SequentialGetter<C> *s = new SequentialGetter<C>();
-        n.sg = s;
+        n.m_sg = s;
         n.m_nullable = m_nullable;
         return n;
 
@@ -1636,17 +1636,17 @@ public:
             c = &m_link_map.m_table->get_column_base(m_column);
         }
 
-        if (sg == nullptr) {
+        if (m_sg == nullptr) {
             if (m_nullable)
-                sg = new SequentialGetter<ColTypeN>();
+                m_sg = new SequentialGetter<ColTypeN>();
             else
-                sg = new SequentialGetter<ColType>();
+                m_sg = new SequentialGetter<ColType>();
         }
 
         if (m_nullable)
-            static_cast<SequentialGetter<ColTypeN>*>(sg)->init(  (ColTypeN*) (c)); // todo, c cast
+            static_cast<SequentialGetter<ColTypeN>*>(m_sg)->init(  (ColTypeN*) (c)); // todo, c cast
         else
-            static_cast<SequentialGetter<ColType>*>(sg)->init( (ColType*)(c));
+            static_cast<SequentialGetter<ColType>*>(m_sg)->init( (ColType*)(c));
     }
 
 
@@ -1666,7 +1666,7 @@ public:
 
     // Load values from Column into destination
     template<class C> void evaluate(size_t index, ValueBase& destination) {
-        SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(sg);
+        SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(m_sg);
 
         if (m_link_map.m_link_columns.size() > 0) {
             // LinkList with more than 0 values. Create Value with payload for all fields
@@ -1683,9 +1683,13 @@ public:
         }
         else {
             // Not a Link column
-            sgc->cache_next(index);
+            // make sequential getter load the respective leaf to access data at column row 'index'
+            sgc->cache_next(index); 
             size_t colsize = sgc->m_column->size();
 
+            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer leaf, then it
+            // contains the method get_chunk() which copies these values in a super fast way (first case of the `if` below. 
+            // Otherwise, copy the values one by one in a for-loop (the `else` case).
             if (std::is_same<T, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
                 Value<T> v;
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
@@ -1696,7 +1700,8 @@ public:
 
                 destination.import(v);
             }
-            else {
+            else          
+            {
                 // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
                 // if an unconditional zero out is faster
                 size_t rows = colsize - index;
@@ -1722,7 +1727,7 @@ public:
     const Table* m_table;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
-    SequentialGetterBase* sg;
+    SequentialGetterBase* m_sg;
 
     // Column index of payload column of m_table
     size_t m_column;

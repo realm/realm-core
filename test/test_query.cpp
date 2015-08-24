@@ -6560,7 +6560,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
 
 }
 
-ONLY(Query_Null)
+TEST(Query_Null)
 {
     // More thoroughly tests of queries on nullable columns. Work in progress.
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
@@ -6656,7 +6656,12 @@ ONLY(Query_Null)
     tv = table->where().between(3, 3., 100.).find_all();
     check(tv, {}, __LINE__);
 
-    // Comparison between two columns
+    tv = (shipping > rating).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (shipping < rating).find_all();
+    check(tv, {}, __LINE__);
+
     tv = (price == rating).find_all();
     check(tv, {}, __LINE__);
 
@@ -6669,13 +6674,20 @@ ONLY(Query_Null)
     tv = (shipping != rating).find_all();
     check(tv, { 0, 1, 2 }, __LINE__);
 
-    tv = (shipping > rating).find_all();
-    check(tv, { }, __LINE__);
-
-    tv = (shipping < rating).find_all();
-    check(tv, { }, __LINE__);
-
+    // Comparison column with itself
     tv = (shipping == shipping).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (shipping > shipping).find_all();
+    check(tv, { }, __LINE__);
+
+    tv = (shipping < shipping).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (shipping <= shipping).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (shipping >= shipping).find_all();
     check(tv, { 0, 1, 2 }, __LINE__);
 
     tv = (rating == rating).find_all();
@@ -6683,6 +6695,18 @@ ONLY(Query_Null)
 
     tv = (rating != rating).find_all();
     check(tv, { }, __LINE__);
+
+    tv = (rating > rating).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (rating < rating).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (rating >= rating).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (rating <= rating).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
 
     tv = (stock == stock).find_all();
     check(tv, { 0, 1, 2 }, __LINE__);
@@ -6696,17 +6720,113 @@ ONLY(Query_Null)
     tv = (price != price).find_all();
     check(tv, { }, __LINE__);
 
+    tv = (price > price).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (price < price).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (price >= price).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (price <= price).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
     tv = (delivery == delivery).find_all();
     check(tv, { 0, 1, 2 }, __LINE__);
 
     tv = (delivery != delivery).find_all();
     check(tv, {}, __LINE__);
 
+    tv = (delivery > delivery).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (delivery < delivery).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (delivery >= delivery).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (delivery <= delivery).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
     tv = (description == description).find_all();
     check(tv, { 0, 1, 2 }, __LINE__);
 
     tv = (description != description).find_all();
     check(tv, {}, __LINE__);
+
+    // integer + null == null
+    // note: booleans can convert to 0 and 1 when compared agaist numeric values, like in c++
+    tv = (price + shipping == stock).find_all();
+    check(tv, { 1 }, __LINE__);
+}
+
+
+// If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works.
+TEST(Query_Null_ManyRows)
+{
+    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
+    {
+        test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
+        for (auto it = indexes.begin(); it != indexes.end(); ++it)
+            test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
+    };
+
+    static_cast<void>(check);
+
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    table->insert_column(0, type_Int, "Price", true);               // nullable = true
+    table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
+    table->insert_column(2, type_String, "Description", true);      // nullable = true
+    table->insert_column(3, type_Double, "Rating", true);           // nullable = true
+    table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
+    table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
+
+    Columns<Int> price = table->column<Int>(0);
+    Columns<Float> shipping = table->column<Float>(1);
+    Columns<String> description = table->column<String>(2);
+    Columns<Double> rating = table->column<Double>(3);
+    Columns<Bool> stock = table->column<Bool>(4);
+    Columns<DateTime> delivery = table->column<DateTime>(5);
+
+    // Create lots of non-null rows
+    for (size_t t = 0; t < 5; t++) {
+        table->add_empty_row(1);
+        table->set_int(0, t, 123);
+        table->set_float(1, t, 30.f);
+        table->set_string(2, t, "foo");
+        table->set_double(3, t, 12.3);
+        table->set_bool(4, t, true);
+        table->set_datetime(5, t, DateTime(2016, 2, 2));
+    }
+
+    std::vector<size_t> nulls;
+
+    // Fill in nulls at random places, at each 10'th row on average
+    for (size_t t = 0; t < table->size() / 10; t++) {
+        // Bad but fast random generator
+        size_t prime = 883;
+        size_t random = ((t + prime) * prime + t) % table->size();
+
+        // Test if already null (simplest way to avoid dublicates in our nulls vector)
+        if (!table->is_null(0, random)) {
+            table->set_null(0, random);
+            table->set_null(1, random);
+            table->set_null(2, random);
+            table->set_null(3, random);
+            table->set_null(4, random);
+            table->set_null(5, random);
+            nulls.push_back(random);
+        }
+    }
+
+    TableView tv;
+
+    tv = (price == null()).find_all();
+    CHECK_EQUAL(tv.size(), nulls.size());
+
 }
 
 #endif // TEST_QUERY
