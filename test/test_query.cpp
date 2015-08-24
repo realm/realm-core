@@ -6557,7 +6557,6 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         CHECK(table->is_null(4, 0));
         CHECK(table->is_null(5, 0));
     }
-
 }
 
 TEST(Query_Null)
@@ -6764,7 +6763,7 @@ TEST(Query_Null)
 
 
 // If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works.
-TEST(Query_Null_ManyRows)
+ONLY(Query_Null_ManyRows)
 {
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
     {
@@ -6792,7 +6791,7 @@ TEST(Query_Null_ManyRows)
     Columns<DateTime> delivery = table->column<DateTime>(5);
 
     // Create lots of non-null rows
-    for (size_t t = 0; t < 5; t++) {
+    for (size_t t = 0; t < 2000; t++) {
         table->add_empty_row(1);
         table->set_int(0, t, 123);
         table->set_float(1, t, 30.f);
@@ -6822,11 +6821,22 @@ TEST(Query_Null_ManyRows)
         }
     }
 
+    std::sort(nulls.begin(), nulls.end(), [](size_t a, size_t b) { return b > a; });
     TableView tv;
+    auto find_nulls = [&](auto column)
+    {
+        tv = (column == null()).find_all();
+        CHECK_EQUAL(tv.size(), nulls.size());
+        for (size_t t = 0; t < tv.size(); t++)
+            CHECK_EQUAL(nulls[t], tv.get_source_ndx(t));
+    };
 
-    tv = (price == null()).find_all();
-    CHECK_EQUAL(tv.size(), nulls.size());
-
+    find_nulls(price);
+    find_nulls(shipping);
+    find_nulls(description);
+    find_nulls(rating);
+    find_nulls(stock);
+    find_nulls(delivery);
 }
 
 #endif // TEST_QUERY
