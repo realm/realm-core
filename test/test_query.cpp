@@ -6559,9 +6559,10 @@ TEST(Query_Null_DefaultsAndErrorhandling)
     }
 }
 
-TEST(Query_Null)
+// Tests queries that compare two columns with eachother in various ways. The columns have different
+// integral types
+TEST(Query_Null_Two_Columns)
 {
-    // More thoroughly tests of queries on nullable columns. Work in progress.
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
     {
         test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
@@ -6621,39 +6622,6 @@ TEST(Query_Null)
     1   null        null                "foo"                   2.2                 null          null
     2   3           30.0                "bar"                   null                false         2016-6-6
     */
-
-    // Nullable doubles in old syntax
-    tv = table->where().equal(3, null()).find_all();
-    check(tv, { 2 }, __LINE__);
-
-    tv = table->where().not_equal(3, null()).find_all();
-    check(tv, { 0, 1 }, __LINE__);
-
-    tv = table->where().between(0, 2, 4).find_all();
-    check(tv, { 2 }, __LINE__);
-
-    // between for floats
-    tv = table->where().between(1, 10.f, 40.f).find_all();
-    check(tv, { 2 }, __LINE__);
-
-    tv = table->where().between(1, 0.f, 20.f).find_all();
-    check(tv, {}, __LINE__);
-
-    tv = table->where().between(1, 40.f, 100.f).find_all();
-    check(tv, {}, __LINE__);
-
-    // between for doubles
-    tv = table->where().between(3, 0., 100.).find_all();
-    check(tv, { 0, 1 }, __LINE__);
-
-    tv = table->where().between(3, 1., 2.).find_all();
-    check(tv, { 0 }, __LINE__);
-
-    tv = table->where().between(3, 2., 3.).find_all();
-    check(tv, { 1 }, __LINE__);
-
-    tv = table->where().between(3, 3., 100.).find_all();
-    check(tv, {}, __LINE__);
 
     tv = (shipping > rating).find_all();
     check(tv, {}, __LINE__);
@@ -6759,11 +6727,47 @@ TEST(Query_Null)
     // note: booleans can convert to 0 and 1 when compared agaist numeric values, like in c++
     tv = (price + shipping == stock).find_all();
     check(tv, { 1 }, __LINE__);
+
+    // Test a few untested things
+    tv = table->where().equal(3, null()).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().not_equal(3, null()).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = table->where().between(0, 2, 4).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    // between for floats
+    tv = table->where().between(1, 10.f, 40.f).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().between(1, 0.f, 20.f).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = table->where().between(1, 40.f, 100.f).find_all();
+    check(tv, {}, __LINE__);
+
+    // between for doubles
+    tv = table->where().between(3, 0., 100.).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = table->where().between(3, 1., 2.).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = table->where().between(3, 2., 3.).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = table->where().between(3, 3., 100.).find_all();
+    check(tv, {}, __LINE__);
+
 }
 
 
-// If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works.
-ONLY(Query_Null_ManyRows)
+// If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works by
+// creating a large table with nulls in arbitrary places and query for nulls. Verify the search result manually.
+// Do that for all Realm types.
+TEST(Query_Null_ManyRows)
 {
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
     {
@@ -6803,7 +6807,7 @@ ONLY(Query_Null_ManyRows)
 
     std::vector<size_t> nulls;
 
-    // Fill in nulls at random places, at each 10'th row on average
+    // Fill in nulls in random rows, at each 10'th row on average
     for (size_t t = 0; t < table->size() / 10; t++) {
         // Bad but fast random generator
         size_t prime = 883;
@@ -6831,6 +6835,8 @@ ONLY(Query_Null_ManyRows)
             CHECK_EQUAL(nulls[t], tv.get_source_ndx(t));
     };
 
+    // Search for all nulls and verify matches against our manually created `nulls` vector. Do that for 
+    // all Realm data types
     find_nulls(price);
     find_nulls(shipping);
     find_nulls(description);
