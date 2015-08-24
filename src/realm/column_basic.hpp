@@ -61,8 +61,9 @@ public:
     using LeafType = typename GetLeafType<T, false>::type;
     using value_type = T;
 
-    // The FloatColumn and DoubleColumn only exists as class types that support null (there is no separate typed
-    // nullable and non-nullable versions). Both have a ´bool m_nullable´ flag which is set in their constructor
+    // The FloatColumn and DoubleColumn only exists as class types that support
+    // null (there is no separate typed nullable and non-nullable versions).
+    // Both have a `bool m_nullable` flag which is set in their constructor
     // according to the m_spec
     static const bool nullable = true;
     
@@ -71,11 +72,11 @@ public:
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
 
-    bool is_nullable() const REALM_NOEXCEPT
+    bool is_nullable() const REALM_NOEXCEPT override
     {
         return m_nullable;
     }
-    bool is_null(size_t index) const REALM_NOEXCEPT
+    bool is_null(size_t index) const REALM_NOEXCEPT override
     {
         if (!m_nullable)
             return false;
@@ -83,7 +84,7 @@ public:
         return null::is_null_float(get(index));
     }
 
-    void set_null(size_t index)
+    void set_null(size_t index) override
     {
         REALM_ASSERT(m_nullable);
         if (!m_array->is_inner_bptree_node()) {

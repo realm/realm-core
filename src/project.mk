@@ -57,7 +57,7 @@ ifneq ($(REALM_HAVE_CONFIG),)
 endif
 
 PROJECT_CFLAGS_DEBUG = -DREALM_DEBUG
-PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER -fno-inline -fno-inline-small-functions -fno-default-inline -fno-elide-constructors
+PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER -fno-inline -fno-inline-small-functions -fno-default-inline
 
 # Load dynamic configuration
 ifneq ($(REALM_HAVE_CONFIG),)
