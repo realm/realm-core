@@ -453,8 +453,6 @@ private:
 
 
 
-
-
 // Implementation:
 
 struct InvalidDatabase: util::File::AccessError {
@@ -522,8 +520,6 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
     return ref < slab.ref_end;
 }
 
-
-
 inline std::size_t SlabAlloc::get_upper_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT
 {
     return get_section_base(1+get_section_index(start_pos));
@@ -543,10 +539,6 @@ inline std::size_t SlabAlloc::get_section_base(std::size_t index) const REALM_NO
 {
     return m_section_bases[index];
 }
-
-
-
-
 
 } // namespace realm
 

@@ -507,7 +507,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!cfg.skip_validate) {
             // Verify the data structures
-                validate_buffer(map.get_addr(), initial_size_of_file, top_ref, cfg.is_shared); // Throws
+            validate_buffer(map.get_addr(), initial_size_of_file, top_ref, cfg.is_shared); // Throws
         }
 
         if (did_create) {
