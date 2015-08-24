@@ -26,7 +26,6 @@
 
 #include <cstdio>
 #include <cstring>
-#include <dlfcn.h>
 #include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -34,15 +33,6 @@
 #include <realm/util/terminate.hpp>
 
 namespace {
-template<typename T>
-void dlsym_cast(T& ptr, const char *name) {
-    void* addr = dlsym(RTLD_DEFAULT, name);
-    REALM_ASSERT(addr);
-    // This cast is forbidden by C++03, but required to work by POSIX, and
-    // C++11 makes it implementation-defined specifically to support dlsym
-    ptr = reinterpret_cast<T>(reinterpret_cast<size_t>(addr));
-}
-
 size_t cached_page_size;
 void get_page_size()
 {
@@ -157,19 +147,6 @@ AESCryptor::AESCryptor(const uint8_t* key)
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #else
-#ifdef REALM_ANDROID
-    // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
-    // into every process with every version of Android, so we can get to it
-    // with dlsym
-    dlsym_cast(AES_set_encrypt_key, "AES_set_encrypt_key");
-    dlsym_cast(AES_set_decrypt_key, "AES_set_decrypt_key");
-    dlsym_cast(AES_cbc_encrypt, "AES_cbc_encrypt");
-
-    dlsym_cast(SHA224_Init, "SHA224_Init");
-    dlsym_cast(SHA256_Update, "SHA256_Update");
-    dlsym_cast(SHA256_Final, "SHA256_Final");
-#endif
-
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
 #endif
