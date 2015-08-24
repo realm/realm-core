@@ -54,7 +54,7 @@ Static library*/
 /src/config.mk
 
 # sh build.sh build-cocoa
-core-*.zip
+/core-*.zip
 
 # sh build.sh build-iphone
 /iphone-lib/include
