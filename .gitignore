@@ -53,6 +53,9 @@ Static library*/
 # sh build.sh config
 /src/config.mk
 
+# sh build.sh build-cocoa
+core-*.zip
+
 # sh build.sh build-iphone
 /iphone-lib/include
 /iphone-lib/librealm-ios.a
