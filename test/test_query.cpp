@@ -6445,6 +6445,9 @@ NOTE NOTE: There is currently only very little syntax checking.
     // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
 }
 
+
+// Test error handling and default values (user gives bad column type, is_null() returns false,
+// get_float() must return 0.9 for null entries, etc, etc)
 TEST(Query_Null_DefaultsAndErrorhandling)
 {
     // Non-nullable columns: Tests is_nullable() and set_null()
@@ -6557,12 +6560,9 @@ TEST(Query_Null_DefaultsAndErrorhandling)
 
 }
 
-TEST(Query_Null_Query_Conditions)
+TEST(Query_Null)
 {
-    // Tests all the condition objects in query_conditions.hpp
-
-    // Work in progress
-
+    // More thoroughly tests of queries on nullable columns. Work in progress.
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
     {
         test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
@@ -6596,7 +6596,7 @@ TEST(Query_Null_Query_Conditions)
 
     table->set_double(3, 0, 1.1);
     table->set_double(3, 1, 2.2);
-    table->set_double(3, 2, 3.3);
+    table->set_null(3, 2);
 
     table->set_bool(4, 0, true);
     table->set_null(4, 1);
@@ -6619,8 +6619,15 @@ TEST(Query_Null_Query_Conditions)
     ----------------------------------------------------------------------------------------------------------------
     0   null            null                null                    1.1                 true          2016-2-2
     1   10              null                "foo"                   2.2                 null          null
-    2   20              30.0                "bar"                   3.3                 false         2016-6-6
+    2   20              30.0                "bar"                   null                 false         2016-6-6
     */
+
+    // Nullable doubles in old syntax
+    tv = table->where().equal(3, null()).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().not_equal(3, null()).find_all();
+    check(tv, { 0, 1 }, __LINE__);
 
 //    tv = table->where().contains()
 //    check(tv, { 0, 1 }, __LINE__);

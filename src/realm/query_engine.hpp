@@ -923,7 +923,7 @@ public:
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    FloatDoubleNode(null, size_t column_ndx) : m_value(null::get_null_float<float>())
+    FloatDoubleNode(null, size_t column_ndx) : m_value(null::get_null_float<TConditionValue>())
     {
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
