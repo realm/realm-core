@@ -60,10 +60,39 @@ class BasicColumn : public ColumnBaseSimple, public ColumnTemplate<T> {
 public:
     using LeafType = typename GetLeafType<T, false>::type;
     using value_type = T;
-    BasicColumn(Allocator&, ref_type);
+
+    // The FloatColumn and DoubleColumn only exists as class types that support null (there is no separate typed
+    // nullable and non-nullable versions). Both have a ´bool m_nullable´ flag which is set in their constructor
+    // according to the m_spec
+    static const bool nullable = true;
+    
+    BasicColumn(Allocator&, ref_type, bool nullable);
 
     std::size_t size() const REALM_NOEXCEPT final;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+
+    bool is_nullable() const REALM_NOEXCEPT
+    {
+        return m_nullable;
+    }
+    bool is_null(size_t index) const REALM_NOEXCEPT
+    {
+        if (!m_nullable)
+            return false;
+
+        return null::is_null_float(get(index));
+    }
+
+    void set_null(size_t index)
+    {
+        REALM_ASSERT(m_nullable);
+        if (!m_array->is_inner_bptree_node()) {
+            static_cast<BasicArray<T>*>(m_array.get())->set(index, null::get_null_float<T>()); // Throws
+            return;
+        }
+        SetLeafElem set_leaf_elem(m_array->get_alloc(), null::get_null_float<T>());
+        m_array->update_bptree_elem(index, set_leaf_elem); // Throws
+    }
 
     struct LeafInfo {
         const BasicArray<T>** out_leaf_ptr;
@@ -149,6 +178,8 @@ private:
 
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void do_clear();
+
+    bool m_nullable;
 
 #ifdef REALM_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);

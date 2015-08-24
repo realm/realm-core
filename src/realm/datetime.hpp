@@ -32,6 +32,7 @@ public:
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
+    /// FIXME: See if we can make this private again. Required by query_expression.hpp
     DateTime(int_fast64_t d) REALM_NOEXCEPT : m_time(d) {}
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
@@ -68,11 +69,9 @@ public:
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
 
-private:
     // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed 
     // because DateTime is internally stored in an int64_t column.
     operator int_fast64_t() REALM_NOEXCEPT;
-
 
 private:
     int_fast64_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.

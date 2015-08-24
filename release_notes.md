@@ -19,9 +19,12 @@
     * `StringIndex`.
 
 ### Enhancements:
-
+* Full null support everywhere and on all column types. See TEST(Query_NullShowcase)
+  in test_query.cpp in core repo.
 * Added `Descriptor::get_link_target()`, for completeness.
 * Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
+* Modifying `Descriptor` methods now throw `LogicError` when appropriate (rather
+  than asserting).
 
 -----------
 
