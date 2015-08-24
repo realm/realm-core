@@ -6560,7 +6560,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
 
 }
 
-ONLY(Query_Null)
+TEST(Query_Null)
 {
     // More thoroughly tests of queries on nullable columns. Work in progress.
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
