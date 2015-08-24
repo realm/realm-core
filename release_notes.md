@@ -48,6 +48,8 @@
 * Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
 * Modifying `Descriptor` methods now throw `LogicError` when appropriate (rather
   than asserting).
+* Allow queries to include expressions that compute aggregates on columns in linked tables,
+  such as `table->column<LinkList>(0).column<Int>(1).sum() >= 1000`.
 
 -----------
 
