@@ -71,6 +71,9 @@ ifneq ($(REALM_HAVE_CONFIG),)
   endif
   ifeq ($(ENABLE_ENCRYPTION),yes)
     PROJECT_CFLAGS += -DREALM_ENABLE_ENCRYPTION
+    ifeq ($(OS),Linux)
+      PROJECT_LDFLAGS += -lcrypto
+    endif
   endif
 else
   ifneq ($(REALM_ENABLE_REPLICATION),)
@@ -84,4 +87,7 @@ endif
 ifneq ($(REALM_ANDROID),)
   PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden -DANDROID
   CFLAGS_OPTIM = -Os -flto -DNDEBUG
+  ifeq ($(ENABLE_ENCRYPTION),yes)
+	PROJECT_CFLAGS += -I../../openssl/include
+  endif
 endif
