@@ -6608,6 +6608,7 @@ ONLY(Query_Null)
 
     Columns<Int> price = table->column<Int>(0);
     Columns<Float> shipping = table->column<Float>(1);
+    Columns<String> description = table->column<String>(2);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
@@ -6653,6 +6654,58 @@ ONLY(Query_Null)
     check(tv, { 1 }, __LINE__);
 
     tv = table->where().between(3, 3., 100.).find_all();
+    check(tv, {}, __LINE__);
+
+    // Comparison between two columns
+    tv = (price == rating).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (price != rating).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (shipping == rating).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (shipping != rating).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (shipping > rating).find_all();
+    check(tv, { }, __LINE__);
+
+    tv = (shipping < rating).find_all();
+    check(tv, { }, __LINE__);
+
+    tv = (shipping == shipping).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (rating == rating).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (rating != rating).find_all();
+    check(tv, { }, __LINE__);
+
+    tv = (stock == stock).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (stock != stock).find_all();
+    check(tv, { }, __LINE__);
+
+    tv = (price == price).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (price != price).find_all();
+    check(tv, { }, __LINE__);
+
+    tv = (delivery == delivery).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (delivery != delivery).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (description == description).find_all();
+    check(tv, { 0, 1, 2 }, __LINE__);
+
+    tv = (description != description).find_all();
     check(tv, {}, __LINE__);
 }
 
