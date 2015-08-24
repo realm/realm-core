@@ -6560,7 +6560,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
 
 }
 
-TEST(Query_Null)
+ONLY(Query_Null)
 {
     // More thoroughly tests of queries on nullable columns. Work in progress.
     auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
@@ -6582,9 +6582,9 @@ TEST(Query_Null)
     table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
     table->add_empty_row(3);
 
-    table->set_null(0, 0);
-    table->set_int(0, 1, 10);
-    table->set_int(0, 2, 20);
+    table->set_int( 0, 0, 1);
+    table->set_null(0, 1);
+    table->set_int( 0, 2, 3);
 
     table->set_null(1, 0);
     table->set_null(1, 1);
@@ -6617,9 +6617,9 @@ TEST(Query_Null)
     /*
     Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
     ----------------------------------------------------------------------------------------------------------------
-    0   null            null                null                    1.1                 true          2016-2-2
-    1   10              null                "foo"                   2.2                 null          null
-    2   20              30.0                "bar"                   null                 false         2016-6-6
+    0   1           null                null                    1.1                 true          2016-2-2
+    1   null        null                "foo"                   2.2                 null          null
+    2   3           30.0                "bar"                   null                false         2016-6-6
     */
 
     // Nullable doubles in old syntax
@@ -6629,9 +6629,31 @@ TEST(Query_Null)
     tv = table->where().not_equal(3, null()).find_all();
     check(tv, { 0, 1 }, __LINE__);
 
-//    tv = table->where().contains()
-//    check(tv, { 0, 1 }, __LINE__);
+    tv = table->where().between(0, 2, 4).find_all();
+    check(tv, { 2 }, __LINE__);
 
+    // between for floats
+    tv = table->where().between(1, 10.f, 40.f).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().between(1, 0.f, 20.f).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = table->where().between(1, 40.f, 100.f).find_all();
+    check(tv, {}, __LINE__);
+
+    // between for doubles
+    tv = table->where().between(3, 0., 100.).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = table->where().between(3, 1., 2.).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = table->where().between(3, 2., 3.).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = table->where().between(3, 3., 100.).find_all();
+    check(tv, {}, __LINE__);
 }
 
 #endif // TEST_QUERY
