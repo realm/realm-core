@@ -36,8 +36,26 @@
 namespace {
 template<typename T>
 void dlsym_cast(T& ptr, const char *name) {
+#ifdef REALM_ANDROID
+    // FIXME: This is a workaround for some OEM phones which have other so files
+    // than libcrypto.so contain the crypto functions we want. That would cause
+    // some random issues. And still, rely on dynamic lib which is not a part of
+    // ndk is not a good idea.
+    void* addr;
+    void* handle = dlopen("/system/lib/libcrypto.so", RTLD_LOCAL | RTLD_LAZY);
+    if (handle) {
+        addr = dlsym(handle, name);
+        dlclose(handle);
+    }
+    if (!addr) {
+        // Try one more time if other so contains the functions.
+        addr = dlsym(RTLD_DEFAULT, name);
+    }
+#else
     void* addr = dlsym(RTLD_DEFAULT, name);
-    REALM_ASSERT(addr);
+#endif
+    // Just crash. The so lib is not found.
+    REALM_ASSERT_RELEASE(addr);
     // This cast is forbidden by C++03, but required to work by POSIX, and
     // C++11 makes it implementation-defined specifically to support dlsym
     ptr = reinterpret_cast<T>(reinterpret_cast<size_t>(addr));
