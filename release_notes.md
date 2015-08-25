@@ -9,6 +9,9 @@
   and target link types correctly.
 * A stackoverflow issue in encrypted_file_mapping. Allocing 4k bytes on the
   stack would cause some random crashes on small stack size configurations.
+* Now includes a statically-linked copy of OpenSSL crypto functions rather
+  than dynamically linking Androids system OpenSSL to avoid bugs introduced
+  by system crypto functions on some devices.
 
 ### API breaking changes:
 
