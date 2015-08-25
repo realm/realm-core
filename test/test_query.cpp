@@ -9,6 +9,7 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
 #include <realm/query_engine.hpp>
+#include <initializer_list>
 
 #include "test.hpp"
 
@@ -5874,7 +5875,7 @@ TEST(Query_NullStrings)
     
 }
 
-#if REALM_NULL_STRINGS == 1
+
 TEST(Query_Nulls_Fuzzy)
 {
     for (int attributes = 1; attributes < 5; attributes++) {
@@ -6048,7 +6049,78 @@ TEST(Query_BinaryNull)
     CHECK_EQUAL(2, t.get_source_ndx(0));
 }
 
-#endif
+TEST(Query_IntegerNullOldQueryEngine)
+{
+/*
+    first   second  third
+     null      100      1
+        0     null      2
+      123      200      3
+      null    null      4
+*/
+    Table table;
+    table.add_column(type_Int, "first", true);
+    table.add_column(type_Int, "second", true);
+    table.add_column(type_Int, "third", false);
+    table.add_empty_row(4);
+
+    table.set_int(0, 1, 0);
+    table.set_int(0, 2, 123);
+
+    table.set_int(1, 0, 100);
+    table.set_int(1, 2, 200);
+
+    table.set_int(2, 0, 1);
+    table.set_int(2, 1, 2);
+    table.set_int(2, 2, 3);
+    table.set_int(2, 3, 4);
+
+    TableView t;
+
+    t = table.where().equal(0, null{}).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(3, t.get_source_ndx(1));
+
+    t = table.where().equal(0, 0).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+
+    t = table.where().equal(0, 123).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+
+    t = table.where().not_equal(0, null{}).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = table.where().not_equal(0, 0).find_all();
+    CHECK_EQUAL(3, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+    CHECK_EQUAL(3, t.get_source_ndx(2));
+
+    t = table.where().greater(0, 0).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(2, t.get_source_ndx(0));
+}
+
+TEST(Query_IntegerNonNull)
+{
+    Table table;
+    table.add_column(type_Int, "first", false);
+    table.add_empty_row(3);
+    table.set_int(0, 1, 123);
+    table.set_int(0, 2, 456);
+
+    TableView t;
+
+    // Fixme, should you be able to query a non-nullable column against null?
+//    t = table.where().equal(0, null{}).find_all();
+//    CHECK_EQUAL(0, t.size());
+}
+
 
 TEST(Query_64BitValues)
 {
@@ -6103,4 +6175,486 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
+
+TEST(Query_NullShowcase)
+{
+/*
+Here we show how comparisons and arithmetic with null works in queries. Basic rules:
+
+null    +, -, *, /          value   ==   null
+null    +, -, *, /          null    ==   null
+
+null    ==, >=, <=]         null    ==   true
+null    !=, >, <            null    ==   false
+
+null    ==, >=, <=, >, <    value   ==   false
+null    !=                  value   ==   true
+
+This does NOT follow SQL! In particular, (null == null) == true and
+(null != value) == true.
+
+NOTE NOTE: There is currently only very little syntax checking.
+
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    ----------------------------------------------------------------------------------------------------------------
+0   null            null                null                    1.1                 true          2016-2-2
+1   10              null                "foo"                   2.2                 null          null
+2   20              30.0                "bar"                   3.3                 false         2016-6-6
+*/
+
+// todo, create new test with at least 8 rows to trigger Array*::get_chunk
+
+    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
+    {
+        test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
+        for (auto it = indexes.begin(); it != indexes.end(); ++it)
+            test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
+    };
+
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    table->insert_column(0, type_Int, "Price", true);               // nullable = true
+    table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
+    table->insert_column(2, type_String, "Description", true);      // nullable = true
+    table->insert_column(3, type_Double, "Rating", true);           // nullable = true
+    table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
+    table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
+    table->add_empty_row(3); 
+
+    // Default values for all nullable columns
+    CHECK(table->is_null(0, 0));
+    CHECK(table->is_null(1, 0));
+    CHECK(table->is_null(2, 0));
+    CHECK(table->is_null(3, 0));
+    CHECK(table->is_null(4, 0));
+    CHECK(table->is_null(5, 0));
+
+    table->set_null(0, 0);
+    table->set_int(0, 1, 10);
+    table->set_int(0, 2, 20);
+
+    table->set_null(1, 0);
+    table->set_null(1, 1);
+    table->set_float(1, 2, 30.f);
+
+    table->set_string(2, 0, null());
+    table->set_string(2, 1, "foo");
+    table->set_string(2, 2, "bar");
+
+    table->set_double(3, 0, 1.1);
+    table->set_double(3, 1, 2.2);
+    table->set_double(3, 2, 3.3);
+
+    table->set_bool(4, 0, true);
+    table->set_null(4, 1);
+    table->set_bool(4, 2, false);
+
+    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_null(5, 1);
+    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+
+    Columns<Int> price = table->column<Int>(0);
+    Columns<Float> shipping = table->column<Float>(1);
+    Columns<Double> rating = table->column<Double>(3);
+    Columns<Bool> stock = table->column<Bool>(4);
+    Columns<DateTime> delivery = table->column<DateTime>(5);
+
+    // check int/double type mismatch error handling
+    Columns<Int> dummy1;
+    CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
+
+    TableView tv;
+    
+    tv = (price == null()).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = (price != null()).find_all();
+    check(tv, { 1, 2}, __LINE__);
+
+    // Note that this returns rows with null, which differs from SQL!
+    tv = (price == shipping).find_all();
+    check(tv, { 0 }, __LINE__); // null == null
+
+    // If you add a != null criteria, you would probably get what most users intended, like in SQL
+    tv = (price == shipping && price != null()).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = (price != shipping).find_all();
+    check(tv, { 1, 2 }, __LINE__); // 10 != null
+    
+    tv = (price < 0 || price > 0).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+
+    // Shows that null + null == null, and 10 + null == null, and null < 100 == false
+    tv = (price + shipping < 100).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    //  null < 0 == false
+    tv = (price < 0).find_all();
+    check(tv, {}, __LINE__);
+
+    //  null > 0 == false
+    tv = (price == 0).find_all();
+    check(tv, {}, __LINE__);
+
+    // (null == 0) == false
+    tv = (price > 0).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+
+
+    // Doubles
+    // (null > double) == false
+    tv = (price > rating).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+    
+    tv = (price + rating == null()).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = (price + rating != null()).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+
+
+    // Booleans
+    tv = (stock == true).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = (stock == false).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = (stock == null()).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = (stock != null()).find_all();
+    check(tv, { 0, 2 }, __LINE__);
+
+    // Dates
+    tv = (delivery == DateTime(2016, 6, 6)).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = (delivery != DateTime(2016, 6, 6)).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = (delivery == null()).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = (delivery != null()).find_all();
+    check(tv, { 0, 2 }, __LINE__);
+
+
+    // Not valid syntaxes. Only == and != can be used with user-given null argument.
+    CHECK_THROW_ANY(tv = (price > null()).find_all());
+    CHECK_THROW_ANY(tv = (price + rating > null()).find_all());
+
+    // Old query syntax
+    tv = table->where().equal(0, null()).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = table->where().not_equal(0, null()).find_all();
+    check(tv, { 1, 2 }, __LINE__);
+    
+    // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
+    CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
+
+    // Nullable floats in old syntax
+    tv = table->where().equal(1, null()).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = table->where().not_equal(1, null()).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().greater(1, 0.0f).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().less(1, 20.0f).find_all();
+    check(tv, { }, __LINE__);
+
+    // TableView
+    int64_t i;
+    double d;
+    tv = table->where().find_all();    
+
+    // Integer column
+    i = tv.maximum_int(0);
+    CHECK_EQUAL(i, 20);
+    i = tv.minimum_int(0);
+    CHECK_EQUAL(i, 10);
+    d = tv.average_int(0);
+    CHECK_APPROXIMATELY_EQUAL(d, 15., 0.001);
+    i = tv.sum_int(0);
+    CHECK_EQUAL(i, 30);
+
+    // Float column
+    d = tv.maximum_float(1);
+    CHECK_EQUAL(d, 30.);
+    d = tv.minimum_float(1);
+    CHECK_EQUAL(d, 30.);
+    d = tv.average_float(1);
+    CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+    d = tv.sum_float(1);
+    CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+
+    // Double column
+    d = tv.maximum_double(3);
+    CHECK_EQUAL(d, 3.3);
+    d = tv.minimum_double(3);
+    CHECK_EQUAL(d, 1.1);
+    d = tv.average_double(3);
+    CHECK_APPROXIMATELY_EQUAL(d, (1.1 + 2.2 + 3.3) / 3, 0.001);
+    d = tv.sum_double(3);
+    CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
+
+    // NaN
+    // null converts to 0 when calling get_float() on it. We intentionally do not return the bit pattern
+    // for internal Realm representation, because that's a NaN, hence making it harder for the end user
+    // to distinguish between his own NaNs and null
+    CHECK_EQUAL(table->get_float(1, 0), 0);
+
+    table->set_float(1, 0, std::numeric_limits<float>::signaling_NaN());
+    table->set_float(1, 1, std::numeric_limits<float>::quiet_NaN());
+    
+    // Realm may return a signalling/quiet NaN that is different from the signalling/quiet NaN you stored 
+    // (the IEEE standard defines a sequence of bits in the NaN that can have custom contents). Realm does 
+    // not preserve these bits.
+    CHECK(std::isnan(table->get_float(1, 0)));
+    CHECK(std::isnan(table->get_float(1, 1)));
+
+#ifndef _WIN32 // signaling_NaN() broken in VS2015
+    CHECK(null::is_signaling(table->get_float(1, 0)));
+#endif
+
+#ifndef _WIN32 // signaling_NaN() broken in VS2015
+    CHECK(!null::is_signaling(table->get_float(1, 1)));
+#endif 
+
+    CHECK(!table->is_null(1, 0));
+    CHECK(!table->is_null(1, 1));
+
+    table->set_double(3, 0, std::numeric_limits<double>::signaling_NaN());
+    table->set_double(3, 1, std::numeric_limits<double>::quiet_NaN());
+    CHECK(std::isnan(table->get_double(3, 0)));
+    CHECK(std::isnan(table->get_double(3, 1)));
+
+#ifndef _WIN32 // signaling_NaN() broken in VS2015
+    CHECK(null::is_signaling(table->get_double(3, 0)));
+    CHECK(!null::is_signaling(table->get_double(3, 1)));
+#endif 
+
+    CHECK(!table->is_null(3, 0));
+    CHECK(!table->is_null(3, 1));
+
+    // NOTE NOTE Queries on float/double columns that contain user-given NaNs are undefined.
+}
+
+
+// Test error handling and default values (user gives bad column type, is_null() returns false,
+// get_float() must return 0.9 for null entries, etc, etc)
+TEST(Query_Null_DefaultsAndErrorhandling)
+{
+    // Non-nullable columns: Tests is_nullable() and set_null()
+    {
+        Group g;
+        TableRef table = g.add_table("Inventory");
+        table->insert_column(0, type_Int, "Price");
+        table->insert_column(1, type_Float, "Shipping");
+        table->insert_column(2, type_String, "Description");
+        table->insert_column(3, type_Double, "Rating");
+        table->insert_column(4, type_Bool, "Stock");
+        table->insert_column(5, type_DateTime, "Delivery date");
+        table->add_empty_row(1);
+
+        CHECK(!table->is_nullable(0));
+        CHECK(!table->is_nullable(1));
+        CHECK(!table->is_nullable(2));
+        CHECK(!table->is_nullable(3));
+        CHECK(!table->is_nullable(4));
+        CHECK(!table->is_nullable(5));
+
+        // is_null() on non-nullable column returns false. If you want it to throw, then do so
+        // in the language binding
+        CHECK(!table->is_null(0, 0));
+        CHECK(!table->is_null(1, 0));
+        CHECK(!table->is_null(2, 0));
+        CHECK(!table->is_null(3, 0));
+        CHECK(!table->is_null(4, 0));
+        CHECK(!table->is_null(5, 0));
+
+        CHECK_THROW_ANY(table->set_null(0, 0));
+        CHECK_THROW_ANY(table->set_null(1, 0));
+        CHECK_THROW_ANY(table->set_null(2, 0));
+        CHECK_THROW_ANY(table->set_null(3, 0));
+        CHECK_THROW_ANY(table->set_null(4, 0));
+        CHECK_THROW_ANY(table->set_null(5, 0));
+
+        // verify that set_null() did not have any side effects
+        CHECK(!table->is_null(0, 0));
+        CHECK(!table->is_null(1, 0));
+        CHECK(!table->is_null(2, 0));
+        CHECK(!table->is_null(3, 0));
+        CHECK(!table->is_null(4, 0));
+        CHECK(!table->is_null(5, 0));
+    }
+
+    // Nullable columns: Tests that default value is null, and tests is_nullable() and set_null()
+    {
+        Group g;
+        TableRef table = g.add_table("Inventory");
+        table->insert_column(0, type_Int, "Price", true);               // nullable = true
+        table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
+        table->insert_column(2, type_String, "Description", true);      // nullable = true
+        table->insert_column(3, type_Double, "Rating", true);           // nullable = true
+        table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
+        table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
+        table->add_empty_row(1);
+
+        CHECK(table->is_nullable(0));
+        CHECK(table->is_nullable(1));
+        CHECK(table->is_nullable(2));
+        CHECK(table->is_nullable(3));
+        CHECK(table->is_nullable(4));
+        CHECK(table->is_nullable(5));
+
+        // default values should be null
+        CHECK(table->is_null(0, 0));
+        CHECK(table->is_null(1, 0));
+        CHECK(table->is_null(2, 0));
+        CHECK(table->is_null(3, 0));
+        CHECK(table->is_null(4, 0));
+        CHECK(table->is_null(5, 0));
+
+        // calling get() on a numeric column must return following:
+        CHECK_EQUAL(table->get_int(0, 0), 0);
+        CHECK_EQUAL(table->get_float(1, 0), 0.0f);
+        CHECK_EQUAL(table->get_double(3, 0), 0.0);
+        CHECK_EQUAL(table->get_bool(4, 0), false);
+        CHECK_EQUAL(table->get_datetime(5, 0), DateTime(0));
+
+        // Set everything to non-null values
+        table->set_int(0, 0, 0);
+        table->set_float(1, 0, 0.f);
+        table->set_string(2, 0, StringData("", 0));
+        table->set_double(3, 0, 0.);
+        table->set_bool(4, 0, false);
+        table->set_datetime(5, 0, DateTime(0));
+
+        CHECK(!table->is_null(0, 0));
+        CHECK(!table->is_null(1, 0));
+        CHECK(!table->is_null(2, 0));
+        CHECK(!table->is_null(3, 0));
+        CHECK(!table->is_null(4, 0));
+        CHECK(!table->is_null(5, 0));
+
+        table->set_null(0, 0);
+        table->set_null(1, 0);
+        table->set_null(2, 0);
+        table->set_null(3, 0);
+        table->set_null(4, 0);
+        table->set_null(5, 0);
+
+        CHECK(table->is_null(0, 0));
+        CHECK(table->is_null(1, 0));
+        CHECK(table->is_null(2, 0));
+        CHECK(table->is_null(3, 0));
+        CHECK(table->is_null(4, 0));
+        CHECK(table->is_null(5, 0));
+    }
+
+}
+
+TEST(Query_Null)
+{
+    // More thoroughly tests of queries on nullable columns. Work in progress.
+    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
+    {
+        test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
+        for (auto it = indexes.begin(); it != indexes.end(); ++it)
+            test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
+    };
+
+    static_cast<void>(check);
+
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    table->insert_column(0, type_Int, "Price", true);               // nullable = true
+    table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
+    table->insert_column(2, type_String, "Description", true);      // nullable = true
+    table->insert_column(3, type_Double, "Rating", true);           // nullable = true
+    table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
+    table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
+    table->add_empty_row(3);
+
+    table->set_int( 0, 0, 1);
+    table->set_null(0, 1);
+    table->set_int( 0, 2, 3);
+
+    table->set_null(1, 0);
+    table->set_null(1, 1);
+    table->set_float(1, 2, 30.f);
+
+    table->set_string(2, 0, null());
+    table->set_string(2, 1, "foo");
+    table->set_string(2, 2, "bar");
+
+    table->set_double(3, 0, 1.1);
+    table->set_double(3, 1, 2.2);
+    table->set_null(3, 2);
+
+    table->set_bool(4, 0, true);
+    table->set_null(4, 1);
+    table->set_bool(4, 2, false);
+
+    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_null(5, 1);
+    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+
+    Columns<Int> price = table->column<Int>(0);
+    Columns<Float> shipping = table->column<Float>(1);
+    Columns<Double> rating = table->column<Double>(3);
+    Columns<Bool> stock = table->column<Bool>(4);
+    Columns<DateTime> delivery = table->column<DateTime>(5);
+
+    TableView tv;
+
+    /*
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    ----------------------------------------------------------------------------------------------------------------
+    0   1           null                null                    1.1                 true          2016-2-2
+    1   null        null                "foo"                   2.2                 null          null
+    2   3           30.0                "bar"                   null                false         2016-6-6
+    */
+
+    // Nullable doubles in old syntax
+    tv = table->where().equal(3, null()).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().not_equal(3, null()).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = table->where().between(0, 2, 4).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    // between for floats
+    tv = table->where().between(1, 10.f, 40.f).find_all();
+    check(tv, { 2 }, __LINE__);
+
+    tv = table->where().between(1, 0.f, 20.f).find_all();
+    check(tv, {}, __LINE__);
+
+    tv = table->where().between(1, 40.f, 100.f).find_all();
+    check(tv, {}, __LINE__);
+
+    // between for doubles
+    tv = table->where().between(3, 0., 100.).find_all();
+    check(tv, { 0, 1 }, __LINE__);
+
+    tv = table->where().between(3, 1., 2.).find_all();
+    check(tv, { 0 }, __LINE__);
+
+    tv = table->where().between(3, 2., 3.).find_all();
+    check(tv, { 1 }, __LINE__);
+
+    tv = table->where().between(3, 3., 100.).find_all();
+    check(tv, {}, __LINE__);
+}
+
 #endif // TEST_QUERY
+

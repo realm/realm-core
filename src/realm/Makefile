@@ -97,6 +97,7 @@ column_linkbase.hpp \
 column_backlink.hpp \
 column_mixed.hpp \
 column_mixed_tpl.hpp \
+column_type_traits.hpp \
 group_writer.hpp \
 index_string.hpp \
 query_engine.hpp \

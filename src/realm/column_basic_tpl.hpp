@@ -34,7 +34,7 @@ template<class T> class SequentialGetter;
 
 
 template<class T>
-BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref)
+BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
@@ -92,8 +92,10 @@ public:
 template<class T>
 void BasicColumn<T>::set(std::size_t ndx, T value)
 {
+    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this. 
+    T normalized = null::to_realm(value);
     if (!m_array->is_inner_bptree_node()) {
-        static_cast<BasicArray<T>*>(m_array.get())->set(ndx, value); // Throws
+        static_cast<BasicArray<T>*>(m_array.get())->set(ndx, normalized); // Throws
         return;
     }
 
@@ -110,6 +112,8 @@ template<class T> inline void BasicColumn<T>::add(T value)
 
 template<class T> inline void BasicColumn<T>::insert(std::size_t row_ndx, T value)
 {
+    REALM_ASSERT((std::is_same<T, float>::value || std::is_same<T, double>::value));
+
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
@@ -312,6 +316,14 @@ inline void BasicColumn<T>::insert_rows(size_t row_ndx, size_t num_rows_to_inser
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     T value = T();
     do_insert(row_ndx_2, value, num_rows_to_insert); // Throws
+
+    if (is_nullable()) {
+        // Default value for nullable columns is NULL.
+        // FIXME: Make faster with an insert_null method.
+        for (size_t i = 0; i < num_rows_to_insert; ++i) {
+            set_null(row_ndx + i);
+        }
+    }
 }
 
 // Implementing pure virtual method of ColumnBase.
@@ -535,38 +547,44 @@ template<class T>
 typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t begin, std::size_t end,
     std::size_t limit, std::size_t* return_ndx) const
 {
-    return aggregate<T, SumType, act_Sum, None>(*this, 0, begin, end, limit, return_ndx);
+    return aggregate<T, SumType, act_Sum, NotNull>(*this, 0, begin, end, limit, return_ndx);
 }
 template<class T>
 T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Min, None>(*this, 0, begin, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, NotNull>(*this, 0, begin, end, limit, return_ndx);
 }
 
 template<class T>
 T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Max, None>(*this, 0, begin, end, limit, return_ndx);
+    return aggregate<T, T, act_Max, NotNull>(*this, 0, begin, end, limit, return_ndx);
 }
 
 template<class T>
-double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit, size_t* /*return_ndx*/) const
+double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    if (end == npos)
+    if (end == size_t(-1))
         end = size();
+    size_t size = end - begin;
+    
+    // fixme, doesn't look correct
+    if (limit < size)
+        size = limit;
 
-    if(limit != npos && begin + limit < end)
-        end = begin + limit;
-
-    std::size_t size = end - begin;
-    double sum1 = sum(begin, end);
-    double avg = sum1 / ( size == 0 ? 1 : size );
+    auto s = sum(begin, end, limit, return_ndx);
+    size_t cnt = aggregate<T, int64_t, act_Count, NotNull>(*this, 0, begin, end, limit, return_ndx);
+    double avg = double(s) / (cnt == 0 ? 1 : cnt);
     return avg;
 }
 
 template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, std::size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
+
+    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this. 
+    T normalized = null::to_realm(value);
+
     ref_type new_sibling_ref;
     Array::TreeInsert<BasicColumn<T>> state;
     for (std::size_t i = 0; i != num_rows; ++i) {
@@ -574,10 +592,10 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, s
         if (root_is_leaf()) {
             REALM_ASSERT(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array.get());
-            new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state);
+            new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, normalized, state);
         }
         else {
-            state.m_value = value;
+            state.m_value = normalized;
             if (row_ndx_2 == realm::npos) {
                 new_sibling_ref = m_array->bptree_append(state); // Throws
             }
