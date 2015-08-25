@@ -7586,7 +7586,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         CHECK_LESS_EQUAL(File(path).get_size(), page_size() + 4096);
     else
 #endif // REALM_ENABLE_ENCRYPTION
-        CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
+    CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
 }
 
 

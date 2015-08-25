@@ -403,7 +403,6 @@ GroupWriter::search_free_space_in_part_of_freelist(std::size_t size, std::size_t
 std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
     typedef std::pair<std::size_t, std::size_t> Chunk;
-    SlabAlloc& alloc = m_group.m_alloc;
     Chunk chunk;
     bool found;
     // Since we do a first-fit search for small chunks, the top pieces are

@@ -514,7 +514,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             Header* header = writable_map.get_addr();
             header->m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
-            header = reinterpret_cast<Header*>(map.get_addr());
         }
         else {
             const Header* header = reinterpret_cast<const Header*>(map.get_addr());
@@ -718,8 +717,6 @@ void SlabAlloc::reset_free_space_tracking()
 
 void SlabAlloc::remap(size_t file_size)
 {
-    //std::cerr << "------------------------- remap(" << file_size << ") --------------------------" << std::endl;
-
     REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
@@ -734,11 +731,12 @@ void SlabAlloc::remap(size_t file_size)
     if (num_additional_mappings > m_capacity_additional_mappings) {
         // FIXME: No harcoded constants here
         m_capacity_additional_mappings = num_additional_mappings + 128;
-        util::File::Map<char>* new_mappings = new util::File::Map<char>[m_capacity_additional_mappings];
+        std::unique_ptr<util::File::Map<char>[]> new_mappings;
+        new_mappings.reset(new util::File::Map<char>[m_capacity_additional_mappings]);
         for (std::size_t j = 0; j < m_num_additional_mappings; ++j)
             new_mappings[j].move(m_additional_mappings[j]);
         delete[] m_additional_mappings;
-        m_additional_mappings = new_mappings;
+        m_additional_mappings = new_mappings.release();
     }
     for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
     {
