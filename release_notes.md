@@ -7,6 +7,10 @@
 * `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
   handles attributes (nullability etc), sub tables, optimized string columns
   and target link types correctly.
+* Added copy constructor to `BasicRow<Table>` to fix a bug that could lead to
+  unregistered row accessors being created. This bug is also part of a list of
+  blocking issues that prevent the test suite from running when compiled with
+  `-fno-elide-constructors`.
 
 ### API breaking changes:
 
@@ -30,6 +34,7 @@
   Android) are likely to want to use unordered mode everywhere.
 
 ### Enhancements:
+
 * Full null support everywhere and on all column types. See TEST(Query_NullShowcase)
   in test_query.cpp in core repo.
 * Added `Descriptor::get_link_target()`, for completeness.
