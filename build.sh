@@ -1164,7 +1164,7 @@ EOF
     "gdb"|"gdb-debug"|\
     "gdb-testcase"|"gdb-testcase-debug"|\
     "performance"|"benchmark"|"benchmark-"*|\
-    "lcov"|"gcovr")
+    "check-cover"|"check-cover-norun"|"lcov"|"gcovr")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
         $MAKE "$MODE" || exit 1

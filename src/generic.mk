@@ -1534,7 +1534,7 @@ $(foreach x,$(TARGETS_CHECK_PROG_DEBUG),$(NL_TAB)$$(VALGRIND) $$(VALGRIND_FLAGS)
 ifneq ($(strip $(or $(SOURCE_DIRS),$(TARGETS_CHECK_COVER))),)
 check-cover/local: $(TARGETS_CHECK_COVER)
 $(if $(SOURCE_DIRS),$(NL_TAB)$$(RM) $(foreach x,$(SOURCE_DIRS),$(patsubst ./%,%,$(x))*.gcda))
-$(foreach x,$(TARGETS_CHECK_PROG_COVER),$(NL_TAB)-./$(x)$(NEWLINE))
+$(foreach x,$(TARGETS_CHECK_PROG_COVER),$(NL_TAB)./$(x)$(NEWLINE))
 endif
 
 endef

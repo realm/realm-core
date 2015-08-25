@@ -17,6 +17,17 @@
     * `Group`;
     * `Query`;
     * `StringIndex`.
+* `TableView::remove()`, `TableView::remove_last()`, and `TableView::clear()`
+  now take an extra argument of type `RemoveMode` which specifies whether rows
+  must be removed in a way that does, or does not maintain the order of the
+  remaining rows in the underlying table. In any case, the order of remaining
+  rows in the table view is maintained. This is listed as an API breaking change
+  because the situation before this change was confusing, to say the least. In
+  particular, `TableView::clear()` would choose between the ordered and the
+  unordered mode based on whether the underlying table had at least one link (or
+  link list) column. You are strongly advised to revisit all call sites and
+  check that they do the right thing. Note that both bindings (Cocoa and
+  Android) are likely to want to use unordered mode everywhere.
 
 ### Enhancements:
 * Full null support everywhere and on all column types. See TEST(Query_NullShowcase)

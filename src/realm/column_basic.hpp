@@ -61,8 +61,9 @@ public:
     using LeafType = typename GetLeafType<T, false>::type;
     using value_type = T;
 
-    // The FloatColumn and DoubleColumn only exists as class types that support null (there is no separate typed
-    // nullable and non-nullable versions). Both have a ´bool m_nullable´ flag which is set in their constructor
+    // The FloatColumn and DoubleColumn only exists as class types that support
+    // null (there is no separate typed nullable and non-nullable versions).
+    // Both have a `bool m_nullable` flag which is set in their constructor
     // according to the m_spec
     static const bool nullable = true;
     
