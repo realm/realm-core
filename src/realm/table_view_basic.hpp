@@ -166,16 +166,16 @@ private:
 
 public:
     BasicTableView() {}
-    BasicTableView& operator=(BasicTableView tv) { Base::m_impl = std::move(tv.m_impl); return *this; }
+    BasicTableView& operator=(BasicTableView);
     friend BasicTableView move(BasicTableView& tv) { return BasicTableView(&tv); }
 
     // Deleting
-    void clear() { Base::m_impl.clear(); }
-    void remove(size_t ndx) { Base::m_impl.remove(ndx); }
-    void remove_last() { Base::m_impl.remove_last(); }
+    void remove(size_t ndx, RemoveMode underlying_mode = RemoveMode::ordered);
+    void remove_last(RemoveMode underlying_mode = RemoveMode::ordered);
+    void clear(RemoveMode underlying_mode = RemoveMode::ordered);
 
     // Resort after requery
-    void apply_same_order(BasicTableView& order) { Base::m_impl.apply_same_order(order.m_impl); };
+    void apply_same_order(BasicTableView& order) { Base::m_impl.apply_same_order(order.m_impl); }
 
     Tab& get_parent() REALM_NOEXCEPT
     {
@@ -217,15 +217,17 @@ public:
         patch.reset();
     }
 
-    BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch, 
-                   ConstSourcePayload mode)
-        : Base(source, patch, mode)
-    {}
+    BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch,
+                   ConstSourcePayload mode):
+        Base(source, patch, mode)
+    {
+    }
 
-    BasicTableView(BasicTableView<Tab>& source, Handover_patch& patch, 
-                   MutableSourcePayload mode)
-        : Base(source, patch, mode)
-    {}
+    BasicTableView(BasicTableView<Tab>& source, Handover_patch& patch,
+                   MutableSourcePayload mode):
+        Base(source, patch, mode)
+    {
+    }
 
     void apply_patch(TableView::Handover_patch& patch, Group& group)
     {
@@ -305,6 +307,35 @@ private:
     friend class Tab::Query;
 };
 
+
+
+
+// Implementation
+
+template<class Tab>
+inline BasicTableView<Tab>& BasicTableView<Tab>::operator=(BasicTableView tv)
+{
+    Base::m_impl = std::move(tv.m_impl);
+    return *this;
+}
+
+template<class Tab>
+inline void BasicTableView<Tab>::remove(size_t ndx, RemoveMode underlying_mode)
+{
+    Base::m_impl.remove(ndx, underlying_mode);
+}
+
+template<class Tab>
+inline void BasicTableView<Tab>::remove_last(RemoveMode underlying_mode)
+{
+    Base::m_impl.remove_last(underlying_mode);
+}
+
+template<class Tab>
+inline void BasicTableView<Tab>::clear(RemoveMode underlying_mode)
+{
+    Base::m_impl.clear(underlying_mode);
+}
 
 } // namespace realm
 
