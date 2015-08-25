@@ -656,8 +656,8 @@ template<class T> inline BasicRow<T>::BasicRow() REALM_NOEXCEPT
 {
 }
 
-template<class T> inline BasicRow<T>::BasicRow(const BasicRow<T>& row) REALM_NOEXCEPT
-    : RowBase(row)
+template<class T> inline BasicRow<T>::BasicRow(const BasicRow<T>& row) REALM_NOEXCEPT:
+    RowBase(row)
 {
     attach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
 }
