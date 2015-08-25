@@ -63,8 +63,10 @@ public:
     ///
     ///   2   FIXME: Does anybody remember what happened here?
     ///
-    ///   3   Supporting null on string columns broke the file format
-    ///
+    ///   3   Supporting null on string columns broke the file format in following way: Index appends an 'X'
+    ///       character to all strings except the null string, to be able to distinguish between null and
+    ///       empty string.
+    
 #if REALM_NULL_STRINGS == 1
     // Bumped to 3 because of null support of String columns and because of new format of index
     static constexpr int library_file_format = 3;
