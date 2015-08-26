@@ -11,6 +11,8 @@
   unregistered row accessors being created. This bug is also part of a list of
   blocking issues that prevent the test suite from running when compiled with
   `-fno-elide-constructors`.
+* A bug in the `Query` copy constructor has been fixed that could cause asserts
+  due to missing capacity extension in one of the object's internal members.
 
 ### API breaking changes:
 
@@ -49,7 +51,8 @@
 * Added argument to SharedGroup to prevent automatic file format upgrade. If an
   upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
 * The code coverage CI job now builds with the `-fno-elide-constructors` flag,
-  which should improve the depth of the coverage analysis.
+  which should improve the depth of the coverage analysis. All bugs that were
+  blocking the use of this flag have been fixed.
 
 ----------------------------------------------
 
