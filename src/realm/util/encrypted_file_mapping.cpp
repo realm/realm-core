@@ -53,43 +53,6 @@ SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
 {
 }
 
-AESCryptor::AESCryptor(const uint8_t* key) {
-#ifdef __APPLE__
-    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
-    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
-#else
-
-#if defined(__linux__)
-    // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
-    // into every process with every version of Android, so we can get to it
-    // with dlsym
-    // FIXME: Don't know where to write the following info:
-    // on linux, we add -ldl to the linking step to get dlsym to work,
-    // and set LD_PRELOAD to the location of libcrypto when running the executable.
-    // (on linux mint this is currently: "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libcrypto.so")
-    // To be able to debug with gdb, use the command "handle SIGSEGV noprint"
-    // before running the program.
-    dlsym_cast(AES_set_encrypt_key, "AES_set_encrypt_key");
-    dlsym_cast(AES_set_decrypt_key, "AES_set_decrypt_key");
-    dlsym_cast(AES_cbc_encrypt, "AES_cbc_encrypt");
-
-    dlsym_cast(SHA224_Init, "SHA224_Init");
-    dlsym_cast(SHA256_Update, "SHA256_Update");
-    dlsym_cast(SHA256_Final, "SHA256_Final");
-#endif
-    AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
-    AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
-#endif
-    memcpy(m_hmacKey, key + 32, 32);
-}
-
-AESCryptor::~AESCryptor() REALM_NOEXCEPT {
-#ifdef __APPLE__
-    CCCryptorRelease(m_encr);
-    CCCryptorRelease(m_decr);
-#endif
-}
-
 // We have the following constraints here:
 //
 // 1. When writing, we only know which 4k page is dirty, and not what bytes
@@ -172,6 +135,45 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
 
 } // anonymous namespace
 
+AESCryptor::AESCryptor(const uint8_t* key)
+: m_rw_buffer(new char[block_size])
+{
+#ifdef __APPLE__
+    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
+    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
+#else
+
+#if defined(__linux__)
+    // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
+    // into every process with every version of Android, so we can get to it
+    // with dlsym
+    // FIXME: Don't know where to write the following info:
+    // on linux, we add -ldl to the linking step to get dlsym to work,
+    // and set LD_PRELOAD to the location of libcrypto when running the executable.
+    // (on linux mint this is currently: "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libcrypto.so")
+    // To be able to debug with gdb, use the command "handle SIGSEGV noprint"
+    // before running the program.
+    dlsym_cast(AES_set_encrypt_key, "AES_set_encrypt_key");
+    dlsym_cast(AES_set_decrypt_key, "AES_set_decrypt_key");
+    dlsym_cast(AES_cbc_encrypt, "AES_cbc_encrypt");
+
+    dlsym_cast(SHA224_Init, "SHA224_Init");
+    dlsym_cast(SHA256_Update, "SHA256_Update");
+    dlsym_cast(SHA256_Final, "SHA256_Final");
+#endif
+    AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
+    AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
+#endif
+    memcpy(m_hmacKey, key + 32, 32);
+}
+
+AESCryptor::~AESCryptor() REALM_NOEXCEPT {
+#ifdef __APPLE__
+    CCCryptorRelease(m_encr);
+    CCCryptorRelease(m_decr);
+#endif
+}
+
 void AESCryptor::set_file_size(off_t new_size)
 {
     REALM_ASSERT(new_size >= 0);
@@ -225,8 +227,7 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) REALM_NOEXCEPT
 bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
-        char buffer[block_size];
-        ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, block_size);
+        ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
         if (bytes_read == 0)
             return false;
@@ -239,7 +240,7 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
             return false;
         }
 
-        if (!check_hmac(buffer, bytes_read, iv.hmac1)) {
+        if (!check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac1)) {
             // Either the DB is corrupted or we were interrupted between writing the
             // new IV and writing the data
             if (iv.iv2 == 0) {
@@ -247,7 +248,7 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
                 return false;
             }
 
-            if (check_hmac(buffer, bytes_read, iv.hmac2)) {
+            if (check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac2)) {
                 // Un-bump the IV since the write with the bumped IV never actually
                 // happened
                 memcpy(&iv.iv1, &iv.iv2, 32);
@@ -258,14 +259,14 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
                 // required to fill any added space with zeroes, so assume that's
                 // what happened if the buffer is all zeroes
                 for (ssize_t i = 0; i < bytes_read; ++i) {
-                    if (buffer[i] != 0)
+                    if (m_rw_buffer[i] != 0)
                         throw DecryptionFailed();
                 }
                 return false;
             }
         }
 
-        crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));
+        crypt(mode_Decrypt, pos, dst, m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
 
         pos += block_size;
         dst += block_size;
@@ -281,22 +282,21 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) REALM_NO
         iv_table& iv = get_iv_table(fd, pos);
 
         memcpy(&iv.iv2, &iv.iv1, 32);
-        char buffer[block_size];
         do {
             ++iv.iv1;
             // 0 is reserved for never-been-used, so bump if we just wrapped around
             if (iv.iv1 == 0)
                 ++iv.iv1;
 
-            crypt(mode_Encrypt, pos, buffer, src, reinterpret_cast<const char*>(&iv.iv1));
-            calc_hmac(buffer, block_size, iv.hmac1, m_hmacKey);
+            crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
+            calc_hmac(m_rw_buffer.get(), block_size, iv.hmac1, m_hmacKey);
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
         } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
-        check_write(fd, real_offset(pos), buffer, block_size);
+        check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
         pos += block_size;
         src += block_size;

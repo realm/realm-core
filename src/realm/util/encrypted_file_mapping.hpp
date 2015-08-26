@@ -99,6 +99,7 @@ private:
 
     uint8_t m_hmacKey[32];
     std::vector<iv_table> m_iv_buffer;
+    std::unique_ptr<char[]> m_rw_buffer;
 
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;

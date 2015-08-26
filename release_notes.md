@@ -7,6 +7,8 @@
 * `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
   handles attributes (nullability etc), sub tables, optimized string columns
   and target link types correctly.
+* A stackoverflow issue in encrypted_file_mapping. Allocing 4k bytes on the
+  stack would cause some random crashes on small stack size configurations.
 
 ### API breaking changes:
 
