@@ -1880,86 +1880,56 @@ private:
 };
 
 namespace aggregate_operations {
-    template <typename T>
-    class NumericTypeIsRequired {
+    template <typename T, typename Derived, typename R=T>
+    class BaseAggregateOperation {
         static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
                       "Numeric aggregates can only be used with subcolumns of numeric types");
-    };
-
-    template <typename T>
-    class Minimum : private NumericTypeIsRequired<T> {
     public:
-        using ResultType = T;
+        using ResultType = R;
 
         void accumulate(T value)
         {
             m_count++;
-            if (value < m_minimum)
-                m_minimum = value;
+            m_result = Derived::apply(m_result, value);
         }
 
         bool is_null() const { return m_count == 0; }
-        T result() const { return m_minimum; }
+        ResultType result() const { return m_result; }
 
-    private:
-        T m_minimum = std::numeric_limits<T>::max();
+    protected:
         size_t m_count = 0;
+        ResultType m_result = Derived::initial_value();
     };
 
     template <typename T>
-    class Maximum : private NumericTypeIsRequired<T> {
+    class Minimum : public BaseAggregateOperation<T, Minimum<T>> {
     public:
-        using ResultType = T;
-
-        void accumulate(T value)
-        {
-            m_count++;
-            if (value > m_maximum)
-                m_maximum = value;
-        }
-
-        bool is_null() const { return m_count == 0; }
-        T result() const { return m_maximum; }
-
-    private:
-        T m_maximum = std::numeric_limits<T>::min();
-        size_t m_count = 0;
+        static T initial_value() { return std::numeric_limits<T>::max(); }
+        static T apply(T a, T b) { return std::min(a, b); }
     };
 
     template <typename T>
-    class Sum : private NumericTypeIsRequired<T> {
+    class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
     public:
-        using ResultType = T;
+        static T initial_value() { return std::numeric_limits<T>::min(); }
+        static T apply(T a, T b) { return std::max(a, b); }
+    };
 
-        void accumulate(T value)
-        {
-            m_total += value;
-        }
-
+    template <typename T>
+    class Sum : public BaseAggregateOperation<T, Sum<T>> {
+    public:
+        static T initial_value() { return T(); }
+        static T apply(T a, T b) { return a + b; }
         bool is_null() const { return false; }
-        T result() const { return m_total; }
-
-    private:
-        T m_total = 0;
     };
 
     template <typename T>
-    class Average : private NumericTypeIsRequired<T> {
+    class Average : public BaseAggregateOperation<T, Average<T>, double> {
+        using Base = BaseAggregateOperation<T, Average<T>, double>;
     public:
-        using ResultType = double;
-
-        void accumulate(T value)
-        {
-            m_total += value;
-            m_count++;
-        }
-
-        bool is_null() const { return m_count == 0; }
-        double result() const { return m_total / m_count; }
-
-    private:
-        size_t m_count = 0;
-        double m_total = 0;
+        static double initial_value() { return 0; }
+        static double apply(double a, T b) { return a + b; }
+        double result() const { return Base::m_result / Base::m_count; }
     };
 }
 
