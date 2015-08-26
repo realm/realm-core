@@ -48,6 +48,8 @@
 * Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
 * Modifying `Descriptor` methods now throw `LogicError` when appropriate (rather
   than asserting).
+* Allow querying based on the number of rows that a linked list column links to,
+  using expressions like `table->column<LinkList>(0).count() > 5`.
 
 -----------
 

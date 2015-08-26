@@ -6870,5 +6870,96 @@ TEST(Query_Null_ManyRows)
     CHECK(equals(tv, non_nulls));
 }
 
-#endif // TEST_QUERY
+TEST(Query_LinkCounts)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_String, "str");
 
+    table1->add_empty_row();
+    table1->set_string(0, 0, "abc");
+    table1->add_empty_row();
+    table1->set_string(0, 1, "def");
+    table1->add_empty_row();
+    table1->set_string(0, 2, "ghi");
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_int = table2->add_column(type_Int, "int");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 1, 1);
+    table2->set_link(col_link, 1, 1);
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 2, 2);
+    table2->set_link(col_link, 2, 2);
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    Query q;
+    size_t match;
+
+    // Verify that queries against the count of a LinkList column work.
+    q = table2->column<LinkList>(col_linklist).count() == 0;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).count() == 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Verify that queries against the count of a Link column work.
+    q = table2->column<Link>(col_link).count() == 0;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<Link>(col_link).count() == 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Verify that reusing the count expression works.
+    auto link_count = table2->column<LinkList>(col_linklist).count();
+    size_t match_count = (link_count == 0).count();
+    CHECK_EQUAL(1, match_count);
+
+    match_count = (link_count >= 1).count();
+    CHECK_EQUAL(2, match_count);
+
+
+    // Verify that combining the count expression with other queries on the same table works.
+    q = table2->column<LinkList>(col_linklist).count() == 1 && table2->column<Int>(col_int) == 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+#endif // TEST_QUERY
