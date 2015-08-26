@@ -71,6 +71,7 @@ Query::Query(const Query& copy)
     update = copy.update;
     update_override = copy.update_override;
     first = copy.first;
+    first.reserve(copy.first.capacity());
     pending_not = copy.pending_not;
     error_code = copy.error_code;
     m_view = copy.m_view;

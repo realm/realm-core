@@ -5265,6 +5265,22 @@ TEST(Table_RowAccessorCopyAndAssign)
     }
 }
 
+TEST(Table_RowAccessorCopyConstructionBug)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+
+    BasicRowExpr<Table> row_expr(table[0]);
+    BasicRow<Table> row_from_expr(row_expr);
+    BasicRow<Table> row_copy(row_from_expr);
+
+    table.remove(0);
+
+    CHECK_NOT(row_from_expr.is_attached());
+    CHECK_NOT(row_copy.is_attached());
+}
+
 TEST(Table_RowAccessorAssignMultipleTables)
 {
     Table tables[2];

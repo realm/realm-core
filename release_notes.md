@@ -12,6 +12,12 @@
 * Now includes a statically-linked copy of OpenSSL crypto functions rather
   than dynamically linking Androids system OpenSSL to avoid bugs introduced
   by system crypto functions on some devices.
+* Added copy constructor to `BasicRow<Table>` to fix a bug that could lead to
+  unregistered row accessors being created. This bug is also part of a list of
+  blocking issues that prevent the test suite from running when compiled with
+  `-fno-elide-constructors`.
+* A bug in the `Query` copy constructor has been fixed that could cause asserts
+  due to missing capacity extension in one of the object's internal members.
 
 ### API breaking changes:
 
@@ -35,6 +41,7 @@
   Android) are likely to want to use unordered mode everywhere.
 
 ### Enhancements:
+
 * Full null support everywhere and on all column types. See TEST(Query_NullShowcase)
   in test_query.cpp in core repo.
 * Added `Descriptor::get_link_target()`, for completeness.
@@ -48,6 +55,9 @@
 
 * Added argument to SharedGroup to prevent automatic file format upgrade. If an
   upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
+* The code coverage CI job now builds with the `-fno-elide-constructors` flag,
+  which should improve the depth of the coverage analysis. All bugs that were
+  blocking the use of this flag have been fixed.
 
 ----------------------------------------------
 
