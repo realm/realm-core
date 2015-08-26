@@ -26,6 +26,20 @@ librealm (0.91.1~@CODENAME@-1) UNRELEASED; urgency=low
  -- Finn Schiermer Andersen <fsa@realm.io>  Fri, 10 Jul 2015 16:39:23 +0200
 
 
+librealm (0.89.7~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Daniel Povlsen <daniel.povlsen@gmail.com>  Wed, 26 Aug 2015 15:45:23 +0200
+
+
+librealm (0.89.6~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Daniel Povlsen <daniel.povlsen@gmail.com>  Fri, 12 Jun 2015 11:19:17 +0200
+
+
 librealm (0.89.5~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
