@@ -17,8 +17,7 @@ ifeq ($(OS),Darwin)
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
 endif
 
-# FIXME: '-fno-elide-constructors' currently causes Realm to fail
-#CFLAGS_DEBUG += -fno-elide-constructors
+CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
 CFLAGS_GENERAL += -Wextra -pedantic
 CFLAGS_CXX = -std=c++11
@@ -57,9 +56,9 @@ ifneq ($(REALM_HAVE_CONFIG),)
 endif
 
 PROJECT_CFLAGS_DEBUG = -DREALM_DEBUG
-PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER \
+PROJECT_CFLAGS_COVER = $(CFLAGS_DEBUG) $(PROJECT_CFLAGS_DEBUG) -DREALM_COVER \
                        -fno-inline -fno-inline-small-functions \
-                       -fno-default-inline -fno-elide-constructors
+                       -fno-default-inline
 
 # Load dynamic configuration
 ifneq ($(REALM_HAVE_CONFIG),)
