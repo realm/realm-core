@@ -846,6 +846,9 @@ public:
         init(link, values, v);
     }
 
+    Value(const Value& other) = default;
+    Value& operator=(const Value&) = default;
+
     void init(bool link, size_t values, T v) {
         m_storage.init(values, v);
         ValueBase::from_link = link;
@@ -1008,9 +1011,7 @@ public:
 
     virtual Subexpr& clone()
     {
-        Value<T>& n = *new Value<T>();
-        n.m_storage = m_storage;
-        return n;
+        return *new Value<T>(*this);
     }
 
     NullableVector<T> m_storage;
