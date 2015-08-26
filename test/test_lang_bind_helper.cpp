@@ -8151,7 +8151,7 @@ void handover_writer(std::string path)
     Group& g = const_cast<Group&>(sg.begin_read());
     TheTable::Ref table = g.get_table<TheTable>("table");
     Random random(random_int<unsigned long>());
-    for (int i = 1; i < 500; ++i)
+    for (int i = 1; i < 5000; ++i)
     {
         LangBindHelper::promote_to_write(sg, *hist);
         // table holds random numbers >= 1, until the writing process
@@ -8174,7 +8174,12 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
     TestResults& test_results = *test_results_ptr;
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    // We need to ensure that the initial version observed is *before* the final
+    // one written by the writer thread. We do this (simplisticly) by locking on
+    // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
+    Thread writer;
+    writer.start(bind(&handover_writer, path));
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -8199,6 +8204,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
             break;
     }
     sg.end_read();
+    writer.join();
 }
 
 void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control, 
@@ -8230,9 +8236,7 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
 
 } // anonymous namespace
 
-// Disabled as it frequently gets into an indefinite hang. Unknown whether this
-// is a bug in core or in the unit test.
-TEST_IF(LangBindHelper_HandoverBetweenThreads, false)
+TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(p);
     std::string path(p);
@@ -8247,11 +8251,9 @@ TEST_IF(LangBindHelper_HandoverBetweenThreads, false)
     sg.end_read();
 
     HandoverControl<SharedGroup::Handover<TableView>> control;
-    Thread writer, querier, verifier;
-    writer.start(bind(&handover_writer, path));
+    Thread querier, verifier;
     querier.start(bind(&handover_querier, &control, &test_results, path));
     verifier.start(bind(&handover_verifier, &control, &test_results, path));
-    writer.join();
     querier.join();
     verifier.join();
 
@@ -8274,7 +8276,12 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
     TestResults& test_results = *test_results_ptr;
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    // We need to ensure that the initial version observed is *before* the final
+    // one written by the writer thread. We do this (simplisticly) by locking on
+    // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
+    Thread writer;
+    writer.start(bind(&handover_writer, path));
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -8302,6 +8309,7 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
         }
     }
     sg.end_read();
+    writer.join();
 }
 
 void stealing_verifier(HandoverControl<StealingInfo>* control,
@@ -8350,9 +8358,7 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
 
 } // anonymous namespace
 
-// Disabled as it frequently gets into an indefinite hang. Unknown whether this
-// is a bug in core or in the unit test.
-TEST_IF(LangBindHelper_HandoverStealing, false)
+TEST(LangBindHelper_HandoverStealing)
 {
     SHARED_GROUP_TEST_PATH(p);
     std::string path(p);
@@ -8366,12 +8372,10 @@ TEST_IF(LangBindHelper_HandoverStealing, false)
     CHECK(bool(table));
     sg.end_read();
     HandoverControl<StealingInfo> control;
-    Thread writer, querier, verifier;
-    writer.start(bind(&handover_writer, path));
 
+    Thread querier, verifier;
     querier.start(bind(&stealing_querier, &control, &test_results, path));
     verifier.start(bind(&stealing_verifier, &control, &test_results, path));
-    writer.join();
     querier.join();
     verifier.join();
 
