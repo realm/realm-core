@@ -1855,7 +1855,9 @@ public:
             // within the chunk that came from rows that we link to.
             const auto& value_storage = value.m_storage;
             for (size_t value_index = 0; value_index < value.m_values; ) {
-                op.accumulate(value_storage[value_index]);
+                if (!value_storage.is_null(value_index)) {
+                    op.accumulate(value_storage[value_index]);
+                }
                 if (++link_index >= links.size()) {
                     break;
                 }
@@ -1865,7 +1867,11 @@ public:
                 value_index += link - previous_link;
             }
         }
-        destination.import(Value<typename Operation::ResultType>(false, 1, op.result()));
+        if (op.is_null()) {
+            destination.import(Value<null>(false, 1, null()));
+        } else {
+            destination.import(Value<typename Operation::ResultType>(false, 1, op.result()));
+        }
     }
 
 private:
@@ -1887,14 +1893,17 @@ namespace aggregate_operations {
 
         void accumulate(T value)
         {
+            m_count++;
             if (value < m_minimum)
                 m_minimum = value;
         }
 
+        bool is_null() const { return m_count == 0; }
         T result() const { return m_minimum; }
 
     private:
         T m_minimum = std::numeric_limits<T>::max();
+        size_t m_count = 0;
     };
 
     template <typename T>
@@ -1904,14 +1913,17 @@ namespace aggregate_operations {
 
         void accumulate(T value)
         {
+            m_count++;
             if (value > m_maximum)
                 m_maximum = value;
         }
 
+        bool is_null() const { return m_count == 0; }
         T result() const { return m_maximum; }
 
     private:
         T m_maximum = std::numeric_limits<T>::min();
+        size_t m_count = 0;
     };
 
     template <typename T>
@@ -1924,6 +1936,7 @@ namespace aggregate_operations {
             m_total += value;
         }
 
+        bool is_null() const { return false; }
         T result() const { return m_total; }
 
     private:
@@ -1941,11 +1954,8 @@ namespace aggregate_operations {
             m_count++;
         }
 
-        double result() const {
-            if (!m_count)
-                return 0;
-            return m_total / m_count;
-        }
+        bool is_null() const { return m_count == 0; }
+        double result() const { return m_total / m_count; }
 
     private:
         size_t m_count = 0;
