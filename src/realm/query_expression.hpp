@@ -947,7 +947,8 @@ public:
     }
     REALM_FORCEINLINE void export_null(ValueBase& destination) const
     {
-        export2<null>(destination);
+        Value<null>& d = static_cast<Value<null>&>(destination);
+        d.init(from_link, m_values);
     }
 
     REALM_FORCEINLINE void import(const ValueBase& source)
