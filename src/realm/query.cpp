@@ -227,12 +227,6 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
     }
 }
 
-/*
-// use and_query() instead!
-Expression* Query::get_expression() {
-    return (static_cast<ExpressionNode*>(first[first.size()-1]))->m_compare;
-}
-*/
 Query& Query::expression(Expression* compare)
 {
     ParentNode* const p = new ExpressionNode(compare);
