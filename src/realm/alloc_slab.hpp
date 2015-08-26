@@ -66,7 +66,7 @@ public:
     ///   3   Supporting null on string columns broke the file format in following way: Index appends an 'X'
     ///       character to all strings except the null string, to be able to distinguish between null and
     ///       empty string.
-    
+
 #if REALM_NULL_STRINGS == 1
     // Bumped to 3 because of null support of String columns and because of new format of index
     static constexpr int library_file_format = 3;
@@ -380,7 +380,8 @@ private:
     /// function will not detect all forms of corruption, though.
     ///
     /// Initializes `m_file_on_streaming_form`.
-    void validate_buffer(const char* data, std::size_t len, ref_type& top_ref, bool is_shared);
+    void validate_buffer(const char* data, std::size_t len, const std::string& path,
+                         ref_type& top_ref, bool is_shared);
 
     void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
@@ -414,8 +415,8 @@ private:
 // Implementation:
 
 struct InvalidDatabase: util::File::AccessError {
-    InvalidDatabase(const std::string& msg):
-        util::File::AccessError(msg)
+    InvalidDatabase(const std::string& msg, const std::string& path):
+        util::File::AccessError(msg, path)
     {
     }
 };

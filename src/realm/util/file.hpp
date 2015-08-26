@@ -412,30 +412,11 @@ public:
 
     class Streambuf;
 
-    /// Used for any I/O related exception. Note the derived exception
-    /// types that are used for various specific types of errors.
-    struct AccessError: std::runtime_error {
-        AccessError(const std::string& msg): std::runtime_error(msg) {}
-    };
-
-    /// Thrown if the user does not have permission to open or create
-    /// the specified file in the specified access mode.
-    struct PermissionDenied: AccessError {
-        PermissionDenied(const std::string& msg): AccessError(msg) {}
-    };
-
-    /// Thrown if the directory part of the specified path was not
-    /// found, or create_Never was specified and the file did no
-    /// exist.
-    struct NotFound: AccessError {
-        NotFound(const std::string& msg): AccessError(msg) {}
-    };
-
-    /// Thrown if create_Always was specified and the file did already
-    /// exist.
-    struct Exists: AccessError {
-        Exists(const std::string& msg): AccessError(msg) {}
-    };
+    // Exceptions
+    class AccessError;
+    class PermissionDenied;
+    class NotFound;
+    class Exists;
 
 private:
 #ifdef _WIN32
@@ -615,6 +596,47 @@ private:
     // Disable copying
     Streambuf(const Streambuf&);
     Streambuf& operator=(const Streambuf&);
+};
+
+
+
+/// Used for any I/O related exception. Note the derived exception
+/// types that are used for various specific types of errors.
+class File::AccessError: public std::runtime_error {
+public:
+    AccessError(const std::string& msg, const std::string& path);
+
+    /// Return the associated file system path, or the empty string if there is
+    /// no associated file system path, or if the file system path is unknown.
+    std::string get_path() const;
+
+private:
+    std::string m_path;
+};
+
+
+/// Thrown if the user does not have permission to open or create
+/// the specified file in the specified access mode.
+class File::PermissionDenied: public AccessError {
+public:
+    PermissionDenied(const std::string& msg, const std::string& path);
+};
+
+
+/// Thrown if the directory part of the specified path was not
+/// found, or create_Never was specified and the file did no
+/// exist.
+class File::NotFound: public AccessError {
+public:
+    NotFound(const std::string& msg, const std::string& path);
+};
+
+
+/// Thrown if create_Always was specified and the file did already
+/// exist.
+class File::Exists: public AccessError {
+public:
+    Exists(const std::string& msg, const std::string& path);
 };
 
 
@@ -861,6 +883,31 @@ inline void File::Streambuf::flush()
     setp(m_buffer.get(), epptr());
 }
 
+inline File::AccessError::AccessError(const std::string& msg, const std::string& path):
+    std::runtime_error(msg),
+    m_path(path)
+{
+}
+
+inline std::string File::AccessError::get_path() const
+{
+    return m_path;
+}
+
+inline File::PermissionDenied::PermissionDenied(const std::string& msg, const std::string& path):
+    AccessError(msg, path)
+{
+}
+
+inline File::NotFound::NotFound(const std::string& msg, const std::string& path):
+    AccessError(msg, path)
+{
+}
+
+inline File::Exists::Exists(const std::string& msg, const std::string& path):
+    AccessError(msg, path)
+{
+}
 
 } // namespace util
 } // namespace realm

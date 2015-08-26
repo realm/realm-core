@@ -42,14 +42,18 @@
 
 ### Enhancements:
 
-* Full null support everywhere and on all column types. See TEST(Query_NullShowcase)
-  in test_query.cpp in core repo.
+* Full null support everywhere and on all column types. See
+  `TEST(Query_NullShowcase)` in `test_query.cpp` in core repo.
 * Added `Descriptor::get_link_target()`, for completeness.
 * Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
 * Modifying `Descriptor` methods now throw `LogicError` when appropriate (rather
   than asserting).
 * Allow querying based on the number of rows that a linked list column links to,
   using expressions like `table->column<LinkList>(0).count() > 5`.
+* New `util::File::AccessError::get_path()` returns the file system path
+  associated with the exception. Note that exception classes
+  `util::File::PermissionDenied`, `util::File::NotFound`, `util::File::Exists`,
+  and `InvlaidDatabase` are subclasses of `util::File::AccessError`.
 
 -----------
 
