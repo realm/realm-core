@@ -1786,7 +1786,8 @@ public:
 
     void evaluate(size_t, ValueBase&) override
     {
-        REALM_ASSERT(false && "SubColumns can only be used in an expression in conjunction with its aggregate methods (min, max, sum, average).");
+        // SubColumns can only be used in an expression in conjunction with its aggregate methods.
+        REALM_ASSERT(false);
     }
 
     SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
