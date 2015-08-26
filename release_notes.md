@@ -48,6 +48,8 @@
 
 * Added argument to SharedGroup to prevent automatic file format upgrade. If an
   upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
+* The code coverage CI job now builds with the `-fno-elide-constructors` flag,
+  which should improve the depth of the coverage analysis.
 
 ----------------------------------------------
 
