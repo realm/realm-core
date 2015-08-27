@@ -5875,6 +5875,7 @@ TEST(Query_NullStrings)
     
 }
 
+#if REALM_NULL_STRINGS == 1
 
 TEST(Query_Nulls_Fuzzy)
 {
@@ -5990,6 +5991,8 @@ TEST(Query_Nulls_Fuzzy)
         }
     }
 }
+
+#endif
 
 TEST(Query_BinaryNull)
 {

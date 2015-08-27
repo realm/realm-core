@@ -131,6 +131,7 @@ TEST(Upgrade_Database_2_3)
     }
 #endif
 
+#if REALM_NULL_STRINGS == 1
     // Prohibit automatic upgrade by SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
@@ -145,6 +146,7 @@ TEST(Upgrade_Database_2_3)
             SharedGroup(temp_copy, no_create, durability, encryption_key, allow_upgrade),
             FileFormatUpgradeRequired);
     }
+#endif
 
     // Automatic upgrade from SharedGroup
     {
