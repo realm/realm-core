@@ -1745,8 +1745,6 @@ public:
             }
             else          
             {
-                // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo,
-                // benchmark if an unconditional zero out is faster
                 size_t rows = colsize - index;
                 if (rows > ValueBase::default_size)
                     rows = ValueBase::default_size;
