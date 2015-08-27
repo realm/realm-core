@@ -280,7 +280,10 @@ double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) cons
 }
 DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
+    else
+        return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 
 // Minimum
@@ -302,7 +305,10 @@ double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) cons
 }
 DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Max, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
+    else
+        return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
 // Average

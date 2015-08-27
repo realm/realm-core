@@ -6409,6 +6409,7 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     // TableView
     int64_t i;
     double d;
+    DateTime dt;
     tv = table->where().find_all();    
 
     // Integer column
@@ -6440,6 +6441,12 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     CHECK_APPROXIMATELY_EQUAL(d, (1.1 + 2.2 + 3.3) / 3, 0.001);
     d = tv.sum_double(3);
     CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
+
+    // DateTime column
+    dt = tv.maximum_datetime(5);
+    CHECK_EQUAL(dt, DateTime(2016, 6, 6));
+    dt = tv.minimum_datetime(5);
+    CHECK_EQUAL(dt, DateTime(2016, 2, 2));
 
     // NaN
     // null converts to 0 when calling get_float() on it. We intentionally do not return the bit pattern
