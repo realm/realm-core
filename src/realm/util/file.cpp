@@ -89,15 +89,15 @@ void make_dir(const std::string& path)
     switch (err) {
         case EACCES:
         case EROFS:
-            throw File::PermissionDenied(msg);
+            throw File::PermissionDenied(msg, path);
         case EEXIST:
-            throw File::Exists(msg);
+            throw File::Exists(msg, path);
         case ELOOP:
         case EMLINK:
         case ENAMETOOLONG:
         case ENOENT:
         case ENOTDIR:
-            throw File::AccessError(msg);
+            throw File::AccessError(msg, path);
         default:
             throw std::runtime_error(msg);
     }
@@ -122,14 +122,14 @@ void remove_dir(const std::string& path)
         case EPERM:
         case EEXIST:
         case ENOTEMPTY:
-            throw File::PermissionDenied(msg);
+            throw File::PermissionDenied(msg, path);
         case ENOENT:
-            throw File::NotFound(msg);
+            throw File::NotFound(msg, path);
         case ELOOP:
         case ENAMETOOLONG:
         case EINVAL:
         case ENOTDIR:
-            throw File::AccessError(msg);
+            throw File::AccessError(msg, path);
         default:
             throw std::runtime_error(msg);
     }
@@ -295,17 +295,17 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case EACCES:
         case EROFS:
         case ETXTBSY:
-            throw PermissionDenied(msg);
+            throw PermissionDenied(msg, path);
         case ENOENT:
-            throw NotFound(msg);
+            throw NotFound(msg, path);
         case EEXIST:
-            throw Exists(msg);
+            throw Exists(msg, path);
         case EISDIR:
         case ELOOP:
         case ENAMETOOLONG:
         case ENOTDIR:
         case ENXIO:
-            throw AccessError(msg);
+            throw AccessError(msg, path);
         default:
             throw std::runtime_error(msg);
     }
@@ -619,6 +619,7 @@ void File::seek(SizeType position)
 #endif
 }
 
+
 // We might be able to use lseek() with offset=0 as cross platform method, because we fortunatly
 // do not require to operate on files larger than 4 GB on 32-bit platforms
 File::SizeType File::get_file_position()
@@ -880,7 +881,7 @@ void File::remove(const std::string& path)
         return;
     int err = ENOENT;
     std::string msg = get_errno_msg("open() failed: ", err);
-    throw NotFound(msg);
+    throw NotFound(msg, path);
 }
 
 
@@ -901,14 +902,14 @@ bool File::try_remove(const std::string& path)
         case ETXTBSY:
         case EBUSY:
         case EPERM:
-            throw PermissionDenied(msg);
+            throw PermissionDenied(msg, path);
         case ENOENT:
             return false;
         case ELOOP:
         case ENAMETOOLONG:
         case EISDIR: // Returned by Linux when path refers to a directory
         case ENOTDIR:
-            throw AccessError(msg);
+            throw AccessError(msg, path);
         default:
             throw std::runtime_error(msg);
     }
@@ -930,20 +931,21 @@ void File::move(const std::string& old_path, const std::string& new_path)
         case EPERM:
         case EEXIST:
         case ENOTEMPTY:
-            throw PermissionDenied(msg);
+            throw PermissionDenied(msg, old_path);
         case ENOENT:
-            throw File::NotFound(msg);
+            throw File::NotFound(msg, old_path);
         case ELOOP:
         case EMLINK:
         case ENAMETOOLONG:
         case EINVAL:
         case EISDIR:
         case ENOTDIR:
-            throw AccessError(msg);
+            throw AccessError(msg, old_path);
         default:
             throw std::runtime_error(msg);
     }
 }
+
 
 bool File::copy(std::string source, std::string destination)
 {
@@ -968,6 +970,7 @@ bool File::copy(std::string source, std::string destination)
     fclose(dst);
     return true;
 }
+
 
 bool File::is_same_file(const File& f) const
 {
@@ -1042,6 +1045,7 @@ bool File::is_removed() const
 
 #endif
 }
+
 
 void File::set_encryption_key(const char* key)
 {

@@ -192,7 +192,8 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) REALM_NOEXCEPT
     }
 }
 
-bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
+bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size)
+{
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
         ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
