@@ -92,7 +92,7 @@ namespace realm {
 // receiving group. Normally, the thread associated with the sourcing SharedGroup will be
 // responsible for the export operation, while the thread associated with the receiving
 // SharedGroup will do the import operation. This is different for "stealing" - see below.
-// See group_shared.hpp for more details on handover. 
+// See group_shared.hpp for more details on handover.
 //
 // 2b. Stealing
 // This is a special variant of handover, where the sourcing thread/shared group has its
@@ -108,7 +108,7 @@ namespace realm {
 //
 // 3. Iterating a view and changing data
 // The third use case (and a motivator behind the imperative view) is when you want
-// to make changes to the database in accordance with a query result. Imagine you want to 
+// to make changes to the database in accordance with a query result. Imagine you want to
 // find all employees with a salary below a limit and raise their salaries to the limit (pseudocode):
 //
 //    promote_to_write();
@@ -357,7 +357,7 @@ protected:
     // handover machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
-    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
                                                               ConstSourcePayload mode) const
     {
         patch.reset(new Handover_patch);
@@ -365,7 +365,7 @@ protected:
         return move(retval);
     }
 
-    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
                                                               MutableSourcePayload mode)
     {
         patch.reset(new Handover_patch);
@@ -380,9 +380,9 @@ protected:
     }
     // handover machinery entry points based on static type
     void apply_patch(Handover_patch& patch, Group& group);
-    TableViewBase(const TableViewBase& source, Handover_patch& patch, 
+    TableViewBase(const TableViewBase& source, Handover_patch& patch,
                   ConstSourcePayload mode);
-    TableViewBase(TableViewBase& source, Handover_patch& patch, 
+    TableViewBase(TableViewBase& source, Handover_patch& patch,
                   MutableSourcePayload mode);
 
 private:
@@ -409,6 +409,12 @@ inline void TableViewBase::detach() const REALM_NOEXCEPT // may have to remove c
 
 
 class ConstTableView;
+
+
+enum class RemoveMode {
+    ordered,
+    unordered
+};
 
 
 /// A TableView gives read and write access to the parent table.
@@ -461,10 +467,34 @@ public:
     ConstTableRef get_link_target(std::size_t column_ndx) const REALM_NOEXCEPT;
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
-    // Deleting
-    void clear();
-    void remove(std::size_t row_ndx);
-    void remove_last();
+    //@{
+    /// \brief Remove the specified row (or rows) from the underlying table.
+    ///
+    /// remove() removes the specified row from the underlying table,
+    /// remove_last() removes the last row in the table view from the underlying
+    /// table, and clear removes all the rows in the table view from the
+    /// underlying table.
+    ///
+    /// When rows are removed from the underlying table, they will by necessity
+    /// also be removed from the table view.
+    ///
+    /// The order of the remaining rows in the the table view will be maintained
+    /// regardless of the value passed for \a underlying_mode.
+    ///
+    /// \param row_ndx The index within this table view of the row to be
+    /// removed.
+    ///
+    /// \param underlying_mode If set to RemoveMode::ordered (the default), the
+    /// rows will be removed from the underlying table in a way that maintains
+    /// the order of the remaining rows in the underlying table. If set to
+    /// RemoveMode::unordered, the order of the remaining rows in the underlying
+    /// table will not in general be maintaind, but the operation will generally
+    /// be much faster. In any case, the order of remaining rows in the table
+    /// view will not be affected.
+    void remove(size_t row_ndx, RemoveMode underlying_mode = RemoveMode::ordered);
+    void remove_last(RemoveMode underlying_mode = RemoveMode::ordered);
+    void clear(RemoveMode underlying_mode = RemoveMode::ordered);
+    //@}
 
     // Searching (Int and String)
     TableView       find_all_int(size_t column_ndx, int64_t value);
@@ -1089,10 +1119,10 @@ inline ConstTableView::~ConstTableView() REALM_NOEXCEPT
 {
 }
 
-inline void TableView::remove_last()
+inline void TableView::remove_last(RemoveMode underlying_mode)
 {
     if (!is_empty())
-        remove(size()-1);
+        remove(size()-1, underlying_mode);
 }
 
 inline Table& TableView::get_parent() REALM_NOEXCEPT

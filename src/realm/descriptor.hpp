@@ -88,6 +88,12 @@ public:
     /// returns `not_found`.
     std::size_t get_column_index(StringData name) const REALM_NOEXCEPT;
 
+    /// Get whether or not the specified column is nullable.
+    ///
+    /// The consequences of specifying a column index that is out of
+    /// range, are undefined.
+    bool is_nullable(std::size_t column_ndx) const REALM_NOEXCEPT;
+
     //@{
 
     /// add_column() and add_column_link() are a shorthands for calling
@@ -514,6 +520,12 @@ inline DataType Descriptor::get_column_type(std::size_t ndx) const REALM_NOEXCEP
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_public_column_type(ndx);
+}
+
+inline bool Descriptor::is_nullable(std::size_t ndx) const REALM_NOEXCEPT
+{
+    REALM_ASSERT(is_attached());
+    return m_spec->get_column_attr(ndx) & col_attr_Nullable;
 }
 
 inline std::size_t Descriptor::get_column_index(StringData name) const REALM_NOEXCEPT

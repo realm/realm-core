@@ -1784,7 +1784,7 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     size_t size = read_int<size_t>(); // Throws
 
     const std::size_t avail = m_input_end - m_input_begin;
-    if (avail >= std::size_t(size)) {
+    if (avail >= size) {
         m_input_begin += size;
         return StringData(m_input_begin - size, size);
     }

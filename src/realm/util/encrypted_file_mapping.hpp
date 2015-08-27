@@ -29,19 +29,6 @@
 
 #ifdef __APPLE__
 #include <CommonCrypto/CommonCrypto.h>
-#elif defined(REALM_ANDROID)
-// OpenSSL headers aren't part of the NDK, so declare the bits we need manually
-#define AES_ENCRYPT    1
-#define AES_DECRYPT    0
-#define SHA224_DIGEST_LENGTH 28
-
-typedef struct aes_key_st {
-    unsigned long data[61];
-} AES_KEY;
-
-typedef struct SHA256state_st {
-    unsigned int data[28];
-} SHA256_CTX;
 #elif !defined(_WIN32)
 #include <openssl/aes.h>
 #include <openssl/sha.h>
@@ -84,21 +71,9 @@ private:
     AES_KEY m_dctx;
 #endif
 
-#if defined(__linux__)
-    // Loaded at runtime with dysym
-    int (*AES_set_encrypt_key)(const unsigned char *, const int, AES_KEY *);
-    int (*AES_set_decrypt_key)(const unsigned char *, const int, AES_KEY *);
-    void (*AES_cbc_encrypt)(const unsigned char *, unsigned char *,
-                            const unsigned long, const AES_KEY *,
-                            unsigned char *, const int);
-
-    int (*SHA224_Init)(SHA256_CTX *);
-    int (*SHA256_Update)(SHA256_CTX *, const void *, size_t);
-    int (*SHA256_Final)(unsigned char *, SHA256_CTX *);
-#endif
-
     uint8_t m_hmacKey[32];
     std::vector<iv_table> m_iv_buffer;
+    std::unique_ptr<char[]> m_rw_buffer;
 
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
@@ -185,7 +160,7 @@ namespace util {
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
 /// contain valid encrypted data
 struct DecryptionFailed: util::File::AccessError {
-    DecryptionFailed(): util::File::AccessError("Decryption failed") {}
+    DecryptionFailed(): util::File::AccessError("Decryption failed", std::string()) {}
 };
 
 }
