@@ -53,7 +53,7 @@
 * New `util::File::AccessError::get_path()` returns the file system path
   associated with the exception. Note that exception classes
   `util::File::PermissionDenied`, `util::File::NotFound`, `util::File::Exists`,
-  and `InvlaidDatabase` are subclasses of `util::File::AccessError`.
+  and `InvalidDatabase` are subclasses of `util::File::AccessError`.
 
 -----------
 
