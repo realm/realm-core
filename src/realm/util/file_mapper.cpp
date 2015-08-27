@@ -594,7 +594,7 @@ void remove_mapping(void* addr, size_t size)
             if (::close(it->info->fd) != 0) {
                 int err = errno; // Eliminate any risk of clobbering
                 if (err == EBADF || err == EIO) // todo, how do we handle EINTR?
-                    throw std::runtime_error(get_errno_msg("close() failed: ", err));                
+                    throw std::runtime_error(get_errno_msg("close() failed: ", err));
             }
             mappings_by_file.erase(it);
             break;

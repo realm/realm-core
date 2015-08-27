@@ -58,7 +58,7 @@ TEST(LinkList_Basic1)
     CHECK_EQUAL(tv2[0].get_index(), 0);
 
     // Just a few tests for the new string conditions to see if they work with links too.
-    // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp 
+    // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp
     Query q3 = table2->link(col_link2).column<String>(1).contains("A", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(tv3.size(), 1);
@@ -346,7 +346,7 @@ TEST(LinkList_ClearView1)
 
         TableView tv = (table2->link(col_link2).column<String>(1) != "!").find_all();
 
-        tv.clear();
+        tv.clear(RemoveMode::unordered);
         CHECK_EQUAL(1, table2->size());
     }
 
@@ -392,7 +392,7 @@ TEST(LinkList_ClearView1)
 
         TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
 
-        tv.clear();
+        tv.clear(RemoveMode::unordered);
         CHECK_EQUAL(1, table2->size());
     }
 

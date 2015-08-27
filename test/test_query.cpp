@@ -6175,6 +6175,55 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
+void create_columns(TableRef table, bool nullable = true)
+{
+    table->insert_column(0, type_Int, "Price", nullable);               // nullable = true
+    table->insert_column(1, type_Float, "Shipping", nullable);          // nullable = true
+    table->insert_column(2, type_String, "Description", nullable);      // nullable = true
+    table->insert_column(3, type_Double, "Rating", nullable);           // nullable = true
+    table->insert_column(4, type_Bool, "Stock", nullable);              // nullable = true
+    table->insert_column(5, type_DateTime, "Delivery date", nullable);  // nullable = true
+}
+
+bool equals(TableView& tv, std::vector<size_t> indexes)
+{
+    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin())
+        return false;
+
+    for (auto it = indexes.begin(); it != indexes.end(); ++it)
+        if (tv.get_source_ndx(it - indexes.begin()) != *it)
+        return false;
+
+    return true;
+}
+
+void fill_data(TableRef table) {
+    table->add_empty_row(3);
+
+    table->set_int(0, 0, 1);
+    table->set_null(0, 1);
+    table->set_int(0, 2, 3);
+
+    table->set_null(1, 0);
+    table->set_null(1, 1);
+    table->set_float(1, 2, 30.f);
+
+    table->set_string(2, 0, null());
+    table->set_string(2, 1, "foo");
+    table->set_string(2, 2, "bar");
+
+    table->set_double(3, 0, 1.1);
+    table->set_double(3, 1, 2.2);
+    table->set_null(3, 2);
+
+    table->set_bool(4, 0, true);
+    table->set_null(4, 1);
+    table->set_bool(4, 2, false);
+
+    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_null(5, 1);
+    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+}
 
 TEST(Query_NullShowcase)
 {
@@ -6195,6 +6244,8 @@ This does NOT follow SQL! In particular, (null == null) == true and
 
 NOTE NOTE: There is currently only very little syntax checking.
 
+NOTE NOTE: For BinaryData, use BinaryData() instead of null().
+
     Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
     ----------------------------------------------------------------------------------------------------------------
 0   null            null                null                    1.1                 true          2016-2-2
@@ -6202,23 +6253,10 @@ NOTE NOTE: There is currently only very little syntax checking.
 2   20              30.0                "bar"                   3.3                 false         2016-6-6
 */
 
-// todo, create new test with at least 8 rows to trigger Array*::get_chunk
-
-    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
-    {
-        test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
-        for (auto it = indexes.begin(); it != indexes.end(); ++it)
-            test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
-    };
-
     Group g;
     TableRef table = g.add_table("Inventory");
-    table->insert_column(0, type_Int, "Price", true);               // nullable = true
-    table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
-    table->insert_column(2, type_String, "Description", true);      // nullable = true
-    table->insert_column(3, type_Double, "Rating", true);           // nullable = true
-    table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
-    table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
+    create_columns(table);
+
     table->add_empty_row(3); 
 
     // Default values for all nullable columns
@@ -6266,79 +6304,79 @@ NOTE NOTE: There is currently only very little syntax checking.
     TableView tv;
     
     tv = (price == null()).find_all();
-    check(tv, { 0 }, __LINE__);
+    CHECK(equals(tv, { 0 }));
 
     tv = (price != null()).find_all();
-    check(tv, { 1, 2}, __LINE__);
+    CHECK(equals(tv, { 1, 2}));
 
     // Note that this returns rows with null, which differs from SQL!
     tv = (price == shipping).find_all();
-    check(tv, { 0 }, __LINE__); // null == null
+    CHECK(equals(tv, { 0 })); // null == null
 
     // If you add a != null criteria, you would probably get what most users intended, like in SQL
     tv = (price == shipping && price != null()).find_all();
-    check(tv, {}, __LINE__);
+    CHECK(equals(tv, {}));
 
     tv = (price != shipping).find_all();
-    check(tv, { 1, 2 }, __LINE__); // 10 != null
+    CHECK(equals(tv, { 1, 2 })); // 10 != null
     
     tv = (price < 0 || price > 0).find_all();
-    check(tv, { 1, 2 }, __LINE__);
+    CHECK(equals(tv, { 1, 2 }));
 
     // Shows that null + null == null, and 10 + null == null, and null < 100 == false
     tv = (price + shipping < 100).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     //  null < 0 == false
     tv = (price < 0).find_all();
-    check(tv, {}, __LINE__);
+    CHECK(equals(tv, {}));
 
     //  null > 0 == false
     tv = (price == 0).find_all();
-    check(tv, {}, __LINE__);
+    CHECK(equals(tv, {}));
 
     // (null == 0) == false
     tv = (price > 0).find_all();
-    check(tv, { 1, 2 }, __LINE__);
+    CHECK(equals(tv, { 1, 2 }));
 
 
     // Doubles
     // (null > double) == false
     tv = (price > rating).find_all();
-    check(tv, { 1, 2 }, __LINE__);
+    CHECK(equals(tv, { 1, 2 }));
     
     tv = (price + rating == null()).find_all();
-    check(tv, { 0 }, __LINE__);
+    CHECK(equals(tv, { 0 }));
 
     tv = (price + rating != null()).find_all();
-    check(tv, { 1, 2 }, __LINE__);
+    CHECK(equals(tv, { 1, 2 }));
 
 
     // Booleans
     tv = (stock == true).find_all();
-    check(tv, { 0 }, __LINE__);
+    CHECK(equals(tv, { 0 }));
 
     tv = (stock == false).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     tv = (stock == null()).find_all();
-    check(tv, { 1 }, __LINE__);
+    CHECK(equals(tv, { 1 }));
 
     tv = (stock != null()).find_all();
-    check(tv, { 0, 2 }, __LINE__);
+    CHECK(equals(tv, { 0, 2 }));
 
     // Dates
     tv = (delivery == DateTime(2016, 6, 6)).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     tv = (delivery != DateTime(2016, 6, 6)).find_all();
-    check(tv, { 0, 1 }, __LINE__);
+    CHECK(equals(tv, { 0, 1 }));
 
     tv = (delivery == null()).find_all();
-    check(tv, { 1 }, __LINE__);
+    CHECK(equals(tv, { 1 }));
 
     tv = (delivery != null()).find_all();
-    check(tv, { 0, 2 }, __LINE__);
+    CHECK(equals(tv, { 0, 2 }));
 
 
     // Not valid syntaxes. Only == and != can be used with user-given null argument.
@@ -6347,26 +6385,26 @@ NOTE NOTE: There is currently only very little syntax checking.
 
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
-    check(tv, { 0 }, __LINE__);
+    CHECK(equals(tv, { 0 }));
 
     tv = table->where().not_equal(0, null()).find_all();
-    check(tv, { 1, 2 }, __LINE__);
+    CHECK(equals(tv, { 1, 2 }));
     
     // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
     CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
     tv = table->where().equal(1, null()).find_all();
-    check(tv, { 0, 1 }, __LINE__);
+    CHECK(equals(tv, { 0, 1 }));
 
     tv = table->where().not_equal(1, null()).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     tv = table->where().greater(1, 0.0f).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     tv = table->where().less(1, 20.0f).find_all();
-    check(tv, { }, __LINE__);
+    CHECK(equals(tv, { }));
 
     // TableView
     int64_t i;
@@ -6454,12 +6492,8 @@ TEST(Query_Null_DefaultsAndErrorhandling)
     {
         Group g;
         TableRef table = g.add_table("Inventory");
-        table->insert_column(0, type_Int, "Price");
-        table->insert_column(1, type_Float, "Shipping");
-        table->insert_column(2, type_String, "Description");
-        table->insert_column(3, type_Double, "Rating");
-        table->insert_column(4, type_Bool, "Stock");
-        table->insert_column(5, type_DateTime, "Delivery date");
+        create_columns(table, false /* nullability */);
+
         table->add_empty_row(1);
 
         CHECK(!table->is_nullable(0));
@@ -6498,12 +6532,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
     {
         Group g;
         TableRef table = g.add_table("Inventory");
-        table->insert_column(0, type_Int, "Price", true);               // nullable = true
-        table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
-        table->insert_column(2, type_String, "Description", true);      // nullable = true
-        table->insert_column(3, type_Double, "Rating", true);           // nullable = true
-        table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
-        table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
+        create_columns(table);
         table->add_empty_row(1);
 
         CHECK(table->is_nullable(0));
@@ -6557,57 +6586,20 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         CHECK(table->is_null(4, 0));
         CHECK(table->is_null(5, 0));
     }
-
 }
 
-TEST(Query_Null)
+// Tests queries that compare two columns with eachother in various ways. The columns have different
+// integral types
+TEST(Query_Null_Two_Columns)
 {
-    // More thoroughly tests of queries on nullable columns. Work in progress.
-    auto check = [&](TableView& tv, std::initializer_list<size_t> indexes, int line)
-    {
-        test_results.check_equal(tv.size(), indexes.end() - indexes.begin(), __FILE__, line, "", "");
-        for (auto it = indexes.begin(); it != indexes.end(); ++it)
-            test_results.check_equal(tv.get_source_ndx(it - indexes.begin()), *it, __FILE__, line, "", "");
-    };
-
-    static_cast<void>(check);
-
     Group g;
     TableRef table = g.add_table("Inventory");
-    table->insert_column(0, type_Int, "Price", true);               // nullable = true
-    table->insert_column(1, type_Float, "Shipping", true);          // nullable = true
-    table->insert_column(2, type_String, "Description", true);      // nullable = true
-    table->insert_column(3, type_Double, "Rating", true);           // nullable = true
-    table->insert_column(4, type_Bool, "Stock", true);              // nullable = true
-    table->insert_column(5, type_DateTime, "Delivery date", true);  // nullable = true
-    table->add_empty_row(3);
-
-    table->set_int( 0, 0, 1);
-    table->set_null(0, 1);
-    table->set_int( 0, 2, 3);
-
-    table->set_null(1, 0);
-    table->set_null(1, 1);
-    table->set_float(1, 2, 30.f);
-
-    table->set_string(2, 0, null());
-    table->set_string(2, 1, "foo");
-    table->set_string(2, 2, "bar");
-
-    table->set_double(3, 0, 1.1);
-    table->set_double(3, 1, 2.2);
-    table->set_null(3, 2);
-
-    table->set_bool(4, 0, true);
-    table->set_null(4, 1);
-    table->set_bool(4, 2, false);
-
-    table->set_datetime(5, 0, DateTime(2016, 2, 2));
-    table->set_null(5, 1);
-    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+    create_columns(table);
+    fill_data(table);
 
     Columns<Int> price = table->column<Int>(0);
     Columns<Float> shipping = table->column<Float>(1);
+    Columns<String> description = table->column<String>(2);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
@@ -6622,39 +6614,352 @@ TEST(Query_Null)
     2   3           30.0                "bar"                   null                false         2016-6-6
     */
 
-    // Nullable doubles in old syntax
+    tv = (shipping > rating).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (shipping < rating).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (price == rating).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (price != rating).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (shipping == rating).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (shipping != rating).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    // Comparison column with itself
+    tv = (shipping == shipping).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (shipping > shipping).find_all();
+    CHECK(equals(tv, { }));
+
+    tv = (shipping < shipping).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (shipping <= shipping).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (shipping >= shipping).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (rating == rating).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (rating != rating).find_all();
+    CHECK(equals(tv, { }));
+
+    tv = (rating > rating).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (rating < rating).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (rating >= rating).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (rating <= rating).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (stock == stock).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (stock != stock).find_all();
+    CHECK(equals(tv, { }));
+
+    tv = (price == price).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (price != price).find_all();
+    CHECK(equals(tv, { }));
+
+    tv = (price > price).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (price < price).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (price >= price).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (price <= price).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (delivery == delivery).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (delivery != delivery).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (delivery > delivery).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (delivery < delivery).find_all();
+    CHECK(equals(tv, {}));
+
+    tv = (delivery >= delivery).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (delivery <= delivery).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (description == description).find_all();
+    CHECK(equals(tv, { 0, 1, 2 }));
+
+    tv = (description != description).find_all();
+    CHECK(equals(tv, {}));
+
+    // integer + null == null
+    // note: booleans can convert to 0 and 1 when compared agaist numeric values, like in c++
+    tv = (price + shipping == stock).find_all();
+    CHECK(equals(tv, { 1 }));
+
+    // Test a few untested things
     tv = table->where().equal(3, null()).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     tv = table->where().not_equal(3, null()).find_all();
-    check(tv, { 0, 1 }, __LINE__);
+    CHECK(equals(tv, { 0, 1 }));
 
     tv = table->where().between(0, 2, 4).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     // between for floats
     tv = table->where().between(1, 10.f, 40.f).find_all();
-    check(tv, { 2 }, __LINE__);
+    CHECK(equals(tv, { 2 }));
 
     tv = table->where().between(1, 0.f, 20.f).find_all();
-    check(tv, {}, __LINE__);
+    CHECK(equals(tv, {}));
 
     tv = table->where().between(1, 40.f, 100.f).find_all();
-    check(tv, {}, __LINE__);
+    CHECK(equals(tv, {}));
 
     // between for doubles
     tv = table->where().between(3, 0., 100.).find_all();
-    check(tv, { 0, 1 }, __LINE__);
+    CHECK(equals(tv, { 0, 1 }));
 
     tv = table->where().between(3, 1., 2.).find_all();
-    check(tv, { 0 }, __LINE__);
+    CHECK(equals(tv, { 0 }));
 
     tv = table->where().between(3, 2., 3.).find_all();
-    check(tv, { 1 }, __LINE__);
+    CHECK(equals(tv, { 1 }));
 
     tv = table->where().between(3, 3., 100.).find_all();
-    check(tv, {}, __LINE__);
+    CHECK(equals(tv, {}));
+
+}
+
+// Between, count, min and max
+TEST(Query_Null_BetweenMinMax)
+{
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    create_columns(table);
+    fill_data(table);
+
+    /*
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    ----------------------------------------------------------------------------------------------------------------
+    0   1           null                null                    1.1                 true          2016-2-2
+    1   null        null                "foo"                   2.2                 null          null
+    2   3           30.0                "bar"                   null                false         2016-6-6
+    */
+
+    
+}
+
+// If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works by
+// creating a large table with nulls in arbitrary places and query for nulls. Verify the search result manually.
+// Do that for all Realm types.
+TEST(Query_Null_ManyRows)
+{
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    create_columns(table);
+
+    Columns<Int> price = table->column<Int>(0);
+    Columns<Float> shipping = table->column<Float>(1);
+    Columns<String> description = table->column<String>(2);
+    Columns<Double> rating = table->column<Double>(3);
+    Columns<Bool> stock = table->column<Bool>(4);
+    Columns<DateTime> delivery = table->column<DateTime>(5);
+
+    // Create lots of non-null rows
+    for (size_t t = 0; t < 2000; t++) {
+        table->add_empty_row(1);
+        table->set_int(0, t, 123);
+        table->set_float(1, t, 30.f);
+        table->set_string(2, t, "foo");
+        table->set_double(3, t, 12.3);
+        table->set_bool(4, t, true);
+        table->set_datetime(5, t, DateTime(2016, 2, 2));
+    }
+
+    // Reference lists used to verify query results
+    std::vector<size_t> nulls;          // List of rows that have all fields set to null
+    std::vector<size_t> non_nulls;      // List of non-null rows
+
+    // Fill in nulls in random rows, at each 10'th row on average
+    for (size_t t = 0; t < table->size() / 10; t++) {
+        // Bad but fast random generator
+        size_t prime = 883;
+        size_t random = ((t + prime) * prime + t) % table->size();
+
+        // Test if already null (simplest way to avoid dublicates in our nulls vector)
+        if (!table->is_null(0, random)) {
+            table->set_null(0, random);
+            table->set_null(1, random);
+            table->set_null(2, random);
+            table->set_null(3, random);
+            table->set_null(4, random);
+            table->set_null(5, random);
+            nulls.push_back(random);
+        }
+    }
+
+    // Fill out non_nulls vector
+    for (size_t t = 0; t < table->size(); t++) {
+        if (!table->is_null(0, t))
+            non_nulls.push_back(t);
+    }
+
+    std::sort(nulls.begin(), nulls.end(), [](size_t a, size_t b) { return b > a; });
+    TableView tv;
+
+    // Search for nulls and non-nulls and verify matches against our manually created `nulls` and non_nulls vectors.
+    // Do that for all Realm data types
+    tv = (price == null()).find_all();
+    CHECK(equals(tv, nulls));
+
+    tv = (price != null()).find_all();
+    CHECK(equals(tv, non_nulls));
+
+    tv = (shipping == null()).find_all();
+    CHECK(equals(tv, nulls));
+
+    tv = (shipping != null()).find_all();
+    CHECK(equals(tv, non_nulls));
+
+    tv = (description == null()).find_all();
+    CHECK(equals(tv, nulls));
+
+    tv = (description != null()).find_all();
+    CHECK(equals(tv, non_nulls));
+
+    tv = (rating == null()).find_all();
+    CHECK(equals(tv, nulls));
+
+    tv = (rating != null()).find_all();
+    CHECK(equals(tv, non_nulls));
+
+    tv = (stock == null()).find_all();
+    CHECK(equals(tv, nulls));
+
+    tv = (stock != null()).find_all();
+    CHECK(equals(tv, non_nulls));
+
+    tv = (delivery == null()).find_all();
+    CHECK(equals(tv, nulls));
+
+    tv = (delivery != null()).find_all();
+    CHECK(equals(tv, non_nulls));
+}
+
+TEST(Query_LinkCounts)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_String, "str");
+
+    table1->add_empty_row();
+    table1->set_string(0, 0, "abc");
+    table1->add_empty_row();
+    table1->set_string(0, 1, "def");
+    table1->add_empty_row();
+    table1->set_string(0, 2, "ghi");
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_int = table2->add_column(type_Int, "int");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 1, 1);
+    table2->set_link(col_link, 1, 1);
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    table2->set_int(col_int, 2, 2);
+    table2->set_link(col_link, 2, 2);
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    Query q;
+    size_t match;
+
+    // Verify that queries against the count of a LinkList column work.
+    q = table2->column<LinkList>(col_linklist).count() == 0;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).count() == 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Verify that queries against the count of a Link column work.
+    q = table2->column<Link>(col_link).count() == 0;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<Link>(col_link).count() == 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Verify that reusing the count expression works.
+    auto link_count = table2->column<LinkList>(col_linklist).count();
+    size_t match_count = (link_count == 0).count();
+    CHECK_EQUAL(1, match_count);
+
+    match_count = (link_count >= 1).count();
+    CHECK_EQUAL(2, match_count);
+
+
+    // Verify that combining the count expression with other queries on the same table works.
+    q = table2->column<LinkList>(col_linklist).count() == 1 && table2->column<Int>(col_int) == 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
 }
 
 #endif // TEST_QUERY
-

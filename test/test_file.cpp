@@ -52,6 +52,7 @@ TEST(File_ExistsAndRemove)
     CHECK(!File::try_remove(path));
 }
 
+
 TEST(File_IsSame)
 {
     TEST_PATH(path_1);
@@ -67,6 +68,7 @@ TEST(File_IsSame)
         CHECK(!f2.is_same_file(f3));
     }
 }
+
 
 TEST(File_Streambuf)
 {
@@ -91,6 +93,7 @@ TEST(File_Streambuf)
     }
 }
 
+
 TEST(File_Map)
 {
     TEST_PATH(path);
@@ -111,6 +114,7 @@ TEST(File_Map)
         CHECK(memcmp(map.get_addr(), data, len) == 0);
     }
 }
+
 
 TEST(File_MapMultiplePages)
 {
@@ -139,6 +143,7 @@ TEST(File_MapMultiplePages)
     }
 }
 
+
 TEST(File_ReaderAndWriter)
 {
     const size_t count = 4096 / sizeof(size_t) * 256 * 2;
@@ -163,6 +168,7 @@ TEST(File_ReaderAndWriter)
             return;
     }
 }
+
 
 TEST(File_MultipleWriters)
 {
@@ -200,6 +206,7 @@ TEST(File_MultipleWriters)
     }
 }
 
+
 TEST(File_SetEncryptionKey)
 {
     TEST_PATH(path);
@@ -212,6 +219,7 @@ TEST(File_SetEncryptionKey)
     CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
 #endif
 }
+
 
 #ifndef _WIN32
 
@@ -233,6 +241,7 @@ TEST(File_ReadWrite)
 }
 
 #endif
+
 
 TEST(File_Resize)
 {
@@ -282,6 +291,25 @@ TEST(File_Resize)
                 return;
         }
     }
+}
+
+
+TEST(File_NotFound)
+{
+    TEST_PATH(path);
+    File file;
+    CHECK_THROW_EX(file.open(path), File::NotFound, e.get_path() == std::string(path));
+}
+
+
+TEST(File_Exists)
+{
+    TEST_PATH(path);
+    File file;
+    file.open(path, File::mode_Write); // Create the file
+    file.close();
+    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc),
+                   File::Exists, e.get_path() == std::string(path));
 }
 
 #endif // TEST_FILE
