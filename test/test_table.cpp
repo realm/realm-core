@@ -5980,6 +5980,11 @@ TEST(Table_Nulls)
         CHECK_EQUAL(false, t.get_bool(1, 0));
         CHECK_EQUAL(DateTime(3), t.get_datetime(2, 0));
 
+        CHECK_EQUAL(65, t.maximum_int(0));
+        CHECK_EQUAL(65, t.minimum_int(0));
+        CHECK_EQUAL(DateTime(3), t.maximum_datetime(2));
+        CHECK_EQUAL(DateTime(3), t.minimum_datetime(2));
+
         CHECK(!t.is_null(0, 0));
         CHECK(!t.is_null(1, 0));
         CHECK(!t.is_null(2, 0));
