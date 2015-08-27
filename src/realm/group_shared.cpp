@@ -561,6 +561,7 @@ void SharedGroup::do_open_1(const std::string& path, bool no_create_file, Durabi
     // throws, it must leave the file closed.
 
     do_open_2(path, no_create_file, durability, is_backend, encryption_key); // Throws
+#if REALM_NULL_STRINGS == 1
     try {
         upgrade_file_format(allow_upgrafe_file_format); // Throws
     }
@@ -568,6 +569,9 @@ void SharedGroup::do_open_1(const std::string& path, bool no_create_file, Durabi
         close();
         throw;
     }
+#else
+    static_cast<void>(allow_upgrafe_file_format);
+#endif
 }
 
 
