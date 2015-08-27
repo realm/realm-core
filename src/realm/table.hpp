@@ -714,15 +714,26 @@ public:
     TableRef get_table_ref() { return TableRef(this); }
     ConstTableRef get_table_ref() const { return ConstTableRef(this); }
 
-    /// Compare two tables for equality. Two tables are equal if, and
-    /// only if, they contain the same columns and rows in the same
-    /// order, that is, for each value V of type T at column index C
-    /// and row index R in one of the tables, there is a value of type
-    /// T at column index C and row index R in the other table that
-    /// is equal to V.
+    /// \brief Compare two tables for equality.
+    ///
+    /// Two tables are equal if they have equal descriptors
+    /// (`Descriptor::operator==()`) and equal contents. Equal descriptors imply
+    /// that the two tables have the same columns in the same order. Equal
+    /// contents means that the two tables must have the same number of rows,
+    /// and that for each row index, the two rows must have the same values in
+    /// each column.
+    ///
+    /// In mixed columns, both the value types and the values are required to be
+    /// equal.
+    ///
+    /// For a particular row and column, if the two values are themselves tables
+    /// (subtable and mixed columns) value equality implies a recursive
+    /// invocation of `Table::operator==()`.
     bool operator==(const Table&) const;
 
-    /// Compare two tables for inequality. See operator==().
+    /// \brief Compare two tables for inequality.
+    ///
+    /// See operator==().
     bool operator!=(const Table& t) const;
 
     /// A subtable in a column of type 'table' (which shares descriptor with
@@ -1167,6 +1178,9 @@ private:
 
     //@}
 
+    /// Used by query. Follows chain of link columns and returns final target table
+    const Table* get_link_chain_target(const std::vector<size_t>& link_chain) const;
+
     /// Remove the specified row by the 'move last over' method.
     void do_move_last_over(std::size_t row_ndx);
 
@@ -1304,7 +1318,6 @@ private:
     template<class> friend class util::bind_ptr;
     friend class LangBindHelper;
     friend class TableViewBase;
-    friend class TableView;
     template<class T> friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
@@ -1386,13 +1399,13 @@ inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
 inline void Table::remove(size_t row_ndx)
 {
     bool is_move_last_over = false;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_ndx, is_move_last_over); // Throws
 }
 
 inline void Table::move_last_over(size_t row_ndx)
 {
     bool is_move_last_over = true;
-    erase_row(row_ndx, is_move_last_over); // Throws;
+    erase_row(row_ndx, is_move_last_over); // Throws
 }
 
 inline void Table::remove_last()
@@ -1601,6 +1614,24 @@ template<class T> inline Columns<T> Table::column(std::size_t column)
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
         tmp.push_back(column);
     }
+
+    // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our 
+    // type traits (all the is_same() cases below).
+    const Table* table = get_link_chain_target(m_link_chain);
+
+    realm::DataType ct = table->get_column_type(column);
+    if (std::is_same<T, int64_t>::value && ct != type_Int)
+        throw(LogicError::type_mismatch);
+    else if (std::is_same<T, bool>::value && ct != type_Bool)
+        throw(LogicError::type_mismatch);
+    else if (std::is_same<T, realm::DataType>::value && ct != type_DateTime)
+        throw(LogicError::type_mismatch);
+    else if (std::is_same<T, float>::value && ct != type_Float)
+        throw(LogicError::type_mismatch);
+    else if (std::is_same<T, double>::value && ct != type_Double)
+        throw(LogicError::type_mismatch);
+
+
     m_link_chain.clear();
     return Columns<T>(column, this, tmp);
 }
@@ -2060,6 +2091,17 @@ public:
         table.do_set_link_type(column_ndx, link_type); // Throws
     }
 
+    static void erase_row(Table& table, size_t row_ndx, bool is_move_last_over)
+    {
+        table.erase_row(row_ndx, is_move_last_over); // Throws
+    }
+
+    static void batch_erase_rows(Table& table, const IntegerColumn& row_indexes,
+                                 bool is_move_last_over)
+    {
+        table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
+    }
+
     static void clear_root_table_desc(const Table& root_table) REALM_NOEXCEPT
     {
         REALM_ASSERT(!root_table.has_shared_type());
@@ -2204,9 +2246,24 @@ public:
         return table.is_cross_table_link_target();
     }
 
+    static Group* get_parent_group(const Table& table) REALM_NOEXCEPT
+    {
+        return table.get_parent_group();
+    }
+
     static Replication* get_repl(Table& table) REALM_NOEXCEPT
     {
         return table.get_repl();
+    }
+
+    static void register_view(Table& table, const TableViewBase* view)
+    {
+        table.register_view(view); // Throws
+    }
+
+    static void unregister_view(Table& table, const TableViewBase* view) REALM_NOEXCEPT
+    {
+        table.unregister_view(view);
     }
 };
 

@@ -2,7 +2,22 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
+  same file if opened from two places simultaneously)
+* `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
+  handles attributes (nullability etc), sub tables, optimized string columns
+  and target link types correctly.
+* A stackoverflow issue in encrypted_file_mapping. Allocing 4k bytes on the
+  stack would cause some random crashes on small stack size configurations.
+* Now includes a statically-linked copy of OpenSSL crypto functions rather
+  than dynamically linking Androids system OpenSSL to avoid bugs introduced
+  by system crypto functions on some devices.
+* Added copy constructor to `BasicRow<Table>` to fix a bug that could lead to
+  unregistered row accessors being created. This bug is also part of a list of
+  blocking issues that prevent the test suite from running when compiled with
+  `-fno-elide-constructors`.
+* A bug in the `Query` copy constructor has been fixed that could cause asserts
+  due to missing capacity extension in one of the object's internal members.
 
 ### API breaking changes:
 
@@ -13,10 +28,32 @@
     * `Group`;
     * `Query`;
     * `StringIndex`.
+* `TableView::remove()`, `TableView::remove_last()`, and `TableView::clear()`
+  now take an extra argument of type `RemoveMode` which specifies whether rows
+  must be removed in a way that does, or does not maintain the order of the
+  remaining rows in the underlying table. In any case, the order of remaining
+  rows in the table view is maintained. This is listed as an API breaking change
+  because the situation before this change was confusing, to say the least. In
+  particular, `TableView::clear()` would choose between the ordered and the
+  unordered mode based on whether the underlying table had at least one link (or
+  link list) column. You are strongly advised to revisit all call sites and
+  check that they do the right thing. Note that both bindings (Cocoa and
+  Android) are likely to want to use unordered mode everywhere.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Full null support everywhere and on all column types. See
+  `TEST(Query_NullShowcase)` in `test_query.cpp` in core repo.
+* Added `Descriptor::get_link_target()`, for completeness.
+* Added extra `allow_file_format_upgrade` argument to `SharedGroup::open()`.
+* Modifying `Descriptor` methods now throw `LogicError` when appropriate (rather
+  than asserting).
+* Allow querying based on the number of rows that a linked list column links to,
+  using expressions like `table->column<LinkList>(0).count() > 5`.
+* New `util::File::AccessError::get_path()` returns the file system path
+  associated with the exception. Note that exception classes
+  `util::File::PermissionDenied`, `util::File::NotFound`, `util::File::Exists`,
+  and `InvalidDatabase` are subclasses of `util::File::AccessError`.
 
 -----------
 
@@ -24,6 +61,9 @@
 
 * Added argument to SharedGroup to prevent automatic file format upgrade. If an
   upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
+* The code coverage CI job now builds with the `-fno-elide-constructors` flag,
+  which should improve the depth of the coverage analysis. All bugs that were
+  blocking the use of this flag have been fixed.
 
 ----------------------------------------------
 
@@ -34,14 +74,6 @@
 * Reverted prelinking of static libraries on Apple platforms as it caused
   `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
   when sorting by integer or floating point columns.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
 
 -----------
 
@@ -218,6 +250,21 @@ StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
 is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.7 Release notes
+
+### Bugfixes:
+
+* A stackoverflow issue in encrypted_file_mapping. Allocing 4k bytes on the
+  stack would cause some random crashes on small stack size configurations.
+* Now includes a statically-linked copy of OpenSSL crypto functions rather
+  than dynamically linking Androids system OpenSSL to avoid bugs introduced
+  by system crypto functions on some devices.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.90.0, 0.92.1].**
 
 ----------------------------------------------
 

@@ -120,7 +120,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
 
-        table->add_column(type_String, "name", true);
+        table->add_column(type_String, "name", true); // nullable = true
         table->add_empty_row();
 
         CHECK(table->get_string(0, 0).is_null());
@@ -137,7 +137,29 @@ TEST(Table_Null)
         CHECK(!table->get_string(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
-        CHECK_THROW_ANY(table->set_string(0, 0, realm::null()));
+        CHECK_LOGIC_ERROR(table->set_string(0, 0, realm::null()), LogicError::column_not_nullable);
+    }
+
+    {
+        // Check that add_empty_row() adds null integer as default
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column(type_Int, "name", true /*nullable*/);
+        table->add_empty_row();
+        CHECK(table->is_null(0, 0));
+    }
+
+    {
+        // Check that add_empty_row() adds 0 integer as default.
+        Group group;
+        TableRef table = group.add_table("test");
+        table->add_column(type_Int, "name");
+        table->add_empty_row();
+        CHECK(!table->is_null(0, 0));
+        CHECK_EQUAL(0, table->get_int(0, 0));
+
+        // Check that inserting null in non-nullable column will throw
+        CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
     }
 
     {
@@ -145,7 +167,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
 
-        table->add_column(type_Binary, "name", true);
+        table->add_column(type_Binary, "name", true /*nullable*/);
         table->add_empty_row();
 
         CHECK(table->get_binary(0, 0).is_null());
@@ -550,7 +572,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         table.add_column(type_Binary,   "binary");           //  9
         table.add_column(type_Table,    "tables", &sub1);    // 10
         table.add_column(type_Mixed,    "mixed");            // 11
-        table.add_column(type_Int,      "int_null", true);   // 12
+        table.add_column(type_Int,      "int_null", true);   // 12, nullable = true
         sub1->add_column(type_Int,        "sub_first");
         sub1->add_column(type_String,     "sub_second");
     }
@@ -819,7 +841,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
         sub_1->add_column(type_Binary,   "binary");        // 6
         sub_1->add_column(type_Table,    "table", &sub_2); // 7
         sub_1->add_column(type_Mixed,    "mixed");         // 8
-        sub_1->add_column(type_Int,      "int_null", nullptr, true); // 9
+        sub_1->add_column(type_Int,      "int_null", nullptr, true); // 9, nullable = true
         sub_2->add_column(type_Int,        "i");
     }
 
@@ -5243,6 +5265,22 @@ TEST(Table_RowAccessorCopyAndAssign)
     }
 }
 
+TEST(Table_RowAccessorCopyConstructionBug)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+
+    BasicRowExpr<Table> row_expr(table[0]);
+    BasicRow<Table> row_from_expr(row_expr);
+    BasicRow<Table> row_copy(row_from_expr);
+
+    table.remove(0);
+
+    CHECK_NOT(row_from_expr.is_attached());
+    CHECK_NOT(row_copy.is_attached());
+}
+
 TEST(Table_RowAccessorAssignMultipleTables)
 {
     Table tables[2];
@@ -5843,8 +5881,8 @@ TEST(Table_Nulls)
     for (size_t round = 0; round < 5; round++) {
         Table t;
         TableView tv;
-        t.add_column(type_String, "str", true);
-        
+        t.add_column(type_String, "str", true /*nullable*/ );
+
         if (round == 1)
             t.add_search_index(0);
         else if (round == 2)
@@ -5928,9 +5966,9 @@ TEST(Table_Nulls)
 
     {
         Table t;
-        t.add_column(type_Int, "int", true);
-        t.add_column(type_Bool, "bool", true);
-        t.add_column(type_DateTime, "bool", true);
+        t.add_column(type_Int, "int", true);        // nullable = true
+        t.add_column(type_Bool, "bool", true);      // nullable = true
+        t.add_column(type_DateTime, "bool", true);  // nullable = true
 
         t.add_empty_row(2);
 
@@ -5955,6 +5993,6 @@ TEST(Table_Nulls)
         CHECK(t.is_null(2, 1));
     }
 }
-#endif 
+#endif
 
 #endif // TEST_TABLE

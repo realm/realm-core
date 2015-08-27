@@ -271,6 +271,7 @@ public:
     BasicRow() REALM_NOEXCEPT;
 
     template<class U> BasicRow(BasicRowExpr<U>) REALM_NOEXCEPT;
+    BasicRow(const BasicRow<T>&) REALM_NOEXCEPT;
     template<class U> BasicRow(const BasicRow<U>&) REALM_NOEXCEPT;
     template<class U> BasicRow& operator=(BasicRowExpr<U>) REALM_NOEXCEPT;
     template<class U> BasicRow& operator=(BasicRow<U>) REALM_NOEXCEPT;
@@ -653,6 +654,12 @@ template<class T> inline void BasicRowExpr<T>::impl_detach() REALM_NOEXCEPT
 
 template<class T> inline BasicRow<T>::BasicRow() REALM_NOEXCEPT
 {
+}
+
+template<class T> inline BasicRow<T>::BasicRow(const BasicRow<T>& row) REALM_NOEXCEPT:
+    RowBase(row)
+{
+    attach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
 }
 
 template<class T> template<class U> inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) REALM_NOEXCEPT

@@ -140,11 +140,6 @@ public:
     /// - \a row_ndx_1 and \a row_ndx_2 point to the same value
     virtual void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) = 0;
 
-    virtual bool is_int_column() const REALM_NOEXCEPT { return false; }
-
-    // Returns true if, and only if this column is an StringColumn.
-    virtual bool is_string_col() const REALM_NOEXCEPT;
-
     virtual void destroy() REALM_NOEXCEPT = 0;
     void move_assign(ColumnBase& col) REALM_NOEXCEPT;
 
@@ -393,6 +388,7 @@ public:
     using value_type = T;
     using LeafInfo = typename BpTree<T, Nullable>::LeafInfo;
     using LeafType = typename BpTree<T, Nullable>::LeafType;
+    static const bool nullable = Nullable;
 
     struct unattached_root_tag {};
 
@@ -421,7 +417,6 @@ public:
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column<T, Nullable>&);
-    bool is_int_column() const REALM_NOEXCEPT override;
 
     std::size_t size() const REALM_NOEXCEPT override;
     bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
@@ -469,8 +464,6 @@ public:
     ref_type get_as_ref(std::size_t ndx) const REALM_NOEXCEPT;
     void set_uint(std::size_t ndx, uint64_t value);
     void set_as_ref(std::size_t ndx, ref_type value);
-
-    void destroy_subtree(std::size_t ndx, bool clear_value);
 
     template <class U>
     void adjust(std::size_t ndx, U diff);
@@ -598,11 +591,6 @@ private:
 
 
 // Implementation:
-
-inline bool ColumnBase::is_string_col() const REALM_NOEXCEPT
-{
-    return false;
-}
 
 inline bool ColumnBase::has_search_index() const REALM_NOEXCEPT
 {
@@ -771,7 +759,10 @@ std::size_t Column<T, N>::count(T target) const
 template <class T, bool N>
 T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
+    if (N)
+        return aggregate<T, T, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
+    else
+        return aggregate<T, T, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
@@ -780,49 +771,27 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
     if (end == size_t(-1))
         end = size();
     size_t size = end - start;
-    if(limit < size)
+
+    // fixme, doesn't look correct
+    if (limit < size)
         size = limit;
+
     auto s = sum(start, end, limit, return_ndx);
-    double avg = double(s) / double(size == 0 ? 1 : size);
+    size_t cnt = aggregate<T, int64_t, act_Count, NotNull>(*this, 0, start, end, limit, return_ndx);
+    double avg = double(s) / (cnt == 0 ? 1 : cnt);
     return avg;
 }
 
 template <class T, bool N>
 T Column<T,N>::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Min, None>(*this, 0, start, end, limit, return_ndx);
+    return aggregate<T, T, act_Min, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
 T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<T, T, act_Max, None>(*this, 0, start, end, limit, return_ndx);
-}
-
-template <class T, bool N>
-void Column<T,N>::destroy_subtree(size_t ndx, bool clear_value)
-{
-    static_assert(std::is_same<T, int_fast64_t>::value && !N,
-        "destroy_subtree only makes sense on non-nullable integer columns");
-    int_fast64_t value = get(ndx);
-
-    // Null-refs indicate empty subtrees
-    if (value == 0)
-        return;
-
-    // A ref is always 8-byte aligned, so the lowest bit
-    // cannot be set. If it is, it means that it should not be
-    // interpreted as a ref.
-    if (value % 2 != 0)
-        return;
-
-    // Delete subtree
-    ref_type ref = to_ref(value);
-    Allocator& alloc = get_alloc();
-    Array::destroy_deep(ref, alloc);
-
-    if (clear_value)
-        set(ndx, 0); // Throws
+    return aggregate<T, T, act_Max, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T, bool N>
@@ -836,6 +805,9 @@ template <class T, bool N>
 StringData Column<T, N>::get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT
 {
     static_assert(sizeof(T) == 8, "not filling buffer");
+    if (N && is_null(ndx)) {
+        return StringData{nullptr, 0};
+    }
     T x = get(ndx);
     *reinterpret_cast<T*>(buffer) = x;
       return StringData(buffer, sizeof(T));
@@ -848,10 +820,14 @@ void Column<T,N>::populate_search_index()
     // Populate the index
     std::size_t num_rows = size();
     for (std::size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        T value = get(row_ndx);
-        size_t num_rows = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        if (N && is_null(row_ndx)) {
+            m_search_index->insert(row_ndx, null{}, 1, is_append); // Throws
+        }
+        else {
+            T value = get(row_ndx);
+            m_search_index->insert(row_ndx, value, 1, is_append); // Throws
+        }
     }
 }
 
@@ -998,12 +974,6 @@ void Column<T,N>::move_assign(Column<T,N>& col)
 }
 
 template <class T, bool N>
-bool Column<T,N>::is_int_column() const REALM_NOEXCEPT
-{
-    return std::is_integral<T>::value;
-}
-
-template <class T, bool N>
 Allocator& Column<T,N>::get_alloc() const REALM_NOEXCEPT
 {
     return m_tree.get_alloc();
@@ -1080,13 +1050,27 @@ bool Column<T,N>::is_nullable() const REALM_NOEXCEPT
 template <class T, bool N>
 T Column<T,N>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
-    return m_tree.get(ndx);
+    // TODO: This can be speed optimized by letting .get() do the null check
+    if (N)
+        if (m_tree.is_null(ndx)) {
+            // Float, double and integer columns must return 0 for null entries
+            return static_cast<T>(0);
+        }
+        else {
+            return m_tree.get(ndx);
+        }
+    else {
+        return m_tree.get(ndx);
+    }
 }
 
 template <class T, bool N>
 bool Column<T,N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
 {
-    return m_tree.is_null(ndx);
+    if (N)
+        return m_tree.is_null(ndx);
+    else
+        return false;
 }
 
 template <class T, bool N>

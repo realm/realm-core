@@ -75,7 +75,6 @@
     <ClCompile Include="..\..\test\test_descriptor.cpp" />
     <ClCompile Include="..\..\test\test_file_locks.cpp" />
     <ClCompile Include="..\..\test\test_group.cpp" />
-    <ClCompile Include="..\..\test\test_index.cpp" />
     <ClCompile Include="..\..\test\test_index_string.cpp" />
     <ClCompile Include="..\..\test\test_lang_bind_helper.cpp" />
     <ClCompile Include="..\..\test\test_self.cpp" />
@@ -161,6 +160,7 @@
     <ClInclude Include="..\..\src\realm\column_tpl.hpp" />
     <ClInclude Include="..\..\src\realm\data_type.hpp" />
     <ClInclude Include="..\..\src\realm\column_type.hpp" />
+    <ClInclude Include="..\..\src\realm\column_type_traits.hpp" />
     <ClInclude Include="..\..\src\realm\util\features.h" />
     <ClInclude Include="..\..\src\realm\datetime.hpp" />
     <ClInclude Include="..\..\src\realm\group.hpp" />

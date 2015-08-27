@@ -76,7 +76,7 @@ template <class C>
 void BasicColumn_IsEmpty(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false); // nullable = false
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0U, c.size());
@@ -96,7 +96,7 @@ template <class C, typename T>
 void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false); // nullable = false
 
     for (size_t i = 0; i < num_values; ++i) {
         c.add(values[i]);
@@ -123,7 +123,7 @@ template <class C, typename T>
 void BasicColumn_Clear(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false); // nullable = false
 
     CHECK(c.is_empty());
 
@@ -150,7 +150,7 @@ template <class C, typename T>
 void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false); // nullable = false
 
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
@@ -185,7 +185,7 @@ void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values
     static_cast<void>(num_values);
 
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false); // nullable = false
 
     // Insert in empty column
     c.insert(0, values[0]);
@@ -242,7 +242,7 @@ void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_va
     static_cast<void>(values);
 
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false); // nullable = false
 
 //    double sum = c.sum();
 //    CHECK_EQUAL(0, sum);
@@ -266,7 +266,7 @@ template <class C, typename T>
 void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default(), ref, false); // nullable = false
 
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
@@ -325,7 +325,8 @@ TEST(FloatColumn_SwapRows)
     // Normal case
     {
         ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(-21.389);
         c.add(30.221);
@@ -346,7 +347,8 @@ TEST(FloatColumn_SwapRows)
     // First two elements
     {
         ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(30.221);
         c.add(10.93);
@@ -362,7 +364,8 @@ TEST(FloatColumn_SwapRows)
     // Last two elements
     {
         ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(5.0099);
         c.add(30.221);
@@ -378,7 +381,8 @@ TEST(FloatColumn_SwapRows)
     // Indices in wrong order
     {
         ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(5.0099);
         c.add(30.221);
@@ -399,7 +403,8 @@ TEST(DoubleColumn_SwapRows)
     // Normal case
     {
         ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(-21.389);
         c.add(30.221);
@@ -420,7 +425,8 @@ TEST(DoubleColumn_SwapRows)
     // First two elements
     {
         ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(30.221);
         c.add(10.93);
@@ -436,7 +442,8 @@ TEST(DoubleColumn_SwapRows)
     // Last two elements
     {
         ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(5.0099);
         c.add(30.221);
@@ -452,7 +459,8 @@ TEST(DoubleColumn_SwapRows)
     // Indices in wrong order
     {
         ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(5.0099);
         c.add(30.221);
