@@ -165,20 +165,7 @@ typedef double              Double;
 typedef realm::StringData String;
 typedef realm::BinaryData Binary;
 
-
-// Return StringData if either T or U is StringData, else return T. See description of usage in export2().
-template<class T, class U> struct EitherIsString
-{
-    typedef T type;
-};
-
-template<class T> struct EitherIsString<T, StringData>
-{
-    typedef StringData type;
-};
-
-// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric and
-// EitherIsString somehow
+// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
 namespace {
 template<class T, class U> T only_numeric(U in)
 {
@@ -670,7 +657,7 @@ template <class T, size_t prealloc = 8> struct NullableVector
     T operator[](size_t index) const
     {
         REALM_ASSERT_3(index, <, m_size);
-        return m_first[index];
+        return static_cast<T>(m_first[index]);
     }
 
     inline bool is_null(size_t index) const
@@ -894,27 +881,28 @@ public:
 
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
-    template<class D> REALM_FORCEINLINE void export2(ValueBase& destination) const
+    template<class D>
+    typename std::enable_if<std::is_convertible<T, D>::value>::type
+    REALM_FORCEINLINE export2(ValueBase& destination) const
     {
-        // export2 is also instantiated for impossible conversions like T = StringData, D = int64_t. These are never
-        // performed at runtime but still result in compiler errors. We therefore introduce EitherIsString which turns
-        // both T and D into StringData if just one of them are
-        typedef typename EitherIsString <D, T>::type dst_t;
-        typedef typename EitherIsString <T, D>::type src_t;
-
-        Value<dst_t>& d = static_cast<Value<dst_t>&>(destination);
+        Value<D>& d = static_cast<Value<D>&>(destination);
         d.init(ValueBase::from_link, ValueBase::m_values, 0);
         for (size_t t = 0; t < ValueBase::m_values; t++) {
-
-            // Values from a NullableVector<bool> must be read through an int64_t*, hence this type translation stuff
-            typedef typename NullableVector<src_t>::t_storage t_storage;
-            t_storage* source = reinterpret_cast<t_storage*>(m_storage.m_first);
-
             if (m_storage.is_null(t))
                 d.m_storage.set_null(t);
-            else
-                d.m_storage.set(t, static_cast<dst_t>(source[t]));
+            else {
+                d.m_storage.set(t, static_cast<D>(m_storage[t]));
+            }
         }
+    }
+
+    template<class D>
+    typename std::enable_if<!std::is_convertible<T, D>::value>::type
+    REALM_FORCEINLINE export2(ValueBase&) const
+    {
+        // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
+        // performed at runtime but would result in a compiler error if we did not provide this implementation.
+        REALM_ASSERT_DEBUG(false);
     }
 
     REALM_FORCEINLINE void export_bool(ValueBase& destination) const
