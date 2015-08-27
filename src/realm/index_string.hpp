@@ -105,7 +105,7 @@ public:
     void verify_entries(const AdaptiveStringColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const override;
     void to_dot() const { to_dot(std::cerr); }
-    void to_dot(std::ostream&, StringData title = StringData()) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const override;
 #endif
 
     typedef int32_t key_type;

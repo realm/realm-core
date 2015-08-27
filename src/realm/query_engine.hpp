@@ -464,7 +464,7 @@ public:
         return tableindex(r);
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new ListviewNode(*this);
     }
@@ -515,7 +515,7 @@ public:
             m_child2->init(table);
     }
 
-    std::string validate()
+    std::string validate() override
     {
         if (error_code != "")
             return error_code;
@@ -546,12 +546,12 @@ public:
         return not_found;
     }
 
-    ParentNode* child_criteria()
+    ParentNode* child_criteria() override
     {
         return m_child2;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new SubtableNode(*this);
     }
@@ -829,7 +829,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new IntegerNode<TConditionValue, TConditionFunction>(*this);
     }
@@ -892,7 +892,7 @@ public:
     }
 
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new FloatDoubleNode(*this);
     }
@@ -954,7 +954,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new BinaryNode(*this);
     }
@@ -1153,7 +1153,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new StringNode<TConditionFunction>(*this);
     }
@@ -1493,7 +1493,7 @@ public:
         return "";
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new OrNode(*this);
     }
@@ -1568,7 +1568,7 @@ public:
         return "";
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new NotNode(*this);
     }
@@ -1688,7 +1688,7 @@ public:
         return not_found;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new TwoColumnsNode<TConditionValue, TConditionFunction>(*this);
     }
@@ -1751,7 +1751,7 @@ public:
         return res;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new ExpressionNode(*this);
     }
@@ -1812,7 +1812,7 @@ public:
         return ret;
     }
 
-    virtual ParentNode* clone()
+    virtual ParentNode* clone() override
     {
         return new LinksToNode(*this);
     }
