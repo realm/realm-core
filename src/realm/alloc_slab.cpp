@@ -37,9 +37,9 @@ SlabAlloc::SlabAlloc()
 {
     m_initial_section_size = page_size();
     m_section_shifts = log2(m_initial_section_size);
-    std::size_t max = std::numeric_limits<std::size_t>::max();
+    size_t max = std::numeric_limits<size_t>::max();
     m_num_section_bases = 1 + get_section_index(max);
-    m_section_bases.reset( new std::size_t[m_num_section_bases] );
+    m_section_bases.reset( new size_t[m_num_section_bases] );
     for (int i = 0; i < m_num_section_bases; ++i) {
         m_section_bases[i] = compute_section_base(i);
     }
@@ -386,9 +386,9 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
     if (ref < m_baseline) {
 
         // reference must be inside a section mapped later
-        std::size_t section_index = get_section_index(ref);
-        std::size_t mapping_index = section_index - m_first_additional_mapping;
-        std::size_t section_offset = ref - get_section_base(section_index);
+        size_t section_index = get_section_index(ref);
+        size_t mapping_index = section_index - m_first_additional_mapping;
+        size_t section_offset = ref - get_section_base(section_index);
         REALM_ASSERT_DEBUG(m_additional_mappings);
         REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
         return m_additional_mappings[mapping_index].get_addr() + section_offset;
@@ -436,11 +436,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
     size_t initial_size = m_initial_section_size;
 
-    std::size_t initial_size_of_file;
+    size_t initial_size_of_file;
     ref_type top_ref = 0;
 
     // The size of a database file must not exceed what can be encoded in
-    // std::size_t.
+    // size_t.
     size_t size;
     bool did_create = false;
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file.get_size(), size)))
@@ -733,8 +733,8 @@ void SlabAlloc::remap(size_t file_size)
         m_capacity_additional_mappings = num_additional_mappings + 128;
         std::unique_ptr<util::File::Map<char>[]> new_mappings;
         new_mappings.reset(new util::File::Map<char>[m_capacity_additional_mappings]);
-        for (std::size_t j = 0; j < m_num_additional_mappings; ++j)
-            new_mappings[j].move(m_additional_mappings[j]);
+        for (size_t j = 0; j < m_num_additional_mappings; ++j)
+            new_mappings[j] = std::move(m_additional_mappings[j]);
         delete[] m_additional_mappings;
         m_additional_mappings = new_mappings.release();
     }
@@ -743,7 +743,7 @@ void SlabAlloc::remap(size_t file_size)
         auto section_start_offset = get_section_base(k + m_first_additional_mapping);
         auto section_size = get_section_base(1 + k + m_first_additional_mapping) - section_start_offset;
         util::File::Map<char> map(m_file, section_start_offset, File::access_ReadOnly, section_size);
-        m_additional_mappings[k].move(map);
+        m_additional_mappings[k] = std::move(map);
     }
     m_num_additional_mappings = num_additional_mappings;
 
@@ -782,7 +782,7 @@ const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 // Please note that the file is not necessarily mmapped with a separate mapping
 // for each section, multiple sections may be mmapped with a single mmap.
 
-std::size_t SlabAlloc::get_section_index(std::size_t pos) const REALM_NOEXCEPT
+size_t SlabAlloc::get_section_index(size_t pos) const REALM_NOEXCEPT
 {
     // size_t section_base_number = pos/m_initial_section_size;
     size_t section_base_number = pos >> m_section_shifts;
@@ -801,7 +801,7 @@ std::size_t SlabAlloc::get_section_index(std::size_t pos) const REALM_NOEXCEPT
     return index;
 }
 
-std::size_t SlabAlloc::compute_section_base(std::size_t index) const REALM_NOEXCEPT
+size_t SlabAlloc::compute_section_base(size_t index) const REALM_NOEXCEPT
 {
     size_t base;
     if (index < 16) {
@@ -818,9 +818,9 @@ std::size_t SlabAlloc::compute_section_base(std::size_t index) const REALM_NOEXC
     return base;
 }
 
-std::size_t SlabAlloc::find_section_in_range(std::size_t start_pos, 
-                                             std::size_t free_chunk_size,
-                                             std::size_t request_size) const REALM_NOEXCEPT
+size_t SlabAlloc::find_section_in_range(size_t start_pos, 
+                                             size_t free_chunk_size,
+                                             size_t request_size) const REALM_NOEXCEPT
 {
     size_t end_of_block = start_pos + free_chunk_size;
     size_t alloc_pos = start_pos;

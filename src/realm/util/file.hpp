@@ -347,10 +347,6 @@ public:
     /// map().
     static void sync_map(void* addr, std::size_t size);
 
-    /// Change the protection for a range of pages.
-    enum class Protection { RO, RW };
-    static void protect(void* addr, std::size_t size, Protection prot);
-
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
     /// calling process has no access to, will necessarily be reported
@@ -519,11 +515,14 @@ public:
     ~Map() REALM_NOEXCEPT;
 
     /// Move the mapping from another Map object to this Map object
-    void move(File::Map<T>& other) {
+    File::Map<T>& operator=(File::Map<T>&& other) 
+    {
         if (m_addr) unmap();
         m_addr = other.m_addr;
         m_size = other.m_size;
         other.m_addr = 0;
+        other.m_size = 0;
+        return *this;
     }
 
     /// See File::map().

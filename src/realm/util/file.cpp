@@ -60,7 +60,8 @@ size_t get_page_size()
     SYSTEM_INFO sysinfo;
     GetNativeSystemInfo(&sysinfo);
     //DWORD size = sysinfo.dwPageSize;
-	DWORD size = sysinfo.dwAllocationGranularity;
+    // On windows we use the allocation granularity instead
+    DWORD size = sysinfo.dwAllocationGranularity;
 #else
     long size = sysconf(_SC_PAGESIZE);
 #endif
@@ -794,9 +795,9 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
     }
     if (REALM_LIKELY(addr))
         return addr;
-	DWORD err = GetLastError(); // Eliminate any risk of clobbering
-	std::string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
-	throw std::runtime_error(msg);
+    DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    std::string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
+    throw std::runtime_error(msg);
 
 #else // POSIX version
 
@@ -853,37 +854,6 @@ void File::sync_map(void* addr, size_t size)
 
     realm::util::msync(addr, size);
 
-#endif
-}
-
-
-void File::protect(void* addr, size_t size, Protection prot)
-{
-#ifdef _WIN32 // Windows version
-    // This currently fails at runtime on windows so protect() is not used.
-    char* start = (char*)addr;
-    volatile char sum = 0;
-    for (char* p = start; p < start + size; ++p) sum += *++p;
-    DWORD oldprot;
-    if (prot == Protection::RO) {
-        if (VirtualProtect(addr, size, PAGE_READONLY, &oldprot))
-            return;
-    }
-    else if (prot == Protection::RW) {
-        if (VirtualProtect(addr, size, PAGE_READWRITE, &oldprot))
-            return;
-    }
-    DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    std::string msg = get_last_error_msg("VirtualProtect() failed: ", err);
-    throw std::runtime_error(msg);
-
-#else // POSIX version
-    if (prot == Protection::RO)
-        ::mprotect(addr, size, PROT_READ);
-    else if (prot == Protection::RW)
-        ::mprotect(addr, size, PROT_READ | PROT_WRITE);
-    else
-        REALM_ASSERT(false);
 #endif
 }
 

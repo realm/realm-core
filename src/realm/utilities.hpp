@@ -125,41 +125,32 @@ int fast_popcount64(int64_t x);
 uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 
 // log2 - returns -1 if x==0, otherwise log2(x)
+inline int log2(std::size_t x) {
+    unsigned long index = -1;
 #if defined(__GNUC__)
-inline int log2(std::size_t x) {
-    if (x)
-#ifdef REALM_PTR_64
-		return 63 - __builtin_clzll(x);
-#else
-		return 31 - __builtin_clz(x);
-#endif
-    else
-        return -1;
-}
-#elif defined(_WIN32)
-inline int log2(std::size_t x) {
     if (x) {
-        unsigned long index;
-#ifdef REALM_PTR_64
-		unsigned char c = _BitScanReverse64(&index, x);
-#else
-		unsigned char c = _BitScanReverse(&index, x);
-#endif
-        return index;
+#   ifdef REALM_PTR_64
+        index = 63 - __builtin_clzll(x);
+#   else
+        index = 31 - __builtin_clz(x);
+#   endif
     }
-    else
-        return -1;
-}
-#else
-inline int log2(std::size_t x) {
-    int result = -1;
+#elif defined(_WIN32)
+    if (x) {
+#   ifdef REALM_PTR_64
+        unsigned char c = _BitScanReverse64(&index, x);
+#   else
+        unsigned char c = _BitScanReverse(&index, x);
+#   endif
+    }
+#else // not __GNUC__ and not _WIN32
     while (x) {
-        ++result;
+        ++index;
         x >>= 1;
     }
-    return result;
-}
 #endif
+    return index;
+}
 
 // Implementation:
 

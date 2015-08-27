@@ -84,7 +84,7 @@ public:
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
     ///
-    /// Except for \param path, the parameters are passed in through a
+    /// Except for \a path, the parameters are passed in through a
     /// configuration object.
     ///
     /// \param is_shared Must be true if, and only if we are called on
@@ -248,7 +248,7 @@ public:
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
-    /// the file_size argument must be aligned to a *section* boundary:
+    /// The file_size argument must be aligned to a *section* boundary:
     /// The database file is logically split into sections, each section
     /// guaranteed to be mapped as a contiguous address range. The allocation
     /// of memory in the file must ensure that no allocation crosses the
@@ -331,10 +331,10 @@ private:
 
     util::File m_file;
 
-    // the initial mapping is determined by m_data and m_initial_mapping_size,
+    // The initial mapping is determined by m_data and m_initial_mapping_size,
     // we don't use a util::File::Map for that to stay compatible with the uses
     // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
-    char* m_data = 0;
+    char* m_data = nullptr;
     std::size_t m_initial_mapping_size = 0;
     // additional sections beyond those covered by the initial mapping, are
     // managed as separate mmap allocations, each covering one section.
