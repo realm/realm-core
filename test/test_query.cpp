@@ -5615,7 +5615,7 @@ TEST(Query_DeepCopy)
     t.add(3, "3", 3.3);
     t.add(4, "4", 4.4);
 
-    Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine.
+    Query q = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine.
 
 
     // Test if we can execute a copy
@@ -5644,16 +5644,14 @@ TEST(Query_DeepCopy)
     CHECK_EQUAL(2, q4->find());
     delete q4;
 
-
     // See if we can append a criteria to a query
-    Query q5 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    Query q5 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     q5.greater(2, 4.0);
     CHECK_EQUAL(3, q5.find());
 
-
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_expression integer node.
-    Query q6 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    Query q6 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     Query q7 = Query(q6, Query::TCopyExpressionTag());
 
     q7.greater(2, 4.0);

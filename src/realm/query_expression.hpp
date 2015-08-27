@@ -1496,7 +1496,7 @@ public:
     {
         Query::expression(this);
         Table* t = const_cast<Table*>(get_table());
-        Query::m_table = t->get_table_ref();
+        Query::set_table(t->get_table_ref());
     }
 
     void set_table()
@@ -1909,9 +1909,8 @@ public:
         m_auto_delete = auto_delete;
         Query::expression(this);
         Table* t = const_cast<Table*>(get_table()); // todo, const
-
         if (t)
-            Query::m_table = t->get_table_ref();
+            Query::set_table(t->get_table_ref());
     }
 
     ~Compare()

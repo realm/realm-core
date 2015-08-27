@@ -261,21 +261,16 @@ protected:
     size_t peek_tableview(size_t tv_index) const;
     void   update_pointers(ParentNode* p, ParentNode** newnode);
     void handle_pending_not();
+    void set_table(TableRef tr);
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
 
 public:
-    TableRef m_table;
     std::vector<ParentNode*> first;
     std::vector<ParentNode**> update;
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
-
-    // points to the base class of the restricting view. If the restricting
-    // view is a link view, m_source_link_view is non-zero. If it is a table view,
-    // m_source_table_view is non-zero.
-    RowIndexes* m_view;
 
     std::vector<bool> pending_not;
     typedef Query_Handover_patch Handover_patch;
@@ -336,12 +331,18 @@ private:
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() REALM_NOEXCEPT;
 
-    void set_table(TableRef tr) { m_table = tr; }
     bool supports_export_for_handover() { return m_view == 0; };
     std::string error_code;
 
     friend class Table;
     friend class TableViewBase;
+
+    TableRef m_table;
+
+    // points to the base class of the restricting view. If the restricting
+    // view is a link view, m_source_link_view is non-zero. If it is a table view,
+    // m_source_table_view is non-zero.
+    RowIndexes* m_view;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
     LinkViewRef m_source_link_view; // link views are refcounted and shared.
