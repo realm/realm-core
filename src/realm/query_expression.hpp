@@ -1683,9 +1683,9 @@ public:
         }
 
         if (m_nullable)
-            static_cast<SequentialGetter<ColTypeN>*>(m_sg)->init(  (ColTypeN*) (c)); // todo, c cast
+            static_cast<SequentialGetter<ColTypeN>*>(m_sg)->init(static_cast<const ColTypeN*>(c));
         else
-            static_cast<SequentialGetter<ColType>*>(m_sg)->init( (ColType*)(c));
+            static_cast<SequentialGetter<ColType>*>(m_sg)->init(static_cast<const ColType*>(c));
     }
 
 
@@ -1739,7 +1739,7 @@ public:
                     static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
 
                 if (m_nullable)
-                   v.m_storage.m_null = ((ArrayIntNull*)(sgc->m_leaf_ptr))->null_value();
+                   v.m_storage.m_null = reinterpret_cast<const ArrayIntNull*>(sgc->m_leaf_ptr)->null_value();
 
                 destination.import(v);
             }
