@@ -416,7 +416,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     size_t size;
     bool did_create = false;
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file.get_size(), size)))
-        throw InvalidDatabase("Realm file too large");
+        throw InvalidDatabase("Realm file too large", path);
 
     // FIXME: This initialization procedure does not provide sufficient
     // robustness given that processes may be abruptly terminated at any point
@@ -433,7 +433,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
     if (size == 0) {
         did_create = true;
         if (REALM_UNLIKELY(read_only))
-            throw InvalidDatabase("Read-only access to empty Realm file");
+            throw InvalidDatabase("Read-only access to empty Realm file", path);
 
         const char* data = reinterpret_cast<const char*>(&empty_file_header);
         m_file.write(data, sizeof empty_file_header); // Throws
@@ -452,7 +452,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            validate_buffer(map.get_addr(), size, top_ref, is_shared); // Throws
+            validate_buffer(map.get_addr(), size, path, top_ref, is_shared); // Throws
         }
 
         if (did_create) {
@@ -466,10 +466,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode &&  !stored_server_sync_mode)
                 throw InvalidDatabase("Specified Realm file was not created with support for "
-                                      "client/server synchronization");
+                                      "client/server synchronization", path);
             if (!server_sync_mode &&  stored_server_sync_mode)
                 throw InvalidDatabase("Specified Realm file requires support for client/server "
-                                      "synchronization");
+                                      "synchronization", path);
         }
 
         {
@@ -485,7 +485,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, bool is_shared, bool re
         // Below this point (assignment to `m_attach_mode`), nothing must throw.
     }
     catch (DecryptionFailed) {
-        throw InvalidDatabase("Realm file decryption failed");
+        throw InvalidDatabase("Realm file decryption failed", path);
     }
 
     // make sure that any call to begin_read cause any slab to be placed in free lists correctly
@@ -504,9 +504,10 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 
     // Verify the data structures
     m_file_on_streaming_form = false; // May be updated by validate_buffer()
+    std::string path; // No path
     ref_type top_ref;
     bool is_shared = false;
-    validate_buffer(data, size, top_ref, is_shared); // Throws
+    validate_buffer(data, size, path, top_ref, is_shared); // Throws
 
     {
         const Header* header = reinterpret_cast<const Header*>(data);
@@ -541,11 +542,12 @@ void SlabAlloc::attach_empty()
     m_baseline = sizeof (Header);
 }
 
-void SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref, bool is_shared)
+void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path,
+                                ref_type& top_ref, bool is_shared)
 {
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof (Header) || size % 8 != 0))
-        throw InvalidDatabase("Realm file has bad size");
+        throw InvalidDatabase("Realm file has bad size", path);
 
     // File header is 24 bytes, composed of three 64-bit
     // blocks. The two first being top_refs (only one valid
@@ -557,7 +559,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
                          file_header[17] == '-' &&
                          file_header[18] == 'D' &&
                          file_header[19] == 'B')))
-        throw InvalidDatabase("Not a Realm file");
+        throw InvalidDatabase("Not a Realm file", path);
 
     // Last bit in info block indicates which top_ref block is valid
     int valid_part = file_header[16 + 7] & 0x1;
@@ -572,24 +574,24 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
         bad_file_format = false;
 
     if (REALM_UNLIKELY(bad_file_format))
-        throw InvalidDatabase("Unsupported Realm file format version");
+        throw InvalidDatabase("Unsupported Realm file format version", path);
 
     // Top_ref should always point within buffer
     const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(data);
     uint_fast64_t ref = top_refs[valid_part];
     if (valid_part == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
-            throw InvalidDatabase("Realm file in streaming form has bad size");
+            throw InvalidDatabase("Realm file in streaming form has bad size", path);
         const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data+size) - 1;
         ref = footer->m_top_ref;
         if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie))
-            throw InvalidDatabase("Bad Realm file header (#1)");
+            throw InvalidDatabase("Bad Realm file header (#1)", path);
         m_file_on_streaming_form = true;
     }
     if (REALM_UNLIKELY(ref % 8 != 0))
-        throw InvalidDatabase("Bad Realm file header (#2)");
+        throw InvalidDatabase("Bad Realm file header (#2)", path);
     if (REALM_UNLIKELY(ref >= size))
-        throw InvalidDatabase("Bad Realm file header (#3)");
+        throw InvalidDatabase("Bad Realm file header (#3)", path);
 
     top_ref = ref_type(ref);
 }
