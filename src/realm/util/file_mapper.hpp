@@ -25,7 +25,7 @@
 namespace realm {
 namespace util {
 
-void *mmap(int fd, size_t size, File::AccessMode access, std::size_t offset, const char *encryption_key);
+void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key);
 void munmap(void *addr, size_t size) REALM_NOEXCEPT;
 void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
 void msync(void *addr, size_t size);
