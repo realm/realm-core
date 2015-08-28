@@ -6429,19 +6429,6 @@ public:
     bool set_null(size_t, size_t) { return false; }
     bool nullify_link(size_t, size_t) { return false; }
     bool optimize_table() { return false; }
-    bool row_insert_complete() { return false; }
-    bool add_int_to_column(size_t, int_fast64_t) { return false; }
-    bool insert_int(size_t, size_t, size_t, int_fast64_t) { return false; }
-    bool insert_bool(size_t, size_t, size_t, bool) { return false; }
-    bool insert_float(size_t, size_t, size_t, float) { return false; }
-    bool insert_double(size_t, size_t, size_t, double) { return false; }
-    bool insert_string(size_t, size_t, size_t, StringData) { return false; }
-    bool insert_binary(size_t, size_t, size_t, BinaryData) { return false; }
-    bool insert_date_time(size_t, size_t, size_t, DateTime) { return false; }
-    bool insert_table(size_t, size_t, size_t) { return false; }
-    bool insert_mixed(size_t, size_t, size_t, const Mixed&) { return false; }
-    bool insert_link(size_t, size_t, size_t, size_t) { return false; }
-    bool insert_link_list(size_t, size_t, size_t) { return false; }
 };
 
 struct AdvanceReadTransact {
