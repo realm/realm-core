@@ -273,13 +273,13 @@ void CondVar::handle_wait_error(int err)
             return;
 #endif
         case EINVAL:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timewait() failed:"
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timedwait() failed:"
                             "Invalid argument provided");
         case EPERM:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timewait() failed:"
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timedwait() failed:"
                             "Mutex not owned by calling thread");
         default:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timewait() failed");
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timedwait() failed");
     }
 }
 
