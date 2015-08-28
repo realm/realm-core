@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* The error handling for `pthread_cond_wait()/pthread_cond_timedwait()`
+  incorrectly attributed the failure to `pthread_mutex_lock()`.
 
 ### API breaking changes:
 
@@ -10,7 +11,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added version chunk information and failure reason for
+  `pthread_mutex_lock()`.
 
 -----------
 
