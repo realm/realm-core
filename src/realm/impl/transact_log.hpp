@@ -1098,6 +1098,7 @@ inline bool TransactLogEncoder::swap_rows(std::size_t row_ndx_1, std::size_t row
 
 inline void TransactLogConvenientEncoder::swap_rows(const Table* t, std::size_t row_ndx_1, std::size_t row_ndx_2)
 {
+    REALM_ASSERT(row_ndx_1 < row_ndx_2);
     select_table(t); // Throws
     m_encoder.swap_rows(row_ndx_1, row_ndx_2);
 }
