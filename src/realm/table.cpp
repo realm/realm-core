@@ -1361,21 +1361,34 @@ void Table::upgrade_file_format()
 {
     for (size_t c = 0; c < get_column_count(); c++) {
         if (has_search_index(c)) {
-            if (get_column_type(c) == type_String) {
-                StringColumn& asc = get_column_string(c);
-                asc.get_search_index()->clear();
-                asc.populate_search_index();
-            }
-            else if (get_real_column_type(c) == col_type_Int) {
-                ColumnBase& col = get_column_base(c);
-                IntegerColumn& c = static_cast<IntegerColumn&>(col);
-                c.get_search_index()->clear();
-                c.populate_search_index();
-            }
-            else {
-                // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
-                // so this is fine for now.
-                REALM_ASSERT(false);
+            ColumnType t = get_real_column_type(c);
+            switch (t) {
+                case col_type_String: {
+                    StringColumn& asc = get_column_string(c);
+                    asc.get_search_index()->clear();
+                    asc.populate_search_index();
+                    break;
+                }
+                case col_type_Bool:
+                case col_type_Int:
+                case col_type_DateTime: {
+                    if (is_nullable(c)) {
+                        IntNullColumn& col = get_column_int_null(c);
+                        col.get_search_index()->clear();
+                        col.populate_search_index();
+                    } else {
+                        IntegerColumn& col = get_column(c);
+                        col.get_search_index()->clear();
+                        col.populate_search_index();
+                    }
+                    break;
+                }
+                case col_type_StringEnum:
+                    REALM_ASSERT(false && "Indices on StringEnumColumn not yet supported");
+                    break;
+                default:
+                    // The rest of the column types are not supported
+                    REALM_ASSERT(false);
             }
 
         }
