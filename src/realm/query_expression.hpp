@@ -1222,22 +1222,21 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap
 {
 public:
-    LinkMap() : m_table(nullptr) {};
-
-    void init(Table* table, std::vector<size_t> columns)
+    LinkMap() : m_table(nullptr) {}
+    LinkMap(const Table* table, const std::vector<size_t>& columns)
     {
         for (size_t t = 0; t < columns.size(); t++) {
             // Link column can be either LinkList or single Link
             ColumnType type = table->get_real_column_type(columns[t]);
             if (type == col_type_LinkList) {
-                LinkListColumn& cll = table->get_column_link_list(columns[t]);
+                const LinkListColumn& cll = table->get_column_link_list(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
                 m_link_types.push_back(realm::type_LinkList);
                 table = &cll.get_target_table();
             }
             else {
-                LinkColumn& cl = table->get_column_link(columns[t]);
+                const LinkColumn& cl = table->get_column_link(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link(columns[t])));
                 m_link_types.push_back(realm::type_Link);
@@ -1267,15 +1266,15 @@ public:
     }
 
     const Table* m_table;
-    std::vector<LinkColumnBase*> m_link_columns;
-    std::vector<Table*> m_tables;
+    std::vector<const LinkColumnBase*> m_link_columns;
+    std::vector<const Table*> m_tables;
 
 private:
     void map_links(size_t column, size_t row, LinkMapFunction& lm)
     {
         bool last = (column + 1 == m_link_columns.size());
         if (m_link_types[column] == type_Link) {
-            LinkColumn& cl = *static_cast<LinkColumn*>(m_link_columns[column]);
+            const LinkColumn& cl = *static_cast<const LinkColumn*>(m_link_columns[column]);
             size_t r = to_size_t(cl.get(row));
             if (r == 0)
                 return;
@@ -1289,8 +1288,8 @@ private:
                 map_links(column + 1, r, lm);
         }
         else {
-            LinkListColumn& cll = *static_cast<LinkListColumn*>(m_link_columns[column]);
-            LinkViewRef lvr = cll.get(row);
+            const LinkListColumn& cll = *static_cast<const LinkListColumn*>(m_link_columns[column]);
+            ConstLinkViewRef lvr = cll.get(row);
             for (size_t t = 0; t < lvr->size(); t++) {
                 size_t r = lvr->get(t).get_index();
                 if (last) {
@@ -1321,17 +1320,14 @@ template <class S, class I> Query string_compare(const Columns<StringData>& left
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table(nullptr),
-                                                                            m_column(column)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links)
+        : m_link_map(table, links), m_table(table), m_column(column)
     {
-        m_link_map.init(const_cast<Table*>(table), links);
-        m_table = table;
         REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), ==, type_String);
     }
 
-    Columns(size_t column, const Table* table) : m_table(nullptr), m_column(column)
+    Columns(size_t column, const Table* table) : m_table(table), m_column(column)
     {
-        m_table = table;
     }
 
     explicit Columns() : m_table(nullptr) { }
@@ -1424,13 +1420,13 @@ public:
         return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
     }
 
+    LinkMap m_link_map;
+
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
     const Table* m_table;
 
     // Column index of payload column of m_table
     size_t m_column;
-
-    LinkMap m_link_map;
 };
 
 
@@ -1571,22 +1567,19 @@ public:
     }
 
 private:
-    Columns(size_t column, const Table* table, std::vector<size_t> links) :
-        m_table(nullptr)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links)
+        : m_link_map(table, links), m_table(table)
     {
         static_cast<void>(column);
-        m_link_map.init(const_cast<Table*>(table), links);
-        m_table = table;
     }
 
     Columns() : m_table(nullptr) { }
 
     explicit Columns(size_t column) : m_table(nullptr) { static_cast<void>(column); }
 
-    Columns(size_t column, const Table* table) : m_table(nullptr)
+    Columns(size_t column, const Table* table) : m_table(table)
     {
         static_cast<void>(column);
-        m_table = table;
     }
 
     Subexpr& clone() override
@@ -1606,13 +1599,14 @@ private:
         REALM_ASSERT(false);
     }
 
+    LinkMap m_link_map;
+
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
     const Table* m_table;
 
     // Column index of payload column of m_table
     size_t m_column;
 
-    LinkMap m_link_map;
     bool auto_delete;
 
    friend class Table;
@@ -1625,11 +1619,10 @@ public:
     using ColType = typename ColumnTypeTraits<T, false>::column_type;
     using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
-    Columns(size_t column, const Table* table, std::vector<size_t> links)
-        : m_table(table), m_sg(nullptr), m_column(column)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links)
+        : m_link_map(table, links), m_table(table), m_sg(nullptr)
+        , m_column(column), m_nullable(m_link_map.m_table->is_nullable(m_column))
     {
-        m_link_map.init(const_cast<Table*>(table), links);
-        m_nullable = m_link_map.m_table->is_nullable(m_column);
     }
 
     Columns(size_t column, const Table* table)
@@ -1771,7 +1764,9 @@ public:
         }
     }
 
-    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class 
+    LinkMap m_link_map;
+
+    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class
     // dependency/entanglement
     const Table* m_table;
 
@@ -1780,8 +1775,6 @@ public:
 
     // Column index of payload column of m_table
     size_t m_column;
-
-    LinkMap m_link_map;
 
     bool m_nullable;
 };
