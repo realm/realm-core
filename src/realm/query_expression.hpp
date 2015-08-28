@@ -858,7 +858,7 @@ public:
         ValueBase::m_values = values;
     }
 
-    void evaluate(size_t, ValueBase& destination)
+    void evaluate(size_t, ValueBase& destination) override
     {
         destination.import(*this);
     }
@@ -914,40 +914,40 @@ public:
         }
     }
 
-    REALM_FORCEINLINE void export_bool(ValueBase& destination) const
+    REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
     {
         export2<bool>(destination);
     }
 
-    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const
+    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const override
     {
         export2<int64_t>(destination);
     }
 
-    REALM_FORCEINLINE void export_float(ValueBase& destination) const
+    REALM_FORCEINLINE void export_float(ValueBase& destination) const override
     {
         export2<float>(destination);
     }
 
-    REALM_FORCEINLINE void export_int(ValueBase& destination) const
+    REALM_FORCEINLINE void export_int(ValueBase& destination) const override
     {
         export2<int>(destination);
     }
 
-    REALM_FORCEINLINE void export_double(ValueBase& destination) const
+    REALM_FORCEINLINE void export_double(ValueBase& destination) const override
     {
         export2<double>(destination);
     }
-    REALM_FORCEINLINE void export_StringData(ValueBase& destination) const
+    REALM_FORCEINLINE void export_StringData(ValueBase& destination) const override
     {
         export2<StringData>(destination);
     }
-    REALM_FORCEINLINE void export_null(ValueBase& destination) const
+    REALM_FORCEINLINE void export_null(ValueBase& destination) const override
     {
         export2<null>(destination);
     }
 
-    REALM_FORCEINLINE void import(const ValueBase& source)
+    REALM_FORCEINLINE void import(const ValueBase& source) override
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
@@ -1006,7 +1006,7 @@ public:
         return not_found; // no match
     }
 
-    virtual Subexpr& clone()
+    Subexpr& clone() override
     {
         Value<T>& n = *new Value<T>();
         n.m_storage = m_storage;
@@ -1168,7 +1168,8 @@ struct FindNullLinks : public LinkMapFunction
 {
     FindNullLinks() : m_has_link(false) {};
 
-    virtual bool consume(size_t row_index) {
+    bool consume(size_t row_index) override
+    {
         static_cast<void>(row_index);
         m_has_link = true;
         return false; // we've found a row index, so this can't be a null-link, so exit link harvesting
@@ -1181,7 +1182,8 @@ struct MakeLinkVector : public LinkMapFunction
 {
     MakeLinkVector(std::vector<size_t>& result) : m_links(result) {}
 
-    virtual bool consume(size_t row_index) {
+    bool consume(size_t row_index) override
+    {
         m_links.push_back(row_index);
         return true; // continue evaluation
     }
@@ -1340,19 +1342,19 @@ public:
     {
     }
 
-    virtual Subexpr& clone()
+    Subexpr& clone() override
     {
         Columns<StringData>& n = *new Columns<StringData>();
         n = *this;
         return n;
     }
 
-    virtual const Table* get_table() const
+    const Table* get_table() const override
     {
         return m_table;
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<StringData>& d = static_cast<Value<StringData>&>(destination);
 
@@ -1497,18 +1499,18 @@ public:
         Query::m_table = t->get_table_ref();
     }
 
-    void set_table()
+    void set_table() override
     {
     }
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as 
     // any linked-to payload tables
-    virtual const Table* get_table() const
+    const Table* get_table() const override
     {
         return m_link_map.m_tables[0];
     }
 
-    size_t find_first(size_t start, size_t end) const
+    size_t find_first(size_t start, size_t end) const override
     {
         for (; start < end;) {
             std::vector<size_t> l = m_link_map.get_links(start);
@@ -1590,17 +1592,17 @@ private:
         m_table = table;
     }
 
-    virtual Subexpr& clone()
+    Subexpr& clone() override
     {
         return *this;
     }
 
-    virtual const Table* get_table() const
+    const Table* get_table() const override
     {
         return m_table;
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         static_cast<void>(index);
         static_cast<void>(destination);
@@ -1664,7 +1666,7 @@ public:
 
     }
 
-    virtual Subexpr& clone()
+    Subexpr& clone() override
     {
         if (m_nullable)
             return clone<ColTypeN>();
@@ -1673,7 +1675,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table()
+    void set_table() override
     {
         const ColumnBase* c;
         if (m_link_map.m_link_columns.size() == 0) {
@@ -1701,12 +1703,13 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression 
     // and binds it to a Query at a later time
-    virtual const Table* get_table() const
+    const Table* get_table() const override
     {
         return m_table;
     }
 
-    void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination) override
+    {
         if (m_nullable)
             evaluate<ColTypeN>(index, destination);
         else
@@ -1806,20 +1809,20 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table()
+    void set_table() override
     {
         m_left.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table() const
+    const Table* get_table() const override
     {
         return m_left.get_table();
     }
 
     // destination = operator(left)
-    void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<T> result;
         Value<T> left;
@@ -1853,7 +1856,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table()
+    void set_table() override
     {
         m_left.set_table();
         m_right.set_table();
@@ -1861,7 +1864,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table() const
+    const Table* get_table() const override
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
@@ -1874,7 +1877,7 @@ public:
     }
 
     // destination = operator(left, right)
-    void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<T> result;
         Value<T> left;
@@ -1921,7 +1924,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table()
+    void set_table() override
     {
         m_left.set_table();
         m_right.set_table();
@@ -1929,7 +1932,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table() const
+    const Table* get_table() const override
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
@@ -1941,7 +1944,7 @@ public:
         return l ? l : r;
     }
 
-    size_t find_first(size_t start, size_t end) const
+    size_t find_first(size_t start, size_t end) const override
     {
         size_t match;
         Value<T> right;
