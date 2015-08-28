@@ -95,7 +95,8 @@ struct SharedFileInfo {
 class EncryptedFileMapping {
 public:
     // Adds the newly-created object to file.mappings iff it's successfully constructed
-    EncryptedFileMapping(SharedFileInfo& file, void* addr, size_t size, File::AccessMode access);
+    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, 
+                         void* addr, size_t size, File::AccessMode access);
     ~EncryptedFileMapping();
 
     // Write all dirty pages to disk and mark them read-only
@@ -111,7 +112,7 @@ public:
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
-    void set(void* new_addr, size_t new_size);
+    void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
 private:
     SharedFileInfo& m_file;
@@ -121,6 +122,7 @@ private:
 
     void* m_addr;
     size_t m_size;
+    size_t m_file_offset = 0;
 
     uintptr_t m_first_page;
     size_t m_page_count;

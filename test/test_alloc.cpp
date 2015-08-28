@@ -104,22 +104,19 @@ TEST(Alloc_AttachFile)
     GROUP_TEST_PATH(path);
     {
         SlabAlloc alloc;
-        bool is_shared     = false;
-        bool read_only     = false;
-        bool no_create     = false;
-        bool skip_validate = false;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        SlabAlloc::Config cfg;
+        alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
         CHECK(alloc.nonempty_attachment());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        read_only = true;
-        no_create = true;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        cfg.read_only = true;
+        cfg.no_create = true;
+        alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
     }
 }
@@ -137,27 +134,22 @@ TEST(Alloc_BadFile)
 
     {
         SlabAlloc alloc;
-        bool is_shared     = false;
-        bool read_only     = true;
-        bool no_create     = true;
-        bool skip_validate = false;
-        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+        SlabAlloc::Config cfg;
+        cfg.read_only     = true;
+        cfg.no_create     = true;
+        CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+        CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        read_only = false;
-        no_create = false;
-        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+        cfg.read_only = false;
+        cfg.no_create = false;
+        CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        alloc.attach_file(path_2, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path_2, cfg);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
-                                      skip_validate, 0, false), InvalidDatabase);
+        CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
     }
 }
 
@@ -173,11 +165,8 @@ TEST(Alloc_AttachBuffer)
         File::try_remove(path);
         {
             SlabAlloc alloc;
-            bool is_shared     = false;
-            bool read_only     = false;
-            bool no_create     = false;
-            bool skip_validate = false;
-            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+            SlabAlloc::Config cfg;
+            alloc.attach_file(path, cfg);
         }
         {
             File file(path);
@@ -191,6 +180,7 @@ TEST(Alloc_AttachBuffer)
 
     {
         SlabAlloc alloc;
+        SlabAlloc::Config cfg;
         alloc.attach_buffer(buffer.get(), buffer_size);
         CHECK(alloc.is_attached());
         CHECK(alloc.nonempty_attachment());
@@ -200,11 +190,7 @@ TEST(Alloc_AttachBuffer)
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        bool is_shared     = false;
-        bool read_only     = false;
-        bool no_create     = false;
-        bool skip_validate = false;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
@@ -233,11 +219,8 @@ TEST(Alloc_BadBuffer)
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_buffer(buffer, sizeof buffer), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        bool is_shared     = false;
-        bool read_only     = false;
-        bool no_create     = false;
-        bool skip_validate = false;
-        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate, 0, false);
+        SlabAlloc::Config cfg;
+        alloc.attach_file(path, cfg);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
