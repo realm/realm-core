@@ -326,8 +326,6 @@ public:
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
 
-class ColumnsBase {};
-
 template <class T> class Columns;
 template <class T> class Value;
 template <class T> class Subexpr2;
@@ -1622,7 +1620,7 @@ private:
 };
 
 
-template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
+template <class T> class Columns : public Subexpr2<T>
 {
 public:
     using ColType = typename ColumnTypeTraits<T, false>::column_type;
