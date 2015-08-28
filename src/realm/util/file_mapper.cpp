@@ -516,7 +516,8 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     return 0;
 }
 
-void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const char* encryption_key)
+void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
+                 File::AccessMode access, const char* encryption_key)
 {
     struct stat st;
     if (fstat(fd, &st)) {
@@ -567,7 +568,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         mapping_and_addr m;
         m.addr = addr;
         m.size = size;
-        m.mapping = new EncryptedFileMapping(*it->info, addr, size, access);
+        m.mapping = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
         mappings_by_addr.push_back(m); // can't throw due to reserve() above
     }
     catch (...) {
@@ -593,7 +594,7 @@ void remove_mapping(void* addr, size_t size)
             if (::close(it->info->fd) != 0) {
                 int err = errno; // Eliminate any risk of clobbering
                 if (err == EBADF || err == EIO) // todo, how do we handle EINTR?
-                    throw std::runtime_error(get_errno_msg("close() failed: ", err));                
+                    throw std::runtime_error(get_errno_msg("close() failed: ", err));
             }
             mappings_by_file.erase(it);
             break;
@@ -624,13 +625,13 @@ size_t round_up_to_page_size(size_t size) REALM_NOEXCEPT
 }
 #endif
 
-void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_key)
+void* mmap(int fd, size_t size, File::AccessMode access, std::size_t offset, const char* encryption_key)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
         size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
-        add_mapping(addr, size, fd, access, encryption_key);
+        add_mapping(addr, size, fd, offset, access, encryption_key);
         return addr;
     }
     else
@@ -648,7 +649,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_
                 break;
         }
 
-        void* addr = ::mmap(0, size, prot, MAP_SHARED, fd, 0);
+        void* addr = ::mmap(0, size, prot, MAP_SHARED, fd, offset);
         if (addr != MAP_FAILED)
             return addr;
     }
@@ -668,7 +669,8 @@ void munmap(void* addr, size_t size) REALM_NOEXCEPT
     }
 }
 
-void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size)
+void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, 
+             File::AccessMode a, size_t new_size)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     {
@@ -680,7 +682,7 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
                 return old_addr;
 
             void* new_addr = mmap_anon(rounded_new_size);
-            m->mapping->set(new_addr, rounded_new_size);
+            m->mapping->set(new_addr, rounded_new_size, file_offset);
             int i = ::munmap(old_addr, rounded_old_size);
             m->addr = new_addr;
             m->size = rounded_new_size;
@@ -705,7 +707,7 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
     // Fall back to no-mremap case if it's not supported
 #endif
 
-    void* new_addr = mmap(fd, new_size, a, nullptr);
+    void* new_addr = mmap(fd, new_size, a, file_offset, nullptr);
     if (::munmap(old_addr, old_size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));

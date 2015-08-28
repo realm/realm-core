@@ -71,6 +71,7 @@ Query::Query(const Query& copy)
     update = copy.update;
     update_override = copy.update_override;
     first = copy.first;
+    first.reserve(copy.first.capacity());
     pending_not = copy.pending_not;
     error_code = copy.error_code;
     m_view = copy.m_view;
@@ -226,12 +227,6 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
     }
 }
 
-/*
-// use and_query() instead!
-Expression* Query::get_expression() {
-    return (static_cast<ExpressionNode*>(first[first.size()-1]))->m_compare;
-}
-*/
 Query& Query::expression(Expression* compare)
 {
     ParentNode* const p = new ExpressionNode(compare);

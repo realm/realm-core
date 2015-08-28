@@ -65,16 +65,12 @@ public:
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
     virtual ~Query() REALM_NOEXCEPT;
-    void move_assign(Query& query);
 
     Query& operator = (const Query& source);
 
     Query& expression(Expression* compare);
-    Expression* get_expression();
 
-    // Find links that point to a specific target row 
-
-    // Find links that point to a specific target row 
+    // Find links that point to a specific target row
     Query& links_to(size_t column_ndx, size_t target_row);
 
     // Conditions: null
@@ -154,7 +150,6 @@ public:
     Query& between_datetime(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_datetime()), int64_t(to.get_datetime())); }
 
     // Conditions: strings
-
     Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
@@ -258,7 +253,6 @@ public:
 
 protected:
     Query(Table& table, TableViewBase* tv = nullptr);
-//    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void create();
 
     void   init(const Table& table) const;
@@ -317,8 +311,6 @@ public:
     Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode);
     Query(Query& source, Handover_patch& patch, MutableSourcePayload mode);
 private:
-    struct PartialCopyTag {};
-    Query(const Query& src, PartialCopyTag);
     void copy_nodes(const Query& source);
     template <class ColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class ColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
@@ -349,9 +341,6 @@ private:
     std::string error_code;
 
     friend class Table;
-    template <typename T> friend class BasicTable;
-    friend class XQueryAccessorInt;
-    friend class XQueryAccessorString;
     friend class TableViewBase;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.

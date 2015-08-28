@@ -7585,8 +7585,10 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         // Encrypted files are always at least a 4096 byte header plus an encrypted page
         CHECK_LESS_EQUAL(File(path).get_size(), page_size() + 4096);
     else
+        CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
+#else
+    CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
 #endif // REALM_ENABLE_ENCRYPTION
-        CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
 }
 
 
