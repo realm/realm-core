@@ -1339,9 +1339,7 @@ public:
 
     Subexpr& clone() override
     {
-        Columns<StringData>& n = *new Columns<StringData>();
-        n = *this;
-        return n;
+        return *new Columns<StringData>(*this);
     }
 
     const Table* get_table() const override
@@ -1615,43 +1613,41 @@ public:
     using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
     Columns(size_t column, const Table* table, const std::vector<size_t>& links)
-        : m_link_map(table, links), m_table(table), m_sg(nullptr)
+        : m_link_map(table, links), m_table(table)
         , m_column(column), m_nullable(m_link_map.m_table->is_nullable(m_column))
     {
     }
 
     Columns(size_t column, const Table* table)
-        : m_table(table), m_sg(nullptr), m_column(column), m_nullable(m_table->is_nullable(m_column))
+        : m_table(table), m_column(column), m_nullable(m_table->is_nullable(m_column))
     {
     }
 
+    Columns() : m_table(nullptr) { }
 
-    Columns() : m_table(nullptr), m_sg(nullptr) { }
+    explicit Columns(size_t column) : m_table(nullptr), m_column(column) { }
 
-    explicit Columns(size_t column) : m_table(nullptr), m_sg(nullptr), m_column(column) { }
-
-    ~Columns()
+    Columns(const Columns& other)
+        : m_link_map(other.m_link_map), m_table(other.m_table)
+        , m_column(other.m_column), m_nullable(other.m_nullable)
     {
-        delete m_sg;
     }
 
-    template<class C> Subexpr& clone()
+    Columns& operator=(const Columns& other)
     {
-        Columns<T>& n = *new Columns<T>();
-        n = *this;
-        SequentialGetter<C> *s = new SequentialGetter<C>();
-        n.m_sg = s;
-        n.m_nullable = m_nullable;
-        return n;
-
+        if (this != &other) {
+            m_link_map = other.m_link_map;
+            m_table = other.m_table;
+            m_sg.reset();
+            m_column = other.m_column;
+            m_nullable = other.m_nullable;
+        }
+        return *this;
     }
 
     Subexpr& clone() override
     {
-        if (m_nullable)
-            return clone<ColTypeN>();
-        else
-            return clone<ColType>();
+        return *new Columns<T>(*this);
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
@@ -1669,15 +1665,15 @@ public:
 
         if (m_sg == nullptr) {
             if (m_nullable)
-                m_sg = new SequentialGetter<ColTypeN>();
+                m_sg.reset(new SequentialGetter<ColTypeN>());
             else
-                m_sg = new SequentialGetter<ColType>();
+                m_sg.reset(new SequentialGetter<ColType>());
         }
 
         if (m_nullable)
-            static_cast<SequentialGetter<ColTypeN>*>(m_sg)->init(  (ColTypeN*) (c)); // todo, c cast
+            static_cast<SequentialGetter<ColTypeN>*>(m_sg.get())->init(  (ColTypeN*) (c)); // todo, c cast
         else
-            static_cast<SequentialGetter<ColType>*>(m_sg)->init( (ColType*)(c));
+            static_cast<SequentialGetter<ColType>*>(m_sg.get())->init( (ColType*)(c));
     }
 
 
@@ -1698,7 +1694,7 @@ public:
 
     // Load values from Column into destination
     template<class C> void evaluate(size_t index, ValueBase& destination) {
-        SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(m_sg);
+        SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(m_sg.get());
 
         if (m_link_map.m_link_columns.size() > 0) {
             // LinkList with more than 0 values. Create Value with payload for all fields
@@ -1766,7 +1762,7 @@ public:
     const Table* m_table;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
-    SequentialGetterBase* m_sg;
+    std::unique_ptr<SequentialGetterBase> m_sg;
 
     // Column index of payload column of m_table
     size_t m_column;
