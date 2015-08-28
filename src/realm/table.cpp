@@ -1372,15 +1372,9 @@ void Table::upgrade_file_format()
                 case col_type_Bool:
                 case col_type_Int:
                 case col_type_DateTime: {
-                    if (is_nullable(c)) {
-                        IntNullColumn& col = get_column_int_null(c);
-                        col.get_search_index()->clear();
-                        col.populate_search_index();
-                    } else {
-                        IntegerColumn& col = get_column(c);
-                        col.get_search_index()->clear();
-                        col.populate_search_index();
-                    }
+                    IntegerColumn& col = get_column(c);
+                    col.get_search_index()->clear();
+                    col.populate_search_index();
                     break;
                 }
                 case col_type_StringEnum:
