@@ -142,6 +142,7 @@ public:
     void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
     void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
     void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
+    void adj_acc_swap_rows(size_t, size_t) REALM_NOEXCEPT override;
     void adj_acc_clear_root_table() REALM_NOEXCEPT override;
     void mark(int) REALM_NOEXCEPT override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;

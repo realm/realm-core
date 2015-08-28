@@ -37,6 +37,12 @@ inline void MixedColumn::adj_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
     m_data->adj_acc_erase_row(row_ndx);
 }
 
+inline void MixedColumn::adj_acc_swap_rows(std::size_t row_ndx_1,
+                                           std::size_t row_ndx_2) REALM_NOEXCEPT
+{
+    m_data->adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+}
+
 inline void MixedColumn::adj_acc_move_over(std::size_t from_row_ndx,
                                            std::size_t to_row_ndx) REALM_NOEXCEPT
 {
