@@ -1622,7 +1622,7 @@ ONLY(TableView_Backlinks)
     links->add_column_link(type_LinkList, "link_list", *source);
 
     { // Links
-        TableView tv(links.get(), source.get(), 0, 2);
+        TableView tv = source->get_backlink_view(2, links.get(), 0);
         tv.sync_if_needed();
 
         CHECK_EQUAL(tv.size(), 0);
@@ -1636,7 +1636,7 @@ ONLY(TableView_Backlinks)
         CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
     }
     { // LinkViews
-        TableView tv(links.get(), source.get(), 1, 2);
+        TableView tv = source->get_backlink_view(2, links.get(), 1);
         tv.sync_if_needed();
 
         CHECK_EQUAL(tv.size(), 0);

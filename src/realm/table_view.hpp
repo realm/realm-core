@@ -306,8 +306,6 @@ public:
 
     virtual ~TableViewBase() REALM_NOEXCEPT;
 
-    TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
-
 protected:
     void do_sync();
     // Null if, and only if, the view is detached.
@@ -343,6 +341,7 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
+    TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -437,8 +436,6 @@ public:
     ~TableView() REALM_NOEXCEPT;
     TableView& operator=(const TableView&) = default;
     TableView& operator=(TableView&&) = default;
-
-    TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
 
     // Rows
     typedef BasicRowExpr<Table> RowExpr;
@@ -568,6 +565,7 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
+    TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
@@ -777,11 +775,11 @@ inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t c
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
     m_linked_table(linked_table->get_table_ref()), // Throws
+    m_linked_column(column),
+    m_linked_row(row_ndx),
     m_last_seen_version(m_table ? m_table->m_version : 0),
     m_distinct_column_source(npos),
-    m_auto_sort(false),
-    m_linked_column(column),
-    m_linked_row(row_ndx)
+    m_auto_sort(false)
 {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
     // a free-standing container, and beause `IntegerColumn` does not conform to the

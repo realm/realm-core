@@ -3683,7 +3683,11 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
     return const_cast<Table*>(this)->get_range_view(begin, end);
 }
 
-
+TableView Table::get_backlink_view(std::size_t row_ndx, Table *src_table, std::size_t src_col_ndx)
+{
+    TableView tv(src_table, this, src_col_ndx, row_ndx);
+    return tv;
+}
 
 size_t Table::lower_bound_int(size_t col_ndx, int64_t value) const REALM_NOEXCEPT
 {
