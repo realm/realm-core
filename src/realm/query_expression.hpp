@@ -1604,11 +1604,6 @@ private:
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
     const Table* m_table;
 
-    // Column index of payload column of m_table
-    size_t m_column;
-
-    bool auto_delete;
-
    friend class Table;
 };
 
