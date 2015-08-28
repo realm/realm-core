@@ -468,7 +468,7 @@ bool SubtableColumnParent::SubtableMap::adj_move_over(std::size_t from_row_ndx,
     // need special handling for the case, where the set of entries are already
     // empty, otherwise the final return statement would return true in this
     // case, even though we didn't actually remove an entry.
-    if (i == n)
+    if (n == 0)
         return false;
 
     while (i < n) {
@@ -498,22 +498,18 @@ template<bool fix_ndx_in_parent>
 void SubtableColumnParent::SubtableMap::adj_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) REALM_NOEXCEPT
 {
     using tf = _impl::TableFriend;
-
-    if (empty())
-        return;
-
-    entry& entry_1 = m_entries[row_ndx_1];
-    entry& entry_2 = m_entries[row_ndx_2];
-
-    {
-        Table* tmp = entry_1.m_table;
-        entry_1.m_table = entry_2.m_table;
-        entry_2.m_table = tmp;
-    }
-
-    if (fix_ndx_in_parent) {
-        tf::set_ndx_in_parent(*(entry_1.m_table), entry_1.m_subtable_ndx);
-        tf::set_ndx_in_parent(*(entry_2.m_table), entry_2.m_subtable_ndx);
+    for (size_t i = 0; i < m_entries.size(); ++i) {
+        entry& e = m_entries[i];
+        if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_1)) {
+            e.m_subtable_ndx = row_ndx_2;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+        }
+        else if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_2)) {
+            e.m_subtable_ndx = row_ndx_1;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+        }
     }
 }
 
