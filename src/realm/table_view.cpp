@@ -613,6 +613,12 @@ void TableViewBase::do_sync()
     else if (m_table && m_distinct_column_source != npos) {
         sync_distinct_view(m_distinct_column_source);
     }
+    else if (m_table && m_linked_table) {
+        m_row_indexes.clear();
+        size_t backlink_count = m_linked_table->get_backlink_count(m_linked_row, *m_table, m_linked_column);
+        for (size_t i = 0; i < backlink_count; i++)
+            m_row_indexes.add(m_linked_table->get_backlink(m_linked_row, *m_table, m_linked_column, i));
+    }
     // precondition: m_table is attached
     else if (!m_query.m_table) {
         // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled

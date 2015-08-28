@@ -306,10 +306,16 @@ public:
 
     virtual ~TableViewBase() REALM_NOEXCEPT;
 
+    TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
+
 protected:
     void do_sync();
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
+
+    mutable TableRef m_linked_table;
+    size_t m_linked_column;
+    size_t m_linked_row;
 
     // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
     mutable ConstLinkViewRef m_linkview_source;
@@ -431,6 +437,8 @@ public:
     ~TableView() REALM_NOEXCEPT;
     TableView& operator=(const TableView&) = default;
     TableView& operator=(TableView&&) = default;
+
+    TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
 
     // Rows
     typedef BasicRowExpr<Table> RowExpr;
@@ -754,6 +762,26 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_start(start),
     m_end(end),
     m_limit(limit)
+{
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
+    // RAII idiom (nor should it).
+    Allocator& alloc = m_row_indexes.get_alloc();
+    _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
+    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
+    parent->register_view(this); // Throws
+    m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
+}
+
+inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx):
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
+    m_table(parent->get_table_ref()), // Throws
+    m_linked_table(linked_table->get_table_ref()), // Throws
+    m_last_seen_version(m_table ? m_table->m_version : 0),
+    m_distinct_column_source(npos),
+    m_auto_sort(false),
+    m_linked_column(column),
+    m_linked_row(row_ndx)
 {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
     // a free-standing container, and beause `IntegerColumn` does not conform to the
@@ -1147,6 +1175,11 @@ inline TableView::TableView(Table& parent):
 
 inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit):
     TableViewBase(&parent, query, start, end, limit)
+{
+}
+
+inline TableView::TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx):
+    TableViewBase(parent, linked_table, column, row_ndx)
 {
 }
 
