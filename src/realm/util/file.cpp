@@ -239,11 +239,11 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
-            throw PermissionDenied(msg);
+            throw PermissionDenied(msg, path);
         case ERROR_FILE_NOT_FOUND:
-            throw NotFound(msg);
+            throw NotFound(msg, path);
         case ERROR_FILE_EXISTS:
-            throw Exists(msg);
+            throw Exists(msg, path);
         default:
             throw std::runtime_error(msg);
     }
