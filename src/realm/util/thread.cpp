@@ -21,6 +21,7 @@
 #include <stdexcept>
 
 #include <realm/util/thread.hpp>
+#include <realm/version.hpp>
 
 #if !defined _WIN32
 #  include <unistd.h>
@@ -171,16 +172,16 @@ REALM_NORETURN void Mutex::lock_failed(int err) noexcept
 {
     switch (err) {
         case EDEADLK:
-            REALM_TERMINATE("pthread_mutex_lock() failed: "
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed: "
                             "Recursive locking of mutex (deadlock)");
         case EINVAL:
-            REALM_TERMINATE("pthread_mutex_lock() failed: "
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed: "
                             "Invalid mutex object provided");
         case EAGAIN:
-            REALM_TERMINATE("pthread_mutex_lock() failed: "
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed: "
                             "Maximum number of recursive locks exceeded");
         default:
-            REALM_TERMINATE("pthread_mutex_lock() failed");
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed");
     }
 }
 
