@@ -2188,8 +2188,8 @@ void Table::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
         throw LogicError(LogicError::row_index_out_of_range);
 
     // Internally, core requires that the first row index is strictly less than
-    // te second one. The changeset merge mechanism is written to take advantage
-    // of it.
+    // the second one. The changeset merge mechanism is written to take
+    // advantage of it, and it requires it.
     if (row_ndx_1 == row_ndx_2)
         return;
     if (row_ndx_1 > row_ndx_2)
