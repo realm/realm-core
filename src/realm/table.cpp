@@ -2939,8 +2939,14 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
         return 0;
 
 #if USE_COLUMN_AGGREGATE
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 #else
     if (is_empty())
         return 0;
@@ -2979,8 +2985,14 @@ DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 }
 
 // maximum ----------------------------------------------
@@ -3038,8 +3050,14 @@ DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.maximum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
 }
 
 
