@@ -265,15 +265,22 @@ REALM_NORETURN void CondVar::init_failed(int err)
 
 void CondVar::handle_wait_error(int err)
 {
+    switch (err) {
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
-    if (err == ENOTRECOVERABLE)
-        throw RobustMutex::NotRecoverable();
-    if (err == EOWNERDEAD)
-        return;
-#else
-    static_cast<void>(err);
+        case ENOTRECOVERABLE:
+            throw RobustMutex::NotRecoverable();
+        case EOWNERDEAD:
+            return;
 #endif
-    REALM_TERMINATE("pthread_mutex_lock() failed");
+        case EINVAL:
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timewait() failed:"
+                            "Invalid argument provided");
+        case EPERM:
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timewait() failed:"
+                            "Mutex not owned by calling thread");
+        default:
+            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timewait() failed");
+    }
 }
 
 REALM_NORETURN void CondVar::attr_init_failed(int err)
