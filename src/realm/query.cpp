@@ -223,7 +223,8 @@ void Query::set_table(TableRef tr)
     m_table = tr;
     if (m_table) {
         fetch_descriptor();
-    } else {
+    }
+    else {
         m_current_descriptor.reset(nullptr);
     }
 }
