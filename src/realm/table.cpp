@@ -1378,9 +1378,16 @@ void Table::upgrade_file_format()
                     break;
                 }
                 case col_type_StringEnum:
-                    REALM_ASSERT(false && "Indices on StringEnumColumn not yet supported");
-                    break;
-                default:
+                case col_type_Binary:
+                case col_type_Table:
+                case col_type_Mixed:
+                case col_type_Reserved1:
+                case col_type_Float:
+                case col_type_Double:
+                case col_type_Reserved4:
+                case col_type_Link:
+                case col_type_LinkList:
+                case col_type_BackLink:
                     // The rest of the column types are not supported
                     REALM_ASSERT(false);
             }
