@@ -357,15 +357,6 @@ void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
                                              broken_reciprocal_backlinks); // Throws
 }
 
-void SubtableColumn::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
-{
-    REALM_ASSERT_3(row_ndx_1, <, size());
-    REALM_ASSERT_3(row_ndx_2, <, size());
-    REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
-
-    SubtableColumnParent::swap_rows(row_ndx_1, row_ndx_2); // Throws
-}
-
 
 void SubtableColumn::destroy_subtable(size_t ndx) REALM_NOEXCEPT
 {

@@ -220,7 +220,6 @@ public:
 
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
-    void swap_rows(std::size_t, std::size_t) override;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const SubtableColumn&) const;
