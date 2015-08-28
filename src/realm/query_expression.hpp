@@ -298,7 +298,7 @@ public:
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table() = 0;
-    virtual const Table* get_table() = 0;
+    virtual const Table* get_table() const = 0;
     virtual ~Expression() {}
 };
 
@@ -318,7 +318,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         return nullptr;
     }
@@ -357,7 +357,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
         (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value))
         &&
         column->m_link_map.m_tables.size() == 0) {
-        const Table* t = (const_cast<Columns<R>*>(column))->get_table();
+        const Table* t = column->get_table();
         Query q = Query(*t);
 
         if (std::is_same<Cond, Less>::value)
@@ -500,7 +500,7 @@ public:
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
         // but only if both columns are non-nullable
         if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable) {
-            const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
+            const Table* t = left_col->get_table();
             Query q = Query(*t);
 
             if (std::numeric_limits<L>::is_integer || std::is_same<L, DateTime>::value) {
@@ -1349,7 +1349,7 @@ public:
         return n;
     }
 
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         return m_table;
     }
@@ -1505,7 +1505,7 @@ public:
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as 
     // any linked-to payload tables
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         return m_link_map.m_tables[0];
     }
@@ -1540,7 +1540,7 @@ public:
         return *new LinkCount(*this);
     }
 
-    const Table* get_table() override
+    const Table* get_table() const override
     {
         return m_link_map.m_tables[0];
     }
@@ -1597,7 +1597,7 @@ private:
         return *this;
     }
 
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         return m_table;
     }
@@ -1703,7 +1703,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression 
     // and binds it to a Query at a later time
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         return m_table;
     }
@@ -1815,10 +1815,9 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
-        const Table* l = m_left.get_table();
-        return l;
+        return m_left.get_table();
     }
 
     // destination = operator(left)
@@ -1864,7 +1863,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
@@ -1932,7 +1931,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
