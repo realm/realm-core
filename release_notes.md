@@ -64,7 +64,8 @@
 * The code coverage CI job now builds with the `-fno-elide-constructors` flag,
   which should improve the depth of the coverage analysis. All bugs that were
   blocking the use of this flag have been fixed.
-
+* SharedGroup no longer needs to remap the database file when it grows. This is
+  a key requirement for reusing the memory mapping across threads.
 ----------------------------------------------
 
 # 0.92.1 Release notes
