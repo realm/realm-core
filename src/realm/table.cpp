@@ -3686,6 +3686,7 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 TableView Table::get_backlink_view(std::size_t row_ndx, Table *src_table, std::size_t src_col_ndx)
 {
     TableView tv(src_table, this, src_col_ndx, row_ndx);
+    tv.do_sync();
     return tv;
 }
 
