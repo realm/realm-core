@@ -917,11 +917,11 @@ EOF
             fi
 
             # Build realm
-            PATH="$path" CC="$cc" $MAKE -C "src/realm" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "librealm-$denom.a" "librealm-dbg-$denom.a" || exit 1
+            PATH="$path" CC="$cc" $MAKE -C "src/realm" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "librealm-$denom.a" "librealm-$denom-dbg.a" || exit 1
 
             if [ "$enable_encryption" = "yes" ]; then
                 # Merge OpenSSL and Realm into one static library
-                for lib_name in "librealm-$denom.a" "librealm-dbg-$denom.a"; do
+                for lib_name in "librealm-$denom.a" "librealm-$denom-dbg.a"; do
                     (
                         TMP_FOLDER=$(mktemp -d /tmp/$$.XXXXXX)
                         cd $TMP_FOLDER
@@ -954,7 +954,7 @@ EOF
                 cat openssl/LICENSE >> $ANDROID_DIR/OpenSSL.txt
             else
                 cp "src/realm/librealm-$denom.a" "$ANDROID_DIR" || exit 1
-                cp "src/realm/librealm-dbg-$denom.a" "$ANDROID_DIR" || exit 1
+                cp "src/realm/librealm-$denom-dbg.a" "$ANDROID_DIR" || exit 1
             fi
 
             rm -rf "$temp_dir" || exit 1
