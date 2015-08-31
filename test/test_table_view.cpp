@@ -1610,7 +1610,7 @@ TEST(TableView_UnderlyingRowRemoval)
     }
 }
 
-ONLY(TableView_Backlinks)
+TEST(TableView_Backlinks)
 {
     Group group;
 
@@ -1621,13 +1621,14 @@ ONLY(TableView_Backlinks)
     links->add_column_link(type_Link, "link", *source);
     links->add_column_link(type_LinkList, "link_list", *source);
 
+    source->add_empty_row(3);
+
     { // Links
         TableView tv = source->get_backlink_view(2, links.get(), 0);
         tv.sync_if_needed();
 
         CHECK_EQUAL(tv.size(), 0);
 
-        source->add_empty_row(3);
         links->add_empty_row();
         links->set_link(0, 0, 2);
 
