@@ -1377,7 +1377,12 @@ void Table::upgrade_file_format()
                     col.populate_search_index();
                     break;
                 }
-                case col_type_StringEnum:
+                case col_type_StringEnum: {
+                    StringEnumColumn& col = get_column_string_enum(c);
+                    col.get_search_index()->clear();
+                    col.populate_search_index();
+                    break;
+                }
                 case col_type_Binary:
                 case col_type_Table:
                 case col_type_Mixed:
@@ -1388,7 +1393,7 @@ void Table::upgrade_file_format()
                 case col_type_Link:
                 case col_type_LinkList:
                 case col_type_BackLink:
-                    // The rest of the column types are not supported
+                    // Indices are not support on these column types
                     REALM_ASSERT(false);
             }
 
