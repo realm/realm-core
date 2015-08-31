@@ -1359,26 +1359,26 @@ bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
 
 void Table::upgrade_file_format()
 {
-    for (size_t c = 0; c < get_column_count(); c++) {
-        if (has_search_index(c)) {
-            ColumnType t = get_real_column_type(c);
-            switch (t) {
+    for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+        if (has_search_index(col_ndx)) {
+            ColumnType col_type = get_real_column_type(col_ndx);
+            switch (col_type) {
                 case col_type_String: {
-                    StringColumn& asc = get_column_string(c);
-                    asc.get_search_index()->clear();
-                    asc.populate_search_index();
+                    StringColumn& col = get_column_string(col_ndx);
+                    col.get_search_index()->clear();
+                    col.populate_search_index();
                     break;
                 }
                 case col_type_Bool:
                 case col_type_Int:
                 case col_type_DateTime: {
-                    IntegerColumn& col = get_column(c);
+                    IntegerColumn& col = get_column(col_ndx);
                     col.get_search_index()->clear();
                     col.populate_search_index();
                     break;
                 }
                 case col_type_StringEnum: {
-                    StringEnumColumn& col = get_column_string_enum(c);
+                    StringEnumColumn& col = get_column_string_enum(col_ndx);
                     col.get_search_index()->clear();
                     col.populate_search_index();
                     break;
