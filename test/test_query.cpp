@@ -6380,8 +6380,10 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, { 0, 2 }));
 
     // You can also compare against user-given null with > and <
-    CHECK(equals((price > null()).find_all(), { }));
-    CHECK(equals((price + rating > null()).find_all(), { }));
+    tv = (price > null()).find_all();
+    CHECK(equals(tv, { }));
+    tv = (price + rating > null()).find_all();
+    CHECK(equals(tv, { }));
 
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
