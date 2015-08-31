@@ -96,7 +96,7 @@ public:
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     std::size_t count(std::size_t key_index) const;
-    std::size_t find_first(std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
+    std::size_t find_first(std::size_t key_index, std::size_t begin = 0, std::size_t end = -1) const;
     void find_all(IntegerColumn& res, std::size_t key_index, std::size_t begin = 0, std::size_t end = -1) const;
 
     //@{
@@ -105,6 +105,7 @@ public:
     /// according to StringData::operator<().
     std::size_t lower_bound_string(StringData value) const REALM_NOEXCEPT;
     std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
+
     //@}
 
     void set_string(std::size_t, StringData) override;
@@ -143,6 +144,7 @@ public:
 #endif
 
 private:
+
     // Member variables
     StringColumn m_keys;
     bool m_nullable;
@@ -293,7 +295,7 @@ inline void StringEnumColumn::set_string(std::size_t row_ndx, StringData value)
 
 inline void StringEnumColumn::set_null(std::size_t row_ndx)
 {
-    set(row_ndx, realm::null{});
+    set(row_ndx, realm::null {});
 }
 
 inline StringColumn& StringEnumColumn::get_keys()

@@ -42,7 +42,9 @@ MemRef StringEnumColumn::clone_deep(Allocator& alloc) const
     size_t n = size();
     for (size_t i = 0; i < n; ++i)
         new_col.add(get(i)); // Throws
-    return MemRef{new_col.get_ref(), alloc};
+    return MemRef {
+               new_col.get_ref(), alloc
+    };
 }
 
 void StringEnumColumn::adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT
@@ -66,7 +68,9 @@ void StringEnumColumn::set(size_t ndx, StringData value)
     REALM_ASSERT_3(ndx, <, IntegerColumn::size());
 
     if (!is_nullable() && value.is_null()) {
-        throw LogicError{LogicError::column_not_nullable};
+        throw LogicError {
+                  LogicError::column_not_nullable
+        };
     }
 
     // Update search index
@@ -167,6 +171,7 @@ size_t StringEnumColumn::count(StringData value) const
     size_t key_ndx = m_keys.find_first(value);
     if (key_ndx == not_found)
         return 0;
+
     return IntegerColumn::count(key_ndx);
 }
 
@@ -179,6 +184,7 @@ void StringEnumColumn::find_all(IntegerColumn& res, StringData value, size_t beg
     size_t key_ndx = m_keys.find_first(value);
     if (key_ndx == size_t(-1))
         return;
+
     IntegerColumn::find_all(res, key_ndx, begin, end);
 }
 
@@ -186,6 +192,7 @@ void StringEnumColumn::find_all(IntegerColumn& res, size_t key_ndx, size_t begin
 {
     if (key_ndx == size_t(-1))
         return;
+
     IntegerColumn::find_all(res, key_ndx, begin, end);
 }
 
@@ -241,6 +248,7 @@ bool StringEnumColumn::compare_string(const StringColumn& c) const
     size_t n = size();
     if (c.size() != n)
         return false;
+
     for (size_t i = 0; i != n; ++i) {
         if (get(i) != c.get(i))
             return false;
@@ -253,6 +261,7 @@ bool StringEnumColumn::compare_string(const StringEnumColumn& c) const
     size_t n = size();
     if (c.size() != n)
         return false;
+
     for (size_t i = 0; i != n; ++i) {
         if (get(i) != c.get(i))
             return false;
@@ -333,6 +342,7 @@ void StringEnumColumn::verify() const
 
     if (m_search_index) {
         m_search_index->verify();
+
         // FIXME: Verify search index contents in a way similar to what is done
         // in StringColumn::verify().
     }
@@ -380,7 +390,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << std::setw(indent) << "" << "String enumeration leaf (size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << "" << "String enumeration leaf (size: " << leaf.size() << ")\n";
 }
 
 } // anonymous namespace
@@ -390,7 +400,7 @@ void StringEnumColumn::do_dump_node_structure(std::ostream& out, int level) cons
     get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;
     out << std::setw(indent) << "" << "Search index\n";
-    m_search_index->do_dump_node_structure(out, level+1);
+    m_search_index->do_dump_node_structure(out, level + 1);
 }
 
 #endif // REALM_DEBUG

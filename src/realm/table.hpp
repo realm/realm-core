@@ -51,12 +51,15 @@ class LinkColumnBase;
 class LinkColumn;
 class LinkListColumn;
 class BacklinkColumn;
-template<class> class Columns;
+template<class>
+class Columns;
 
 struct Link {};
 typedef Link LinkList;
 
-namespace _impl { class TableFriend; }
+namespace _impl {
+class TableFriend;
+}
 
 class Replication;
 
@@ -81,6 +84,7 @@ class Replication;
 /// should REALM_ASSERT(is_attached()).
 class Table {
 public:
+
     /// Construct a new freestanding top-level table with static
     /// lifetime.
     ///
@@ -166,6 +170,7 @@ public:
     DataType    get_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
     StringData  get_column_name(std::size_t column_ndx) const REALM_NOEXCEPT;
     std::size_t get_column_index(StringData name) const REALM_NOEXCEPT;
+
     //@}
 
     //@{
@@ -210,6 +215,7 @@ public:
                             LinkType link_type = link_Weak);
     void remove_column(std::size_t column_ndx);
     void rename_column(std::size_t column_ndx, StringData new_name);
+
     //@}
 
     //@{
@@ -248,6 +254,7 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(std::size_t column_ndx) const REALM_NOEXCEPT;
+
 //    void remove_search_index(size_t col_ndx);
     void add_search_index(std::size_t column_ndx);
     void remove_search_index(std::size_t column_ndx);
@@ -270,6 +277,7 @@ public:
     /// \sa has_shared_type()
     DescriptorRef get_descriptor();
     ConstDescriptorRef get_descriptor() const;
+
     //@}
 
     //@{
@@ -280,6 +288,7 @@ public:
     /// on the descriptor returned by `get_descriptor()`.
     DescriptorRef get_subdescriptor(std::size_t column_ndx);
     ConstDescriptorRef get_subdescriptor(std::size_t column_ndx) const;
+
     //@}
 
     //@{
@@ -292,6 +301,7 @@ public:
     typedef std::vector<std::size_t> path_vec;
     DescriptorRef get_subdescriptor(const path_vec& path);
     ConstDescriptorRef get_subdescriptor(const path_vec& path) const;
+
     //@}
 
     //@{
@@ -312,6 +322,7 @@ public:
                           DataType type, StringData name);
     void remove_subcolumn(const path_vec& path, std::size_t column_ndx);
     void rename_subcolumn(const path_vec& path, std::size_t column_ndx, StringData new_name);
+
     //@}
 
     /// Does this table share its type with other tables?
@@ -339,7 +350,8 @@ public:
     bool has_shared_type() const REALM_NOEXCEPT;
 
 
-    template<class T> Columns<T> column(std::size_t column); // FIXME: Should this one have been declared REALM_NOEXCEPT?
+    template<class T>
+    Columns<T> column(std::size_t column);                   // FIXME: Should this one have been declared REALM_NOEXCEPT?
 
     // Table size and deletion
     bool is_empty() const REALM_NOEXCEPT;
@@ -439,7 +451,8 @@ public:
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
     void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
-    template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
+    template<class E>
+    void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
     void set_float(std::size_t column_ndx, std::size_t row_ndx, float value);
     void set_double(std::size_t column_ndx, std::size_t row_ndx, double value);
     void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
@@ -468,7 +481,7 @@ public:
     TableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx);
     ConstTableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx) const;
     std::size_t get_subtable_size(std::size_t column_ndx, std::size_t row_ndx)
-        const REALM_NOEXCEPT;
+    const REALM_NOEXCEPT;
     void clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
     // Backlinks
@@ -476,7 +489,7 @@ public:
                                    std::size_t origin_col_ndx) const REALM_NOEXCEPT;
     std::size_t get_backlink(std::size_t row_ndx, const Table& origin,
                              std::size_t origin_col_ndx, std::size_t backlink_ndx) const
-        REALM_NOEXCEPT;
+    REALM_NOEXCEPT;
 
 
     //@{
@@ -603,12 +616,18 @@ public:
     };
 
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
-    void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const IntegerColumn* viewrefs = nullptr) const;
+    void aggregate(size_t               group_by_column,
+                   size_t               aggr_column,
+                   AggrType             op,
+                   Table&               result,
+                   const IntegerColumn* viewrefs = nullptr) const;
 
 
 private:
-    template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
-    template <class T> TableView find_all(size_t column_ndx, T value);
+    template<class T>
+    std::size_t find_first(std::size_t column_ndx, T value) const;                    // called by above methods
+    template<class T>
+    TableView find_all(size_t column_ndx, T value);
 public:
 
 
@@ -651,6 +670,7 @@ public:
     std::size_t upper_bound_double(std::size_t column_ndx, double value) const REALM_NOEXCEPT;
     std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const REALM_NOEXCEPT;
     std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const REALM_NOEXCEPT;
+
     //@}
 
     // Queries
@@ -705,7 +725,7 @@ public:
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string,
-                 std::string>* renames = 0) const;
+                                                                    std::string>* renames = 0) const;
     void to_string(std::ostream& out, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
@@ -757,6 +777,7 @@ public:
     class Parent;
 
 protected:
+
     /// Get a pointer to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
     ///
@@ -968,11 +989,11 @@ private:
 
     // recursive methods called by to_json, to follow links
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-        std::vector<ref_type>& followed) const;
+                 std::vector<ref_type>& followed) const;
     void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth,
-        std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
+                     std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
     void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
+                     std::map<std::string, std::string>* renames = nullptr) const;
 
     // Detach accessor from underlying table. Caller must ensure that
     // a reference count exists upon return, for example by obtaining
@@ -1028,8 +1049,10 @@ private:
 
     const ColumnBase& get_column_base(std::size_t column_ndx) const REALM_NOEXCEPT;
     ColumnBase& get_column_base(std::size_t column_ndx);
-    template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
-    template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
+    template<class T, ColumnType col_type>
+    T& get_column(std::size_t ndx);
+    template<class T, ColumnType col_type>
+    const T& get_column(std::size_t ndx) const REALM_NOEXCEPT;
     IntegerColumn& get_column(std::size_t column_ndx);
     const IntegerColumn& get_column(std::size_t column_ndx) const REALM_NOEXCEPT;
     IntNullColumn& get_column_int_null(std::size_t column_ndx);
@@ -1311,13 +1334,16 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
-    template<class> friend class util::bind_ptr;
+    template<class>
+    friend class util::bind_ptr;
     friend class LangBindHelper;
     friend class TableViewBase;
-    template<class T> friend class Columns;
+    template<class T>
+    friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template<class> friend class SequentialGetter;
+    template<class>
+    friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;
@@ -1375,8 +1401,9 @@ inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
         m_top.get_alloc().bump_global_version();
     }
     if (m_top.get_alloc().should_propagate_version(m_version)) {
-        if (const Table* parent = get_parent_table_ptr())
+        if (const Table * parent = get_parent_table_ptr())
             parent->bump_version(false);
+
         // Recurse through linked tables, use m_mark to avoid infinite recursion
         std::size_t limit = m_cols.size();
         for (std::size_t i = 0; i < limit; ++i) {
@@ -1386,7 +1413,7 @@ inline void Table::bump_version(bool bump_global) const REALM_NOEXCEPT
             // pending as well. In this case it is ok to just ignore the zeroed
             // backlink column, because the origin table is guaranteed to also
             // be refreshed/marked dirty and hence have it's version bumped.
-            if (ColumnBase* col = m_cols[i])
+            if (ColumnBase * col = m_cols[i])
                 col->bump_link_origin_table_version();
         }
     }
@@ -1407,7 +1434,7 @@ inline void Table::move_last_over(size_t row_ndx)
 inline void Table::remove_last()
 {
     if (!is_empty())
-        remove(size()-1);
+        remove(size() - 1);
 }
 
 inline void Table::register_view(const TableViewBase* view)
@@ -1439,6 +1466,7 @@ inline StringData Table::get_name() const REALM_NOEXCEPT
     ArrayParent* parent = real_top.get_parent();
     if (!parent)
         return StringData("");
+
     std::size_t index_in_parent = real_top.get_ndx_in_parent();
     REALM_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->get_child_name(index_in_parent);
@@ -1474,7 +1502,8 @@ inline DataType Table::get_column_type(std::size_t ndx) const REALM_NOEXCEPT
     return m_spec.get_public_column_type(ndx);
 }
 
-template<class Col, ColumnType col_type> inline Col& Table::get_column(std::size_t ndx)
+template<class Col, ColumnType col_type>
+inline Col& Table::get_column(std::size_t ndx)
 {
     ColumnBase& col = get_column_base(ndx);
 #ifdef REALM_DEBUG
@@ -1604,14 +1633,15 @@ inline TableRef Table::copy(Allocator& alloc) const
 }
 
 // For use by queries
-template<class T> inline Columns<T> Table::column(std::size_t column)
+template<class T>
+inline Columns<T> Table::column(std::size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
         tmp.push_back(column);
     }
 
-    // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our 
+    // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(m_link_chain);
 
@@ -1673,12 +1703,12 @@ inline Table::ConstRowExpr Table::front() const REALM_NOEXCEPT
 
 inline Table::RowExpr Table::back() REALM_NOEXCEPT
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::ConstRowExpr Table::back() const REALM_NOEXCEPT
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::RowExpr Table::operator[](std::size_t row_ndx) REALM_NOEXCEPT
@@ -1838,7 +1868,7 @@ inline std::size_t* Table::record_subtable_path(std::size_t* begin,
 }
 
 inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
-                                                        std::size_t*) REALM_NOEXCEPT
+                                                        std::size_t  *) REALM_NOEXCEPT
 {
     return begin;
 }
@@ -1968,7 +1998,7 @@ public:
     }
 
     static void discard_subtable_accessor(Table& table, std::size_t col_ndx, std::size_t row_ndx)
-        REALM_NOEXCEPT
+    REALM_NOEXCEPT
     {
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
@@ -2039,7 +2069,7 @@ public:
     }
 
     static std::size_t get_num_strong_backlinks(const Table& table,
-                                                std::size_t row_ndx) REALM_NOEXCEPT
+                                                std::size_t  row_ndx) REALM_NOEXCEPT
     {
         return table.get_num_strong_backlinks(row_ndx);
     }
@@ -2106,7 +2136,7 @@ public:
     }
 
     static const Table* get_link_target_table_accessor(const Table& table,
-                                                       std::size_t col_ndx) REALM_NOEXCEPT
+                                                       std::size_t  col_ndx) REALM_NOEXCEPT
     {
         return const_cast<Table&>(table).get_link_target_table_accessor(col_ndx);
     }
@@ -2212,7 +2242,7 @@ public:
     }
 
     static void set_shared_subspec_ndx_in_parent(Table& table, std::size_t spec_ndx_in_parent)
-        REALM_NOEXCEPT
+    REALM_NOEXCEPT
     {
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }

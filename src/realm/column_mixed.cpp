@@ -83,6 +83,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
         case mixcol_Double:
         case mixcol_DoubleNeg:
             goto carry_on;
+
         case mixcol_String:
         case mixcol_Binary: {
             // If item is in middle of the column, we just clear it to avoid
@@ -90,7 +91,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             //
             // FIXME: this is a leak. We should adjust
             size_t data_ndx = size_t(uint64_t(m_data->get(row_ndx)) >> 1);
-            if (data_ndx == m_binary_data->size()-1) {
+            if (data_ndx == m_binary_data->size() - 1) {
                 bool is_last = true;
                 m_binary_data->erase(data_ndx, is_last);
             }
@@ -101,12 +102,14 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             }
             goto carry_on;
         }
+
         case mixcol_Table: {
             // Delete entire table
             ref_type ref = m_data->get_as_ref(row_ndx);
             Array::destroy_deep(ref, m_data->get_alloc());
             goto carry_on;
         }
+
         case mixcol_Mixed:
             break;
     }
@@ -130,6 +133,7 @@ void MixedColumn::do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prio
     bool is_last = (row_ndx + num_rows_to_erase == prior_num_rows);
     for (size_t i = num_rows_to_erase; i > 0; --i) {
         size_t row_ndx_2 = row_ndx + i - 1;
+
         // Remove refs or binary data
         clear_value(row_ndx_2, mixcol_Int); // Throws
         m_types->erase(row_ndx, is_last); // Throws
@@ -174,9 +178,14 @@ DataType MixedColumn::get_type(size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
     switch (coltype) {
-        case mixcol_IntNeg:    return type_Int;
-        case mixcol_DoubleNeg: return type_Double;
-        default: return DataType(coltype);   // all others must be in sync with ColumnType
+        case mixcol_IntNeg:
+            return type_Int;
+
+        case mixcol_DoubleNeg:
+            return type_Double;
+
+        default:
+            return DataType(coltype);        // all others must be in sync with ColumnType
     }
 }
 
@@ -253,39 +262,56 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
     if (c.size() != n)
         return false;
 
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i<n; ++i) {
         DataType type = get_type(i);
         if (c.get_type(i) != type)
             return false;
+
         switch (type) {
             case type_Int:
                 if (get_int(i) != c.get_int(i)) return false;
+
                 break;
+
             case type_Bool:
                 if (get_bool(i) != c.get_bool(i)) return false;
+
                 break;
+
             case type_DateTime:
                 if (get_datetime(i) != c.get_datetime(i)) return false;
+
                 break;
+
             case type_Float:
                 if (get_float(i) != c.get_float(i)) return false;
+
                 break;
+
             case type_Double:
                 if (get_double(i) != c.get_double(i)) return false;
+
                 break;
+
             case type_String:
                 if (get_string(i) != c.get_string(i)) return false;
+
                 break;
+
             case type_Binary:
                 if (get_binary(i) != c.get_binary(i)) return false;
+
                 break;
+
             case type_Table: {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
                 if (*t1 != *t2)
                     return false;
+
                 break;
             }
+
             case type_Mixed:
             case type_Link:
             case type_LinkList:

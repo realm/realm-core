@@ -29,7 +29,9 @@
 
 namespace realm {
 
-namespace _impl { class DescriptorFriend; }
+namespace _impl {
+class DescriptorFriend;
+}
 
 
 /// Accessor for table type descriptors.
@@ -66,6 +68,7 @@ namespace _impl { class DescriptorFriend; }
 /// \sa Table::get_descriptor()
 class Descriptor {
 public:
+
     /// Get the number of columns in the associated tables.
     std::size_t get_column_count() const REALM_NOEXCEPT;
 
@@ -154,10 +157,11 @@ public:
     void insert_column(std::size_t col_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0, bool nullable = false);
 
-    std::size_t add_column_link(DataType type, StringData name, Table& target,
+    std::size_t add_column_link(DataType type, StringData name, Table & target,
                                 LinkType = link_Weak);
-    void insert_column_link(std::size_t col_ndx, DataType type, StringData name, Table& target,
+    void insert_column_link(std::size_t col_ndx, DataType type, StringData name, Table & target,
                             LinkType = link_Weak);
+
     //@}
 
     /// Remove the specified column from each of the associated
@@ -297,6 +301,7 @@ public:
     /// \sa is_root()
     DescriptorRef get_subdescriptor(std::size_t column_ndx);
     ConstDescriptorRef get_subdescriptor(std::size_t column_ndx) const;
+
     //@}
 
     //@{
@@ -309,6 +314,7 @@ public:
     /// \sa is_root()
     DescriptorRef get_parent() REALM_NOEXCEPT;
     ConstDescriptorRef get_parent() const REALM_NOEXCEPT;
+
     //@}
 
     //@{
@@ -318,6 +324,7 @@ public:
     /// \sa is_root()
     TableRef get_root_table() REALM_NOEXCEPT;
     ConstTableRef get_root_table() const REALM_NOEXCEPT;
+
     //@}
 
     //@{
@@ -326,6 +333,7 @@ public:
     /// link column (`type_Link` or `type_LinkList`).
     TableRef get_link_target(size_t col_ndx) REALM_NOEXCEPT;
     ConstTableRef get_link_target(size_t col_ndx) const REALM_NOEXCEPT;
+
     //@}
 
     /// Is this a root descriptor?
@@ -391,6 +399,7 @@ public:
     /// undefined.
     bool operator==(const Descriptor&) const REALM_NOEXCEPT;
     bool operator!=(const Descriptor&) const REALM_NOEXCEPT;
+
     //@}
 
     /// If the specified column is optimized to store only unique values, then
@@ -582,6 +591,7 @@ inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, String
         throw LogicError(LogicError::illegal_type);
     if (REALM_UNLIKELY(!is_root()))
         throw LogicError(LogicError::wrong_kind_of_descriptor);
+
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = tf::get_parent_group(*get_root_table());
     Group* target_group = tf::get_parent_group(target);
@@ -736,7 +746,7 @@ public:
     }
 
     static void attach(Descriptor& desc, Table* table, Descriptor* parent, Spec* spec)
-        REALM_NOEXCEPT
+    REALM_NOEXCEPT
     {
         desc.attach(table, parent, spec);
     }
@@ -773,7 +783,7 @@ public:
     }
 
     static Descriptor* get_subdesc_accessor(Descriptor& desc, std::size_t column_ndx)
-        REALM_NOEXCEPT
+    REALM_NOEXCEPT
     {
         return desc.get_subdesc_accessor(column_ndx);
     }

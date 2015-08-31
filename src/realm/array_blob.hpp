@@ -65,7 +65,7 @@ public:
 private:
     std::size_t calc_byte_len(std::size_t count, std::size_t width) const override;
     std::size_t calc_item_count(std::size_t bytes,
-                              std::size_t width) const REALM_NOEXCEPT override;
+                                std::size_t width) const REALM_NOEXCEPT override;
     WidthType GetWidthType() const override { return wtype_Ignore; }
 };
 
@@ -82,7 +82,7 @@ inline ArrayBlob::ArrayBlob(Allocator& alloc) REALM_NOEXCEPT:
 
 inline bool ArrayBlob::is_null(std::size_t index) const REALM_NOEXCEPT
 {
-    return (get(index) == nullptr);
+    return get(index) == nullptr;
 }
 
 inline const char* ArrayBlob::get(std::size_t index) const REALM_NOEXCEPT

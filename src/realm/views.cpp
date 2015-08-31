@@ -11,6 +11,7 @@ void RowIndexes::sort(Sorter& sorting_predicate)
 
     std::vector<size_t> v;
     v.reserve(sz);
+
     // always put any detached refs at the end of the sort
     // FIXME: reconsider if this is the right thing to do
     // FIXME: consider specialized implementations in derived classes

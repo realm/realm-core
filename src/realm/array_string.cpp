@@ -17,7 +17,7 @@ namespace {
 
 const int max_width = 64;
 
-// Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
+// Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty
 // strings in as little space as possible, because 0 can only store nulls.
 size_t round_up(size_t size)
 {
@@ -77,11 +77,11 @@ void ArrayString::set(size_t ndx, StringData value)
         alloc(m_size, new_width); // Throws
 
         char* base = m_data;
-        char* new_end = base + m_size*new_width;
+        char* new_end = base + m_size * new_width;
 
         // Expand the old values in reverse order
         if (0 < m_width) {
-            const char* old_end = base + m_size*m_width;
+            const char* old_end = base + m_size * m_width;
             while (new_end != base) {
                 *--new_end = char(*--old_end + (new_width - m_width));
                 {
@@ -102,8 +102,8 @@ void ArrayString::set(size_t ndx, StringData value)
         else {
             // m_width == 0. Expand to new width.
             while (new_end != base) {
-                REALM_ASSERT_3(new_width, <= , max_width);
-                *--new_end = static_cast<char>(new_width); 
+                REALM_ASSERT_3(new_width, <=, max_width);
+                *--new_end = static_cast<char>(new_width);
                 {
                     char* new_begin = new_end - (new_width - 1);
                     std::fill(new_begin, new_end, 0); // Fill with zero bytes
@@ -125,7 +125,7 @@ void ArrayString::set(size_t ndx, StringData value)
     REALM_STATIC_ASSERT(max_width <= max_width, "Padding size must fit in 7-bits");
 
     if (value.is_null()) {
-        REALM_ASSERT_3(m_width, <= , 128);
+        REALM_ASSERT_3(m_width, <=, 128);
         *end = static_cast<char>(m_width);
     }
     else {
@@ -169,9 +169,9 @@ void ArrayString::erase(size_t ndx)
 
     // move data backwards after deletion
     if (ndx < m_size - 1) {
-        char* new_begin = m_data + ndx*m_width;
+        char* new_begin = m_data + ndx * m_width;
         char* old_begin = new_begin + m_width;
-        char* old_end = m_data + m_size*m_width;
+        char* old_end = m_data + m_size * m_width;
         std::copy(old_begin, old_end, new_begin);
     }
 
@@ -240,6 +240,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         const char* data = m_data + (m_width - 1);
         for (size_t i = begin; i != end; ++i) {
             size_t size = (m_width - 1) - data[i * m_width];
+
             // left-hand-side tests if array element is NULL
             if (REALM_UNLIKELY(size == 0))
                 return i;
@@ -257,6 +258,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
                     size_t size = (m_width - 1) - data[m_width - 1];
                     if (REALM_LIKELY(size == value.size()))
                         return i;
+
                     break;
                 }
             }
@@ -267,7 +269,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 }
 
 void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_offset,
-    size_t begin, size_t end)
+                           size_t begin, size_t end)
 {
     size_t begin_2 = begin;
     for (;;) {

@@ -40,18 +40,19 @@ void SimulatedFailure::do_check(type failure_type)
 
 namespace {
 
-    const int num_failure_types = SimulatedFailure::_num_failure_types;
-    pthread_key_t key;
+const int num_failure_types = SimulatedFailure::_num_failure_types;
+pthread_key_t key;
 
-    bool * get_threadlocal_primed_failure_types() {
-        pthread_key_create(&key, NULL);
-        if (bool *primed_failure_types = static_cast<bool *>(pthread_getspecific(key))) {
-            return primed_failure_types;
-        }
-        auto primed_failure_types = calloc(num_failure_types, sizeof(bool));
-        pthread_setspecific(key, primed_failure_types);
-        return static_cast<bool *>(primed_failure_types);
+bool* get_threadlocal_primed_failure_types()
+{
+    pthread_key_create(&key, NULL);
+    if (bool* primed_failure_types = static_cast<bool*>(pthread_getspecific(key))) {
+        return primed_failure_types;
     }
+    auto primed_failure_types = calloc(num_failure_types, sizeof(bool));
+    pthread_setspecific(key, primed_failure_types);
+    return static_cast<bool*>(primed_failure_types);
+}
 
 } // anonymous namespace
 

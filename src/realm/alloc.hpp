@@ -66,6 +66,7 @@ public:
 /// \sa SlabAlloc
 class Allocator {
 public:
+
     /// The specified size must be divisible by 8, and must not be
     /// zero.
     ///
@@ -209,6 +210,7 @@ inline int_fast64_t from_ref(ref_type v) REALM_NOEXCEPT
 inline ref_type to_ref(int_fast64_t v) REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<ref_type>(v));
+
     // Check that v is divisible by 8 (64-bit aligned).
     REALM_ASSERT_DEBUG(v % 8 == 0);
     return ref_type(v);

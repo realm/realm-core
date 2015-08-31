@@ -36,13 +36,15 @@ namespace util {
 /// type to 'stdout', since it will convert values of character-like
 /// types to regular integer types, which will then be printed as
 /// numbers rather characters.
-template<class T> typename Promote<T>::type promote(T value) REALM_NOEXCEPT;
+template<class T>
+typename Promote<T>::type promote(T value) REALM_NOEXCEPT;
 
 
 /// This function allows you to test for a negative value in any
 /// numeric type, even when the type is unsigned. Normally, when the
 /// type is unsigned, such a test will produce a compiler warning.
-template<class T> bool is_negative(T value) REALM_NOEXCEPT;
+template<class T>
+bool is_negative(T value) REALM_NOEXCEPT;
 
 
 /// Cast the specified value to the specified unsigned type reducing
@@ -50,7 +52,8 @@ template<class T> bool is_negative(T value) REALM_NOEXCEPT;
 /// representation) modulo `2**N` where `N` is the number of value
 /// bits (or digits) in the unsigned target type. This is usefull in
 /// cases where the target type may be `bool`, but need not be `bool`.
-template<class To, class From> To cast_to_unsigned(From) REALM_NOEXCEPT;
+template<class To, class From>
+To cast_to_unsigned(From) REALM_NOEXCEPT;
 
 
 //@{
@@ -77,12 +80,18 @@ template<class To, class From> To cast_to_unsigned(From) REALM_NOEXCEPT;
 /// These functions make absolutely no assumptions about the platform
 /// except that it complies with at least C++03.
 
-template<class A, class B> inline bool int_equal_to(A,B) REALM_NOEXCEPT;
-template<class A, class B> inline bool int_not_equal_to(A,B) REALM_NOEXCEPT;
-template<class A, class B> inline bool int_less_than(A,B) REALM_NOEXCEPT;
-template<class A, class B> inline bool int_less_than_or_equal(A,B) REALM_NOEXCEPT;
-template<class A, class B> inline bool int_greater_than(A,B) REALM_NOEXCEPT;
-template<class A, class B> inline bool int_greater_than_or_equal(A,B) REALM_NOEXCEPT;
+template<class A, class B>
+inline bool int_equal_to(A,B) REALM_NOEXCEPT;
+template<class A, class B>
+inline bool int_not_equal_to(A,B) REALM_NOEXCEPT;
+template<class A, class B>
+inline bool int_less_than(A,B) REALM_NOEXCEPT;
+template<class A, class B>
+inline bool int_less_than_or_equal(A,B) REALM_NOEXCEPT;
+template<class A, class B>
+inline bool int_greater_than(A,B) REALM_NOEXCEPT;
+template<class A, class B>
+inline bool int_greater_than_or_equal(A,B) REALM_NOEXCEPT;
 
 //@}
 
@@ -151,7 +160,8 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) REALM_NOEXCEPT;
 ///
 /// This function makes absolutely no assumptions about the platform
 /// except that it complies with at least C++03.
-template<class T> inline bool int_shift_left_with_overflow_detect(T& lval, int i) REALM_NOEXCEPT;
+template<class T>
+inline bool int_shift_left_with_overflow_detect(T& lval, int i) REALM_NOEXCEPT;
 
 
 //@{
@@ -216,7 +226,8 @@ bool int_cast_with_overflow_detect(From from, To& to) REALM_NOEXCEPT;
 /// representation.
 ///
 /// \tparam To A signed or unsigned integer type.
-template<class To, class From> To from_twos_compl(From twos_compl) REALM_NOEXCEPT;
+template<class To, class From>
+To from_twos_compl(From twos_compl) REALM_NOEXCEPT;
 
 
 
@@ -225,7 +236,8 @@ template<class To, class From> To from_twos_compl(From twos_compl) REALM_NOEXCEP
 
 // Implementation:
 
-template<class T> inline typename Promote<T>::type promote(T value) REALM_NOEXCEPT
+template<class T>
+inline typename Promote<T>::type promote(T value) REALM_NOEXCEPT
 {
     typedef typename Promote<T>::type promoted_type;
     promoted_type value_2 = promoted_type(value);
@@ -236,33 +248,40 @@ template<class T> inline typename Promote<T>::type promote(T value) REALM_NOEXCE
 
 namespace _impl {
 
-template<class T, bool is_signed> struct IsNegative {
+template<class T, bool is_signed>
+struct IsNegative {
     static bool test(T value) REALM_NOEXCEPT
     {
         return value < 0;
     }
 };
-template<class T> struct IsNegative<T, false> {
+template<class T>
+struct IsNegative<T, false> {
     static bool test(T) REALM_NOEXCEPT
     {
         return false;
     }
 };
 
-template<class To> struct CastToUnsigned {
-    template<class From> static To cast(From value) REALM_NOEXCEPT
+template<class To>
+struct CastToUnsigned {
+    template<class From>
+    static To cast(From value) REALM_NOEXCEPT
     {
         return To(value);
     }
 };
-template<> struct CastToUnsigned<bool> {
-    template<class From> static bool cast(From value) REALM_NOEXCEPT
+template<>
+struct CastToUnsigned<bool> {
+    template<class From>
+    static bool cast(From value) REALM_NOEXCEPT
     {
         return bool(unsigned(value) & 1);
     }
 };
 
-template<class L, class R, bool l_signed, bool r_signed> struct SafeIntBinopsImpl {};
+template<class L, class R, bool l_signed, bool r_signed>
+struct SafeIntBinopsImpl {};
 
 // (unsigned, unsigned) (all size combinations)
 //
@@ -275,7 +294,8 @@ template<class L, class R, bool l_signed, bool r_signed> struct SafeIntBinopsImp
 // overflows, then the result must be a value that is less than both
 // operands. Also, if modular subtraction overflows, then the result
 // must be a value that is greater than the first operand.
-template<class L, class R> struct SafeIntBinopsImpl<L, R, false, false> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, false, false> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     static const int needed_bits_l = lim_l::digits;
@@ -296,6 +316,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, false> {
         bool overflow = common_unsigned(lval_2) < common_unsigned(rval);
         if (REALM_UNLIKELY(overflow))
             return true;
+
         lval = lval_2;
         return false;
     }
@@ -305,13 +326,15 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, false> {
         bool overflow = lval_2 > common_unsigned(lval);
         if (REALM_UNLIKELY(overflow))
             return true;
+
         lval = util::cast_to_unsigned<L>(lval_2);
         return false;
     }
 };
 
 // (unsigned, signed) (all size combinations)
-template<class L, class R> struct SafeIntBinopsImpl<L, R, false, true> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, false, true> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     static const int needed_bits_l = lim_l::digits;
@@ -322,12 +345,12 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, true> {
     static bool equal(L l, R r) REALM_NOEXCEPT
     {
         return (lim_l::digits > lim_r::digits) ?
-            r >= 0 && l == util::cast_to_unsigned<L>(r) : R(l) == r;
+               r >= 0 && l == util::cast_to_unsigned<L>(r) : R(l) == r;
     }
     static bool less(L l, R r) REALM_NOEXCEPT
     {
         return (lim_l::digits > lim_r::digits) ?
-            r >= 0 && l < util::cast_to_unsigned<L>(r) : R(l) < r;
+               r >= 0 && l < util::cast_to_unsigned<L>(r) : R(l) < r;
     }
     static bool add(L& lval, R rval) REALM_NOEXCEPT
     {
@@ -341,6 +364,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, true> {
         }
         if (REALM_UNLIKELY(overflow))
             return true;
+
         lval = util::cast_to_unsigned<L>(lval_2);
         return false;
     }
@@ -356,13 +380,15 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, true> {
         }
         if (REALM_UNLIKELY(overflow))
             return true;
+
         lval = util::cast_to_unsigned<L>(lval_2);
         return false;
     }
 };
 
 // (signed, unsigned) (all size combinations)
-template<class L, class R> struct SafeIntBinopsImpl<L, R, true, false> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, true, false> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     static const int needed_bits_l = lim_l::digits + 1;
@@ -372,12 +398,12 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, false> {
     static bool equal(L l, R r) REALM_NOEXCEPT
     {
         return (lim_l::digits < lim_r::digits) ?
-            l >= 0 && util::cast_to_unsigned<R>(l) == r : l == L(r);
+               l >= 0 && util::cast_to_unsigned<R>(l) == r : l == L(r);
     }
     static bool less(L l, R r) REALM_NOEXCEPT
     {
         return (lim_l::digits < lim_r::digits) ?
-            l < 0 || util::cast_to_unsigned<R>(l) < r : l < L(r);
+               l < 0 || util::cast_to_unsigned<R>(l) < r : l < L(r);
     }
     static bool add(L& lval, R rval) REALM_NOEXCEPT
     {
@@ -385,6 +411,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, false> {
         bool overflow = common_unsigned(rval) > max_add;
         if (REALM_UNLIKELY(overflow))
             return true;
+
         lval = util::from_twos_compl<L>(common_unsigned(lval) + rval);
         return false;
     }
@@ -394,13 +421,15 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, false> {
         bool overflow = common_unsigned(rval) > max_sub;
         if (REALM_UNLIKELY(overflow))
             return true;
+
         lval = util::from_twos_compl<L>(common_unsigned(lval) - rval);
         return false;
     }
 };
 
 // (signed, signed) (all size combinations)
-template<class L, class R> struct SafeIntBinopsImpl<L, R, true, true> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, true, true> {
     typedef std::numeric_limits<L> lim_l;
     static bool equal(L l, R r) REALM_NOEXCEPT
     {
@@ -426,6 +455,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, true> {
             if (REALM_UNLIKELY(lval > lim_l::max() - rval))
                 return true;
         }
+
         // The following statement has exactly the same effect as
         // `lval += rval`.
         lval = L(lval + rval);
@@ -446,6 +476,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, true> {
             if (REALM_UNLIKELY(lval < lim_l::min() + rval))
                 return true;
         }
+
         // The following statement has exactly the same effect as
         // `lval += rval`.
         lval = L(lval - rval);
@@ -455,56 +486,63 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, true> {
 
 template<class L, class R>
 struct SafeIntBinops: SafeIntBinopsImpl<L, R, std::numeric_limits<L>::is_signed,
-                                        std::numeric_limits<R>::is_signed>
-{
+                                        std::numeric_limits<R>::is_signed>{
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     REALM_STATIC_ASSERT(lim_l::is_specialized && lim_r::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
+                        "std::numeric_limits<> must be specialized for both types");
     REALM_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
-                          "Both types must be integers");
+                        "Both types must be integers");
 };
 
 } // namespace _impl
 
 namespace util {
 
-template<class T> inline bool is_negative(T value) REALM_NOEXCEPT
+template<class T>
+inline bool is_negative(T value) REALM_NOEXCEPT
 {
     return _impl::IsNegative<T, std::numeric_limits<T>::is_signed>::test(value);
 }
 
-template<class To, class From> inline To cast_to_unsigned(From value) REALM_NOEXCEPT
+template<class To, class From>
+inline To cast_to_unsigned(From value) REALM_NOEXCEPT
 {
     return _impl::CastToUnsigned<To>::cast(value);
 }
 
-template<class A, class B> inline bool int_equal_to(A a, B b) REALM_NOEXCEPT
+template<class A, class B>
+inline bool int_equal_to(A a, B b) REALM_NOEXCEPT
 {
     return _impl::SafeIntBinops<A,B>::equal(a,b);
 }
 
-template<class A, class B> inline bool int_not_equal_to(A a, B b) REALM_NOEXCEPT
+template<class A, class B>
+inline bool int_not_equal_to(A a, B b) REALM_NOEXCEPT
 {
     return !_impl::SafeIntBinops<A,B>::equal(a,b);
 }
 
-template<class A, class B> inline bool int_less_than(A a, B b) REALM_NOEXCEPT
+template<class A, class B>
+inline bool int_less_than(A a, B b) REALM_NOEXCEPT
 {
     return _impl::SafeIntBinops<A,B>::less(a,b);
 }
 
-template<class A, class B> inline bool int_less_than_or_equal(A a, B b) REALM_NOEXCEPT
+template<class A, class B>
+inline bool int_less_than_or_equal(A a, B b) REALM_NOEXCEPT
 {
     return !_impl::SafeIntBinops<B,A>::less(b,a); // Not greater than
 }
 
-template<class A, class B> inline bool int_greater_than(A a, B b) REALM_NOEXCEPT
+template<class A, class B>
+inline bool int_greater_than(A a, B b) REALM_NOEXCEPT
 {
     return _impl::SafeIntBinops<B,A>::less(b,a);
 }
 
-template<class A, class B> inline bool int_greater_than_or_equal(A a, B b) REALM_NOEXCEPT
+template<class A, class B>
+inline bool int_greater_than_or_equal(A a, B b) REALM_NOEXCEPT
 {
     return !_impl::SafeIntBinops<A,B>::less(a,b); // Not less than
 }
@@ -530,13 +568,14 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) REALM_NOEXCEPT
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     REALM_STATIC_ASSERT(lim_l::is_specialized && lim_r::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
+                        "std::numeric_limits<> must be specialized for both types");
     REALM_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
-                          "Both types must be integers");
+                        "Both types must be integers");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     REALM_ASSERT(int_greater_than(rval, 0));
     if (int_less_than(lim_r::max() / rval, lval))
         return true;
+
     lval = L(lval * rval);
     return false;
 }
@@ -546,12 +585,13 @@ inline bool int_shift_left_with_overflow_detect(T& lval, int i) REALM_NOEXCEPT
 {
     typedef std::numeric_limits<T> lim;
     REALM_STATIC_ASSERT(lim::is_specialized,
-                          "std::numeric_limits<> must be specialized for T");
+                        "std::numeric_limits<> must be specialized for T");
     REALM_STATIC_ASSERT(lim::is_integer,
-                          "T must be an integer type");
+                        "T must be an integer type");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     if ((lim::max() >> i) < lval)
         return true;
+
     lval <<= i;
     return false;
 }
@@ -573,14 +613,15 @@ inline bool int_cast_with_overflow_detect(From from, To& to) REALM_NOEXCEPT
     return true;
 }
 
-template<class To, class From> inline To from_twos_compl(From twos_compl) REALM_NOEXCEPT
+template<class To, class From>
+inline To from_twos_compl(From twos_compl) REALM_NOEXCEPT
 {
     typedef std::numeric_limits<From> lim_f;
     typedef std::numeric_limits<To>   lim_t;
     REALM_STATIC_ASSERT(lim_f::is_specialized && lim_t::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
+                        "std::numeric_limits<> must be specialized for both types");
     REALM_STATIC_ASSERT(lim_f::is_integer && lim_t::is_integer,
-                          "Both types must be integers");
+                        "Both types must be integers");
     REALM_STATIC_ASSERT(!lim_f::is_signed, "`From` must be unsigned");
     To native;
     int sign_bit_pos = lim_f::digits - 1;

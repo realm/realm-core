@@ -26,11 +26,13 @@ inline unsigned long long _xgetbv(unsigned index)
 {
 #if REALM_HAVE_AT_LEAST_GCC(4, 4)
     unsigned int eax, edx;
-    __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
+    __asm__ __volatile__ ("xgetbv" : "=a" (eax), "=d" (edx) : "c" (index));
     return (static_cast<unsigned long long>(edx) << 32) | eax;
+
 #else
     static_cast<void>(index);
     return 0;
+
 #endif
 }
 
@@ -60,12 +62,12 @@ void cpuid_init()
 #  else
     int a = 1;
     __asm ( "mov %1, %%eax; "            // a into eax
-          "cpuid;"
-          "mov %%ecx, %0;"             // ecx into b
-          :"=r"(cret)                     // output
-          :"r"(a)                      // input
-          :"%eax","%ebx","%ecx","%edx" // clobbered register
-         );
+            "cpuid;"
+            "mov %%ecx, %0;"           // ecx into b
+            : "=r" (cret)                 // output
+            : "r" (a)                  // input
+            : "%eax","%ebx","%ecx","%edx" // clobbered register
+            );
 #  endif
 
 // Byte is atomic. Race can/will occur but that's fine
@@ -114,7 +116,7 @@ void* round_up(void* p, size_t align)
     // be stored in size_t. Use uintptr_t instead. The problem with
     // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
-    return static_cast<char *>(p) + r;
+    return static_cast<char*>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
@@ -123,7 +125,7 @@ void* round_down(void* p, size_t align)
     // be stored in size_t. Use uintptr_t instead. The problem with
     // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p);
-    return reinterpret_cast<void *>(r & ~(align - 1));
+    return reinterpret_cast<void*>(r & ~(align - 1));
 }
 
 size_t round_up(size_t p, size_t align)
@@ -160,7 +162,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
 {
     while (t->remainder_len < 8 && len > 0) {
         t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
+        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7 * 8);
         t->remainder_len++;
         data++;
         len--;
@@ -183,7 +185,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
         unsigned long long l = 0;
         for (unsigned int i = 0; i < 8; i++) {
             l = l >> 8;
-            l = l | static_cast<unsigned long long>(*(data + i)) << (7*8);
+            l = l | static_cast<unsigned long long>(*(data + i)) << (7 * 8);
         }
         t->a_val += l * t->b_val;
 #endif
@@ -194,7 +196,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
 
     while (len > 0) {
         t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
+        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7 * 8);
         t->remainder_len++;
         data++;
         len--;
@@ -257,7 +259,14 @@ int fast_popcount64(int64_t x)
 namespace {
 
 const char a_popcount_bits[256] = {
-    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1,
+    2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1,
+    2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2,
+    3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1,
+    2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2,
+    3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2,
+    3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3,
+    4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
 };
 
 } // anonymous namespace
@@ -267,7 +276,9 @@ namespace realm {
 // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
 int fast_popcount32(int32_t x)
 {
-    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+    return a_popcount_bits[255 &
+                           x] +
+           a_popcount_bits[255 & x >> 8] + a_popcount_bits[255 & x >> 16] + a_popcount_bits[255 & x >> 24];
 }
 int fast_popcount64(int64_t x)
 {
@@ -275,13 +286,15 @@ int fast_popcount64(int64_t x)
 }
 
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
-uint64_t fastrand(uint64_t max) 
+uint64_t fastrand(uint64_t max)
 {
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
     static std::atomic<uint64_t> state(1);
+
     // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
-    state.fetch_add(1, std::memory_order_release); 
+    state.fetch_add(1, std::memory_order_release);
     uint64_t x = state.load(std::memory_order_acquire);
+
     // The result of this arithmetic may be overwritten by another thread, but that's fine in a rand generator
     x ^= x >> 12; // a
     x ^= x << 25; // b

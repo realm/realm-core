@@ -35,7 +35,8 @@
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
 extern "C" REALM_NORETURN REALM_NOINLINE
-void please_report_this_error_to_help_at_realm_dot_io() {
+void please_report_this_error_to_help_at_realm_dot_io()
+{
     std::abort();
 }
 
@@ -43,8 +44,12 @@ namespace realm {
 namespace util {
 
 #ifdef __APPLE__
-void nslog(const char *message) {
-    CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
+void nslog(const char* message)
+{
+    CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault,
+                                                      message,
+                                                      kCFStringEncodingUTF8,
+                                                      kCFAllocatorNull);
     CFShow(str);
 
     // Log the message to Crashlytics if it's loaded into the process

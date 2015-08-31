@@ -36,7 +36,7 @@ namespace realm {
 namespace util {
 
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
-: fd(fd), cryptor(key)
+    : fd(fd), cryptor(key)
 {
 }
 
@@ -106,14 +106,14 @@ off_t iv_table_pos(off_t pos)
     return metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size;
 }
 
-void check_write(int fd, off_t pos, const void *data, size_t len)
+void check_write(int fd, off_t pos, const void* data, size_t len)
 {
     ssize_t ret = pwrite(fd, data, len, pos);
     REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
     static_cast<void>(ret);
 }
 
-size_t check_read(int fd, off_t pos, void *dst, size_t len)
+size_t check_read(int fd, off_t pos, void* dst, size_t len)
 {
     ssize_t ret = pread(fd, dst, len, pos);
     REALM_ASSERT(ret >= 0);
@@ -123,7 +123,7 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
 } // anonymous namespace
 
 AESCryptor::AESCryptor(const uint8_t* key)
-: m_rw_buffer(new char[block_size])
+    : m_rw_buffer(new char[block_size])
 {
 #ifdef __APPLE__
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
@@ -135,7 +135,8 @@ AESCryptor::AESCryptor(const uint8_t* key)
     memcpy(m_hmacKey, key + 32, 32);
 }
 
-AESCryptor::~AESCryptor() REALM_NOEXCEPT {
+AESCryptor::~AESCryptor() REALM_NOEXCEPT
+{
 #ifdef __APPLE__
     CCCryptorRelease(m_encr);
     CCCryptorRelease(m_decr);
@@ -169,14 +170,14 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT
     return m_iv_buffer[idx];
 }
 
-bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) const
+bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) const
 {
     uint8_t buffer[224 / 8];
     calc_hmac(src, len, buffer, m_hmacKey);
 
     // Constant-time memcmp to avoid timing attacks
     uint8_t result = 0;
-    for (size_t i = 0; i < 224/8; ++i)
+    for (size_t i = 0; i < 224 / 8; ++i)
         result |= buffer[i] ^ hmac[i];
     return result == 0;
 }
@@ -253,12 +254,14 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) REALM_NO
         memcpy(&iv.iv2, &iv.iv1, 32);
         do {
             ++iv.iv1;
+
             // 0 is reserved for never-been-used, so bump if we just wrapped around
             if (iv.iv1 == 0)
                 ++iv.iv1;
 
             crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
             calc_hmac(m_rw_buffer.get(), block_size, iv.hmac1, m_hmacKey);
+
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
@@ -274,7 +277,7 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) REALM_NO
 }
 
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
-                         const char* src, const char* stored_iv) REALM_NOEXCEPT
+                       const char* src, const char* stored_iv) REALM_NOEXCEPT
 {
     uint8_t iv[aes_block_size] = {0};
     memcpy(iv, stored_iv, 4);
@@ -326,17 +329,17 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 #endif
 }
 
-EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, 
+EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size,
                                            File::AccessMode access)
-: m_file(file)
-, m_page_size(realm::util::page_size())
-, m_blocks_per_page(m_page_size / block_size)
-, m_addr(nullptr)
-, m_size(0)
-, m_page_count(0)
-, m_access(access)
+    : m_file(file)
+    , m_page_size(realm::util::page_size())
+    , m_blocks_per_page(m_page_size / block_size)
+    , m_addr(nullptr)
+    , m_size(0)
+    , m_page_count(0)
+    , m_access(access)
 #ifdef REALM_DEBUG
-, m_validate_buffer(new char[m_page_size])
+    , m_validate_buffer(new char[m_page_size])
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == m_page_size);
@@ -388,6 +391,7 @@ void EncryptedFileMapping::mark_unwritable(size_t i) REALM_NOEXCEPT
     REALM_ASSERT(m_read_pages[i]);
     mprotect(page_addr(i), m_page_size, PROT_READ);
     m_write_pages[i] = false;
+
     // leave dirty bit set
 }
 
@@ -439,7 +443,7 @@ void EncryptedFileMapping::validate_page(size_t page) REALM_NOEXCEPT
     if (!m_read_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, m_file_offset + page * m_page_size, 
+    if (!m_file.cryptor.read(m_file.fd, m_file_offset + page * m_page_size,
                              m_validate_buffer.get(), m_page_size))
         return;
 
@@ -500,6 +504,7 @@ void EncryptedFileMapping::flush() REALM_NOEXCEPT
 void EncryptedFileMapping::sync() REALM_NOEXCEPT
 {
     fsync(m_file.fd);
+
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
     // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
     //
@@ -569,6 +574,7 @@ File::SizeType encrypted_size_to_data_size(File::SizeType size) REALM_NOEXCEPT
 {
     if (size == 0)
         return 0;
+
     return fake_offset(size);
 }
 

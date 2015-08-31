@@ -62,6 +62,7 @@ public:
     // the new Spec object.
     SubspecRef get_subtable_spec(std::size_t column_ndx) REALM_NOEXCEPT;
     ConstSubspecRef get_subtable_spec(std::size_t column_ndx) const REALM_NOEXCEPT;
+
     //@}
 
     // Column info
@@ -94,7 +95,7 @@ public:
     void set_opposite_link_table_ndx(std::size_t column_ndx, std::size_t table_ndx);
     bool has_backlinks() const REALM_NOEXCEPT;
     void set_backlink_origin_column(std::size_t backlink_col_ndx, std::size_t origin_col_ndx);
-    std::size_t get_origin_column_ndx(std::size_t backlink_col_ndx) const  REALM_NOEXCEPT;
+    std::size_t get_origin_column_ndx(std::size_t backlink_col_ndx) const REALM_NOEXCEPT;
     std::size_t find_backlink_column(std::size_t origin_table_ndx,
                                      std::size_t origin_col_ndx) const REALM_NOEXCEPT;
 
@@ -108,6 +109,7 @@ public:
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const REALM_NOEXCEPT;
     bool operator!=(const Spec&) const REALM_NOEXCEPT;
+
     //@}
 
     void destroy() REALM_NOEXCEPT;
@@ -121,6 +123,7 @@ public:
 #endif
 
 private:
+
     // Underlying array structure.
     //
     // `m_subspecs` contains one entry for each subtable column, one entry for
@@ -132,7 +135,7 @@ private:
     // table, and the second entry is the index of the origin column in the
     // origin table.
     Array m_top;
-    ArrayInteger m_types;// 1st slot in m_top
+    ArrayInteger m_types; // 1st slot in m_top
     ArrayString m_names; // 2nd slot in m_top
     ArrayInteger m_attr; // 3rd slot in m_top
     Array m_subspecs;    // 4th slot in m_top (optional)
@@ -176,8 +179,8 @@ private:
 
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.
-    static bool get_first_column_type_from_ref(ref_type, Allocator&,
-                                               ColumnType& type) REALM_NOEXCEPT;
+    static bool get_first_column_type_from_ref(ref_type, Allocator &,
+                                               ColumnType & type) REALM_NOEXCEPT;
 
     friend class Replication;
 
@@ -411,6 +414,7 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
     const char* types_header = alloc.translate(types_ref);
     if (Array::get_size_from_header(types_header) == 0)
         return false;
+
     type = ColumnType(Array::get(types_header, 0));
     return true;
 }
@@ -425,7 +429,7 @@ inline bool Spec::has_backlinks() const REALM_NOEXCEPT
     // the user.
 }
 
-inline bool Spec::operator!=(const Spec &s) const REALM_NOEXCEPT
+inline bool Spec::operator!=(const Spec& s) const REALM_NOEXCEPT
 {
     return !(*this == s);
 }
@@ -444,14 +448,14 @@ inline SubspecRef::SubspecRef(const_cast_tag, ConstSubspecRef r) REALM_NOEXCEPT:
 }
 
 inline ConstSubspecRef::ConstSubspecRef(const Array* parent,
-                                        std::size_t ndx_in_parent) REALM_NOEXCEPT:
+                                        std::size_t  ndx_in_parent) REALM_NOEXCEPT:
     m_parent(parent),
     m_ndx_in_parent(ndx_in_parent)
 {
 }
 
 inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) REALM_NOEXCEPT:
-        m_parent(r.m_parent),
+    m_parent(r.m_parent),
     m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }

@@ -76,7 +76,7 @@ private:
     std::unique_ptr<char[]> m_rw_buffer;
 
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
-    bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
+    bool check_hmac(const void* data, size_t len, const uint8_t* hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
                const char* stored_iv) REALM_NOEXCEPT;
     iv_table& get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT;
@@ -94,8 +94,9 @@ struct SharedFileInfo {
 
 class EncryptedFileMapping {
 public:
+
     // Adds the newly-created object to file.mappings iff it's successfully constructed
-    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, 
+    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset,
                          void* addr, size_t size, File::AccessMode access);
     ~EncryptedFileMapping();
 

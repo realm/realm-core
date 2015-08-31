@@ -36,7 +36,8 @@ namespace util {
 
 /// A simple buffer concept that owns a region of memory and knows its
 /// size.
-template<class T> class Buffer {
+template<class T>
+class Buffer {
 public:
     Buffer() REALM_NOEXCEPT: m_size(0) {}
     explicit Buffer(std::size_t size);
@@ -74,7 +75,7 @@ public:
 
     T* release() REALM_NOEXCEPT;
 
-    friend void swap(Buffer&a, Buffer&b) REALM_NOEXCEPT
+    friend void swap(Buffer& a, Buffer& b) REALM_NOEXCEPT
     {
         using std::swap;
         swap(a.m_data, b.m_data);
@@ -90,7 +91,8 @@ private:
 /// A buffer that can be efficiently resized. It acheives this by
 /// using an underlying buffer that may be larger than the logical
 /// size, and is automatically expanded in progressively larger steps.
-template<class T> class AppendBuffer {
+template<class T>
+class AppendBuffer {
 public:
     AppendBuffer() REALM_NOEXCEPT;
     ~AppendBuffer() REALM_NOEXCEPT {}
@@ -144,20 +146,23 @@ public:
     }
 };
 
-template<class T> inline Buffer<T>::Buffer(std::size_t size):
+template<class T>
+inline Buffer<T>::Buffer(std::size_t size):
     m_data(new T[size]), // Throws
     m_size(size)
 {
 }
 
-template<class T> inline void Buffer<T>::set_size(std::size_t new_size)
+template<class T>
+inline void Buffer<T>::set_size(std::size_t new_size)
 {
     m_data.reset(new T[new_size]); // Throws
     m_size = new_size;
 }
 
-template<class T> inline void Buffer<T>::resize(std::size_t new_size, std::size_t copy_begin,
-                                                std::size_t copy_end, std::size_t copy_to)
+template<class T>
+inline void Buffer<T>::resize(std::size_t new_size, std::size_t copy_begin,
+                              std::size_t copy_end, std::size_t copy_to)
 {
     std::unique_ptr<T[]> new_data(new T[new_size]); // Throws
     std::copy(m_data.get() + copy_begin, m_data.get() + copy_end, new_data.get() + copy_to);
@@ -165,12 +170,14 @@ template<class T> inline void Buffer<T>::resize(std::size_t new_size, std::size_
     m_size = new_size;
 }
 
-template<class T> inline void Buffer<T>::reserve(std::size_t used_size,
-                                                 std::size_t min_capacity)
+template<class T>
+inline void Buffer<T>::reserve(std::size_t used_size,
+                               std::size_t min_capacity)
 {
     std::size_t current_capacity = m_size;
     if (REALM_LIKELY(current_capacity >= min_capacity))
         return;
+
     std::size_t new_capacity = current_capacity;
     if (REALM_UNLIKELY(int_multiply_with_overflow_detect(new_capacity, 2)))
         new_capacity = std::numeric_limits<std::size_t>::max();
@@ -179,8 +186,9 @@ template<class T> inline void Buffer<T>::reserve(std::size_t used_size,
     resize(new_capacity, 0, used_size, 0); // Throws
 }
 
-template<class T> inline void Buffer<T>::reserve_extra(std::size_t used_size,
-                                                       std::size_t min_extra_capacity)
+template<class T>
+inline void Buffer<T>::reserve_extra(std::size_t used_size,
+                                     std::size_t min_extra_capacity)
 {
     std::size_t min_capacity = used_size;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(min_capacity, min_extra_capacity)))
@@ -188,51 +196,60 @@ template<class T> inline void Buffer<T>::reserve_extra(std::size_t used_size,
     reserve(used_size, min_capacity); // Throws
 }
 
-template<class T> inline T* Buffer<T>::release() REALM_NOEXCEPT
+template<class T>
+inline T* Buffer<T>::release() REALM_NOEXCEPT
 {
     m_size = 0;
     return m_data.release();
 }
 
 
-template<class T> inline AppendBuffer<T>::AppendBuffer() REALM_NOEXCEPT: m_size(0)
+template<class T>
+inline AppendBuffer<T>::AppendBuffer() REALM_NOEXCEPT: m_size(0)
 {
 }
 
-template<class T> inline std::size_t AppendBuffer<T>::size() const REALM_NOEXCEPT
+template<class T>
+inline std::size_t AppendBuffer<T>::size() const REALM_NOEXCEPT
 {
     return m_size;
 }
 
-template<class T> inline T* AppendBuffer<T>::data() REALM_NOEXCEPT
+template<class T>
+inline T* AppendBuffer<T>::data() REALM_NOEXCEPT
 {
     return m_buffer.data();
 }
 
-template<class T> inline const T* AppendBuffer<T>::data() const REALM_NOEXCEPT
+template<class T>
+inline const T* AppendBuffer<T>::data() const REALM_NOEXCEPT
 {
     return m_buffer.data();
 }
 
-template<class T> inline void AppendBuffer<T>::append(const T* data, std::size_t size)
+template<class T>
+inline void AppendBuffer<T>::append(const T* data, std::size_t size)
 {
     m_buffer.reserve_extra(m_size, size); // Throws
-    std::copy(data, data+size, m_buffer.data()+m_size);
+    std::copy(data, data + size, m_buffer.data() + m_size);
     m_size += size;
 }
 
-template<class T> inline void AppendBuffer<T>::reserve(std::size_t min_capacity)
+template<class T>
+inline void AppendBuffer<T>::reserve(std::size_t min_capacity)
 {
     m_buffer.reserve(m_size, min_capacity);
 }
 
-template<class T> inline void AppendBuffer<T>::resize(std::size_t size)
+template<class T>
+inline void AppendBuffer<T>::resize(std::size_t size)
 {
     reserve(size);
     m_size = size;
 }
 
-template<class T> inline void AppendBuffer<T>::clear() REALM_NOEXCEPT
+template<class T>
+inline void AppendBuffer<T>::clear() REALM_NOEXCEPT
 {
     m_size = 0;
 }

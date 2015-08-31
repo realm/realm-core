@@ -30,6 +30,7 @@
 #define REALM_MULTITHREAD_QUERY 0
 
 #if REALM_MULTITHREAD_QUERY
+
 // FIXME: Use our C++ thread abstraction API since it provides a much
 // higher level of encapsulation and safety.
 #include <pthread.h>
@@ -120,7 +121,7 @@ public:
     Query& less_float(size_t column_ndx1, size_t column_ndx2);
     Query& less_equal_float(size_t column_ndx1, size_t column_ndx2);
 
-     // Conditions: double
+    // Conditions: double
     Query& equal(size_t column_ndx, double value);
     Query& not_equal(size_t column_ndx, double value);
     Query& greater(size_t column_ndx, double value);
@@ -141,26 +142,36 @@ public:
     Query& equal(size_t column_ndx, bool value);
 
     // Conditions: date
-    Query& equal_datetime(size_t column_ndx, DateTime value) { return equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& not_equal_datetime(size_t column_ndx, DateTime value) { return not_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& greater_datetime(size_t column_ndx, DateTime value) { return greater(column_ndx, int64_t(value.get_datetime())); }
-    Query& greater_equal_datetime(size_t column_ndx, DateTime value) { return greater_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& less_datetime(size_t column_ndx, DateTime value) { return less(column_ndx, int64_t(value.get_datetime())); }
-    Query& less_equal_datetime(size_t column_ndx, DateTime value) { return less_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& between_datetime(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_datetime()), int64_t(to.get_datetime())); }
+    Query& equal_datetime(size_t   column_ndx,
+                          DateTime value) { return equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& not_equal_datetime(size_t   column_ndx,
+                              DateTime value) { return not_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& greater_datetime(size_t   column_ndx,
+                            DateTime value) { return greater(column_ndx, int64_t(value.get_datetime())); }
+    Query& greater_equal_datetime(size_t   column_ndx,
+                                  DateTime value) { return greater_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& less_datetime(size_t column_ndx, DateTime value)
+    {
+        return less(column_ndx, int64_t(value.get_datetime()));
+    }
+    Query& less_equal_datetime(size_t   column_ndx,
+                               DateTime value) { return less_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& between_datetime(size_t column_ndx, DateTime from,
+                            DateTime to) { return between(column_ndx, int64_t(from.get_datetime()),
+                                                          int64_t(to.get_datetime())); }
 
     // Conditions: strings
-    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& contains(size_t column_ndx, StringData value, bool case_sensitive = true);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
     // implicit conversion of char* to bool.
-    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive = true);
+    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive = true);
 
     // Conditions: binary data
     Query& equal(size_t column_ndx, BinaryData value);
@@ -186,29 +197,29 @@ public:
 
 
     // Searching
-    size_t         find(size_t begin_at_table_row=size_t(0));
-    TableView      find_all(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
-    ConstTableView find_all(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    size_t         find(size_t begin_at_table_row = size_t(0));
+    TableView      find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
+    ConstTableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
     // Aggregates
-    size_t count(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    size_t count(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
-    int64_t sum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    int64_t sum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                     size_t limit = size_t(-1)) const;
 
     double  average_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                         size_t limit = size_t(-1)) const;
 
-    int64_t maximum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    int64_t maximum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                         size_t limit = size_t(-1), size_t* return_ndx = 0) const;
 
-    int64_t minimum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    int64_t minimum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                         size_t limit = size_t(-1), size_t* return_ndx = 0) const;
 
-    double sum_float(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double sum_float(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                          size_t limit = size_t(-1)) const;
 
-    double average_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double average_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                          size_t limit = size_t(-1)) const;
 
     float  maximum_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
@@ -217,35 +228,36 @@ public:
     float  minimum_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                          size_t limit = size_t(-1), size_t* return_ndx = 0) const;
 
-    double sum_double(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double sum_double(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                           size_t limit = size_t(-1)) const;
 
-    double average_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double average_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                           size_t limit = size_t(-1)) const;
 
-    double maximum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double maximum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                           size_t limit = size_t(-1), size_t* return_ndx = 0) const;
 
-    double minimum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double minimum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                           size_t limit = size_t(-1), size_t* return_ndx = 0) const;
 
     DateTime maximum_datetime(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                               size_t limit = size_t(-1), size_t* return_ndx = 0) const;
 
-    DateTime minimum_datetime(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    DateTime minimum_datetime(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
                               size_t limit = size_t(-1), size_t* return_ndx = 0) const;
 
     // Deletion
-    size_t  remove(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
+    size_t  remove(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
 
 #if REALM_MULTITHREAD_QUERY
+
     // Multi-threading
-    TableView      find_all_multi(size_t start = 0, size_t end=size_t(-1));
-    ConstTableView find_all_multi(size_t start = 0, size_t end=size_t(-1)) const;
+    TableView      find_all_multi(size_t start = 0, size_t end = size_t(-1));
+    ConstTableView find_all_multi(size_t start = 0, size_t end = size_t(-1)) const;
     int            set_threads(unsigned int threadcount);
 #endif
 
-    TableRef& get_table() {return m_table;}
+    TableRef& get_table() {return m_table; }
 
     std::string validate();
 
@@ -255,7 +267,7 @@ protected:
 
     void   init(const Table& table) const;
     bool   is_initialized() const;
-    size_t find_internal(size_t start = 0, size_t end=size_t(-1)) const;
+    size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;
     void   update_pointers(ParentNode* p, ParentNode** newnode);
     void handle_pending_not();
@@ -267,15 +279,15 @@ public:
     typedef Query_Handover_patch Handover_patch;
 
     virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
-                                                      ConstSourcePayload mode) const
+                                                      ConstSourcePayload               mode) const
     {
         patch.reset(new Handover_patch);
         std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
         return retval;
     }
 
-    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
-                                                      MutableSourcePayload mode)
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
+                                                      MutableSourcePayload             mode)
     {
         patch.reset(new Handover_patch);
         std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
@@ -295,28 +307,36 @@ private:
     void copy_nodes(const Query& source);
     void fetch_descriptor();
 
-    template <class ColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
-    template <class ColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& less(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& less_equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& greater(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& not_equal(size_t column_ndx1, size_t column_ndx2);
 
-    template <typename TConditionFunction, class T> Query& add_condition(size_t column_ndx, T value);
+    template<typename TConditionFunction, class T>
+    Query& add_condition(size_t column_ndx, T value);
 
-    template<typename T, bool Nullable> double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
-                                        size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    template<typename T, bool Nullable>
+    double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
+                   size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
-    template <Action action, typename T, typename R, class ColClass>
-        R aggregate(R (ColClass::*method)(size_t, size_t, size_t, size_t*) const,
-                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-                    size_t* return_ndx = nullptr) const;
+    template<Action action, typename T, typename R, class ColClass>
+    R aggregate(R (ColClass::* method)(size_t, size_t, size_t, size_t*) const,
+                size_t column_ndx, size_t * resultcount, size_t start, size_t end, size_t limit,
+                size_t * return_ndx = nullptr) const;
 
     void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
-                            ParentNode* pn, QueryStateBase* st, 
+                            ParentNode* pn, QueryStateBase* st,
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
-    void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    void find_all(TableViewBase& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() REALM_NOEXCEPT;
 
     bool supports_export_for_handover() { return m_view == 0; };

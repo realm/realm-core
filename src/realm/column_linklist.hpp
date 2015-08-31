@@ -150,7 +150,7 @@ inline ref_type LinkListColumn::create(Allocator& alloc, std::size_t size)
 inline bool LinkListColumn::has_links(std::size_t row_ndx) const REALM_NOEXCEPT
 {
     ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
-    return (ref != 0);
+    return ref != 0;
 }
 
 inline std::size_t LinkListColumn::get_link_count(std::size_t row_ndx) const REALM_NOEXCEPT
@@ -158,6 +158,7 @@ inline std::size_t LinkListColumn::get_link_count(std::size_t row_ndx) const REA
     ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
     if (ref == 0)
         return 0;
+
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 

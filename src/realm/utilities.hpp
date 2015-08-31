@@ -36,7 +36,8 @@
 #include <realm/util/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
+#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || \
+    defined(__x86_64__) || defined(_M_X64))
 #  define REALM_X86_OR_X64
 #  define REALM_X86_OR_X64_TRUE true
 #else
@@ -48,7 +49,9 @@
 #  define REALM_ARCH_ARM
 #endif
 
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
+#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || \
+    __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || \
+    defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
 #  define REALM_PTR_64
 #endif
 
@@ -60,12 +63,13 @@
 
 namespace realm {
 
-typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
+typedef bool (* StringCompareCallback)(const char* string1, const char* string2);
 
 extern signed char sse_support;
 extern signed char avx_support;
 
-template<int version> REALM_FORCEINLINE bool sseavx()
+template<int version>
+REALM_FORCEINLINE bool sseavx()
 {
 /*
     Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
@@ -85,20 +89,22 @@ template<int version> REALM_FORCEINLINE bool sseavx()
 
     We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called
     prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
-*/
-    REALM_STATIC_ASSERT(version == 1 || version == 2 || version == 30 || version == 42, "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
+ */
+    REALM_STATIC_ASSERT(version == 1 || version == 2 || version == 30 || version == 42,
+                        "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
 #ifdef REALM_COMPILER_SSE
     if (version == 30)
-        return (sse_support >= 0);
+        return sse_support >= 0;
     else if (version == 42)
-        return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
+        return sse_support > 0;     // faster than == 1 (0 requres no immediate operand)
     else if (version == 1) // avx
-        return (avx_support >= 0);
+        return avx_support >= 0;
     else if (version == 2) // avx2
-        return (avx_support > 0);
+        return avx_support > 0;
 
 #else
     return false;
+
 #endif
 }
 
@@ -125,7 +131,8 @@ int fast_popcount64(int64_t x);
 uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 
 // log2 - returns -1 if x==0, otherwise log2(x)
-inline int log2(std::size_t x) {
+inline int log2(std::size_t x)
+{
     unsigned long index = -1;
 #if defined(__GNUC__)
     if (x) {
@@ -190,7 +197,7 @@ enum IndexMethod {
 
 
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
-template <class InputIterator1, class InputIterator2>
+template<class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -199,14 +206,17 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
     // pointer to std::equal(). It's uncertain if this is allowed by the C++ standard. For details, see
     // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
     // Below check 'first1==last1' is to prevent failure in debug mode.
-    return (first1 == last1 || std::equal(first1, last1, first2));
+    return first1 == last1 || std::equal(first1, last1, first2);
+
 #else
     return std::equal(first1, last1, first2);
+
 #endif
 }
 
 
-template<class T> struct Wrap {
+template<class T>
+struct Wrap {
     Wrap(const T& v): m_value(v) {}
     operator T() const { return m_value; }
 private:
@@ -216,7 +226,7 @@ private:
 // PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
 // placement new. It simply calls the object's destructor without freeing the memory.
 struct PlacementDelete {
-    template <class T>
+    template<class T>
     void operator()(T* v) const
     {
         v->~T();

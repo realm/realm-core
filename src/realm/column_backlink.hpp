@@ -86,6 +86,7 @@ public:
 #endif
 
 protected:
+
     // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
     ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT override;
@@ -95,9 +96,9 @@ protected:
 #endif
 
 private:
-    TableRef        m_origin_table;
+    TableRef m_origin_table;
     LinkColumnBase* m_origin_column = nullptr;
-    std::size_t     m_origin_column_ndx = npos;
+    std::size_t m_origin_column_ndx = npos;
 
     template<typename Func>
     std::size_t for_each_link(std::size_t row_ndx, bool do_destroy, Func&& f);

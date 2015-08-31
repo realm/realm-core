@@ -44,6 +44,7 @@ namespace realm {
 /// making the corresponding call to unbind_table_ptr().
 class LangBindHelper {
 public:
+
     /// Increment the reference counter of the specified table accessor. This is
     /// done automatically by all of the functions in this class that return
     /// table accessor pointers, but if the binding/application makes a copy of
@@ -320,12 +321,12 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
 
 inline void LangBindHelper::unbind_table_ptr(const Table* t) REALM_NOEXCEPT
 {
-   t->unbind_ref();
+    t->unbind_ref();
 }
 
 inline void LangBindHelper::bind_table_ptr(const Table* t) REALM_NOEXCEPT
 {
-   t->bind_ref();
+    t->bind_ref();
 }
 
 inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_ndx,
@@ -343,7 +344,7 @@ inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, std::size_t col_ndx)
 
 inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
 {
-   link_view->unbind_ref();
+    link_view->unbind_ref();
 }
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,

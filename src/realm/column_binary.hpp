@@ -87,6 +87,7 @@ public:
 #endif
 
 private:
+
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
                    std::size_t num_rows);
@@ -116,7 +117,7 @@ private:
 
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const override;
+                     std::ostream &) const override;
 #endif
 
     friend class Array;
@@ -134,7 +135,7 @@ inline StringData BinaryColumn::get_index_data(std::size_t, char*) const REALM_N
     REALM_UNREACHABLE();
 }
 
-inline std::size_t BinaryColumn::size() const  REALM_NOEXCEPT
+inline std::size_t BinaryColumn::size() const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
@@ -143,10 +144,12 @@ inline std::size_t BinaryColumn::size() const  REALM_NOEXCEPT
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
             return leaf->size();
         }
+
         // Big blobs root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->size();
     }
+
     // Non-leaf root
     return m_array->get_bptree_size();
 }
@@ -166,11 +169,13 @@ inline void BinaryColumn::update_from_parent(std::size_t old_baseline) REALM_NOE
             leaf->update_from_parent(old_baseline);
             return;
         }
+
         // Big blobs root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         leaf->update_from_parent(old_baseline);
         return;
     }
+
     // Non-leaf root
     m_array->update_from_parent(old_baseline);
 }
@@ -185,6 +190,7 @@ inline BinaryData BinaryColumn::get(std::size_t ndx) const REALM_NOEXCEPT
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
             return leaf->get(ndx);
         }
+
         // Big blobs root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->get(ndx);
@@ -200,6 +206,7 @@ inline BinaryData BinaryColumn::get(std::size_t ndx) const REALM_NOEXCEPT
         // Small blobs
         return ArrayBinary::get(leaf_header, ndx_in_leaf, alloc);
     }
+
     // Big blobs
     return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, alloc);
 }
@@ -213,7 +220,7 @@ inline StringData BinaryColumn::get_string(std::size_t ndx) const REALM_NOEXCEPT
 {
     BinaryData bin = get(ndx);
     REALM_ASSERT_3(0, <, bin.size());
-    return StringData(bin.data(), bin.size()-1);
+    return StringData(bin.data(), bin.size() - 1);
 }
 
 inline void BinaryColumn::set_string(std::size_t ndx, StringData value)
@@ -252,7 +259,7 @@ inline void BinaryColumn::insert(std::size_t row_ndx, BinaryData value)
 
 inline void BinaryColumn::set_null(std::size_t row_ndx)
 {
-    set(row_ndx, BinaryData{});
+    set(row_ndx, BinaryData {});
 }
 
 inline size_t BinaryColumn::find_first(BinaryData value) const
@@ -347,7 +354,7 @@ inline void BinaryColumn::insert_string(std::size_t row_ndx, StringData value)
     do_insert(row_ndx_2, value_2, add_zero_term, num_rows); // Throws
 }
 
-inline std::size_t BinaryColumn::get_size_from_ref(ref_type root_ref,
+inline std::size_t BinaryColumn::get_size_from_ref(ref_type   root_ref,
                                                    Allocator& alloc) REALM_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
@@ -358,6 +365,7 @@ inline std::size_t BinaryColumn::get_size_from_ref(ref_type root_ref,
             // Small blobs leaf
             return ArrayBinary::get_size_from_header(root_header, alloc);
         }
+
         // Big blobs leaf
         return ArrayBigBlobs::get_size_from_header(root_header);
     }

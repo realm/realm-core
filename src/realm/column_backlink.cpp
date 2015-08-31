@@ -39,6 +39,7 @@ void BacklinkColumn::add_backlink(size_t row_ndx, size_t origin_row_ndx)
     }
 
     ref_type ref;
+
     // When increasing the size of the backlink list from 1 to 2, we need to
     // convert from the single non-ref column value representation, to a B+-tree
     // representation.
@@ -87,6 +88,7 @@ size_t BacklinkColumn::get_backlink(size_t row_ndx, size_t backlink_ndx) const R
     else {
         ref_type ref = to_ref(value);
         REALM_ASSERT_3(backlink_ndx, <, ColumnBase::get_size_from_ref(ref, get_alloc()));
+
         // FIXME: Optimize with direct access (that is, avoid creation of a
         // Column instance, since that implies dynamic allocation).
         IntegerColumn backlink_list(get_alloc(), ref); // Throws
@@ -210,10 +212,10 @@ void BacklinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
     for (size_t i = num_rows_moved; i > 0; --i) {
         size_t old_target_row_ndx = row_ndx + i - 1;
         size_t new_target_row_ndx = row_ndx + num_rows_to_insert + i - 1;
-        auto handler = [=](size_t origin_row_ndx) {
-            m_origin_column->do_update_link(origin_row_ndx, old_target_row_ndx,
-                                            new_target_row_ndx); // Throws
-        };
+        auto handler = [ = ](size_t origin_row_ndx) {
+                           m_origin_column->do_update_link(origin_row_ndx, old_target_row_ndx,
+                                                           new_target_row_ndx); // Throws
+                       };
         bool do_destroy = false;
         for_each_link(old_target_row_ndx, do_destroy, handler); // Throws
     }
@@ -231,9 +233,9 @@ void BacklinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 
     // Nullify forward links to the removed target rows
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
-        auto handler = [=](size_t origin_row_ndx) {
-            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx+i); // Throws
-        };
+        auto handler = [ = ](size_t origin_row_ndx) {
+                           m_origin_column->do_nullify_link(origin_row_ndx, row_ndx + i); // Throws
+                       };
         bool do_destroy = true;
         for_each_link(row_ndx, do_destroy, handler); // Throws
     }
@@ -243,16 +245,16 @@ void BacklinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     for (size_t i = 0; i < num_rows_moved; ++i) {
         size_t old_target_row_ndx = row_ndx + num_rows_to_erase + i;
         size_t new_target_row_ndx = row_ndx + i;
-        auto handler = [=](size_t origin_row_ndx) {
-            m_origin_column->do_update_link(origin_row_ndx, old_target_row_ndx,
-                                            new_target_row_ndx); // Throws
-        };
+        auto handler = [ = ](size_t origin_row_ndx) {
+                           m_origin_column->do_update_link(origin_row_ndx, old_target_row_ndx,
+                                                           new_target_row_ndx); // Throws
+                       };
         bool do_destroy = false;
         for_each_link(old_target_row_ndx, do_destroy, handler); // Throws
     }
 
     IntegerColumn::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                       broken_reciprocal_backlinks); // Throws
+                              broken_reciprocal_backlinks); // Throws
 }
 
 
@@ -263,9 +265,9 @@ void BacklinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     REALM_ASSERT(row_ndx < prior_num_rows);
 
     // Nullify forward links to the removed target row
-    auto handler = [=](size_t origin_row_ndx) {
-        m_origin_column->do_nullify_link(origin_row_ndx, row_ndx);  // Throws
-    };
+    auto handler = [ = ](size_t origin_row_ndx) {
+                       m_origin_column->do_nullify_link(origin_row_ndx, row_ndx); // Throws
+                   };
     bool do_destroy = true;
     for_each_link(row_ndx, do_destroy, handler); // Throws
 
@@ -273,9 +275,9 @@ void BacklinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     size_t last_row_ndx = prior_num_rows - 1;
     if (row_ndx != last_row_ndx) {
         do_destroy = false;
-        for_each_link(last_row_ndx, do_destroy, [=](size_t origin_row_ndx) {
-            m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, row_ndx); // Throws
-        });
+        for_each_link(last_row_ndx, do_destroy, [ = ](size_t origin_row_ndx) {
+                          m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, row_ndx); // Throws
+                      });
     }
 
     IntegerColumn::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
@@ -287,9 +289,9 @@ void BacklinkColumn::clear(std::size_t num_rows, bool)
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
         // IntegerColumn::clear() handles the destruction of subtrees
         bool do_destroy = false;
-        for_each_link(row_ndx, do_destroy, [=](size_t origin_row_ndx) {
-            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx);  // Throws
-        });
+        for_each_link(row_ndx, do_destroy, [ = ](size_t origin_row_ndx) {
+                          m_origin_column->do_nullify_link(origin_row_ndx, row_ndx); // Throws
+                      });
     }
 
     clear_without_updating_index(); // Throws
@@ -316,8 +318,8 @@ void BacklinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
     if (state.track_link_nullifications) {
         bool do_destroy = false;
         for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-            state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx, row_ndx});
-        });
+                          state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx, row_ndx});
+                      });
     }
 }
 
@@ -328,8 +330,9 @@ void BacklinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
             // IntegerColumn::clear() handles the destruction of subtrees
             bool do_destroy = false;
             for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-                state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx, row_ndx});
-            });
+                              state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx,
+                                                     row_ndx});
+                          });
         }
     }
 }
@@ -381,7 +384,7 @@ void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
 {
     VerifyPair pair;
     size_t n = size();
-    for (size_t i = 0; i < n ; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         pair.target_row_ndx = i;
         size_t m = get_backlink_count(i);
         for (size_t j = 0; j < m; ++j) {
