@@ -460,8 +460,6 @@ public:
     // Compare, right side constant
     Query operator > (R right)
     {
-        if (std::is_same<R, null>::value)
-            throw(realm::LogicError::type_mismatch);
         return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator < (R right)
@@ -1628,27 +1626,23 @@ public:
     using ColType = typename ColumnTypeTraits<T, false>::column_type;
     using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
-    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr), 
-                                                                            m_table(nullptr), m_sg(nullptr),
-                                                                            m_column(column)
+    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_column(column)
     {
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table; 
         m_nullable = m_link_map.m_table->is_nullable(m_column);
     }
 
-    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), m_sg(nullptr),
-                                                 m_column(column)
+    Columns(size_t column, const Table* table) : m_column(column)
     {
         m_table = table;
         m_nullable = m_table->is_nullable(column);
     }
 
 
-    Columns() : m_table_linked_from(nullptr), m_table(nullptr), m_sg(nullptr) { }
+    Columns() { }
 
-    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), m_sg(nullptr),
-                                      m_column(column) {}
+    explicit Columns(size_t column) : m_column(column) {}
 
     ~Columns()
     {
@@ -1663,7 +1657,6 @@ public:
         n.m_sg = s;
         n.m_nullable = m_nullable;
         return n;
-
     }
 
     virtual Subexpr& clone()
@@ -1778,21 +1771,23 @@ public:
         }
     }
 
-    const Table* m_table_linked_from;
+    const Table* m_table_linked_from = nullptr;
 
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class 
     // dependency/entanglement
-    const Table* m_table;
+    const Table* m_table = nullptr;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
-    SequentialGetterBase* m_sg;
+    SequentialGetterBase* m_sg = nullptr;
 
     // Column index of payload column of m_table
     size_t m_column;
 
     LinkMap m_link_map;
 
-    bool m_nullable;
+    // set to false by default for stand-alone Columns declaration that are not yet associated with any table
+    // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
+    bool m_nullable = false;
 };
 
 

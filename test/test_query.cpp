@@ -6228,37 +6228,37 @@ void fill_data(TableRef table) {
 
 TEST(Query_NullShowcase)
 {
-/*
-Here we show how comparisons and arithmetic with null works in queries. Basic rules:
+    /*
+    Here we show how comparisons and arithmetic with null works in queries. Basic rules:
 
-null    +, -, *, /          value   ==   null
-null    +, -, *, /          null    ==   null
+    null    +, -, *, /          value   ==   null
+    null    +, -, *, /          null    ==   null
 
-null    ==, >=, <=]         null    ==   true
-null    !=, >, <            null    ==   false
+    null    ==, >=, <=]         null    ==   true
+    null    !=, >, <            null    ==   false
 
-null    ==, >=, <=, >, <    value   ==   false
-null    !=                  value   ==   true
+    null    ==, >=, <=, >, <    value   ==   false
+    null    !=                  value   ==   true
 
-This does NOT follow SQL! In particular, (null == null) == true and
-(null != value) == true.
+    This does NOT follow SQL! In particular, (null == null) == true and
+    (null != value) == true.
 
-NOTE NOTE: There is currently only very little syntax checking.
+    NOTE NOTE: There is currently only very little syntax checking.
 
-NOTE NOTE: For BinaryData, use BinaryData() instead of null().
+    NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
-    ----------------------------------------------------------------------------------------------------------------
-0   null            null                null                    1.1                 true          2016-2-2
-1   10              null                "foo"                   2.2                 null          null
-2   20              30.0                "bar"                   3.3                 false         2016-6-6
-*/
+        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+        ----------------------------------------------------------------------------------------------------------------
+    0   null            null                null                    1.1                 true          2016-2-2
+    1   10              null                "foo"                   2.2                 null          null
+    2   20              30.0                "bar"                   3.3                 false         2016-6-6
+    */
 
     Group g;
     TableRef table = g.add_table("Inventory");
     create_columns(table);
 
-    table->add_empty_row(3); 
+    table->add_empty_row(3);
 
     // Default values for all nullable columns
     CHECK(table->is_null(0, 0));
@@ -6303,12 +6303,12 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
 
     TableView tv;
-    
+
     tv = (price == null()).find_all();
     CHECK(equals(tv, { 0 }));
 
     tv = (price != null()).find_all();
-    CHECK(equals(tv, { 1, 2}));
+    CHECK(equals(tv, { 1, 2 }));
 
     // Note that this returns rows with null, which differs from SQL!
     tv = (price == shipping).find_all();
@@ -6320,7 +6320,7 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
     tv = (price != shipping).find_all();
     CHECK(equals(tv, { 1, 2 })); // 10 != null
-    
+
     tv = (price < 0 || price > 0).find_all();
     CHECK(equals(tv, { 1, 2 }));
 
@@ -6345,7 +6345,7 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     // (null > double) == false
     tv = (price > rating).find_all();
     CHECK(equals(tv, { 1, 2 }));
-    
+
     tv = (price + rating == null()).find_all();
     CHECK(equals(tv, { 0 }));
 
@@ -6379,19 +6379,21 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     tv = (delivery != null()).find_all();
     CHECK(equals(tv, { 0, 2 }));
 
-
-    // Not valid syntaxes. Only == and != can be used with user-given null argument.
-    CHECK_THROW_ANY(tv = (price > null()).find_all());
-    CHECK_THROW_ANY(tv = (price + rating > null()).find_all());
-
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
     CHECK(equals(tv, { 0 }));
 
     tv = table->where().not_equal(0, null()).find_all();
     CHECK(equals(tv, { 1, 2 }));
-    
-    // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
+
+    // You can also compare against user-given null with > and <, but only in the expression syntax!
+    tv = (price > null()).find_all();
+    CHECK(equals(tv, { }));
+    tv = (price + rating > null()).find_all();
+    CHECK(equals(tv, { }));
+
+    // As stated above, if you want to use `> null()`, you cannot do it in the old syntax. This is for source
+    // code simplicity (would need tons of new method overloads that also need unit test testing, etc).
     CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
