@@ -636,9 +636,11 @@ template <class T, size_t prealloc = 8> struct NullableVector
 
     NullableVector& operator= (const NullableVector& other)
     {
-        init(other.m_size);
-        std::copy(other.m_first, other.m_first + other.m_size, m_first);
-        m_null = other.m_null;
+        if (this != &other) {
+            init(other.m_size);
+            std::copy(other.m_first, other.m_first + other.m_size, m_first);
+            m_null = other.m_null;
+        }
         return *this;
     }
 
