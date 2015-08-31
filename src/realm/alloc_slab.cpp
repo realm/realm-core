@@ -113,9 +113,11 @@ void SlabAlloc::detach() REALM_NOEXCEPT
         case attach_None:
         case attach_UsersBuffer:
             goto found;
+
         case attach_OwnedBuffer:
             ::free(m_data);
             goto found;
+
         case attach_SharedFile:
         case attach_UnsharedFile:
             File::unmap(m_data, m_initial_mapping_size);
@@ -145,8 +147,8 @@ SlabAlloc::~SlabAlloc() REALM_NOEXCEPT
                     print();
 #  ifndef REALM_SLAB_ALLOC_DEBUG
                     std::cerr << "To get the stack-traces of the corresponding allocations,"
-                        "first compile with REALM_SLAB_ALLOC_DEBUG defined,"
-                        "then run under Valgrind with --leak-check=full\n";
+                                 "first compile with REALM_SLAB_ALLOC_DEBUG defined,"
+                                 "then run under Valgrind with --leak-check=full\n";
                     REALM_TERMINATE("SlabAlloc detected a leak");
 #  endif
                 }
@@ -203,7 +205,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
                 char* addr = translate(ref);
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
-                std::fill(addr, addr+size, 0);
+                std::fill(addr, addr + size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
@@ -214,16 +216,17 @@ MemRef SlabAlloc::do_alloc(size_t size)
     }
 
     // Else, allocate new slab
-    size_t new_size = ((size-1) | 255) + 1; // Round up to nearest multiple of 256
+    size_t new_size = ((size - 1) | 255) + 1; // Round up to nearest multiple of 256
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline;
     }
     else {
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
+
         // Make it at least as big as twice the previous slab
         ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
-            to_size_t(m_slabs[m_slabs.size()-2].ref_end);
+                                to_size_t(m_slabs[m_slabs.size() - 2].ref_end);
         size_t min_size = 2 * (curr_ref_end - prev_ref_end);
         if (new_size < min_size)
             new_size = min_size;
@@ -231,7 +234,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     }
     REALM_ASSERT_DEBUG(0 < new_size);
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
-    std::fill(mem.get(), mem.get()+new_size, 0);
+    std::fill(mem.get(), mem.get() + new_size, 0);
 
     // Add to list of slabs
     Slab slab;
@@ -255,7 +258,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
-    std::fill(slab.addr, slab.addr+size, 0);
+    std::fill(slab.addr, slab.addr + size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
@@ -279,7 +282,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) REALM_NOEXCEPT
 
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) :
-        Array::get_capacity_from_header(addr);
+                  Array::get_capacity_from_header(addr);
     ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
@@ -319,6 +322,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) REALM_NOEXCEPT
         if (i != free_space.end()) {
             if (merged_with != free_space.end()) {
                 i->size += merged_with->size;
+
                 // Erase by "move last over"
                 *merged_with = free_space.back();
                 free_space.pop_back();
@@ -360,7 +364,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
     // Copy existing segment
     char* new_addr = new_mem.m_addr;
-    std::copy(addr, addr+old_size, new_addr);
+    std::copy(addr, addr + old_size, new_addr);
 
     // Add old segment to freelist
     do_free(ref, addr);
@@ -368,7 +372,8 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 #ifdef REALM_DEBUG
     if (m_debug_out) {
         std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-            "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
+                                                                                 "new_ref: " << new_mem.m_ref <<
+        " new_size: " << new_size << "\n";
     }
 #endif // REALM_DEBUG
 
@@ -398,7 +403,7 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
     iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
     REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-    ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+    ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i - 1)->ref_end;
     return i->addr + (ref - slab_ref);
 }
 
@@ -423,6 +428,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // processes to access a database file concurrently if it is done via a
     // SharedGroup, and in that case 'read_only' can never be true.
     REALM_ASSERT(!(cfg.is_shared && cfg.read_only));
+
     // session_initiator can be set *only* if we're shared.
     REALM_ASSERT(cfg.is_shared || !cfg.session_initiator);
 
@@ -484,7 +490,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // undefined behavior.
     // The mapping of the first part of the file *must* be contiguous, because
     // we do not know if the file was created by a version of the code, that took
-    // the section boundaries into account. If it wasn't we cannot map it in sections 
+    // the section boundaries into account. If it wasn't we cannot map it in sections
     // without risking datastructures that cross a mapping boundary.
     // If the file is opened read-only, we cannot extend it. This is not a problem,
     // because for a read-only file we assume that it will not change while we use it.
@@ -495,6 +501,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         REALM_ASSERT_3(cfg.session_initiator, ||, !cfg.is_shared);
         size = get_upper_section_boundary(size);
         m_file.prealloc(0, size);
+
         // resizing the file (as we do here) without actually changing any internal
         // datastructures to reflect the additional free space will work, because the
         // free space management relies on the logical filesize and disregards the
@@ -553,17 +560,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         Header* header = reinterpret_cast<Header*>(m_data);
 
-        // Don't compare file format version fields as they are allowed to differ. 
+        // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
-        REALM_ASSERT_3(header->m_flags, == , streaming_header.m_flags);
-        REALM_ASSERT_3(header->m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
-        REALM_ASSERT_3(header->m_mnemonic[1], == , streaming_header.m_mnemonic[1]);
-        REALM_ASSERT_3(header->m_mnemonic[2], == , streaming_header.m_mnemonic[2]);
-        REALM_ASSERT_3(header->m_mnemonic[3], == , streaming_header.m_mnemonic[3]);
-        REALM_ASSERT_3(header->m_top_ref[0], == , streaming_header.m_top_ref[0]);
-        REALM_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
+        REALM_ASSERT_3(header->m_flags, ==, streaming_header.m_flags);
+        REALM_ASSERT_3(header->m_mnemonic[0], ==, streaming_header.m_mnemonic[0]);
+        REALM_ASSERT_3(header->m_mnemonic[1], ==, streaming_header.m_mnemonic[1]);
+        REALM_ASSERT_3(header->m_mnemonic[2], ==, streaming_header.m_mnemonic[2]);
+        REALM_ASSERT_3(header->m_mnemonic[3], ==, streaming_header.m_mnemonic[3]);
+        REALM_ASSERT_3(header->m_top_ref[0], ==, streaming_header.m_top_ref[0]);
+        REALM_ASSERT_3(header->m_top_ref[1], ==, streaming_header.m_top_ref[1]);
 
-        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1;
+        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data + initial_size_of_file) - 1;
         REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
         {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
@@ -669,7 +676,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
     if (valid_part == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
             throw InvalidDatabase("Realm file in streaming form has bad size", path);
-        const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data+size) - 1;
+        const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data + size) - 1;
         ref = footer->m_top_ref;
         if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie))
             throw InvalidDatabase("Bad Realm file header (#1)", path);
@@ -740,8 +747,7 @@ void SlabAlloc::remap(size_t file_size)
         delete[] m_additional_mappings;
         m_additional_mappings = new_mappings.release();
     }
-    for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
-    {
+    for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k) {
         auto section_start_offset = get_section_base(k + m_first_additional_mapping);
         auto section_size = get_section_base(1 + k + m_first_additional_mapping) - section_start_offset;
         util::File::Map<char> map(m_file, section_start_offset, File::access_ReadOnly, section_size);
@@ -788,7 +794,7 @@ size_t SlabAlloc::get_section_index(size_t pos) const REALM_NOEXCEPT
 {
     // size_t section_base_number = pos/m_initial_section_size;
     size_t section_base_number = pos >> m_section_shifts;
-    size_t section_group_number = section_base_number/16;
+    size_t section_group_number = section_base_number / 16;
     size_t index;
     if (section_group_number == 0) {
         // first 16 entries aligns 1:1
@@ -797,7 +803,7 @@ size_t SlabAlloc::get_section_index(size_t pos) const REALM_NOEXCEPT
     else {
         // remaning entries are exponential
         size_t log_index = log2(section_group_number);
-        size_t section_index_in_group = (section_base_number >> (1+log_index)) & 0x7;
+        size_t section_index_in_group = (section_base_number >> (1 + log_index)) & 0x7;
         index = (16 + (log_index * 8)) + section_index_in_group;
     }
     return index;
@@ -812,17 +818,18 @@ size_t SlabAlloc::compute_section_base(size_t index) const REALM_NOEXCEPT
     }
     else {
         size_t section_index_in_group = index & 7;
-        size_t log_index = (index - section_index_in_group)/8 - 2;
-        size_t section_base_number = (8 + section_index_in_group)<<(1+log_index);
+        size_t log_index = (index - section_index_in_group) / 8 - 2;
+        size_t section_base_number = (8 + section_index_in_group) << (1 + log_index);
+
         // base = m_initial_section_size * section_base_number;
         base = section_base_number << m_section_shifts;
     }
     return base;
 }
 
-size_t SlabAlloc::find_section_in_range(size_t start_pos, 
-                                             size_t free_chunk_size,
-                                             size_t request_size) const REALM_NOEXCEPT
+size_t SlabAlloc::find_section_in_range(size_t start_pos,
+                                        size_t free_chunk_size,
+                                        size_t request_size) const REALM_NOEXCEPT
 {
     size_t end_of_block = start_pos + free_chunk_size;
     size_t alloc_pos = start_pos;
@@ -855,8 +862,10 @@ bool SlabAlloc::is_all_free() const
             find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));
         if (chunk == m_free_space.end())
             return false;
+
         if (slab_size != chunk->size)
             return false;
+
         slab_ref = slab->ref_end;
     }
     return true;
@@ -901,7 +910,7 @@ void SlabAlloc::print() const
             ref_type last_ref = i->ref_end - 1;
             size_t size = i->ref_end - first_ref;
             void* addr = i->addr;
-            std::cout << "("<<first_ref<<"->"<<last_ref<<", size="<<size<<", addr="<<addr<<")";
+            std::cout << "(" << first_ref << "->" << last_ref << ", size=" << size << ", addr=" << addr << ")";
             first_ref = i->ref_end;
         }
         std::cout << "\n";
@@ -913,7 +922,7 @@ void SlabAlloc::print() const
             if (i != m_free_space.begin())
                 std::cout << ", ";
             ref_type last_ref = i->ref + i->size - 1;
-            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+            std::cout << "(" << i->ref << "->" << last_ref << ", size=" << i->size << ")";
         }
         std::cout << "\n";
     }
@@ -924,7 +933,7 @@ void SlabAlloc::print() const
             if (i != m_free_read_only.begin())
                 std::cout << ", ";
             ref_type last_ref = i->ref + i->size - 1;
-            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+            std::cout << "(" << i->ref << "->" << last_ref << ", size=" << i->size << ")";
         }
         std::cout << "\n";
     }

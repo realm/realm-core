@@ -139,7 +139,8 @@ Importer::Importer():
 
 // Convert string to int64_t. Set can_fail = true if you also want to verify if your string was of that type. In this
 // case, provide the optional 'success' argument. If the string is null (as defined by is_null()) it will return 0
-template <bool can_fail> int64_t Importer::parse_integer(const char* col, bool* success)
+template<bool can_fail>
+int64_t Importer::parse_integer(const char* col, bool* success)
 {
     int64_t x = 0;
 
@@ -151,21 +152,21 @@ template <bool can_fail> int64_t Importer::parse_integer(const char* col, bool* 
         return 0;
     }
 
-    if (*col == '-'){
+    if (*col == '-') {
         ++col;
         x = 0;
         while (*col != '\0') {
-            if (can_fail && ('0' > *col || *col > '9')){
+            if (can_fail && ('0' > *col || *col > '9')) {
                 *success = false;
                 return 0;
             }
             int64_t y = *col - '0';
-            if (can_fail && x < (std::numeric_limits<int64_t>::min()+y)/10){
+            if (can_fail && x < (std::numeric_limits<int64_t>::min() + y) / 10) {
                 *success = false;
                 return 0;
             }
 
-            x = 10*x-y;
+            x = 10 * x - y;
             ++col;
         }
         if(can_fail)
@@ -175,13 +176,13 @@ template <bool can_fail> int64_t Importer::parse_integer(const char* col, bool* 
     else if (*col == '+')
         ++col;
 
-    while (*col != '\0'){
-        if(can_fail && ('0' > *col || *col > '9')){
+    while (*col != '\0') {
+        if(can_fail && ('0' > *col || *col > '9')) {
             *success = false;
             return 0;
         }
         int64_t y = *col - '0';
-        x = 10*x+y;
+        x = 10 * x + y;
         ++col;
     }
 
@@ -193,10 +194,12 @@ template <bool can_fail> int64_t Importer::parse_integer(const char* col, bool* 
 
 // Convert string to bool. Set can_fail = true if you also want to verify if your string was of that type. In this
 // case, provide the optional 'success' argument. If the string is null (as defined by is_null()) it will return false
-template <bool can_fail> bool Importer::parse_bool(const char*col, bool* success)
+template<bool can_fail>
+bool Importer::parse_bool(const char* col, bool* success)
 {
     // Must be tuples of {true value, false value}
-    static const char* a[] = {"True", "False", "true", "false", "TRUE", "FALSE", "1", "0", "Yes", "No", "yes", "no", "YES", "NO"};
+    static const char* a[] =
+    {"True", "False", "true", "false", "TRUE", "FALSE", "1", "0", "Yes", "No", "yes", "no", "YES", "NO"};
 
     char c = *col;
 
@@ -218,10 +221,8 @@ template <bool can_fail> bool Importer::parse_bool(const char*col, bool* success
             return false;
         }
 
-        for(size_t t = 0; t < sizeof(a) / sizeof(a[0]); t++)
-        {
-            if(strcmp(col, a[t]) == 0)
-            {
+        for(size_t t = 0; t < sizeof(a) / sizeof(a[0]); t++) {
+            if(strcmp(col, a[t]) == 0) {
                 *success = true;
                 return !((t & 0x1) == 0);
             }
@@ -243,7 +244,8 @@ template <bool can_fail> bool Importer::parse_bool(const char*col, bool* success
 //
 // If the string contains more than 6 significant digits (5.259862, -9.1869e11), it will return *success = false
 // because a 32-bit float cannot represent so many significants. In that case, use double instead
-template <bool can_fail> float Importer::parse_float(const char*col, bool* success)
+template<bool can_fail>
+float Importer::parse_float(const char* col, bool* success)
 {
     bool s;
     size_t significants = 0;
@@ -263,7 +265,8 @@ template <bool can_fail> float Importer::parse_float(const char*col, bool* succe
 // Convert string to double. Supports normal representation (1.234) and scientific (-4.43e6). Set can_fail = true if you
 // also want to verify if your string was of that type. In this case, provide the optional 'success' argument. If the
 // string is null (as defined by is_null()) it will return 0.0
-template <bool can_fail> double Importer::parse_double(const char* col, bool* success, size_t* significants)
+template<bool can_fail>
+double Importer::parse_double(const char* col, bool* success, size_t* significants)
 {
     const char* orig_col = col;
     double x;
@@ -288,7 +291,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
         ++col;
 
     x = 0;
-    while('0' <= *col && *col <= '9'){
+    while('0' <= *col && *col <= '9') {
         int y = *col - '0';
         x *= 10;
         x += y;
@@ -296,19 +299,19 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
         ++*significants;
     }
 
-    if(*col == '.'|| *col == Separator){
+    if(*col == '.'|| *col == Separator) {
         ++col;
         double pos = 1;
-        while ('0' <= *col && *col <= '9'){
+        while ('0' <= *col && *col <= '9') {
             pos /= 10;
             int y = *col - '0';
             ++col;
-            x += y*pos;
+            x += y * pos;
             ++*significants;
         }
     }
 
-    if(*col == 'e' || *col == 'E'){
+    if(*col == 'e' || *col == 'E') {
         if(can_fail && col == orig_col) {
             *success = false;
             return 0;
@@ -330,7 +333,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 
             while (e != 1) {
                 if ((e & 1) == 0) {
-                    base = base*base;
+                    base = base * base;
                     e >>= 1;
                 }
                 else {
@@ -397,7 +400,9 @@ std::vector<DataType> Importer::lowest_common(std::vector<DataType> types1, std:
             res.push_back(type_String);
         else if(types1[t] == type_Double || types2[t] == type_Double)
             res.push_back(type_Double);
-        else if((types1[t] == type_Float && types2[t] == type_Int) || (types2[t] == type_Float && types1[t] == type_Int)) {
+        else if((types1[t] == type_Float &&
+                 types2[t] == type_Int) || (types2[t] == type_Float && types1[t] == type_Int))
+        {
             // This covers the special case where first values are integers and suddenly radix points occur. In this
             // case we must import as double, because a float may not be precise enough to hold the number of
             // significant digits in the integers. Todo: We could keep track of the significant digits seen in all
@@ -417,7 +422,8 @@ std::vector<DataType> Importer::lowest_common(std::vector<DataType> types1, std:
 }
 
 // Takes payload vectors, and for each field finds best type that can represent all rows.
-std::vector<DataType> Importer::detect_scheme(std::vector<std::vector<std::string>> payload, size_t begin, size_t end)
+std::vector<DataType> Importer::detect_scheme(std::vector<std::vector<std::string >> payload, size_t begin,
+                                              size_t end)
 {
     std::vector<DataType> res;
     res = types(payload[begin]);
@@ -429,11 +435,11 @@ std::vector<DataType> Importer::detect_scheme(std::vector<std::vector<std::strin
     return res;
 }
 
-size_t Importer::tokenize(std::vector<std::vector<std::string>> & payload, size_t records)
+size_t Importer::tokenize(std::vector<std::vector<std::string >>& payload, size_t records)
 {
     size_t original_size = payload.size();
 
-nextrecord:
+  nextrecord:
 
     if(payload.size() - original_size >= records)
         goto end;
@@ -454,7 +460,7 @@ nextrecord:
 
     payload.push_back(std::vector<std::string>());
 
-nextfield:
+  nextfield:
     payload.back().push_back("");
 
     if(src[m_curpos] == 0)
@@ -465,7 +471,8 @@ nextfield:
 
     if(src[m_curpos] == '"') {
         m_curpos++;
-payload:
+  payload:
+
         // Field in quotes - can only end with another quote
         while(src[m_curpos] != '"') {
             // m_row is only used to display file line number in an err msg. We need to include field-embedded breaks
@@ -500,7 +507,9 @@ payload:
         // new record by just testing for 0a/0d.
         size_t fields = payload.back().size();
 
-        while(src[m_curpos] != Separator && src[m_curpos] != 0 && ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
+        while(src[m_curpos] != Separator && src[m_curpos] != 0 &&
+              ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) ))
+        {
             m_row += src[m_curpos] == 0xa;
             payload.back().back().push_back(src[m_curpos]);
             m_curpos++;
@@ -522,13 +531,16 @@ payload:
             m_curpos++;
 
         if(payload.size() >= 2) {
-            if(payload[payload.size() - 2].size() != payload[payload.size()- 1].size()) {
+            if(payload[payload.size() - 2].size() != payload[payload.size() - 1].size()) {
                 // We don't use n-versions of printf because windows needs some macro tweaking for it
                 char buf[500];
                 std::string s = payload[payload.size() - 1][0];
                 if(s.length() > 100)
                     s = s.substr(0, 100);
-                sprintf(buf, "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters of line: %s", static_cast<unsigned long long>(m_row - 1),  s.c_str());
+                sprintf(buf,
+                        "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters of line: %s",
+                        static_cast<unsigned long long>(m_row - 1),
+                        s.c_str());
                 throw std::runtime_error(buf);
             }
         }
@@ -538,16 +550,20 @@ payload:
 
     goto nextfield;
 
-end:
+  end:
 
     return payload.size() - original_size;
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *scheme2, std::vector<std::string> *column_names,
-                            size_t type_detection_rows, size_t skip_first_rows,
-                            size_t import_rows)
+size_t Importer::import_csv(FILE*                     file,
+                            Table&                    table,
+                            std::vector<DataType>*    scheme2,
+                            std::vector<std::string>* column_names,
+                            size_t                    type_detection_rows,
+                            size_t                    skip_first_rows,
+                            size_t                    import_rows)
 {
-    std::vector<std::vector<std::string>> payload;  // Used to build a 2D string vector with rows and columns of .csv content.
+    std::vector<std::vector<std::string >> payload;  // Used to build a 2D string vector with rows and columns of .csv content.
     std::vector<std::string> header;                // Column names (will be either auto-detected or read from cmd line args)
     std::vector<DataType> scheme;                   // Scheme (will be either auto-detected or read from cmd line args)
     bool header_present = false;                    // Used only in auto-detection mode.
@@ -688,21 +704,25 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *sch
 
                     if(type_detection_rows > 0) {
                         if(scheme[col] != type_String && is_null(payload[row][col].c_str()) && Empty_as_string)
-                            sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col])
-                            << " using the first " << type_detection_rows << " rows of CSV file, but in row " <<
-                            imported_rows << " of cvs file the field contained the NULL value '" <<
-                            payload[row][col].c_str() << "'. Please increase the 'type_detection_rows' argument or set "
-                            "Empty_as_string = false/void the -e flag to convert such fields to 0, 0.0 or false";
+                            sstm << "Column " << col << " was auto detected to be of type " <<
+                            DataTypeToText(scheme[col])
+                                 << " using the first " << type_detection_rows << " rows of CSV file, but in row " <<
+                                imported_rows << " of cvs file the field contained the NULL value '" <<
+                                payload[row][col].c_str() <<
+                            "'. Please increase the 'type_detection_rows' argument or set "
+                                                         "Empty_as_string = false/void the -e flag to convert such fields to 0, 0.0 or false";
+
                         else
-                            sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col])
-                            << " using the first " << type_detection_rows << " rows of CSV file, but in row " <<
-                            imported_rows << " of cvs file the field contained '" << payload[row][col].c_str() <<
-                            "' which is of another type. Please increase the 'type_detection_rows' argument";
+                            sstm << "Column " << col << " was auto detected to be of type " <<
+                            DataTypeToText(scheme[col])
+                                 << " using the first " << type_detection_rows << " rows of CSV file, but in row " <<
+                                imported_rows << " of cvs file the field contained '" << payload[row][col].c_str() <<
+                                "' which is of another type. Please increase the 'type_detection_rows' argument";
                     }
                     else
                         sstm << "Column " << col << " was specified to be of type " << DataTypeToText(scheme[col]) <<
-                        ", but in row " << imported_rows << " of cvs file," << "the field contained '" <<
-                        payload[row][col].c_str() << "' which is of another type";
+                            ", but in row " << imported_rows << " of cvs file," << "the field contained '" <<
+                            payload[row][col].c_str() << "' which is of another type";
 
                     throw std::runtime_error(sstm.str());
                 }
@@ -732,8 +752,12 @@ size_t Importer::import_csv_auto(FILE* file, Table& table, size_t type_detection
     return import_csv(file, table, nullptr, nullptr, type_detection_rows, 0, import_rows);
 }
 
-size_t Importer::import_csv_manual(FILE* file, Table& table, std::vector<DataType> scheme, std::vector<std::string> column_names,
-                                   size_t skip_first_rows, size_t import_rows)
+size_t Importer::import_csv_manual(FILE*                    file,
+                                   Table&                   table,
+                                   std::vector<DataType>    scheme,
+                                   std::vector<std::string> column_names,
+                                   size_t                   skip_first_rows,
+                                   size_t                   import_rows)
 {
     return import_csv(file, table, &scheme, &column_names, 0, skip_first_rows, import_rows);
 }

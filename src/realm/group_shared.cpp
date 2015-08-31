@@ -141,7 +141,8 @@ const uint16_t relaxed_sync_threshold = 50;
 //   there is no standardized support for it.
 //
 
-template<typename T> bool atomic_double_inc_if_even(std::atomic<T>& counter)
+template<typename T>
+bool atomic_double_inc_if_even(std::atomic<T>& counter)
 {
     T oldval = counter.fetch_add(2, std::memory_order_acquire);
     if (oldval & 1) {
@@ -152,12 +153,14 @@ template<typename T> bool atomic_double_inc_if_even(std::atomic<T>& counter)
     return true;
 }
 
-template<typename T> inline void atomic_double_dec(std::atomic<T>& counter)
+template<typename T>
+inline void atomic_double_dec(std::atomic<T>& counter)
 {
     counter.fetch_sub(2, std::memory_order_release);
 }
 
-template<typename T> bool atomic_one_if_zero(std::atomic<T>& counter)
+template<typename T>
+bool atomic_one_if_zero(std::atomic<T>& counter)
 {
     T old_val = counter.fetch_add(1, std::memory_order_acquire);
     if (old_val != 0) {
@@ -167,7 +170,8 @@ template<typename T> bool atomic_one_if_zero(std::atomic<T>& counter)
     return true;
 }
 
-template<typename T> void atomic_dec(std::atomic<T>& counter)
+template<typename T>
+void atomic_dec(std::atomic<T>& counter)
 {
     counter.fetch_sub(1, std::memory_order_release);
 }
@@ -175,6 +179,7 @@ template<typename T> void atomic_dec(std::atomic<T>& counter)
 // nonblocking ringbuffer
 class Ringbuffer {
 public:
+
     // the ringbuffer is a circular list of ReadCount structures.
     // Entries from old_pos to put_pos are considered live and may
     // have an even value in 'count'. The count indicates the
@@ -191,6 +196,7 @@ public:
         uint64_t version;
         uint64_t filesize;
         uint64_t current_top;
+
         // The count field acts as synchronization point for accesses to the above
         // fields. A succesfull inc implies acquire with regard to memory consistency.
         // Release is triggered by explicitly storing into count whenever a
@@ -202,7 +208,7 @@ public:
     Ringbuffer() REALM_NOEXCEPT
     {
         entries = init_readers_size;
-        for (int i=0; i < init_readers_size; i++) {
+        for (int i = 0; i < init_readers_size; i++) {
             data[i].version = 1;
             data[i].count.store( 1, std::memory_order_relaxed );
             data[i].current_top = 0;
@@ -211,7 +217,7 @@ public:
         }
         old_pos = 0;
         data[ 0 ].count.store( 0, std::memory_order_relaxed );
-        data[ init_readers_size-1 ].next = 0 ;
+        data[ init_readers_size - 1 ].next = 0;
         put_pos.store( 0, std::memory_order_release );
     }
 
@@ -219,23 +225,23 @@ public:
     {
         uint_fast32_t i = old_pos;
         std::cout << "--- " << std::endl;
-         while (i != put_pos.load()) {
+        while (i != put_pos.load()) {
             std::cout << "  used " << i << " : "
-                 << data[i].count.load() << " | "
-                 << data[i].version
-                 << std::endl;
+                      << data[i].count.load() << " | "
+                      << data[i].version
+                      << std::endl;
             i = data[i].next;
         }
         std::cout << "  LAST " << i << " : "
-             << data[i].count.load() << " | "
-             << data[i].version
-             << std::endl;
+                  << data[i].count.load() << " | "
+                  << data[i].version
+                  << std::endl;
         i = data[i].next;
         while (i != old_pos) {
             std::cout << "  free " << i << " : "
-                 << data[i].count.load() << " | "
-                 << data[i].version
-                 << std::endl;
+                      << data[i].count.load() << " | "
+                      << data[i].version
+                      << std::endl;
             i = data[i].next;
         }
         std::cout << "--- Done" << std::endl;
@@ -255,6 +261,7 @@ public:
         data[ new_entries - 1 ].next = old_pos;
         data[ put_pos.load(std::memory_order_relaxed) ].next = entries;
         entries = new_entries;
+
         // dump();
     }
 
@@ -266,38 +273,38 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const  REALM_NOEXCEPT
+    uint_fast32_t get_num_entries() const REALM_NOEXCEPT
     {
         return entries;
     }
 
-    uint_fast32_t last() const  REALM_NOEXCEPT
+    uint_fast32_t last() const REALM_NOEXCEPT
     {
         return put_pos.load(std::memory_order_acquire);
     }
 
-    const ReadCount& get(uint_fast32_t idx) const  REALM_NOEXCEPT
+    const ReadCount& get(uint_fast32_t idx) const REALM_NOEXCEPT
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const  REALM_NOEXCEPT
+    const ReadCount& get_last() const REALM_NOEXCEPT
     {
         return get(last());
     }
 
-    const ReadCount& get_oldest() const  REALM_NOEXCEPT
+    const ReadCount& get_oldest() const REALM_NOEXCEPT
     {
         return get(old_pos.load(std::memory_order_relaxed));
     }
 
-    bool is_full() const  REALM_NOEXCEPT
+    bool is_full() const REALM_NOEXCEPT
     {
         uint_fast32_t idx = get(last()).next;
         return idx == old_pos.load(std::memory_order_relaxed);
     }
 
-    uint_fast32_t next() const  REALM_NOEXCEPT
+    uint_fast32_t next() const REALM_NOEXCEPT
     { // do not call this if the buffer is full!
         uint_fast32_t idx = get(last()).next;
         return idx;
@@ -321,7 +328,7 @@ public:
         // dump();
         while (old_pos.load(std::memory_order_relaxed) != put_pos.load(std::memory_order_relaxed)) {
             const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
-            if (! atomic_one_if_zero( r.count ))
+            if (!atomic_one_if_zero( r.count ))
                 break;
             auto next = get(old_pos.load(std::memory_order_relaxed)).next;
             old_pos.store(next, std::memory_order_relaxed);
@@ -329,6 +336,7 @@ public:
     }
 
 private:
+
     // number of entries. Access synchronized through put_pos.
     uint32_t entries;
     std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
@@ -350,8 +358,7 @@ private:
 
 
 
-struct SharedGroup::SharedInfo
-{
+struct SharedGroup::SharedInfo {
     // indicates lock file has valid content, implying that all the following member
     // variables have been initialized. All member variables, except for the Ringbuffer,
     // are protected by 'controlmutex', except during initialization, where access is
@@ -394,12 +401,14 @@ struct SharedGroup::SharedInfo
     RobustMutex balancemutex;
     RobustMutex controlmutex;
 #ifndef _WIN32
+
     // FIXME: windows pthread support for condvar not ready
     PlatformSpecificCondVar::SharedPart room_to_write;
     PlatformSpecificCondVar::SharedPart work_to_do;
     PlatformSpecificCondVar::SharedPart daemon_becomes_ready;
     PlatformSpecificCondVar::SharedPart new_commit_available;
 #endif
+
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
     SharedInfo(DurabilityLevel);
@@ -478,19 +487,22 @@ void spawn_daemon(const std::string& file)
 
         // close all descriptors:
         int i;
-        for (i=m-1;i>=0;--i)
+        for (i = m - 1; i>=0; --i)
             close(i);
         i = ::open("/dev/null",O_RDWR);
 #ifdef REALM_ENABLE_LOGFILE
+
         // FIXME: Do we want to always open the log file? Should it be configurable?
-        i = ::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        i = ::open((file + ".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = dup(i);
 #endif
-        i = dup(i); static_cast<void>(i);
+        i = dup(i);
+        static_cast<void>(i);
 #ifdef REALM_ENABLE_LOGFILE
         std::cerr << "Detaching" << std::endl;
 #endif
+
         // detach from current session:
         setsid();
 
@@ -514,6 +526,7 @@ void spawn_daemon(const std::string& file)
 #else
         _Exit(1);
 #endif
+
         // child process ends here
 
     }
@@ -623,7 +636,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             // We're alone in the world, and it is Ok to initialize the file:
             char empty_buf[sizeof (SharedInfo)];
-            std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
+            std::fill(empty_buf, empty_buf + sizeof(SharedInfo), 0);
             m_file.write(empty_buf, sizeof(SharedInfo));
 
             // Complete initialization of shared info via the memory mapping:
@@ -652,7 +665,8 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
         REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
 
         // If this ever triggers we are on a really weird architecture
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
+        REALM_STATIC_ASSERT(offsetof(SharedInfo,
+                                     latest_version_number) == 16, "misalignment of latest_version_number");
 
         // we need to have the size_of_mutex, size_of_condvar and init_complete
         // fields available before we can check for compatibility
@@ -742,12 +756,13 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                     if (top.size() <= 5) {
                         // the database wasn't written by shared group, so no versioning info
                         version = 1;
-                        REALM_ASSERT(! cfg.server_sync_mode);
+                        REALM_ASSERT(!cfg.server_sync_mode);
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
                         REALM_ASSERT(top.size() == 7);
                         version = top.get(6) / 2;
+
                         // In case this was written by an older version of shared group, it
                         // will have version 0. Version 0 is not a legal initial version, so
                         // it has to be set to 1 instead.
@@ -759,6 +774,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                     // the database was just created, no metadata has been written yet.
                     version = 1;
                 }
+
                 // If replication is enabled, we need to inform it of the latest version,
                 // allowing it to discard any surplus log entries
                 repl = _impl::GroupFriend::get_replication(m_group);
@@ -789,6 +805,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
             m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
 #ifdef REALM_ASYNC_DAEMON
+
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
@@ -796,15 +813,19 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                         spawn_daemon(path);
                         info->daemon_started = true;
                     }
+
                     // FIXME: It might be more robust to sleep a little, then restart the loop
                     // std::cerr << "Waiting for daemon" << std::endl;
                     m_daemon_becomes_ready.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
+
                     // std::cerr << " - notified" << std::endl;
                 }
             }
+
             // std::cerr << "daemon should be ready" << std::endl;
 #endif
 #endif
+
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to detect concurrent expansion of the ringbuffer.
             m_local_max_entry = 0;
@@ -845,6 +866,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
     }
 
     m_transact_stage = transact_Ready;
+
     // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
@@ -868,6 +890,7 @@ bool SharedGroup::compact()
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
     }
+
     // Verify that preconditions for compacting is met:
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
@@ -941,9 +964,11 @@ void SharedGroup::close() REALM_NOEXCEPT
     switch (m_transact_stage) {
         case transact_Ready:
             break;
+
         case transact_Reading:
             end_read();
             break;
+
         case transact_Writing:
             rollback();
             break;
@@ -959,6 +984,7 @@ void SharedGroup::close() REALM_NOEXCEPT
 
         --info->num_participants;
         bool end_of_session = info->num_participants == 0;
+
         // std::cerr << "closing" << std::endl;
         if (end_of_session) {
 
@@ -968,8 +994,10 @@ void SharedGroup::close() REALM_NOEXCEPT
                 try {
                     util::File::remove(m_db_path.c_str());
                 }
-                catch(...) {} // ignored on purpose.
+                catch(...) {
+                }             // ignored on purpose.
             }
+
             // If replication is enabled, we need to stop log management:
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl) {
@@ -977,7 +1005,8 @@ void SharedGroup::close() REALM_NOEXCEPT
                 try {
                     repl->stop_logging();
                 }
-                catch(...) {} // FIXME, on Windows, stop_logging() fails to delete a file because it's open
+                catch(...) {
+                }             // FIXME, on Windows, stop_logging() fails to delete a file because it's open
 #else
                 repl->stop_logging();
 #endif
@@ -992,6 +1021,7 @@ void SharedGroup::close() REALM_NOEXCEPT
     m_new_commit_available.close();
 #endif
     m_file.unlock();
+
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
     m_file_map.unmap();
@@ -1044,6 +1074,7 @@ void SharedGroup::do_async_commits()
     // overwritten by commits being made to memory by others.
     bool dummy;
     grab_latest_readlock(m_readlock, dummy);
+
     // we must treat version and version_index the same way:
     {
         RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
@@ -1086,7 +1117,7 @@ void SharedGroup::do_async_commits()
 
 #ifdef REALM_ENABLE_LOGFILE
             std::cerr << "Syncing from version " << m_readlock.m_version
-                 << " to " << next_readlock.m_version << std::endl;
+                      << " to " << next_readlock.m_version << std::endl;
 #endif
             GroupWriter writer(m_group);
             writer.commit(next_readlock.m_top_ref);
@@ -1115,6 +1146,7 @@ void SharedGroup::do_async_commits()
         if (free_write_slots > relaxed_sync_threshold) {
             timespec ts;
             timeval tv;
+
             // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
             gettimeofday(&tv, nullptr);
             ts.tv_sec = tv.tv_sec;
@@ -1150,9 +1182,10 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
             continue;
         }
         const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+
         // if the entry is stale and has been cleared by the cleanup process,
         // we need to start all over again. This is extremely unlikely, but possible.
-        if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
+        if (!atomic_double_inc_if_even(r.count))  // <-- most of the exec time spent here!
             continue;
         same_as_before       = readlock.m_version == r.version;
         readlock.m_version   = r.version;
@@ -1176,16 +1209,17 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
 
         // if the entry is stale and has been cleared by the cleanup process,
         // the requested version is no longer available
-        while (! atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
+        while (!atomic_double_inc_if_even(r.count)) {  // <-- most of the exec time spent here!
             // we failed to lock the version. This could be because the version
             // is being cleaned up, but also because the cleanup is probing for access
             // to it. If it's being probed, the tail ptr of the ringbuffer will point
             // to it. If so we retry. If the tail ptr points somewhere else, the entry
             // has been cleaned up.
-            if (& r_info->readers.get_oldest() != &r)
-	        return false;
-	}
-	// we managed to lock an entry in the ringbuffer, but it may be so old that
+            if (&r_info->readers.get_oldest() != &r)
+                return false;
+        }
+
+        // we managed to lock an entry in the ringbuffer, but it may be so old that
         // the version doesn't match the specific request. In that case we must release and fail
         if (r.version != specific_version.version) {
             atomic_double_dec(r.count); // <-- release
@@ -1282,7 +1316,7 @@ void SharedGroup::rollback() REALM_NOEXCEPT
     do_end_write();
     do_end_read();
 
-    if (Replication* repl = m_group.get_replication())
+    if (Replication * repl = m_group.get_replication())
         repl->abort_transact(*this);
 
     m_transact_stage = transact_Ready;
@@ -1341,6 +1375,7 @@ void SharedGroup::do_begin_write()
         // if we are running low on write slots, kick the sync daemon
         if (info->free_write_slots < relaxed_sync_threshold)
             m_work_to_do.notify();
+
         // if we are out of write slots, wait for the sync daemon to catch up
         while (info->free_write_slots <= 0) {
             m_room_to_write.wait(info->balancemutex, recover_from_dead_write_transact);
@@ -1368,7 +1403,7 @@ Replication::version_type SharedGroup::do_commit()
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
-    if (Replication* repl = m_group.get_replication()) {
+    if (Replication * repl = m_group.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
         // transaction with a call to SharedGroup::rollback(), which in turn
@@ -1462,6 +1497,7 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
         SharedInfo* r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
         size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
+
         // std::cout << "Growing reader mapping to " << infosize << std::endl;
         m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
         return true;
@@ -1492,11 +1528,12 @@ uint_fast64_t SharedGroup::get_current_version()
         // now (double) increment the read count so that no-one cleans up the entry
         // while we read it.
         const Ringbuffer::ReadCount& r = r_info->readers.get(index);
-        if (! atomic_double_inc_if_even(r.count)) {
+        if (!atomic_double_inc_if_even(r.count)) {
 
             continue;
         }
         uint_fast64_t version = r.version;
+
         // release the entry again:
         atomic_double_dec(r.count);
         return version;
@@ -1519,6 +1556,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
+
         // If replication is enabled, we need to propagate knowledge of the earliest
         // available version:
         Replication* repl = _impl::GroupFriend::get_replication(m_group);
@@ -1529,9 +1567,11 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // Do the actual commit
     REALM_ASSERT(m_group.m_top.is_attached());
     REALM_ASSERT(readlock_version <= new_version);
+
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
     out.set_versions(new_version, readlock_version);
+
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
@@ -1540,8 +1580,10 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         case durability_Full:
             out.commit(new_top_ref); // Throws
             break;
+
         case durability_MemOnly:
         case durability_Async:
+
             // In durability_MemOnly mode, we just use the file as backing for
             // the shared memory. So we never actually flush the data to disk
             // (the OS may do so opportinisticly, or when swapping). So in this
@@ -1549,6 +1591,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             break;
     }
     size_t new_file_size = out.get_file_size();
+
     // Update reader info
     {
         SharedInfo* r_info = m_reader_map.get_addr();
@@ -1557,6 +1600,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             uint_fast32_t entries = r_info->readers.get_num_entries();
             entries = entries + 32;
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space( entries );
+
             // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
             m_file.prealloc(0, new_info_size); // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
@@ -1584,6 +1628,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 void SharedGroup::reserve(size_t size)
 {
     REALM_ASSERT(is_attached());
+
     // FIXME: There is currently no synchronization between this and
     // concurrent commits in progress. This is so because it is
     // believed that the OS guarantees race free behavior when
@@ -1595,14 +1640,14 @@ void SharedGroup::reserve(size_t size)
 
 
 
-std::unique_ptr<SharedGroup::Handover<LinkView>> 
-SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
+std::unique_ptr<SharedGroup::Handover<LinkView >>
+SharedGroup::export_linkview_for_handover(const LinkViewRef &accessor)
 {
     LockGuard lg(m_handover_lock);
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }
-    std::unique_ptr<Handover<LinkView>> result(new Handover<LinkView>());
+    std::unique_ptr<Handover<LinkView >> result(new Handover<LinkView>());
     LinkView::generate_patch(accessor, result->patch);
     result->clone = 0; // not used for LinkView - maybe specialize Handover<LinkView> ?
     result->version = get_version_of_current_transaction();
@@ -1610,11 +1655,12 @@ SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 }
 
 
-LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover)
+LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<LinkView >> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
         throw BadVersion();
     }
+
     // move data
     LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);
     return result;

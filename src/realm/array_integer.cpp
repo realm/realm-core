@@ -8,8 +8,8 @@ using namespace realm;
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
-template <size_t w>
-bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) const
+template<size_t w>
+bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const
 {
     int64_t min2;
     int64_t max2;
@@ -20,6 +20,7 @@ bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t *min
 
     for (t = from + 1; t < to; t++) {
         int64_t v = Array::get<w>(t);
+
         // Utilizes that range test is only needed if max2 or min2 were changed
         if (v < min2) {
             min2 = v;
@@ -55,7 +56,8 @@ std::vector<int64_t> ArrayInteger::to_vector() const
     return v;
 }
 
-MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size, int_fast64_t value, Allocator& alloc)
+MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size, int_fast64_t value,
+                                  Allocator& alloc)
 {
     MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, value, alloc); // Throws
     ArrayIntNull arr(alloc);
@@ -76,7 +78,7 @@ void ArrayIntNull::init_from_ref(ref_type ref) REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
-    init_from_mem(MemRef{header, ref});
+    init_from_mem(MemRef {header, ref});
 }
 
 void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
@@ -101,13 +103,15 @@ void ArrayIntNull::init_from_parent() REALM_NOEXCEPT
 }
 
 namespace {
-    int64_t next_null_candidate(int64_t previous_candidate) {
-        uint64_t x = static_cast<uint64_t>(previous_candidate);
-        // Increment by a prime number. This guarantees that we will
-        // eventually hit every possible integer in the 2^64 range.
-        x += 0xfffffffbULL;
-        return util::from_twos_compl<int64_t>(x);
-    }
+int64_t next_null_candidate(int64_t previous_candidate)
+{
+    uint64_t x = static_cast<uint64_t>(previous_candidate);
+
+    // Increment by a prime number. This guarantees that we will
+    // eventually hit every possible integer in the 2^64 range.
+    x += 0xfffffffbULL;
+    return util::from_twos_compl<int64_t>(x);
+}
 }
 
 int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming)
@@ -186,7 +190,11 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
     }
 }
 
-void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
+void ArrayIntNull::find_all(IntegerColumn* result,
+                            int64_t        value,
+                            std::size_t    col_offset,
+                            std::size_t    begin,
+                            std::size_t    end) const
 {
     // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
     // in the result column. Since find_all may be invoked many times for different leaves in the
@@ -214,8 +222,12 @@ namespace {
 
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
-    template <class T>
-    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, std::size_t ndx, T value, Array::TreeInsertBase& state)
+    template<class T>
+    static ref_type leaf_insert(Allocator&             alloc,
+                                ArrayIntNull&          self,
+                                std::size_t            ndx,
+                                T                      value,
+                                Array::TreeInsertBase& state)
     {
         size_t leaf_size = self.size();
         REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
@@ -236,7 +248,7 @@ struct ArrayIntNullLeafInserter {
         else {
             for (size_t i = ndx; i < leaf_size; ++i) {
                 if (self.is_null(i)) {
-                    new_leaf.add(null{}); // Throws
+                    new_leaf.add(null {}); // Throws
                 }
                 else {
                     new_leaf.add(self.get(i)); // Throws
@@ -260,7 +272,7 @@ ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, int64_t value, Array:
 
 ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, null, Array::TreeInsertBase& state)
 {
-    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, null{}, state);
+    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, null {}, state);
 }
 
 MemRef ArrayIntNull::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const

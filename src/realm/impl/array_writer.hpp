@@ -16,7 +16,7 @@
  * is strictly forbidden unless prior written permission is obtained
  * from Realm Incorporated.
  *
-***************************************************************************/
+ ***************************************************************************/
 
 #ifndef REALM_ARRAY_WRITER_HPP
 #define REALM_ARRAY_WRITER_HPP

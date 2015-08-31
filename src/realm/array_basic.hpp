@@ -26,7 +26,8 @@ namespace realm {
 
 /// A BasicArray can currently only be used for simple unstructured
 /// types like float, double.
-template<class T> class BasicArray: public Array {
+template<class T>
+class BasicArray: public Array {
 public:
     explicit BasicArray(Allocator&) REALM_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) REALM_NOEXCEPT;
@@ -40,7 +41,7 @@ public:
     void truncate(std::size_t size);
     void clear();
 
-    std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
+    std::size_t find_first(T value, std::size_t begin = 0, std::size_t end = npos) const;
     void find_all(IntegerColumn* result, T value, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
@@ -57,7 +58,7 @@ public:
     /// slower.
     static T get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase & state);
 
     std::size_t lower_bound(T value) const REALM_NOEXCEPT;
     std::size_t upper_bound(T value) const REALM_NOEXCEPT;
@@ -90,7 +91,8 @@ private:
     virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT override;
     virtual WidthType GetWidthType() const override { return wtype_Multiply; }
 
-    template<bool find_max> bool minmax(T& result, std::size_t begin, std::size_t end) const;
+    template<bool find_max>
+    bool minmax(T& result, std::size_t begin, std::size_t end) const;
 
     /// Calculate the total number of bytes needed for a basic array
     /// with the specified number of elements. This includes the size

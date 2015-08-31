@@ -38,13 +38,16 @@ namespace realm {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() REALM_NOEXCEPT : m_data(0), m_size(0) {}
+    BinaryData() REALM_NOEXCEPT: m_data(0), m_size(0) {}
     BinaryData(const char* data, std::size_t size) REALM_NOEXCEPT: m_data(data), m_size(size) {}
-    template<std::size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
-    template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
+    template<std::size_t N>
+    explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
+    template<class T, class A>
+    explicit BinaryData(const std::basic_string<char, T, A>&);
 
 #if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
+    template<class T, class A>
+    explicit operator std::basic_string<char, T, A>() const;
 #endif
 
     char operator[](std::size_t i) const REALM_NOEXCEPT { return m_data[i]; }
@@ -85,6 +88,7 @@ public:
     friend bool operator>(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
     friend bool operator<=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
     friend bool operator>=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
+
     //@}
 
     bool begins_with(BinaryData) const REALM_NOEXCEPT;
@@ -97,7 +101,7 @@ public:
 #ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const REALM_NOEXCEPT;
 #else
-    typedef const char* BinaryData::*unspecified_bool_type;
+    typedef const char* BinaryData::* unspecified_bool_type;
     operator unspecified_bool_type() const REALM_NOEXCEPT;
 #endif
 
@@ -110,7 +114,8 @@ private:
 
 // Implementation:
 
-template<class T, class A> inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
+template<class T, class A>
+inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
     m_data(s.data()),
     m_size(s.size())
 {
@@ -118,7 +123,8 @@ template<class T, class A> inline BinaryData::BinaryData(const std::basic_string
 
 #if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
-template<class T, class A> inline BinaryData::operator std::basic_string<char, T, A>() const
+template<class T, class A>
+inline BinaryData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
 }
@@ -186,13 +192,13 @@ inline bool BinaryData::contains(BinaryData d) const REALM_NOEXCEPT
         return false;
 
     return d.m_size == 0 ||
-        std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+           std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 template<class C, class T>
 inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BinaryData& d)
 {
-    out << "BinaryData("<<static_cast<const void*>(d.m_data)<<", "<<d.m_size<<")";
+    out << "BinaryData(" << static_cast<const void*>(d.m_data) << ", " << d.m_size << ")";
     return out;
 }
 

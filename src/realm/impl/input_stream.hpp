@@ -32,6 +32,7 @@ namespace _impl {
 
 class InputStream {
 public:
+
     /// Read bytes from this input stream and place them in the specified
     /// buffer. The returned value is the actual number of bytes that were read,
     /// and this is some number `n` such that `n <= min(size, m)` where `m` is
@@ -58,7 +59,7 @@ public:
     }
     size_t read(char* buffer, size_t size) override
     {
-        size_t n = std::min(size, size_t(m_end-m_ptr));
+        size_t n = std::min(size, size_t(m_end - m_ptr));
         const char* begin = m_ptr;
         m_ptr += n;
         const char* end = m_ptr;
@@ -73,6 +74,7 @@ private:
 
 class NoCopyInputStream {
 public:
+
     /// \return the number of accessible bytes.
     /// A value of zero indicates end-of-input.
     /// For non-zero return value, \a begin and \a end are
@@ -118,6 +120,7 @@ public:
     {
         if (m_size == 0)
             return 0;
+
         std::size_t size = m_size;
         begin = m_data;
         end = m_data + size;
@@ -143,12 +146,14 @@ public:
     {
         if (m_logs_begin == m_logs_end)
             return 0;
+
         for (;;) {
             if (m_curr_buf_remaining_size > 0) {
                 size_t offset = m_logs_begin->size() - m_curr_buf_remaining_size;
                 const char* data = m_logs_begin->data() + offset;
                 size_t size_2 = std::min(m_curr_buf_remaining_size, size);
                 m_curr_buf_remaining_size -= size_2;
+
                 // FIXME: Eliminate the need for copying by changing the API of
                 // Replication::InputStream such that blocks can be handed over
                 // without copying. This is a straight forward change, but the
@@ -160,6 +165,7 @@ public:
             ++m_logs_begin;
             if (m_logs_begin == m_logs_end)
                 return 0;
+
             m_curr_buf_remaining_size = m_logs_begin->size();
         }
     }

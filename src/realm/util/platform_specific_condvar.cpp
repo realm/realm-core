@@ -52,6 +52,7 @@ void PlatformSpecificCondVar::close() REALM_NOEXCEPT
         m_sem = nullptr;
         return; // we don't need to clean up the SharedPart
     }
+
     // we don't do anything to the shared part, other CondVars may shared it
     m_shared_part = nullptr;
 }
@@ -64,7 +65,8 @@ PlatformSpecificCondVar::~PlatformSpecificCondVar() REALM_NOEXCEPT
 
 
 
-void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar)
+void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path,
+                                              std::size_t offset_of_condvar)
 {
     REALM_ASSERT(m_shared_part == nullptr);
     close();
@@ -79,31 +81,33 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
 sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, std::size_t offset)
 {
     uint64_t magic = 0;
-    for (unsigned int i=0; i<path.length(); ++i)
-        magic ^= (i+1) * 0x794e80091e8f2bc7ULL * static_cast<unsigned int>(path[i]);
+    for (unsigned int i = 0; i<path.length(); ++i)
+        magic ^= (i + 1) * 0x794e80091e8f2bc7ULL * static_cast<unsigned int>(path[i]);
     std::string name = internal_naming_prefix;
-    magic *= (offset+1);
-    name += 'A'+(magic % 23);
+    magic *= (offset + 1);
+    name += 'A' + (magic % 23);
     magic /= 23;
-    name += 'A'+(magic % 23);
+    name += 'A' + (magic % 23);
     magic /= 23;
-    name += 'A'+(magic % 23);
+    name += 'A' + (magic % 23);
     magic /= 23;
     REALM_ASSERT(m_shared_part);
     if (m_sem == nullptr) {
         m_sem = sem_open(name.c_str(), O_CREAT, S_IRWXG | S_IRWXU, 0);
+
         // FIXME: error checking
     }
     return m_sem;
 }
 
 
-void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
+void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part)
+{
 #ifdef REALM_CONDVAR_EMULATION
     shared_part.waiters = 0;
     shared_part.signal_counter = 0;
 #else
-    new (&shared_part) CondVar(CondVar::process_shared_tag());
+    new (&shared_part)CondVar(CondVar::process_shared_tag());
 #endif // REALM_CONDVAR_EMULATION
 }
 

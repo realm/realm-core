@@ -43,38 +43,38 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
     static_cast<void>(nullable);
 
     if (TAction == act_ReturnFirst)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
 
     else if (TAction == act_Count)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Count, IntegerColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Count, IntegerColumn>;
 
     else if (TAction == act_Sum && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, IntegerColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, IntegerColumn>;
 
     else if (TAction == act_Sum && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<float>>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, BasicColumn<float >>;
     else if (TAction == act_Sum && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<double>>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, BasicColumn<double >>;
 
     else if (TAction == act_Max && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, IntegerColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntegerColumn>;
     else if (TAction == act_Max && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<float>>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, BasicColumn<float >>;
     else if (TAction == act_Max && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<double>>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, BasicColumn<double >>;
 
     else if (TAction == act_Min && col_id == type_Int)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, IntegerColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, IntegerColumn>;
     else if (TAction == act_Min && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<float>>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, BasicColumn<float >>;
     else if (TAction == act_Min && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<double>>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, BasicColumn<double >>;
 
     else if (TAction == act_FindAll)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
 
     else if (TAction == act_CallbackIdx)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, IntegerColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntegerColumn>;
 
     else {
         REALM_ASSERT(false);
@@ -83,7 +83,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    SequentialGetterBase* source_column)
-    {
+{
     // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
     // integer version, because find_first_local() is relatively slower here (because it's non-integers).
     //
@@ -121,7 +121,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
 
         // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
         if (m == r) {
-            bool cont = (this->* m_column_action_specializer)(st, source_column, r);
+            bool cont = (this->*m_column_action_specializer)(st, source_column, r);
             if (!cont) {
                 return static_cast<size_t>(-1);
             }
@@ -141,7 +141,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
         return find_first_overlap_lower(start, end);
     }
     else if (start <= m_known_range_end && end > m_known_range_end) {
-        return find_first_overlap_upper(start, end);   
+        return find_first_overlap_upper(start, end);
     }
     else { // start > m_known_range_end || end < m_known_range_start
         return find_first_no_overlap(start, end);
@@ -150,7 +150,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
 
 bool NotNode::evaluate_at(size_t rowndx)
 {
-    return m_cond->find_first(rowndx, rowndx+1) == not_found;
+    return m_cond->find_first(rowndx, rowndx + 1) == not_found;
 }
 
 void NotNode::update_known(size_t start, size_t end, size_t first)
@@ -195,6 +195,7 @@ size_t NotNode::find_first_covers_known(size_t start, size_t end)
 size_t NotNode::find_first_covered_by_known(size_t start, size_t end)
 {
     REALM_ASSERT_DEBUG(start >= m_known_range_start && end <= m_known_range_end);
+
     // CASE: the known range covers start-end
     // ###[#####]###
     if (m_first_in_known_range != not_found) {
@@ -205,6 +206,7 @@ size_t NotNode::find_first_covered_by_known(size_t start, size_t end)
             return m_first_in_known_range;
         }
     }
+
     // The first known match is before start, so we can't use the results to improve
     // heuristics.
     return find_first_loop(start, end);
@@ -214,6 +216,7 @@ size_t NotNode::find_first_overlap_lower(size_t start, size_t end)
 {
     REALM_ASSERT_DEBUG(start < m_known_range_start && end >= m_known_range_start && end <= m_known_range_end);
     static_cast<void>(end);
+
     // CASE: partial overlap, lower end
     // [   ###]#####
     size_t result;
@@ -228,6 +231,7 @@ size_t NotNode::find_first_overlap_lower(size_t start, size_t end)
 size_t NotNode::find_first_overlap_upper(size_t start, size_t end)
 {
     REALM_ASSERT_DEBUG(start <= m_known_range_end && start >= m_known_range_start && end > m_known_range_end);
+
     // CASE: partial overlap, upper end
     // ####[###    ]
     size_t result;
@@ -250,7 +254,9 @@ size_t NotNode::find_first_overlap_upper(size_t start, size_t end)
 
 size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 {
-    REALM_ASSERT_DEBUG((start < m_known_range_start && end < m_known_range_start) || (start > m_known_range_end && end > m_known_range_end));
+    REALM_ASSERT_DEBUG((start < m_known_range_start &&
+                        end < m_known_range_start) || (start > m_known_range_end && end > m_known_range_end));
+
     // CASE: no overlap
     // ### [    ]   or    [    ] ####
     // if input is a larger range, discard and replace with results.

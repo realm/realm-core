@@ -32,7 +32,8 @@ namespace _impl {
 /// when the guard is destroyed. For arrays (`T` = `Array`) this means
 /// that the array is destroyed in a shallow fashion. See
 /// `DeepArrayDestroyGuard` for an alternative.
-template<class T> class DestroyGuard {
+template<class T>
+class DestroyGuard {
 public:
     DestroyGuard() REALM_NOEXCEPT;
 
@@ -103,35 +104,41 @@ private:
 
 // DestroyGuard<T>
 
-template<class T> inline DestroyGuard<T>::DestroyGuard() REALM_NOEXCEPT:
+template<class T>
+inline DestroyGuard<T>::DestroyGuard() REALM_NOEXCEPT:
     m_ptr(0)
 {
 }
 
-template<class T> inline DestroyGuard<T>::DestroyGuard(T* ptr) REALM_NOEXCEPT:
+template<class T>
+inline DestroyGuard<T>::DestroyGuard(T* ptr) REALM_NOEXCEPT:
     m_ptr(ptr)
 {
 }
 
-template<class T> inline DestroyGuard<T>::~DestroyGuard() REALM_NOEXCEPT
+template<class T>
+inline DestroyGuard<T>::~DestroyGuard() REALM_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy();
 }
 
-template<class T> inline void DestroyGuard<T>::reset(T* ptr) REALM_NOEXCEPT
+template<class T>
+inline void DestroyGuard<T>::reset(T* ptr) REALM_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy();
     m_ptr = ptr;
 }
 
-template<class T> inline T* DestroyGuard<T>::get() const REALM_NOEXCEPT
+template<class T>
+inline T* DestroyGuard<T>::get() const REALM_NOEXCEPT
 {
     return m_ptr;
 }
 
-template<class T> inline T* DestroyGuard<T>::release() REALM_NOEXCEPT
+template<class T>
+inline T* DestroyGuard<T>::release() REALM_NOEXCEPT
 {
     T* ptr = m_ptr;
     m_ptr = nullptr;
@@ -185,7 +192,7 @@ inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) REAL
 {
 }
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref,
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type   ref,
                                                           Allocator& alloc) REALM_NOEXCEPT:
     m_ref(ref),
     m_alloc(alloc)

@@ -50,7 +50,7 @@ public:
             throw std::bad_alloc();
         }
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
-        std::fill(addr, addr+size, 0);
+        std::fill(addr, addr + size, 0);
 #endif
         return MemRef(addr, reinterpret_cast<size_t>(addr));
     }
@@ -64,7 +64,7 @@ public:
             throw std::bad_alloc();
         }
 #ifdef REALM_ENABLE_ALLOC_SET_ZERO
-        std::fill(new_addr+old_size, new_addr+new_size, 0);
+        std::fill(new_addr + old_size, new_addr + new_size, 0);
 #else
         static_cast<void>(old_size);
 #endif
@@ -104,7 +104,7 @@ MemRef Allocator::do_realloc(ref_type ref, const char* addr, size_t old_size,
 
     // Copy existing contents
     char* new_addr = new_mem.m_addr;
-    std::copy(addr, addr+old_size, new_addr);
+    std::copy(addr, addr + old_size, new_addr);
 
     // Free old chunk
     do_free(ref, addr);

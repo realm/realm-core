@@ -42,6 +42,7 @@ class SlabAlloc;
 /// FIXME: Move this class to namespace realm::_impl and to subdir src/realm/impl.
 class GroupWriter: public _impl::ArrayWriterBase {
 public:
+
     // For groups in transactional mode (Group::m_is_shared), this constructor
     // must be called while a write transaction is in progress.
     //
@@ -88,8 +89,8 @@ private:
     ArrayInteger m_free_positions; // 4th slot in Group::m_top
     ArrayInteger m_free_lengths;   // 5th slot in Group::m_top
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
-    uint64_t   m_current_version;
-    uint64_t   m_readlock_version;
+    uint64_t m_current_version;
+    uint64_t m_readlock_version;
     util::File::Map<char> m_file_map;
 
     // Merge adjacent chunks
@@ -110,7 +111,7 @@ private:
     /// inside a contiguous address range. The specified size does not
     /// need to be 8-byte aligned. Extend the file if required.
     /// The returned chunk is not removed from the amount of remaing
-    /// free space. 
+    /// free space.
     ///
     /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
     /// is the index of a chunk whose size is at least the requestd
@@ -120,8 +121,8 @@ private:
     /// Search only a range of the free list for a block as big as the
     /// specified size. Return a pair with index and size of the found chunk.
     /// \param found indicates whether a suitable block was found.
-    std::pair<std::size_t, std::size_t> 
-    search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin, 
+    std::pair<std::size_t, std::size_t>
+    search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin,
                                           std::size_t end, bool& found);
 
     /// Extend the file to ensure that a chunk of free space of the
@@ -135,7 +136,7 @@ private:
     std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);
 
     void write_array_at(std::size_t pos, const char* data, std::size_t size);
-    std::size_t split_freelist_chunk(std::size_t index, std::size_t start_pos, 
+    std::size_t split_freelist_chunk(std::size_t index, std::size_t start_pos,
                                      std::size_t alloc_pos, std::size_t chunk_size, bool is_shared);
 };
 

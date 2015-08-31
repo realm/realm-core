@@ -38,10 +38,11 @@ namespace util {
 ///    logger.log("Listening for peers on %1:%2", listen_address, listen_port);
 class Logger {
 public:
-    template<class... Params> void log(const char* message, Params... params)
+    template<class ... Params>
+    void log(const char* message, Params ... params)
     {
         State state(message);
-        log_impl(state, params...);
+        log_impl(state, params ...);
     }
 
     virtual ~Logger() {}
@@ -70,7 +71,8 @@ private:
         }
     };
 
-    template<class T> struct Subst {
+    template<class T>
+    struct Subst {
         void operator()(const T& param, State* state)
         {
             state->m_formatter << "%" << state->m_param_num;
@@ -93,11 +95,11 @@ private:
         do_log(state.m_message);
     }
 
-    template<class Param, class... Params>
-    void log_impl(State& state, const Param& param, Params... params)
+    template<class Param, class ... Params>
+    void log_impl(State& state, const Param& param, Params ... params)
     {
-        Subst<Param>()(param, &state);
-        log_impl(state, params...);
+        Subst<Param>() (param, &state);
+        log_impl(state, params ...);
     }
 };
 

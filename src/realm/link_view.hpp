@@ -41,7 +41,7 @@ class TransactLogConvenientEncoder;
 /// exceptions are is_attached() and the destructor.
 ///
 /// FIXME: Rename this class to `LinkList`.
-class LinkView : public RowIndexes {
+class LinkView: public RowIndexes {
 public:
     ~LinkView() REALM_NOEXCEPT;
     bool is_attached() const REALM_NOEXCEPT;
@@ -63,6 +63,7 @@ public:
     void add(std::size_t target_row_ndx);
     void insert(std::size_t link_ndx, std::size_t target_row_ndx);
     void set(std::size_t link_ndx, std::size_t target_row_ndx);
+
     /// Moves the link currently at `old_link_ndx` to `new_link_ndx`,
     /// such that after the move, `get(new_link_ndx)` returns what
     /// `get(old_link_ndx)` would have returned before the move.
@@ -92,7 +93,7 @@ public:
     /// by its index in the target table). If found, the index of the link to
     /// that row within this list is returned, otherwise `realm::not_found` is
     /// returned.
-    std::size_t find(std::size_t target_row_ndx, std::size_t start=0) const REALM_NOEXCEPT;
+    std::size_t find(std::size_t target_row_ndx, std::size_t start = 0) const REALM_NOEXCEPT;
 
     const ColumnBase& get_column_base(size_t index) const; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
     const Table& get_origin_table() const REALM_NOEXCEPT;
@@ -225,12 +226,13 @@ inline bool LinkView::operator==(const LinkView& link_list) const REALM_NOEXCEPT
     Table& target_table_2 = link_list.m_origin_column.get_target_table();
     if (target_table_1.get_index_in_group() != target_table_2.get_index_in_group())
         return false;
+
     if (!m_row_indexes.is_attached() || m_row_indexes.is_empty()) {
         return !link_list.m_row_indexes.is_attached() ||
-            link_list.m_row_indexes.is_empty();
+               link_list.m_row_indexes.is_empty();
     }
     return link_list.m_row_indexes.is_attached() &&
-        m_row_indexes.compare_int(link_list.m_row_indexes);
+           m_row_indexes.compare_int(link_list.m_row_indexes);
 }
 
 inline bool LinkView::operator!=(const LinkView& link_list) const REALM_NOEXCEPT

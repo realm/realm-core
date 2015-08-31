@@ -24,8 +24,13 @@
 
 namespace realm {
 
-enum class ConstSourcePayload { Copy, Stay };
-enum class MutableSourcePayload { Move };
+enum class ConstSourcePayload {
+    Copy, Stay
+};
+
+enum class MutableSourcePayload {
+    Move
+};
 
 struct TableView_Handover_patch;
 

@@ -87,7 +87,7 @@ public:
     ~address() REALM_NOEXCEPT {}
 
 private:
-    typedef in_addr  ip_v4_type;
+    typedef in_addr ip_v4_type;
     typedef in6_addr ip_v6_type;
     union union_type {
         ip_v4_type m_ip_v4;
@@ -115,11 +115,11 @@ public:
 private:
     class protocol m_protocol;
 
-    typedef sockaddr     sockaddr_base_type;
-    typedef sockaddr_in  sockaddr_ip_v4_type;
+    typedef sockaddr sockaddr_base_type;
+    typedef sockaddr_in sockaddr_ip_v4_type;
     typedef sockaddr_in6 sockaddr_ip_v6_type;
     union sockaddr_union_type {
-        sockaddr_base_type  m_base;
+        sockaddr_base_type m_base;
         sockaddr_ip_v4_type m_ip_v4;
         sockaddr_ip_v6_type m_ip_v6;
     };
@@ -189,11 +189,13 @@ public:
     ///
     /// This function may be called by any thread, even via handlers executed by
     /// the thread that executes run().
-    template<class H> void post(const H& handler);
+    template<class H>
+    void post(const H& handler);
 
 private:
     class async_handler;
-    template<class H> class post_handler;
+    template<class H>
+    class post_handler;
 
     // Handler ownership is passed from caller to callee in calls to
     // add_io_handler(), add_imm_handler(), and add_post_handler().
@@ -203,7 +205,8 @@ private:
     void add_post_handler(async_handler*);
     void cancel_io_ops(int fd);
 
-    template<class H> class write_handler;
+    template<class H>
+    class write_handler;
 
     class impl;
     const std::unique_ptr<impl> m_impl;
@@ -211,7 +214,8 @@ private:
     friend class socket_base;
     friend class acceptor;
     friend class buffered_input_stream;
-    template<class H> friend void async_write(socket&, const char*, std::size_t, const H&);
+    template<class H>
+    friend void async_write(socket&, const char*, std::size_t, const H&);
 };
 
 
@@ -242,8 +246,8 @@ public:
         address_configured = AI_ADDRCONFIG
     };
 
-    query(std::string service, int flags = passive|address_configured);
-    query(const protocol&, std::string service, int flags = passive|address_configured);
+    query(std::string service, int flags = passive | address_configured);
+    query(const protocol&, std::string service, int flags = passive | address_configured);
     query(std::string host, std::string service, int flags = address_configured);
     query(const protocol&, std::string host, std::string service, int flags = address_configured);
 
@@ -278,11 +282,15 @@ public:
     void close();
     std::error_code close(std::error_code&);
 
-    template<class O> void get_option(O& option) const;
-    template<class O> std::error_code get_option(O& option, std::error_code&) const;
+    template<class O>
+    void get_option(O& option) const;
+    template<class O>
+    std::error_code get_option(O& option, std::error_code&) const;
 
-    template<class O> void set_option(const O& option);
-    template<class O> std::error_code set_option(const O& option, std::error_code&);
+    template<class O>
+    void set_option(const O& option);
+    template<class O>
+    std::error_code set_option(const O& option, std::error_code&);
 
     void bind(const endpoint&);
     std::error_code bind(const endpoint&, std::error_code&);
@@ -295,7 +303,8 @@ private:
         opt_ReuseAddr ///< `SOL_SOCKET`, `SO_REUSEADDR`
     };
 
-    template<class, int, class> class option;
+    template<class, int, class>
+    class option;
 
 public:
     typedef option<bool, opt_ReuseAddr, int> reuse_address;
@@ -307,17 +316,19 @@ protected:
 
     socket_base(io_service&);
 
-    void get_option(opt_enum, void* value_data, std::size_t& value_size, std::error_code&) const;
-    void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code&);
+    void get_option(opt_enum, void* value_data, std::size_t & value_size, std::error_code &) const;
+    void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code &);
     void map_option(opt_enum, int& level, int& option_name) const;
 
     friend class acceptor;
     friend class buffered_input_stream;
-    template<class H> friend void async_write(socket&, const char*, std::size_t, const H&);
+    template<class H>
+    friend void async_write(socket&, const char*, std::size_t, const H&);
 };
 
 
-template<class T, int opt, class U> class socket_base::option {
+template<class T, int opt, class U>
+class socket_base::option {
 public:
     option(T value = T()):
         m_value(value)
@@ -387,13 +398,17 @@ public:
     std::error_code accept(socket&, std::error_code&);
     std::error_code accept(socket&, endpoint&, std::error_code&);
 
-    template<class H> void async_accept(socket&, const H& handler);
-    template<class H> void async_accept(socket&, endpoint&, const H& handler);
+    template<class H>
+    void async_accept(socket&, const H& handler);
+    template<class H>
+    void async_accept(socket&, endpoint&, const H& handler);
 
 private:
     std::error_code accept(socket&, endpoint*, std::error_code&);
-    template<class H> class accept_handler;
-    template<class H> void async_accept(socket&, endpoint*, const H&);
+    template<class H>
+    class accept_handler;
+    template<class H>
+    void async_accept(socket&, endpoint*, const H&);
 };
 
 
@@ -417,7 +432,8 @@ public:
 
 private:
     class read_handler_base;
-    template<class H> class read_handler;
+    template<class H>
+    class read_handler;
 
     socket& m_socket;
     static const std::size_t s_buffer_size = 1024;
@@ -434,10 +450,11 @@ private:
 
 
 std::error_code write(socket&, const char* data, std::size_t size, std::error_code&)
-    REALM_NOEXCEPT;
+REALM_NOEXCEPT;
 void write(socket&, const char* data, std::size_t size);
 
-template<class H> void async_write(socket&, const char* data, std::size_t size, const H& handler);
+template<class H>
+void async_write(socket&, const char* data, std::size_t size, const H& handler);
 
 
 enum errors {
@@ -474,7 +491,8 @@ std::error_code make_error_code(errors);
 
 namespace std {
 
-template<> struct is_error_code_enum<realm::util::network::errors> {
+template<>
+struct is_error_code_enum<realm::util::network::errors> {
 public:
     static const bool value = true;
 };
@@ -603,8 +621,9 @@ public:
     virtual ~async_handler() REALM_NOEXCEPT {}
 };
 
-template<class H> class io_service::post_handler:
-        public async_handler {
+template<class H>
+class io_service::post_handler:
+    public async_handler {
 public:
     post_handler(const H& h):
         m_handler(h)
@@ -623,7 +642,8 @@ private:
     const H m_handler;
 };
 
-template<class H> inline void io_service::post(const H& handler)
+template<class H>
+inline void io_service::post(const H& handler)
 {
     io_service::post_handler<H>* h = new io_service::post_handler<H>(handler); // Throws
     add_post_handler(h); // Throws
@@ -705,6 +725,7 @@ inline socket_base::~socket_base() REALM_NOEXCEPT
 {
     std::error_code ec;
     close(ec);
+
     // Ignore errors
 }
 
@@ -732,7 +753,8 @@ inline void socket_base::close()
         throw std::system_error(ec);
 }
 
-template<class O> inline void socket_base::get_option(O& option) const
+template<class O>
+inline void socket_base::get_option(O& option) const
 {
     std::error_code ec;
     if (get_option(option, ec))
@@ -746,7 +768,8 @@ inline std::error_code socket_base::get_option(O& option, std::error_code& ec) c
     return ec;
 }
 
-template<class O> inline void socket_base::set_option(const O& option)
+template<class O>
+inline void socket_base::set_option(const O& option)
 {
     std::error_code ec;
     if (set_option(option, ec))
@@ -843,19 +866,22 @@ inline std::error_code acceptor::accept(socket& sock, endpoint& ep, std::error_c
     return accept(sock, &ep, ec);
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, const H& handler)
 {
     endpoint* ep = nullptr;
     async_accept(sock, ep, handler);
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
 {
     async_accept(sock, &ep, handler);
 }
 
-template<class H> class acceptor::accept_handler:
-        public io_service::async_handler {
+template<class H>
+class acceptor::accept_handler:
+    public io_service::async_handler {
 public:
     accept_handler(acceptor& a, socket& s, endpoint* e, const H& h):
         m_acceptor(a),
@@ -883,7 +909,8 @@ private:
     const H m_handler;
 };
 
-template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
 {
     accept_handler<H>* h = new accept_handler<H>(*this, sock, ep, handler); // Throws
     m_service.add_io_handler(m_sock_fd, h, io_service::op_Read); // Throws
@@ -941,7 +968,7 @@ inline void buffered_input_stream::async_read_until(char* buffer, std::size_t si
 }
 
 class buffered_input_stream::read_handler_base:
-        public io_service::async_handler {
+    public io_service::async_handler {
 public:
     read_handler_base(buffered_input_stream& s, char* buffer, std::size_t size, int delim):
         m_stream(s),
@@ -969,7 +996,7 @@ protected:
 
 template<class H>
 class buffered_input_stream::read_handler:
-        public read_handler_base {
+    public read_handler_base {
 public:
     read_handler(buffered_input_stream& s, char* buffer, std::size_t size, int delim, const H& h):
         read_handler_base(s, buffer, size, delim),
@@ -987,7 +1014,7 @@ public:
         std::size_t num_bytes_transferred = m_out_curr - m_out_begin;
         if (!ec && m_delim != std::char_traits<char>::eof()) {
             bool delim_found = num_bytes_transferred >= 1 &&
-                m_out_curr[-1] == std::char_traits<char>::to_char_type(m_delim);
+                               m_out_curr[-1] == std::char_traits<char>::to_char_type(m_delim);
             if (!delim_found)
                 ec = delim_not_found;
         }
@@ -1030,7 +1057,8 @@ inline void write(socket& sock, const char* data, std::size_t size)
         throw std::system_error(ec);
 }
 
-template<class H> class io_service::write_handler: public async_handler {
+template<class H>
+class io_service::write_handler: public async_handler {
 public:
     write_handler(socket& s, const char* data, std::size_t size, const H& h):
         m_socket(s),
@@ -1043,11 +1071,12 @@ public:
     bool exec() override
     {
         std::error_code ec;
-        std::size_t n = m_socket.write_some(m_curr, m_end-m_curr, ec);
+        std::size_t n = m_socket.write_some(m_curr, m_end - m_curr, ec);
         m_curr += n;
         bool complete = m_curr == m_end;
         if (!complete && !ec)
             return false;
+
         std::size_t num_bytes_transferred = m_curr - m_begin;
         m_handler(ec, num_bytes_transferred); // Throws
         return true;

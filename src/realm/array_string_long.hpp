@@ -31,7 +31,7 @@ public:
     typedef StringData value_type;
 
     explicit ArrayStringLong(Allocator&, bool nullable) REALM_NOEXCEPT;
-    ~ArrayStringLong() REALM_NOEXCEPT override{}
+    ~ArrayStringLong() REALM_NOEXCEPT override {}
 
     /// Create a new empty long string array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -46,6 +46,7 @@ public:
     void init_from_ref(ref_type) REALM_NOEXCEPT;
     void init_from_mem(MemRef) REALM_NOEXCEPT;
     void init_from_parent() REALM_NOEXCEPT;
+
     //@}
 
     bool is_empty() const REALM_NOEXCEPT;
@@ -69,7 +70,7 @@ public:
                       std::size_t end = npos) const REALM_NOEXCEPT;
     std::size_t find_first(StringData value, std::size_t begin = 0,
                            std::size_t end = npos) const REALM_NOEXCEPT;
-    void find_all(IntegerColumn &result, StringData value, std::size_t add_offset = 0,
+    void find_all(IntegerColumn& result, StringData value, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     /// Get the specified element without the cost of constructing an
@@ -78,7 +79,7 @@ public:
     /// slower.
     static StringData get(const char* header, std::size_t ndx, Allocator&, bool nullable) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
+    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase &);
 
     static std::size_t get_size_from_header(const char*, Allocator&) REALM_NOEXCEPT;
 
@@ -108,7 +109,8 @@ private:
 
 // Implementation:
 inline ArrayStringLong::ArrayStringLong(Allocator& alloc, bool nullable) REALM_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(nullable ? alloc : Allocator::get_default()), m_nullable(nullable)
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(nullable ? alloc : Allocator::get_default()), m_nullable(
+        nullable)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
@@ -159,7 +161,7 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const REALM_NOEXCEPT
         // FIXME: Consider how much of a performance problem it is,
         // that we have to issue two separate calls to read two
         // consecutive values from an array.
-        begin = to_size_t(m_offsets.get(ndx-1));
+        begin = to_size_t(m_offsets.get(ndx - 1));
         end   = to_size_t(m_offsets.get(ndx));
     }
     else {
@@ -168,14 +170,14 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const REALM_NOEXCEPT
     }
     --end; // Discount the terminating zero
 
-    return StringData(m_blob.get(begin), end-begin);
+    return StringData(m_blob.get(begin), end - begin);
 }
 
 inline void ArrayStringLong::truncate(std::size_t size)
 {
     REALM_ASSERT_3(size, <, m_offsets.size());
 
-    std::size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
+    std::size_t blob_size = size ? to_size_t(m_offsets.get(size - 1)) : 0;
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
@@ -213,7 +215,7 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) REALM_NOEXC
 }
 
 inline std::size_t ArrayStringLong::get_size_from_header(const char* header,
-                                                         Allocator& alloc) REALM_NOEXCEPT
+                                                         Allocator&  alloc) REALM_NOEXCEPT
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);

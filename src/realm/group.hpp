@@ -65,6 +65,7 @@ class TransactLogParser;
 ///
 class Group: private Table::Parent {
 public:
+
     /// Construct a free-standing group. This group instance will be
     /// in the attached state, but neither associated with a file, nor
     /// with an external memory buffer.
@@ -73,8 +74,10 @@ public:
     enum OpenMode {
         /// Open in read-only mode. Fail if the file does not already exist.
         mode_ReadOnly,
+
         /// Open in read/write mode. Create the file if it doesn't exist.
         mode_ReadWrite,
+
         /// Open in read/write mode. Fail if the file does not already exist.
         mode_ReadWriteNoCreate
     };
@@ -325,14 +328,20 @@ public:
     TableRef add_table(StringData name, bool require_unique_name = true);
     TableRef get_or_add_table(StringData name, bool* was_added = 0);
 
-    template<class T> BasicTableRef<T> get_table(std::size_t index);
-    template<class T> BasicTableRef<const T> get_table(std::size_t index) const;
+    template<class T>
+    BasicTableRef<T> get_table(std::size_t index);
+    template<class T>
+    BasicTableRef<const T> get_table(std::size_t index) const;
 
-    template<class T> BasicTableRef<T> get_table(StringData name);
-    template<class T> BasicTableRef<const T> get_table(StringData name) const;
+    template<class T>
+    BasicTableRef<T> get_table(StringData name);
+    template<class T>
+    BasicTableRef<const T> get_table(StringData name) const;
 
-    template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
+    template<class T>
+    BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
+    template<class T>
+    BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
 
     void remove_table(std::size_t index);
     void remove_table(StringData name);
@@ -348,7 +357,7 @@ public:
     ///
     /// \param pad If true, the file is padded to ensure the footer is aligned
     /// to the end of a page
-    void write(std::ostream&, bool pad=false) const;
+    void write(std::ostream&, bool pad = false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -365,7 +374,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key=0) const;
+    void write(const std::string& file, const char* encryption_key = 0) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -456,8 +465,9 @@ public:
     //@}
 
     // Conversion
-    template<class S> void to_json(S& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
+    template<class S>
+    void to_json(S& out, size_t link_depth = 0,
+                 std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream& out) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
@@ -567,10 +577,10 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, TableWriter&, bool, uint_fast64_t = 0);
+    static void write(std::ostream &, TableWriter &, bool, uint_fast64_t = 0);
 
-    typedef void (*DescSetter)(Table&);
-    typedef bool (*DescMatcher)(const Spec&);
+    typedef void (* DescSetter)(Table&);
+    typedef bool (* DescMatcher)(const Spec&);
 
     Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher);
     const Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher) const;
@@ -788,7 +798,8 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     return TableRef(table);
 }
 
-template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx)
+template<class T>
+inline BasicTableRef<T> Group::get_table(std::size_t table_ndx)
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
@@ -798,7 +809,8 @@ template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t table_ndx) const
+template<class T>
+inline BasicTableRef<const T> Group::get_table(std::size_t table_ndx) const
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
@@ -808,7 +820,8 @@ template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t tab
     return BasicTableRef<const T>(static_cast<const T*>(table));
 }
 
-template<class T> inline BasicTableRef<T> Group::get_table(StringData name)
+template<class T>
+inline BasicTableRef<T> Group::get_table(StringData name)
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
@@ -818,7 +831,8 @@ template<class T> inline BasicTableRef<T> Group::get_table(StringData name)
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T> inline BasicTableRef<const T> Group::get_table(StringData name) const
+template<class T>
+inline BasicTableRef<const T> Group::get_table(StringData name) const
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
@@ -839,7 +853,8 @@ inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_na
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T> inline BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
+template<class T>
+inline BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
@@ -911,7 +926,8 @@ inline bool Group::has_cascade_notification_handler() const REALM_NOEXCEPT
     return !!m_notify_handler;
 }
 
-inline void Group::set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) REALM_NOEXCEPT
+inline void Group::set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler)
+REALM_NOEXCEPT
 {
     m_notify_handler = std::move(new_handler);
 }

@@ -81,7 +81,7 @@ void LinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t pri
     // Remove backlinks to the removed origin rows
     if (!broken_reciprocal_backlinks) {
         for (size_t i = 0; i < num_rows_to_erase; ++i)
-            remove_backlinks(row_ndx+i);
+            remove_backlinks(row_ndx + i);
     }
 
     // Update backlinks to the moved origin rows
@@ -140,6 +140,7 @@ void LinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 
     if (m_weak_links)
         return;
+
     if (m_target_table == state.stop_on_table)
         return;
 
@@ -156,6 +157,7 @@ void LinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
 
     if (m_weak_links)
         return;
+
     if (m_target_table == state.stop_on_table)
         return;
 
@@ -174,7 +176,7 @@ void LinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
 
 void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 {
-    if (Replication* repl = get_root_array()->get_alloc().get_replication()) {
+    if (Replication * repl = get_root_array()->get_alloc().get_replication()) {
         repl->nullify_link(m_table, m_column_ndx, row_ndx);
     }
     LinkColumnBase::set(row_ndx, 0);
@@ -201,6 +203,7 @@ void LinkColumn::verify(const Table& table, size_t col_ndx) const
         BacklinkColumn::VerifyPair search_value;
         search_value.origin_row_ndx = i;
         std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+
         // Exactly one corresponding backlink must exist
         REALM_ASSERT(range.second - range.first == 1);
         REALM_ASSERT_3(range.first->target_row_ndx, ==, target_row_ndx);

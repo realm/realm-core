@@ -11,7 +11,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
     DescriptorRef subdesc;
 
     // Reuse the the descriptor accessor if it is already in the map
-    if (Descriptor* d = get_subdesc_accessor(column_ndx)) {
+    if (Descriptor * d = get_subdesc_accessor(column_ndx)) {
         subdesc.reset(d);
         goto out;
     }
@@ -37,6 +37,7 @@ size_t Descriptor::get_num_unique_values(size_t column_ndx) const
     ColumnType col_type = m_spec->get_column_type(column_ndx);
     if (col_type != col_type_StringEnum)
         return 0;
+
     ref_type ref = m_spec->get_enumkeys_ref(column_ndx);
     StringColumn col(m_spec->get_alloc(), ref); // Throws
     return col.size();
@@ -47,6 +48,7 @@ Descriptor::~Descriptor() REALM_NOEXCEPT
 {
     if (!is_attached())
         return;
+
     if (m_parent) {
         delete m_spec;
         m_parent->remove_subdesc_entry(this);
@@ -107,8 +109,10 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const REALM_
     for (;;) {
         if (desc->is_root())
             return begin_2;
+
         if (REALM_UNLIKELY(begin_2 == begin))
             return 0; // Not enough space in path buffer
+
         const Descriptor* parent = desc->m_parent.get();
         size_t column_ndx = not_found;
         typedef subdesc_map::iterator iter;

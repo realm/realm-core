@@ -43,10 +43,11 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
     DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
     DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
     DWORD size =
-        FormatMessageA(flags, 0, err, language_id, buffer.data()+offset,
+        FormatMessageA(flags, 0, err, language_id, buffer.data() + offset,
                        static_cast<DWORD>(max_msg_size), 0);
     if (0 < size)
-        return std::string(buffer.data(), offset+size);
+        return std::string(buffer.data(), offset + size);
+
     buffer.resize(offset);
     buffer.append_c_str("Unknown error");
     return buffer.str();
@@ -59,6 +60,7 @@ size_t get_page_size()
 #ifdef _WIN32
     SYSTEM_INFO sysinfo;
     GetNativeSystemInfo(&sysinfo);
+
     //DWORD size = sysinfo.dwPageSize;
     // On windows we use the allocation granularity instead
     DWORD size = sysinfo.dwAllocationGranularity;
@@ -82,9 +84,11 @@ void make_dir(const std::string& path)
 #ifdef _WIN32
     if (_mkdir(path.c_str()) == 0)
         return;
+
 #else // POSIX
-    if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0)
+    if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return;
+
 #endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("open() failed: ", err);
@@ -92,14 +96,17 @@ void make_dir(const std::string& path)
         case EACCES:
         case EROFS:
             throw File::PermissionDenied(msg, path);
+
         case EEXIST:
             throw File::Exists(msg, path);
+
         case ELOOP:
         case EMLINK:
         case ENAMETOOLONG:
         case ENOENT:
         case ENOTDIR:
             throw File::AccessError(msg, path);
+
         default:
             throw std::runtime_error(msg);
     }
@@ -111,9 +118,11 @@ void remove_dir(const std::string& path)
 #ifdef _WIN32
     if (_rmdir(path.c_str()) == 0)
         return;
+
 #else // POSIX
     if (::rmdir(path.c_str()) == 0)
         return;
+
 #endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("open() failed: ", err);
@@ -125,13 +134,16 @@ void remove_dir(const std::string& path)
         case EEXIST:
         case ENOTEMPTY:
             throw File::PermissionDenied(msg, path);
+
         case ENOENT:
             throw File::NotFound(msg, path);
+
         case ELOOP:
         case ENAMETOOLONG:
         case EINVAL:
         case ENOTDIR:
             throw File::AccessError(msg, path);
+
         default:
             throw std::runtime_error(msg);
     }
@@ -143,8 +155,8 @@ std::string make_temp_dir()
 #ifdef _WIN32 // Windows version
 
     StringBuffer buffer1;
-    buffer1.resize(MAX_PATH+1);
-    if (GetTempPathA(MAX_PATH+1, buffer1.data()) == 0)
+    buffer1.resize(MAX_PATH + 1);
+    if (GetTempPathA(MAX_PATH + 1, buffer1.data()) == 0)
         throw std::runtime_error("CreateDirectory() failed");
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
@@ -192,6 +204,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     switch (a) {
         case access_ReadOnly:
             break;
+
         case access_ReadWrite:
             if (flags & flag_Append) {
                 desired_access  = FILE_APPEND_DATA;
@@ -201,6 +214,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             }
             break;
     }
+
     // FIXME: Should probably be zero if we are called on behalf of a
     // Group instance that is not managed by a SharedGroup instance,
     // since in this case concurrenct access is prohibited anyway.
@@ -210,9 +224,11 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case create_Auto:
             creation_disposition = flags & flag_Trunc ? CREATE_ALWAYS : OPEN_ALWAYS;
             break;
+
         case create_Never:
             creation_disposition = flags & flag_Trunc ? TRUNCATE_EXISTING : OPEN_EXISTING;
             break;
+
         case create_Must:
             creation_disposition = CREATE_NEW;
             break;
@@ -242,10 +258,13 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
             throw PermissionDenied(msg, path);
+
         case ERROR_FILE_NOT_FOUND:
             throw NotFound(msg, path);
+
         case ERROR_FILE_EXISTS:
             throw Exists(msg, path);
+
         default:
             throw std::runtime_error(msg);
     }
@@ -257,6 +276,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case access_ReadOnly:
             flags2 = O_RDONLY;
             break;
+
         case access_ReadWrite:
             flags2 = O_RDWR;
             break;
@@ -265,8 +285,10 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case create_Auto:
             flags2 |= O_CREAT;
             break;
+
         case create_Never:
             break;
+
         case create_Must:
             flags2 |= O_CREAT | O_EXCL;
             break;
@@ -275,7 +297,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         flags2 |= O_TRUNC;
     if (flags & flag_Append)
         flags2 |= O_APPEND;
-    int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = ::open(path.c_str(), flags2, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
         if (success)
@@ -298,16 +320,20 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case EROFS:
         case ETXTBSY:
             throw PermissionDenied(msg, path);
+
         case ENOENT:
             throw NotFound(msg, path);
+
         case EEXIST:
             throw Exists(msg, path);
+
         case EISDIR:
         case ELOOP:
         case ENAMETOOLONG:
         case ENOTDIR:
         case ENXIO:
             throw AccessError(msg, path);
+
         default:
             throw std::runtime_error(msg);
     }
@@ -322,6 +348,7 @@ void File::close() REALM_NOEXCEPT
 
     if (!m_handle)
         return;
+
     if (m_have_lock)
         unlock();
 
@@ -333,6 +360,7 @@ void File::close() REALM_NOEXCEPT
 
     if (m_fd < 0)
         return;
+
     int r = ::close(m_fd);
     REALM_ASSERT_RELEASE(r == 0);
     m_fd = -1;
@@ -363,7 +391,7 @@ size_t File::read(char* data, size_t size)
     }
     return data - data_0;
 
-error:
+  error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("ReadFile() failed: ", err);
     throw std::runtime_error(msg);
@@ -393,7 +421,7 @@ error:
     }
     return data - data_0;
 
-error:
+  error:
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("read(): failed: ", err);
     throw std::runtime_error(msg);
@@ -482,6 +510,7 @@ File::SizeType File::get_size() const
             throw std::runtime_error("File size overflow");
         if (m_encryption_key)
             return encrypted_size_to_data_size(size);
+
         return size;
     }
     throw std::runtime_error("fstat() failed");
@@ -562,6 +591,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     if (::posix_fallocate(m_fd, offset, size2) == 0)
         return;
+
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("posix_fallocate() failed: ", err);
     throw std::runtime_error(msg);
@@ -589,8 +619,10 @@ bool File::is_prealloc_supported()
 {
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
     return true;
+
 #else
     return false;
+
 #endif
 }
 
@@ -616,6 +648,7 @@ void File::seek(SizeType position)
 
     if (0 <= ::lseek(m_fd, position2, SEEK_SET))
         return;
+
     throw std::runtime_error("lseek() failed");
 
 #endif
@@ -634,10 +667,13 @@ File::SizeType File::get_file_position()
     if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
         throw std::runtime_error("SetFilePointerEx() failed");
     return liNew.QuadPart;
+
 #else
+
     // POSIX version not needed because it's only used by Windows version of resize().
     REALM_ASSERT(false);
     return 0;
+
 #endif
 }
 
@@ -654,12 +690,14 @@ void File::sync()
 
     if (FlushFileBuffers(m_handle))
         return;
+
     throw std::runtime_error("FlushFileBuffers() failed");
 
 #elif defined __APPLE__
 
     if (::fcntl(m_fd, F_FULLFSYNC) == 0)
         return;
+
     int err = errno; // Eliminate any risk of clobbering
     throw std::runtime_error(get_errno_msg("fcntl() with F_FULLFSYNC failed: ", err));
 
@@ -667,6 +705,7 @@ void File::sync()
 
     if (::fsync(m_fd) == 0)
         return;
+
     throw std::runtime_error("fsync() failed");
 
 #endif
@@ -701,6 +740,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     if (err == ERROR_LOCK_VIOLATION)
         return false;
+
     std::string msg = get_last_error_msg("LockFileEx() failed: ", err);
     throw std::runtime_error(msg);
 
@@ -729,9 +769,11 @@ bool File::lock(bool exclusive, bool non_blocking)
         operation |=  LOCK_NB;
     if (flock(m_fd, operation) == 0)
         return true;
+
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
+
     std::string msg = get_errno_msg("flock() failed: ", err);
     throw std::runtime_error(msg);
 
@@ -745,6 +787,7 @@ void File::unlock() REALM_NOEXCEPT
 
     if (!m_have_lock)
         return;
+
     BOOL r = UnlockFile(m_handle, 0, 0, 1, 0);
     REALM_ASSERT_RELEASE(r);
     m_have_lock = false;
@@ -774,13 +817,14 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
     switch (a) {
         case access_ReadOnly:
             break;
+
         case access_ReadWrite:
             protect        = PAGE_READWRITE;
             desired_access = FILE_MAP_WRITE;
             break;
     }
     LARGE_INTEGER large_int;
-    if (int_cast_with_overflow_detect(offset+size, large_int.QuadPart))
+    if (int_cast_with_overflow_detect(offset + size, large_int.QuadPart))
         throw std::runtime_error("Map size is too large");
     HANDLE map_handle =
         CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
@@ -796,6 +840,7 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
     }
     if (REALM_LIKELY(addr))
         return addr;
+
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
     throw std::runtime_error(msg);
@@ -836,9 +881,11 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     void* new_addr = map(a, new_size, map_flags);
     unmap(old_addr, old_size);
     return new_addr;
+
 #else
     static_cast<void>(map_flags);
     return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size);
+
 #endif
 }
 
@@ -849,6 +896,7 @@ void File::sync_map(void* addr, size_t size)
 
     if (FlushViewOfFile(addr, size))
         return;
+
     throw std::runtime_error("FlushViewOfFile() failed");
 
 #else // POSIX version
@@ -864,9 +912,11 @@ bool File::exists(const std::string& path)
 #ifdef _WIN32
     if (_access(path.c_str(), 0) == 0)
         return true;
+
 #else // POSIX
     if (::access(path.c_str(), F_OK) == 0)
         return true;
+
 #endif
     int err = errno; // Eliminate any risk of clobbering
     switch (err) {
@@ -884,6 +934,7 @@ void File::remove(const std::string& path)
 {
     if (try_remove(path))
         return;
+
     int err = ENOENT;
     std::string msg = get_errno_msg("open() failed: ", err);
     throw NotFound(msg, path);
@@ -895,9 +946,11 @@ bool File::try_remove(const std::string& path)
 #ifdef _WIN32
     if (_unlink(path.c_str()) == 0)
         return true;
+
 #else // POSIX
     if (::unlink(path.c_str()) == 0)
         return true;
+
 #endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("unlink() failed: ", err);
@@ -908,13 +961,16 @@ bool File::try_remove(const std::string& path)
         case EBUSY:
         case EPERM:
             throw PermissionDenied(msg, path);
+
         case ENOENT:
             return false;
+
         case ELOOP:
         case ENAMETOOLONG:
         case EISDIR: // Returned by Linux when path refers to a directory
         case ENOTDIR:
             throw AccessError(msg, path);
+
         default:
             throw std::runtime_error(msg);
     }
@@ -926,6 +982,7 @@ void File::move(const std::string& old_path, const std::string& new_path)
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
         return;
+
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("rename() failed: ", err);
     switch (err) {
@@ -937,8 +994,10 @@ void File::move(const std::string& old_path, const std::string& new_path)
         case EEXIST:
         case ENOTEMPTY:
             throw PermissionDenied(msg, old_path);
+
         case ENOENT:
             throw File::NotFound(msg, old_path);
+
         case ELOOP:
         case EMLINK:
         case ENAMETOOLONG:
@@ -946,6 +1005,7 @@ void File::move(const std::string& old_path, const std::string& new_path)
         case EISDIR:
         case ENOTDIR:
             throw AccessError(msg, old_path);
+
         default:
             throw std::runtime_error(msg);
     }
@@ -992,8 +1052,8 @@ bool File::is_same_file(const File& f) const
         DWORD file_ndx_low   = file_info.nFileIndexLow;
         if (GetFileInformationByHandle(f.m_handle, &file_info)) {
             return vol_serial_num == file_info.dwVolumeSerialNumber &&
-                file_ndx_high == file_info.nFileIndexHigh &&
-                file_ndx_low  == file_info.nFileIndexLow;
+                   file_ndx_high == file_info.nFileIndexHigh &&
+                   file_ndx_low  == file_info.nFileIndexLow;
         }
     }
 
@@ -1010,7 +1070,7 @@ bool File::is_same_file(const File& f) const
                 file_id == file_id_info.FileId;
         }
     }
-*/
+ */
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
@@ -1046,6 +1106,7 @@ bool File::is_removed() const
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0)
         return statbuf.st_nlink == 0;
+
     throw std::runtime_error("fstat() failed");
 
 #endif
@@ -1056,7 +1117,7 @@ void File::set_encryption_key(const char* key)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     if (key) {
-        char *buffer = new char[64];
+        char* buffer = new char[64];
         memcpy(buffer, key, 64);
         m_encryption_key.reset(buffer);
     }
