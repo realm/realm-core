@@ -37,15 +37,13 @@ namespace realm {
 class BinaryColumn;
 
 
-/// A mixed column (MixedColumn) is composed of three subcolumns. The
-/// first subcolumn is an integer column (Column) and stores value
-/// types. The second one stores values and is a subtable parent
-/// column (SubtableColumnParent), which is a subclass of an integer
-/// column (Column). The last one is a binary column (BinaryColumn)
-/// and stores additional data for values of type string or binary
-/// data. The last subcolumn is optional. The root of a mixed column
-/// is an array node of type Array that stores the root refs of the
-/// subcolumns.
+/// A mixed column (MixedColumn) is composed of three subcolumns. The first
+/// subcolumn is an integer column (Column) and stores value types. The second
+/// one stores values and is a subtable parent column (SubtableColumnBase),
+/// which is a subclass of an integer column (Column). The last one is a binary
+/// column (BinaryColumn) and stores additional data for values of type string
+/// or binary data. The last subcolumn is optional. The root of a mixed column
+/// is an array node of type Array that stores the root refs of the subcolumns.
 class MixedColumn: public ColumnBaseSimple {
 public:
     /// Create a mixed column wrapper and attach it to a preexisting
@@ -225,16 +223,16 @@ inline StringData MixedColumn::get_index_data(std::size_t, char*) const REALM_NO
 }
 
 
-class MixedColumn::RefsColumn: public SubtableColumnParent {
+class MixedColumn::RefsColumn: public SubtableColumnBase {
 public:
     RefsColumn(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx):
-        SubtableColumnParent(alloc, ref, table, column_ndx)
+        SubtableColumnBase(alloc, ref, table, column_ndx)
     {
     }
 
     ~RefsColumn() REALM_NOEXCEPT override {}
 
-    using SubtableColumnParent::get_subtable_ptr;
+    using SubtableColumnBase::get_subtable_ptr;
 
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 

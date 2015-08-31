@@ -125,10 +125,10 @@
 ///    allows for a column accessor to be properly destroyed.
 ///
 ///  - The map of subtable accessors in a column acccessor
-///    (SubtableColumnParent::m_subtable_map). All pointers refer to existing
+///    (SubtableColumnBase:m_subtable_map). All pointers refer to existing
 ///    subtable accessors, but it is not required that the set of subtable
-///    accessors referenced from a particular parent P conincide with the set
-///    of subtables accessors specifying P as parent.
+///    accessors referenced from a particular parent P conincide with the set of
+///    subtables accessors specifying P as parent.
 ///
 ///  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
 ///    is not null, then it refers to an existing descriptor accessor.
@@ -199,7 +199,7 @@
 ///  - For each entry in the subtable map of a column accessor there must be an
 ///    underlying subtable at column `i` and row `j`, where `i` is the index of
 ///    the column accessor in `Table::m_cols`, and `j` is the value of
-///    `SubtableColumnParent::SubtableMap::entry::m_subtable_ndx`. The
+///    `SubtableColumnBase::SubtableMap::entry::m_subtable_ndx`. The
 ///    corresponding subtable accessor must satisfy all the "requirements for a
 ///    table" with respect to that underlying subtable.
 ///
