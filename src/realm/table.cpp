@@ -1360,44 +1360,45 @@ bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
 void Table::upgrade_file_format()
 {
     for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
-        if (has_search_index(col_ndx)) {
-            ColumnType col_type = get_real_column_type(col_ndx);
-            switch (col_type) {
-                case col_type_String: {
-                    StringColumn& col = get_column_string(col_ndx);
-                    col.get_search_index()->clear();
-                    col.populate_search_index();
-                    break;
-                }
-                case col_type_Bool:
-                case col_type_Int:
-                case col_type_DateTime: {
-                    IntegerColumn& col = get_column(col_ndx);
-                    col.get_search_index()->clear();
-                    col.populate_search_index();
-                    break;
-                }
-                case col_type_StringEnum: {
-                    StringEnumColumn& col = get_column_string_enum(col_ndx);
-                    col.get_search_index()->clear();
-                    col.populate_search_index();
-                    break;
-                }
-                case col_type_Binary:
-                case col_type_Table:
-                case col_type_Mixed:
-                case col_type_Reserved1:
-                case col_type_Float:
-                case col_type_Double:
-                case col_type_Reserved4:
-                case col_type_Link:
-                case col_type_LinkList:
-                case col_type_BackLink:
-                    // Indices are not support on these column types
-                    REALM_ASSERT(false);
-            }
-
+        if (!has_search_index(col_ndx)) {
+            continue;
         }
+        ColumnType col_type = get_real_column_type(col_ndx);
+        switch (col_type) {
+            case col_type_String: {
+                StringColumn& col = get_column_string(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Bool:
+            case col_type_Int:
+            case col_type_DateTime: {
+                IntegerColumn& col = get_column(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_StringEnum: {
+                StringEnumColumn& col = get_column_string_enum(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Binary:
+            case col_type_Table:
+            case col_type_Mixed:
+            case col_type_Reserved1:
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Reserved4:
+            case col_type_Link:
+            case col_type_LinkList:
+            case col_type_BackLink:
+                // Indices are not support on these column types
+                break;
+        }
+        REALM_ASSERT(false);
     }
 }
 
