@@ -214,6 +214,21 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
     copy_nodes(source);
 }
 
+void Query::set_table(TableRef tr)
+{
+    if (tr == m_table) {
+        return;
+    }
+
+    m_table = tr;
+    if (m_table) {
+        fetch_descriptor();
+    }
+    else {
+        m_current_descriptor.reset(nullptr);
+    }
+}
+
 
 void Query::apply_patch(Handover_patch& patch, Group& group)
 {
@@ -223,7 +238,7 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
     m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, group);
     m_view = m_source_link_view.get();
     if (patch.m_has_table) {
-        m_table = group.get_table(patch.m_table_num);
+        set_table(group.get_table(patch.m_table_num));
     }
 }
 
@@ -374,6 +389,7 @@ void Query::fetch_descriptor()
 template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
+    REALM_ASSERT_DEBUG(m_current_descriptor);
     ParentNode* const parent = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
     update_pointers(parent, &parent->m_child);
     return *this;

@@ -5615,7 +5615,7 @@ TEST(Query_DeepCopy)
     t.add(3, "3", 3.3);
     t.add(4, "4", 4.4);
 
-    Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine.
+    Query q = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine.
 
 
     // Test if we can execute a copy
@@ -5644,16 +5644,14 @@ TEST(Query_DeepCopy)
     CHECK_EQUAL(2, q4->find());
     delete q4;
 
-
     // See if we can append a criteria to a query
-    Query q5 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    Query q5 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     q5.greater(2, 4.0);
     CHECK_EQUAL(3, q5.find());
 
-
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_expression integer node.
-    Query q6 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    Query q6 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     Query q7 = Query(q6, Query::TCopyExpressionTag());
 
     q7.greater(2, 4.0);
@@ -5699,7 +5697,7 @@ TEST(Query_TableViewMoveAssign1)
     t.add(4, "4", 4.4);
 
     // temporary query is created, then q makes and stores a deep copy and then temporary is destructed
-    Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    Query q = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
 
     // now deep copy should be destructed and replaced by new temporary
     TableView tv = q.find_all();
@@ -5778,7 +5776,7 @@ TEST(Query_DeepCopyLeak1)
     t.add(4, "4", 4.4);
 
     // See if copying of a mix of query_expression and query_engine nodes will leak
-    Query q = !(t.column().ints > 2 + 0 && t.column().ints > 2 && t.column().doubles > 2.2) || t.column().ints == 4 || t.column().ints == 4 + 0;
+    Query q = !(t.column().ints > Value<Int>(2) && t.column().ints > 2 && t.column().doubles > 2.2) || t.column().ints == 4 || t.column().ints == Value<Int>(4);
     Query q2 = Query(q, Query::TCopyExpressionTag());
     Query q3 = Query(q2, Query::TCopyExpressionTag());
 }
@@ -6412,6 +6410,7 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     // TableView
     int64_t i;
     double d;
+    DateTime dt;
     tv = table->where().find_all();    
 
     // Integer column
@@ -6443,6 +6442,12 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     CHECK_APPROXIMATELY_EQUAL(d, (1.1 + 2.2 + 3.3) / 3, 0.001);
     d = tv.sum_double(3);
     CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
+
+    // DateTime column
+    dt = tv.maximum_datetime(5);
+    CHECK_EQUAL(dt, DateTime(2016, 6, 6));
+    dt = tv.minimum_datetime(5);
+    CHECK_EQUAL(dt, DateTime(2016, 2, 2));
 
     // NaN
     // null converts to 0 when calling get_float() on it. We intentionally do not return the bit pattern

@@ -125,10 +125,10 @@
 ///    allows for a column accessor to be properly destroyed.
 ///
 ///  - The map of subtable accessors in a column acccessor
-///    (SubtableColumnParent::m_subtable_map). All pointers refer to existing
+///    (SubtableColumnBase:m_subtable_map). All pointers refer to existing
 ///    subtable accessors, but it is not required that the set of subtable
-///    accessors referenced from a particular parent P conincide with the set
-///    of subtables accessors specifying P as parent.
+///    accessors referenced from a particular parent P conincide with the set of
+///    subtables accessors specifying P as parent.
 ///
 ///  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
 ///    is not null, then it refers to an existing descriptor accessor.
@@ -199,7 +199,7 @@
 ///  - For each entry in the subtable map of a column accessor there must be an
 ///    underlying subtable at column `i` and row `j`, where `i` is the index of
 ///    the column accessor in `Table::m_cols`, and `j` is the value of
-///    `SubtableColumnParent::SubtableMap::entry::m_subtable_ndx`. The
+///    `SubtableColumnBase::SubtableMap::entry::m_subtable_ndx`. The
 ///    corresponding subtable accessor must satisfy all the "requirements for a
 ///    table" with respect to that underlying subtable.
 ///
@@ -2939,8 +2939,14 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
         return 0;
 
 #if USE_COLUMN_AGGREGATE
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 #else
     if (is_empty())
         return 0;
@@ -2979,8 +2985,14 @@ DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 }
 
 // maximum ----------------------------------------------
@@ -3038,8 +3050,14 @@ DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.maximum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
 }
 
 

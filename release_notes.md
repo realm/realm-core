@@ -18,6 +18,9 @@
   `-fno-elide-constructors`.
 * A bug in the `Query` copy constructor has been fixed that could cause asserts
   due to missing capacity extension in one of the object's internal members.
+* `Expression` subclasses now update `Query`s current descriptor after setting
+  the table. This prevents a null dereference when adding further conditions
+  to the query.
 
 ### API breaking changes:
 
