@@ -20,6 +20,8 @@ const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
             return "Row index out of range";
         case column_index_out_of_range:
             return "Column index out of range";
+        case link_index_out_of_range:
+            return "Link index out of range";
         case bad_version:
             return "Bad version number";
         case illegal_type:
