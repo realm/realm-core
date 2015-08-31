@@ -6300,7 +6300,7 @@ TEST(Query_NullShowcase)
 
     // check int/double type mismatch error handling
     Columns<Int> dummy1;
-    // CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
+    CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
 
     TableView tv;
 
@@ -6379,20 +6379,21 @@ TEST(Query_NullShowcase)
     tv = (delivery != null()).find_all();
     CHECK(equals(tv, { 0, 2 }));
 
-    // You can also compare against user-given null with > and <
-    tv = (price > null()).find_all();
-    CHECK(equals(tv, { }));
-    tv = (price + rating > null()).find_all();
-    CHECK(equals(tv, { }));
-
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
     CHECK(equals(tv, { 0 }));
 
     tv = table->where().not_equal(0, null()).find_all();
     CHECK(equals(tv, { 1, 2 }));
-    
-    // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
+
+    // You can also compare against user-given null with > and <, but only in the expression syntax!
+    tv = (price > null()).find_all();
+    CHECK(equals(tv, { }));
+    tv = (price + rating > null()).find_all();
+    CHECK(equals(tv, { }));
+
+    // As stated above, if you want to use `> null()`, you cannot do it in the old syntax. This is for source
+    // code simplicity (would need tons of new method overloads that also need unit test testing, etc).
     CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
