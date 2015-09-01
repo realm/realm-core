@@ -1359,26 +1359,46 @@ bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
 
 void Table::upgrade_file_format()
 {
-    for (size_t c = 0; c < get_column_count(); c++) {
-        if (has_search_index(c)) {
-            if (get_column_type(c) == type_String) {
-                StringColumn& asc = get_column_string(c);
-                asc.get_search_index()->clear();
-                asc.populate_search_index();
-            }
-            else if (get_real_column_type(c) == col_type_Int) {
-                ColumnBase& col = get_column_base(c);
-                IntegerColumn& c = static_cast<IntegerColumn&>(col);
-                c.get_search_index()->clear();
-                c.populate_search_index();
-            }
-            else {
-                // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
-                // so this is fine for now.
-                REALM_ASSERT(false);
-            }
-
+    for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+        if (!has_search_index(col_ndx)) {
+            continue;
         }
+        ColumnType col_type = get_real_column_type(col_ndx);
+        switch (col_type) {
+            case col_type_String: {
+                StringColumn& col = get_column_string(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Bool:
+            case col_type_Int:
+            case col_type_DateTime: {
+                IntegerColumn& col = get_column(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_StringEnum: {
+                StringEnumColumn& col = get_column_string_enum(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Binary:
+            case col_type_Table:
+            case col_type_Mixed:
+            case col_type_Reserved1:
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Reserved4:
+            case col_type_Link:
+            case col_type_LinkList:
+            case col_type_BackLink:
+                // Indices are not support on these column types
+                break;
+        }
+        REALM_ASSERT(false);
     }
 }
 
