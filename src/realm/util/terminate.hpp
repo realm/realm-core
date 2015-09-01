@@ -23,7 +23,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <string>
-#include <stdint.h>
+
 #include <realm/util/features.h>
 
 #define REALM_TERMINATE(msg) realm::util::terminate((msg), __FILE__, __LINE__)
