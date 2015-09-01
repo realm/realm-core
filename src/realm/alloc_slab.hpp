@@ -57,6 +57,7 @@ struct InvalidDatabase;
 /// of slabs.
 class SlabAlloc: public Allocator {
 public:
+
     /// File format versions:
     ///
     ///   1   Initial file format version
@@ -68,6 +69,7 @@ public:
     ///       empty string.
 
 #if REALM_NULL_STRINGS == 1
+
     // Bumped to 3 because of null support of String columns and because of new format of index
     static constexpr int library_file_format = 3;
 #else
@@ -76,6 +78,7 @@ public:
 
     ~SlabAlloc() REALM_NOEXCEPT override;
     SlabAlloc();
+
     /// Attach this allocator to the specified file.
     ///
     /// When used by free-standing Group instances, no concurrency is
@@ -267,7 +270,8 @@ public:
 protected:
     MemRef do_alloc(std::size_t size) override;
     MemRef do_realloc(ref_type, const char*, std::size_t old_size,
-                    std::size_t new_size) override;
+                      std::size_t new_size) override;
+
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, const char*) REALM_NOEXCEPT override;
     char* do_translate(ref_type) const REALM_NOEXCEPT override;
@@ -309,6 +313,7 @@ private:
         uint8_t m_mnemonic[4]; // "T-DB"
         uint8_t m_file_format[2]; // See `library_file_format`
         uint8_t m_reserved;
+
         // bit 0 of m_flags is used to select between the two top refs.
         // bit 1 of m_flags is to be set for persistent commit-logs (Sync support).
         // when clear, the commit-logs will be removed at the end of a session.
@@ -323,8 +328,8 @@ private:
         uint64_t m_magic_cookie;
     };
 
-    REALM_STATIC_ASSERT(sizeof (Header) == 24, "Bad header size");
-    REALM_STATIC_ASSERT(sizeof (StreamingFooter) == 16, "Bad footer size");
+    REALM_STATIC_ASSERT(sizeof(Header) == 24, "Bad header size");
+    REALM_STATIC_ASSERT(sizeof(StreamingFooter) == 16, "Bad footer size");
 
     static const Header empty_file_header;
     static const Header streaming_header;
@@ -338,6 +343,7 @@ private:
     // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
     char* m_data = nullptr;
     std::size_t m_initial_mapping_size = 0;
+
     // additional sections beyond those covered by the initial mapping, are
     // managed as separate mmap allocations, each covering one section.
     std::size_t m_first_additional_mapping = 0;
@@ -404,7 +410,7 @@ private:
     class ChunkRefEq;
     class ChunkRefEndEq;
     class SlabRefEndEq;
-    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) REALM_NOEXCEPT;
+    static bool ref_less_than_slab_ref_end(ref_type, const Slab &) REALM_NOEXCEPT;
 
     Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
@@ -437,7 +443,7 @@ private:
     /// Find a possible allocation of 'request_size' that will fit into a section
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
-    std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size, 
+    std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size,
                                       std::size_t request_size) const REALM_NOEXCEPT;
 
     friend class Group;
@@ -525,7 +531,7 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
 
 inline std::size_t SlabAlloc::get_upper_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT
 {
-    return get_section_base(1+get_section_index(start_pos));
+    return get_section_base(1 + get_section_index(start_pos));
 }
 
 inline std::size_t SlabAlloc::get_lower_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT

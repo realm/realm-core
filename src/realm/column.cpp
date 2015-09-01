@@ -31,7 +31,9 @@ bool ColumnBase::is_null(size_t) const REALM_NOEXCEPT
 
 void ColumnBase::set_null(size_t)
 {
-    throw LogicError{LogicError::column_not_nullable};
+    throw LogicError {
+              LogicError::column_not_nullable
+    };
 }
 
 void ColumnBase::move_assign(ColumnBase&) REALM_NOEXCEPT
@@ -133,27 +135,35 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_Link:
             op.template call<IntegerColumn>();
             return;
+
         case col_type_String:
             op.template call<StringColumn>();
             return;
+
         case col_type_StringEnum:
             op.template call<StringEnumColumn>();
             return;
+
         case col_type_Binary:
             op.template call<BinaryColumn>();
             return;
+
         case col_type_Table:
             op.template call<SubtableColumn>();
             return;
+
         case col_type_Mixed:
             op.template call<MixedColumn>();
             return;
+
         case col_type_Float:
             op.template call<FloatColumn>();
             return;
+
         case col_type_Double:
             op.template call<DoubleColumn>();
             return;
+
         case col_type_Reserved1:
         case col_type_Reserved4:
         case col_type_LinkList:
@@ -244,9 +254,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
                                             bool leaf_or_compact, ref_type* is_last)
 {
     bool force_general_form = !leaf_or_compact ||
-        (elems_in_child != m_max_elems_per_child &&
-         m_main.size() != 1 + REALM_MAX_BPNODE_SIZE - 1 &&
-         !is_last);
+                              (elems_in_child != m_max_elems_per_child &&
+                               m_main.size() != 1 + REALM_MAX_BPNODE_SIZE - 1 &&
+                               !is_last);
 
     // Add the incoming child to this inner node
     if (m_elems_in_parent > 0) { // This node contains children already
@@ -269,7 +279,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         }
         m_elems_in_parent += elems_in_child;
         if (!is_last && m_main.size() < 1 + REALM_MAX_BPNODE_SIZE)
-          return;
+            return;
     }
     else { // First child in this node
         m_main.add(0); // Placeholder for `elems_per_child` or `offsets_ref`
@@ -288,7 +298,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     // Write this inner node to the output stream
     if (!m_is_on_general_form) {
         int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.set(0, 1 + 2*v); // Throws
+        m_main.set(0, 1 + 2 * v); // Throws
     }
     else {
         size_t pos = m_offsets.write(m_out); // Throws
@@ -298,7 +308,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     }
     {
         int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.add(1 + 2*v); // Throws
+        m_main.add(1 + 2 * v); // Throws
     }
     bool recurse = false; // Shallow
     size_t pos = m_main.write(m_out, recurse); // Throws
@@ -351,7 +361,7 @@ size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
 class ColumnBase::WriteSliceHandler: public Array::VisitHandler {
 public:
     WriteSliceHandler(size_t offset, size_t size, Allocator& alloc,
-                      ColumnBase::SliceHandler &slice_handler,
+                      ColumnBase::SliceHandler& slice_handler,
                       _impl::OutputStream& out) REALM_NOEXCEPT:
         m_begin(offset), m_end(offset + size),
         m_leaf_cache(alloc),
@@ -412,14 +422,14 @@ private:
 
 
 ref_type ColumnBaseSimple::write(const Array* root, size_t slice_offset, size_t slice_size,
-                           size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
+                                 size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
 {
     return BpTreeBase::write_subtree(*root, slice_offset, slice_size, table_size, handler, out);
 }
 
 
 void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
-                                    bool is_append)
+                                          bool is_append)
 {
     // At this point the original root and its new sibling is either
     // both leaves, or both inner nodes on the same form, compact or
@@ -435,13 +445,14 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
     new_root->update_parent(); // Throws
     bool compact_form =
         is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
+
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     REALM_ASSERT(!compact_form || is_append);
     if (compact_form) {
         // FIXME: Dangerous cast here (unsigned -> signed)
         int_fast64_t v = state.m_split_offset; // elems_per_child
-        new_root->add(1 + 2*v); // Throws
+        new_root->add(1 + 2 * v); // Throws
     }
     else {
         Array new_offsets(alloc);
@@ -451,13 +462,14 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
         // FIXME: Dangerous cast here (unsigned -> signed)
         new_root->add(new_offsets.get_ref()); // Throws
     }
+
     // FIXME: Dangerous cast here (unsigned -> signed)
     new_root->add(orig_root->get_ref()); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     new_root->add(new_sibling_ref); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
-    new_root->add(1 + 2*v); // Throws
+    new_root->add(1 + 2 * v); // Throws
     replace_root_array(std::move(new_root));
 }
 
@@ -481,7 +493,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             new_inner_node.create(Array::type_InnerBptreeNode); // Throws
             try {
                 int_fast64_t v = orig_rest_size - rest_size; // elems_per_child
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add(1 + 2 * v); // Throws
                 v = node; // FIXME: Dangerous cast here (unsigned -> signed)
                 new_inner_node.add(v); // Throws
                 node = 0;
@@ -498,7 +510,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                     }
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add(1 + 2 * v); // Throws
             }
             catch (...) {
                 new_inner_node.destroy_deep();
@@ -556,11 +568,11 @@ void ColumnBaseWithIndex::destroy_search_index() REALM_NOEXCEPT
 }
 
 void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent,
-    size_t ndx_in_parent, bool allow_duplicate_valaues)
+                                               size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
     m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-        !allow_duplicate_valaues, get_alloc())); // Throws
+                                         !allow_duplicate_valaues, get_alloc())); // Throws
 }
 
 
@@ -601,8 +613,8 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << setw(indent) << "" << "Integer leaf (ref: "<<leaf.get_ref()<<", "
-        "size: "<<leaf.size()<<")\n";
+    out << setw(indent) << "" << "Integer leaf (ref: " << leaf.get_ref() << ", "
+                                                                            "size: " << leaf.size() << ")\n";
     ostringstream out_2;
     for (size_t i = 0; i != leaf.size(); ++i) {
         if (i != 0) {
@@ -614,7 +626,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         }
         out_2 << leaf.get(i);
     }
-    out << setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
+    out << setw(indent) << "" << "  Elems: " << out_2.str() << "\n";
 }
 
 } // namespace _impl

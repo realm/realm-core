@@ -19,7 +19,7 @@ void StringBuffer::append(const char* data, size_t size)
     if (int_add_with_overflow_detect(new_size, size))
         throw util::BufferSizeOverflow();
     reserve(new_size); // Throws
-    std::copy(data, data+size, m_buffer.data()+m_size);
+    std::copy(data, data + size, m_buffer.data() + m_size);
     m_size = new_size;
     m_buffer[new_size] = 0; // Add zero termination
 }
@@ -28,6 +28,7 @@ void StringBuffer::append(const char* data, size_t size)
 void StringBuffer::reallocate(size_t min_capacity)
 {
     size_t min_capacity_2 = min_capacity;
+
     // Make space for zero termination
     if (int_add_with_overflow_detect(min_capacity_2, 1))
         throw util::BufferSizeOverflow();

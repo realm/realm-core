@@ -79,9 +79,9 @@ public:
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
     ~WriteLogCollector() REALM_NOEXCEPT;
     std::string do_get_database_path() override { return m_database_name; }
-    void do_initiate_transact(SharedGroup&, version_type) override;
+    void do_initiate_transact(SharedGroup &, version_type) override;
     version_type do_prepare_commit(SharedGroup& sg, version_type orig_version)
-        override;
+    override;
     void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT override;
     void do_abort_transact(SharedGroup&) REALM_NOEXCEPT override;
     BinaryData get_uncommitted_changes() REALM_NOEXCEPT override;
@@ -92,11 +92,12 @@ public:
     void stop_logging() override;
     void reset_log_management(version_type last_version) override;
     void set_last_version_seen_locally(version_type last_seen_version_number)
-        REALM_NOEXCEPT override;
+    REALM_NOEXCEPT override;
 
     void get_changesets(version_type, version_type, BinaryData*) const REALM_NOEXCEPT override;
 
 protected:
+
     // file and memory mappings are always multiples of this size
     static const size_t page_size = 4096;
 
@@ -133,6 +134,7 @@ protected:
         CommitLogPreamble(uint_fast64_t version)
         {
             active_file_is_log_a = true;
+
             // The first commit will be from version 1 -> 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = version;
@@ -278,8 +280,9 @@ inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble() c
 {
     CommitLogHeader* header = m_header.get_addr();
     if (header->use_preamble_a)
-        return & header->preamble_a;
-    return & header->preamble_b;
+        return &header->preamble_a;
+
+    return &header->preamble_b;
 }
 
 
@@ -312,7 +315,7 @@ inline void WriteLogCollector::map_header_if_needed() const
 {
     if (m_header.is_attached() == false) {
         File header_file(m_header_name, File::mode_Update);
-        m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+        m_header.map(header_file, File::access_ReadWrite, sizeof(CommitLogHeader));
     }
 }
 
@@ -338,6 +341,7 @@ WriteLogCollector::get_active_log(CommitLogPreamble* preamble)
 {
     if (preamble->active_file_is_log_a)
         return &m_log_a;
+
     return &m_log_b;
 }
 
@@ -384,11 +388,11 @@ void WriteLogCollector::reset_header()
     File::try_remove(m_header_name);
 
     File header_file(m_header_name, File::mode_Write);
-    header_file.resize(sizeof (CommitLogHeader)); // Throws
+    header_file.resize(sizeof(CommitLogHeader));  // Throws
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         header_file.sync(); // Throws
-    m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+    m_header.map(header_file, File::access_ReadWrite, sizeof(CommitLogHeader));
 }
 
 
@@ -418,7 +422,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         File::SizeType size = active_log->file.get_size();
         size /= page_size * minimal_pages;
         if (size > 4) {
-            size -= size/4;
+            size -= size / 4;
             size *= page_size * minimal_pages;
             active_log->map.unmap();
             active_log->file.resize(size); // Throws
@@ -445,7 +449,7 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
     // make sure we have space (allocate if not)
     File::SizeType size_needed =
-        aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
+        aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size()) {
         active_log->file.resize(size_needed); // Throws
@@ -470,9 +474,9 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
         active_log->map.sync(); // Throws
 
     // update metadata to reflect the added commit log
-    preamble->write_offset += aligned_to(sizeof (uint64_t), entry.changeset.size() + sizeof(EntryHeader));
+    preamble->write_offset += aligned_to(sizeof(uint64_t), entry.changeset.size() + sizeof(EntryHeader));
     version_type orig_version = preamble->end_commit_range;
-    preamble->end_commit_range = orig_version+1;
+    preamble->end_commit_range = orig_version + 1;
     sync_header();
     return orig_version;
 }
@@ -498,10 +502,11 @@ void WriteLogCollector::reset_log_management(version_type last_version)
     reset_header();
     reset_file(m_log_a);
     reset_file(m_log_b);
-    new (m_header.get_addr()) CommitLogHeader(last_version);
+    new (m_header.get_addr())CommitLogHeader(last_version);
+
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
-    new (& m_header.get_addr()->lock) RobustMutex;
+    new (&m_header.get_addr()->lock)RobustMutex;
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_header.sync(); // Throws
@@ -511,7 +516,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 // FIXME: Finn, `map_header_if_needed()` can throw, so it is an error to declare
 // this one `noexcept`
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number)
-    REALM_NOEXCEPT
+REALM_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -545,7 +550,7 @@ void WriteLogCollector::get_changesets(version_type from_version, version_type t
 template<typename T>
 void WriteLogCollector::get_commit_entries_internal(version_type from_version,
                                                     version_type to_version,
-                                                    T* logs_buffer) const REALM_NOEXCEPT
+                                                    T*           logs_buffer) const REALM_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -556,6 +561,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
     // - make sure the files are open and mapped, possibly update stale mappings
     remap_if_needed(m_log_a);
     remap_if_needed(m_log_b);
+
     // std::cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << std::endl;
     const char* buffer;
     const char* second_buffer;
@@ -565,6 +571,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
     if ((m_read_version != from_version) || (m_read_version < preamble->begin_oldest_commit_range)) {
         m_read_version = preamble->begin_oldest_commit_range;
         m_read_offset = 0;
+
         // std::cerr << "  -- reset tracking" << std::endl;
     }
 
@@ -572,6 +579,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
     if (m_read_version >= preamble->begin_newest_commit_range) {
         buffer = second_buffer;
         second_buffer = 0;
+
         // std::cerr << "  -- resuming directly in second file" << std::endl;
         // The saved offset (m_read_offset) should still be valid
     }
@@ -588,6 +596,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
             buffer = second_buffer;
             second_buffer = 0;
             m_read_offset = 0;
+
             // std::cerr << "  -- switching from first to second file\n";
         }
 
@@ -601,17 +610,18 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
         uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // std::cerr << "  --at: " << m_read_offset << ", " << size << "\n";
-            set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
+            set_log_entry_internal(logs_buffer, hdr, buffer + tmp_offset);
             ++logs_buffer;
         }
+
         // break early to avoid updating tracking information, if we've reached
         // past the final entry.. We CAN resume from the final entry, but we
         // cannot safely resume once we've read past the final entry. The reason
         // is that an intervening call to set_oldest_version could shift the
         // write point to the beginning of the other file.
-        if (m_read_version+1 >= preamble->end_commit_range)
+        if (m_read_version + 1 >= preamble->end_commit_range)
             break;
-        uint_fast64_t size = aligned_to(sizeof (uint64_t), hdr->size);
+        uint_fast64_t size = aligned_to(sizeof(uint64_t), hdr->size);
         m_read_offset = tmp_offset + size;
         m_read_version++;
     }
@@ -637,9 +647,11 @@ WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_ty
     char* data = m_transact_log_buffer.data();
     size_t size = write_position() - data;
     HistoryEntry entry;
-    entry.changeset = BinaryData { data, size };
+    entry.changeset = BinaryData {
+        data, size
+    };
     version_type from_version = internal_submit_log(entry);
-    REALM_ASSERT_3(from_version, == , orig_version);
+    REALM_ASSERT_3(from_version, ==, orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
     return new_version;
@@ -685,7 +697,7 @@ void WriteLogCollector::transact_log_reserve(size_t size, char** new_begin, char
 
 
 WriteLogCollector::WriteLogCollector(const std::string& database_name,
-                                     const char* encryption_key):
+                                     const char*        encryption_key):
     m_log_a(database_name + ".log_a"),
     m_log_b(database_name + ".log_b")
 {
@@ -701,7 +713,7 @@ WriteLogCollector::WriteLogCollector(const std::string& database_name,
 
 
 std::unique_ptr<ClientHistory> make_client_history(const std::string& database_name,
-                                                   const char* encryption_key)
+                                                   const char*        encryption_key)
 {
     return std::unique_ptr<ClientHistory>(new _impl::WriteLogCollector(database_name,
                                                                        encryption_key));

@@ -30,24 +30,34 @@
 namespace realm {
 namespace util {
 
-template <class T> class Optional;
+template<class T> class Optional;
 
 // some() should be the equivalent of the proposed C++17 `make_optional`.
-template <class T, class... Args> Optional<T> some(Args&&...);
-template <class T> struct Some;
+template<class T, class ... Args> Optional<T> some(Args&& ...);
+template<class T> struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
-static REALM_CONSTEXPR struct None { REALM_CONSTEXPR None(int) {} } none { 0 };
-static REALM_CONSTEXPR struct InPlace { REALM_CONSTEXPR InPlace() {} } in_place;
+static REALM_CONSTEXPR struct None {
+    REALM_CONSTEXPR None(int)
+    {
+    }
+} none {
+    0
+};
+static REALM_CONSTEXPR struct InPlace {
+    REALM_CONSTEXPR InPlace()
+    {
+    }
+} in_place;
 
 // Note: Should conform with the future std::bad_optional_access.
-struct BadOptionalAccess : std::logic_error {
-    explicit BadOptionalAccess(const std::string& what_arg) : std::logic_error(what_arg) {}
-    explicit BadOptionalAccess(const char* what_arg) : std::logic_error(what_arg) {}
+struct BadOptionalAccess: std::logic_error {
+    explicit BadOptionalAccess(const std::string& what_arg): std::logic_error(what_arg) {}
+    explicit BadOptionalAccess(const char* what_arg): std::logic_error(what_arg) {}
 };
 
 // Note: Should conform with the future std::optional.
-template <class T>
+template<class T>
 class Optional {
 public:
     using value_type = T;
@@ -60,8 +70,8 @@ public:
     /*REALM_CONSTEXPR*/ Optional(T&& value);      // FIXME: Can be constexpr with C++14
     /*REALM_CONSTEXPR*/ Optional(const T& value); // FIXME: Can be constexpr with C++14
 
-    template <class... Args>
-    /*REALM_CONSTEXPR*/ Optional(InPlace tag, Args&&...); // FIXME: Can be constexpr with C++14
+    template<class ... Args>
+    /*REALM_CONSTEXPR*/ Optional(InPlace tag, Args&& ...); // FIXME: Can be constexpr with C++14
     // FIXME: std::optional specifies an std::initializer_list constructor overload as well.
 
     ~Optional();
@@ -69,7 +79,7 @@ public:
     Optional<T>& operator=(None);
     Optional<T>& operator=(Optional<T>&& other);
     Optional<T>& operator=(const Optional<T>& other);
-    template <class U>
+    template<class U>
     Optional<T>& operator=(U&& value);
 
     explicit REALM_CONSTEXPR operator bool() const;
@@ -80,16 +90,17 @@ public:
     REALM_CONSTEXPR const T* operator->() const; // Throws
     T* operator->(); // Throws, FIXME: Can be constexpr with C++14
 
-    template <class U>
-    REALM_CONSTEXPR T value_or(U&& value) const&;
+    template<class U>
+    REALM_CONSTEXPR T value_or(U&& value) const &;
 
-    template <class U>
+    template<class U>
     T value_or(U&& value) &&;
 
     void swap(Optional<T>& other); // FIXME: Add noexcept() clause
 
-    template <class... Args>
-    void emplace(Args&&...);
+    template<class ... Args>
+    void emplace(Args&& ...);
+
     // FIXME: std::optional specifies an std::initializer_list overload for `emplace` as well.
 private:
     using Storage = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
@@ -122,27 +133,27 @@ private:
 // };
 
 /// An Optional<T&> is a non-owning nullable pointer that throws on dereference.
-template <class T>
+template<class T>
 class Optional<T&> {
 public:
-    using value_type = T&;
+    using value_type = T &;
     using target_type = typename std::decay<T>::type;
 
     REALM_CONSTEXPR Optional() {}
-    REALM_CONSTEXPR Optional(None) : Optional() {}
+    REALM_CONSTEXPR Optional(None): Optional() {}
     Optional(const Optional<T&>& other) = default;
-    template <class U>
-    Optional(const Optional<U&>& other) : m_ptr(other.m_ptr) {}
-    template <class U>
-    Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get()) {}
+    template<class U>
+    Optional(const Optional<U&>& other): m_ptr(other.m_ptr) {}
+    template<class U>
+    Optional(std::reference_wrapper<U> ref): m_ptr(&ref.get()) {}
 
-    REALM_CONSTEXPR Optional(T& value) : m_ptr(&value) {}
+    REALM_CONSTEXPR Optional(T& value): m_ptr(&value) {}
     Optional(T&& value) = delete; // Catches accidental references to rvalue temporaries.
 
     Optional<T&>& operator=(None) { m_ptr = nullptr; return *this; }
     Optional<T&>& operator=(const Optional<T&>& other) { m_ptr = other.m_ptr; return *this; }
 
-    template <class U>
+    template<class U>
     Optional<T&>& operator=(std::reference_wrapper<U> ref) { m_ptr = &ref.get(); return *this; }
 
     explicit REALM_CONSTEXPR operator bool() const { return m_ptr; }
@@ -157,17 +168,17 @@ public:
 private:
     T* m_ptr = nullptr;
 
-    template <class U> friend class Optional;
+    template<class U> friend class Optional;
 };
 
 /// Implementation:
 
-template <class T>
+template<class T>
 struct Some {
-    template <class... Args>
-    static Optional<T> some(Args&&... args)
+    template<class ... Args>
+    static Optional<T> some(Args&& ... args)
     {
-        return Optional<T>{std::forward<Args>(args)...};
+        return Optional<T>{std::forward<Args>(args) ...};
     }
 };
 
@@ -182,59 +193,59 @@ struct Some {
 //     }
 // };
 
-template <class T, class... Args>
-Optional<T> some(Args&&... args)
+template<class T, class ... Args>
+Optional<T> some(Args&& ... args)
 {
-    return Some<T>::some(std::forward<Args>(args)...);
+    return Some<T>::some(std::forward<Args>(args) ...);
 }
 
 
-template <class T>
+template<class T>
 REALM_CONSTEXPR Optional<T>::Optional(): m_engaged(false)
 {
 }
 
-template <class T>
+template<class T>
 REALM_CONSTEXPR Optional<T>::Optional(None): m_engaged(false)
 {
 }
 
-template <class T>
+template<class T>
 Optional<T>::Optional(Optional<T>&& other): m_engaged(other.m_engaged)
 {
     if (m_engaged) {
-        new(ptr()) T(std::move(*other.ptr()));
+        new(ptr())T(std::move(*other.ptr()));
     }
 }
 
-template <class T>
+template<class T>
 Optional<T>::Optional(const Optional<T>& other): m_engaged(other.m_engaged)
 {
     if (m_engaged) {
-        new(ptr()) T(*other.ptr());
+        new(ptr())T(*other.ptr());
     }
 }
 
-template <class T>
+template<class T>
 Optional<T>::Optional(T&& value): m_engaged(true)
 {
-    new(ptr()) T(std::move(value));
+    new(ptr())T(std::move(value));
 }
 
-template <class T>
+template<class T>
 Optional<T>::Optional(const T& value): m_engaged(true)
 {
-    new(ptr()) T(value);
+    new(ptr())T(value);
 }
 
-template <class T>
-template <class... Args>
-Optional<T>::Optional(InPlace, Args&&... args): m_engaged(true)
+template<class T>
+template<class ... Args>
+Optional<T>::Optional(InPlace, Args&& ... args): m_engaged(true)
 {
-    new(ptr()) T(std::forward<Args>(args)...);
+    new(ptr())T(std::forward<Args>(args) ...);
 }
 
-template <class T>
+template<class T>
 Optional<T>::~Optional()
 {
     if (m_engaged) {
@@ -242,7 +253,7 @@ Optional<T>::~Optional()
     }
 }
 
-template <class T>
+template<class T>
 void Optional<T>::clear()
 {
     if (m_engaged) {
@@ -251,14 +262,14 @@ void Optional<T>::clear()
     }
 }
 
-template <class T>
+template<class T>
 Optional<T>& Optional<T>::operator=(None)
 {
     clear();
     return *this;
 }
 
-template <class T>
+template<class T>
 Optional<T>& Optional<T>::operator=(Optional<T>&& other)
 {
     if (m_engaged) {
@@ -271,13 +282,13 @@ Optional<T>& Optional<T>::operator=(Optional<T>&& other)
     }
     else {
         if (other.m_engaged) {
-            new(ptr()) T(std::move(*other.ptr()));
+            new(ptr())T(std::move(*other.ptr()));
         }
     }
     return *this;
 }
 
-template <class T>
+template<class T>
 Optional<T>& Optional<T>::operator=(const Optional<T>& other)
 {
     if (m_engaged) {
@@ -290,99 +301,107 @@ Optional<T>& Optional<T>::operator=(const Optional<T>& other)
     }
     else {
         if (other.m_engaged) {
-            new(ptr()) T(*other.ptr());
+            new(ptr())T(*other.ptr());
         }
     }
     return *this;
 }
 
-template <class T>
-template <class U>
+template<class T>
+template<class U>
 Optional<T>& Optional<T>::operator=(U&& value)
 {
     if (m_engaged) {
         *ptr() = std::forward<U>(value);
     }
     else {
-        new(ptr()) T(std::forward<U>(value));
+        new(ptr())T(std::forward<U>(value));
         m_engaged = true;
     }
     return *this;
 }
 
-template <class T>
+template<class T>
 REALM_CONSTEXPR Optional<T>::operator bool() const
 {
     return m_engaged;
 }
 
-template <class T>
+template<class T>
 REALM_CONSTEXPR const T& Optional<T>::value() const
 {
-    return m_engaged ? *ptr() : (throw BadOptionalAccess{"bad optional access"}, T{});
+    return m_engaged ? *ptr() : (throw BadOptionalAccess {"bad optional access"}, T {});
 }
 
-template <class T>
+template<class T>
 T& Optional<T>::value()
 {
     if (!m_engaged) {
-        throw BadOptionalAccess{"bad optional access"};
+        throw BadOptionalAccess {
+                  "bad optional access"
+        };
     }
     return *ptr();
 }
 
-template <class T>
-REALM_CONSTEXPR const typename Optional<T&>::target_type& Optional<T&>::value() const
+template<class T>
+REALM_CONSTEXPR const typename Optional<T&>::target_type & Optional<T&>::value() const
 {
-    return m_ptr ? *m_ptr : (throw BadOptionalAccess{"bad optional access"}, T{});
+    return m_ptr ? *m_ptr : (throw BadOptionalAccess {"bad optional access"}, T {});
 }
 
-template <class T>
-typename Optional<T&>::target_type& Optional<T&>::value()
+template<class T>
+typename Optional<T&>::target_type & Optional<T&>::value()
 {
     if (!m_ptr) {
-        throw BadOptionalAccess{"bad optional access"};
+        throw BadOptionalAccess {
+                  "bad optional access"
+        };
     }
     return *m_ptr;
 }
 
-template <class T>
+template<class T>
 REALM_CONSTEXPR const T& Optional<T>::operator*() const
 {
     // Note: This differs from std::optional, which doesn't throw.
     return value();
 }
 
-template <class T>
+template<class T>
 T& Optional<T>::operator*()
 {
     // Note: This differs from std::optional, which doesn't throw.
     return value();
 }
 
-template <class T>
+template<class T>
 REALM_CONSTEXPR const T* Optional<T>::operator->() const
 {
     // Note: This differs from std::optional, which doesn't throw.
     return &value();
 }
 
-template <class T>
+template<class T>
 T* Optional<T>::operator->()
 {
     // Note: This differs from std::optional, which doesn't throw.
     return &value();
 }
 
-template <class T>
-template <class U>
-REALM_CONSTEXPR T Optional<T>::value_or(U&& otherwise) const&
+template<class T>
+template<class U>
+REALM_CONSTEXPR T Optional<T>::value_or(U&& otherwise) const &
 {
-    return m_engaged ? T{*ptr()} : T{std::forward<U>(otherwise)};
+    return m_engaged ? T {
+               *ptr()
+    } : T {
+               std::forward<U>(otherwise)
+    };
 }
 
-template <class T>
-template <class U>
+template<class T>
+template<class U>
 T Optional<T>::value_or(U&& otherwise) &&
 {
     if (is_engaged()) {
@@ -393,7 +412,7 @@ T Optional<T>::value_or(U&& otherwise) &&
     }
 }
 
-template <class T>
+template<class T>
 void Optional<T>::swap(Optional<T>& other)
 {
     // FIXME: This might be optimizable.
@@ -402,17 +421,17 @@ void Optional<T>::swap(Optional<T>& other)
     *this = std::move(tmp);
 }
 
-template <class T>
-template <class... Args>
-void Optional<T>::emplace(Args&&... args)
+template<class T>
+template<class ... Args>
+void Optional<T>::emplace(Args&& ... args)
 {
     clear();
-    new(ptr()) T(std::forward<Args>(args)...);
+    new(ptr())T(std::forward<Args>(args) ...);
     m_engaged = true;
 }
 
 
-template <class T>
+template<class T>
 REALM_CONSTEXPR Optional<typename std::decay<T>::type>
 make_optional(T&& value)
 {
@@ -420,73 +439,81 @@ make_optional(T&& value)
     return some<Type>(std::forward<T>(value));
 }
 
-template <class T>
+template<class T>
 bool operator==(const Optional<T>& lhs, const Optional<T>& rhs)
 {
-    if (!lhs && !rhs) { return true; }
-    if (lhs && rhs) { return *lhs == *rhs; }
+    if (!lhs && !rhs) {
+        return true;
+    }
+    if (lhs && rhs) {
+        return *lhs == *rhs;
+    }
     return false;
 }
 
-template <class T>
+template<class T>
 bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
 {
-    if (!rhs) { return false; }
-    if (!lhs) { return true; }
-    return std::less<T>{}(*lhs, *rhs);
+    if (!rhs) {
+        return false;
+    }
+    if (!lhs) {
+        return true;
+    }
+    return std::less<T>{} (*lhs, *rhs);
 }
 
-template <class T>
+template<class T>
 bool operator==(const Optional<T>& lhs, None)
 {
     return !bool(lhs);
 }
 
-template <class T>
+template<class T>
 bool operator<(const Optional<T>& lhs, None)
 {
     static_cast<void>(lhs);
     return false;
 }
 
-template <class T>
+template<class T>
 bool operator==(None, const Optional<T>& rhs)
 {
     return !bool(rhs);
 }
 
-template <class T>
+template<class T>
 bool operator<(None, const Optional<T>& rhs)
 {
     return bool(rhs);
 }
 
-template <class T>
+template<class T>
 bool operator==(const Optional<T>& lhs, const T& rhs)
 {
     return lhs ? *lhs == rhs : false;
 }
 
-template <class T>
+template<class T>
 bool operator<(const Optional<T>& lhs, const T& rhs)
 {
-    return lhs ? std::less<T>{}(*lhs, rhs) : true;
+    return lhs ? std::less<T>{} (*lhs, rhs) : true;
 }
 
-template <class T>
+template<class T>
 bool operator==(const T& lhs, const Optional<T>& rhs)
 {
     return rhs ? lhs == *rhs : false;
 }
 
-template <class T>
+template<class T>
 bool operator<(const T& lhs, const Optional<T>& rhs)
 {
-    return rhs ? std::less<T>{}(lhs, *rhs) : false;
+    return rhs ? std::less<T>{} (lhs, *rhs) : false;
 }
 
-template <class T, class F>
-auto operator>>(Optional<T> lhs, F&& rhs) -> decltype(fmap(lhs, std::forward<F>(rhs)))
+template<class T, class F>
+auto operator>>(Optional<T> lhs, F&& rhs)->decltype(fmap(lhs, std::forward<F>(rhs)))
 {
     return fmap(lhs, std::forward<F>(rhs));
 }

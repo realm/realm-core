@@ -46,6 +46,7 @@ class BinaryColumn;
 /// is an array node of type Array that stores the root refs of the subcolumns.
 class MixedColumn: public ColumnBaseSimple {
 public:
+
     /// Create a mixed column wrapper and attach it to a preexisting
     /// underlying structure of arrays.
     ///
@@ -157,11 +158,13 @@ private:
         mixcol_Int         =  0,
         mixcol_Bool        =  1,
         mixcol_String      =  2,
+
         //                    3, used for STRING_ENUM in ColumnType
         mixcol_Binary      =  4,
         mixcol_Table       =  5,
         mixcol_Mixed       =  6,
         mixcol_Date        =  7,
+
         //                    8, used for RESERVED1 in ColumnType
         mixcol_Float       =  9,
         mixcol_Double      = 10, // Positive Double
@@ -191,7 +194,7 @@ private:
     void do_move_last_over(size_t row_ndx, size_t prior_num_rows);
     void do_clear(std::size_t num_rows);
 
-    void create(Allocator&, ref_type, Table*, std::size_t column_ndx);
+    void create(Allocator &, ref_type, Table*, std::size_t column_ndx);
     void ensure_binary_data_column();
 
     MixedColType clear_value(std::size_t ndx, MixedColType new_type); // Returns old type

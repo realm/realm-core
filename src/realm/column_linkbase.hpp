@@ -30,6 +30,7 @@ class Table;
 // Abstract base class for columns containing links
 class LinkColumnBase: public IntegerColumn {
 public:
+
     // Create unattached root array aaccessor.
     LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx);
     ~LinkColumnBase() REALM_NOEXCEPT override;
@@ -61,6 +62,7 @@ public:
 #endif
 
 protected:
+
     // A pointer to the table that this column is part of.
     Table* const m_table;
 

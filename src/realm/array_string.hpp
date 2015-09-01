@@ -25,7 +25,7 @@
 namespace realm {
 
 /*
-ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The 
+ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The
 longest string it can store is (m_width - 1) bytes before it needs to expand.
 
 An example of the format for m_width = 4 is following sequence of bytes, where x is payload:
@@ -43,6 +43,7 @@ New: StringData is null() if-and-only-if StringData::data() == 0.
 class ArrayString: public Array {
 public:
     typedef StringData value_type;
+
     // Constructor defaults to non-nullable because we use non-nullable ArrayString so many places internally in core
     // (data which isn't user payload) where null isn't needed.
     explicit ArrayString(Allocator&, bool nullable = false) REALM_NOEXCEPT;
@@ -74,7 +75,7 @@ public:
     /// slower.
     static StringData get(const char* header, std::size_t ndx, bool nullable) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase & state);
 
     /// Construct a string array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
@@ -101,7 +102,7 @@ public:
 private:
     std::size_t calc_byte_len(std::size_t count, std::size_t width) const override;
     std::size_t calc_item_count(std::size_t bytes,
-                              std::size_t width) const REALM_NOEXCEPT override;
+                                std::size_t width) const REALM_NOEXCEPT override;
     WidthType GetWidthType() const override { return wtype_Multiply; }
 
     bool m_nullable;
@@ -113,7 +114,7 @@ private:
 
 // Creates new array (but invalid, call init_from_ref() to init)
 inline ArrayString::ArrayString(Allocator& alloc, bool nullable) REALM_NOEXCEPT:
-Array(alloc), m_nullable(nullable)
+    Array(alloc), m_nullable(nullable)
 {
 }
 
@@ -146,7 +147,7 @@ inline StringData ArrayString::get(std::size_t ndx) const REALM_NOEXCEPT
         return m_nullable ? realm::null() : StringData("");
 
     const char* data = m_data + (ndx * m_width);
-    std::size_t size = (m_width-1) - data[m_width-1];
+    std::size_t size = (m_width - 1) - data[m_width - 1];
 
     if (size == static_cast<size_t>(-1))
         return m_nullable ? realm::null() : StringData("");
@@ -175,7 +176,7 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nul
     if (width == 0)
         return nullable ? realm::null() : StringData("");
 
-    std::size_t size = (width-1) - data[width-1];
+    std::size_t size = (width - 1) - data[width - 1];
 
     if (size == static_cast<size_t>(-1))
         return nullable ? realm::null() : StringData("");

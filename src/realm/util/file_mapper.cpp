@@ -58,13 +58,13 @@ using namespace realm;
 using namespace realm::util;
 
 namespace {
-bool handle_access(void *addr);
+bool handle_access(void* addr);
 
 #ifdef __APPLE__
 
 #if defined(__x86_64__) || defined(__arm64__)
 typedef int64_t NativeCodeType;
-#define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
+#define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES | EXCEPTION_STATE_IDENTITY
 #else
 typedef int32_t NativeCodeType;
 #define REALM_EXCEPTION_BEHAVIOR EXCEPTION_STATE_IDENTITY
@@ -152,7 +152,7 @@ void check_error(kern_return_t kr)
         REALM_TERMINATE(mach_error_string(kr));
 }
 
-void send_mach_msg(mach_msg_header_t *msg)
+void send_mach_msg(mach_msg_header_t* msg)
 {
     kern_return_t kr = mach_msg(msg, MACH_SEND_MSG, msg->msgh_size,
                                 0, MACH_PORT_NULL, // no reply needed
@@ -192,9 +192,9 @@ void copy_state(const RaiseRequest<CodeType>&, const RaiseStateIdentityRequest<N
 }
 
 template<template<typename> class ForwardType, typename ForwardCodeType>
-void copy_state(ForwardType<ForwardCodeType>& forward,
+void copy_state(ForwardType<ForwardCodeType>&                    forward,
                 const RaiseStateIdentityRequest<NativeCodeType>& request,
-                typename ForwardType<ForwardCodeType>::has_state = 0)
+                typename ForwardType<ForwardCodeType>::          has_state = 0)
 {
     mach_msg_size_t state_size = request.state.old_stateCnt * sizeof request.state.old_state[0];
     REALM_ASSERT_3(sizeof(forward.state.old_state), >=, state_size);
@@ -222,9 +222,9 @@ void copy_thread(const RaiseStateRequest<CodeType>&, const RaiseStateIdentityReq
 }
 
 template<template<typename> class ForwardType, typename ForwardCodeType>
-void copy_thread(ForwardType<ForwardCodeType>& forward,
-                const RaiseStateIdentityRequest<NativeCodeType>& request,
-                typename ForwardType<ForwardCodeType>::has_thread = 0)
+void copy_thread(ForwardType<ForwardCodeType>&                    forward,
+                 const RaiseStateIdentityRequest<NativeCodeType>& request,
+                 typename ForwardType<ForwardCodeType>::          has_thread = 0)
 {
     forward.thread.body = request.thread.body;
     forward.thread.thread = request.thread.thread;
@@ -303,21 +303,27 @@ void handle_exception()
         case EXCEPTION_DEFAULT:
             convert_and_forward_message<RaiseRequest, int32_t>(request, msg_Request);
             return;
+
         case exception_behavior_t(EXCEPTION_DEFAULT | MACH_EXCEPTION_CODES):
             convert_and_forward_message<RaiseRequest, int64_t>(request, msg_Request);
             return;
+
         case EXCEPTION_STATE:
             convert_and_forward_message<RaiseStateRequest, int32_t>(request, msg_RequestState);
             return;
+
         case exception_behavior_t(EXCEPTION_STATE | MACH_EXCEPTION_CODES):
             convert_and_forward_message<RaiseStateRequest, int64_t>(request, msg_RequestState);
             return;
+
         case EXCEPTION_STATE_IDENTITY:
             convert_and_forward_message<RaiseStateRequest, int32_t>(request, msg_RequestStateIdentity);
             return;
+
         case exception_behavior_t(EXCEPTION_STATE_IDENTITY | MACH_EXCEPTION_CODES):
             convert_and_forward_message<RaiseStateRequest, int64_t>(request, msg_RequestStateIdentity);
             return;
+
         default:
             REALM_TERMINATE("Unsupported exception behavior");
     }
@@ -334,6 +340,7 @@ void install_handler()
     static bool has_installed_handler = false;
     if (has_installed_handler)
         return;
+
     has_installed_handler = true;
 
     // Create a port and ask to be able to read from it
@@ -372,8 +379,10 @@ void install_handler()
 #else // __APPLE__
 
 #if defined(REALM_ANDROID) && defined(__LP64__)
+
 // bionic's sigaction() is broken on arm64, so use the syscall directly
-int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sigaction* old_action) {
+int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sigaction* old_action)
+{
     __kernel_sigaction kernel_new_action;
     kernel_new_action.sa_flags = new_action->sa_flags;
     kernel_new_action.sa_handler = new_action->sa_handler;
@@ -445,7 +454,7 @@ void install_handler()
 
 class SpinLockGuard {
 public:
-    SpinLockGuard(std::atomic<bool>& lock) : m_lock(lock)
+    SpinLockGuard(std::atomic<bool>& lock): m_lock(lock)
     {
         while (m_lock.exchange(true, std::memory_order_acquire)) ;
     }
@@ -491,7 +500,7 @@ struct AtExit {
     }
 } at_exit;
 
-bool handle_access(void *addr)
+bool handle_access(void* addr)
 {
     SpinLockGuard lock(mapping_lock);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -645,6 +654,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, std::size_t offset, con
             case File::access_ReadWrite:
                 prot |= PROT_WRITE;
                 break;
+
             case File::access_ReadOnly:
                 break;
         }
@@ -663,20 +673,20 @@ void munmap(void* addr, size_t size) REALM_NOEXCEPT
 #ifdef REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
-    if(::munmap(addr, size) != 0) {
+    if (::munmap(addr, size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
     }
 }
 
-void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, 
+void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
              File::AccessMode a, size_t new_size)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     {
         SpinLockGuard lock(mapping_lock);
         size_t rounded_old_size = round_up_to_page_size(old_size);
-        if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
+        if (mapping_and_addr * m = find_mapping_for_addr(old_addr, rounded_old_size)) {
             size_t rounded_new_size = round_up_to_page_size(new_size);
             if (rounded_old_size == rounded_new_size)
                 return old_addr;
@@ -700,10 +710,12 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
         if (new_addr != MAP_FAILED)
             return new_addr;
+
         int err = errno; // Eliminate any risk of clobbering
         if (err != ENOTSUP)
             throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
     }
+
     // Fall back to no-mremap case if it's not supported
 #endif
 
@@ -720,7 +732,7 @@ void msync(void* addr, size_t size)
 #ifdef REALM_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
         SpinLockGuard lock(mapping_lock);
-        if (mapping_and_addr* m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {
+        if (mapping_and_addr * m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {
             m->mapping->flush();
             m->mapping->sync();
             return;

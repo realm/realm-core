@@ -20,13 +20,13 @@ namespace {
 void make_nonblocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
-    if(flags == -1) {
+    if (flags == -1) {
         std::error_code ec = make_basic_system_error_code(errno);
         throw std::system_error(ec);
     }
     flags |= O_NONBLOCK;
     int ret = fcntl(fd, F_SETFL, flags);
-    if(ret == -1) {
+    if (ret == -1) {
         std::error_code ec = make_basic_system_error_code(errno);
         throw std::system_error(ec);
     }
@@ -38,14 +38,19 @@ std::error_code translate_addrinfo_error(int err)
     switch (err) {
         case EAI_AGAIN:
             return host_not_found_try_again;
+
         case EAI_BADFLAGS:
             return error::invalid_argument;
+
         case EAI_FAIL:
             return no_recovery;
+
         case EAI_FAMILY:
             return error::address_family_not_supported;
+
         case EAI_MEMORY:
             return error::no_memory;
+
         case EAI_NONAME:
 #if defined(EAI_ADDRFAMILY)
         case EAI_ADDRFAMILY:
@@ -54,10 +59,13 @@ std::error_code translate_addrinfo_error(int err)
         case EAI_NODATA:
 #endif
             return host_not_found;
+
         case EAI_SERVICE:
             return service_not_found;
+
         case EAI_SOCKTYPE:
             return socket_type_not_supported;
+
         default:
             return error::unknown;
     }
@@ -95,18 +103,25 @@ std::string network_error_category::message(int value) const
     switch (errors(value)) {
         case end_of_input:
             return "End of input";
+
         case delim_not_found:
             return "Delimiter not found";
+
         case host_not_found:
             return "Host not found (authoritative)";
+
         case host_not_found_try_again:
             return "Host not found (non-authoritative)";
+
         case no_data:
             return "The query is valid but does not have associated address data";
+
         case no_recovery:
             return "A non-recoverable error occurred";
+
         case service_not_found:
             return "The service is not supported for the given socket type";
+
         case socket_type_not_supported:
             return "The socket type is not supported";
     }
@@ -186,7 +201,7 @@ public:
 
     void run()
     {
-      restart:
+restart:
         clear_wake_up_pipe();
         for (;;) {
             {
@@ -230,6 +245,7 @@ public:
                         num_ready_descriptors = ret;
                         break;
                     }
+
                     // Ignore interruptions due to system signals
                     if (errno != EINTR) {
                         std::error_code ec = make_basic_system_error_code(errno);
@@ -238,22 +254,23 @@ public:
                 }
             }
             REALM_ASSERT(num_ready_descriptors >= 1);
+
             // Check wake-up descriptor
-            if ((m_pollfd_slots[0].revents & (POLLRDNORM|POLLERR|POLLHUP)) != 0)
+            if ((m_pollfd_slots[0].revents & (POLLRDNORM | POLLERR | POLLHUP)) != 0)
                 goto restart;
             REALM_ASSERT(m_pollfd_slots[0].revents == 0);
             size_t n = m_poll_handlers.size();
             REALM_ASSERT(n == m_pollfd_slots.size() - 1);
             for (size_t fd = 0; fd < n; ++fd) {
-                pollfd* pollfd_slot = &m_pollfd_slots[fd+1];
+                pollfd* pollfd_slot = &m_pollfd_slots[fd + 1];
                 if (REALM_LIKELY(pollfd_slot->revents == 0))
                     continue;
 
                 REALM_ASSERT(pollfd_slot->fd >= 0);
                 REALM_ASSERT((pollfd_slot->revents & POLLNVAL) == 0);
 
-                if ((pollfd_slot->revents & (POLLHUP|POLLERR)) != 0) {
-                    REALM_ASSERT((pollfd_slot->events & (POLLRDNORM|POLLWRNORM)) != 0);
+                if ((pollfd_slot->revents & (POLLHUP | POLLERR)) != 0) {
+                    REALM_ASSERT((pollfd_slot->events & (POLLRDNORM | POLLWRNORM)) != 0);
                     if ((pollfd_slot->events & POLLRDNORM) != 0)
                         pollfd_slot->revents |= POLLRDNORM;
                     if ((pollfd_slot->events & POLLWRNORM) != 0)
@@ -277,7 +294,7 @@ public:
                         // asynchronous operations. The latter may have caused
                         // the m_pollfd_slots vector to reallocate its
                         // underlying memory.
-                        pollfd_slot = &m_pollfd_slots[fd+1];
+                        pollfd_slot = &m_pollfd_slots[fd + 1];
                         if (pollfd_slot->fd < 0)
                             continue;
                     }
@@ -320,6 +337,7 @@ public:
             LockGuard l(m_mutex);
             if (m_stopped)
                 return;
+
             m_stopped = true;
         }
 
@@ -330,7 +348,7 @@ public:
     {
         LockGuard l(m_mutex);
         m_stopped = false;
-   }
+    }
 
     void add_io_handler(int fd, async_handler* handler, io_op op)
     {
@@ -344,26 +362,27 @@ public:
             poll_handler_slot handler_slot = poll_handler_slot(); // Cleared slot
             pollfd pollfd_slot = pollfd(); // Cleared slot
             pollfd_slot.fd = -1; // Unused
-            m_pollfd_slots.reserve(n_2+1); // Throws
+            m_pollfd_slots.reserve(n_2 + 1); // Throws
             m_poll_handlers.resize(n_2, handler_slot); // Throws
-            m_pollfd_slots.resize(n_2+1, pollfd_slot);
+            m_pollfd_slots.resize(n_2 + 1, pollfd_slot);
         }
 
-        pollfd&            pollfd_slot  = m_pollfd_slots[fd+1];
+        pollfd&            pollfd_slot  = m_pollfd_slots[fd + 1];
         poll_handler_slot& handler_slot = m_poll_handlers[fd];
         REALM_ASSERT(pollfd_slot.fd == -1 || pollfd_slot.fd == fd);
         REALM_ASSERT((pollfd_slot.fd == -1) == (pollfd_slot.events == 0));
         REALM_ASSERT(((pollfd_slot.events & POLLRDNORM) != 0) ==
-                       (handler_slot.read_handler != 0));
+                     (handler_slot.read_handler != 0));
         REALM_ASSERT(((pollfd_slot.events & POLLWRNORM) != 0) ==
-                       (handler_slot.write_handler != 0));
-        REALM_ASSERT((pollfd_slot.events & ~(POLLRDNORM|POLLWRNORM)) == 0);
+                     (handler_slot.write_handler != 0));
+        REALM_ASSERT((pollfd_slot.events & ~(POLLRDNORM | POLLWRNORM)) == 0);
         switch (op) {
             case op_Read:
                 REALM_ASSERT(!handler_slot.read_handler);
                 pollfd_slot.events |= POLLRDNORM;
                 handler_slot.read_handler = handler;
                 goto finish;
+
             case op_Write:
                 REALM_ASSERT(!handler_slot.write_handler);
                 pollfd_slot.events |= POLLWRNORM;
@@ -373,7 +392,7 @@ public:
         REALM_ASSERT(false);
         return;
 
-      finish:
+finish:
         pollfd_slot.fd = fd;
         h.release();
         ++m_num_poll_handlers;
@@ -402,7 +421,7 @@ public:
         REALM_ASSERT(fd >= 0);
         if (unsigned(fd) < m_poll_handlers.size()) {
             REALM_ASSERT(m_poll_handlers.size() == m_pollfd_slots.size() - 1);
-            pollfd&            pollfd_slot  = m_pollfd_slots[fd+1];
+            pollfd&            pollfd_slot  = m_pollfd_slots[fd + 1];
             poll_handler_slot& handler_slot = m_poll_handlers[fd];
             if (pollfd_slot.fd >= 0) {
                 m_cancel_handlers.reserve(m_cancel_handlers.size() + 2); // Throws
@@ -447,6 +466,7 @@ private:
     {
         char c = 0;
         ssize_t ret = ::write(m_wakeup_pipe_write_fd, &c, 1);
+
         // EAGAIN can be ignored in this case, as it would imply that a previous
         // "signal" is already pending.
         if (ret == -1 && errno != EAGAIN) {
@@ -460,6 +480,7 @@ private:
         char buffer[64];
         for (;;) {
             ssize_t ret = ::read(m_wakeup_pipe_read_fd, buffer, sizeof buffer);
+
             // EAGAIN can be ignored in this case, as it would imply that a previous
             // "signal" is already pending.
             if (ret < 0) {
@@ -566,8 +587,8 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
         bool ip_v4 = curr->ai_family == AF_INET;
         bool ip_v6 = curr->ai_family == AF_INET6;
         if (ip_v4 || ip_v6) {
-            REALM_ASSERT((ip_v4 && curr->ai_addrlen == sizeof (endpoint::sockaddr_ip_v4_type)) ||
-                           (ip_v6 && curr->ai_addrlen == sizeof (endpoint::sockaddr_ip_v6_type)));
+            REALM_ASSERT((ip_v4 && curr->ai_addrlen == sizeof(endpoint::sockaddr_ip_v4_type)) ||
+                         (ip_v6 && curr->ai_addrlen == sizeof(endpoint::sockaddr_ip_v6_type)));
             endpoint& ep = list.m_endpoints[endpoint_ndx];
             ep.m_protocol.m_family   = curr->ai_family;
             ep.m_protocol.m_socktype = curr->ai_socktype;
@@ -642,7 +663,7 @@ std::error_code socket_base::bind(const endpoint& ep, std::error_code& ec)
     }
 
     socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
-        sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
+                         sizeof(endpoint::sockaddr_ip_v4_type) : sizeof(endpoint::sockaddr_ip_v6_type);
     int ret = ::bind(m_sock_fd, &ep.m_sockaddr_union.m_base, addr_len);
     if (REALM_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
@@ -659,7 +680,7 @@ endpoint socket_base::local_endpoint(std::error_code& ec) const
     endpoint ep;
     union union_type {
         endpoint::sockaddr_union_type m_sockaddr_union;
-        char m_extra_byte[sizeof (endpoint::sockaddr_union_type) + 1];
+        char m_extra_byte[sizeof(endpoint::sockaddr_union_type) + 1];
     };
     union_type buffer;
     struct sockaddr* addr = &buffer.m_sockaddr_union.m_base;
@@ -670,7 +691,7 @@ endpoint socket_base::local_endpoint(std::error_code& ec) const
         return ep;
     }
     socklen_t expected_addr_len = m_protocol.is_ip_v4() ?
-        sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
+                                  sizeof(endpoint::sockaddr_ip_v4_type) : sizeof(endpoint::sockaddr_ip_v6_type);
     if (addr_len != expected_addr_len)
         throw std::runtime_error("Unexpected local address length");
     ep.m_protocol = m_protocol;
@@ -735,7 +756,7 @@ std::error_code socket::connect(const endpoint& ep, std::error_code& ec)
     }
 
     socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
-        sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
+                         sizeof(endpoint::sockaddr_ip_v4_type) : sizeof(endpoint::sockaddr_ip_v6_type);
     int ret = ::connect(m_sock_fd, &ep.m_sockaddr_union.m_base, addr_len);
     if (REALM_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
@@ -799,7 +820,7 @@ std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_code& ec
         throw std::runtime_error("Socket is already open");
     union union_type {
         endpoint::sockaddr_union_type m_sockaddr_union;
-        char m_extra_byte[sizeof (endpoint::sockaddr_union_type) + 1];
+        char m_extra_byte[sizeof(endpoint::sockaddr_union_type) + 1];
     };
     union_type buffer;
     struct sockaddr* addr = &buffer.m_sockaddr_union.m_base;
@@ -810,7 +831,7 @@ std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_code& ec
         return ec;
     }
     socklen_t expected_addr_len = m_protocol.is_ip_v4() ?
-        sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
+                                  sizeof(endpoint::sockaddr_ip_v4_type) : sizeof(endpoint::sockaddr_ip_v6_type);
     if (REALM_UNLIKELY(addr_len != expected_addr_len)) {
         ::close(sock_fd);
         throw std::runtime_error("Unexpected peer address length");
@@ -846,7 +867,7 @@ size_t buffered_input_stream::read(char* buffer, size_t size, int delim,
         size_t out_avail = out_end - out_begin;
         size_t n = std::min(in_avail, out_avail);
         char* i = delim == std::char_traits<char>::eof() ? m_begin + n :
-            std::find(m_begin, m_begin + n, std::char_traits<char>::to_char_type(delim));
+                  std::find(m_begin, m_begin + n, std::char_traits<char>::to_char_type(delim));
         out_begin = std::copy(m_begin, i, out_begin);
         m_begin = i;
         if (out_begin == out_end)
@@ -859,6 +880,7 @@ size_t buffered_input_stream::read(char* buffer, size_t size, int delim,
         size_t m = m_socket.read_some(m_buffer.get(), s_buffer_size, ec);
         if (REALM_UNLIKELY(ec))
             return out_begin - buffer;
+
         REALM_ASSERT(m > 0);
         REALM_ASSERT(m <= s_buffer_size);
         m_begin = m_buffer.get();
@@ -876,13 +898,14 @@ void buffered_input_stream::read_handler_base::process_input() REALM_NOEXCEPT
     size_t out_avail = m_out_end - m_out_curr;
     size_t n = std::min(in_avail, out_avail);
     char* i = m_delim == std::char_traits<char>::eof() ? m_stream.m_begin + n :
-        std::find(m_stream.m_begin, m_stream.m_begin + n,
-                  std::char_traits<char>::to_char_type(m_delim));
+              std::find(m_stream.m_begin, m_stream.m_begin + n,
+                        std::char_traits<char>::to_char_type(m_delim));
     m_out_curr = std::copy(m_stream.m_begin, i, m_out_curr);
     m_stream.m_begin = i;
     if (m_out_curr != m_out_end) {
         if (m_stream.m_begin == m_stream.m_end)
             return;
+
         REALM_ASSERT(m_delim != std::char_traits<char>::eof());
         *m_out_curr++ = *m_stream.m_begin++; // Transfer delimiter
     }
@@ -896,6 +919,7 @@ void buffered_input_stream::read_handler_base::read_some(std::error_code& ec) RE
     size_t n = m_stream.m_socket.read_some(m_stream.m_buffer.get(), s_buffer_size, ec);
     if (REALM_UNLIKELY(ec))
         return;
+
     REALM_ASSERT(n > 0);
     REALM_ASSERT(n <= s_buffer_size);
     m_stream.m_begin = m_stream.m_buffer.get();
@@ -936,16 +960,17 @@ std::string host_name()
 }
 
 std::error_code write(socket& sock, const char* data, size_t size, std::error_code& ec)
-    REALM_NOEXCEPT
+REALM_NOEXCEPT
 {
     const char* begin = data;
     const char* end = data + size;
     while (begin != end) {
-        size_t n = sock.write_some(begin, end-begin, ec);
+        size_t n = sock.write_some(begin, end - begin, ec);
         if (REALM_UNLIKELY(ec))
             return ec;
+
         REALM_ASSERT(n > 0);
-        REALM_ASSERT(n <= size_t(end-begin));
+        REALM_ASSERT(n <= size_t(end - begin));
         begin += n;
     }
     ec = std::error_code(); // Success

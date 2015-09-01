@@ -110,7 +110,7 @@ public:
     /// derived from AccessError, the derived exception type is thrown
     /// (as long as the underlying system provides the information to
     /// unambiguously distinguish that particular reason).
-    void open(const std::string& path, Mode = mode_Read);
+    void open(const std::string & path, Mode = mode_Read);
 
     /// This function is idempotent, that is, it is valid to call it
     /// regardless of whether this instance currently is attached to
@@ -143,7 +143,7 @@ public:
     /// not create_Never, or together with a non-zero \a flags
     /// argument, results in undefined behavior. Specifying flag_Trunc
     /// together with create_Must results in undefined behavior.
-    void open(const std::string& path, AccessMode, CreateMode, int flags);
+    void open(const std::string & path, AccessMode, CreateMode, int flags);
 
     /// Same as open(path, access_ReadWrite, create_Auto, 0), except
     /// that this one returns an indication of whether a new file was
@@ -171,10 +171,10 @@ public:
     void write(const std::string& s) { write(s.data(), s.size()); }
 
     /// Calls read(data, N).
-    template<std::size_t N> std::size_t read(char (&data)[N]) { return read(data, N); }
+    template<std::size_t N> std::size_t read(char(&data)[N]) { return read(data, N); }
 
     /// Calls write(data(), N).
-    template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
+    template<std::size_t N> void write(const char(&data)[N]) { write(data, N); }
 
     /// Plays the same role as off_t in POSIX
     typedef int_fast64_t SizeType;
@@ -429,7 +429,7 @@ private:
     std::unique_ptr<const char[]> m_encryption_key;
 
     bool lock(bool exclusive, bool non_blocking);
-    void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
+    void open_internal(const std::string & path, AccessMode, CreateMode, int flags, bool* success);
 
     struct MapBase {
         void* m_addr;
@@ -438,8 +438,8 @@ private:
         MapBase() REALM_NOEXCEPT;
         ~MapBase() REALM_NOEXCEPT;
 
-        void map(const File&, AccessMode, std::size_t size, int map_flags, std::size_t offset = 0);
-        void remap(const File&, AccessMode, std::size_t size, int map_flags);
+        void map(const File &, AccessMode, std::size_t size, int map_flags, std::size_t offset = 0);
+        void remap(const File &, AccessMode, std::size_t size, int map_flags);
         void unmap() REALM_NOEXCEPT;
         void sync();
     };
@@ -482,11 +482,12 @@ private:
 /// multiple threads.
 template<class T> class File::Map: private MapBase {
 public:
+
     /// Equivalent to calling map() on a default constructed instance.
-    explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+    explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof(T),
                  int map_flags = 0);
 
-    explicit Map(const File&, std::size_t offset, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+    explicit Map(const File&, std::size_t offset, AccessMode = access_ReadOnly, std::size_t size = sizeof(T),
                  int map_flags = 0);
 
     /// Create an instance that is not initially attached to a memory
@@ -496,7 +497,7 @@ public:
     ~Map() REALM_NOEXCEPT;
 
     /// Move the mapping from another Map object to this Map object
-    File::Map<T>& operator=(File::Map<T>&& other) 
+    File::Map<T>& operator=(File::Map<T>&& other)
     {
         if (m_addr) unmap();
         m_addr = other.m_addr;
@@ -512,7 +513,7 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+    T* map(const File &, AccessMode = access_ReadOnly, std::size_t size = sizeof(T),
            int map_flags = 0, std::size_t offset = 0);
 
     /// See File::unmap(). This function is idempotent, that is, it is
@@ -526,7 +527,7 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* remap(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+    T* remap(const File &, AccessMode = access_ReadOnly, std::size_t size = sizeof(T),
              int map_flags = 0);
 
     /// See File::sync_map().
@@ -691,10 +692,22 @@ inline void File::open(const std::string& path, Mode m)
     CreateMode c = create_Auto;
     int flags = 0;
     switch (m) {
-        case mode_Read:   a = access_ReadOnly; c = create_Never; break;
-        case mode_Update:                      c = create_Never; break;
-        case mode_Write:  flags = flag_Trunc;                    break;
-        case mode_Append: flags = flag_Append;                   break;
+        case mode_Read:
+            a = access_ReadOnly;
+            c = create_Never;
+            break;
+
+        case mode_Update:
+            c = create_Never;
+            break;
+
+        case mode_Write:
+            flags = flag_Trunc;
+            break;
+
+        case mode_Append:
+            flags = flag_Append;
+            break;
     }
     open(path, a, c, flags);
 }
@@ -725,9 +738,11 @@ inline void File::open(const std::string& path, bool& was_created)
 inline bool File::is_attached() const REALM_NOEXCEPT
 {
 #ifdef _WIN32
-    return (m_handle != nullptr);
+    return m_handle != nullptr;
+
 #else
     return 0 <= m_fd;
+
 #endif
 }
 
@@ -772,6 +787,7 @@ inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, in
 inline void File::MapBase::unmap() REALM_NOEXCEPT
 {
     if (!m_addr) return;
+
     File::unmap(m_addr, m_size);
     m_addr = nullptr;
 }
@@ -833,7 +849,7 @@ template<class T> inline void File::Map<T>::sync()
 
 template<class T> inline bool File::Map<T>::is_attached() const REALM_NOEXCEPT
 {
-    return (m_addr != nullptr);
+    return m_addr != nullptr;
 }
 
 template<class T> inline T* File::Map<T>::get_addr() const REALM_NOEXCEPT
@@ -875,6 +891,7 @@ inline File::Streambuf::int_type File::Streambuf::overflow(int_type c)
     flush();
     if (c == traits_type::eof())
         return traits_type::not_eof(c);
+
     *pptr() = traits_type::to_char_type(c);
     pbump(1);
     return c;

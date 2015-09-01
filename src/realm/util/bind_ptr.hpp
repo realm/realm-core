@@ -69,7 +69,11 @@ public:
 
     // Copy assign
     bind_ptr& operator=(const bind_ptr& p) REALM_NOEXCEPT { bind_ptr(p).swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(const bind_ptr<U>& p) REALM_NOEXCEPT { bind_ptr(p).swap(*this); return *this; }
+    template<class U> bind_ptr& operator=(const bind_ptr<U>& p) REALM_NOEXCEPT
+    {
+        bind_ptr(p).swap(*this);
+        return *this;
+    }
 
     // Move construct
     bind_ptr(bind_ptr&& p) REALM_NOEXCEPT: m_ptr(p.release()) {}
@@ -77,7 +81,11 @@ public:
 
     // Move assign
     bind_ptr& operator=(bind_ptr&& p) REALM_NOEXCEPT { bind_ptr(std::move(p)).swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(bind_ptr<U>&& p) REALM_NOEXCEPT { bind_ptr(std::move(p)).swap(*this); return *this; }
+    template<class U> bind_ptr& operator=(bind_ptr<U>&& p) REALM_NOEXCEPT
+    {
+        bind_ptr(std::move(p)).swap(*this);
+        return *this;
+    }
 
 #else // !REALM_HAVE_CXX11_RVALUE_REFERENCE
 
@@ -87,7 +95,11 @@ public:
 
     // Copy assign
     bind_ptr& operator=(bind_ptr p) REALM_NOEXCEPT { p.swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(bind_ptr<U> p) REALM_NOEXCEPT { bind_ptr(move(p)).swap(*this); return *this; }
+    template<class U> bind_ptr& operator=(bind_ptr<U> p) REALM_NOEXCEPT
+    {
+        bind_ptr(move(p)).swap(*this);
+        return *this;
+    }
 
 #endif // !REALM_HAVE_CXX11_RVALUE_REFERENCE
 
@@ -108,6 +120,7 @@ public:
     template<class U> bool operator<=(U*) const REALM_NOEXCEPT;
     template<class U> bool operator>=(const bind_ptr<U>&) const REALM_NOEXCEPT;
     template<class U> bool operator>=(U*) const REALM_NOEXCEPT;
+
     //@}
 
     // Dereference
@@ -117,7 +130,7 @@ public:
 #ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const REALM_NOEXCEPT { return m_ptr != 0; }
 #else
-    typedef T* bind_ptr::*unspecified_bool_type;
+    typedef T* bind_ptr::* unspecified_bool_type;
     operator unspecified_bool_type() const REALM_NOEXCEPT { return m_ptr ? &bind_ptr::m_ptr : 0; }
 #endif
 
@@ -165,6 +178,7 @@ template<class T, class U> bool operator<(T*, const bind_ptr<U>&) REALM_NOEXCEPT
 template<class T, class U> bool operator>(T*, const bind_ptr<U>&) REALM_NOEXCEPT;
 template<class T, class U> bool operator<=(T*, const bind_ptr<U>&) REALM_NOEXCEPT;
 template<class T, class U> bool operator>=(T*, const bind_ptr<U>&) REALM_NOEXCEPT;
+
 //@}
 
 
@@ -192,6 +206,7 @@ private:
 
 
 #ifdef REALM_HAVE_CXX11_ATOMIC
+
 /// Same as RefCountBase, but this one makes the copying of, and the
 /// destruction of counted references thread-safe.
 ///
@@ -203,6 +218,7 @@ public:
     virtual ~AtomicRefCountBase() REALM_NOEXCEPT {}
 
 protected:
+
     // FIXME: Operators ++ and -- as used below use
     // std::memory_order_seq_cst. I'm not sure whether this is the
     // choice that leads to maximum efficiency, but at least it is
@@ -215,6 +231,7 @@ private:
 
     template<class> friend class bind_ptr;
 };
+
 #endif // REALM_HAVE_CXX11_ATOMIC
 
 

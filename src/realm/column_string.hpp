@@ -84,6 +84,7 @@ public:
     /// according to StringData::operator<().
     std::size_t lower_bound_string(StringData value) const REALM_NOEXCEPT;
     std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
+
     //@}
 
     void set_string(std::size_t, StringData) override;
@@ -121,7 +122,7 @@ public:
     };
 
     std::unique_ptr<const ArrayParent> get_leaf(std::size_t ndx, std::size_t& out_ndx_in_parent,
-                      LeafType& out_leaf_type) const;
+                                                LeafType& out_leaf_type) const;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
@@ -153,7 +154,7 @@ private:
     bool m_nullable;
 
     LeafType get_block(std::size_t ndx, ArrayParent**, std::size_t& off,
-                      bool use_retval = false) const;
+                       bool use_retval = false) const;
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
@@ -195,7 +196,7 @@ private:
 
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                     std::ostream&) const override;
+                     std::ostream &) const override;
 #endif
 
     friend class Array;
@@ -223,10 +224,12 @@ inline std::size_t StringColumn::size() const REALM_NOEXCEPT
             ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             return leaf->size();
         }
+
         // Big strings root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         return leaf->size();
     }
+
     // Non-leaf root
     return m_array->get_bptree_size();
 }
@@ -291,6 +294,7 @@ inline int StringColumn::compare_values(std::size_t row1, std::size_t row2) cons
 
     if (a == b)
         return 0;
+
     return utf8_compare(a, b) ? 1 : -1;
 }
 
@@ -315,7 +319,7 @@ inline const StringIndex* StringColumn::get_search_index() const REALM_NOEXCEPT
     return m_search_index.get();
 }
 
-inline std::size_t StringColumn::get_size_from_ref(ref_type root_ref,
+inline std::size_t StringColumn::get_size_from_ref(ref_type   root_ref,
                                                    Allocator& alloc) REALM_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
@@ -331,6 +335,7 @@ inline std::size_t StringColumn::get_size_from_ref(ref_type root_ref,
             // Medium strings leaf
             return ArrayStringLong::get_size_from_header(root_header, alloc);
         }
+
         // Big strings leaf
         return ArrayBigBlobs::get_size_from_header(root_header);
     }

@@ -49,6 +49,7 @@ namespace realm {
 /// class to the SharedGroup constructor.
 class Replication: public _impl::TransactLogConvenientEncoder, protected _impl::TransactLogStream {
 public:
+
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
     using version_type = History::version_type;
@@ -96,7 +97,7 @@ public:
     /// recycled, to keep the commit log management in sync with what versions
     /// can possibly be interesting in the future.
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
-        REALM_NOEXCEPT;
+    REALM_NOEXCEPT;
 
 
     //@{
@@ -301,7 +302,7 @@ private:
     util::Buffer<char> m_transact_log_buffer;
 
     std::string do_get_database_path() override;
-    void do_initiate_transact(SharedGroup&, version_type) override;
+    void do_initiate_transact(SharedGroup &, version_type) override;
     version_type do_prepare_commit(SharedGroup&, version_type orig_version) override;
     void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT override;
     void do_abort_transact(SharedGroup&) REALM_NOEXCEPT override;

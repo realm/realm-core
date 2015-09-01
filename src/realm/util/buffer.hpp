@@ -74,7 +74,7 @@ public:
 
     T* release() REALM_NOEXCEPT;
 
-    friend void swap(Buffer&a, Buffer&b) REALM_NOEXCEPT
+    friend void swap(Buffer& a, Buffer& b) REALM_NOEXCEPT
     {
         using std::swap;
         swap(a.m_data, b.m_data);
@@ -171,6 +171,7 @@ template<class T> inline void Buffer<T>::reserve(std::size_t used_size,
     std::size_t current_capacity = m_size;
     if (REALM_LIKELY(current_capacity >= min_capacity))
         return;
+
     std::size_t new_capacity = current_capacity;
     if (REALM_UNLIKELY(int_multiply_with_overflow_detect(new_capacity, 2)))
         new_capacity = std::numeric_limits<std::size_t>::max();
@@ -217,7 +218,7 @@ template<class T> inline const T* AppendBuffer<T>::data() const REALM_NOEXCEPT
 template<class T> inline void AppendBuffer<T>::append(const T* data, std::size_t size)
 {
     m_buffer.reserve_extra(m_size, size); // Throws
-    std::copy(data, data+size, m_buffer.data()+m_size);
+    std::copy(data, data + size, m_buffer.data() + m_size);
     m_size += size;
 }
 

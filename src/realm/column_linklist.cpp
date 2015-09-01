@@ -68,13 +68,13 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 
     // Remove backlinks to the removed origin rows
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
-        if (ref_type ref = get_as_ref(row_ndx+i)) {
+        if (ref_type ref = get_as_ref(row_ndx + i)) {
             if (!broken_reciprocal_backlinks) {
                 IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
                     size_t target_row_ndx = to_size_t(link_list.get(j));
-                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+i);
+                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx + i);
                 }
             }
             Array::destroy_deep(ref, get_alloc());
@@ -175,6 +175,7 @@ void LinkListColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
     ref_type ref = get_as_ref(row_ndx);
     if (ref == 0)
         return;
+
     Array root(get_alloc());
     root.init_from_ref(ref);
 
@@ -226,6 +227,7 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 
     if (m_weak_links)
         return;
+
     if (m_target_table == state.stop_on_table)
         return;
 
@@ -256,7 +258,7 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 }
 
 
-void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
+void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array&  link_list_leaf,
                                                                CascadeState& state)
 {
     size_t target_table_ndx = m_target_table->get_index_in_group();
@@ -276,6 +278,7 @@ bool LinkListColumn::compare_link_list(const LinkListColumn& c) const
     size_t n = size();
     if (c.size() != n)
         return false;
+
     for (size_t i = 0; i < n; ++i) {
         if (*get(i) != *c.get(i))
             return false;
@@ -418,6 +421,7 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REAL
             // Must hold a counted reference while detaching
             LinkViewRef list(i->m_list);
             list->detach();
+
             // Remove entry by moving last over (faster and avoids invalidating
             // iterators)
             *i = *--end;
@@ -439,6 +443,7 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM
             // Must hold a counted reference while detaching
             LinkViewRef list(e.m_list);
             list->detach();
+
             // Delete entry by moving last over (faster and avoids invalidating
             // iterators)
             e = m_list_accessors[--n];

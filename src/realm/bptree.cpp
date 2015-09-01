@@ -32,13 +32,14 @@ void BpTreeBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     new_root->update_parent(); // Throws
     bool compact_form =
         is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
+
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     REALM_ASSERT(!compact_form || is_append);
     if (compact_form) {
         // FIXME: Dangerous cast here (unsigned -> signed)
         int_fast64_t v = state.m_split_offset; // elems_per_child
-        new_root->add(1 + 2*v); // Throws
+        new_root->add(1 + 2 * v); // Throws
     }
     else {
         Array new_offsets(alloc);
@@ -48,13 +49,14 @@ void BpTreeBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
         // FIXME: Dangerous cast here (unsigned -> signed)
         new_root->add(new_offsets.get_ref()); // Throws
     }
+
     // FIXME: Dangerous cast here (unsigned -> signed)
     new_root->add(orig_root->get_ref()); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     new_root->add(new_sibling_ref); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
-    new_root->add(1 + 2*v); // Throws
+    new_root->add(1 + 2 * v); // Throws
     replace_root(std::move(new_root));
 }
 
@@ -140,9 +142,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
                                             bool leaf_or_compact, ref_type* is_last)
 {
     bool force_general_form = !leaf_or_compact ||
-        (elems_in_child != m_max_elems_per_child &&
-         m_main.size() != 1 + REALM_MAX_BPNODE_SIZE - 1 &&
-         !is_last);
+                              (elems_in_child != m_max_elems_per_child &&
+                               m_main.size() != 1 + REALM_MAX_BPNODE_SIZE - 1 &&
+                               !is_last);
 
     // Add the incoming child to this inner node
     if (m_elems_in_parent > 0) { // This node contains children already
@@ -165,7 +167,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         }
         m_elems_in_parent += elems_in_child;
         if (!is_last && m_main.size() < 1 + REALM_MAX_BPNODE_SIZE)
-          return;
+            return;
     }
     else { // First child in this node
         m_main.add(0); // Placeholder for `elems_per_child` or `offsets_ref`
@@ -184,7 +186,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     // Write this inner node to the output stream
     if (!m_is_on_general_form) {
         int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.set(0, 1 + 2*v); // Throws
+        m_main.set(0, 1 + 2 * v); // Throws
     }
     else {
         size_t pos = m_offsets.write(m_out); // Throws
@@ -194,7 +196,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     }
     {
         int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.add(1 + 2*v); // Throws
+        m_main.add(1 + 2 * v); // Throws
     }
     bool recurse = false; // Shallow
     size_t pos = m_main.write(m_out, recurse); // Throws
@@ -209,7 +211,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             Allocator& alloc = m_main.get_alloc();
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (util::int_multiply_with_overflow_detect(next_level_elems_per_child,
-                                                  REALM_MAX_BPNODE_SIZE))
+                                                        REALM_MAX_BPNODE_SIZE))
                 throw std::runtime_error("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
                                                       next_level_elems_per_child)); // Throws
@@ -236,7 +238,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
 struct BpTreeBase::WriteSliceHandler: public Array::VisitHandler {
 public:
     WriteSliceHandler(size_t offset, size_t size, Allocator& alloc,
-                      BpTreeBase::SliceHandler &slice_handler,
+                      BpTreeBase::SliceHandler& slice_handler,
                       _impl::OutputStream& out) REALM_NOEXCEPT:
         m_begin(offset), m_end(offset + size),
         m_leaf_cache(alloc),
@@ -273,6 +275,7 @@ public:
                 m_slice_handler.slice_leaf(leaf_info.m_mem, offset, size, slice_alloc); // Throws
             Array slice(slice_alloc);
             _impl::DeepArrayDestroyGuard dg(&slice);
+
             // Warning: Initializing leaf as Array.
             slice.init_from_mem(mem);
             pos = slice.write(m_out); // Throws
@@ -305,6 +308,7 @@ ref_type BpTreeBase::write_subtree(const Array& root, size_t slice_offset, size_
     size_t offset = slice_offset;
     if (slice_size == 0)
         offset = 0;
+
     // At this point we know that `offset` refers to an element that
     // exists in the tree (this is required by
     // Array::visit_bptree_leaves()). There are two cases to consider:

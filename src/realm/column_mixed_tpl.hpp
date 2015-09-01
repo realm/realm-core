@@ -53,6 +53,7 @@ inline ref_type MixedColumn::get_subtable_ref(std::size_t row_ndx) const REALM_N
     REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
         return 0;
+
     return m_data->get_as_ref(row_ndx);
 }
 
@@ -61,6 +62,7 @@ inline std::size_t MixedColumn::get_subtable_size(std::size_t row_ndx) const REA
     ref_type top_ref = get_subtable_ref(row_ndx);
     if (top_ref == 0)
         return 0;
+
     return _impl::TableFriend::get_size_from_ref(top_ref, m_data->get_alloc());
 }
 
@@ -79,6 +81,7 @@ inline Table* MixedColumn::get_subtable_ptr(std::size_t row_ndx)
     REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
         return 0;
+
     return m_data->get_subtable_ptr(row_ndx); // Throws
 }
 
@@ -130,7 +133,7 @@ inline bool MixedColumn::get_bool(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Bool);
 
-    return (get_value(ndx) != 0);
+    return get_value(ndx) != 0;
 }
 
 inline DateTime MixedColumn::get_datetime(std::size_t ndx) const REALM_NOEXCEPT
@@ -143,7 +146,7 @@ inline DateTime MixedColumn::get_datetime(std::size_t ndx) const REALM_NOEXCEPT
 inline float MixedColumn::get_float(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559, "'float' is not IEEE");
-    REALM_STATIC_ASSERT((sizeof (float) * CHAR_BIT == 32), "Assume 32 bit float.");
+    REALM_STATIC_ASSERT((sizeof(float) * CHAR_BIT == 32), "Assume 32 bit float.");
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Float);
 
     return type_punning<float>(get_value(ndx));
@@ -152,7 +155,7 @@ inline float MixedColumn::get_float(std::size_t ndx) const REALM_NOEXCEPT
 inline double MixedColumn::get_double(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559, "'double' is not IEEE");
-    REALM_STATIC_ASSERT((sizeof (double) * CHAR_BIT == 64), "Assume 64 bit double.");
+    REALM_STATIC_ASSERT((sizeof(double) * CHAR_BIT == 64), "Assume 64 bit double.");
 
     int64_t int_val = get_value(ndx);
 
@@ -258,6 +261,7 @@ inline void MixedColumn::set_subtable(std::size_t ndx, const Table* t)
     else {
         ref = tf::create_empty_table(get_alloc()); // Throws
     }
+
     // Remove any previous refs or binary data
     clear_value_and_discard_subtab_acc(ndx, mixcol_Table); // Throws
     m_data->set(ndx, ref); // Throws
@@ -284,6 +288,7 @@ inline void MixedColumn::insert_value(std::size_t row_ndx, int_fast64_t types_va
 inline void MixedColumn::insert_int(std::size_t ndx, int_fast64_t value, MixedColType type)
 {
     int_fast64_t types_value = type;
+
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     int_fast64_t data_value =  1 + (value << 1);
     insert_value(ndx, types_value, data_value); // Throws
@@ -295,6 +300,7 @@ inline void MixedColumn::insert_pos_neg(std::size_t ndx, int_fast64_t value, Mix
     // 'store' the sign-bit in the integer-type
     MixedColType type = (value & REALM_BIT63) == 0 ? pos_type : neg_type;
     int_fast64_t types_value = type;
+
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     int_fast64_t data_value =  1 + (value << 1);
     insert_value(ndx, types_value, data_value); // Throws
@@ -383,7 +389,7 @@ inline void MixedColumn::clear()
     do_clear(num_rows); // Throws
 }
 
-inline std::size_t MixedColumn::get_size_from_ref(ref_type root_ref,
+inline std::size_t MixedColumn::get_size_from_ref(ref_type   root_ref,
                                                   Allocator& alloc) REALM_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
@@ -391,7 +397,7 @@ inline std::size_t MixedColumn::get_size_from_ref(ref_type root_ref,
     return IntegerColumn::get_size_from_ref(types_ref, alloc);
 }
 
-inline void MixedColumn::clear_value_and_discard_subtab_acc(std::size_t row_ndx,
+inline void MixedColumn::clear_value_and_discard_subtab_acc(std::size_t  row_ndx,
                                                             MixedColType new_type)
 {
     MixedColType old_type = clear_value(row_ndx, new_type);
@@ -451,6 +457,7 @@ inline void MixedColumn::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
         m_binary_data->refresh_accessor_tree(col_ndx, spec); // Throws
         return;
     }
+
     // See if m_binary_data needs to be created.
     if (get_root_array()->size() == 3) {
         ref_type ref = get_root_array()->get_as_ref(2);

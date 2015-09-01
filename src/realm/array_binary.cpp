@@ -16,13 +16,13 @@ void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0);
     ref_type blob_ref = get_as_ref(1);
-    
+
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
 
     if (!legacy_array_type()) {
         ref_type nulls_ref = get_as_ref(2);
-        m_nulls.init_from_ref(nulls_ref);        
+        m_nulls.init_from_ref(nulls_ref);
     }
 }
 
@@ -40,7 +40,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         ++stored_size;
     size_t offset = stored_size;
     if (!m_offsets.is_empty())
-        offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
+        offset += m_offsets.back(); //fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
     m_offsets.add(offset);
 
     if (!legacy_array_type())
@@ -55,7 +55,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t start = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t current_end = to_size_t(m_offsets.get(ndx));
     size_t stored_size = value.size();
     if (add_zero_term)
@@ -76,14 +76,14 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
     size_t stored_size = value.size();
     if (add_zero_term)
         ++stored_size;
     m_offsets.insert(ndx, pos + stored_size);
-    m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
+    m_offsets.adjust(ndx + 1, m_offsets.size(), stored_size);
 
     if (!legacy_array_type())
         m_nulls.insert(ndx, value.is_null());
@@ -93,7 +93,7 @@ void ArrayBinary::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t start = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t end = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(start, end);
@@ -110,25 +110,26 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) RE
     // See comment in legacy_array_type() and also in array_binary.hpp.
     size_t siz = Array::get_size_from_header(header);
     REALM_ASSERT_7(siz, ==, 2, ||, siz, ==, 3);
-    
+
     if (siz == 3) {
         std::pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
         int64_t n = ArrayInteger::get(nulls_header, ndx);
+
         // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
         REALM_ASSERT_3(n == 1, ||, n == 0);
         bool null = (n != 0);
         ArrayInteger::get(nulls_header, ndx);
         if (null)
-            return BinaryData(0, 0);        
+            return BinaryData(0, 0);
     }
-    
+
     std::pair<int64_t, int64_t> p = get_two(header, 0);
     const char* offsets_header = alloc.translate(to_ref(p.first));
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
     if (ndx) {
-        p = get_two(offsets_header, ndx-1);
+        p = get_two(offsets_header, ndx - 1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }
@@ -199,7 +200,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
     {
         // Always create a m_nulls array, regardless if its column is marked as nullable or not. NOTE: This is new
         // - existing binary arrays from earier versions of core will not have this third array. All methods on ArrayBinary
-        // must thus check if this array exists before trying to access it. If it doesn't, it must be interpreted as if its 
+        // must thus check if this array exists before trying to access it. If it doesn't, it must be interpreted as if its
         // column isn't nullable.
         bool context_flag = false;
         int64_t value = 1; // all entries are null by default

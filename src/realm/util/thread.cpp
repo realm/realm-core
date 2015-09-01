@@ -68,8 +68,7 @@ namespace {
 #if defined _WIN32 && defined REALM_DEBUG
 void free_threadpool();
 
-class Initialization
-{
+class Initialization {
 public:
     ~Initialization()
     {
@@ -144,6 +143,7 @@ REALM_NORETURN void Mutex::init_failed(int err)
     switch (err) {
         case ENOMEM:
             throw std::bad_alloc();
+
         default:
             throw std::runtime_error("pthread_mutex_init() failed");
     }
@@ -154,6 +154,7 @@ REALM_NORETURN void Mutex::attr_init_failed(int err)
     switch (err) {
         case ENOMEM:
             throw std::bad_alloc();
+
         default:
             throw std::runtime_error("pthread_mutexattr_init() failed");
     }
@@ -179,8 +180,10 @@ bool RobustMutex::is_robust_on_this_platform() REALM_NOEXCEPT
 {
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
     return true;
+
 #else
     return false;
+
 #endif
 }
 
@@ -189,9 +192,11 @@ bool RobustMutex::low_level_lock()
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return true;
+
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
     if (r == EOWNERDEAD)
         return false;
+
     if (r == ENOTRECOVERABLE)
         throw NotRecoverable();
 #endif
@@ -247,6 +252,7 @@ REALM_NORETURN void CondVar::init_failed(int err)
     switch (err) {
         case ENOMEM:
             throw std::bad_alloc();
+
         default:
             throw std::runtime_error("pthread_cond_init() failed");
     }
@@ -259,6 +265,7 @@ void CondVar::handle_wait_error(int err)
         throw RobustMutex::NotRecoverable();
     if (err == EOWNERDEAD)
         return;
+
 #else
     static_cast<void>(err);
 #endif
@@ -270,6 +277,7 @@ REALM_NORETURN void CondVar::attr_init_failed(int err)
     switch (err) {
         case ENOMEM:
             throw std::bad_alloc();
+
         default:
             throw std::runtime_error("pthread_condattr_init() failed");
     }

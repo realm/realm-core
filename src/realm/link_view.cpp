@@ -40,7 +40,7 @@ void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Hando
 }
 
 
-LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group) 
+LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
 {
     if (patch) {
         TableRef tr(group.get_table(patch->m_table_num));
@@ -75,7 +75,7 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     m_row_indexes.insert(link_ndx, target_row_ndx); // Throws
     m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
 
-    if (Replication* repl = get_repl())
+    if (Replication * repl = get_repl())
         repl->link_list_insert(*this, link_ndx, target_row_ndx); // Throws
 }
 
@@ -86,7 +86,7 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
 
-    if (Replication* repl = get_repl())
+    if (Replication * repl = get_repl())
         repl->link_list_set(*this, link_ndx, target_row_ndx); // Throws
 
     size_t old_target_row_ndx = do_set(link_ndx, target_row_ndx); // Throws
@@ -133,6 +133,7 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 
     if (old_link_ndx == new_link_ndx)
         return;
+
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
@@ -140,7 +141,7 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
     m_row_indexes.erase(old_link_ndx);
     m_row_indexes.insert(new_link_ndx, target_row_ndx);
 
-    if (Replication* repl = get_repl())
+    if (Replication * repl = get_repl())
         repl->link_list_move(*this, old_link_ndx, new_link_ndx); // Throws
 }
 
@@ -153,6 +154,7 @@ void LinkView::swap(size_t link1_ndx, size_t link2_ndx)
 
     if (link1_ndx == link2_ndx)
         return;
+
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
@@ -160,7 +162,7 @@ void LinkView::swap(size_t link1_ndx, size_t link2_ndx)
     m_row_indexes.set(link1_ndx, m_row_indexes.get(link2_ndx));
     m_row_indexes.set(link2_ndx, target_row_ndx);
 
-    if (Replication* repl = get_repl())
+    if (Replication * repl = get_repl())
         repl->link_list_swap(*this, link1_ndx, link2_ndx); // Throws
 }
 
@@ -170,7 +172,7 @@ void LinkView::remove(size_t link_ndx)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
-    if (Replication* repl = get_repl())
+    if (Replication * repl = get_repl())
         repl->link_list_erase(*this, link_ndx); // Throws
 
     size_t target_row_ndx = do_remove(link_ndx); // Throws
@@ -214,7 +216,7 @@ void LinkView::clear()
     if (!m_row_indexes.is_attached())
         return;
 
-    if (Replication* repl = get_repl())
+    if (Replication * repl = get_repl())
         repl->link_list_clear(*this); // Throws
 
     if (m_origin_column.m_weak_links) {
@@ -241,6 +243,7 @@ void LinkView::clear()
         target_row.table_ndx = target_table.get_index_in_group();
         target_row.row_ndx   = target_row_ndx;
         auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
+
         // This target row cannot already be in state.rows
         REALM_ASSERT(i == state.rows.begin() || i[-1] != target_row);
         state.rows.insert(i, target_row);
@@ -286,7 +289,7 @@ void LinkView::sort(size_t column, bool ascending)
 
 void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
 {
-    if (Replication* repl = get_repl()) {
+    if (Replication * repl = get_repl()) {
         // todo, write to the replication log that we're doing a sort
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
@@ -298,6 +301,7 @@ TableView LinkView::get_sorted_view(std::vector<size_t> column_indexes, std::vec
 {
     TableView v(m_origin_column.get_target_table()); // sets m_table
     v.m_last_seen_version = m_origin_table->m_version;
+
     // sets m_linkview_source to indicate that this TableView was generated from a LinkView
     v.m_linkview_source = ConstLinkViewRef(this);
     if (m_row_indexes.is_attached()) {
@@ -352,7 +356,7 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
     REALM_ASSERT_3(pos, !=, realm::not_found);
 
-    if (Replication* repl = m_origin_table->get_repl())
+    if (Replication * repl = m_origin_table->get_repl())
         repl->link_list_nullify(*this, pos);
 
     m_row_indexes.erase(pos);
@@ -384,7 +388,7 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
 
 void LinkView::repl_unselect() REALM_NOEXCEPT
 {
-    if (Replication* repl = get_repl())
+    if (Replication * repl = get_repl())
         repl->on_link_list_destroyed(*this);
 }
 

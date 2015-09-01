@@ -108,10 +108,11 @@ public:
     /// Note that these operations will cause the row accessor to be detached.
     void remove();
     void move_last_over();
+
     //@}
 
     std::size_t get_backlink_count(const Table& src_table,
-                                   std::size_t src_col_ndx) const REALM_NOEXCEPT;
+                                   std::size_t  src_col_ndx) const REALM_NOEXCEPT;
     std::size_t get_backlink(const Table& src_table, std::size_t src_col_ndx,
                              std::size_t backlink_ndx) const REALM_NOEXCEPT;
 
@@ -155,7 +156,7 @@ public:
 #ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const REALM_NOEXCEPT;
 #else
-    typedef bool (RowFuncs::*unspecified_bool_type)() const;
+    typedef bool (RowFuncs::* unspecified_bool_type)() const;
     operator unspecified_bool_type() const REALM_NOEXCEPT;
 #endif
 
@@ -179,7 +180,7 @@ private:
 ///
 /// \sa BasicRow
 template<class T> class BasicRowExpr:
-        public RowFuncs<T, BasicRowExpr<T>> {
+    public RowFuncs<T, BasicRowExpr<T >> {
 public:
     template<class U> BasicRowExpr(const BasicRowExpr<U>&) REALM_NOEXCEPT;
 
@@ -195,7 +196,7 @@ private:
 
     // Make impl_get_table(), impl_get_row_ndx(), and impl_detach() accessible
     // from RowFuncs.
-    friend class RowFuncs<T, BasicRowExpr<T>>;
+    friend class RowFuncs<T, BasicRowExpr<T >>;
 
     // Make m_table and m_col_ndx accessible from BasicRowExpr(const
     // BasicRowExpr<U>&) for any U.
@@ -265,8 +266,8 @@ private:
 ///
 /// \sa RowFuncs
 template<class T> class BasicRow:
-        private RowBase,
-        public RowFuncs<T, BasicRow<T>> {
+    private RowBase,
+    public RowFuncs<T, BasicRow<T >> {
 public:
     BasicRow() REALM_NOEXCEPT;
 
@@ -285,16 +286,16 @@ private:
 
     // Make impl_get_table(), impl_get_row_ndx(), and impl_detach() accessible
     // from RowFuncs.
-    friend class RowFuncs<T, BasicRow<T>>;
+    friend class RowFuncs<T, BasicRow<T >>;
 
     // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.
     template<class> friend class BasicRow;
 
-    std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
+    std::unique_ptr<BasicRow<T >> clone_for_handover(std::unique_ptr<Handover_patch>&patch) const
     {
         patch.reset(new Handover_patch);
-        std::unique_ptr<BasicRow<T>> retval(new BasicRow<T>(*this, *patch));
+        std::unique_ptr<BasicRow<T >> retval(new BasicRow<T>(*this, *patch));
         return retval;
     }
 
@@ -528,7 +529,7 @@ template<class T, class R> inline void RowFuncs<T,R>::move_last_over()
 
 template<class T, class R> inline std::size_t
 RowFuncs<T,R>::get_backlink_count(const Table& src_table, std::size_t src_col_ndx) const
-    REALM_NOEXCEPT
+REALM_NOEXCEPT
 {
     return table()->get_backlink_count(row_ndx(), src_table, src_col_ndx);
 }

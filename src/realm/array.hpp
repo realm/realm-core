@@ -72,8 +72,10 @@ Searching: The main finding function is:
 
 namespace realm {
 
-enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx,
-             act_CallbackVal, act_CallbackNone, act_CallbackBoth, act_Average};
+enum Action {
+    act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx,
+    act_CallbackVal, act_CallbackNone, act_CallbackBoth, act_Average
+};
 
 template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
@@ -87,61 +89,61 @@ const std::size_t npos = std::size_t(-1);
 /// Alias for realm::npos.
 const std::size_t not_found = npos;
 
- /* wid == 16/32 likely when accessing offsets in B tree */
+/* wid == 16/32 likely when accessing offsets in B tree */
 #define REALM_TEMPEX(fun, wid, arg) \
-    if (wid == 16) {fun<16> arg;} \
-    else if (wid == 32) {fun<32> arg;} \
-    else if (wid == 0) {fun<0> arg;} \
-    else if (wid == 1) {fun<1> arg;} \
-    else if (wid == 2) {fun<2> arg;} \
-    else if (wid == 4) {fun<4> arg;} \
-    else if (wid == 8) {fun<8> arg;} \
-    else if (wid == 64) {fun<64> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<0> arg;}
+    if (wid == 16) {fun<16> arg; } \
+    else if (wid == 32) {fun<32> arg; } \
+    else if (wid == 0) {fun<0> arg; } \
+    else if (wid == 1) {fun<1> arg; } \
+    else if (wid == 2) {fun<2> arg; } \
+    else if (wid == 4) {fun<4> arg; } \
+    else if (wid == 8) {fun<8> arg; } \
+    else if (wid == 64) {fun<64> arg; } \
+    else {REALM_ASSERT_DEBUG(false); fun<0> arg; }
 
 #define REALM_TEMPEX2(fun, targ, wid, arg) \
-    if (wid == 16) {fun<targ, 16> arg;} \
-    else if (wid == 32) {fun<targ, 32> arg;} \
-    else if (wid == 0) {fun<targ, 0> arg;} \
-    else if (wid == 1) {fun<targ, 1> arg;} \
-    else if (wid == 2) {fun<targ, 2> arg;} \
-    else if (wid == 4) {fun<targ, 4> arg;} \
-    else if (wid == 8) {fun<targ, 8> arg;} \
-    else if (wid == 64) {fun<targ, 64> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<targ, 0> arg;}
+    if (wid == 16) {fun<targ, 16> arg; } \
+    else if (wid == 32) {fun<targ, 32> arg; } \
+    else if (wid == 0) {fun<targ, 0> arg; } \
+    else if (wid == 1) {fun<targ, 1> arg; } \
+    else if (wid == 2) {fun<targ, 2> arg; } \
+    else if (wid == 4) {fun<targ, 4> arg; } \
+    else if (wid == 8) {fun<targ, 8> arg; } \
+    else if (wid == 64) {fun<targ, 64> arg; } \
+    else {REALM_ASSERT_DEBUG(false); fun<targ, 0> arg; }
 
 #define REALM_TEMPEX3(fun, targ1, targ2, wid, arg) \
-    if (wid == 16) {fun<targ1, targ2, 16> arg;} \
-    else if (wid == 32) {fun<targ1, targ2, 32> arg;} \
-    else if (wid == 0) {fun<targ1, targ2, 0> arg;} \
-    else if (wid == 1) {fun<targ1, targ2, 1> arg;} \
-    else if (wid == 2) {fun<targ1, targ2, 2> arg;} \
-    else if (wid == 4) {fun<targ1, targ2, 4> arg;} \
-    else if (wid == 8) {fun<targ1, targ2, 8> arg;} \
-    else if (wid == 64) {fun<targ1, targ2, 64> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, 0> arg;}
+    if (wid == 16) {fun<targ1, targ2, 16> arg; } \
+    else if (wid == 32) {fun<targ1, targ2, 32> arg; } \
+    else if (wid == 0) {fun<targ1, targ2, 0> arg; } \
+    else if (wid == 1) {fun<targ1, targ2, 1> arg; } \
+    else if (wid == 2) {fun<targ1, targ2, 2> arg; } \
+    else if (wid == 4) {fun<targ1, targ2, 4> arg; } \
+    else if (wid == 8) {fun<targ1, targ2, 8> arg; } \
+    else if (wid == 64) {fun<targ1, targ2, 64> arg; } \
+    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, 0> arg; }
 
 #define REALM_TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
-    if (wid == 16) {fun<targ1, targ2, 16, targ3> arg;} \
-    else if (wid == 32) {fun<targ1, targ2, 32, targ3> arg;} \
-    else if (wid == 0) {fun<targ1, targ2, 0, targ3> arg;} \
-    else if (wid == 1) {fun<targ1, targ2, 1, targ3> arg;} \
-    else if (wid == 2) {fun<targ1, targ2, 2, targ3> arg;} \
-    else if (wid == 4) {fun<targ1, targ2, 4, targ3> arg;} \
-    else if (wid == 8) {fun<targ1, targ2, 8, targ3> arg;} \
-    else if (wid == 64) {fun<targ1, targ2, 64, targ3> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, 0, targ3> arg;}
+    if (wid == 16) {fun<targ1, targ2, 16, targ3> arg; } \
+    else if (wid == 32) {fun<targ1, targ2, 32, targ3> arg; } \
+    else if (wid == 0) {fun<targ1, targ2, 0, targ3> arg; } \
+    else if (wid == 1) {fun<targ1, targ2, 1, targ3> arg; } \
+    else if (wid == 2) {fun<targ1, targ2, 2, targ3> arg; } \
+    else if (wid == 4) {fun<targ1, targ2, 4, targ3> arg; } \
+    else if (wid == 8) {fun<targ1, targ2, 8, targ3> arg; } \
+    else if (wid == 64) {fun<targ1, targ2, 64, targ3> arg; } \
+    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, 0, targ3> arg; }
 
 #define REALM_TEMPEX5(fun, targ1, targ2, targ3, targ4, wid, arg) \
-    if (wid == 16) {fun<targ1, targ2, targ3, targ4, 16> arg;} \
-    else if (wid == 32) {fun<targ1, targ2, targ3, targ4, 32> arg;} \
-    else if (wid == 0) {fun<targ1, targ2, targ3, targ4, 0> arg;} \
-    else if (wid == 1) {fun<targ1, targ2, targ3, targ4, 1> arg;} \
-    else if (wid == 2) {fun<targ1, targ2, targ3, targ4, 2> arg;} \
-    else if (wid == 4) {fun<targ1, targ2, targ3, targ4, 4> arg;} \
-    else if (wid == 8) {fun<targ1, targ2, targ3, targ4, 8> arg;} \
-    else if (wid == 64) {fun<targ1, targ2, targ3, targ4, 64> arg;} \
-    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, targ3, targ4, 0> arg;}
+    if (wid == 16) {fun<targ1, targ2, targ3, targ4, 16> arg; } \
+    else if (wid == 32) {fun<targ1, targ2, targ3, targ4, 32> arg; } \
+    else if (wid == 0) {fun<targ1, targ2, targ3, targ4, 0> arg; } \
+    else if (wid == 1) {fun<targ1, targ2, targ3, targ4, 1> arg; } \
+    else if (wid == 2) {fun<targ1, targ2, targ3, targ4, 2> arg; } \
+    else if (wid == 4) {fun<targ1, targ2, targ3, targ4, 4> arg; } \
+    else if (wid == 8) {fun<targ1, targ2, targ3, targ4, 8> arg; } \
+    else if (wid == 64) {fun<targ1, targ2, targ3, targ4, 64> arg; } \
+    else {REALM_ASSERT_DEBUG(false); fun<targ1, targ2, targ3, targ4, 0> arg; }
 
 
 // Pre-definitions
@@ -149,7 +151,9 @@ class Array;
 class StringColumn;
 class GroupWriter;
 template<class T> class QueryState;
-namespace _impl { class ArrayWriterBase; }
+namespace _impl {
+class ArrayWriterBase;
+}
 
 
 #ifdef REALM_DEBUG
@@ -165,11 +169,11 @@ public:
     std::size_t used;
     std::size_t array_count;
 };
+
 #endif
 
 
-class ArrayParent
-{
+class ArrayParent {
 public:
     virtual ~ArrayParent() REALM_NOEXCEPT {}
 
@@ -179,6 +183,7 @@ protected:
     virtual ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT = 0;
 
 #ifdef REALM_DEBUG
+
     // Used only by Array::to_dot().
     virtual std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t ndx_in_parent) const = 0;
 #endif
@@ -317,13 +322,13 @@ public:
 
     /// Construct an empty integer array of the specified type, and return just
     /// the reference to the underlying memory.
-    static MemRef create_empty_array(Type, bool context_flag, Allocator&);
+    static MemRef create_empty_array(Type, bool context_flag, Allocator &);
 
     /// Construct an integer array of the specified type and size, and return
     /// just the reference to the underlying memory. All elements will be
     /// initialized to the specified value.
     static MemRef create_array(Type, bool context_flag, size_t size,
-                               int_fast64_t value, Allocator&);
+                               int_fast64_t value, Allocator &);
 
     /// Construct a shallow copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will **not** be cloned. See
@@ -458,7 +463,7 @@ public:
     /// specified value.
     void ensure_minimum_width(int64_t value);
 
-    typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
+    typedef StringData (* StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
     void   index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
     size_t index_string_count(StringData value, ColumnBase* column) const;
@@ -487,6 +492,7 @@ public:
     /// `get_alloc().is_read_only(get_ref())` returns false.
     void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
     void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
+
     //@}
 
     //@{
@@ -522,6 +528,7 @@ public:
     /// by doing a linear search for short sequences.
     std::size_t lower_bound_int(int64_t value) const REALM_NOEXCEPT;
     std::size_t upper_bound_int(int64_t value) const REALM_NOEXCEPT;
+
     //@}
 
     /// \brief Search the \c Array for a value greater or equal than \a target,
@@ -594,7 +601,7 @@ public:
 
     /// Destroy only the specified array node, not its children. See also
     /// destroy_deep(MemRef, Allocator&).
-    static void destroy(MemRef, Allocator&) REALM_NOEXCEPT;
+    static void destroy(MemRef, Allocator &) REALM_NOEXCEPT;
 
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
     static void destroy_deep(ref_type ref, Allocator& alloc) REALM_NOEXCEPT;
@@ -603,7 +610,7 @@ public:
     ///
     /// This is done by freeing the specified array node after calling
     /// destroy_deep() for every contained 'ref' element.
-    static void destroy_deep(MemRef, Allocator&) REALM_NOEXCEPT;
+    static void destroy_deep(MemRef, Allocator &) REALM_NOEXCEPT;
 
     Allocator& get_alloc() const REALM_NOEXCEPT { return m_alloc; }
 
@@ -630,7 +637,8 @@ public:
 
     template<class cond, Action action, size_t bitwidth, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
-              QueryState<int64_t>* state, Callback callback, bool nullable_array = false, bool find_null = false) const;
+              QueryState<int64_t>* state, Callback callback, bool nullable_array = false, bool find_null =
+                  false) const;
 
     // This is the one installed into the m_vtable->finder slots.
     template<class cond, Action action, size_t bitwidth>
@@ -639,7 +647,7 @@ public:
 
     template<class cond, Action action, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback, bool nullable_array = false, bool find_null = false) const;
+              Callback callback, bool nullable_array = false, bool find_null = false) const;
 
 /*
     template<class cond, Action action, class Callback>
@@ -649,8 +657,14 @@ public:
 
     // Optimized implementation for release mode
     template<class cond2, Action action, size_t bitwidth, class Callback>
-    bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
-                        QueryState<int64_t>* state, Callback callback, bool nullable_array = false, bool find_null = false) const;
+    bool find_optimized(int64_t              value,
+                        size_t               start,
+                        size_t               end,
+                        size_t               baseindex,
+                        QueryState<int64_t>* state,
+                        Callback             callback,
+                        bool                 nullable_array = false,
+                        bool                 find_null = false) const;
 
     // Called for each search result
     template<Action action, class Callback>
@@ -681,46 +695,46 @@ public:
     // Non-SSE find for Equal/NotEqual
     template<bool eq, Action action, size_t width, class Callback>
     inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex,
-                                QueryState<int64_t>* state, Callback callback) const;
+                                 QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Less/Greater
     template<bool gt, Action action, size_t bitwidth, class Callback>
     bool compare_relation(int64_t value, size_t start, size_t end, size_t baseindex,
-                         QueryState<int64_t>* state, Callback callback) const;
+                          QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t foreign_width, class Callback, size_t width>
     bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex,
-                       QueryState<int64_t>* state, Callback callback) const;
+                         QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
     bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
-                      QueryState<int64_t>* state, Callback callback) const;
+                       QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback>
     bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
-                      QueryState<int64_t>* state, Callback callback) const;
+                       QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t width, class Callback>
     bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
-                      QueryState<int64_t>* state, Callback callback) const;
+                       QueryState<int64_t>* state, Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef REALM_COMPILER_SSE
     template<class cond2, Action action, size_t width, class Callback>
-    bool find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
-                 size_t baseindex, Callback callback) const;
+    bool find_sse(int64_t value, __m128i* data, size_t items, QueryState<int64_t>* state,
+                  size_t baseindex, Callback callback) const;
 
     template<class cond2, Action action, size_t width, class Callback>
     REALM_FORCEINLINE bool find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
-                                            QueryState<int64_t>* state, size_t baseindex,
-                                            Callback callback) const;
+                                           QueryState<int64_t>* state, size_t baseindex,
+                                           Callback callback) const;
 
 #endif
 
     template<size_t width> inline bool test_zero(uint64_t value) const;         // Tests value for 0-elements
-    template<bool eq, size_t width>size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
+    template<bool eq, size_t width> size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
-    template<bool gt, size_t width>int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
+    template<bool gt, size_t width> int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template<size_t width> inline int64_t lower_bits() const;                   // Return chunk with lower bit set in each element
     std::size_t first_set_bit(unsigned int v) const;
     std::size_t first_set_bit64(int64_t v) const;
@@ -729,12 +743,12 @@ public:
     // Find value greater/less in 64-bit chunk - only works for positive values
     template<bool gt, Action action, std::size_t width, class Callback>
     bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, std::size_t baseindex,
-                       Callback callback) const;
+                        Callback callback) const;
 
     // Find value greater/less in 64-bit chunk - no constraints
     template<bool gt, Action action, std::size_t width, class Callback>
     bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
-                  Callback callback) const;
+                   Callback callback) const;
 
 
     /// Get the number of elements in the B+-tree rooted at this array
@@ -864,7 +878,7 @@ public:
     template<class TreeTraits>
     ref_type bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state);
 
-    ref_type bptree_leaf_insert(std::size_t ndx, int64_t, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, int64_t, TreeInsertBase & state);
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -875,7 +889,7 @@ public:
     /// Like get(const char*, std::size_t) but gets two consecutive
     /// elements.
     static std::pair<int64_t, int64_t> get_two(const char* header,
-                                                           std::size_t ndx) REALM_NOEXCEPT;
+                                               std::size_t ndx) REALM_NOEXCEPT;
 
     static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT;
 
@@ -923,23 +937,25 @@ public:
 #ifdef REALM_DEBUG
     void print() const;
     void verify() const;
-    typedef std::size_t (*LeafVerifier)(MemRef, Allocator&);
+    typedef std::size_t (* LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;
     class MemUsageHandler {
-    public:
+public:
         virtual void handle(ref_type ref, std::size_t allocated, std::size_t used) = 0;
     };
+
     void report_memory_usage(MemUsageHandler&) const;
     void stats(MemStats& stats) const;
-    typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
-    void dump_bptree_structure(std::ostream&, int level, LeafDumper) const;
+    typedef void (* LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
+    void dump_bptree_structure(std::ostream &, int level, LeafDumper) const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
     class ToDotHandler {
-    public:
+public:
         virtual void to_dot(MemRef leaf_mem, ArrayParent*, std::size_t ndx_in_parent,
                             std::ostream&) = 0;
         ~ToDotHandler() {}
     };
+
     void bptree_to_dot(std::ostream&, ToDotHandler&) const;
     void to_dot_parent_edge(std::ostream&) const;
 #endif
@@ -949,7 +965,7 @@ public:
 private:
     Array& operator=(const Array&); // not allowed
 protected:
-    typedef bool(*CallbackDummy)(int64_t);
+    typedef bool (* CallbackDummy)(int64_t);
 
     /// Insert a new child after original. If the parent has to be
     /// split, this function returns the `ref` of the new parent node.
@@ -961,10 +977,11 @@ protected:
 
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
-    template <IndexMethod method, class T>
+    template<IndexMethod method, class T>
     std::size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                              ColumnBase* column) const;
 protected:
+
 //    void add_positive_local(int64_t value);
 
     // Includes array header. Not necessarily 8-byte aligned.
@@ -1006,13 +1023,13 @@ protected:
 
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <std::size_t width>
+    template<std::size_t width>
     static int_fast64_t lbound_for_width() REALM_NOEXCEPT;
     static int_fast64_t lbound_for_width(std::size_t width) REALM_NOEXCEPT;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <std::size_t width>
+    template<std::size_t width>
     static int_fast64_t ubound_for_width() REALM_NOEXCEPT;
     static int_fast64_t ubound_for_width(std::size_t width) REALM_NOEXCEPT;
 
@@ -1029,6 +1046,7 @@ private:
     template<size_t w> std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
 
 protected:
+
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
@@ -1037,7 +1055,7 @@ protected:
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.
     static MemRef create(Type, bool context_flag, WidthType, std::size_t size,
-                         int_fast64_t value, Allocator&);
+                         int_fast64_t value, Allocator &);
 
     static MemRef clone(MemRef header, Allocator& alloc, Allocator& target_alloc);
 
@@ -1064,11 +1082,12 @@ protected:
 #endif
 
 protected:
+
     // Getters and Setters for adaptive-packed arrays
-    typedef int64_t (Array::*Getter)(std::size_t) const; // Note: getters must not throw
-    typedef void (Array::*Setter)(std::size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
-    typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
+    typedef int64_t (Array::* Getter)(std::size_t) const; // Note: getters must not throw
+    typedef void (Array::* Setter)(std::size_t, int64_t);
+    typedef bool (Array::* Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
+    typedef void (Array::* ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
     struct VTable {
         Getter getter;
@@ -1076,7 +1095,7 @@ protected:
         Setter setter;
         Finder finder[cond_Count]; // one for each COND_XXX enum
     };
-    template <size_t w> struct VTableForWidth;
+    template<size_t w> struct VTableForWidth;
 
 protected:
 
@@ -1094,6 +1113,7 @@ private:
     const VTable* m_vtable = nullptr;
 
 public:
+
     // FIXME: Should not be mutable
     // FIXME: Should not be public
     mutable char* m_data = nullptr; // Points to first byte after header
@@ -1147,6 +1167,7 @@ public:
 
 class Array::EraseHandler {
 public:
+
     /// If the specified leaf has more than one element, this function
     /// must erase the specified element from the leaf and return
     /// false. Otherwise, when the leaf has a single element, this
@@ -1185,7 +1206,11 @@ public:
 
 // Implementation:
 
-class QueryStateBase { virtual void dyncast(){} };
+class QueryStateBase {
+    virtual void dyncast()
+    {
+    }
+};
 
 template<> class QueryState<int64_t>: public QueryStateBase {
 public:
@@ -1227,7 +1252,7 @@ public:
         }
     }
 
-    template <Action action, bool pattern>
+    template<Action action, bool pattern>
     inline bool match(size_t index, uint64_t indexpattern, int64_t value)
     {
         if (pattern) {
@@ -1241,6 +1266,7 @@ public:
                 m_match_count = size_t(m_state);
                 return true;
             }
+
             // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false instead
             return false;
         }
@@ -1275,12 +1301,12 @@ public:
         else {
             REALM_ASSERT_DEBUG(false);
         }
-        return (m_limit > m_match_count);
+        return m_limit > m_match_count;
     }
 };
 
 // Used only for Basic-types: currently float and double
-template<class R> class QueryState : public QueryStateBase {
+template<class R> class QueryState: public QueryStateBase {
 public:
     R m_state;
     size_t m_match_count;
@@ -1289,13 +1315,13 @@ public:
 
     template<Action action> bool uses_val()
     {
-        return (action == act_Max || action == act_Min || action == act_Sum || action == act_Count);
+        return action == act_Max || action == act_Min || action == act_Sum || action == act_Count;
     }
 
     void init(Action action, Array*, size_t limit)
     {
         REALM_ASSERT((std::is_same<R, float>::value ||
-                               std::is_same<R, double>::value));
+                      std::is_same<R, double>::value));
         m_match_count = 0;
         m_limit = limit;
         m_minmax_index = not_found;
@@ -1317,7 +1343,8 @@ public:
         if (pattern)
             return false;
 
-        REALM_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Count, "Search action not supported");
+        REALM_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
+                            "Search action not supported");
 
         ++m_match_count;
 
@@ -1338,7 +1365,7 @@ public:
         else {
             REALM_ASSERT_DEBUG(false);
         }
-        return (m_limit > m_match_count);
+        return m_limit > m_match_count;
     }
 };
 
@@ -1388,6 +1415,7 @@ inline Array::Type Array::get_type() const REALM_NOEXCEPT
     }
     if (m_has_refs)
         return type_HasRefs;
+
     return type_Normal;
 }
 
@@ -1475,6 +1503,7 @@ inline void Array::destroy() REALM_NOEXCEPT
 {
     if (!is_attached())
         return;
+
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
     m_data = nullptr;
@@ -1503,7 +1532,7 @@ inline void Array::erase(std::size_t ndx)
 {
     // This can throw, but only if array is currently in read-only
     // memory.
-    move(ndx+1, size(), ndx);
+    move(ndx + 1, size(), ndx);
 
     // Update size (also in header)
     --m_size;
@@ -1781,8 +1810,10 @@ inline Array::Type Array::get_type_from_header(const char* header) REALM_NOEXCEP
 {
     if (get_is_inner_bptree_node_from_header(header))
         return type_InnerBptreeNode;
+
     if (get_hasrefs_from_header(header))
         return type_HasRefs;
+
     return type_Normal;
 }
 
@@ -1813,17 +1844,20 @@ inline std::size_t Array::get_byte_size() const REALM_NOEXCEPT
                 ++num_bytes;
             goto found;
         }
+
         case wtype_Multiply: {
             num_bytes = m_size * m_width;
             goto found;
         }
+
         case wtype_Ignore:
             num_bytes = m_size;
             goto found;
     }
     REALM_ASSERT_DEBUG(false);
 
-  found:
+found:
+
     // Ensure 8-byte alignment
     std::size_t rest = (~num_bytes & 0x7) + 1;
     if (rest < 8)
@@ -1851,18 +1885,21 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) REALM_NO
                 ++num_bytes;
             goto found;
         }
+
         case wtype_Multiply: {
             int width = get_width_from_header(header);
             num_bytes = size * width;
             goto found;
         }
+
         case wtype_Ignore:
             num_bytes = size;
             goto found;
     }
     REALM_ASSERT_DEBUG(false);
 
-  found:
+found:
+
     // Ensure 8-byte alignment
     std::size_t rest = (~num_bytes & 0x7) + 1;
     if (rest < 8)
@@ -1903,6 +1940,7 @@ inline MemRef Array::clone_deep(Allocator& target_alloc) const
 inline void Array::move_assign(Array& a) REALM_NOEXCEPT
 {
     REALM_ASSERT_3(&get_alloc(), ==, &a.get_alloc());
+
     // FIXME: Be carefull with the old parent info here. Should it be
     // copied?
 
@@ -2024,7 +2062,7 @@ inline std::size_t Array::get_bptree_size_from_header(const char* root_header) R
 {
     REALM_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
     size_t root_size = get_size_from_header(root_header);
-    int_fast64_t v = get(root_header, root_size-1);
+    int_fast64_t v = get(root_header, root_size - 1);
     return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
@@ -2094,7 +2132,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 
     if (REALM_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
-        adjust(size()-1, +2); // Throws
+        adjust(size() - 1, +2); // Throws
         return 0; // Child was not split, so parent was not split either
     }
 
@@ -2136,7 +2174,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
         // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
         REALM_ASSERT_3(child_ndx, <, size() - 2);
-        std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
+        std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx - 1));
         elem_ndx_in_child = elem_ndx - elem_ndx_offset;
     }
 
@@ -2160,7 +2198,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 
     if (REALM_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
-        adjust(size()-1, +2); // Throws
+        adjust(size() - 1, +2); // Throws
         offsets.adjust(child_ndx, offsets.size(), +1);
         return 0; // Child was not split, so parent was not split either
     }
@@ -2272,7 +2310,7 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
     }
     else if (width == 2) {
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0x3 * 0x1;
+        const uint64_t c1 = ~0ULL / 0x3 * 0x1;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a &= m1;     // isolate single bit in each segment
@@ -2282,11 +2320,11 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
         return a;
     }
     else if (width == 4) {
-        const uint64_t m  = ~0ULL/0xF * 0x1;
+        const uint64_t m  = ~0ULL / 0xF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xF * 0x7;
-        const uint64_t c2 = ~0ULL/0xF * 0x3;
+        const uint64_t c1 = ~0ULL / 0xF * 0x7;
+        const uint64_t c2 = ~0ULL / 0xF * 0x3;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2297,12 +2335,12 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
         return a;
     }
     else if (width == 8) {
-        const uint64_t m  = ~0ULL/0xFF * 0x1;
+        const uint64_t m  = ~0ULL / 0xFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFF * 0x7F;
-        const uint64_t c2 = ~0ULL/0xFF * 0x3F;
-        const uint64_t c3 = ~0ULL/0xFF * 0x0F;
+        const uint64_t c1 = ~0ULL / 0xFF * 0x7F;
+        const uint64_t c2 = ~0ULL / 0xFF * 0x3F;
+        const uint64_t c3 = ~0ULL / 0xFF * 0x0F;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2314,13 +2352,13 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
         return a;
     }
     else if (width == 16) {
-        const uint64_t m  = ~0ULL/0xFFFF * 0x1;
+        const uint64_t m  = ~0ULL / 0xFFFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFFFF * 0x7FFF;
-        const uint64_t c2 = ~0ULL/0xFFFF * 0x3FFF;
-        const uint64_t c3 = ~0ULL/0xFFFF * 0x0FFF;
-        const uint64_t c4 = ~0ULL/0xFFFF * 0x00FF;
+        const uint64_t c1 = ~0ULL / 0xFFFF * 0x7FFF;
+        const uint64_t c2 = ~0ULL / 0xFFFF * 0x3FFF;
+        const uint64_t c3 = ~0ULL / 0xFFFF * 0x0FFF;
+        const uint64_t c4 = ~0ULL / 0xFFFF * 0x00FF;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2334,14 +2372,14 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
     }
 
     else if (width == 32) {
-        const uint64_t m  = ~0ULL/0xFFFFFFFF * 0x1;
+        const uint64_t m  = ~0ULL / 0xFFFFFFFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFFFFFFFF * 0x7FFFFFFF;
-        const uint64_t c2 = ~0ULL/0xFFFFFFFF * 0x3FFFFFFF;
-        const uint64_t c3 = ~0ULL/0xFFFFFFFF * 0x0FFFFFFF;
-        const uint64_t c4 = ~0ULL/0xFFFFFFFF * 0x00FFFFFF;
-        const uint64_t c5 = ~0ULL/0xFFFFFFFF * 0x0000FFFF;
+        const uint64_t c1 = ~0ULL / 0xFFFFFFFF * 0x7FFFFFFF;
+        const uint64_t c2 = ~0ULL / 0xFFFFFFFF * 0x3FFFFFFF;
+        const uint64_t c3 = ~0ULL / 0xFFFFFFFF * 0x0FFFFFFF;
+        const uint64_t c4 = ~0ULL / 0xFFFFFFFF * 0x00FFFFFF;
+        const uint64_t c5 = ~0ULL / 0xFFFFFFFF * 0x0000FFFF;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2367,12 +2405,21 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 // Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
 // for each match. Break and return if find_action() returns false or 'end' is reached.
 
-// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the 
+// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the
 // first entry and compare correctly against null, etc.
 //
-// If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set, 
+// If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
 // then nullable_array must be set too.
-template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool find_null) const
+template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(
+    int64_t              value,
+    size_t               start,
+    size_t               end,
+    size_t               baseindex,
+    QueryState<int64_t>* state,
+    Callback             callback,
+    bool                 nullable_array,
+    bool                 find_null)
+const
 {
     REALM_ASSERT(!(find_null && !nullable_array));
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
@@ -2384,7 +2431,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         end = nullable_array ? size() - 1 : size();
 
     if (nullable_array) {
-        // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme: 
+        // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme:
         // Huge speed optimizations are possible here! This is a very simple generic method.
         for (; start2 < end; start2++) {
             int64_t v = get<bitwidth>(start2 + 1);
@@ -2478,33 +2525,43 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     REALM_ASSERT_3(m_width, !=, 0);
 
 #if defined(REALM_COMPILER_SSE)
-    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support 
-    // Less-than comparison for 64-bit values. 
+
+    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support
+    // Less-than comparison for 64-bit values.
     if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start2 >= sizeof(__m128i) && m_width >= 8 &&
-        (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
+        (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64)))
+    {
 
         // find_sse() must start2 at 16-byte boundary, so search area before that using compare_equality()
-        __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start2 * bitwidth / 8, sizeof (__m128i)));
-        __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
+        __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start2 * bitwidth / 8, sizeof(__m128i)));
+        __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof(__m128i)));
 
-        if (!compare<cond2, action, bitwidth, Callback>(value, start2, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
+        if (!compare<cond2, action, bitwidth, Callback>(value, start2,
+                                                        (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth),
+                                                        baseindex, state, callback))
             return false;
 
         // Search aligned area with SSE
         if (b > a) {
             if (sseavx<42>()) {
-                if (!find_sse<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!find_sse<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex +
+                                                                 ((reinterpret_cast<char*>(a) -
+                                                                   m_data) * 8 / no0(bitwidth)), callback))
                     return false;
-                }
-                else if (sseavx<30>()) {
+            }
+            else if (sseavx<30>()) {
 
-                if (!find_sse<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!find_sse<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex +
+                                                                 ((reinterpret_cast<char*>(a) -
+                                                                   m_data) * 8 / no0(bitwidth)), callback))
                     return false;
-                }
+            }
         }
 
         // Search remainder with compare_equality()
-        if (!compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
+        if (!compare<cond2, action, bitwidth, Callback>(value,
+                                                        (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth),
+                                                        end, baseindex, state, callback))
             return false;
 
         return true;
@@ -2513,7 +2570,8 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
     }
 #else
-return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
+    return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
+
 #endif
 }
 
@@ -2551,10 +2609,11 @@ template<size_t width> inline bool Array::test_zero(uint64_t value) const
 
 // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
 // IMPORTANT: This function assumes that at least 1 item matches (test this with test_zero() or other means first)!
-template<bool eq, size_t width>size_t Array::find_zero(uint64_t v) const
+template<bool eq, size_t width> size_t Array::find_zero(uint64_t v) const
 {
     size_t start = 0;
     uint64_t hasZeroByte;
+
     // Warning free way of computing (1ULL << width) - 1
     uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL));
 
@@ -2600,7 +2659,7 @@ template<bool eq, size_t width>size_t Array::find_zero(uint64_t v) const
 }
 
 // Generate a magic constant used for later bithacks
-template<bool gt, size_t width>int64_t Array::find_gtlt_magic(int64_t v) const
+template<bool gt, size_t width> int64_t Array::find_gtlt_magic(int64_t v) const
 {
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
@@ -2608,14 +2667,23 @@ template<bool gt, size_t width>int64_t Array::find_gtlt_magic(int64_t v) const
     return magic;
 }
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt_fast(uint64_t             chunk,
+                                                                                          uint64_t             magic,
+                                                                                          QueryState<int64_t>* state,
+                                                                                          size_t               baseindex,
+                                                                                          Callback             callback)
+const
 {
     // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v.
     // Fast, but limited to work when all values in the chunk are positive.
 
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
-    uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / no0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/no0(mask1)*(mask2+1));
+    uint64_t m =
+        gt ? (((chunk +
+                magic) |
+               chunk) & ~0ULL / no0(mask1) *
+              (mask2 + 1)) : ((chunk - magic) & ~chunk & ~0ULL / no0(mask1) * (mask2 + 1));
     size_t p = 0;
     while (m) {
         if (find_action_pattern<action, Callback>(baseindex, m >> (no0(width) - 1), state, callback))
@@ -2637,95 +2705,405 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::find_
 }
 
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt(int64_t              v,
+                                                                                     uint64_t             chunk,
+                                                                                     QueryState<int64_t>* state,
+                                                                                     size_t               baseindex,
+                                                                                     Callback             callback)
+const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
         for (size_t t = 0; t < 64; t++) {
-            if (gt ? static_cast<int64_t>(chunk & 0x1) > v : static_cast<int64_t>(chunk & 0x1) < v) {if (!find_action<action, Callback>( t + baseindex, static_cast<int64_t>(chunk & 0x1), state, callback)) return false;} chunk >>= 1;
+            if (gt ? static_cast<int64_t>(chunk & 0x1) > v : static_cast<int64_t>(chunk & 0x1) < v) {
+                if (!find_action<action, Callback>( t + baseindex, static_cast<int64_t>(chunk & 0x1), state,
+                                                    callback))
+                    return false;
+            }
+            chunk >>= 1;
         }
     }
     else if (width == 2) {
         // Alot (50% +) faster than loop/compiler-unrolled loop
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 4 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 5 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 6 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 7 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 0 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 1 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 2 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 3 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 4 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 5 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 6 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 7 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
 
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 8 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 9 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 10 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 11 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 12 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 13 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 14 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 15 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 8 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 9 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 10 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 11 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 12 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 13 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 14 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 15 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
 
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 16 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 17 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 18 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 19 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 20 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 21 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 22 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 23 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 16 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 17 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 18 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 19 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 20 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 21 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 22 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 23 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
 
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 24 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 25 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 26 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 27 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 28 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 29 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 30 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<action, Callback>( 31 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;} chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 24 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 25 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 26 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 27 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 28 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 29 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 30 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {
+            if (!find_action<action, Callback>( 31 + baseindex, static_cast<int64_t>(chunk & 0x3), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 2;
     }
     else if (width == 4) {
         // 128 ms:
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 4 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 5 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 6 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 7 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 0 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 1 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 2 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 3 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 4 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 5 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 6 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 7 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
 
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 8 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 9 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 10 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 11 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 12 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 13 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 14 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 15 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;} chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 8 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 9 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 10 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 11 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 12 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 13 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 14 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {
+            if (!find_action<action, Callback>( 15 + baseindex, static_cast<int64_t>(chunk & 0xf), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 4;
 
         // 187 ms:
         // if (gt ? static_cast<int64_t>(chunk >> 0*4) & 0xf > v : static_cast<int64_t>(chunk >> 0*4) & 0xf < v) return 0;
     }
     else if (width == 8) {
         // 88 ms:
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 4 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 5 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 6 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 7 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 0 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 1 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 2 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 3 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 4 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 5 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 6 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
+        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {
+            if (!find_action<action, Callback>( 7 + baseindex, static_cast<char>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 8;
 
         //97 ms ms:
         // if (gt ? static_cast<char>(chunk >> 0*8) > v : static_cast<char>(chunk >> 0*8) < v) return 0;
     }
     else if (width == 16) {
 
-        if (gt ? static_cast<short int>(chunk >> 0*16) > v : static_cast<short int>(chunk >> 0*16) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<short int>(chunk >> 0*16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 1*16) > v : static_cast<short int>(chunk >> 1*16) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<short int>(chunk >> 1*16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 2*16) > v : static_cast<short int>(chunk >> 2*16) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<short int>(chunk >> 2*16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 3*16) > v : static_cast<short int>(chunk >> 3*16) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<short int>(chunk >> 3*16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 0 * 16) > v : static_cast<short int>(chunk >> 0 * 16) < v) {
+            if (!find_action<action, Callback>( 0 + baseindex, static_cast<short int>(chunk >> 0 * 16), state,
+                                                callback))
+                return false;
+        }
+        ;
+        if (gt ? static_cast<short int>(chunk >> 1 * 16) > v : static_cast<short int>(chunk >> 1 * 16) < v) {
+            if (!find_action<action, Callback>( 1 + baseindex, static_cast<short int>(chunk >> 1 * 16), state,
+                                                callback))
+                return false;
+        }
+        ;
+        if (gt ? static_cast<short int>(chunk >> 2 * 16) > v : static_cast<short int>(chunk >> 2 * 16) < v) {
+            if (!find_action<action, Callback>( 2 + baseindex, static_cast<short int>(chunk >> 2 * 16), state,
+                                                callback))
+                return false;
+        }
+        ;
+        if (gt ? static_cast<short int>(chunk >> 3 * 16) > v : static_cast<short int>(chunk >> 3 * 16) < v) {
+            if (!find_action<action, Callback>( 3 + baseindex, static_cast<short int>(chunk >> 3 * 16), state,
+                                                callback))
+                return false;
+        }
+        ;
 
         /*
         // Faster but disabled due to bug in VC2010 compiler (fixed in 2012 toolchain) where last 'if' is errorneously optimized away
@@ -2777,18 +3155,40 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::find_
         */
     }
     else if (width == 32) {
-        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int>(chunk), state, callback)) return false;} chunk >>= 32;
-        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<int>(chunk), state, callback)) return false;} chunk >>= 32;
+        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {
+            if (!find_action<action, Callback>( 0 + baseindex, static_cast<int>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 32;
+        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {
+            if (!find_action<action, Callback>( 1 + baseindex, static_cast<int>(chunk), state,
+                                                callback))
+                return false;
+        }
+        chunk >>= 32;
     }
     else if (width == 64) {
-        if (gt ? static_cast<int64_t>(v) > v : static_cast<int64_t>(v) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int64_t>(v), state, callback)) return false;};
+        if (gt ? static_cast<int64_t>(v) > v : static_cast<int64_t>(v) < v) {
+            if (!find_action<action, Callback>( 0 + baseindex, static_cast<int64_t>(v), state,
+                                                callback))
+                return false;
+        }
+        ;
     }
 
     return true;
 }
 
 
-template<bool eq, Action action, size_t width, class Callback> inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<bool eq, Action action, size_t width, class Callback> inline bool Array::compare_equality(
+    int64_t              value,
+    size_t               start,
+    size_t               end,
+    size_t               baseindex,
+    QueryState<int64_t>* state,
+    Callback             callback)
+const
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
@@ -2830,6 +3230,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 
                 if (!find_action<action, Callback>(a + start + baseindex, get<width>(start + t), state, callback))
                     return false;
+
                 v2 >>= (t + 1) * width;
                 a += 1;
             }
@@ -2850,7 +3251,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
         ++start;
     }
 
-        return true;
+    return true;
 }
 
 // There exists a couple of find() functions that take more or less template arguments. Always call the one that
@@ -2867,21 +3268,30 @@ template<class cond, Action action, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                  Callback callback, bool nullable_array, bool find_null) const
 {
-    REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback, nullable_array, find_null));
+    REALM_TEMPEX4(return find, cond, action, m_width, Callback,
+                  (value, start, end, baseindex, state, callback, nullable_array, find_null));
 }
 
 template<class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                  Callback callback, bool nullable_array, bool find_null) const
 {
-    return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback, nullable_array, find_null);
+    return find_optimized<cond, action, bitwidth, Callback>(value,
+                                                            start,
+                                                            end,
+                                                            baseindex,
+                                                            state,
+                                                            callback,
+                                                            nullable_array,
+                                                            find_null);
 }
 
 #ifdef REALM_COMPILER_SSE
+
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
 template<class cond2, Action action, size_t width, class Callback>
-bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
-                    Callback callback) const
+bool Array::find_sse(int64_t value, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex,
+                     Callback callback) const
 {
     __m128i search = {0};
 
@@ -2906,7 +3316,7 @@ bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int6
 // find_all, etc) on value inside action_data for first match, if any
 template<class cond2, Action action, size_t width, class Callback>
 REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
-                                               QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+                                              QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     int cond = cond2::condition;
     size_t i = 0;
@@ -2939,6 +3349,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
             if (width == 64)
                 compare = _mm_cmpgt_epi64(action_data[i], *data);
         }
+
         // less
         else if (cond == cond_Less) {
             if (width == 8)
@@ -2959,7 +3370,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 //        if (resmask != 0)
 //            printf("resmask=%d\n", resmask);
 
-        size_t s = i * sizeof (__m128i) * 8 / no0(width);
+        size_t s = i * sizeof(__m128i) * 8 / no0(width);
 
         while (resmask != 0) {
 
@@ -2970,8 +3381,11 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 
             size_t idx = first_set_bit(resmask) * 8 / no0(width);
             s += idx;
-            if (!find_action<action, Callback>( s + baseindex, get_universal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
+            if (!find_action<action, Callback>( s + baseindex,
+                                                get_universal<width>(reinterpret_cast<char*>(action_data),
+                                                                     s), state, callback))
                 return false;
+
             resmask >>= (idx + 1) * no0(width) / 8;
             ++s;
         }
@@ -2982,8 +3396,12 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 #endif //REALM_COMPILER_SSE
 
 template<class cond, Action action, class Callback>
-bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                         Callback callback) const
+bool Array::compare_leafs(const Array*         foreign,
+                          size_t               start,
+                          size_t               end,
+                          size_t               baseindex,
+                          QueryState<int64_t>* state,
+                          Callback             callback) const
 {
     cond c;
     REALM_ASSERT_3(start, <=, end);
@@ -3025,23 +3443,40 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
     }
 
     bool r;
-    REALM_TEMPEX4(r = compare_leafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX4(r = compare_leafs,
+                  cond,
+                  action,
+                  m_width,
+                  Callback,
+                  (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
 
-template<class cond, Action action, size_t width, class Callback> bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<class cond, Action action, size_t width, class Callback> bool Array::compare_leafs(
+    const Array*         foreign,
+    size_t               start,
+    size_t               end,
+    size_t               baseindex,
+    QueryState<int64_t>* state,
+    Callback             callback)
+const
 {
     size_t fw = foreign->m_width;
     bool r;
-    REALM_TEMPEX5(r = compare_leafs_4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
+    REALM_TEMPEX5(r = compare_leafs_4, cond, action, width, Callback, fw,
+                  (foreign, start, end, baseindex, state, callback))
     return r;
 }
 
 
 template<class cond, Action action, size_t width, class Callback, size_t foreign_width>
-bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                          Callback callback) const
+bool Array::compare_leafs_4(const Array*         foreign,
+                            size_t               start,
+                            size_t               end,
+                            size_t               baseindex,
+                            QueryState<int64_t>* state,
+                            Callback             callback) const
 {
     cond c;
     char* foreign_m_data = foreign->m_data;
@@ -3051,6 +3486,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
             while (start < end) {
                 if (!find_action<action, Callback>(start + baseindex, 0, state, callback))
                     return false;
+
                 start++;
             }
         }
@@ -3083,7 +3519,12 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
             __m128i* a = reinterpret_cast<__m128i*>(m_data + start * width / 8);
             __m128i* b = reinterpret_cast<__m128i*>(foreign_m_data + start * width / 8);
 
-            bool continue_search = find_sse_intern<cond, action, width, Callback>(a, b, 1, state, baseindex + start, callback);
+            bool continue_search = find_sse_intern<cond, action, width, Callback>(a,
+                                                                                  b,
+                                                                                  1,
+                                                                                  state,
+                                                                                  baseindex + start,
+                                                                                  callback);
 
             if (!continue_search)
                 return false;
@@ -3097,7 +3538,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
 #if 0 // this method turned out to be 33% slower than a naive loop. Find out why
 
     // index from which both arrays are 64-bit aligned
-    size_t a = round_up(start, 8 * sizeof (int64_t) / (width < foreign_width ? width : foreign_width));
+    size_t a = round_up(start, 8 * sizeof(int64_t) / (width < foreign_width ? width : foreign_width));
 
     while (start < end && start < a) {
         int64_t v = get_universal<width>(m_data, start);
@@ -3115,7 +3556,8 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
     uint64_t chunk;
     uint64_t fchunk;
 
-    size_t unroll_outer = (foreign_width > width ? foreign_width : width) / (foreign_width < width ? foreign_width : width);
+    size_t unroll_outer =
+        (foreign_width > width ? foreign_width : width) / (foreign_width < width ? foreign_width : width);
     size_t unroll_inner = 64 / (foreign_width > width ? foreign_width : width);
 
     while (start + unroll_outer * unroll_inner < end) {
@@ -3144,8 +3586,12 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
                 fchunk >>= foreign_width;
 
                 // Sign extend if required
-                v = (width <= 4) ? v : (width == 8) ? int8_t(v) : (width == 16) ? int16_t(v) : (width == 32) ? int32_t(v) : int64_t(v);
-                fv = (foreign_width <= 4) ? fv : (foreign_width == 8) ? int8_t(fv) : (foreign_width == 16) ? int16_t(fv) : (foreign_width == 32) ? int32_t(fv) : int64_t(fv);
+                v =
+                    (width <= 4) ? v : (width == 8) ? int8_t(v) : (width == 16) ? int16_t(v) : (width ==
+                                                                                                32) ? int32_t(
+                        v) : int64_t(v);
+                fv = (foreign_width <= 4) ? fv : (foreign_width == 8) ? int8_t(fv) : (foreign_width == 16) ? int16_t(
+                    fv) : (foreign_width == 32) ? int32_t(fv) : int64_t(fv);
 
                 if (v == fv)
                     r++;
@@ -3223,7 +3669,7 @@ bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
 
 template<bool gt, Action action, size_t bitwidth, class Callback>
 bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                            Callback callback) const
+                             Callback callback) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
@@ -3250,7 +3696,9 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
         uint64_t magic = find_gtlt_magic<gt, bitwidth>(value);
 
         // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
-        if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0))) {
+        if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <=
+            static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0)))
+        {
             // 15 ms
             while (p < e) {
                 uint64_t upper = lower_bits<bitwidth>() << (no0(bitwidth) - 1);
@@ -3264,13 +3712,26 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
                 if ((bitwidth > 4 ? !upper : true)) {
                     // Assert that all values in chunk are positive.
                     REALM_ASSERT(bitwidth <= 4 || ((lower_bits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
-                    idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
+                    idx =
+                        find_gtlt_fast<gt, action, bitwidth, Callback>(v,
+                                                                       magic,
+                                                                       state,
+                                                                       (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(
+                                                                           bitwidth) + baseindex,
+                                                                       callback);
                 }
                 else
-                    idx = find_gtlt<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
+                    idx =
+                        find_gtlt<gt, action, bitwidth, Callback>(value,
+                                                                  v,
+                                                                  state,
+                                                                  (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(
+                                                                      bitwidth) + baseindex,
+                                                                  callback);
 
                 if (!idx)
                     return false;
+
                 ++p;
             }
         }
@@ -3278,12 +3739,16 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
             // 24 ms
             while (p < e) {
                 int64_t v = *p;
-                if (!find_gtlt<gt, action, bitwidth, Callback>(value, v, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback))
+                if (!find_gtlt<gt, action, bitwidth, Callback>(value, v, state,
+                                                               (p -
+                                                                reinterpret_cast<int64_t*>(m_data)) * 8 * 8 /
+                                                               no0(bitwidth) + baseindex, callback))
                     return false;
+
                 ++p;
             }
         }
-        start = (p - reinterpret_cast<int64_t *>(m_data)) * 8 * 8 / no0(bitwidth);
+        start = (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth);
     }
 
     // matchcount logic in SIMD no longer pays off for 32/64 bit ints because we have just 4/2 elements

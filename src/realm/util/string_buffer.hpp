@@ -158,13 +158,14 @@ inline void StringBuffer::append_c_str(const char* c_str)
 inline void StringBuffer::reserve(std::size_t min_capacity)
 {
     std::size_t capacity = m_buffer.size();
-    if (capacity == 0 || capacity-1 < min_capacity)
+    if (capacity == 0 || capacity - 1 < min_capacity)
         reallocate(min_capacity);
 }
 
 inline void StringBuffer::resize(std::size_t size)
 {
     reserve(size);
+
     // Note that even reserve(0) will attempt to allocate a
     // buffer, so we can safely write the truncating zero at this
     // time.
@@ -176,6 +177,7 @@ inline void StringBuffer::clear() REALM_NOEXCEPT
 {
     if (m_buffer.size() == 0)
         return;
+
     m_size = 0;
     m_buffer[0] = 0;
 }

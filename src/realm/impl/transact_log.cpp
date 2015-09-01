@@ -6,7 +6,7 @@ namespace _impl {
 
 namespace {
 const size_t init_subtab_path_buf_levels = 2; // 2 table levels (soft limit)
-const size_t init_subtab_path_buf_size = 2*init_subtab_path_buf_levels - 1;
+const size_t init_subtab_path_buf_size = 2 * init_subtab_path_buf_levels - 1;
 } // anonymous namespace
 
 TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& stream):
@@ -77,7 +77,7 @@ bool TransactLogEncoder::select_descriptor(size_t levels, const size_t* path)
 {
     const size_t* end = path + levels;
     int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
-    char* buf = reserve(1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int); // Throws
+    char* buf = reserve(1 + (1 + max_elems_per_chunk) * max_enc_bytes_per_int); // Throws
     *buf++ = char(instr_SelectDescriptor);
     size_t level = end - path;
     buf = encode_int(buf, level);

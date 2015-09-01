@@ -61,6 +61,7 @@ public:
 #endif
 
 protected:
+
     /// A pointer to the table that this column is part of. For a free-standing
     /// column, this pointer is null.
     Table* const m_table;
@@ -74,32 +75,37 @@ protected:
         bool empty() const REALM_NOEXCEPT { return m_entries.empty(); }
         Table* find(std::size_t subtable_ndx) const REALM_NOEXCEPT;
         void add(std::size_t subtable_ndx, Table*);
+
         // Returns true if, and only if at least one entry was detached and
         // removed from the map.
         bool detach_and_remove_all() REALM_NOEXCEPT;
+
         // Returns true if, and only if the entry was found and removed, and it
         // was the last entry in the map.
         bool detach_and_remove(std::size_t subtable_ndx) REALM_NOEXCEPT;
+
         // Returns true if, and only if the entry was found and removed, and it
         // was the last entry in the map.
         bool remove(Table*) REALM_NOEXCEPT;
         void update_from_parent(std::size_t old_baseline) const REALM_NOEXCEPT;
         template<bool fix_ndx_in_parent>
         void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT;
+
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
         bool adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT;
+
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
         bool adj_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx)
-            REALM_NOEXCEPT;
+        REALM_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
         void recursive_mark() REALM_NOEXCEPT;
         void refresh_accessor_tree(std::size_t spec_ndx_in_parent);
-    private:
+private:
         struct entry {
             std::size_t m_subtable_ndx;
             Table* m_table;
@@ -172,6 +178,7 @@ protected:
 
 class SubtableColumn: public SubtableColumnBase {
 public:
+
     /// Create a subtable column accessor and attach it to a
     /// preexisting underlying structure of arrays.
     ///
@@ -257,7 +264,7 @@ inline void SubtableColumnBase::erase_rows(size_t row_ndx, size_t num_rows_to_er
                                            bool broken_reciprocal_backlinks)
 {
     IntegerColumn::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                       broken_reciprocal_backlinks); // Throws
+                              broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
     bool last_entry_removed =
@@ -356,7 +363,7 @@ inline void SubtableColumnBase::adj_acc_clear_root_table() REALM_NOEXCEPT
 }
 
 inline Table* SubtableColumnBase::get_subtable_accessor(std::size_t row_ndx) const
-    REALM_NOEXCEPT
+REALM_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -388,7 +395,7 @@ inline void SubtableColumnBase::SubtableMap::add(std::size_t subtable_ndx, Table
 
 template<bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted)
-    REALM_NOEXCEPT
+REALM_NOEXCEPT
 {
     typedef entries::iterator iter;
     iter end = m_entries.end();
@@ -404,10 +411,11 @@ void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num
 
 template<bool fix_ndx_in_parent>
 bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased)
-    REALM_NOEXCEPT
+REALM_NOEXCEPT
 {
     if (m_entries.empty())
         return false;
+
     typedef _impl::TableFriend tf;
     auto end = m_entries.end();
     auto i = m_entries.begin();
@@ -421,6 +429,7 @@ bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_
             // Must hold a counted reference while detaching
             TableRef table(i->m_table);
             tf::detach(*table);
+
             // Move last over
             *i = *--end;
             continue;
@@ -440,6 +449,7 @@ bool SubtableColumnBase::SubtableMap::adj_move_over(std::size_t from_row_ndx,
     typedef _impl::TableFriend tf;
 
     std::size_t i = 0, n = m_entries.size();
+
     // We return true if, and only if we remove the last entry in the map.  We
     // need special handling for the case, where the set of entries are already
     // empty, otherwise the final return statement would return true in this
@@ -453,6 +463,7 @@ bool SubtableColumnBase::SubtableMap::adj_move_over(std::size_t from_row_ndx,
             // Must hold a counted reference while detaching
             TableRef table(e.m_table);
             tf::detach(*table);
+
             // Delete entry by moving last over (faster and avoids invalidating
             // iterators)
             e = m_entries[--n];
@@ -520,9 +531,11 @@ inline std::size_t* SubtableColumnBase::record_subtable_path(std::size_t* begin,
 {
     if (end == begin)
         return 0; // Error, not enough space in buffer
+
     *begin++ = m_column_ndx;
     if (end == begin)
         return 0; // Error, not enough space in buffer
+
     return _impl::TableFriend::record_subtable_path(*m_table, begin, end);
 }
 

@@ -72,7 +72,7 @@ private:
     pthread_t m_id;
     bool m_joinable;
 
-    typedef void* (*entry_func_type)(void*);
+    typedef void* (* entry_func_type)(void*);
 
     void start(entry_func_type, void* arg);
 
@@ -247,6 +247,7 @@ public:
 /// A simple robust mutex ownership wrapper.
 class RobustLockGuard {
 public:
+
     /// \param recover_func See RobustMutex::lock().
     template<class TFunc>
     RobustLockGuard(RobustMutex&, TFunc func);
@@ -353,7 +354,7 @@ template<class F> inline void* Thread::entry_point(void* cookie) REALM_NOEXCEPT
 {
     std::unique_ptr<F> func(static_cast<F*>(cookie));
     try {
-        (*func)();
+        (* func)();
     }
     catch (...) {
         std::terminate();
@@ -392,6 +393,7 @@ inline void Mutex::lock() REALM_NOEXCEPT
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return;
+
     lock_failed(r);
 }
 
@@ -447,7 +449,7 @@ inline void UniqueLock::unlock() REALM_NOEXCEPT
 }
 
 template<typename TFunc>
-inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
+inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func):
     m_mutex(m)
 {
     m_mutex.lock(func);
@@ -476,9 +478,11 @@ template<class Func> inline void RobustMutex::lock(Func recover_func)
     bool no_thread_has_died = low_level_lock(); // Throws
     if (REALM_LIKELY(no_thread_has_died))
         return;
+
     try {
         recover_func(); // Throws
         mark_as_consistent();
+
         // If we get this far, the protected memory has been
         // brought back into a consistent state, and the mutex has
         // been notified aboit this. This means that we can safely
@@ -538,10 +542,12 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
     }
     if (REALM_LIKELY(r == 0))
         return;
+
     handle_wait_error(r);
     try {
         recover_func(); // Throws
         m.mark_as_consistent();
+
         // If we get this far, the protected memory has been
         // brought back into a consistent state, and the mutex has
         // been notified aboit this. This means that we can safely

@@ -135,15 +135,15 @@ const size_t probe_matches = 4;
 
 const size_t bitwidth_time_unit = 64;
 
-typedef bool (*CallbackDummy)(int64_t);
+typedef bool (* CallbackDummy)(int64_t);
 
 class SequentialGetterBase {
 public:
     virtual ~SequentialGetterBase() REALM_NOEXCEPT {}
 };
 
-template <class ColType>
-class SequentialGetter : public SequentialGetterBase {
+template<class ColType>
+class SequentialGetter: public SequentialGetterBase {
 public:
     using T = typename ColType::value_type;
     using ArrayType = typename ColType::LeafType;
@@ -167,7 +167,7 @@ public:
     void init(const ColType* column)
     {
         m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
-        m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayType(column->get_alloc()));
+        m_array_ptr.reset(new(&m_leaf_accessor_storage)ArrayType(column->get_alloc()));
         m_column = column;
         m_leaf_end = 0;
     }
@@ -218,6 +218,7 @@ public:
 
     const ArrayType* m_leaf_ptr = nullptr;
 private:
+
     // Leaf cache for when the root of the column is not a leaf.
     // This dog and pony show is because Array has a reference to Allocator internally,
     // but we need to be able to transfer queries between contexts, so init() reinitializes
@@ -298,9 +299,10 @@ public:
 
         // Sum of float column must accumulate in double
         REALM_STATIC_ASSERT( !(TAction == act_Sum && (std::is_same<TSourceColumn, float>::value &&
-                                                        !std::is_same<TResult, double>::value)), "");
+                                                      !std::is_same<TResult, double>::value)), "");
 
-        TSourceValue av{};
+        TSourceValue av {};
+
         // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
             REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
@@ -319,6 +321,7 @@ public:
     {
         if (error_code != "")
             return error_code;
+
         if (m_child == nullptr)
             return "";
         else
@@ -377,7 +380,7 @@ protected:
 // Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
 class ListviewNode: public ParentNode {
 public:
-    ListviewNode(TableView& tv) : m_size(tv.size()), m_tv(tv) { m_dT = 0.0; }
+    ListviewNode(TableView& tv): m_size(tv.size()), m_tv(tv) { m_dT = 0.0; }
     ~ListviewNode() REALM_NOEXCEPT override {  }
 
     // Return the n'th table row index contained in the TableView.
@@ -463,6 +466,7 @@ public:
     {
         if (error_code != "")
             return error_code;
+
         if (m_child == nullptr)
             return "Unbalanced subtable/end_subtable block";
         else
@@ -520,14 +524,14 @@ public:
 
 namespace _impl {
 
-template <class ColType> struct CostHeuristic;
+template<class ColType> struct CostHeuristic;
 
-template <> struct CostHeuristic<IntegerColumn> {
+template<> struct CostHeuristic<IntegerColumn> {
     static const double dD;
     static const double dT;
 };
 
-template <> struct CostHeuristic<IntNullColumn> {
+template<> struct CostHeuristic<IntNullColumn> {
     static const double dD;
     static const double dT;
 };
@@ -536,19 +540,18 @@ template <> struct CostHeuristic<IntNullColumn> {
 
 }
 
-class ColumnNodeBase : public ParentNode
-{
+class ColumnNodeBase: public ParentNode {
 protected:
     ColumnNodeBase(size_t column_idx)
     {
         m_condition_column_idx = column_idx;
     }
 
-    ColumnNodeBase(const ColumnNodeBase& other) : ParentNode(other)
+    ColumnNodeBase(const ColumnNodeBase& other): ParentNode(other)
     {
     }
 
-    template <Action TAction, class ColType>
+    template<Action TAction, class ColType>
     bool match_callback(int64_t v)
     {
         using TSourceValue = typename ColType::value_type;
@@ -570,12 +573,12 @@ protected:
         }
 
         bool b;
-        if (state->template uses_val<TAction>())    { // Compiler cannot see that IntegerColumn::Get has no side effect and result is discarded
+        if (state->template uses_val<TAction>()) {    // Compiler cannot see that IntegerColumn::Get has no side effect and result is discarded
             TSourceValue av = source_column->get_next(i);
             b = state->template match<TAction, false>(i, 0, av);
         }
         else {
-            b = state->template match<TAction, false>(i, 0, TSourceValue{});
+            b = state->template match<TAction, false>(i, 0, TSourceValue {});
         }
 
         return b;
@@ -591,15 +594,14 @@ protected:
     SequentialGetterBase* m_source_column = nullptr; // Column of values used in aggregate (act_FindAll, actReturnFirst, act_Sum, etc)
 };
 
-template <class ColType>
-class IntegerNodeBase : public ColumnNodeBase
-{
+template<class ColType>
+class IntegerNodeBase: public ColumnNodeBase {
     using ThisType = IntegerNodeBase<ColType>;
 public:
     using TConditionValue = typename ColType::value_type;
     static const bool nullable = ColType::nullable;
 
-    template <class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
+    template<class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
     bool find_callback_specialization(size_t s, size_t end_in_leaf)
     {
         using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
@@ -607,12 +609,15 @@ public:
         size_t start_in_leaf = s - this->m_leaf_start;
         if (this->m_null) {
             cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
-                (null{}, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
-                 std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
-        } else {
+                       (null {}, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
+                       std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction,
+                                                                                    AggregateColumnType>), this));
+        }
+        else {
             cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
-                (m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
-                 std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
+                       (m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
+                       std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction,
+                                                                                    AggregateColumnType>), this));
         }
         return cont;
     }
@@ -622,7 +627,7 @@ protected:
     using LeafInfo = typename ColType::LeafInfo;
 
     size_t aggregate_local_impl(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column, int c)
+                                SequentialGetterBase* source_column, int c)
     {
         REALM_ASSERT(m_conds > 0);
         m_local_matches = 0;
@@ -634,7 +639,7 @@ protected:
         // the same as the column used for the aggregate action, then the entire query can run within scope of that
         // column only, with no references to other columns:
         bool fastmode = should_run_in_fastmode(source_column);
-        for (size_t s = start; s < end; ) {
+        for (size_t s = start; s < end;) {
             cache_leaf(s);
 
             size_t end_in_leaf;
@@ -647,14 +652,27 @@ protected:
                 bool cont;
                 size_t start_in_leaf = s - m_leaf_start;
                 if (m_null) {
-                    cont = m_leaf_ptr->find(c, m_action, null{}, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                    cont = m_leaf_ptr->find(c,
+                                            m_action,
+                                            null {},
+                                            start_in_leaf,
+                                            end_in_leaf,
+                                            m_leaf_start,
+                                            static_cast<QueryState<int64_t>*>(st));
                 }
                 else {
-                    cont = m_leaf_ptr->find(c, m_action, m_value, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                    cont = m_leaf_ptr->find(c,
+                                            m_action,
+                                            m_value,
+                                            start_in_leaf,
+                                            end_in_leaf,
+                                            m_leaf_start,
+                                            static_cast<QueryState<int64_t>*>(st));
                 }
                 if (!cont)
                     return not_found;
             }
+
             // Else, for each match in this node, call our IntegerNodeBase::match_callback to test remaining nodes and/or extract
             // aggregate payload from aggregate column:
             else {
@@ -692,7 +710,7 @@ protected:
         m_null = true;
     }
 
-    IntegerNodeBase(const ThisType& from) : ColumnNodeBase(from),
+    IntegerNodeBase(const ThisType& from): ColumnNodeBase(from),
         m_value(from.m_value), m_null(from.m_null)
     {
         // state is transient/only valid during search, no need to copy
@@ -717,7 +735,7 @@ protected:
         // Clear leaf cache
         m_leaf_end = 0;
         m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
-        m_array_ptr.reset(new(&m_leaf_cache_storage) LeafType(table.get_alloc()));
+        m_array_ptr.reset(new(&m_leaf_cache_storage)LeafType(table.get_alloc()));
 
         if (m_child) {
             m_child->init(table);
@@ -727,7 +745,7 @@ protected:
     void get_leaf(const ColType& col, size_t ndx)
     {
         size_t ndx_in_leaf;
-        LeafInfo leaf_info{&m_leaf_ptr, m_array_ptr.get()};
+        LeafInfo leaf_info {&m_leaf_ptr, m_array_ptr.get()};
         col.get_leaf(ndx, ndx_in_leaf, leaf_info);
         m_leaf_start = ndx - ndx_in_leaf;
         m_leaf_end = m_leaf_start + m_leaf_ptr->size();
@@ -744,10 +762,10 @@ protected:
 
     bool should_run_in_fastmode(SequentialGetterBase* source_column) const
     {
-        return (m_conds == 1 &&
-                (source_column == nullptr ||
-                 (!m_fastmode_disabled
-                  && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));
+        return m_conds == 1 &&
+               (source_column == nullptr ||
+                (!m_fastmode_disabled
+                 && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column));
     }
 
     // Search value:
@@ -768,11 +786,11 @@ protected:
     size_t m_local_end;
 
     // Aggregate optimization
-    using TFind_callback_specialized = bool(ThisType::*)(size_t, size_t);
+    using TFind_callback_specialized = bool(ThisType::*) (size_t, size_t);
     TFind_callback_specialized m_find_callback_specialized = nullptr;
 
 private:
-    explicit IntegerNodeBase(size_t column_idx) : ColumnNodeBase(column_idx)
+    explicit IntegerNodeBase(size_t column_idx): ColumnNodeBase(column_idx)
     {
         m_dT = _impl::CostHeuristic<ColType>::dT;
         m_dD = _impl::CostHeuristic<ColType>::dD;
@@ -780,8 +798,8 @@ private:
 };
 
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
-template <class ColType, class TConditionFunction>
-class IntegerNode : public IntegerNodeBase<ColType> {
+template<class ColType, class TConditionFunction>
+class IntegerNode: public IntegerNodeBase<ColType> {
     using BaseType = IntegerNodeBase<ColType>;
     using ThisType = IntegerNode<ColType, TConditionFunction>;
 public:
@@ -789,17 +807,17 @@ public:
     using TConditionValue = typename BaseType::TConditionValue;
 
     IntegerNode(TConditionValue value, size_t column_ndx)
-    : IntegerNodeBase<ColType>(value, column_ndx)
+        : IntegerNodeBase<ColType>(value, column_ndx)
     {
     }
 
     IntegerNode(null n, size_t column_ndx)
-    : IntegerNodeBase<ColType>(n, column_ndx)
+        : IntegerNodeBase<ColType>(n, column_ndx)
     {
     }
 
     IntegerNode(const ThisType& other)
-    : IntegerNodeBase<ColType>(other)
+        : IntegerNodeBase<ColType>(other)
     {
     }
 
@@ -816,7 +834,7 @@ public:
         int c = TConditionFunction::condition;
         return this->aggregate_local_impl(st, start, end, local_limit, source_column, c);
     }
-    
+
 
     size_t find_first_local(size_t start, size_t end) override
     {
@@ -844,7 +862,9 @@ public:
             else
                 end2 = end - this->m_leaf_start;
 
-            size_t s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start - this->m_leaf_start, end2);
+            size_t s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value,
+                                                                                 start - this->m_leaf_start,
+                                                                                 end2);
 
             if (s == not_found) {
                 start = this->m_leaf_end;
@@ -868,30 +888,50 @@ protected:
     static TFind_callback_specialized get_specialized_callback(Action action, DataType col_id, bool nullable)
     {
         switch (action) {
-            case act_Count: return get_specialized_callback_2_int<act_Count>(col_id, nullable);
-            case act_Sum: return get_specialized_callback_2<act_Sum>(col_id, nullable);
-            case act_Max: return get_specialized_callback_2<act_Max>(col_id, nullable);
-            case act_Min: return get_specialized_callback_2<act_Min>(col_id, nullable);
-            case act_FindAll: return get_specialized_callback_2_int<act_FindAll>(col_id, nullable);
-            case act_CallbackIdx: return get_specialized_callback_2_int<act_CallbackIdx>(col_id, nullable);
-            default: break;
+            case act_Count:
+                return get_specialized_callback_2_int<act_Count>(col_id, nullable);
+
+            case act_Sum:
+                return get_specialized_callback_2<act_Sum>(col_id, nullable);
+
+            case act_Max:
+                return get_specialized_callback_2<act_Max>(col_id, nullable);
+
+            case act_Min:
+                return get_specialized_callback_2<act_Min>(col_id, nullable);
+
+            case act_FindAll:
+                return get_specialized_callback_2_int<act_FindAll>(col_id, nullable);
+
+            case act_CallbackIdx:
+                return get_specialized_callback_2_int<act_CallbackIdx>(col_id, nullable);
+
+            default:
+                break;
         }
         REALM_ASSERT(false); // Invalid aggregate function
     }
 
-    template <Action TAction>
+    template<Action TAction>
     static TFind_callback_specialized get_specialized_callback_2(DataType col_id, bool nullable)
     {
         switch (col_id) {
-            case type_Int: return get_specialized_callback_3<TAction, type_Int>(nullable);
-            case type_Float: return get_specialized_callback_3<TAction, type_Float>(nullable);
-            case type_Double: return get_specialized_callback_3<TAction, type_Double>(nullable);
-            default: break;
+            case type_Int:
+                return get_specialized_callback_3<TAction, type_Int>(nullable);
+
+            case type_Float:
+                return get_specialized_callback_3<TAction, type_Float>(nullable);
+
+            case type_Double:
+                return get_specialized_callback_3<TAction, type_Double>(nullable);
+
+            default:
+                break;
         }
         REALM_ASSERT(false); // Invalid aggregate source column
     }
 
-    template <Action TAction>
+    template<Action TAction>
     static TFind_callback_specialized get_specialized_callback_2_int(DataType col_id, bool nullable)
     {
         if (col_id == type_Int) {
@@ -900,12 +940,13 @@ protected:
         REALM_ASSERT(false); // Invalid aggregate source column
     }
 
-    template <Action TAction, DataType TDataType>
+    template<Action TAction, DataType TDataType>
     static TFind_callback_specialized get_specialized_callback_3(bool nullable)
     {
         if (nullable) {
             return &BaseType::template find_callback_specialization<TConditionFunction, TAction, TDataType, true>;
-        } else {
+        }
+        else {
             return &BaseType::template find_callback_specialization<TConditionFunction, TAction, TDataType, false>;
         }
     }
@@ -913,17 +954,17 @@ protected:
 
 
 // This node is currently used for floats and doubles only
-template <class ColType, class TConditionFunction> class FloatDoubleNode: public ParentNode {
+template<class ColType, class TConditionFunction> class FloatDoubleNode: public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;
     static const bool special_null_node = false;
 
-    FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
+    FloatDoubleNode(TConditionValue v, size_t column_ndx): m_value(v)
     {
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    FloatDoubleNode(null, size_t column_ndx) : m_value(null::get_null_float<TConditionValue>())
+    FloatDoubleNode(null, size_t column_ndx): m_value(null::get_null_float<TConditionValue>())
     {
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
@@ -943,17 +984,18 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
-        
+
         auto find = [&](bool nullability)   {
-            bool m_value_nan = nullability ? null::is_null_float(m_value) : false;
-            for (size_t s = start; s < end; ++s) {
-                TConditionValue v = m_condition_column.get_next(s);
-                REALM_ASSERT(!(null::is_null_float(v) && !nullability));
-                if (cond(v, m_value, nullability ? null::is_null_float<TConditionValue>(v) : false, m_value_nan))
-                    return s;
-            }
-            return not_found;
-        };
+                        bool m_value_nan = nullability ? null::is_null_float(m_value) : false;
+                        for (size_t s = start; s < end; ++s) {
+                            TConditionValue v = m_condition_column.get_next(s);
+                            REALM_ASSERT(!(null::is_null_float(v) && !nullability));
+                            if (cond(v, m_value, nullability ? null::is_null_float<TConditionValue>(v) : false,
+                                     m_value_nan))
+                                return s;
+                        }
+                        return not_found;
+                    };
 
         // This will inline the second case but no the first. Todo, use templated lambda when switching to c++14
         if (m_table->is_nullable(m_condition_column_idx))
@@ -972,6 +1014,7 @@ public:
     {
         m_value = from.m_value;
         m_child = from.m_child;
+
         // m_condition_column is not copied
     }
 
@@ -981,12 +1024,16 @@ protected:
 };
 
 
-template <class TConditionFunction> class BinaryNode: public ParentNode {
+template<class TConditionFunction> class BinaryNode: public ParentNode {
 public:
     using TConditionValue = BinaryData;
     static const bool special_null_node = false;
 
-    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template<Action TAction> int64_t find_all(IntegerColumn* /*res*/,
+                                              size_t /*start*/,
+                                              size_t /*end*/,
+                                              size_t /*limit*/,
+                                              size_t /*source_column*/) {REALM_ASSERT(false); return 0; }
 
     BinaryNode(BinaryData v, size_t column)
     {
@@ -1000,7 +1047,7 @@ public:
     }
 
     BinaryNode(null, size_t column)
-    : BinaryNode(BinaryData{nullptr, 0}, column)
+        : BinaryNode(BinaryData {nullptr, 0}, column)
     {
     }
 
@@ -1058,12 +1105,12 @@ protected:
 };
 
 
-class StringNodeBase : public ParentNode {
+class StringNodeBase: public ParentNode {
 public:
     using TConditionValue = StringData;
     static const bool special_null_node = true;
 
-    template <Action TAction>
+    template<Action TAction>
     int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
@@ -1136,9 +1183,9 @@ protected:
 };
 
 // Conditions for strings. Note that Equal is specialized later in this file!
-template <class TConditionFunction> class StringNode: public StringNodeBase {
+template<class TConditionFunction> class StringNode: public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column) : StringNodeBase(v,column)
+    StringNode(StringData v, size_t column): StringNodeBase(v,column)
     {
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
@@ -1222,7 +1269,7 @@ public:
         return new StringNode<TConditionFunction>(*this);
     }
 
-    StringNode(const StringNode& from) : StringNodeBase(from)
+    StringNode(const StringNode& from): StringNodeBase(from)
     {
         size_t sz = 6 * m_value.size();
         char* lcase = new char[sz];
@@ -1301,16 +1348,19 @@ public:
 
             switch (fr) {
                 case FindRes_single:
-                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
+                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(),
+                                                            Allocator::get_default()));                                       // Throws
                     m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
                     m_index_matches->add(index_ref);
                     m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
                     break;
 
                 case FindRes_column:
+
                     // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
                     // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
+                    m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(),
+                                                            m_condition_column->get_alloc()));                                       // Throws
                     m_index_matches->get_root_array()->init_from_ref(index_ref);
                     break;
 
@@ -1353,7 +1403,9 @@ public:
 
             while (f == not_found && m_last_indexed < m_index_size) {
                 m_index_getter->cache_next(m_last_indexed);
-                f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start, nullptr);
+                f =
+                    m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
+                                                         nullptr);
 
                 if (f >= end || f == not_found) {
                     m_last_indexed = m_index_getter->m_leaf_end;
@@ -1411,7 +1463,9 @@ public:
             else if (m_leaf_type ==  StringColumn::leaf_type_Medium)
                 s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
             else
-                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
+                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(
+                                                                              m_value), true, s - m_leaf_start, end2);
+
 
             if (s == not_found)
                 s = m_leaf_end - 1;
@@ -1428,7 +1482,7 @@ public:
         return new StringNode<Equal>(*this);
     }
 
-    StringNode(const StringNode& from) : StringNodeBase(from)
+    StringNode(const StringNode& from): StringNodeBase(from)
     {
         m_index_matches_destroy = false;
     }
@@ -1448,7 +1502,7 @@ private:
     // Used for index lookup
     std::unique_ptr<IntegerColumn> m_index_matches;
     bool m_index_matches_destroy = false;
-    std::unique_ptr<SequentialGetter<IntegerColumn>> m_index_getter;
+    std::unique_ptr<SequentialGetter<IntegerColumn >> m_index_getter;
     size_t m_index_size;
     size_t m_last_start;
 };
@@ -1462,13 +1516,14 @@ private:
 // also set to next AND condition (if any exists) following the OR.
 class OrNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
+    template<Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
     }
 
-    OrNode(ParentNode* p1) : m_cond(1, p1) {
+    OrNode(ParentNode* p1): m_cond(1, p1)
+    {
         m_child = nullptr;
         m_dT = 50.0;
     }
@@ -1515,14 +1570,16 @@ public:
                 m_last[c] = 0;
                 m_was_match[c] = false;
             }
+
             // already searched this range and didn't match
             else if (m_last[c] >= end)
                 continue;
+
             // already search this range and *did* match
-           else if (m_was_match[c] && m_last[c] >= start) {
+            else if (m_was_match[c] && m_last[c] >= start) {
                 if (index > m_last[c])
                     index = m_last[c];
-               continue;
+                continue;
             }
 
             m_start[c] = start;
@@ -1541,15 +1598,19 @@ public:
     {
         if (error_code != "")
             return error_code;
+
         if (m_cond[0] == 0)
             return "Missing left-hand side of OR";
+
         if (m_cond.back() == 0)
             return "Missing final right-hand side of OR";
+
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
         if (s != "")
             return s;
+
         for (size_t i = 0; i < m_cond.size(); ++i) {
             s = m_cond[i]->validate();
             if (s != "")
@@ -1572,8 +1633,10 @@ public:
 
     std::vector<ParentNode*> m_cond;
 private:
+
     // start index of the last find for each cond
     std::vector<size_t> m_start;
+
     // last looked at index of the lasft find for each cond
     // is a matching index if m_was_match is true
     std::vector<size_t> m_last;
@@ -1584,13 +1647,13 @@ private:
 
 class NotNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
+    template<Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
     }
 
-    NotNode() {m_child = nullptr; m_cond = nullptr; m_dT = 50.0;}
+    NotNode() {m_child = nullptr; m_cond = nullptr; m_dT = 50.0; }
     ~NotNode() REALM_NOEXCEPT override {}
 
     void init(const Table& table) override
@@ -1620,16 +1683,20 @@ public:
     {
         if (error_code != "")
             return error_code;
+
         if (m_cond == 0)
             return "Missing argument to Not";
+
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
         if (s != "")
             return s;
+
         s = m_cond->validate();
         if (s != "")
             return s;
+
         return "";
     }
 
@@ -1657,6 +1724,7 @@ public:
 
     ParentNode* m_cond;
 private:
+
     // FIXME This heuristic might as well be reused for all condition nodes.
     size_t m_known_range_start;
     size_t m_known_range_end;
@@ -1674,11 +1742,15 @@ private:
 
 
 // Compare two columns with eachother row-by-row
-template <class ColType, class TConditionFunction> class TwoColumnsNode: public ParentNode {
+template<class ColType, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;
 
-    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template<Action TAction> int64_t find_all(IntegerColumn* /*res*/,
+                                              size_t /*start*/,
+                                              size_t /*end*/,
+                                              size_t /*limit*/,
+                                              size_t /*source_column*/) {REALM_ASSERT(false); return 0; }
 
     TwoColumnsNode(size_t column1, size_t column2)
     {
@@ -1722,7 +1794,13 @@ public:
                 m_getter2.cache_next(s);
 
                 QueryState<int64_t> qs;
-                bool resume = m_getter1.m_leaf_ptr->template compare_leafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_leaf_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
+                bool resume = m_getter1.m_leaf_ptr->template compare_leafs<TConditionFunction, act_ReturnFirst>(
+                    m_getter2.m_leaf_ptr,
+                    s - m_getter1.m_leaf_start,
+                    m_getter1.local_end(end),
+                    0,
+                    &qs,
+                    CallbackDummy());
 
                 if (resume)
                     s = m_getter1.m_leaf_end;
@@ -1733,6 +1811,7 @@ public:
                 // This is for float and double.
 
 #if 0 && defined(REALM_COMPILER_AVX)
+
 // AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
 //
 // For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
@@ -1770,6 +1849,7 @@ public:
         m_condition_column_idx1 = from.m_condition_column_idx1;
         m_condition_column_idx2 = from.m_condition_column_idx2;
         m_child = from.m_child;
+
         // NOT copied:
         // m_getter1 = from.m_getter1;
         // m_getter2 = from.m_getter2;
@@ -1830,10 +1910,10 @@ public:
 };
 
 
-class LinksToNode : public ParentNode {
+class LinksToNode: public ParentNode {
 public:
-    LinksToNode(size_t origin_column_index, size_t target_row) : m_origin_column(origin_column_index),
-                                                                 m_target_row(target_row)
+    LinksToNode(size_t origin_column_index, size_t target_row): m_origin_column(origin_column_index),
+        m_target_row(target_row)
     {
         m_dD = 10.0;
         m_dT = 50.0;

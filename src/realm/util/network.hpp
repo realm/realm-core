@@ -87,7 +87,7 @@ public:
     ~address() REALM_NOEXCEPT {}
 
 private:
-    typedef in_addr  ip_v4_type;
+    typedef in_addr ip_v4_type;
     typedef in6_addr ip_v6_type;
     union union_type {
         ip_v4_type m_ip_v4;
@@ -115,11 +115,11 @@ public:
 private:
     class protocol m_protocol;
 
-    typedef sockaddr     sockaddr_base_type;
-    typedef sockaddr_in  sockaddr_ip_v4_type;
+    typedef sockaddr sockaddr_base_type;
+    typedef sockaddr_in sockaddr_ip_v4_type;
     typedef sockaddr_in6 sockaddr_ip_v6_type;
     union sockaddr_union_type {
-        sockaddr_base_type  m_base;
+        sockaddr_base_type m_base;
         sockaddr_ip_v4_type m_ip_v4;
         sockaddr_ip_v6_type m_ip_v6;
     };
@@ -242,8 +242,8 @@ public:
         address_configured = AI_ADDRCONFIG
     };
 
-    query(std::string service, int flags = passive|address_configured);
-    query(const protocol&, std::string service, int flags = passive|address_configured);
+    query(std::string service, int flags = passive | address_configured);
+    query(const protocol&, std::string service, int flags = passive | address_configured);
     query(std::string host, std::string service, int flags = address_configured);
     query(const protocol&, std::string host, std::string service, int flags = address_configured);
 
@@ -307,8 +307,8 @@ protected:
 
     socket_base(io_service&);
 
-    void get_option(opt_enum, void* value_data, std::size_t& value_size, std::error_code&) const;
-    void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code&);
+    void get_option(opt_enum, void* value_data, std::size_t & value_size, std::error_code &) const;
+    void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code &);
     void map_option(opt_enum, int& level, int& option_name) const;
 
     friend class acceptor;
@@ -336,7 +336,7 @@ private:
     {
         union {
             U value;
-            char strut[sizeof (U) + 1];
+            char strut[sizeof(U) + 1];
         };
         size_t value_size = sizeof strut;
         sock.get_option(opt_enum(opt), &value, value_size, ec);
@@ -434,7 +434,7 @@ private:
 
 
 std::error_code write(socket&, const char* data, std::size_t size, std::error_code&)
-    REALM_NOEXCEPT;
+REALM_NOEXCEPT;
 void write(socket&, const char* data, std::size_t size);
 
 template<class H> void async_write(socket&, const char* data, std::size_t size, const H& handler);
@@ -539,7 +539,7 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const a
         char ip_v4[INET_ADDRSTRLEN];
         char ip_v6[INET6_ADDRSTRLEN];
     };
-    char buffer[sizeof (buffer_union)];
+    char buffer[sizeof(buffer_union)];
     int af = addr.m_is_ip_v6 ? AF_INET6 : AF_INET;
     const char* ret = inet_ntop(af, &addr.m_union, buffer, sizeof buffer);
     if (ret == 0) {
@@ -604,7 +604,7 @@ public:
 };
 
 template<class H> class io_service::post_handler:
-        public async_handler {
+    public async_handler {
 public:
     post_handler(const H& h):
         m_handler(h)
@@ -705,6 +705,7 @@ inline socket_base::~socket_base() REALM_NOEXCEPT
 {
     std::error_code ec;
     close(ec);
+
     // Ignore errors
 }
 
@@ -855,7 +856,7 @@ template<class H> inline void acceptor::async_accept(socket& sock, endpoint& ep,
 }
 
 template<class H> class acceptor::accept_handler:
-        public io_service::async_handler {
+    public io_service::async_handler {
 public:
     accept_handler(acceptor& a, socket& s, endpoint* e, const H& h):
         m_acceptor(a),
@@ -941,7 +942,7 @@ inline void buffered_input_stream::async_read_until(char* buffer, std::size_t si
 }
 
 class buffered_input_stream::read_handler_base:
-        public io_service::async_handler {
+    public io_service::async_handler {
 public:
     read_handler_base(buffered_input_stream& s, char* buffer, std::size_t size, int delim):
         m_stream(s),
@@ -969,7 +970,7 @@ protected:
 
 template<class H>
 class buffered_input_stream::read_handler:
-        public read_handler_base {
+    public read_handler_base {
 public:
     read_handler(buffered_input_stream& s, char* buffer, std::size_t size, int delim, const H& h):
         read_handler_base(s, buffer, size, delim),
@@ -987,7 +988,7 @@ public:
         std::size_t num_bytes_transferred = m_out_curr - m_out_begin;
         if (!ec && m_delim != std::char_traits<char>::eof()) {
             bool delim_found = num_bytes_transferred >= 1 &&
-                m_out_curr[-1] == std::char_traits<char>::to_char_type(m_delim);
+                               m_out_curr[-1] == std::char_traits<char>::to_char_type(m_delim);
             if (!delim_found)
                 ec = delim_not_found;
         }
@@ -1043,11 +1044,12 @@ public:
     bool exec() override
     {
         std::error_code ec;
-        std::size_t n = m_socket.write_some(m_curr, m_end-m_curr, ec);
+        std::size_t n = m_socket.write_some(m_curr, m_end - m_curr, ec);
         m_curr += n;
         bool complete = m_curr == m_end;
         if (!complete && !ec)
             return false;
+
         std::size_t num_bytes_transferred = m_curr - m_begin;
         m_handler(ec, num_bytes_transferred); // Throws
         return true;

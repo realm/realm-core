@@ -185,7 +185,7 @@ inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) REAL
 {
 }
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref,
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type   ref,
                                                           Allocator& alloc) REALM_NOEXCEPT:
     m_ref(ref),
     m_alloc(alloc)

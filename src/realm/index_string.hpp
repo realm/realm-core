@@ -33,7 +33,7 @@ class Spec;
 
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
 // by making IntegerColumn convert its integers to strings by calling to_str().
-template <class T> inline StringData to_str(const T& value)
+template<class T> inline StringData to_str(const T& value)
 {
     REALM_STATIC_ASSERT((std::is_same<T, int64_t>::value), "");
     const char* c = reinterpret_cast<const char*>(&value);
@@ -80,35 +80,35 @@ public:
 
     bool is_empty() const;
 
-    template <class T> void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
-    template <class T> void set(size_t row_ndx, T new_value);
-    template <class T> void erase(size_t row_ndx, bool is_last);
+    template<class T> void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
+    template<class T> void set(size_t row_ndx, T new_value);
+    template<class T> void erase(size_t row_ndx, bool is_last);
 
-    template <class T> size_t find_first(T value) const
+    template<class T> size_t find_first(T value) const
     {
         // Use direct access method
         return m_array->index_string_find_first(to_str(value), m_target_column);
     }
 
-    template <class T> void find_all(IntegerColumn& result, T value) const
+    template<class T> void find_all(IntegerColumn& result, T value) const
     {
         // Use direct access method
         return m_array->index_string_find_all(result, to_str(value), m_target_column);
     }
 
-    template <class T> FindRes find_all(T value, ref_type& ref) const
+    template<class T> FindRes find_all(T value, ref_type& ref) const
     {
         // Use direct access method
         return m_array->index_string_find_all_no_copy(to_str(value), ref, m_target_column);
     }
 
-    template <class T> size_t count(T value) const
+    template<class T> size_t count(T value) const
     {
         // Use direct access method
         return m_array->index_string_count(to_str(value), m_target_column);
     }
 
-    template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
+    template<class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
     {
         do_update_ref(to_str(value), old_row_ndx, new_row_ndx, 0);
     }
@@ -159,15 +159,16 @@ private:
         size_t ref1;
         size_t ref2;
         enum ChangeType { none, insert_before, insert_after, split } type;
-        NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
-        NodeChange() : ref1(0), ref2(0), type(none) {}
+        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0): ref1(r1), ref2(r2), type(t) {}
+        NodeChange(): ref1(0), ref2(0), type(none) {}
     };
 
     // B-Tree functions
     void TreeInsert(size_t row_ndx, key_type, size_t offset, StringData value);
     NodeChange do_insert(size_t ndx, key_type, size_t offset, StringData value);
+
     /// Returns true if there is room or it can join existing entries
-    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
+    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
     void do_delete(size_t ndx, StringData, size_t offset);
@@ -222,7 +223,7 @@ inline void StringIndex::set_allow_duplicate_values(bool allow) REALM_NOEXCEPT
 }
 
 // Byte order of the key is *reversed*, so that for the integer index, the least significant
-// byte comes first, so that it fits little-endian machines. That way we can perform fast 
+// byte comes first, so that it fits little-endian machines. That way we can perform fast
 // range-lookups and iterate in order, etc, as future features. This, however, makes the same
 // features slower for string indexes. Todo, we should reverse the order conditionally, depending
 // on the column type.
@@ -241,19 +242,19 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) REALM_NOEXC
     // Create 4 byte index key
     // (encoded like this to allow literal comparisons
     // independently of endianness)
-  four:
+four:
     key |= (key_type(static_cast<unsigned char>(str[3])) <<  0);
-  three:
+three:
     key |= (key_type(static_cast<unsigned char>(str[2])) <<  8);
-  two:
+two:
     key |= (key_type(static_cast<unsigned char>(str[1])) << 16);
-  one:
+one:
     key |= (key_type(static_cast<unsigned char>(str[0])) << 24);
-  none:
+none:
     return key;
 }
 
-// Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So 
+// Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So
 // "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) REALM_NOEXCEPT
 {
@@ -266,19 +267,20 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 
     // for very short strings
     size_t tail = str.size() - offset;
-    if (tail <= sizeof(key_type)-1) {
+    if (tail <= sizeof(key_type) - 1) {
         char buf[sizeof(key_type)];
         memset(buf, 0, sizeof(key_type));
         buf[tail] = 'X';
         memcpy(buf, str.data() + offset, tail);
         return create_key(StringData(buf, tail + 1));
     }
+
     // else fallback
 #endif
     return create_key(str.substr(offset));
 }
 
-template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
+template<class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
 
@@ -298,7 +300,7 @@ template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_
     }
 }
 
-template <class T> void StringIndex::set(size_t row_ndx, T new_value)
+template<class T> void StringIndex::set(size_t row_ndx, T new_value)
 {
     char buffer[sizeof(T)];
     StringData old_value = get(row_ndx, buffer);
@@ -315,7 +317,7 @@ template <class T> void StringIndex::set(size_t row_ndx, T new_value)
     }
 }
 
-template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
+template<class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 {
     char buffer[sizeof(T)];
     StringData value = get(row_ndx, buffer);

@@ -53,7 +53,7 @@ void SubtableColumnBase::verify(const Table& table, size_t col_ndx) const
 Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
 {
     REALM_ASSERT_3(subtable_ndx, <, size());
-    if (Table* subtable = m_subtable_map.find(subtable_ndx))
+    if (Table * subtable = m_subtable_map.find(subtable_ndx))
         return subtable;
 
     typedef _impl::TableFriend tf;
@@ -76,7 +76,7 @@ Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
 Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
 {
     REALM_ASSERT_3(subtable_ndx, <, size());
-    if (Table* subtable = m_subtable_map.find(subtable_ndx))
+    if (Table * subtable = m_subtable_map.find(subtable_ndx))
         return subtable;
 
     typedef _impl::TableFriend tf;
@@ -132,6 +132,7 @@ Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const REALM_NO
     for (iter i = m_entries.begin(); i != end; ++i)
         if (i->m_subtable_ndx == subtable_ndx)
             return i->m_table;
+
     return 0;
 }
 
@@ -159,6 +160,7 @@ bool SubtableColumnBase::SubtableMap::detach_and_remove(size_t subtable_ndx) REA
     for (;;) {
         if (i == end)
             return false;
+
         if (i->m_subtable_ndx == subtable_ndx)
             break;
         ++i;
@@ -182,6 +184,7 @@ bool SubtableColumnBase::SubtableMap::remove(Table* subtable) REALM_NOEXCEPT
     for (;;) {
         if (i == end)
             return false;
+
         if (i->m_table == subtable)
             break;
         ++i;
@@ -193,7 +196,7 @@ bool SubtableColumnBase::SubtableMap::remove(Table* subtable) REALM_NOEXCEPT
 
 
 void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline)
-    const REALM_NOEXCEPT
+const REALM_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
     typedef entries::const_iterator iter;
@@ -318,7 +321,7 @@ void SubtableColumn::set(size_t row_ndx, const Table* subtable)
     IntegerColumn::set(row_ndx, value); // Throws
 
     // Refresh the accessors, if present
-    if (Table* table = m_subtable_map.find(row_ndx)) {
+    if (Table * table = m_subtable_map.find(row_ndx)) {
         TableRef table_2;
         table_2.reset(table); // Must hold counted reference
         typedef _impl::TableFriend tf;
@@ -331,7 +334,7 @@ void SubtableColumn::set(size_t row_ndx, const Table* subtable)
 
 
 void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                             bool broken_reciprocal_backlinks)
+                                bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
@@ -346,7 +349,7 @@ void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 
 
 void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                     bool broken_reciprocal_backlinks)
+                                        bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx < prior_num_rows);
@@ -370,6 +373,7 @@ bool SubtableColumn::compare_table(const SubtableColumn& c) const
     size_t n = size();
     if (c.size() != n)
         return false;
+
     for (size_t i = 0; i != n; ++i) {
         ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref(); // Throws
         ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref(); // throws
@@ -437,7 +441,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << std::setw(indent) << "" << "Subtable leaf (size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << "" << "Subtable leaf (size: " << leaf.size() << ")\n";
 }
 
 } // anonymous namespace

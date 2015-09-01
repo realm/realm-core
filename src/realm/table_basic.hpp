@@ -169,12 +169,12 @@ public:
     ///
     RowAccessor back(int rel_idx = -1) REALM_NOEXCEPT
     {
-        return RowAccessor(std::make_pair(this, size()+rel_idx));
+        return RowAccessor(std::make_pair(this, size() + rel_idx));
     }
 
     ConstRowAccessor back(int rel_idx = -1) const REALM_NOEXCEPT
     {
-        return ConstRowAccessor(std::make_pair(this, size()+rel_idx));
+        return ConstRowAccessor(std::make_pair(this, size() + rel_idx));
     }
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
@@ -197,14 +197,16 @@ public:
     {
         using namespace realm::util;
         REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
-                              "Wrong number of tuple elements");
+                            "Wrong number of tuple elements");
         ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
     }
 
     // FIXME: This probably fails if Spec::ConvenienceMethods has no add().
     using Spec::ConvenienceMethods::add;
+
     // FIXME: This probably fails if Spec::ConvenienceMethods has no insert().
     using Spec::ConvenienceMethods::insert;
+
     // FIXME: This probably fails if Spec::ConvenienceMethods has no set().
     using Spec::ConvenienceMethods::set;
 
@@ -214,8 +216,16 @@ public:
 
 
     class Query;
-    Query       where(typename BasicTable<Spec>::View* tv = nullptr) { return Query(*this, tv ? tv->get_impl() : nullptr); }
-    Query where(typename BasicTable<Spec>::View* tv = nullptr) const { return Query(*this, tv ? tv->get_impl() : nullptr); }
+    Query       where(typename BasicTable<Spec>::View* tv = nullptr)
+    {
+        return Query(*this,
+                     tv ? tv->get_impl() : nullptr);
+    }
+    Query where(typename BasicTable<Spec>::View* tv = nullptr) const
+    {
+        return Query(*this,
+                     tv ? tv->get_impl() : nullptr);
+    }
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -251,6 +261,7 @@ public:
     /// compatible with the specified table type.
     template<class T> friend BasicTableRef<T> checked_cast(TableRef) REALM_NOEXCEPT;
     template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) REALM_NOEXCEPT;
+
     //@}
 
     using Table::verify;
@@ -333,9 +344,9 @@ private:
 #endif
 
 template<class Spec> class BasicTable<Spec>::Query:
-        public Spec::template ColNames<QueryCol, Query*> {
+    public Spec::template ColNames<QueryCol, Query*> {
 public:
-    Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
+    Query(const Query &q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     virtual ~Query() REALM_NOEXCEPT {}
 
     Query& group() { m_impl.group(); return *this; }
@@ -386,18 +397,18 @@ public:
     std::string validate() { return m_impl.validate(); }
 
 protected:
-    Query(const BasicTable<Spec>& table, TableViewBase* tv):
+    Query(const BasicTable<Spec>&table, TableViewBase * tv):
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
     typedef Query_Handover_patch Handover_patch;
-    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode) : 
-        Spec::template ColNames<QueryCol, Query*>(this), 
+    Query(const Query &source, Handover_patch & patch, ConstSourcePayload mode):
+        Spec::template ColNames<QueryCol, Query*>(this),
         m_impl(source.m_impl, patch, mode)
     {
     }
 
-    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode) : 
-        Spec::template ColNames<QueryCol, Query*>(this), 
+    Query(Query & source, Handover_patch & patch, MutableSourcePayload mode):
+        Spec::template ColNames<QueryCol, Query*>(this),
         m_impl(source.m_impl, patch, mode)
     {
     }
@@ -407,7 +418,7 @@ protected:
         m_impl.apply_patch(patch, group);
     }
 
-    virtual std::unique_ptr<Query> 
+    virtual std::unique_ptr<Query>
     clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
     {
         patch.reset(new Handover_patch);
@@ -415,7 +426,7 @@ protected:
         return retval;
     }
 
-    virtual std::unique_ptr<Query> 
+    virtual std::unique_ptr<Query>
     clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
     {
         patch.reset(new Handover_patch);
@@ -454,7 +465,7 @@ template<class T> struct GetColumnTypeId;
 template<> struct GetColumnTypeId<int64_t> {
     static const DataType id = type_Int;
 };
-template<class E> struct GetColumnTypeId<SpecBase::Enum<E>> {
+template<class E> struct GetColumnTypeId<SpecBase::Enum<E >> {
     static const DataType id = type_Int;
 };
 template<> struct GetColumnTypeId<bool> {
@@ -510,7 +521,7 @@ template<class Type, int col_idx> struct CmpColType {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
         return GetColumnTypeId<Type>::id != spec->get_public_column_type(col_idx) ||
-            col_names[col_idx] != spec->get_column_name(col_idx);
+               col_names[col_idx] != spec->get_column_name(col_idx);
     }
 };
 
@@ -520,6 +531,7 @@ template<class Subtab, int col_idx> struct CmpColType<SpecBase::Subtable<Subtab>
     {
         if (spec->get_column_type(col_idx) != col_type_Table ||
             col_names[col_idx] != spec->get_column_name(col_idx)) return true;
+
         const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
         return !Subtab::matches_dynamic_type(subspec);
     }
@@ -616,14 +628,14 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
 {
     TableRef table = Table::create(alloc);
     set_dynamic_type(*table);
-    return unchecked_cast<BasicTable<Spec>>(move(table));
+    return unchecked_cast<BasicTable<Spec >> (move(table));
 }
 
 
 template<class Spec>
 inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) const
 {
-    return unchecked_cast<BasicTable<Spec>>(Table::copy(alloc));
+    return unchecked_cast<BasicTable<Spec >> (Table::copy(alloc));
 }
 
 
@@ -638,6 +650,7 @@ template<class T> inline BasicTableRef<T> checked_cast(TableRef t) REALM_NOEXCEP
 {
     if (!is_a<T>(*t))
         return BasicTableRef<T>(); // Null
+
     return unchecked_cast<T>(t);
 }
 
@@ -646,6 +659,7 @@ template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) RE
 {
     if (!is_a<T>(*t))
         return BasicTableRef<const T>(); // Null
+
     return unchecked_cast<T>(t);
 }
 

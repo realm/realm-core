@@ -86,7 +86,7 @@ template<int bits> struct FastestUnsigned;
 
 #ifdef REALM_HAVE_CXX11_DECLTYPE
 template<class T> struct Promote {
-    typedef decltype(+T()) type; // FIXME: This is not performing floating-point promotion.
+    typedef decltype (+T ()) type; // FIXME: This is not performing floating-point promotion.
 };
 #else
 template<> struct Promote<bool> {
@@ -110,7 +110,7 @@ public:
 };
 template<> struct Promote<wchar_t> {
 private:
-    typedef intmax_t  max_int;
+    typedef intmax_t max_int;
     typedef uintmax_t max_uint;
     static const bool cond_0 =
         (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(ULLONG_MAX));
@@ -143,21 +143,39 @@ private:
 public:
     typedef std::conditional<cond, int, unsigned>::type type;
 };
-template<> struct Promote<int> { typedef int type; };
-template<> struct Promote<unsigned> { typedef unsigned type; };
-template<> struct Promote<long> { typedef long type; };
-template<> struct Promote<unsigned long> { typedef unsigned long type; };
-template<> struct Promote<long long> { typedef long long type; };
-template<> struct Promote<unsigned long long> { typedef unsigned long long type; };
-template<> struct Promote<float> { typedef double type; };
-template<> struct Promote<double> { typedef double type; };
-template<> struct Promote<long double> { typedef long double type; };
+template<> struct Promote<int> {
+    typedef int type;
+};
+template<> struct Promote<unsigned> {
+    typedef unsigned type;
+};
+template<> struct Promote<long> {
+    typedef long type;
+};
+template<> struct Promote<unsigned long> {
+    typedef unsigned long type;
+};
+template<> struct Promote<long long> {
+    typedef long long type;
+};
+template<> struct Promote<unsigned long long> {
+    typedef unsigned long long type;
+};
+template<> struct Promote<float> {
+    typedef double type;
+};
+template<> struct Promote<double> {
+    typedef double type;
+};
+template<> struct Promote<long double> {
+    typedef long double type;
+};
 #endif // !REALM_HAVE_CXX11_DECLTYPE
 
 
 #ifdef REALM_HAVE_CXX11_DECLTYPE
 template<class A, class B> struct ArithBinOpType {
-    typedef decltype(A()+B()) type;
+    typedef decltype (A () + B()) type;
 };
 #else
 template<class A, class B> struct ArithBinOpType {
@@ -169,16 +187,20 @@ private:
     typedef typename std::conditional<ullong(UINT_MAX) <= ullong(LONG_MAX), long, unsigned long>::type type_l_u;
     typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, type_l_u, long>::type type_l;
 
-    typedef typename std::conditional<ullong(UINT_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_u;
-    typedef typename std::conditional<ullong(ULONG_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_ul;
+    typedef typename std::conditional<ullong(UINT_MAX) <= ullong(LLONG_MAX), long long,
+                                      unsigned long long>::type type_ll_u;
+    typedef typename std::conditional<ullong(ULONG_MAX) <= ullong(LLONG_MAX), long long,
+                                      unsigned long long>::type type_ll_ul;
     typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, type_ll_u, long long>::type type_ll_1;
-    typedef typename std::conditional<EitherTypeIs<unsigned long, A2, B2>::value, type_ll_ul, type_ll_1>::type type_ll;
+    typedef typename std::conditional<EitherTypeIs<unsigned long, A2,
+                                                   B2>::value, type_ll_ul, type_ll_1>::type type_ll;
 
     typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, unsigned, int>::type type_1;
     typedef typename std::conditional<EitherTypeIs<long, A2, B2>::value, type_l, type_1>::type type_2;
     typedef typename std::conditional<EitherTypeIs<unsigned long, A2, B2>::value, unsigned long, type_2>::type type_3;
     typedef typename std::conditional<EitherTypeIs<long long, A2, B2>::value, type_ll, type_3>::type type_4;
-    typedef typename std::conditional<EitherTypeIs<unsigned long long, A2, B2>::value, unsigned long long, type_4>::type type_5;
+    typedef typename std::conditional<EitherTypeIs<unsigned long long, A2,
+                                                   B2>::value, unsigned long long, type_4>::type type_5;
     typedef typename std::conditional<EitherTypeIs<float, A, B>::value, float, type_5>::type type_6;
     typedef typename std::conditional<EitherTypeIs<double, A, B>::value, double, type_6>::type type_7;
 
@@ -193,9 +215,9 @@ private:
     typedef std::numeric_limits<A> lim_a;
     typedef std::numeric_limits<B> lim_b;
     REALM_STATIC_ASSERT(lim_a::is_specialized && lim_b::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
+                        "std::numeric_limits<> must be specialized for both types");
     REALM_STATIC_ASSERT(lim_a::is_integer && lim_b::is_integer,
-                          "Both types must be integers");
+                        "Both types must be integers");
 public:
     typedef typename std::conditional<(lim_a::digits >= lim_b::digits), A, B>::type type;
 };
@@ -203,13 +225,14 @@ public:
 
 template<int bits> struct LeastUnsigned {
 private:
-    typedef void                                          types_0;
-    typedef TypeAppend<types_0, unsigned char>::type      types_1;
-    typedef TypeAppend<types_1, unsigned short>::type     types_2;
-    typedef TypeAppend<types_2, unsigned int>::type       types_3;
-    typedef TypeAppend<types_3, unsigned long>::type      types_4;
+    typedef void types_0;
+    typedef TypeAppend<types_0, unsigned char>::type types_1;
+    typedef TypeAppend<types_1, unsigned short>::type types_2;
+    typedef TypeAppend<types_2, unsigned int>::type types_3;
+    typedef TypeAppend<types_3, unsigned long>::type types_4;
     typedef TypeAppend<types_4, unsigned long long>::type types_5;
     typedef types_5 types;
+
     // The `dummy<>` template is there to work around a bug in
     // VisualStudio (seen in versions 2010 and 2012). Without the
     // `dummy<>` template, The C++ compiler in Visual Studio would

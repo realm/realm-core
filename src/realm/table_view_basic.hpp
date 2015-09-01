@@ -47,7 +47,7 @@ public:
     }
 
     void to_json(std::ostream& out) const { m_impl.to_json(out); };
-    void to_string(std::ostream& out, size_t limit=500) const
+    void to_string(std::ostream& out, size_t limit = 500) const
     {
         m_impl.to_string(out, limit);
     }
@@ -116,10 +116,10 @@ protected:
     Impl m_impl;
 
     BasicTableViewBase() {}
-    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch,
                        ConstSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode) { }
-    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch,
                        MutableSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode) { }
     BasicTableViewBase(Impl i): m_impl(std::move(i)) {}
@@ -195,19 +195,19 @@ public:
     }
     typedef TableView_Handover_patch Handover_patch;
 
-    std::unique_ptr<BasicTableView<Tab>>
-    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
+    std::unique_ptr<BasicTableView<Tab >>
+    clone_for_handover(std::unique_ptr<Handover_patch>&patch, ConstSourcePayload mode) const
     {
         patch.reset(new Handover_patch);
-        std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
+        std::unique_ptr<BasicTableView<Tab >> retval(new BasicTableView<Tab>(*this, *patch, mode));
         return retval;
     }
 
-    std::unique_ptr<BasicTableView<Tab>>
-    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
+    std::unique_ptr<BasicTableView<Tab >>
+    clone_for_handover(std::unique_ptr<Handover_patch>&patch, MutableSourcePayload mode)
     {
         patch.reset(new Handover_patch);
-        std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
+        std::unique_ptr<BasicTableView<Tab >> retval(new BasicTableView<Tab>(*this, *patch, mode));
         return retval;
     }
 
@@ -241,13 +241,13 @@ private:
     template<class Subtab> Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx)
     {
         return get_parent().template
-            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+               get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
     template<class Subtab> const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
     {
         return get_parent().template
-            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+               get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
     friend class BasicTableView<const Tab>;
@@ -275,7 +275,7 @@ public:
 
     /// Construct BasicTableView<const Tab> from BasicTableView<Tab>.
     ///
-        BasicTableView(BasicTableView<Tab> tv): Base(std::move(tv.m_impl)) {}
+    BasicTableView(BasicTableView<Tab> tv): Base(std::move(tv.m_impl)) {}
 
     /// Assign BasicTableView<Tab> to BasicTableView<const Tab>.
     ///
@@ -297,7 +297,7 @@ private:
     template<class Subtab> const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
     {
         return get_parent().template
-            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+               get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
     template<class, int, class, bool> friend class _impl::FieldAccessor;

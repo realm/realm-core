@@ -40,7 +40,7 @@ public:
     void truncate(std::size_t size);
     void clear();
 
-    std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
+    std::size_t find_first(T value, std::size_t begin = 0, std::size_t end = npos) const;
     void find_all(IntegerColumn* result, T value, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
@@ -57,7 +57,7 @@ public:
     /// slower.
     static T get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase & state);
 
     std::size_t lower_bound(T value) const REALM_NOEXCEPT;
     std::size_t upper_bound(T value) const REALM_NOEXCEPT;

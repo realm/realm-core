@@ -146,10 +146,10 @@ public:
 private:
     DataType m_type;
     union {
-        int64_t      m_int;
-        bool         m_bool;
-        float        m_float;
-        double       m_double;
+        int64_t m_int;
+        bool m_bool;
+        float m_float;
+        double m_double;
         const char*  m_data;
         int_fast64_t m_date;
     };
@@ -246,8 +246,8 @@ inline Mixed::Mixed(float v) REALM_NOEXCEPT
 
 inline Mixed::Mixed(double v) REALM_NOEXCEPT
 {
-   m_type = type_Double;
-   m_double = v;
+    m_type = type_Double;
+    m_double = v;
 }
 
 inline Mixed::Mixed(StringData v) REALM_NOEXCEPT
@@ -369,14 +369,38 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 {
     out << "Mixed(";
     switch (m.m_type) {
-        case type_Int:      out << m.m_int;                        break;
-        case type_Bool:     out << m.m_bool;                       break;
-        case type_Float:    out << m.m_float;                      break;
-        case type_Double:   out << m.m_double;                     break;
-        case type_String:   out << StringData(m.m_data, m.m_size); break;
-        case type_Binary:   out << BinaryData(m.m_data, m.m_size); break;
-        case type_DateTime: out << DateTime(m.m_date);             break;
-        case type_Table:    out << "subtable";                     break;
+        case type_Int:
+            out << m.m_int;
+            break;
+
+        case type_Bool:
+            out << m.m_bool;
+            break;
+
+        case type_Float:
+            out << m.m_float;
+            break;
+
+        case type_Double:
+            out << m.m_double;
+            break;
+
+        case type_String:
+            out << StringData(m.m_data, m.m_size);
+            break;
+
+        case type_Binary:
+            out << BinaryData(m.m_data, m.m_size);
+            break;
+
+        case type_DateTime:
+            out << DateTime(m.m_date);
+            break;
+
+        case type_Table:
+            out << "subtable";
+            break;
+
         case type_Mixed:
         case type_Link:
         case type_LinkList:

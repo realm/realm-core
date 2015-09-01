@@ -189,10 +189,12 @@ public:
     template<class U> bool operator<=(U*) const REALM_NOEXCEPT;
     template<class U> bool operator>=(const BasicTableRef<U>&) const REALM_NOEXCEPT;
     template<class U> bool operator>=(U*) const REALM_NOEXCEPT;
+
     //@}
 
     // Dereference
 #ifdef __clang__
+
     // Clang has a bug that causes it to effectively ignore the 'using' declaration.
     T& operator*() const REALM_NOEXCEPT { return util::bind_ptr<T>::operator*(); }
 #else
@@ -204,6 +206,7 @@ public:
     using util::bind_ptr<T>::operator bool;
 #else
 #  ifdef __clang__
+
     // Clang 3.0 and 3.1 has a bug that causes it to effectively
     // ignore the 'using' declaration.
     typedef typename util::bind_ptr<T>::unspecified_bool_type unspecified_bool_type;
@@ -230,15 +233,16 @@ public:
 
 private:
     template<class> struct GetRowAccType { typedef void type; };
-    template<class Spec> struct GetRowAccType<BasicTable<Spec>> {
+    template<class Spec> struct GetRowAccType<BasicTable<Spec >> {
         typedef typename BasicTable<Spec>::RowAccessor type;
     };
-    template<class Spec> struct GetRowAccType<const BasicTable<Spec>> {
+    template<class Spec> struct GetRowAccType<const BasicTable<Spec >> {
         typedef typename BasicTable<Spec>::ConstRowAccessor type;
     };
     typedef typename GetRowAccType<T>::type RowAccessor;
 
 public:
+
     /// Same as 'table[i]' where 'table' is the referenced table.
     RowAccessor operator[](std::size_t i) const REALM_NOEXCEPT { return (*this->get())[i]; }
 
@@ -291,6 +295,7 @@ template<class T, class U> bool operator<(T*, const BasicTableRef<U>&) REALM_NOE
 template<class T, class U> bool operator>(T*, const BasicTableRef<U>&) REALM_NOEXCEPT;
 template<class T, class U> bool operator<=(T*, const BasicTableRef<U>&) REALM_NOEXCEPT;
 template<class T, class U> bool operator>=(T*, const BasicTableRef<U>&) REALM_NOEXCEPT;
+
 //@}
 
 

@@ -12,17 +12,16 @@ const std::size_t detached_ref = std::size_t(-1);
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
-class RowIndexes
-{
+class RowIndexes {
 public:
-    RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
+    RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc):
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected),
 #endif
         m_row_indexes(urt, alloc)
     {}
 
-    RowIndexes(IntegerColumn&& col) :
+    RowIndexes(IntegerColumn&& col):
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected),
 #endif
@@ -57,10 +56,10 @@ public:
     }
 
     // Predicate for std::sort
-    struct Sorter
-    {
+    struct Sorter {
         Sorter(){}
-        Sorter(std::vector<size_t> columns, std::vector<bool> ascending) : m_column_indexes(columns), m_ascending(ascending) {}
+        Sorter(std::vector<size_t> columns, std::vector<bool> ascending): m_column_indexes(columns), m_ascending(
+                ascending) {}
         bool operator()(size_t i, size_t j) const
         {
             for (size_t t = 0; t < m_columns.size(); t++) {
@@ -68,7 +67,7 @@ public:
                 // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited
                 // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up
                 int c;
-                if (const StringEnumColumn* cse = m_string_enum_columns[t])
+                if (const StringEnumColumn * cse = m_string_enum_columns[t])
                     c = cse->compare_values(i, j);
                 else
                     c = m_columns[t]->compare_values(i, j);
@@ -90,7 +89,7 @@ public:
                 const ColumnBase& cb = row_indexes->get_column_base(m_column_indexes[i]);
                 const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
                 REALM_ASSERT(ctb);
-                if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&cb))
+                if (const StringEnumColumn * cse = dynamic_cast<const StringEnumColumn*>(&cb))
                     m_string_enum_columns[i] = cse;
                 else
                     m_columns[i] = ctb;

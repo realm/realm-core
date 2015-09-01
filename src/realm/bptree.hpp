@@ -32,7 +32,7 @@ namespace realm {
 // FIXME: Instead of the Nullable parameter, templates could specialize on an
 // "Optional<T>" type instead. It would also remove the need for separate
 // is_null/set_null methods.
-template <class T, bool Nullable>
+template<class T, bool Nullable>
 class BpTree;
 
 class ArrayInteger;
@@ -82,12 +82,12 @@ private:
     // FIXME: Move B+Tree functionality from Array to this class.
 };
 
-template <class T, bool Nullable> struct GetLeafType;
+template<class T, bool Nullable> struct GetLeafType;
 
 // Default implementation of BpTree. This should work for all types that have monomorphic
 // leaves (i.e. all leaves are of the same type).
-template <class T, bool Nullable>
-class BpTree : public BpTreeBase {
+template<class T, bool Nullable>
+class BpTree: public BpTreeBase {
 public:
     using value_type = T;
     using LeafType = typename GetLeafType<T, Nullable>::type;
@@ -109,7 +109,7 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
-    explicit BpTree(std::unique_ptr<Array> root) : BpTreeBase(std::move(root)) {}
+    explicit BpTree(std::unique_ptr<Array> root): BpTreeBase(std::move(root)) {}
     BpTree(BpTree<T, Nullable>&&) = default;
     BpTree<T, Nullable>& operator=(BpTree<T, Nullable>&&) = default;
     void init_from_ref(Allocator& alloc, ref_type ref);
@@ -164,11 +164,11 @@ public:
     static std::size_t verify_leaf(MemRef mem, Allocator& alloc);
 #endif
     static void leaf_to_dot(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                         std::ostream& out, Allocator& alloc);
+                            std::ostream& out, Allocator& alloc);
 private:
     LeafType& root_as_leaf();
     const LeafType& root_as_leaf() const;
-    
+
     std::unique_ptr<Array> create_root_from_ref(Allocator& alloc, ref_type ref);
     std::unique_ptr<Array> create_root_from_mem(Allocator& alloc, MemRef mem);
 
@@ -182,14 +182,14 @@ private:
     struct LeafValueInserter;
     struct LeafNullInserter;
 
-    template <class TreeTraits>
+    template<class TreeTraits>
     void bptree_insert(std::size_t row_ndx, Array::TreeInsert<TreeTraits>& state, std::size_t num_rows);
 };
 
 
 /// Implementation:
 
-inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> root) : m_root(std::move(root))
+inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> root): m_root(std::move(root))
 {
 }
 
@@ -266,70 +266,78 @@ Array& BpTreeBase::root() REALM_NOEXCEPT
     return *m_root;
 }
 
-template <class T, bool N>
-BpTree<T,N>::BpTree() : BpTree(Allocator::get_default())
+template<class T, bool N>
+BpTree<T,N>::BpTree(): BpTree(Allocator::get_default())
 {
 }
 
-template <class T, bool N>
-BpTree<T,N>::BpTree(Allocator& alloc) : BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))
+template<class T, bool N>
+BpTree<T,N>::BpTree(Allocator& alloc): BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))
 {
 }
 
-template <class T, bool N>
-BpTree<T,N>::BpTree(BpTreeBase::unattached_tag) : BpTreeBase(nullptr)
+template<class T, bool N>
+BpTree<T,N>::BpTree(BpTreeBase::unattached_tag): BpTreeBase(nullptr)
 {
 }
 
-template <class T, bool N>
+template<class T, bool N>
 std::unique_ptr<Array> BpTree<T,N>::create_root_from_mem(Allocator& alloc, MemRef mem)
 {
     const char* header = mem.m_addr;
     std::unique_ptr<Array> new_root;
     if (Array::get_is_inner_bptree_node_from_header(header)) {
-        new_root.reset(new Array{alloc});
+        new_root.reset(new Array {alloc});
         new_root->init_from_mem(mem);
     }
     else {
-        std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
+        std::unique_ptr<LeafType> leaf {
+            new LeafType {
+                alloc
+            }
+        };
         leaf->init_from_mem(mem);
         new_root = std::move(leaf);
     }
     return new_root;
 }
 
-template <class T, bool N>
+template<class T, bool N>
 std::unique_ptr<Array> BpTree<T,N>::create_root_from_ref(Allocator& alloc, ref_type ref)
 {
     const char* header = alloc.translate(ref);
     std::unique_ptr<Array> new_root;
     if (Array::get_is_inner_bptree_node_from_header(header)) {
-        new_root.reset(new Array{alloc});
+        new_root.reset(new Array {alloc});
         new_root->init_from_ref(ref);
     }
     else {
-        std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
+        std::unique_ptr<LeafType> leaf {
+            new LeafType {
+                alloc
+            }
+        };
         leaf->init_from_ref(ref);
         new_root = std::move(leaf);
     }
     return new_root;
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::init_from_ref(Allocator& alloc, ref_type ref)
 {
     auto new_root = create_root_from_ref(alloc, ref);
     replace_root(std::move(new_root));
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::init_from_mem(Allocator& alloc, MemRef mem)
 {
     auto new_root = create_root_from_mem(alloc, mem);
     replace_root(std::move(new_root));
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::init_from_parent()
 {
     ref_type ref = root().get_ref_from_parent();
@@ -338,8 +346,8 @@ void BpTree<T,N>::init_from_parent()
     m_root = std::move(new_root);
 }
 
-template <class T, bool N>
-typename BpTree<T,N>::LeafType&
+template<class T, bool N>
+typename BpTree<T,N>::LeafType &
 BpTree<T,N>::root_as_leaf()
 {
     REALM_ASSERT_DEBUG(root_is_leaf());
@@ -347,8 +355,8 @@ BpTree<T,N>::root_as_leaf()
     return static_cast<LeafType&>(root());
 }
 
-template <class T, bool N>
-const typename BpTree<T,N>::LeafType&
+template<class T, bool N>
+const typename BpTree<T,N>::LeafType &
 BpTree<T,N>::root_as_leaf() const
 {
     REALM_ASSERT_DEBUG(root_is_leaf());
@@ -356,7 +364,7 @@ BpTree<T,N>::root_as_leaf() const
     return static_cast<const LeafType&>(root());
 }
 
-template <class T, bool N>
+template<class T, bool N>
 std::size_t BpTree<T, N>::size() const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
@@ -365,11 +373,11 @@ std::size_t BpTree<T, N>::size() const REALM_NOEXCEPT
     return root().get_bptree_size();
 }
 
-template <class T, bool N>
+template<class T, bool N>
 T BpTree<T, N>::back() const REALM_NOEXCEPT
 {
     // FIXME: slow
-    return get(size()-1);
+    return get(size() - 1);
 }
 
 namespace _impl {
@@ -379,8 +387,8 @@ namespace _impl {
 // don't have to implement is_null/set_null but BpTree can still
 // support the interface (and return false / assert when null
 // is not supported).
-template <class Leaf, bool Nullable> struct NullableOrNothing;
-template <class Leaf>
+template<class Leaf, bool Nullable> struct NullableOrNothing;
+template<class Leaf>
 struct NullableOrNothing<Leaf, true> {
     static bool is_null(const Leaf& leaf, std::size_t ndx)
     {
@@ -391,7 +399,7 @@ struct NullableOrNothing<Leaf, true> {
         leaf.set_null(ndx);
     }
 };
-template <class Leaf>
+template<class Leaf>
 struct NullableOrNothing<Leaf, false> {
     static bool is_null(const Leaf&, std::size_t)
     {
@@ -405,7 +413,7 @@ struct NullableOrNothing<Leaf, false> {
 
 }
 
-template <class T, bool N>
+template<class T, bool N>
 bool BpTree<T, N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
 {
     if (!N) {
@@ -418,20 +426,22 @@ bool BpTree<T, N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
     }
     LeafType fallback(get_alloc());
     const LeafType* leaf;
-    LeafInfo leaf_info { &leaf, &fallback };
+    LeafInfo leaf_info {
+        &leaf, &fallback
+    };
     std::size_t ndx_in_leaf;
     get_leaf(ndx, ndx_in_leaf, leaf_info);
     return _impl::NullableOrNothing<LeafType, N>::is_null(*leaf, ndx_in_leaf);
 }
 
-template <class T, bool N>
+template<class T, bool N>
 T BpTree<T, N>::get(std::size_t ndx) const REALM_NOEXCEPT
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
         return root_as_leaf().get(ndx);
     }
-    
+
     // Use direct getter to avoid initializing leaf array:
     std::pair<MemRef, std::size_t> p = root().get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
@@ -439,8 +449,8 @@ T BpTree<T, N>::get(std::size_t ndx) const REALM_NOEXCEPT
     return LeafType::get(leaf_header, ndx_in_leaf);
 }
 
-template <class T, bool N>
-template <class TreeTraits>
+template<class T, bool N>
+template<class TreeTraits>
 void BpTree<T,N>::bptree_insert(std::size_t row_ndx, Array::TreeInsert<TreeTraits>& state, std::size_t num_rows)
 {
     ref_type new_sibling_ref;
@@ -466,11 +476,11 @@ void BpTree<T,N>::bptree_insert(std::size_t row_ndx, Array::TreeInsert<TreeTrait
     }
 }
 
-template <class T, bool N>
+template<class T, bool N>
 struct BpTree<T,N>::LeafValueInserter {
     using value_type = T;
     T m_value;
-    LeafValueInserter(T value) : m_value(std::move(value)) {}
+    LeafValueInserter(T value): m_value(std::move(value)) {}
 
     // TreeTraits concept:
     static ref_type
@@ -480,15 +490,17 @@ struct BpTree<T,N>::LeafValueInserter {
         LeafType leaf { alloc };
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(&parent, ndx_in_parent);
+
         // Should not move out of m_value, because the same inserter may be used to perform
         // multiple insertions (for example, if num_rows > 1).
         return leaf.bptree_leaf_insert(ndx_in_leaf, state.m_value, state);
     }
 };
 
-template <class T, bool N>
+template<class T, bool N>
 struct BpTree<T,N>::LeafNullInserter {
     using value_type = null;
+
     // TreeTraits concept:
     static ref_type
     leaf_insert(MemRef leaf_mem, ArrayParent& parent, std::size_t ndx_in_parent,
@@ -497,11 +509,11 @@ struct BpTree<T,N>::LeafNullInserter {
         LeafType leaf { alloc };
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(&parent, ndx_in_parent);
-        return leaf.bptree_leaf_insert(ndx_in_leaf, null{}, state);
+        return leaf.bptree_leaf_insert(ndx_in_leaf, null {}, state);
     }
 };
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
 {
     REALM_ASSERT_DEBUG(row_ndx == npos || row_ndx < size());
@@ -511,7 +523,7 @@ void BpTree<T, N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
     bptree_insert(row_ndx, inserter, num_rows); // Throws
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
 {
     static_assert(N, "BpTree is not nullable.");
@@ -520,13 +532,12 @@ void BpTree<T, N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
     bptree_insert(row_ndx, inserter, num_rows); // Throws
 }
 
-template <class T, bool N>
-struct BpTree<T,N>::UpdateHandler : Array::UpdateHandler
-{
+template<class T, bool N>
+struct BpTree<T,N>::UpdateHandler: Array::UpdateHandler {
     LeafType m_leaf;
     const T m_value;
-    UpdateHandler(BpTreeBase& tree, T value) REALM_NOEXCEPT:
-        m_leaf(tree.get_alloc()), m_value(std::move(value)) {}
+    UpdateHandler(BpTreeBase & tree, T value) REALM_NOEXCEPT :
+    m_leaf(tree.get_alloc()), m_value(std::move(value)) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                 size_t elem_ndx_in_leaf) override
     {
@@ -536,11 +547,10 @@ struct BpTree<T,N>::UpdateHandler : Array::UpdateHandler
     }
 };
 
-template <class T, bool N>
-struct BpTree<T,N>::SetNullHandler : Array::UpdateHandler
-{
+template<class T, bool N>
+struct BpTree<T,N>::SetNullHandler: Array::UpdateHandler {
     LeafType m_leaf;
-    SetNullHandler(BpTreeBase& tree) REALM_NOEXCEPT: m_leaf(tree.get_alloc()) {}
+    SetNullHandler(BpTreeBase & tree) REALM_NOEXCEPT : m_leaf(tree.get_alloc()) {}
     void update(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
                 std::size_t elem_ndx_in_leaf) override
     {
@@ -550,7 +560,7 @@ struct BpTree<T,N>::SetNullHandler : Array::UpdateHandler
     }
 };
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::set(std::size_t ndx, T value)
 {
     if (root_is_leaf()) {
@@ -562,13 +572,13 @@ void BpTree<T, N>::set(std::size_t ndx, T value)
     }
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::set(std::size_t ndx, null)
 {
     set_null(ndx);
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::set_null(std::size_t ndx)
 {
     if (!N) {
@@ -584,15 +594,15 @@ void BpTree<T,N>::set_null(std::size_t ndx)
     }
 }
 
-template <class T, bool N>
-struct BpTree<T,N>::EraseHandler : Array::EraseHandler {
+template<class T, bool N>
+struct BpTree<T,N>::EraseHandler: Array::EraseHandler {
     BpTreeBase& m_tree;
     LeafType m_leaf;
     bool m_leaves_have_refs; // FIXME: Should be able to eliminate this.
-    EraseHandler(BpTreeBase& tree) REALM_NOEXCEPT:
-        m_tree(tree),
-        m_leaf(tree.get_alloc()),
-        m_leaves_have_refs(false) {}
+    EraseHandler(BpTreeBase & tree) REALM_NOEXCEPT :
+    m_tree(tree),
+    m_leaf(tree.get_alloc()),
+    m_leaves_have_refs(false) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) override
@@ -620,24 +630,24 @@ struct BpTree<T,N>::EraseHandler : Array::EraseHandler {
     }
     void replace_root_by_leaf(MemRef leaf_mem) override
     {
-        std::unique_ptr<LeafType> leaf{new LeafType(m_tree.get_alloc())}; // Throws
+        std::unique_ptr<LeafType> leaf {new LeafType(m_tree.get_alloc())}; // Throws
         leaf->init_from_mem(leaf_mem);
         m_tree.replace_root(std::move(leaf)); // Throws
     }
     void replace_root_by_empty_leaf() override
     {
-        std::unique_ptr<LeafType> leaf{new LeafType(m_tree.get_alloc())}; // Throws
+        std::unique_ptr<LeafType> leaf {new LeafType(m_tree.get_alloc())}; // Throws
         leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
                      Array::type_Normal); // Throws
         m_tree.replace_root(std::move(leaf)); // Throws
     }
 };
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::erase(std::size_t ndx, bool is_last)
 {
     REALM_ASSERT_DEBUG(ndx < size());
-    REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
+    REALM_ASSERT_DEBUG(is_last == (ndx == size() - 1));
     if (root_is_leaf()) {
         root_as_leaf().erase(ndx);
     }
@@ -648,7 +658,7 @@ void BpTree<T,N>::erase(std::size_t ndx, bool is_last)
     }
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     // Copy value from last row over
@@ -657,7 +667,7 @@ void BpTree<T, N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
     erase(last_row_ndx, true);
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::clear()
 {
     if (root_is_leaf()) {
@@ -672,22 +682,22 @@ void BpTree<T,N>::clear()
     }
     else {
         root().clear_and_destroy_children();
-        
+
         // Reinitialize the root's memory as a leaf.
         Allocator& alloc = get_alloc();
         std::unique_ptr<LeafType> new_root(new LeafType(alloc));
-        new_root->init_from_mem(MemRef{root().get_ref(), alloc});
+        new_root->init_from_mem(MemRef {root().get_ref(), alloc});
         new_root->set_type(Array::type_Normal);
         replace_root(std::move(new_root));
     }
 }
 
 
-template <class T, bool N>
-struct BpTree<T,N>::AdjustHandler : Array::UpdateHandler {
+template<class T, bool N>
+struct BpTree<T,N>::AdjustHandler: Array::UpdateHandler {
     LeafType m_leaf;
     const T m_diff;
-    AdjustHandler(BpTreeBase& tree, T diff) : m_leaf(tree.get_alloc()),
+    AdjustHandler(BpTreeBase & tree, T diff): m_leaf(tree.get_alloc()),
         m_diff(diff)
     {}
 
@@ -699,7 +709,7 @@ struct BpTree<T,N>::AdjustHandler : Array::UpdateHandler {
     }
 };
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::adjust(T diff)
 {
     if (root_is_leaf()) {
@@ -711,18 +721,18 @@ void BpTree<T, N>::adjust(T diff)
     }
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::adjust(std::size_t ndx, T diff)
 {
     set(ndx, get(ndx) + diff);
 }
 
-template <class T, bool N>
-struct BpTree<T,N>::AdjustGEHandler : Array::UpdateHandler {
+template<class T, bool N>
+struct BpTree<T,N>::AdjustGEHandler: Array::UpdateHandler {
     LeafType m_leaf;
     const T m_limit, m_diff;
 
-    AdjustGEHandler(BpTreeBase& tree, T limit, T diff) : m_leaf(tree.get_alloc()),
+    AdjustGEHandler(BpTreeBase & tree, T limit, T diff): m_leaf(tree.get_alloc()),
         m_limit(limit), m_diff(diff)
     {}
 
@@ -734,7 +744,7 @@ struct BpTree<T,N>::AdjustGEHandler : Array::UpdateHandler {
     }
 };
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::adjust_ge(T limit, T diff)
 {
     if (root_is_leaf()) {
@@ -746,10 +756,10 @@ void BpTree<T, N>::adjust_ge(T limit, T diff)
     }
 }
 
-template <class T, bool N>
-struct BpTree<T,N>::SliceHandler : public BpTreeBase::SliceHandler {
+template<class T, bool N>
+struct BpTree<T,N>::SliceHandler: public BpTreeBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
+    SliceHandler(Allocator & alloc): m_leaf(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
                       Allocator& target_alloc) override
     {
@@ -760,7 +770,7 @@ private:
     LeafType m_leaf;
 };
 
-template <class T, bool N>
+template<class T, bool N>
 ref_type BpTree<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
                             std::size_t table_size, _impl::OutputStream& out) const
 {
@@ -778,21 +788,21 @@ ref_type BpTree<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
     else {
         SliceHandler handler(get_alloc());
         ref = write_subtree(root(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                            table_size, handler, out);     // Throws
     }
     return ref;
 }
 
-template <class T, bool N>
+template<class T, bool N>
 MemRef BpTree<T, N>::create_leaf(Array::Type leaf_type, std::size_t size, T value, Allocator& alloc)
 {
     bool context_flag = false;
     return LeafType::create_array(leaf_type, context_flag, size, std::move(value), alloc);
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                                  LeafInfo& inout_leaf_info) const REALM_NOEXCEPT
+                            LeafInfo& inout_leaf_info) const REALM_NOEXCEPT
 {
     if (root_is_leaf()) {
         ndx_in_leaf = ndx;
@@ -805,7 +815,7 @@ void BpTree<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
     *inout_leaf_info.out_leaf = inout_leaf_info.fallback;
 }
 
-template <class T, bool N>
+template<class T, bool N>
 std::size_t BpTree<T, N>::find_first(T value, std::size_t begin, std::size_t end) const
 {
     if (root_is_leaf()) {
@@ -822,7 +832,9 @@ std::size_t BpTree<T, N>::find_first(T value, std::size_t begin, std::size_t end
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
         const LeafType* leaf;
-        LeafInfo leaf_info { &leaf, &leaf_cache };
+        LeafInfo leaf_info {
+            &leaf, &leaf_cache
+        };
         std::size_t ndx_in_leaf;
         get_leaf(ndx_in_tree, ndx_in_leaf, leaf_info);
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
@@ -830,13 +842,14 @@ std::size_t BpTree<T, N>::find_first(T value, std::size_t begin, std::size_t end
         size_t ndx = leaf->find_first(value, ndx_in_leaf, end_in_leaf); // Throws (maybe)
         if (ndx != not_found)
             return leaf_offset + ndx;
+
         ndx_in_tree = leaf_offset + end_in_leaf;
     }
 
     return not_found;
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::find_all(IntegerColumn& result, T value, std::size_t begin, std::size_t end) const
 {
     if (root_is_leaf()) {
@@ -854,7 +867,9 @@ void BpTree<T,N>::find_all(IntegerColumn& result, T value, std::size_t begin, st
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
         const LeafType* leaf;
-        LeafInfo leaf_info { &leaf, &leaf_cache };
+        LeafInfo leaf_info {
+            &leaf, &leaf_cache
+        };
         std::size_t ndx_in_leaf;
         get_leaf(ndx_in_tree, ndx_in_leaf, leaf_info);
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
@@ -865,7 +880,7 @@ void BpTree<T,N>::find_all(IntegerColumn& result, T value, std::size_t begin, st
 }
 
 #if defined(REALM_DEBUG)
-template <class T, bool N>
+template<class T, bool N>
 std::size_t BpTree<T, N>::verify_leaf(MemRef mem, Allocator& alloc)
 {
     LeafType leaf(alloc);
@@ -874,7 +889,7 @@ std::size_t BpTree<T, N>::verify_leaf(MemRef mem, Allocator& alloc)
     return leaf.size();
 }
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T, N>::verify() const
 {
     if (root_is_leaf()) {
@@ -886,9 +901,9 @@ void BpTree<T, N>::verify() const
 }
 #endif // REALM_DEBUG
 
-template <class T, bool N>
+template<class T, bool N>
 void BpTree<T,N>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                                    std::ostream& out, Allocator& alloc)
+                              std::ostream& out, Allocator& alloc)
 {
     LeafType leaf(alloc);
     leaf.init_from_mem(leaf_mem);

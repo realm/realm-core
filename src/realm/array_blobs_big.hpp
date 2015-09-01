@@ -55,7 +55,7 @@ public:
     static BinaryData get(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
-                                TreeInsertBase& state);
+                                TreeInsertBase & state);
 
     //@{
     /// Those that return a string, discard the terminating zero from
@@ -66,7 +66,8 @@ public:
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
     static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool nullable) REALM_NOEXCEPT;
-    ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
+    ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase & state);
+
     //@}
 
     /// Create a new empty big blobs array and attach this accessor to
@@ -95,7 +96,7 @@ private:
 // Implementation:
 
 inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc, bool nullable) REALM_NOEXCEPT:
-                                    Array(alloc), m_nullable(nullable)
+    Array(alloc), m_nullable(nullable)
 {
 }
 
@@ -154,7 +155,7 @@ inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const REALM_NOEXCEP
     if (bin.is_null())
         return realm::null();
     else
-        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
 inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
@@ -190,7 +191,7 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
     if (bin.is_null())
         return realm::null();
     else
-        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
 inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(std::size_t ndx, StringData value,

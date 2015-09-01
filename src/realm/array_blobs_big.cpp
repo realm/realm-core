@@ -108,7 +108,7 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
     // When strings are stored as blobs, they are always zero-terminated
     // but the value we get as input might not be.
     size_t value_size = value.size();
-    size_t full_size = is_string ? value_size+1 : value_size;
+    size_t full_size = is_string ? value_size + 1 : value_size;
 
     if (value.is_null()) {
         for (size_t i = begin; i != end; ++i) {
@@ -190,6 +190,7 @@ void ArrayBigBlobs::verify() const
     REALM_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
+
         // 0 is used to indicate realm::null()
         if (blob_ref != 0) {
             ArrayBlob blob(m_alloc);
