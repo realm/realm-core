@@ -6780,7 +6780,6 @@ TEST(Query_Null_BetweenMinMax)
 
     TableView tv;
     size_t match;
-    int64_t m;
 
     // Here we test max/min/average with 0 rows used to compute the value, either becuase all inputs are null or
     // becuase 0 rows exist.
