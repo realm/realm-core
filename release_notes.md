@@ -57,6 +57,8 @@
   associated with the exception. Note that exception classes
   `util::File::PermissionDenied`, `util::File::NotFound`, `util::File::Exists`,
   and `InvalidDatabase` are subclasses of `util::File::AccessError`.
+* Allow queries to include expressions that compute aggregates on columns in linked tables,
+  such as `table->column<LinkList>(0).column<Int>(1).sum() >= 1000`.
 
 -----------
 
