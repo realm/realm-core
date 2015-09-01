@@ -552,6 +552,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     if (cfg.session_initiator && m_file_on_streaming_form) {
 
         Header* header = reinterpret_cast<Header*>(m_data);
+        static_cast<void>(header);
 
         // Don't compare file format version fields as they are allowed to differ. 
         // Also don't compare reserved fields (todo, is it correct to ignore?)

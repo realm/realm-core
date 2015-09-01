@@ -142,11 +142,13 @@ const int global_i = 0;
 struct TestingReferenceBinding {
     TestingReferenceBinding(const int& ii)
     {
+        static_cast<void>(ii);
         REALM_ASSERT(&ii == &global_i);
     }
 
     void operator=(const int& ii)
     {
+        static_cast<void>(ii);
         REALM_ASSERT(&ii == &global_i);
     }
 

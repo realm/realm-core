@@ -12,17 +12,6 @@ bool keep_files = false;
 std::string path_prefix;
 std::string resource_path;
 
-} // anonymous namespace
-
-namespace realm {
-namespace test_util {
-
-
-void keep_test_files()
-{
-    keep_files = true;
-}
-
 #ifdef _WIN32
 std::string sanitize_for_file_name(std::string str)
 {
@@ -37,6 +26,17 @@ std::string sanitize_for_file_name(std::string str)
 #else
 std::string sanitize_for_file_name(const std::string& str) { return str; }
 #endif
+
+} // anonymous namespace
+
+namespace realm {
+namespace test_util {
+
+
+void keep_test_files()
+{
+    keep_files = true;
+}
 
 std::string get_test_path(const TestDetails& test_details, const std::string& suffix)
 {
