@@ -877,6 +877,7 @@ protected:
             default: break;
         }
         REALM_ASSERT(false); // Invalid aggregate function
+        return nullptr;
     }
 
     template <Action TAction>
@@ -889,6 +890,7 @@ protected:
             default: break;
         }
         REALM_ASSERT(false); // Invalid aggregate source column
+        return nullptr;
     }
 
     template <Action TAction>
@@ -898,6 +900,7 @@ protected:
             return get_specialized_callback_3<TAction, type_Int>(nullable);
         }
         REALM_ASSERT(false); // Invalid aggregate source column
+        return nullptr;
     }
 
     template <Action TAction, DataType TDataType>
