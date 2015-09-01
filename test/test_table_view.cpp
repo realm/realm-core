@@ -1625,7 +1625,6 @@ TEST(TableView_Backlinks)
 
     { // Links
         TableView tv = source->get_backlink_view(2, links.get(), 0);
-        tv.sync_if_needed();
 
         CHECK_EQUAL(tv.size(), 0);
 
@@ -1638,7 +1637,6 @@ TEST(TableView_Backlinks)
     }
     { // LinkViews
         TableView tv = source->get_backlink_view(2, links.get(), 1);
-        tv.sync_if_needed();
 
         CHECK_EQUAL(tv.size(), 0);
 
