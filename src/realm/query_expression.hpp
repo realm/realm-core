@@ -1320,20 +1320,20 @@ template <class S, class I> Query string_compare(const Columns<StringData>& left
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links)
-        : m_link_map(table, links), m_table(table), m_column(column)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+        m_link_map(table, links), m_table(table), m_column(column)
     {
         REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), ==, type_String);
     }
 
-    Columns(size_t column, const Table* table) : m_table(table), m_column(column)
+    Columns(size_t column, const Table* table): m_table(table), m_column(column)
     {
     }
 
-    explicit Columns() : m_table(nullptr) { }
+    explicit Columns() { }
 
 
-    explicit Columns(size_t column) : m_table(nullptr), m_column(column)
+    explicit Columns(size_t column): m_column(column)
     {
     }
 
@@ -1421,7 +1421,7 @@ public:
     LinkMap m_link_map;
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
-    const Table* m_table;
+    const Table* m_table = nullptr;
 
     // Column index of payload column of m_table
     size_t m_column;
@@ -1524,7 +1524,7 @@ private:
 
 class LinkCount : public Subexpr2<Int> {
 public:
-    LinkCount(LinkMap link_map) : m_link_map(link_map) { }
+    LinkCount(LinkMap link_map): m_link_map(link_map) { }
 
     Subexpr& clone() override
     {
@@ -1565,17 +1565,17 @@ public:
     }
 
 private:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links)
-        : m_link_map(table, links), m_table(table)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+        m_link_map(table, links), m_table(table)
     {
         static_cast<void>(column);
     }
 
-    Columns() : m_table(nullptr) { }
+    Columns() { }
 
-    explicit Columns(size_t column) : m_table(nullptr) { static_cast<void>(column); }
+    explicit Columns(size_t column) { static_cast<void>(column); }
 
-    Columns(size_t column, const Table* table) : m_table(table)
+    Columns(size_t column, const Table* table): m_table(table)
     {
         static_cast<void>(column);
     }
@@ -1600,7 +1600,7 @@ private:
     LinkMap m_link_map;
 
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
-    const Table* m_table;
+    const Table* m_table = nullptr;
 
    friend class Table;
 };
@@ -1612,24 +1612,23 @@ public:
     using ColType = typename ColumnTypeTraits<T, false>::column_type;
     using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links)
-        : m_link_map(table, links), m_table(table)
-        , m_column(column), m_nullable(m_link_map.m_table->is_nullable(m_column))
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+        m_link_map(table, links), m_table(table), m_column(column),
+        m_nullable(m_link_map.m_table->is_nullable(m_column))
     {
     }
 
-    Columns(size_t column, const Table* table)
-        : m_table(table), m_column(column), m_nullable(m_table->is_nullable(m_column))
+    Columns(size_t column, const Table* table):
+        m_table(table), m_column(column), m_nullable(m_table->is_nullable(m_column))
     {
     }
 
-    Columns() : m_table(nullptr) { }
+    Columns() { }
 
-    explicit Columns(size_t column) : m_table(nullptr), m_column(column) { }
+    explicit Columns(size_t column): m_column(column) { }
 
-    Columns(const Columns& other)
-        : m_link_map(other.m_link_map), m_table(other.m_table)
-        , m_column(other.m_column), m_nullable(other.m_nullable)
+    Columns(const Columns& other):
+        m_link_map(other.m_link_map), m_table(other.m_table), m_column(other.m_column), m_nullable(other.m_nullable)
     {
     }
 
@@ -1759,7 +1758,7 @@ public:
 
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class
     // dependency/entanglement
-    const Table* m_table;
+    const Table* m_table = nullptr;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
     std::unique_ptr<SequentialGetterBase> m_sg;
