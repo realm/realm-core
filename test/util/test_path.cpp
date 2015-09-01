@@ -23,10 +23,25 @@ void keep_test_files()
     keep_files = true;
 }
 
+#ifdef _WIN32
+std::string sanitize_for_file_name(std::string str)
+{
+    static const std::string invalid("<>:\"|?*\\/");
+    std::transform(str.begin(), str.end(), str.begin(), [](char c) {
+        if (invalid.find(c) != std::string::npos)
+            return '-';
+        return c;
+    });
+    return str;
+}
+#else
+std::string sanitize_for_file_name(const std::string& str) { return str; }
+#endif
+
 std::string get_test_path(const TestDetails& test_details, const std::string& suffix)
 {
     std::string path = path_prefix;
-    path += test_details.test_name;
+    path += sanitize_for_file_name(test_details.test_name);
     path += suffix;
     return path;
 }
