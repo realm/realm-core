@@ -892,6 +892,7 @@ EOF
             denom="android-$target"
 
             # Build OpenSSL if needed
+            repodir=$(pwd)
             libcrypto_name="libcrypto-$denom.a"
             if ! [ -f "$ANDROID_DIR/$libcrypto_name" ] && [ "$enable_encryption" = "yes" ]; then
                 (
@@ -927,9 +928,7 @@ EOF
                         cd $TMP_FOLDER
                         AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
                         RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
-                        cd ar-temp
-                        echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                        $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
+                        $AR x "$repodir/$ANDROID_DIR/$libcrypto_name" || exit 1
                         find \
                           . ! -name 'aes*' \
                           -a ! -name cbc128.o \
@@ -937,14 +936,13 @@ EOF
                           -a ! -name sha256-586.o \
                           -delete || exit 1
                         rm -f aes_wrap.o
-                        $AR x "../src/realm/$lib_name" || exit 1
-                        $AR r "../$ANDROID_DIR/$lib_name" *.o || exit 1
-                        $RANLIB "../$ANDROID_DIR/$lib_name"
+                        $AR x "$repodir/src/realm/$lib_name" || exit 1
+                        $AR r "$repodir/$ANDROID_DIR/$lib_name" *.o || exit 1
+                        $RANLIB "$repodir/$ANDROID_DIR/$lib_name"
                         cd -
                         rm -rf $TMP_FOLDER
                     ) || exit 1
                 done
-                rm -r ar-temp
 
                 echo 'This product includes software developed by the OpenSSL Project for use in the OpenSSL toolkit. (http://www.openssl.org/).' > $ANDROID_DIR/OpenSSL.txt
                 echo '' >> $ANDROID_DIR/OpenSSL.txt
