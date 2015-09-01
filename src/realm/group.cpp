@@ -185,7 +185,7 @@ void Group::attach(ref_type top_ref)
     else {
         m_top.init_from_ref(top_ref);
         size_t top_size = m_top.size();
-        REALM_ASSERT(top_size == 3 || top_size == 5 || top_size == 7);
+        REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
 
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
