@@ -6770,17 +6770,92 @@ TEST(Query_Null_BetweenMinMax)
     Group g;
     TableRef table = g.add_table("Inventory");
     create_columns(table);
-    fill_data(table);
+    table->add_empty_row();
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
     ----------------------------------------------------------------------------------------------------------------
-    0   1           null                null                    1.1                 true          2016-2-2
-    1   null        null                "foo"                   2.2                 null          null
-    2   3           30.0                "bar"                   null                false         2016-6-6
+    null            null                null                    null                null            null
     */
 
-    
+    TableView tv;
+    size_t match;
+    int64_t m;
+
+    // Here we test max/min/average with 0 rows used to compute the value, either becuase all inputs are null or
+    // becuase 0 rows exist.
+    auto test_tv = [&]() {
+        // int
+        match = 123;
+        tv.maximum_int(0, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_int(0, &match);
+        CHECK_EQUAL(match, npos);
+
+        CHECK_EQUAL(tv.sum_int(0), 0);
+        CHECK_EQUAL(tv.average_int(0), 0.);
+
+        // float
+        match = 123;
+        tv.maximum_float(1, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_float(1, &match);
+        CHECK_EQUAL(match, npos);
+
+        CHECK_EQUAL(tv.sum_float(1), 0.);
+        CHECK_EQUAL(tv.average_float(1), 0.);
+
+        // double
+        match = 123;
+        tv.maximum_double(3, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_double(3, &match);
+        CHECK_EQUAL(match, npos);
+
+        CHECK_EQUAL(tv.sum_double(3), 0.);
+        CHECK_EQUAL(tv.average_double(3), 0.);
+
+        // date
+        match = 123;
+        tv.maximum_datetime(5, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_datetime(5, &match);
+        CHECK_EQUAL(match, npos);
+    };
+
+    // There are rows in TableView but they all point to null
+    tv = table->where().find_all();
+    test_tv();
+
+    // There are 0 rows in TableView
+    tv = table->where().equal(0, 123).find_all();
+    test_tv();
+
+    // Now we test that average does not include nulls in row count:
+    /*
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
+    ----------------------------------------------------------------------------------------------------------------
+    null            null                null                    null                null            null
+    10              10.f                null                    10.                 null            null
+    */
+
+    table->add_empty_row();
+    table->set_int(0, 1, 10);
+    table->set_float(1, 1, 10.f);
+    table->set_double(3, 1, 10.);
+
+    tv = table->where().find_all();
+    CHECK_EQUAL(tv.average_int(0), 10);
+    CHECK_EQUAL(tv.average_float(1), 10.);
+    CHECK_EQUAL(tv.average_double(3), 10.);
 }
 
 // If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works by
