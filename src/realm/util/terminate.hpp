@@ -20,8 +20,8 @@
 #ifndef REALM_UTIL_TERMINATE_HPP
 #define REALM_UTIL_TERMINATE_HPP
 
-#include <sstream>
 #include <cstdlib>
+#include <sstream>
 #include <string>
 
 #include <realm/util/features.h>
