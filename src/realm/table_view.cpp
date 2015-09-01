@@ -166,8 +166,11 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
               || function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
-    if ((m_row_indexes.size() - m_num_detached_refs) == 0)
+    if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
+        if (return_ndx)
+            *return_ndx = npos;
         return 0;
+    }
 
     typedef typename ColumnTypeTraits<T, ColType::nullable>::leaf_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
@@ -326,8 +329,7 @@ double TableViewBase::average_float(size_t column_ndx) const
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0)
-        / static_cast<double>(num_attached_rows());
+    return aggregate<act_Average, double>(&DoubleColumn::average, column_ndx, 0);
 }
 
 // Count
