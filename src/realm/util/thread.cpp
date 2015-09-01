@@ -21,7 +21,6 @@
 #include <stdexcept>
 
 #include <realm/util/thread.hpp>
-#include <realm/version.hpp>
 
 #if !defined _WIN32
 #  include <unistd.h>
@@ -172,16 +171,13 @@ REALM_NORETURN void Mutex::lock_failed(int err) noexcept
 {
     switch (err) {
         case EDEADLK:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed: "
-                            "Recursive locking of mutex (deadlock)");
+            REALM_TERMINATE("pthread_mutex_lock() failed: Recursive locking of mutex (deadlock)");
         case EINVAL:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed: "
-                            "Invalid mutex object provided");
+            REALM_TERMINATE("pthread_mutex_lock() failed: Invalid mutex object provided");
         case EAGAIN:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed: "
-                            "Maximum number of recursive locks exceeded");
+            REALM_TERMINATE("pthread_mutex_lock() failed: Maximum number of recursive locks exceeded");
         default:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_mutex_lock() failed");
+            REALM_TERMINATE("pthread_mutex_lock() failed");
     }
 }
 
@@ -273,13 +269,12 @@ void CondVar::handle_wait_error(int err)
             return;
 #endif
         case EINVAL:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timedwait() failed:"
-                            "Invalid argument provided");
+            REALM_TERMINATE("pthread_cond_wait()/pthread_cond_timedwait() failed: Invalid argument provided");
         case EPERM:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timedwait() failed:"
+            REALM_TERMINATE("pthread_cond_wait()/pthread_cond_timedwait() failed:"
                             "Mutex not owned by calling thread");
         default:
-            REALM_TERMINATE(REALM_VER_CHUNK " - pthread_cond_wait()/pthread_cond_timedwait() failed");
+            REALM_TERMINATE("pthread_cond_wait()/pthread_cond_timedwait() failed");
     }
 }
 
