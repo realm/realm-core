@@ -1414,7 +1414,6 @@ TEST(TableView_MultiColSort)
     CHECK_EQUAL(tv.get_float(1, 2), 1.f);
 }
 
-
 TEST(TableView_QueryCopy)
 {
     Table table;
@@ -1438,16 +1437,15 @@ TEST(TableView_QueryCopy)
     q.end_group();
 
     q.count();
-    
+
     Query q2;
     q2 = table.where().equal(0, 1234);
-    
+
     q2 = q;
     size_t t = q2.count();
 
     CHECK_EQUAL(t, 2);
 }
-
 
 TEST(TableView_SortEnum)
 {
@@ -1474,7 +1472,142 @@ TEST(TableView_SortEnum)
     CHECK_EQUAL(tv[3].get_string(0), "foo");
     CHECK_EQUAL(tv[4].get_string(0), "foo");
     CHECK_EQUAL(tv[5].get_string(0), "foo");
+}
 
+
+TEST(TableView_UnderlyingRowRemoval)
+{
+    struct Fixture {
+        Table table;
+        TableView view;
+        Fixture() {
+            table.add_column(type_Int, "a");
+            table.add_column(type_Int, "b");
+            table.add_empty_row(5);
+
+            table.set_int(0,0,0);
+            table.set_int(0,1,1);
+            table.set_int(0,2,2);
+            table.set_int(0,3,3);
+            table.set_int(0,4,4);
+
+            table.set_int(1,0,0);
+            table.set_int(1,1,1);
+            table.set_int(1,2,0);
+            table.set_int(1,3,1);
+            table.set_int(1,4,1);
+
+            view = table.find_all_int(1,0);
+        }
+    };
+
+    // Sanity
+    {
+        Fixture f;
+        CHECK_EQUAL(2, f.view.size());
+        CHECK_EQUAL(0, f.view.get_source_ndx(0));
+        CHECK_EQUAL(2, f.view.get_source_ndx(1));
+    }
+
+    // The following checks assume that unordered row removal in the underlying
+    // table is done using `Table::move_last_over()`, and that Table::clear()
+    // does that in reverse order of rows in the view.
+
+    // Ordered remove()
+    {
+        Fixture f;
+        f.view.remove(0);
+        CHECK_EQUAL(4, f.table.size());
+        CHECK_EQUAL(1, f.table.get_int(0,0));
+        CHECK_EQUAL(2, f.table.get_int(0,1));
+        CHECK_EQUAL(3, f.table.get_int(0,2));
+        CHECK_EQUAL(4, f.table.get_int(0,3));
+        CHECK_EQUAL(1, f.view.size());
+        CHECK_EQUAL(1, f.view.get_source_ndx(0));
+    }
+    {
+        Fixture f;
+        f.view.remove(1);
+        CHECK_EQUAL(4, f.table.size());
+        CHECK_EQUAL(0, f.table.get_int(0,0));
+        CHECK_EQUAL(1, f.table.get_int(0,1));
+        CHECK_EQUAL(3, f.table.get_int(0,2));
+        CHECK_EQUAL(4, f.table.get_int(0,3));
+        CHECK_EQUAL(1, f.view.size());
+        CHECK_EQUAL(0, f.view.get_source_ndx(0));
+    }
+
+    // Unordered remove()
+    {
+        Fixture f;
+        f.view.remove(0, RemoveMode::unordered);
+        CHECK_EQUAL(4, f.table.size());
+        CHECK_EQUAL(4, f.table.get_int(0,0));
+        CHECK_EQUAL(1, f.table.get_int(0,1));
+        CHECK_EQUAL(2, f.table.get_int(0,2));
+        CHECK_EQUAL(3, f.table.get_int(0,3));
+        CHECK_EQUAL(1, f.view.size());
+        CHECK_EQUAL(2, f.view.get_source_ndx(0));
+    }
+    {
+        Fixture f;
+        f.view.remove(1, RemoveMode::unordered);
+        CHECK_EQUAL(4, f.table.size());
+        CHECK_EQUAL(0, f.table.get_int(0,0));
+        CHECK_EQUAL(1, f.table.get_int(0,1));
+        CHECK_EQUAL(4, f.table.get_int(0,2));
+        CHECK_EQUAL(3, f.table.get_int(0,3));
+        CHECK_EQUAL(1, f.view.size());
+        CHECK_EQUAL(0, f.view.get_source_ndx(0));
+    }
+
+    // Ordered remove_last()
+    {
+        Fixture f;
+        f.view.remove_last();
+        CHECK_EQUAL(4, f.table.size());
+        CHECK_EQUAL(0, f.table.get_int(0,0));
+        CHECK_EQUAL(1, f.table.get_int(0,1));
+        CHECK_EQUAL(3, f.table.get_int(0,2));
+        CHECK_EQUAL(4, f.table.get_int(0,3));
+        CHECK_EQUAL(1, f.view.size());
+        CHECK_EQUAL(0, f.view.get_source_ndx(0));
+    }
+
+    // Unordered remove_last()
+    {
+        Fixture f;
+        f.view.remove_last(RemoveMode::unordered);
+        CHECK_EQUAL(4, f.table.size());
+        CHECK_EQUAL(0, f.table.get_int(0,0));
+        CHECK_EQUAL(1, f.table.get_int(0,1));
+        CHECK_EQUAL(4, f.table.get_int(0,2));
+        CHECK_EQUAL(3, f.table.get_int(0,3));
+        CHECK_EQUAL(1, f.view.size());
+        CHECK_EQUAL(0, f.view.get_source_ndx(0));
+    }
+
+    // Ordered clear()
+    {
+        Fixture f;
+        f.view.clear();
+        CHECK_EQUAL(3, f.table.size());
+        CHECK_EQUAL(1, f.table.get_int(0,0));
+        CHECK_EQUAL(3, f.table.get_int(0,1));
+        CHECK_EQUAL(4, f.table.get_int(0,2));
+        CHECK_EQUAL(0, f.view.size());
+    }
+
+    // Unordered clear()
+    {
+        Fixture f;
+        f.view.clear(RemoveMode::unordered);
+        CHECK_EQUAL(3, f.table.size());
+        CHECK_EQUAL(3, f.table.get_int(0,0));
+        CHECK_EQUAL(1, f.table.get_int(0,1));
+        CHECK_EQUAL(4, f.table.get_int(0,2));
+        CHECK_EQUAL(0, f.view.size());
+    }
 }
 
 #endif // TEST_TABLE_VIEW

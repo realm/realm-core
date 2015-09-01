@@ -58,7 +58,7 @@ TEST(LinkList_Basic1)
     CHECK_EQUAL(tv2[0].get_index(), 0);
 
     // Just a few tests for the new string conditions to see if they work with links too.
-    // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp 
+    // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp
     Query q3 = table2->link(col_link2).column<String>(1).contains("A", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(tv3.size(), 1);
@@ -346,7 +346,7 @@ TEST(LinkList_ClearView1)
 
         TableView tv = (table2->link(col_link2).column<String>(1) != "!").find_all();
 
-        tv.clear();
+        tv.clear(RemoveMode::unordered);
         CHECK_EQUAL(1, table2->size());
     }
 
@@ -392,7 +392,7 @@ TEST(LinkList_ClearView1)
 
         TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
 
-        tv.clear();
+        tv.clear(RemoveMode::unordered);
         CHECK_EQUAL(1, table2->size());
     }
 
@@ -1445,4 +1445,26 @@ TEST(LinkList_QueryUnsortedListWithOr)
     CHECK_EQUAL(2, tv[2].get_index());
 }
 
+TEST(LinkList_QueryDateTime)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("first");
+    TableRef table2 = group.add_table("second");
+
+    table1->add_column_link(type_LinkList, "link", *table2);
+
+    table2->add_column(type_DateTime, "date");
+    
+    table2->add_empty_row();
+    table2->set_datetime(0, 0, DateTime(1));
+    
+    table1->add_empty_row();
+    LinkViewRef lvr = table1->get_linklist(0, 0);
+    lvr->add(0);
+
+    TableView tv = (table1->link(0).column<DateTime>(0) >= DateTime(1)).find_all();
+
+    CHECK_EQUAL(1, tv.size());
+}
 #endif

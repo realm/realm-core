@@ -150,7 +150,7 @@ TEST(EncryptedFile_LargePages)
     cryptor.set_file_size(sizeof(data));
     char buffer[sizeof(data)];
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR);
+    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     cryptor.write(fd, 0, data, sizeof(data));
     cryptor.read(fd, 0, buffer, sizeof(buffer));
     CHECK(memcmp(buffer, data, sizeof(data)) == 0);

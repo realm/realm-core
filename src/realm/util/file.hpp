@@ -320,7 +320,7 @@ public:
     ///
     /// Calling this function with a size that is greater than the
     /// size of the file has undefined behavior.
-    void* map(AccessMode, std::size_t size, int map_flags = 0) const;
+    void* map(AccessMode, std::size_t size, int map_flags = 0, std::size_t offset = 0) const;
 
     /// The same as unmap(old_addr, old_size) followed by map(a,
     /// new_size, map_flags), but more efficient on some systems.
@@ -335,7 +335,7 @@ public:
     /// If this function throws, the old address range will remain
     /// mapped.
     void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size,
-                int map_flags = 0) const;
+                int map_flags = 0, size_t file_offset = 0) const;
 
     /// Unmap the specified address range which must have been
     /// previously returned by map().
@@ -343,7 +343,7 @@ public:
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete. The specified
-    /// address range must be one that was previously returned by
+    /// address range must be (a subset of) one that was previously returned by
     /// map().
     static void sync_map(void* addr, std::size_t size);
 
@@ -412,30 +412,11 @@ public:
 
     class Streambuf;
 
-    /// Used for any I/O related exception. Note the derived exception
-    /// types that are used for various specific types of errors.
-    struct AccessError: std::runtime_error {
-        AccessError(const std::string& msg): std::runtime_error(msg) {}
-    };
-
-    /// Thrown if the user does not have permission to open or create
-    /// the specified file in the specified access mode.
-    struct PermissionDenied: AccessError {
-        PermissionDenied(const std::string& msg): AccessError(msg) {}
-    };
-
-    /// Thrown if the directory part of the specified path was not
-    /// found, or create_Never was specified and the file did no
-    /// exist.
-    struct NotFound: AccessError {
-        NotFound(const std::string& msg): AccessError(msg) {}
-    };
-
-    /// Thrown if create_Always was specified and the file did already
-    /// exist.
-    struct Exists: AccessError {
-        Exists(const std::string& msg): AccessError(msg) {}
-    };
+    // Exceptions
+    class AccessError;
+    class PermissionDenied;
+    class NotFound;
+    class Exists;
 
 private:
 #ifdef _WIN32
@@ -457,7 +438,7 @@ private:
         MapBase() REALM_NOEXCEPT;
         ~MapBase() REALM_NOEXCEPT;
 
-        void map(const File&, AccessMode, std::size_t size, int map_flags);
+        void map(const File&, AccessMode, std::size_t size, int map_flags, std::size_t offset = 0);
         void remap(const File&, AccessMode, std::size_t size, int map_flags);
         void unmap() REALM_NOEXCEPT;
         void sync();
@@ -505,11 +486,25 @@ public:
     explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
                  int map_flags = 0);
 
+    explicit Map(const File&, std::size_t offset, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+                 int map_flags = 0);
+
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
     Map() REALM_NOEXCEPT;
 
     ~Map() REALM_NOEXCEPT;
+
+    /// Move the mapping from another Map object to this Map object
+    File::Map<T>& operator=(File::Map<T>&& other) 
+    {
+        if (m_addr) unmap();
+        m_addr = other.m_addr;
+        m_size = other.m_size;
+        other.m_addr = 0;
+        other.m_size = 0;
+        return *this;
+    }
 
     /// See File::map().
     ///
@@ -518,7 +513,7 @@ public:
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
     T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
-           int map_flags = 0);
+           int map_flags = 0, std::size_t offset = 0);
 
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
@@ -615,6 +610,47 @@ private:
     // Disable copying
     Streambuf(const Streambuf&);
     Streambuf& operator=(const Streambuf&);
+};
+
+
+
+/// Used for any I/O related exception. Note the derived exception
+/// types that are used for various specific types of errors.
+class File::AccessError: public std::runtime_error {
+public:
+    AccessError(const std::string& msg, const std::string& path);
+
+    /// Return the associated file system path, or the empty string if there is
+    /// no associated file system path, or if the file system path is unknown.
+    std::string get_path() const;
+
+private:
+    std::string m_path;
+};
+
+
+/// Thrown if the user does not have permission to open or create
+/// the specified file in the specified access mode.
+class File::PermissionDenied: public AccessError {
+public:
+    PermissionDenied(const std::string& msg, const std::string& path);
+};
+
+
+/// Thrown if the directory part of the specified path was not
+/// found, or create_Never was specified and the file did no
+/// exist.
+class File::NotFound: public AccessError {
+public:
+    NotFound(const std::string& msg, const std::string& path);
+};
+
+
+/// Thrown if create_Always was specified and the file did already
+/// exist.
+class File::Exists: public AccessError {
+public:
+    Exists(const std::string& msg, const std::string& path);
 };
 
 
@@ -725,11 +761,11 @@ inline File::MapBase::~MapBase() REALM_NOEXCEPT
     unmap();
 }
 
-inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
 {
     REALM_ASSERT(!m_addr);
 
-    m_addr = f.map(a, size, map_flags);
+    m_addr = f.map(a, size, map_flags, offset);
     m_size = size;
 }
 
@@ -761,14 +797,20 @@ inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size, int map_
     map(f, a, size, map_flags);
 }
 
+template<class T>
+inline File::Map<T>::Map(const File& f, std::size_t offset, AccessMode a, std::size_t size, int map_flags)
+{
+    map(f, a, size, map_flags, offset);
+}
+
 template<class T> inline File::Map<T>::Map() REALM_NOEXCEPT {}
 
 template<class T> inline File::Map<T>::~Map() REALM_NOEXCEPT {}
 
 template<class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
 {
-    MapBase::map(f, a, size, map_flags);
+    MapBase::map(f, a, size, map_flags, offset);
     return static_cast<T*>(m_addr);
 }
 
@@ -861,6 +903,31 @@ inline void File::Streambuf::flush()
     setp(m_buffer.get(), epptr());
 }
 
+inline File::AccessError::AccessError(const std::string& msg, const std::string& path):
+    std::runtime_error(msg),
+    m_path(path)
+{
+}
+
+inline std::string File::AccessError::get_path() const
+{
+    return m_path;
+}
+
+inline File::PermissionDenied::PermissionDenied(const std::string& msg, const std::string& path):
+    AccessError(msg, path)
+{
+}
+
+inline File::NotFound::NotFound(const std::string& msg, const std::string& path):
+    AccessError(msg, path)
+{
+}
+
+inline File::Exists::Exists(const std::string& msg, const std::string& path):
+    AccessError(msg, path)
+{
+}
 
 } // namespace util
 } // namespace realm

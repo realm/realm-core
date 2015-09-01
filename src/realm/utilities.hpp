@@ -124,6 +124,34 @@ int fast_popcount32(int32_t x);
 int fast_popcount64(int64_t x);
 uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 
+// log2 - returns -1 if x==0, otherwise log2(x)
+inline int log2(std::size_t x) {
+    unsigned long index = -1;
+#if defined(__GNUC__)
+    if (x) {
+#   ifdef REALM_PTR_64
+        index = 63 - __builtin_clzll(x);
+#   else
+        index = 31 - __builtin_clz(x);
+#   endif
+    }
+#elif defined(_WIN32)
+    if (x) {
+#   ifdef REALM_PTR_64
+        unsigned char c = _BitScanReverse64(&index, x);
+#   else
+        unsigned char c = _BitScanReverse(&index, x);
+#   endif
+    }
+#else // not __GNUC__ and not _WIN32
+    while (x) {
+        ++index;
+        x >>= 1;
+    }
+#endif
+    return index;
+}
+
 // Implementation:
 
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.

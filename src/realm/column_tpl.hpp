@@ -29,7 +29,7 @@
 namespace realm {
 
 template<class T, class cond> class FloatDoubleNode;
-template<class T, class cond> class IntegerNode;
+template <class ColType, class Cond> class IntegerNode;
 template<class T> class SequentialGetter;
 
 template<class cond, class T> struct ColumnTypeTraits2;
@@ -63,9 +63,11 @@ struct FindInLeaf {
     {
         Condition cond;
         bool cont = true;
+        // todo, make an additional loop with hard coded `false` instead of is_null(v) for non-nullable columns
+        bool null_target = null::is_null_float(target);
         for (size_t local_index = local_start; cont && local_index < local_end; local_index++) {
             auto v = leaf.get(local_index);
-            if (cond(v, target)) {
+            if (cond(v, target, null::is_null_float(v), null_target)) {
                 cont = state.template match<action, false>(leaf_start + local_index , 0, static_cast<R>(v));
             }
         }

@@ -160,19 +160,21 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 {
     check_cookie();
 
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
-    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
+    using ColTypeTraits = ColumnTypeTraits<T, ColType::nullable>;
+    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
+    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count 
+              || function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
     if ((m_row_indexes.size() - m_num_detached_refs) == 0)
         return 0;
 
-    typedef typename ColumnTypeTraits<T>::array_type ArrType;
+    typedef typename ColumnTypeTraits<T, ColType::nullable>::leaf_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
     if (m_num_detached_refs == 0 && m_row_indexes.size() == column->size()) {
         // direct aggregate on the column
-        if(function == act_Count)
+        if (function == act_Count)
             return static_cast<R>(column->count(count_target));
         else
             return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
@@ -193,7 +195,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     if (return_ndx)
         *return_ndx = 0;
 
-    if(function == act_Count)
+    if (function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
     else
         res = static_cast<R>(first);
@@ -206,7 +208,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
-            typename ColType::LeafInfo leaf { &arrp, &arr };
+            typename ColType::LeafInfo leaf{ &arrp, &arr };
             column->get_leaf(row_ndx, ndx_in_leaf, leaf);
             leaf_start = row_ndx - ndx_in_leaf;
             leaf_end = leaf_start + arrp->size();
@@ -214,8 +216,9 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
         T v = arrp->get(row_ndx - leaf_start);
 
-        if (function == act_Sum)
+        if (function == act_Sum) {
             res += static_cast<R>(v);
+        }
         else if (function == act_Max && v > static_cast<T>(res)) {
             res = static_cast<R>(v);
             if (return_ndx)
@@ -226,19 +229,28 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
             if (return_ndx)
                 *return_ndx = ss;
         }
-        else if (function == act_Count && v == count_target)
+        else if (function == act_Count && v == count_target) {
             res++;
-
+        }
+        else if (function == act_Average) {
+            res += static_cast<R>(v);
+        }
     }
 
-    return res;
+    if (function == act_Average)
+            return res / (m_row_indexes.size() == 0 ? 1 : m_row_indexes.size());
+    else
+        return res;
 }
 
 // sum
 
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, 0);
+    else
+        return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
@@ -253,7 +265,10 @@ double TableViewBase::sum_double(size_t column_ndx) const
 
 int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
+    else
+        return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
 {
@@ -265,14 +280,20 @@ double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) cons
 }
 DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
+    else
+        return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 
 // Minimum
 
 int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
+    else
+        return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
 {
@@ -284,19 +305,24 @@ double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) cons
 }
 DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Max, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
+    else
+        return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
 // Average
 
 double TableViewBase::average_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0);
+    else
+        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0);
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0)
-        / static_cast<double>(num_attached_rows());
+    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0);
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
@@ -307,7 +333,10 @@ double TableViewBase::average_double(size_t column_ndx) const
 // Count
 size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
 {
-    return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
+    if (m_table->is_nullable(column_ndx))
+        return aggregate<act_Count, int64_t, size_t, IntNullColumn>(nullptr, column_ndx, target);
+    else
+        return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
 }
 size_t TableViewBase::count_float(size_t column_ndx, float target) const
 {
@@ -477,30 +506,29 @@ void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t 
 }
 
 
-
-
-
-// O(n) for n = this->size()
-void TableView::remove(size_t ndx)
+void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
 {
     check_cookie();
 
     REALM_ASSERT(m_table);
-    REALM_ASSERT(ndx < m_row_indexes.size());
+    REALM_ASSERT(row_ndx < m_row_indexes.size());
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    // Delete row in source table
-    const size_t real_ndx = size_t(m_row_indexes.get(ndx));
-    m_table->remove(real_ndx);
+    size_t origin_row_ndx = size_t(m_row_indexes.get(row_ndx));
+
+    // Update refs
+    m_row_indexes.erase(row_ndx);
+
+    // Delete row in origin table
+    using tf = _impl::TableFriend;
+    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
+    tf::erase_row(*m_table, origin_row_ndx, is_move_last_over); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
         m_last_seen_version = outside_version();
-
-    // Update refs
-    m_row_indexes.erase(ndx);
 
     // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
@@ -508,34 +536,23 @@ void TableView::remove(size_t ndx)
 }
 
 
-void TableView::clear()
+void TableView::clear(RemoveMode underlying_mode)
 {
     REALM_ASSERT(m_table);
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
-    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered
-    // tables with no links - and then this test will break.
-    bool is_ordered = true;
-    for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
-        ColumnType t = m_table->m_spec.get_column_type(c);
-        if (t == col_type_Link || t == col_type_LinkList || t == col_type_BackLink) {
-            is_ordered = false;
-            break;
-        }
-    }
-
     // Temporarily unregister this view so that it's not pointlessly updated
     // for the row removals
-    m_table->unregister_view(this);
+    using tf = _impl::TableFriend;
+    tf::unregister_view(*m_table, this);
 
-    bool is_move_last_over = !is_ordered;
-    m_table->batch_erase_rows(m_row_indexes, is_move_last_over);
+    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
+    tf::batch_erase_rows(*m_table, m_row_indexes, is_move_last_over); // Throws
 
     m_row_indexes.clear();
     m_num_detached_refs = 0;
-    m_table->register_view(this);
+    tf::register_view(*m_table, this); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:

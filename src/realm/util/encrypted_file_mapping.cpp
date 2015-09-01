@@ -26,24 +26,11 @@
 
 #include <cstdio>
 #include <cstring>
-#include <dlfcn.h>
 #include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 #include <realm/util/terminate.hpp>
-
-namespace {
-template<typename T>
-void dlsym_cast(T& ptr, const char *name) {
-    void* addr = dlsym(RTLD_DEFAULT, name);
-    REALM_ASSERT(addr);
-    // This cast is forbidden by C++03, but required to work by POSIX, and
-    // C++11 makes it implementation-defined specifically to support dlsym
-    ptr = reinterpret_cast<T>(reinterpret_cast<size_t>(addr));
-}
-
-} // anonymous namespace
 
 namespace realm {
 namespace util {
@@ -51,43 +38,6 @@ namespace util {
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
 : fd(fd), cryptor(key)
 {
-}
-
-AESCryptor::AESCryptor(const uint8_t* key) {
-#ifdef __APPLE__
-    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
-    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
-#else
-
-#if defined(__linux__)
-    // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
-    // into every process with every version of Android, so we can get to it
-    // with dlsym
-    // FIXME: Don't know where to write the following info:
-    // on linux, we add -ldl to the linking step to get dlsym to work,
-    // and set LD_PRELOAD to the location of libcrypto when running the executable.
-    // (on linux mint this is currently: "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libcrypto.so")
-    // To be able to debug with gdb, use the command "handle SIGSEGV noprint"
-    // before running the program.
-    dlsym_cast(AES_set_encrypt_key, "AES_set_encrypt_key");
-    dlsym_cast(AES_set_decrypt_key, "AES_set_decrypt_key");
-    dlsym_cast(AES_cbc_encrypt, "AES_cbc_encrypt");
-
-    dlsym_cast(SHA224_Init, "SHA224_Init");
-    dlsym_cast(SHA256_Update, "SHA256_Update");
-    dlsym_cast(SHA256_Final, "SHA256_Final");
-#endif
-    AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
-    AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
-#endif
-    memcpy(m_hmacKey, key + 32, 32);
-}
-
-AESCryptor::~AESCryptor() REALM_NOEXCEPT {
-#ifdef __APPLE__
-    CCCryptorRelease(m_encr);
-    CCCryptorRelease(m_decr);
-#endif
 }
 
 // We have the following constraints here:
@@ -172,6 +122,26 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
 
 } // anonymous namespace
 
+AESCryptor::AESCryptor(const uint8_t* key)
+: m_rw_buffer(new char[block_size])
+{
+#ifdef __APPLE__
+    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
+    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
+#else
+    AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
+    AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
+#endif
+    memcpy(m_hmacKey, key + 32, 32);
+}
+
+AESCryptor::~AESCryptor() REALM_NOEXCEPT {
+#ifdef __APPLE__
+    CCCryptorRelease(m_encr);
+    CCCryptorRelease(m_decr);
+#endif
+}
+
 void AESCryptor::set_file_size(off_t new_size)
 {
     REALM_ASSERT(new_size >= 0);
@@ -222,11 +192,11 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) REALM_NOEXCEPT
     }
 }
 
-bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
+bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size)
+{
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
-        char buffer[block_size];
-        ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, block_size);
+        ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
         if (bytes_read == 0)
             return false;
@@ -239,7 +209,7 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
             return false;
         }
 
-        if (!check_hmac(buffer, bytes_read, iv.hmac1)) {
+        if (!check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac1)) {
             // Either the DB is corrupted or we were interrupted between writing the
             // new IV and writing the data
             if (iv.iv2 == 0) {
@@ -247,7 +217,7 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
                 return false;
             }
 
-            if (check_hmac(buffer, bytes_read, iv.hmac2)) {
+            if (check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac2)) {
                 // Un-bump the IV since the write with the bumped IV never actually
                 // happened
                 memcpy(&iv.iv1, &iv.iv2, 32);
@@ -258,14 +228,14 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
                 // required to fill any added space with zeroes, so assume that's
                 // what happened if the buffer is all zeroes
                 for (ssize_t i = 0; i < bytes_read; ++i) {
-                    if (buffer[i] != 0)
+                    if (m_rw_buffer[i] != 0)
                         throw DecryptionFailed();
                 }
                 return false;
             }
         }
 
-        crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));
+        crypt(mode_Decrypt, pos, dst, m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
 
         pos += block_size;
         dst += block_size;
@@ -281,22 +251,21 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) REALM_NO
         iv_table& iv = get_iv_table(fd, pos);
 
         memcpy(&iv.iv2, &iv.iv1, 32);
-        char buffer[block_size];
         do {
             ++iv.iv1;
             // 0 is reserved for never-been-used, so bump if we just wrapped around
             if (iv.iv1 == 0)
                 ++iv.iv1;
 
-            crypt(mode_Encrypt, pos, buffer, src, reinterpret_cast<const char*>(&iv.iv1));
-            calc_hmac(buffer, block_size, iv.hmac1, m_hmacKey);
+            crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
+            calc_hmac(m_rw_buffer.get(), block_size, iv.hmac1, m_hmacKey);
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
         } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
-        check_write(fd, real_offset(pos), buffer, block_size);
+        check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
         pos += block_size;
         src += block_size;
@@ -357,7 +326,8 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 #endif
 }
 
-EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, size_t size, File::AccessMode access)
+EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, 
+                                           File::AccessMode access)
 : m_file(file)
 , m_page_size(realm::util::page_size())
 , m_blocks_per_page(m_page_size / block_size)
@@ -370,7 +340,7 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, siz
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == m_page_size);
-    set(addr, size); // throws
+    set(addr, size, file_offset); // throws
     file.mappings.push_back(this);
 }
 
@@ -443,7 +413,7 @@ void EncryptedFileMapping::read_page(size_t i) REALM_NOEXCEPT
     mprotect(addr, m_page_size, PROT_READ | PROT_WRITE);
 
     if (!copy_read_page(i))
-        m_file.cryptor.read(m_file.fd, i * m_page_size, addr, m_page_size);
+        m_file.cryptor.read(m_file.fd, m_file_offset + i * m_page_size, addr, m_page_size);
 
     mprotect(page_addr(i), m_page_size, PROT_READ);
     m_read_pages[i] = true;
@@ -469,7 +439,8 @@ void EncryptedFileMapping::validate_page(size_t page) REALM_NOEXCEPT
     if (!m_read_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, page * m_page_size, m_validate_buffer.get(), m_page_size))
+    if (!m_file.cryptor.read(m_file.fd, m_file_offset + page * m_page_size, 
+                             m_validate_buffer.get(), m_page_size))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
@@ -516,7 +487,7 @@ void EncryptedFileMapping::flush() REALM_NOEXCEPT
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, i * m_page_size, page_addr(i), m_page_size);
+        m_file.cryptor.write(m_file.fd, m_file_offset + i * m_page_size, page_addr(i), m_page_size);
         m_dirty_pages[i] = false;
         m_write_pages[i] = false;
     }
@@ -556,8 +527,11 @@ void EncryptedFileMapping::handle_access(void* addr) REALM_NOEXCEPT
     }
 }
 
-void EncryptedFileMapping::set(void* new_addr, size_t new_size)
+void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
+    // FIXME: size is no longer the full file size - is that a problem?
+    // if cryptor is already independent of the actual file, then the set_file_size()
+    // need a new name
     m_file.cryptor.set_file_size(new_size);
     REALM_ASSERT(new_size % m_page_size == 0);
     REALM_ASSERT(new_size > 0);
@@ -567,6 +541,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size)
     flush();
     m_addr = new_addr;
     m_size = new_size;
+    m_file_offset = new_file_offset;
 
     m_first_page = reinterpret_cast<uintptr_t>(m_addr) / m_page_size;
     m_page_count = m_size / m_page_size;
@@ -581,7 +556,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size)
 
     if (first_init) {
         if (!copy_read_page(0))
-            m_file.cryptor.try_read(m_file.fd, 0, page_addr(0), m_page_size);
+            m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
         mark_readable(0);
         if (m_page_count > 0)
             mprotect(page_addr(1), (m_page_count - 1) * m_page_size, PROT_NONE);

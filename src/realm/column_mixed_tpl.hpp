@@ -461,7 +461,7 @@ inline void MixedColumn::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
 
 inline void MixedColumn::RefsColumn::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
 {
-    SubtableColumnParent::refresh_accessor_tree(col_ndx, spec); // Throws
+    SubtableColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     std::size_t spec_ndx_in_parent = 0; // Ignored because these are root tables
     m_subtable_map.refresh_accessor_tree(spec_ndx_in_parent); // Throws
 }

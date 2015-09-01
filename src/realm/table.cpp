@@ -125,10 +125,10 @@
 ///    allows for a column accessor to be properly destroyed.
 ///
 ///  - The map of subtable accessors in a column acccessor
-///    (SubtableColumnParent::m_subtable_map). All pointers refer to existing
+///    (SubtableColumnBase:m_subtable_map). All pointers refer to existing
 ///    subtable accessors, but it is not required that the set of subtable
-///    accessors referenced from a particular parent P conincide with the set
-///    of subtables accessors specifying P as parent.
+///    accessors referenced from a particular parent P conincide with the set of
+///    subtables accessors specifying P as parent.
 ///
 ///  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
 ///    is not null, then it refers to an existing descriptor accessor.
@@ -199,7 +199,7 @@
 ///  - For each entry in the subtable map of a column accessor there must be an
 ///    underlying subtable at column `i` and row `j`, where `i` is the index of
 ///    the column accessor in `Table::m_cols`, and `j` is the value of
-///    `SubtableColumnParent::SubtableMap::entry::m_subtable_ndx`. The
+///    `SubtableColumnBase::SubtableMap::entry::m_subtable_ndx`. The
 ///    corresponding subtable accessor must satisfy all the "requirements for a
 ///    table" with respect to that underlying subtable.
 ///
@@ -1201,6 +1201,8 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                                   col_type != col_type_StringEnum &&
                                   col_type != col_type_Binary &&
                                   col_type != col_type_Int &&
+                                  col_type != col_type_Float &&
+                                  col_type != col_type_Double &&
                                   col_type != col_type_DateTime &&
                                   col_type != col_type_Bool)));
 
@@ -1216,10 +1218,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             }
             break;
         case col_type_Float:
-            col = new FloatColumn(alloc, ref); // Throws
+            col = new FloatColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Double:
-            col = new DoubleColumn(alloc, ref); // Throws
+            col = new DoubleColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_String:
             col = new StringColumn(alloc, ref, nullable); // Throws
@@ -1357,26 +1359,46 @@ bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
 
 void Table::upgrade_file_format()
 {
-    for (size_t c = 0; c < get_column_count(); c++) {
-        if (has_search_index(c)) {
-            if (get_column_type(c) == type_String) {
-                StringColumn& asc = get_column_string(c);
-                asc.get_search_index()->clear();
-                asc.populate_search_index();
-            }
-            else if (get_real_column_type(c) == col_type_Int) {
-                ColumnBase& col = get_column_base(c);
-                IntegerColumn& c = static_cast<IntegerColumn&>(col);
-                c.get_search_index()->clear();
-                c.populate_search_index();
-            }
-            else {
-                // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
-                // so this is fine for now.
-                REALM_ASSERT(false);
-            }
-
+    for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+        if (!has_search_index(col_ndx)) {
+            continue;
         }
+        ColumnType col_type = get_real_column_type(col_ndx);
+        switch (col_type) {
+            case col_type_String: {
+                StringColumn& col = get_column_string(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Bool:
+            case col_type_Int:
+            case col_type_DateTime: {
+                IntegerColumn& col = get_column(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_StringEnum: {
+                StringEnumColumn& col = get_column_string_enum(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Binary:
+            case col_type_Table:
+            case col_type_Mixed:
+            case col_type_Reserved1:
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Reserved4:
+            case col_type_Link:
+            case col_type_LinkList:
+            case col_type_BackLink:
+                // Indices are not support on these column types
+                break;
+        }
+        REALM_ASSERT(false);
     }
 }
 
@@ -2088,7 +2110,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
 void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         size_t num_rows_to_erase = 1;
         column.erase_rows(row_ndx, num_rows_to_erase, m_size,
@@ -2486,7 +2508,11 @@ float Table::get_float(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_size);
 
     const FloatColumn& column = get_column_float(col_ndx);
-    return column.get(ndx);
+    float f = column.get(ndx);
+    if (null::is_null_float(f))
+        return 0.0f;
+    else
+        return f;
 }
 
 
@@ -2510,7 +2536,12 @@ double Table::get_double(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
     REALM_ASSERT_3(ndx, <, m_size);
 
     const DoubleColumn& column = get_column_double(col_ndx);
-    return column.get(ndx);
+    double d = column.get(ndx);
+    if (null::is_null_float(d))
+        return 0.0;
+    else
+        return d;
+
 }
 
 
@@ -2799,6 +2830,8 @@ size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEP
 
 bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 {
+    if (!is_nullable(col_ndx))
+        return false;
     auto& col = get_column_base(col_ndx);
     return col.is_null(row_ndx);
 }
@@ -2807,7 +2840,9 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 void Table::set_null(size_t col_ndx, size_t row_ndx)
 {
     auto& col = get_column_base(col_ndx);
-    REALM_ASSERT(col.is_nullable());
+    if (!col.is_nullable()) {
+        throw LogicError{LogicError::column_not_nullable};
+    }
     col.set_null(row_ndx);
 
     if (Replication* repl = get_repl())
@@ -2924,8 +2959,14 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
         return 0;
 
 #if USE_COLUMN_AGGREGATE
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 #else
     if (is_empty())
         return 0;
@@ -2964,8 +3005,14 @@ DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 }
 
 // maximum ----------------------------------------------
@@ -3023,8 +3070,14 @@ DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.maximum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
 }
 
 
@@ -3300,6 +3353,30 @@ ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<b
 {
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
+
+const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain) const
+{
+    const Table* table = this;
+    for (size_t t = 0; t < link_chain.size(); t++) {
+        // Link column can be either LinkList or single Link
+        ColumnType type = table->get_real_column_type(link_chain[t]);
+        if (type == col_type_LinkList) {
+            const LinkListColumn& cll = table->get_column_link_list(link_chain[t]);
+            table = &cll.get_target_table();
+        }
+        else if (type == col_type_Link) {
+            const LinkColumn& cl = table->get_column_link(link_chain[t]);
+            table = &cl.get_target_table();
+        }
+        else {
+            // Only last column in link chain is allowed to be non-link
+            if (t + 1 != link_chain.size())
+                throw(LogicError::type_mismatch);
+        }
+    }
+    return table;
+}
+
 
 
 namespace {
@@ -4855,7 +4932,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // If the current column accessor is StringColumn, but the underlying
         // column has been upgraded to an enumerated strings column, then we
         // need to replace the accessor with an instance of StringEnumColumn.
-        if (col && col->is_string_col()) {
+        if (dynamic_cast<StringColumn*>(col) != nullptr) {
             ColumnType col_type = m_spec.get_column_type(col_ndx);
             if (col_type == col_type_StringEnum) {
                 delete col;
