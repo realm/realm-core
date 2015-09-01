@@ -19,12 +19,16 @@
   supported by query_expression.hpp.
 * Added version chunk information and failure reason for
   `pthread_mutex_lock()`.
+* Termination routines now always display the library's version before the
+  error message.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* All calls to `REALM_TERMINATE` or `util::terminate()` now display the
+  library's version. It is no longer necessary to include `REALM_VER_CHUNK` in
+  calls to those functions.
 
 ----------------------------------------------
 
