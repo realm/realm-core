@@ -409,7 +409,7 @@ volatile sig_atomic_t signal_test_state = signal_test_state_Untested;
 
 void signal_handler(int code, siginfo_t* info, void* ctx)
 {
-    if (signal_test_state == SignalHandlerUntested) {
+    if (signal_test_state == signal_test_state_Untested) {
         signal_test_state = info->si_addr == expected_si_addr ? signal_test_state_Works : signal_test_state_Broken;
         mprotect(expected_si_addr, page_size(), PROT_READ | PROT_WRITE);
         return;
