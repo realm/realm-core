@@ -1699,8 +1699,12 @@ public:
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                sgc->cache_next(link_to); // todo, needed?
-                v.m_storage.set(t, sgc->get_next(link_to));
+                sgc->cache_next(link_to);
+
+                if (sgc->m_column->is_null(link_to))
+                    v.m_storage.set_null(t);
+                else
+                    v.m_storage.set(t, sgc->get_next(link_to));
             }
             destination.import(v);
         }
