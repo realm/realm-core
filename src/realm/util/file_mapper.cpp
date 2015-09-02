@@ -397,8 +397,17 @@ int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sig
 struct sigaction old_segv;
 struct sigaction old_bus;
 
+void* expected_si_addr;
+volatile sig_atomic_t signal_test_state = 0; // 0 untested, 1 failed, 2 works
+
 void signal_handler(int code, siginfo_t* info, void* ctx)
 {
+    if (signal_test_state == 0) {
+        signal_test_state = info->si_addr == expected_si_addr ? 2 : 1;
+        mprotect(expected_si_addr, page_size(), PROT_READ | PROT_WRITE);
+        return;
+    }
+
     if (handle_access(info->si_addr))
         return;
 
@@ -426,19 +435,39 @@ void signal_handler(int code, siginfo_t* info, void* ctx)
 void install_handler()
 {
     static bool has_installed_handler = false;
-    if (!has_installed_handler) {
-        has_installed_handler = true;
+    if (has_installed_handler)
+        return;
 
-        struct sigaction action;
-        memset(&action, 0, sizeof(action));
-        action.sa_sigaction = signal_handler;
-        action.sa_flags = SA_SIGINFO;
+    has_installed_handler = true;
 
-        if (sigaction_wrapper(SIGSEGV, &action, &old_segv) != 0)
-            REALM_TERMINATE("sigaction SEGV failed");
-        if (sigaction_wrapper(SIGBUS, &action, &old_bus) != 0)
-            REALM_TERMINATE("sigaction SIGBUS");
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_sigaction = signal_handler;
+    action.sa_flags = SA_SIGINFO;
+
+    if (sigaction_wrapper(SIGSEGV, &action, &old_segv) != 0)
+        REALM_TERMINATE("sigaction SEGV failed");
+    if (sigaction_wrapper(SIGBUS, &action, &old_bus) != 0)
+        REALM_TERMINATE("sigaction SIGBUS failed");
+
+    // Test if the SIGSEGV handler is actually sent the address, as on some
+    // devices it's always 0
+    size_t size = page_size();
+
+    // Allocate an unreadable/unwritable block of address space
+    expected_si_addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (expected_si_addr == MAP_FAILED) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
+
+    // Should produce a SIGSEGV with si_addr = expected_si_addr
+    mprotect(expected_si_addr, size, PROT_NONE);
+    *static_cast<char *>(expected_si_addr) = 0;
+
+    ::munmap(expected_si_addr, size);
+    if (signal_test_state != 2)
+        throw EncryptionNotSupportedOnThisDevice();
 }
 
 #endif // __APPLE__

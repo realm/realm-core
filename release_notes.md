@@ -59,6 +59,8 @@
   and `InvalidDatabase` are subclasses of `util::File::AccessError`.
 * Allow queries to include expressions that compute aggregates on columns in linked tables,
   such as `table->column<LinkList>(0).column<Int>(1).sum() >= 1000`.
+* Added a check for functioning SEGV signals to fail more gracefully when
+  they're broken.
 
 -----------
 
@@ -256,6 +258,18 @@ StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
 is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.8 Release notes
+
+### Enhancements:
+
+* Added a check for functioning SEGV signals to fail more gracefully when
+  they're broken.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.90.0, 0.92.1].**
 
 ----------------------------------------------
 
