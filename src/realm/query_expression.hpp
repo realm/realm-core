@@ -1498,7 +1498,7 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 
 // Handling of BinaryData columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 //
-// Todo: See if we can merge it with Columns<StringData> because they are very similiar
+// FIXME: See if we can merge it with Columns<StringData> because they are very similiar
 template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
 {
 public:
