@@ -403,7 +403,7 @@ void signal_handler(int code, siginfo_t* info, void* ctx)
 {
     if (signal_test_state == 0) {
         signal_test_state = info->si_addr == expected_si_addr ? 2 : 1;
-        mprotect(expected_si_addr, page_size(), PROT_READ|PROT_WRITE);
+        mprotect(expected_si_addr, page_size(), PROT_READ | PROT_WRITE);
         return;
     }
 
