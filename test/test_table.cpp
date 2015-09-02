@@ -5989,13 +5989,68 @@ TEST(Table_Nulls)
         CHECK(!t.is_null(1, 0));
         CHECK(!t.is_null(2, 0));
 
-        t.set_null(0, 1);
-        t.set_null(1, 1);
-        t.set_null(2, 1);
-
         CHECK(t.is_null(0, 1));
         CHECK(t.is_null(1, 1));
         CHECK(t.is_null(2, 1));
+
+        CHECK_EQUAL(1, t.find_first_null(0));
+        CHECK_EQUAL(1, t.find_first_null(1));
+        CHECK_EQUAL(1, t.find_first_null(2));
+
+        CHECK_EQUAL(not_found, t.find_first_int(0, -1));
+        CHECK_EQUAL(not_found, t.find_first_bool(1, true));
+        CHECK_EQUAL(not_found, t.find_first_datetime(2, DateTime(5)));
+
+        CHECK_EQUAL(0, t.find_first_int(0, 65));
+        CHECK_EQUAL(0, t.find_first_bool(1, false));
+        CHECK_EQUAL(0, t.find_first_datetime(2, DateTime(3)));
+
+        t.set_null(0, 0);
+        t.set_null(1, 0);
+        t.set_null(2, 0);
+
+        CHECK(t.is_null(0, 0));
+        CHECK(t.is_null(1, 0));
+        CHECK(t.is_null(2, 0));
+    }
+    {
+        Table t;
+        t.add_column(type_Float, "float", true);        // nullable = true
+        t.add_column(type_Double, "double", true);      // nullable = true
+
+        t.add_empty_row(2);
+
+        t.set_float(0, 0, 1.23f);
+        t.set_double(1, 0, 12.3);
+
+        CHECK_EQUAL(1.23f, t.get_float(0, 0));
+        CHECK_EQUAL(12.3, t.get_double(1, 0));
+
+        CHECK_EQUAL(1.23f, t.maximum_float(0));
+        CHECK_EQUAL(1.23f, t.minimum_float(0));
+        CHECK_EQUAL(12.3, t.maximum_double(1));
+        CHECK_EQUAL(12.3, t.minimum_double(1));
+
+        CHECK(!t.is_null(0, 0));
+        CHECK(!t.is_null(1, 0));
+
+        CHECK(t.is_null(0, 1));
+        CHECK(t.is_null(1, 1));
+
+        CHECK_EQUAL(1, t.find_first_null(0));
+        CHECK_EQUAL(1, t.find_first_null(1));
+
+        CHECK_EQUAL(not_found, t.find_first_float(0, 2.22f));
+        CHECK_EQUAL(not_found, t.find_first_double(1, 2.22));
+
+        CHECK_EQUAL(0, t.find_first_float(0, 1.23f));
+        CHECK_EQUAL(0, t.find_first_double(1, 12.3));
+
+        t.set_null(0, 0);
+        t.set_null(1, 0);
+
+        CHECK(t.is_null(0, 0));
+        CHECK(t.is_null(1, 0));
     }
 }
 #endif
