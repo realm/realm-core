@@ -397,12 +397,12 @@ struct sigaction old_segv;
 struct sigaction old_bus;
 
 void* expected_si_addr;
-volatile sig_atomic_t signal_test_state = 0;
+volatile sig_atomic_t signal_test_state = 0; // 0 untested, 1 failed, 2 works
 
 void signal_handler(int code, siginfo_t* info, void* ctx)
 {
-    if (!signal_test_state) {
-        signal_test_state = 1 + (info->si_addr != expected_si_addr);
+    if (signal_test_state == 0) {
+        signal_test_state = info->si_addr == expected_si_addr ? 2 : 1;
         mprotect(expected_si_addr, page_size(), PROT_READ|PROT_WRITE);
         return;
     }
@@ -451,7 +451,7 @@ void install_handler()
 
     // Test if the SIGSEGV handler is actually sent the address, as on some
     // devices it's always 0
-    auto size = page_size();
+    size_t size = page_size();
 
     // Allocate an unreadable/unwritable block of address space
     expected_si_addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
