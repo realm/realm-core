@@ -24,17 +24,18 @@
 class Snapshot {
 public:
 
-    // FIXME: How should the 'synchronized' parameter be specified?
-
     // Get latest possible snapshot, snapshot is RO
-    Snapshot(Realm&, bool is_dynamic = false);
+    Snapshot(Realm&, bool is_dynamic = false, bool is_synchronized = true);
 
     // Get a snapshot identical to an existing one, snapshot is RO
-    Snapshot(Snapshot&, bool is_dynamic = false);
+    Snapshot(Snapshot&, bool is_dynamic = false, bool is_synchronized = true);
 
     // Get a writable Snapshot, ready to make changes.
     // Writable Snapshots are always dynamic.
-    Snapshot(Realm&)
+    Snapshot(Realm&, bool is_synchronized = true)
+
+    // Check if a newer snapshot has become available
+    bool newer_snapshot_available()
 
     // Commit any changes made inside a writable Snapshot to the database
     // After a call to commit() all accessors obtained from this Snapshot
@@ -59,7 +60,8 @@ public:
     // is still owned by and dies with the Snapshot.
     Group& get_group();
 
-    // Changing snapshot contents - will throw in Snapshots that are not dynamic
+    // The following will throw in Snapshots that are not dynamic:
+
     // advance Snapshot to latest commit in the database
     bool advance_read();
 
