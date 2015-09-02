@@ -6000,7 +6000,7 @@ TEST(Table_Nulls)
 }
 #endif
 
-ONLY(Table_RowAccessor_Null)
+TEST(Table_RowAccessor_Null)
 {
     Table table;
     size_t col_bool   = table.add_column(type_Bool,     "bool",   true);
