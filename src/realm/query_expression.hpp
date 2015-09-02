@@ -741,6 +741,7 @@ template <class T, size_t prealloc = 8> struct NullableVector
 };
 
 // Double
+// NOTE: fails in gcc 4.8 without `inline`. Do not remove. Same applies for all methods below.
 template<> inline void NullableVector<double>::set(size_t index, double value)
 {
     m_first[index] = value;
@@ -817,16 +818,16 @@ template<> inline void NullableVector<StringData>::set_null(size_t index)
 }
 
 // BinaryData
-template<> void NullableVector<BinaryData>::set(size_t index, BinaryData value)
+template<> inline void NullableVector<BinaryData>::set(size_t index, BinaryData value)
 {
     m_first[index] = value;
 }
-template<> bool NullableVector<BinaryData>::is_null(size_t index) const
+template<> inline bool NullableVector<BinaryData>::is_null(size_t index) const
 {
     return m_first[index].is_null();
 }
 
-template<> void NullableVector<BinaryData>::set_null(size_t index)
+template<> inline void NullableVector<BinaryData>::set_null(size_t index)
 {
     m_first[index] = BinaryData();
 }
