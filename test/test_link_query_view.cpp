@@ -1344,7 +1344,7 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 
-TEST(LinkList_QueryLinkNull)
+ONLY(LinkList_QueryLinkNull)
 {
     Group group;
 
@@ -1352,36 +1352,41 @@ TEST(LinkList_QueryLinkNull)
     data_table->add_column(type_String, "string", true);
     data_table->add_column_link(type_Link, "link", *data_table);
     data_table->add_column(type_Int, "int", true);
+    data_table->add_column(type_Double, "double", true);
 
-    // +-+--------+------+------+
-    // | |   0    |  1   |   2  |
-    // +-+--------+------+------+
-    // | | string | link | int  |
-    // +-+--------+------+------+
-    // |0| Fish   |    0 |   1  |
-    // |1| null   | null | null |
-    // |2| Horse  |    1 |   2  |
-    // +-+--------+------+------+
+    // +-+--------+------+------+--------+
+    // | |   0    |  1   |   2  |  3     |
+    // +-+--------+------+------+--------+
+    // | | string | link | int  | double |
+    // +-+--------+------+------+--------+
+    // |0| Fish   |    0 |   1  |   1.0  |
+    // |1| null   | null | null |  null  | 
+    // |2| Horse  |    1 |   2  |   2.0  |
+    // +-+--------+------+------+--------+
 
     data_table->add_empty_row();
     data_table->set_string(0, 0, "Fish");
     data_table->set_link(1, 0, 0);
     data_table->set_int(2, 0, 1);
+    data_table->set_double(3, 0, 1.0);
 
     data_table->add_empty_row();
     data_table->set_string(0, 1, realm::null());
     data_table->nullify_link(1, 1);
     data_table->set_null(2, 1);
+    data_table->set_null(3, 1);
 
     data_table->add_empty_row();
     data_table->set_string(0, 2, "Horse");
     data_table->set_link(1, 2, 1);
     data_table->set_int(2, 2, 2);
+    data_table->set_double(3, 2, 2.0);
 
     CHECK_EQUAL(1, data_table->where().and_query(data_table->column<String>(0) == realm::null()).count());
     CHECK_EQUAL(2, data_table->where().and_query(data_table->column<String>(0) != realm::null()).count());
 
     CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Int>(2) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Double>(3) == realm::null()).count());
 
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).count());
@@ -1389,6 +1394,9 @@ TEST(LinkList_QueryLinkNull)
 
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) != realm::null()).count());
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) != realm::null()).count());
 
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
