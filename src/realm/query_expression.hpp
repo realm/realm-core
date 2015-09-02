@@ -817,16 +817,16 @@ template<> inline void NullableVector<StringData>::set_null(size_t index)
 }
 
 // BinaryData
-template<> inline void NullableVector<BinaryData>::set(size_t index, BinaryData value)
+template<> void NullableVector<BinaryData>::set(size_t index, BinaryData value)
 {
     m_first[index] = value;
 }
-template<> inline bool NullableVector<BinaryData>::is_null(size_t index) const
+template<> bool NullableVector<BinaryData>::is_null(size_t index) const
 {
     return m_first[index].is_null();
 }
 
-template<> inline void NullableVector<BinaryData>::set_null(size_t index)
+template<> void NullableVector<BinaryData>::set_null(size_t index)
 {
     m_first[index] = BinaryData();
 }
@@ -1496,7 +1496,6 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 }
 
 
-
 // Handling of BinaryData columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 //
 // Todo: See if we can merge it with Columns<StringData> because they are very similiar
@@ -1504,21 +1503,21 @@ template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
 {
 public:
     Columns(size_t column, const Table* table, std::vector<size_t> links) :  
-        m_table_linked_from(nullptr), m_table(nullptr), m_column(column), m_link_map(table, links)
+        m_column(column), m_link_map(table, links)
     {
         m_table = table;
         REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), == , type_Binary);
     }
 
-    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), m_column(column)
+    Columns(size_t column, const Table* table) : m_column(column)
     {
         m_table = table;
     }
 
-    explicit Columns() : m_table_linked_from(nullptr), m_table(nullptr) { }
+    explicit Columns() { }
 
 
-    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), m_column(column)
+    explicit Columns(size_t column) : m_column(column)
     {
     }
 
@@ -1555,10 +1554,10 @@ public:
         }
     }
 
-    const Table* m_table_linked_from;
+    const Table* m_table_linked_from = nullptr;
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
-    const Table* m_table;
+    const Table* m_table = nullptr;
 
     // Column index of payload column of m_table
     size_t m_column;
@@ -1566,19 +1565,19 @@ public:
     LinkMap m_link_map;
 };
 
-inline Query operator == (const Columns<BinaryData>& left, BinaryData right) {
+inline Query operator==(const Columns<BinaryData>& left, BinaryData right) {
     return create<BinaryData, Equal, BinaryData>(right, left);
 }
 
-inline Query operator == (BinaryData left, const Columns<BinaryData>& right) {
+inline Query operator==(BinaryData left, const Columns<BinaryData>& right) {
     return create<BinaryData, Equal, BinaryData>(left, right);
 }
 
-inline Query operator != (const Columns<BinaryData>& left, BinaryData right) {
+inline Query operator!=(const Columns<BinaryData>& left, BinaryData right) {
     return create<BinaryData, NotEqual, BinaryData>(right, left);
 }
 
-inline Query operator != (BinaryData left, const Columns<BinaryData>& right) {
+inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
     return create<BinaryData, NotEqual, BinaryData>(left, right);
 }
 
