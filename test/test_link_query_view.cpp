@@ -28,17 +28,23 @@ TEST(LinkList_Basic1)
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
     table1->add_column(type_String, "str1");
+    table1->add_column(type_Binary, "bin1", true /*nullable*/);
 
     // add some rows
     table1->add_empty_row();
     table1->set_int(0, 0, 100);
     table1->set_string(1, 0, "foo");
+    table1->set_binary(2, 0, BinaryData("foo"));
+
     table1->add_empty_row();
     table1->set_int(0, 1, 200);
     table1->set_string(1, 1, "!");
+    table1->set_binary(2, 1, BinaryData("", 0)); // empty binary
+
     table1->add_empty_row();
     table1->set_int(0, 2, 300);
     table1->set_string(1, 2, "bar");
+    table1->set_binary(2, 2, BinaryData()); // null binary
 
     size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
     table2->add_empty_row();
@@ -49,6 +55,21 @@ TEST(LinkList_Basic1)
 
     Query q = table2->link(col_link2).column<String>(1) == "!";
     TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
+
+    q = table2->link(col_link2).column<BinaryData>(2) == BinaryData(); // == null
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 1);
+
+    q = table2->link(col_link2).column<BinaryData>(2) == BinaryData("", 0); // == empty binary
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
+
+    q = table2->link(col_link2).column<BinaryData>(2) != BinaryData(); // != null
+    tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv[0].get_index(), 0);
 

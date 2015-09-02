@@ -178,6 +178,12 @@ template<class T> int only_numeric(const StringData&)
     return 0;
 }
 
+template<class T> int only_numeric(const BinaryData&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
 template<class T> StringData only_string(T in)
 {
     REALM_ASSERT(false);
@@ -267,6 +273,7 @@ struct ValueBase
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void export_StringData(ValueBase& destination) const = 0;
+    virtual void export_BinaryData(ValueBase& destination) const = 0;
     virtual void export_null(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
@@ -339,7 +346,8 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
         ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
-        (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value))
+        (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
+        (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value))
         &&
         column->m_link_map.m_tables.size() == 0) {
         const Table* t = column->get_table();
@@ -808,6 +816,21 @@ template<> inline void NullableVector<StringData>::set_null(size_t index)
     m_first[index] = StringData();
 }
 
+// BinaryData
+template<> void NullableVector<BinaryData>::set(size_t index, BinaryData value)
+{
+    m_first[index] = value;
+}
+template<> bool NullableVector<BinaryData>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template<> void NullableVector<BinaryData>::set_null(size_t index)
+{
+    m_first[index] = BinaryData();
+}
+
 
 // Stores N values of type T. Can also exchange data with other ValueBase of different types
 template<class T> class Value : public ValueBase, public Subexpr2<T>
@@ -815,15 +838,16 @@ template<class T> class Value : public ValueBase, public Subexpr2<T>
 public:
     Value()
     {
-        init(false, ValueBase::default_size, 0);
+        init(false, ValueBase::default_size, T());
     }
     Value(T v)
     {
         init(false, ValueBase::default_size, v);
     }
+
     Value(bool link, size_t values)
     {
-        init(link, values, 0);
+        init(link, values, T());
     }
 
     Value(bool link, size_t values, T v)
@@ -884,7 +908,7 @@ public:
     REALM_FORCEINLINE export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
-        d.init(ValueBase::from_link, ValueBase::m_values, 0);
+        d.init(ValueBase::from_link, ValueBase::m_values, D());
         for (size_t t = 0; t < ValueBase::m_values; t++) {
             if (m_storage.is_null(t))
                 d.m_storage.set_null(t);
@@ -931,6 +955,10 @@ public:
     {
         export2<StringData>(destination);
     }
+    REALM_FORCEINLINE void export_BinaryData(ValueBase& destination) const override
+    {
+        export2<BinaryData>(destination);
+    }
     REALM_FORCEINLINE void export_null(ValueBase& destination) const override
     {
         Value<null>& d = static_cast<Value<null>&>(destination);
@@ -951,6 +979,8 @@ public:
             source.export_int64_t(*this);
         else if (std::is_same<T, StringData>::value)
             source.export_StringData(*this);
+        else if (std::is_same<T, BinaryData>::value)
+            source.export_BinaryData(*this);
         else if (std::is_same<T, null>::value)
             source.export_null(*this);
         else
@@ -1464,6 +1494,93 @@ template <class T> Query operator == (const Columns<StringData>& left, T right) 
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
     return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
 }
+
+
+// Handling of BinaryData columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
+//
+// FIXME: See if we can merge it with Columns<StringData> because they are very similiar
+template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
+{
+public:
+    Columns(size_t column, const Table* table, std::vector<size_t> links) :  
+        m_column(column), m_link_map(table, links)
+    {
+        m_table = table;
+        REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), == , type_Binary);
+    }
+
+    Columns(size_t column, const Table* table) : m_column(column)
+    {
+        m_table = table;
+    }
+
+    explicit Columns() { }
+
+
+    explicit Columns(size_t column) : m_column(column)
+    {
+    }
+
+    virtual Subexpr& clone()
+    {
+        Columns<BinaryData>& n = *new Columns<BinaryData>();
+        n = *this;
+        return n;
+    }
+
+    const Table* get_table() const override
+    {
+        return m_table;
+    }
+
+    virtual void evaluate(size_t index, ValueBase& destination)
+    {
+        Value<BinaryData>& d = static_cast<Value<BinaryData>&>(destination);
+
+        if (m_link_map.m_link_columns.size() > 0) {
+            std::vector<size_t> links = m_link_map.get_links(index);
+            Value<BinaryData> v(true, links.size());
+            for (size_t t = 0; t < links.size(); t++) {
+                size_t link_to = links[t];
+                v.m_storage.set(t, m_link_map.m_table->get_binary(m_column, link_to));
+            }
+            destination.import(v);
+        }
+        else {
+            // Not a link column
+            for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
+                d.m_storage.set(t, m_table->get_binary(m_column, index + t));
+            }
+        }
+    }
+
+    const Table* m_table_linked_from = nullptr;
+
+    // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
+    const Table* m_table = nullptr;
+
+    // Column index of payload column of m_table
+    size_t m_column;
+
+    LinkMap m_link_map;
+};
+
+inline Query operator==(const Columns<BinaryData>& left, BinaryData right) {
+    return create<BinaryData, Equal, BinaryData>(right, left);
+}
+
+inline Query operator==(BinaryData left, const Columns<BinaryData>& right) {
+    return create<BinaryData, Equal, BinaryData>(left, right);
+}
+
+inline Query operator!=(const Columns<BinaryData>& left, BinaryData right) {
+    return create<BinaryData, NotEqual, BinaryData>(right, left);
+}
+
+inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
+    return create<BinaryData, NotEqual, BinaryData>(left, right);
+}
+
 
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
 // in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
