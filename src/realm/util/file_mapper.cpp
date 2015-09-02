@@ -398,12 +398,19 @@ struct sigaction old_segv;
 struct sigaction old_bus;
 
 void* expected_si_addr;
-volatile sig_atomic_t signal_test_state = 0; // 0 untested, 1 failed, 2 works
+
+enum {
+    signal_test_state_Untested,
+    signal_test_state_Works,
+    signal_test_state_Broken
+};
+
+volatile sig_atomic_t signal_test_state = signal_test_state_Untested;
 
 void signal_handler(int code, siginfo_t* info, void* ctx)
 {
-    if (signal_test_state == 0) {
-        signal_test_state = info->si_addr == expected_si_addr ? 2 : 1;
+    if (signal_test_state == SignalHandlerUntested) {
+        signal_test_state = info->si_addr == expected_si_addr ? signal_test_state_Works : signal_test_state_Broken;
         mprotect(expected_si_addr, page_size(), PROT_READ | PROT_WRITE);
         return;
     }
@@ -470,7 +477,7 @@ void install_handler()
     *static_cast<char *>(expected_si_addr) = 0;
 
     ::munmap(expected_si_addr, size);
-    if (signal_test_state != 2)
+    if (signal_test_state != signal_test_state_Works)
         throw EncryptionNotSupportedOnThisDevice();
 }
 
