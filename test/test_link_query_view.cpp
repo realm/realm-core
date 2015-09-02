@@ -1344,7 +1344,7 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 
-TEST(LinkList_QueryLinkNull)
+ONLY(LinkList_QueryLinkNull)
 {
     Group group;
 
@@ -1416,6 +1416,9 @@ TEST(LinkList_QueryLinkNull)
     CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
     CHECK_EQUAL(0, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(0));
     CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(1));
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Link>(1).is_null()).count());
+    CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<Link>(1).is_null()).count());
 }
 
 
