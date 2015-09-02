@@ -45,17 +45,17 @@ class TransactLogParser;
 }
 
 
-/// A group is a collection of named tables.
+/// \brief A group is a collection of named tables.
 ///
 /// Tables occur in the group in an unspecified order, but an order that
-/// generally remains fixed. The order is guaranteed to remain fixed between two
-/// points in time if no tables are added to, or removed from the group during
-/// that time. When tables are added to, or removed from the group, the order
-/// may change arbitrarily.
+/// generally remains fixed. The order is guaranteed to remain fixed between
+/// two points in time if no tables are added to, or removed from the group
+/// during that time. When tables are added to, or removed from the group, the
+/// order may change arbitrarily.
 ///
 /// If `table` is a table accessor attached to a group-level table, and `group`
-/// is a group accessor attached to the group, then the following is guaranteed,
-/// even after a change in the table order:
+/// is a group accessor attached to the group, then the following is
+/// guaranteed, even after a change in the table order:
 ///
 /// \code{.cpp}
 ///
@@ -63,13 +63,36 @@ class TransactLogParser;
 ///
 /// \endcode
 ///
+/// Note that changes made to the database via a \c Group instance are not
+/// automatically committed to the specified file. You may, however, at any
+/// time, explicitly commit your changes by calling the `commit()` method,
+/// provided that the specified open-mode is not `mode_ReadOnly`.
+/// Alternatively, you may call `write()` to write the entire database to a
+/// new file. Writing the database to a new file does not end, or in any
+/// other way change the association between the \c Group instance and the
+/// file that was specified in the call to `open()`.
+///
+/// Accessing a Realm database file through manual construction of a \c
+/// Group object does not offer any level of thread safety or transaction
+/// safety. When any of those kinds of safety are a concern, consider using
+/// a \c SharedGroup instead. When accessing a database file in read/write
+/// mode through a manually constructed Group object, it is entirely the
+/// responsibility of the application that the file is not accessed in any
+/// way by a third party during the life-time of that group object. It is,
+/// on the other hand, safe to concurrently access a database file by
+/// multiple manually created \c Group objects, as long as all of them are
+/// opened in read-only mode, and there is no other party that modifies the
+/// file concurrently.
+///
+/// Some operations on the tables in a \c Group can cause indirect changes to
+/// other fields, including in other tables in the same Group. Specifically,
+/// removing a row will set any links to that row to null, and if it had the
+/// last strong links to other rows, will remove those rows. When this happens,
+/// the cascade notification handler will be called with a \c
+/// CascadeNotification containing information about what indirect changes will
+/// occur, before any changes are made.
 class Group: private Table::Parent {
 public:
-    /// Construct a free-standing group. This group instance will be
-    /// in the attached state, but neither associated with a file, nor
-    /// with an external memory buffer.
-    Group();
-
     enum OpenMode {
         /// Open in read-only mode. Fail if the file does not already exist.
         mode_ReadOnly,
@@ -79,329 +102,10 @@ public:
         mode_ReadWriteNoCreate
     };
 
-    /// Equivalent to calling open(const std::string&, const char*, OpenMode)
-    /// on an unattached group accessor.
-    explicit Group(const std::string& file, const char* encryption_key = 0, OpenMode = mode_ReadOnly);
-
-    /// Equivalent to calling open(BinaryData, bool) on an unattached
-    /// group accessor. Note that if this constructor throws, the
-    /// ownership of the memory buffer will remain with the caller,
-    /// regardless of whether \a take_ownership is set to `true` or
-    /// `false`.
-    explicit Group(BinaryData, bool take_ownership = true);
-
+    /// \brief Used to call the unattached constructor.
     struct unattached_tag {};
 
-    /// Create a Group instance in its unattached state. It may then
-    /// be attached to a database file later by calling one of the
-    /// open() methods. You may test whether this instance is
-    /// currently in its attached state by calling
-    /// is_attached(). Calling any other method (except the
-    /// destructor) while in the unattached state has undefined
-    /// behavior.
-    Group(unattached_tag) REALM_NOEXCEPT;
-
-    // FIXME: Implement a proper copy constructor (fairly trivial).
-    Group(const Group&) = delete;
-
-    ~Group() REALM_NOEXCEPT override;
-
-    /// Attach this Group instance to the specified database file.
-    ///
-    /// By default, the specified file is opened in read-only mode
-    /// (mode_ReadOnly). This allows opening a file even when the
-    /// caller lacks permission to write to that file. The opened
-    /// group may still be modified freely, but the changes cannot be
-    /// written back to the same file using the commit() function. An
-    /// attempt to do that, will cause an exception to be thrown. When
-    /// opening in read-only mode, it is an error if the specified
-    /// file does not already exist in the file system.
-    ///
-    /// Alternatively, the file can be opened in read/write mode
-    /// (mode_ReadWrite). This allows use of the commit() function,
-    /// but, of course, it also requires that the caller has
-    /// permission to write to the specified file. When opening in
-    /// read-write mode, an attempt to create the specified file will
-    /// be made, if it does not already exist in the file system.
-    ///
-    /// In any case, if the file already exists, it must contain a
-    /// valid Realm database. In many cases invalidity will be
-    /// detected and cause the InvalidDatabase exception to be thrown,
-    /// but you should not rely on it.
-    ///
-    /// Note that changes made to the database via a Group instance
-    /// are not automatically committed to the specified file. You
-    /// may, however, at any time, explicitly commit your changes by
-    /// calling the commit() method, provided that the specified
-    /// open-mode is not mode_ReadOnly. Alternatively, you may call
-    /// write() to write the entire database to a new file. Writing
-    /// the database to a new file does not end, or in any other way
-    /// change the association between the Group instance and the file
-    /// that was specified in the call to open().
-    ///
-    /// A file that is passed to Group::open(), may not be modified by
-    /// a third party until after the Group object is
-    /// destroyed. Behavior is undefined if a file is modified by a
-    /// third party while any Group object is associated with it.
-    ///
-    /// Calling open() on a Group instance that is already in the
-    /// attached state has undefined behavior.
-    ///
-    /// Accessing a Realm database file through manual construction
-    /// of a Group object does not offer any level of thread safety or
-    /// transaction safety. When any of those kinds of safety are a
-    /// concern, consider using a SharedGroup instead. When accessing
-    /// a database file in read/write mode through a manually
-    /// constructed Group object, it is entirely the responsibility of
-    /// the application that the file is not accessed in any way by a
-    /// third party during the life-time of that group object. It is,
-    /// on the other hand, safe to concurrently access a database file
-    /// by multiple manually created Group objects, as long as all of
-    /// them are opened in read-only mode, and there is no other party
-    /// that modifies the file concurrently.
-    ///
-    /// Do not call this function on a group instance that is managed
-    /// by a shared group. Doing so will result in undefined behavior.
-    ///
-    /// Even if this function throws, it may have the side-effect of
-    /// creating the specified file, and the file may get left behind
-    /// in an invalid state. Of course, this can only happen if
-    /// read/write mode (mode_ReadWrite) was requested, and the file
-    /// did not already exist.
-    ///
-    /// \param file File system path to a Realm database file.
-    ///
-    /// \param encryption_key 32-byte key used to encrypt and decrypt
-    /// the database file, or nullptr to disable encryption.
-    ///
-    /// \param mode Specifying a mode that is not mode_ReadOnly
-    /// requires that the specified file can be opened in read/write
-    /// mode. In general there is no reason to open a group in
-    /// read/write mode unless you want to be able to call
-    /// Group::commit().
-    ///
-    /// \throw util::File::AccessError If the file could not be
-    /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
-    /// derived exception type is thrown. Note that InvalidDatabase is
-    /// among these derived exception types.
-    void open(const std::string& file, const char* encryption_key = 0,
-              OpenMode mode = mode_ReadOnly);
-
-    /// Attach this Group instance to the specified memory buffer.
-    ///
-    /// This is similar to constructing a group from a file except
-    /// that in this case the database is assumed to be stored in the
-    /// specified memory buffer.
-    ///
-    /// If \a take_ownership is `true`, you pass the ownership of the
-    /// specified buffer to the group. In this case the buffer will
-    /// eventually be freed using std::free(), so the buffer you pass,
-    /// must have been allocated using std::malloc().
-    ///
-    /// On the other hand, if \a take_ownership is set to `false`, it
-    /// is your responsibility to keep the memory buffer alive during
-    /// the lifetime of the group, and in case the buffer needs to be
-    /// deallocated afterwards, that is your responsibility too.
-    ///
-    /// If this function throws, the ownership of the memory buffer
-    /// will remain with the caller, regardless of whether \a
-    /// take_ownership is set to `true` or `false`.
-    ///
-    /// Calling open() on a Group instance that is already in the
-    /// attached state has undefined behavior.
-    ///
-    /// Do not call this function on a group instance that is managed
-    /// by a shared group. Doing so will result in undefined behavior.
-    ///
-    /// \throw InvalidDatabase If the specified buffer does not appear
-    /// to contain a valid database.
-    void open(BinaryData, bool take_ownership = true);
-
-    /// A group may be created in the unattached state, and then later
-    /// attached to a file with a call to open(). Calling any method
-    /// other than open(), and is_attached() on an unattached instance
-    /// results in undefined behavior.
-    bool is_attached() const REALM_NOEXCEPT;
-
-    /// Returns true if, and only if the number of tables in this
-    /// group is zero.
-    bool is_empty() const REALM_NOEXCEPT;
-
-    /// Returns the number of tables in this group.
-    std::size_t size() const;
-
-    //@{
-
-    /// has_table() returns true if, and only if this group contains a table
-    /// with the specified name.
-    ///
-    /// find_table() returns the index of the first table in this group with the
-    /// specified name, or `realm::not_found` if this group does not contain a
-    /// table with the specified name.
-    ///
-    /// get_table_name() returns the name of table at the specified index.
-    ///
-    /// The versions of get_table(), that accepts a \a name argument, return the
-    /// first table with the specified name, or null if no such table exists.
-    ///
-    /// add_table() adds a table with the specified name to this group. It
-    /// throws TableNameInUse if \a require_unique_name is true and \a name
-    /// clashes with the name of an existing table. If \a require_unique_name is
-    /// false, it is possible to add more than one table with the same
-    /// name. Whenever a table is added, the order of the preexisting tables may
-    /// change arbitrarily, and the new table may not end up as the last one
-    /// either. But know that you can always call Table::get_index_in_group() on
-    /// the returned table accessor to find out at which index it ends up.
-    ///
-    /// remove_table() removes the specified table from this group. A table can
-    /// be removed only when it is not the target of a link column of a
-    /// different table. Whenever a table is removed, the order of the remaining
-    /// tables may change arbitrarily.
-    ///
-    /// rename_table() changes the name of a preexisting table. If \a
-    /// require_unique_name is false, it becomes possible to have more than one
-    /// table with a given name in a single group.
-    ///
-    /// The template functions work exactly like their non-template namesakes
-    /// except as follows: The template versions of get_table() and
-    /// get_or_add_table() throw DescriptorMismatch if the dynamic type of the
-    /// specified table does not match the statically specified custom table
-    /// type. The template versions of add_table() and get_or_add_table() set
-    /// the dynamic type (descriptor) to match the statically specified custom
-    /// table type.
-    ///
-    /// \tparam T An instance of the BasicTable class template.
-    ///
-    /// \param index Index of table in this group.
-    ///
-    /// \param name Name of table. All strings are valid table names as long as
-    /// they are valid UTF-8 encodings and the number of bytes does not exceed
-    /// `max_table_name_length`. A call to add_table() or get_or_add_table()
-    /// with a name that is longer than `max_table_name_length` will cause an
-    /// exception to be thrown.
-    ///
-    /// \param new_name New name for preexisting table.
-    ///
-    /// \param require_unique_name When set to true (the default), it becomes
-    /// impossible to add a table with a name that is already in use, or to
-    /// rename a table to a name that is already in use.
-    ///
-    /// \param was_added When specified, the boolean variable is set to true if
-    /// the table was added, and to false otherwise. If the function throws, the
-    /// boolean variable retains its original value.
-    ///
-    /// \return get_table(), add_table(), and get_or_add_table() return a table
-    /// accessor attached to the requested (or added) table. get_table() may
-    /// return null.
-    ///
-    /// \throw DescriptorMismatch Thrown by get_table() and get_or_add_table()
-    /// tf the dynamic table type does not match the statically specified custom
-    /// table type (\a T).
-    ///
-    /// \throw NoSuchTable Thrown by remove_table() and rename_table() if there
-    /// is no table with the specified \a name.
-    ///
-    /// \throw TableNameInUse Thrown by add_table() if \a require_unique_name is
-    /// true and \a name clashes with the name of a preexisting table. Thrown by
-    /// rename_table() if \a require_unique_name is true and \a new_name clashes
-    /// with the name of a preexisting table.
-    ///
-    /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
-    /// table is the target of a link column of a different table.
-
-    static const std::size_t max_table_name_length = 63;
-
-    bool has_table(StringData name) const REALM_NOEXCEPT;
-    std::size_t find_table(StringData name) const REALM_NOEXCEPT;
-    StringData get_table_name(std::size_t table_ndx) const;
-
-    TableRef get_table(std::size_t index);
-    ConstTableRef get_table(std::size_t index) const;
-
-    TableRef get_table(StringData name);
-    ConstTableRef get_table(StringData name) const;
-
-    TableRef add_table(StringData name, bool require_unique_name = true);
-    TableRef get_or_add_table(StringData name, bool* was_added = 0);
-
-    template<class T> BasicTableRef<T> get_table(std::size_t index);
-    template<class T> BasicTableRef<const T> get_table(std::size_t index) const;
-
-    template<class T> BasicTableRef<T> get_table(StringData name);
-    template<class T> BasicTableRef<const T> get_table(StringData name) const;
-
-    template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
-
-    void remove_table(std::size_t index);
-    void remove_table(StringData name);
-
-    void rename_table(std::size_t index, StringData new_name, bool require_unique_name = true);
-    void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
-
-    //@}
-
-    // Serialization
-
-    /// Write this database to the specified output stream.
-    ///
-    /// \param pad If true, the file is padded to ensure the footer is aligned
-    /// to the end of a page
-    void write(std::ostream&, bool pad=false) const;
-
-    /// Write this database to a new file. It is an error to specify a
-    /// file that already exists. This is to protect against
-    /// overwriting a database file that is currently open, which
-    /// would cause undefined behaviour.
-    ///
-    /// \param file A filesystem path.
-    ///
-    /// \param encryption_key 32-byte key used to encrypt the database file,
-    /// or nullptr to disable encryption.
-    ///
-    /// \throw util::File::AccessError If the file could not be
-    /// opened. If the reason corresponds to one of the exception
-    /// types that are derived from util::File::AccessError, the
-    /// derived exception type is thrown. In particular,
-    /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key=0) const;
-
-    /// Write this database to a memory buffer.
-    ///
-    /// Ownership of the returned buffer is transferred to the
-    /// caller. The memory will have been allocated using
-    /// std::malloc().
-    BinaryData write_to_mem() const;
-
-    /// Commit changes to the attached file. This requires that the
-    /// attached file is opened in read/write mode.
-    ///
-    /// Calling this function on an unattached group, a free-standing
-    /// group, a group whose attached file is opened in read-only
-    /// mode, a group that is attached to a memory buffer, or a group
-    /// that is managed by a shared group, is an error and will result
-    /// in undefined behavior.
-    ///
-    /// Table accesors will remain valid across the commit. Note that
-    /// this is not the case when working with proper transactions.
-    void commit();
-
-    //@{
-    /// Some operations on Tables in a Group can cause indirect changes to other
-    /// fields, including in other Tables in the same Group. Specifically,
-    /// removing a row will set any links to that row to null, and if it had the
-    /// last strong links to other rows, will remove those rows. When this
-    /// happens, The cascade notification handler will be called with a
-    /// CascadeNotification containing information about what indirect changes
-    /// will occur, before any changes are made.
-    ///
-    /// has_cascade_notification_handler() returns true if and only if there is
-    /// currently a non-null notification handler registered.
-    ///
-    /// set_cascade_notification_handler() replaces the current handler (if any)
-    /// with the passed in handler. Pass in nullptr to remove the current handler
-    /// without registering a new one.
+    /// \brief Contains information about the indirect changes that will occur.
     ///
     /// CascadeNotification contains a vector of rows which will be removed and
     /// a vector of links which will be set to null (or removed, for entries in
@@ -450,25 +154,604 @@ public:
         std::vector<link> links;
     };
 
-    bool has_cascade_notification_handler() const REALM_NOEXCEPT;
-    void set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) REALM_NOEXCEPT;
+    /// \brief FIXME: Add documentation
+    static const std::size_t max_table_name_length = 63;
 
-    //@}
+    /// \name Constructors and destructors
+    /// @{
 
-    // Conversion
-    template<class S> void to_json(S& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
-    void to_string(std::ostream& out) const;
+    /// \brief Construct a free-standing group.
+    ///
+    /// This group instance will be in the attached state, but neither
+    /// associated with a file, nor with an external memory buffer.
+    Group();
 
-    /// Compare two groups for equality. Two groups are equal if, and
-    /// only if, they contain the same tables in the same order, that
-    /// is, for each table T at index I in one of the groups, there is
-    /// a table at index I in the other group that is equal to T.
+    /// \brief Equivalent to calling `open(const std::string&, const char*,
+    /// OpenMode)` on an unattached group accessor.
+    explicit Group(const std::string& file, const char* encryption_key = 0, OpenMode = mode_ReadOnly);
+
+    /// \brief Equivalent to calling `open(BinaryData, bool)` on an unattached
+    /// group accessor.
+    ///
+    /// Note that if this constructor throws, the ownership of the memory
+    /// buffer will remain with the caller, regardless of whether \a
+    /// take_ownership is set to `true` or `false`.
+    explicit Group(BinaryData, bool take_ownership = true);
+
+    /// \brief Create an unattached \c Group instance.
+    ///
+    /// Create a \c Group instance in its unattached state. It may then be
+    /// attached to a database file later by calling one of the `open()`
+    /// methods. You may test whether this instance is currently in its
+    /// attached state by calling `is_attached()`. Calling any other method
+    /// (except the destructor) while in the unattached state has undefined
+    /// behavior.
+    Group(unattached_tag) REALM_NOEXCEPT;
+
+    /// \brief FIXME: Add documentation
+    // FIXME: Implement a proper copy constructor (fairly trivial).
+    Group(const Group&) = delete;
+
+    /// \brief FIXME: Add documentation
+    ~Group() REALM_NOEXCEPT override;
+
+    /// @} constructors and destructors
+
+    /// \name State and size
+    /// @{
+
+    /// \brief Check whether the group is attached or not.
+    ///
+    /// A group may be created in the unattached state, and then later attached
+    /// to a file with a call to `open()`. Calling any method other than
+    /// `open()`, and `is_attached()` on an unattached instance results in
+    /// undefined behavior.
+    bool is_attached() const REALM_NOEXCEPT;
+
+    /// \brief Check if the group has any tables.
+    ///
+    /// \returns true if, and only if the number of tables in this group is
+    /// zero.
+    bool is_empty() const REALM_NOEXCEPT;
+
+    /// \brief Retrieve the number of tables in this group.
+    std::size_t size() const;
+
+    /// @} state and size
+
+    /// \name Comparison
+    /// @{
+
+    /// \brief Compare two groups for equality.
+    ///
+    /// Two groups are equal if, and only if, they contain the same tables in
+    /// the same order, that is, for each table `T` at index `I` in one of the
+    /// groups, there is a table at index `I` in the other group that is equal
+    /// to `T`.
     bool operator==(const Group&) const;
 
-    /// Compare two groups for inequality. See operator==().
+    /// \brief Compare two groups for inequality.
+    ///
+    /// \see operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
+    /// @}
+
+    /// \name Serializers and converters
+    /// @{
+
+    /// \brief Write this database to the specified output stream.
+    ///
+    /// \param pad if true, the file is padded to ensure the footer is aligned
+    /// to the end of a page
+    void write(std::ostream&, bool pad=false) const;
+
+    /// \brief Write this database to a new file.
+    ///
+    /// It is an error to specify a file that already exists. This is to
+    /// protect against overwriting a database file that is currently open,
+    /// which would cause undefined behaviour.
+    ///
+    /// \param file A valid filesystem path.
+    ///
+    /// \param encryption_key 32-byte key used to encrypt the database file, or
+    /// nullptr to disable encryption.
+    ///
+    /// \throws util::File::AccessError If the file could not be opened. If the
+    /// reason corresponds to one of the exception types that are derived from
+    /// util::File::AccessError, the derived exception type is thrown. In
+    /// particular, util::File::Exists will be thrown if the file exists
+    /// already.
+    void write(const std::string& file, const char* encryption_key=0) const;
+
+    /// \brief Write this database to a memory buffer.
+    ///
+    /// Ownership of the returned buffer is transferred to the caller. The
+    /// memory will have been allocated using std::malloc().
+    BinaryData write_to_mem() const;
+
+    /// \brief FIXME: Add documentation
+    template<class S>
+    void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
+
+    /// \brief FIXME: Add documentation
+    void to_string(std::ostream& out) const;
+
+    /// @} serializers and converters
+
+    /// \name Modifiers
+    /// @{
+
+    /// \brief Attach this Group instance to the specified database file.
+    ///
+    /// By default, the specified file is opened in read-only mode
+    /// (`mode_ReadOnly`). This allows opening a file even when the caller
+    /// lacks permission to write to that file. The opened group may still be
+    /// modified freely, but the changes cannot be written back to the same
+    /// file using the `commit()` function. An attempt to do that, will cause
+    /// an exception to be thrown. When opening in read-only mode, it is an
+    /// error if the specified file does not already exist in the file system.
+    ///
+    /// Alternatively, the file can be opened in read/write mode
+    /// (`mode_ReadWrite`). This allows use of the `commit()` function, but, of
+    /// course, it also requires that the caller has permission to write to the
+    /// specified file. When opening in read-write mode, an attempt to create
+    /// the specified file will be made, if it does not already exist in the
+    /// file system.
+    ///
+    /// In any case, if the file already exists, it must contain a valid Realm
+    /// database. In many cases invalidity will be detected and cause the \c
+    /// InvalidDatabase exception to be thrown, but you should not rely on it.
+    ///
+    /// A file that is passed to `Group::open()`, may not be modified by a
+    /// third party until after the \c Group object is destroyed. Behavior is
+    /// undefined if a file is modified by a third party while any Group object
+    /// is associated with it.
+    ///
+    /// Calling `open()` on a \c Group instance that is already in the attached
+    /// state has undefined behavior.
+    ///
+    /// Do not call this function on a group instance that is managed by a
+    /// shared group. Doing so will result in undefined behavior.
+    ///
+    /// Even if this function throws, it may have the side-effect of creating
+    /// the specified file, and the file may get left behind in an invalid
+    /// state. Of course, this can only happen if read/write mode
+    /// (`mode_ReadWrite`) was requested, and the file did not already exist.
+    ///
+    /// \param file A valid file system path to a Realm database file.
+    ///
+    /// \param encryption_key 32-byte key used to encrypt and decrypt the
+    /// database file, or nullptr to disable encryption.
+    ///
+    /// \param mode Specifying a mode that is not `mode_ReadOnly` requires that
+    /// the specified file can be opened in read/write mode. In general there
+    /// is no reason to open a group in read/write mode unless you want to be
+    /// able to call `Group::commit()`.
+    ///
+    /// \throw util::File::AccessError If the file could not be opened. If the
+    /// reason corresponds to one of the exception types that are derived from
+    /// util::File::AccessError, the derived exception type is thrown. Note
+    /// that \c InvalidDatabase is among these derived exception types.
+    void open(const std::string& file, const char* encryption_key = 0,
+              OpenMode mode = mode_ReadOnly);
+
+    /// \brief Attach this Group instance to the specified memory buffer.
+    ///
+    /// This is similar to constructing a group from a file except that in this
+    /// case the database is assumed to be stored in the specified memory
+    /// buffer.
+    ///
+    /// If \a take_ownership is `true`, you pass the ownership of the specified
+    /// buffer to the group. In this case the buffer will eventually be freed
+    /// using std::free(), so the buffer you pass, must have been allocated
+    /// using std::malloc().
+    ///
+    /// On the other hand, if \a take_ownership is set to `false`, it is your
+    /// responsibility to keep the memory buffer alive during the lifetime of
+    /// the group, and in case the buffer needs to be deallocated afterwards,
+    /// that is your responsibility too.
+    ///
+    /// If this function throws, the ownership of the memory buffer will remain
+    /// with the caller, regardless of whether \a take_ownership is set to
+    /// `true` or `false`.
+    ///
+    /// Calling open() on a Group instance that is already in the attached
+    /// state has undefined behavior.
+    ///
+    /// Do not call this function on a group instance that is managed by a
+    /// shared group. Doing so will result in undefined behavior.
+    ///
+    /// \throws InvalidDatabase If the specified buffer does not appear to
+    /// contain a valid database.
+    void open(BinaryData, bool take_ownership = true);
+
+    /// \brief Commit changes to the attached file.
+    ///
+    /// This requires that the attached file is opened in read/write mode.
+    ///
+    /// Calling this function on an unattached group, a free-standing group, a
+    /// group whose attached file is opened in read-only mode, a group that is
+    /// attached to a memory buffer, or a group that is managed by a shared
+    /// group, is an error and will result in undefined behavior.
+    ///
+    /// Table accesors will remain valid across the commit. Note that this is
+    /// not the case when working with proper transactions.
+    void commit();
+
+    /// \brief Append a new table to the group.
+    ///
+    /// This method adds a table with the specified name to this group. If \a
+    /// require_unique_name is false, it is possible to add more than one table
+    /// with the same name. Whenever a table is added, the order of the
+    /// preexisting tables may change arbitrarily, and the new table may not
+    /// end up as the last one either. But know that you can always call
+    /// Table::get_index_in_group() on the returned table accessor to find out
+    /// at which index it ends up.
+    ///
+    /// Behaviour is undefined if \a name exceeds \ref max_table_name_length.
+    ///
+    /// \returns a table accessor attached to the added table.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \param require_unique_name When set to true (the default), it becomes
+    /// impossible to add a table with a name that is already in use.
+    ///
+    /// \throws TableNameInUse if \a require_unique_name is set to true and \a
+    /// name clashes with the name of an existing table.
+    TableRef add_table(StringData name, bool require_unique_name = true);
+
+    /// \brief Retrieve the first table in the group whose name matches \a
+    /// name or append a new one if required.
+    ///
+    /// If \a name can not be found in the ground, this method adds a table
+    /// with the specified name to this group. Whenever a table is added, the
+    /// order of the preexisting tables may change arbitrarily, and the new
+    /// table may not end up as the last one either. But know that you can
+    /// always call Table::get_index_in_group() on the returned table accessor
+    /// to find out at which index it ends up.
+    ///
+    /// Behaviour is undefined if \a name exceeds \ref max_table_name_length and a
+    /// table needs to be created.
+    ///
+    /// \returns a table accessor attached to either the pre-existing or added
+    /// table.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \param was_added When specified, the boolean variable is set to true if
+    /// the table was added, and to false otherwise. If the function throws, the
+    /// boolean variable retains its original value.
+    TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
+
+    /// \brief Append a new table to the group.
+    ///
+    /// This method adds a table with the specified name to this group. If \a
+    /// require_unique_name is false, it is possible to add more than one table
+    /// with the same name. Whenever a table is added, the order of the
+    /// preexisting tables may change arbitrarily, and the new table may not
+    /// end up as the last one either. But know that you can always call
+    /// Table::get_index_in_group() on the returned table accessor to find out
+    /// at which index it ends up.
+    ///
+    /// Behaviour is undefined if \a name exceeds \ref max_table_name_length.
+    ///
+    /// \returns a table accessor attached to the added table.
+    ///
+    /// \tparam T An instance of the BasicTable class template.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \param require_unique_name When set to true (the default), it becomes
+    /// impossible to add a table with a name that is already in use.
+    ///
+    /// \throws TableNameInUse if \a require_unique_name is set to true and \a
+    /// name clashes with the name of an existing table.
+    ///
+    /// \throws DescriptorMismatch if the dynamic type of the specified table
+    /// does not match the statically specified custom table type (\a T).
+    template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
+
+    /// \brief Retrieve the first table in the group whose name matches \a name
+    /// or append a new one if required.
+    ///
+    /// If \a name can not be found in the ground, this method adds a table
+    /// with the specified name to this group. Whenever a table is added, the
+    /// order of the preexisting tables may change arbitrarily, and the new
+    /// table may not end up as the last one either. But know that you can
+    /// always call Table::get_index_in_group() on the returned table accessor
+    /// to find out at which index it ends up.
+    ///
+    /// Behaviour is undefined if \a name exceeds \ref max_table_name_length and a
+    /// table needs to be created.
+    ///
+    /// \returns a table accessor attached to either the pre-existing or added
+    /// table.
+    ///
+    /// \tparam T An instance of the BasicTable class template.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \param was_added When specified, the boolean variable is set to true if
+    /// the table was added, and to false otherwise. If the function throws,
+    /// the boolean variable retains its original value.
+    ///
+    /// \throws DescriptorMismatch if the dynamic type of the specified table
+    /// does not match the statically specified custom table type (\a T).
+    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
+
+    /// \brief Remove the table pointed to by \a index from the group.
+    ///
+    /// This function removes the specified table from this group. A table can
+    /// be removed only when it is not the target of a link column of a
+    /// different table. Whenever a table is removed, the order of the
+    /// remaining tables may change arbitrarily. But know that you can always
+    /// call Table::get_index_in_group() on the returned table accessor to find
+    /// out at which index it ends up.
+    ///
+    /// \param index Index of table in this group.
+    ///
+    /// \throws NoSuchTable if there is no table at the specified \a index.
+    ///
+    /// \throws CrossTableLinkTarget if the specified table is the target of a
+    /// link column of a different table.
+    void remove_table(std::size_t index);
+
+    /// \brief Remove the first table from the group whose name matches \a
+    /// name.
+    ///
+    /// This function removes the specified table from this group. A table can
+    /// be removed only when it is not the target of a link column of a
+    /// different table. Whenever a table is removed, the order of the
+    /// remaining tables may change arbitrarily. But know that you can always
+    /// call Table::get_index_in_group() on the returned table accessor to find
+    /// out at which index it ends up.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \throws NoSuchTable if there is no table that matches the provided \a
+    /// name.
+    ///
+    /// \throws CrossTableLinkTarget if the specified table is the target of a
+    /// link column of a different table.
+    void remove_table(StringData name);
+
+    /// \brief Rename the table pointed to by \a index to \a new_name.
+    ///
+    /// This function changes the name of a preexisting table. If \a
+    /// require_unique_name is false, it becomes possible to have more than one
+    /// table with a given name in a single group.
+    ///
+    /// Behaviour is undefined if \a name exceeds \ref max_table_name_length.
+    ///
+    /// \param index Index of table in this group.
+    ///
+    /// \param new_name New name for preexisting table. All strings are valid
+    /// table names as long as they are valid UTF-8 encodings and the number of
+    /// bytes does not exceed \ref max_table_name_length.
+    ///
+    /// \param require_unique_name When set to true (the default), it becomes
+    /// impossible to give the table a name that is already in use.
+    ///
+    /// \throws NoSuchTable if there is no table at the specified \a index.
+    void rename_table(std::size_t index, StringData new_name, bool require_unique_name = true);
+
+    /// \brief Rename the first table in the group that matches \a name to \a
+    /// new_name.
+    ///
+    /// This function changes the name of a preexisting table. If \a
+    /// require_unique_name is false, it becomes possible to have more than one
+    /// table with a given name in a single group.
+    ///
+    /// Behaviour is undefined if \a name exceeds \ref max_table_name_length.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \param new_name New name for preexisting table. All strings are valid
+    /// table names as long as they are valid UTF-8 encodings and the number of
+    /// bytes does not exceed \ref max_table_name_length.
+    ///
+    /// \param require_unique_name When set to true (the default), it becomes
+    /// impossible to give the table a name that is already in use.
+    ///
+    /// \throws NoSuchTable if there is no table that matches the provided \a
+    /// name.
+    void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
+
+    /// @} modifiers
+
+    /// \name Table accessors
+    /// @{
+
+    /// \brief Check if the group contains a table named \a name.
+    ///
+    /// \returns true if, and only if this group contains a table with the
+    /// specified name.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    bool has_table(StringData name) const REALM_NOEXCEPT;
+
+    /// \brief Retrieve the index of the first table in the group whose name
+    /// matches \a name.
+    ///
+    /// \returns the index of the first table in this group with the specified
+    /// name, or `realm::not_found` if this group does not contain a table with
+    /// the specified name.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    std::size_t find_table(StringData name) const REALM_NOEXCEPT;
+
+    /// \brief Retrieve the name of the table at the specified index.
+    ///
+    /// The behaviour is undefined if \a table_ndx is out of range.
+    ///
+    /// \param table_ndx Index of table in this group.
+    StringData get_table_name(std::size_t table_ndx) const;
+
+    /// \brief Retrieve the table located at \a index.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a table accessor attached to the requested table, or
+    /// null-initialised if \a index is out of bounds.
+    ///
+    /// \param index Index of table in this group.
+    TableRef get_table(std::size_t index);
+
+    /// \brief Retrieve the table located at \a index.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a const table accessor attached to the requested table, or
+    /// null-initialised if \a index is out of bounds.
+    ///
+    /// \param index Index of table in this group.
+    ConstTableRef get_table(std::size_t index) const;
+
+    /// \brief Retrieve the first table in the group whose name matches \a
+    /// name.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a const table accessor attached to the requested table, or
+    /// null-initialised if no table matching \a name could be found.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    TableRef get_table(StringData name);
+
+    /// \brief Retrieve the first table in the group whose name matches \a
+    /// name.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a const table accessor attached to the requested table, or
+    /// null-initialised if no table matching \a name could be found.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ConstTableRef get_table(StringData name) const;
+
+    /// \brief Retrieve the table located at \a index.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a table accessor attached to the requested table, or
+    /// null-initialised if \a index is out of bounds.
+    ///
+    /// \tparam T An instance of the BasicTable class template.
+    ///
+    /// \param index Index of table in this group.
+    ///
+    /// \throws DescriptorMismatch if the dynamic type of the specified table
+    /// does not match the statically specified custom table type (\a T).
+    template<class T> BasicTableRef<T> get_table(std::size_t index);
+
+    /// \brief Retrieve the table located at \a index.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a const table accessor attached to the requested table, or
+    /// null-initialised if \a index is out of bounds.
+    ///
+    /// \tparam T An instance of the BasicTable class template.
+    ///
+    /// \param index Index of table in this group.
+    ///
+    /// \throws DescriptorMismatch if the dynamic type of the specified table
+    /// does not match the statically specified custom table type (\a T).
+    template<class T> BasicTableRef<const T> get_table(std::size_t index) const;
+
+    /// \brief Retrieve the first table in the group whose name matches \a
+    /// name.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a const table accessor attached to the requested table, or
+    /// null-initialised if no table matching \a name could be found.
+    ///
+    /// \tparam T An instance of the BasicTable class template.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \throws DescriptorMismatch if the dynamic type of the specified table
+    /// does not match the statically specified custom table type (\a T).
+    template<class T> BasicTableRef<T> get_table(StringData name);
+
+    /// \brief Retrieve the first table in the group whose name matches \a
+    /// name.
+    ///
+    /// The behaviour is undefined if the \c Group object is not in an attached
+    /// state.
+    ///
+    /// \returns a const table accessor attached to the requested table, or
+    /// null-initialised if no table matching \a name could be found.
+    ///
+    /// \tparam T An instance of the BasicTable class template.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// \ref max_table_name_length.
+    ///
+    /// \throws DescriptorMismatch if the dynamic type of the specified table
+    /// does not match the statically specified custom table type (\a T).
+    template<class T> BasicTableRef<const T> get_table(StringData name) const;
+
+    /// @} table accessors
+
+    /// \name Cascade notification
+    /// @{
+
+    /// \brief Check if the \c Group has a registered notification handler.
+    ///
+    /// \returns true if and only if there is currently a non-null notification
+    /// handler registered.
+    bool has_cascade_notification_handler() const REALM_NOEXCEPT;
+
+    /// \brief Set or replace the notification handler for the \c Group.
+    ///
+    /// Sets or replaces the current handler (if any) with the passed in
+    /// handler. Pass in nullptr to remove the current handler without
+    /// registering a new one.
+    ///
+    // FIXME: Add documentation for \a new_handler.
+    /// \param new_handler (documentation missing)
+    void set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) REALM_NOEXCEPT;
+
+    /// @} cascade notification
+
+    /// \name Debug
+    /// These functions are only available in debug mode. Some of them are
+    /// defined as no-ops in order to ease debug integration.
+    /// @{
 #ifdef REALM_DEBUG
     void verify() const;
     void print() const;
@@ -479,8 +762,10 @@ public:
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
 #else
+    /// \brief FIXME: Add documentation
     void verify() const {}
 #endif
+    /// @} debug
 
 private:
     SlabAlloc m_alloc;
@@ -851,8 +1136,7 @@ template<class T> inline BasicTableRef<T> Group::get_or_add_table(StringData nam
 }
 
 template<class S>
-void Group::to_json(S& out, std::size_t link_depth,
-                    std::map<std::string, std::string>* renames) const
+void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
