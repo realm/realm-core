@@ -1,3 +1,12 @@
+# 0.89.8 Release notes
+
+### Enhancements:
+
+* Added a check for functioning SEGV signals to fail more gracefully when
+  they're broken.
+
+----------------------------------------------
+
 # 0.89.7 Release notes
 
 ### Bugfixes:
