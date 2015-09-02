@@ -1344,7 +1344,7 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 
-ONLY(LinkList_QueryLinkNull)
+TEST(LinkList_QueryLinkNull)
 {
     Group group;
 
