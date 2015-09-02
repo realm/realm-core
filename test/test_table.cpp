@@ -6000,4 +6000,61 @@ TEST(Table_Nulls)
 }
 #endif
 
+ONLY(Table_RowAccessor_Null)
+{
+    Table table;
+    size_t col_bool   = table.add_column(type_Bool,     "bool",   true);
+    size_t col_int    = table.add_column(type_Int,      "int",    true);
+    size_t col_string = table.add_column(type_String,   "string", true);
+    size_t col_float  = table.add_column(type_Float,    "float",  true);
+    size_t col_double = table.add_column(type_Double,   "double", true);    
+    size_t col_date   = table.add_column(type_DateTime, "date",   true);
+    size_t col_binary = table.add_column(type_Binary,   "binary", true);
+
+    {
+        table.add_empty_row();
+        Row row = table[0];
+        row.set_null(col_bool);
+        row.set_null(col_int);
+        row.set_string(col_string, realm::null());
+        row.set_null(col_float);
+        row.set_null(col_double);
+        row.set_null(col_date);
+        row.set_binary(col_binary, BinaryData());
+    }
+    {
+        table.add_empty_row();
+        Row row = table[1];
+        row.set_bool(col_bool, true);
+        row.set_int(col_int, 1);
+        row.set_string(col_string, "1");
+        row.set_float(col_float, 1.0);
+        row.set_double(col_double, 1.0);
+        row.set_datetime(col_date, DateTime(1));
+        row.set_binary(col_binary, BinaryData("a"));
+    }
+
+    {
+        Row row = table[0];
+        CHECK(row.is_null(col_bool));
+        CHECK(row.is_null(col_int));
+        CHECK(row.is_null(col_string));
+        CHECK(row.is_null(col_float));
+        CHECK(row.is_null(col_double));
+        CHECK(row.is_null(col_date));
+        CHECK(row.is_null(col_binary));
+    }
+
+    {
+        Row row = table[1];
+        CHECK_EQUAL(true,            row.get_bool(col_bool));
+        CHECK_EQUAL(1,               row.get_int(col_int));
+        CHECK_EQUAL("1",             row.get_string(col_string));
+        CHECK_EQUAL(1.0,             row.get_float(col_float));
+        CHECK_EQUAL(1.0,             row.get_double(col_double));
+        CHECK_EQUAL(DateTime(1),     row.get_datetime(col_date));
+        CHECK_EQUAL(BinaryData("a"), row.get_binary(col_binary));
+    }
+}
+
 #endif // TEST_TABLE
