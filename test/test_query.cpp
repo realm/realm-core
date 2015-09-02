@@ -6954,7 +6954,7 @@ TEST(Query_Null_ManyRows)
     CHECK(equals(tv, non_nulls));
 }
 
-ONLY(Query_Null_Sort)
+TEST(Query_Null_Sort)
 {
     Group g;
     TableRef table = g.add_table("Inventory");
