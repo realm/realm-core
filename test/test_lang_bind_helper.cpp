@@ -8188,6 +8188,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         // here we need to allow the reciever to get hold on the proper version before
         // we go through the loop again and advance_read().
         control->wait_feedback();
+        sched_yield();
 
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
@@ -8206,7 +8207,11 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID version;
         control->get(handover, version);
+        CHECK_EQUAL(version.version, handover->version.version);
+        CHECK(version == handover->version);
         Group& g = const_cast<Group&>(sg.begin_read(version));
+        CHECK_EQUAL(version.version, sg.get_version_of_current_transaction().version);
+        CHECK(version == sg.get_version_of_current_transaction());
         control->signal_feedback();
         TableRef table = g.get_table("table");
         TableView tv = table->where().greater(0,50).find_all();
@@ -8214,9 +8219,9 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
-        CHECK(tv.size() == tv2->size());
+        CHECK_EQUAL(tv.size(), tv2->size());
         for (std::size_t k=0; k<tv.size(); ++k)
-            CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
+            CHECK_EQUAL(tv.get_int(0,k), tv2->get_int(0,k));
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
         sg.end_read();
