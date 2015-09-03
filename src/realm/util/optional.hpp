@@ -319,7 +319,7 @@ REALM_CONSTEXPR Optional<T>::operator bool() const
 template <class T>
 REALM_CONSTEXPR const T& Optional<T>::value() const
 {
-    return m_engaged ? *ptr() : throw BadOptionalAccess{"bad optional access"};
+    return m_engaged ? *ptr() : (throw BadOptionalAccess{"bad optional access"}, *ptr());
 }
 
 template <class T>
@@ -334,7 +334,7 @@ T& Optional<T>::value()
 template <class T>
 REALM_CONSTEXPR const typename Optional<T&>::target_type& Optional<T&>::value() const
 {
-    return m_ptr ? *m_ptr : throw BadOptionalAccess{"bad optional access"};
+    return m_ptr ? *m_ptr : (throw BadOptionalAccess{"bad optional access"}, *m_ptr);
 }
 
 template <class T>
