@@ -2,6 +2,7 @@ nobase_subinclude_HEADERS = \
 util/features.h \
 util/meta.hpp \
 util/assert.hpp \
+util/encryption_not_supported_exception.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
 util/tuple.hpp \

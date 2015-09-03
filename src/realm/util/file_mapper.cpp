@@ -39,6 +39,7 @@
 #include <atomic>
 
 #include <realm/util/errno.hpp>
+#include <realm/util/encryption_not_supported_exception.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
