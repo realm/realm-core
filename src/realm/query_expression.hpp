@@ -856,7 +856,7 @@ public:
         init(link, values, v);
     }
 
-    Value(const Value& other) = default;
+    Value(const Value&) = default;
     Value& operator=(const Value&) = default;
 
     void init(bool link, size_t values, T v) {
