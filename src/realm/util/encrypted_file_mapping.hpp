@@ -165,10 +165,6 @@ struct DecryptionFailed: util::File::AccessError {
     DecryptionFailed(): util::File::AccessError("Decryption failed") {}
 };
 
-struct EncryptionNotSupportedOnThisDevice: std::runtime_error {
-    EncryptionNotSupportedOnThisDevice(): std::runtime_error("Encryption is not supported on this device") { }
-};
-
 }
 }
 
