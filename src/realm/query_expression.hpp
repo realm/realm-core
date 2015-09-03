@@ -602,7 +602,7 @@ public:
 };
 
 
-/* 
+/*
 This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
 to be null too. It's used by the Value class for internal storage.
 
@@ -633,7 +633,7 @@ time optimizations for these cases.
 
 template <class T, size_t prealloc = 8> struct NullableVector
 {
-    typedef typename std::conditional<std::is_same<T, bool>::value 
+    typedef typename std::conditional<std::is_same<T, bool>::value
         || std::is_same<T, int>::value, int64_t, T>::type t_storage;
 
     NullableVector() {};
@@ -693,7 +693,7 @@ template <class T, size_t prealloc = 8> struct NullableVector
         m_first[index] = value;
     }
 
-    void fill(T value) 
+    void fill(T value)
     {
         for (size_t t = 0; t < m_size; t++) {
             if (std::is_same<T, null>::value)
@@ -755,7 +755,7 @@ template<> inline bool NullableVector<double>::is_null(size_t index) const
 template<> inline void NullableVector<double>::set_null(size_t index)
 {
     m_first[index] = null::get_null_float<double>();
-} 
+}
 
 // Float
 template<> inline bool NullableVector<float>::is_null(size_t index) const
@@ -883,11 +883,11 @@ public:
         size_t vals = minimum(left->m_values, right->m_values);
 
         for (size_t t = 0; t < vals; t++) {
-            if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(t) || right->m_storage.is_null(t))) 
+            if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(t) || right->m_storage.is_null(t)))
                 m_storage.set_null(t);
             else
                 m_storage.set(t, o(left->m_storage[t], right->m_storage[t]));
-            
+
         }
     }
 
@@ -1007,7 +1007,7 @@ public:
             REALM_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
-            // Right values come from link. Left must come from single row. Semantics: Match if at least 1 
+            // Right values come from link. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
@@ -1176,7 +1176,7 @@ template <class T> UnaryOperator<Pow<T>>& power (Subexpr2<T>& left) {
 // Classes used for LinkMap (see below).
 struct LinkMapFunction
 {
-    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or 
+    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or
     // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
     // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
@@ -1228,10 +1228,10 @@ The LinkMap and LinkMapFunction classes are used for query conditions on links t
 the value payload they point at).
 
 MapLink::map_links() takes a row index of the link column as argument and follows any link chain stated in the query
-(through the link()->link() methods) until the final payload table is reached, and then applies LinkMapFunction on 
-the linked-to row index(es). 
+(through the link()->link() methods) until the final payload table is reached, and then applies LinkMapFunction on
+the linked-to row index(es).
 
-If all link columns are type_Link, then LinkMapFunction is only invoked for a single row index. If one or more 
+If all link columns are type_Link, then LinkMapFunction is only invoked for a single row index. If one or more
 columns are type_LinkList, then it may result in multiple row indexes.
 
 The reason we use this map pattern is that we can exit the link-tree-traversal as early as possible, e.g. when we've
@@ -1406,7 +1406,7 @@ public:
     {
         return string_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
     }
-    
+
     Query begins_with(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
@@ -1426,7 +1426,7 @@ public:
     {
         return string_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
     }
-    
+
     Query contains(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
@@ -1503,7 +1503,7 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
 {
 public:
-    Columns(size_t column, const Table* table, std::vector<size_t> links) :  
+    Columns(size_t column, const Table* table, std::vector<size_t> links) :
         m_column(column), m_link_map(table, links)
     {
         m_table = table;
@@ -1583,7 +1583,7 @@ inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
 }
 
 
-// This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
+// This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload*
 // in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
 // only "find first null-link" is supported. More will be added later.
 class UnaryLinkCompare : public Expression
@@ -1600,7 +1600,7 @@ public:
     {
     }
 
-    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as 
+    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
     // any linked-to payload tables
     const Table* get_table() const override
     {
@@ -1617,7 +1617,7 @@ public:
             m_link_map.map_links(start, fnl);
             if (!fnl.m_has_link)
                 return start;
-            
+
             start++;
         }
 
@@ -1790,7 +1790,7 @@ public:
     }
 
 
-    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression 
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
     const Table* get_table() const override
     {
@@ -1829,19 +1829,19 @@ public:
         else {
             // Not a Link column
             // make sequential getter load the respective leaf to access data at column row 'index'
-            sgc->cache_next(index); 
+            sgc->cache_next(index);
             size_t colsize = sgc->m_column->size();
 
-            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer 
-            // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first 
+            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer
+            // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
             if (std::is_same<T, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
                 Value<T> v;
 
                 // If you want to modify 'default_size' then update Array::get_chunk()
-                REALM_ASSERT_3(ValueBase::default_size, ==, 8); 
-                
-                sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, 
+                REALM_ASSERT_3(ValueBase::default_size, ==, 8);
+
+                sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start,
                     static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
 
                 if (m_nullable)
@@ -1849,7 +1849,7 @@ public:
 
                 destination.import(v);
             }
-            else          
+            else
             {
                 size_t rows = colsize - index;
                 if (rows > ValueBase::default_size)
@@ -2240,9 +2240,9 @@ private:
     TLeft& m_left;
     TRight& m_right;
 
-    // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in 
-    // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this 
-    // Compare object is destructed and the copy is no longer needed. 
+    // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in
+    // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this
+    // Compare object is destructed and the copy is no longer needed.
     const char* m_compare_string;
 };
 
