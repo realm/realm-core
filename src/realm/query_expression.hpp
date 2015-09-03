@@ -893,6 +893,8 @@ public:
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* value)
     {
+        init(value->from_link, value->m_values);
+
         TOperator o;
         for (size_t t = 0; t < value->m_values; t++) {
             if (std::is_same<T, int64_t>::value && value->m_storage.is_null(t))
@@ -1009,16 +1011,16 @@ public:
         else if (!left->from_link && right->from_link) {
             // Right values come from link. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
-            REALM_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
-            for (size_t r = 0; r < right->ValueBase::m_values; r++) {
+            REALM_ASSERT_DEBUG(left->m_values > 0);
+            for (size_t r = 0; r < right->m_values; r++) {
                 if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0), right->m_storage.is_null(r)))
                     return 0;
             }
         }
         else if (left->from_link && !right->from_link) {
-            // Same as above, right left values coming from links
-            REALM_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
-            for (size_t l = 0; l < left->ValueBase::m_values; l++) {
+            // Same as above, but with left values coming from links
+            REALM_ASSERT_DEBUG(right->m_values > 0);
+            for (size_t l = 0; l < left->m_values; l++) {
                 if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l), right->m_storage.is_null(0)))
                     return 0;
             }
@@ -1167,8 +1169,8 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type>>& operator / 
 }
 
 // Unary operators
-template <class T> UnaryOperator<Pow<T>>& power (Subexpr2<T>& left) {
-    return *new UnaryOperator<Pow<T>>(left.clone(), true);
+template <class T> UnaryOperator<Pow<T>>& power (const Subexpr2<T>& left) {
+    return *new UnaryOperator<Pow<T>>(const_cast<Subexpr2<T>&>(left).clone(), true);
 }
 
 
