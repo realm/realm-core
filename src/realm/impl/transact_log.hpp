@@ -2072,7 +2072,9 @@ public:
     bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx,
                            std::size_t backlink_col_idx)
     {
-        m_encoder.insert_link_column(col_idx, DataType(), "", target_table_idx, backlink_col_idx);
+        DataType type = type_Link; // The real type of the column doesn't matter here,
+                                   // but the encoder asserts that it's actually a link type.
+        m_encoder.insert_link_column(col_idx, type, "", target_table_idx, backlink_col_idx);
         append_instruction();
         return true;
     }
