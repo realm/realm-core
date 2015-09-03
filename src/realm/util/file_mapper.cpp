@@ -443,6 +443,10 @@ void signal_handler(int code, siginfo_t* info, void* ctx)
 void install_handler()
 {
     static bool has_installed_handler = false;
+    // Test failed before, just throw the exception
+    if (signal_test_state == signal_test_state_Broken)
+        throw EncryptionNotSupportedOnThisDevice();
+
     if (has_installed_handler)
         return;
 
