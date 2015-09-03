@@ -169,6 +169,16 @@ TEST(Optional_ReferenceBinding)
     ttt2 = iref;
 }
 
+TEST(Optional_ValueDoesntGenerateWarning)
+{
+    // Shouldn't generate any warnings:
+    const Optional<int> i { 1 };
+    CHECK(*i);
+    int one = 1;
+    const Optional<int&> ii { one };
+    CHECK(*ii);
+}
+
 // Disabled for compliance with std::optional
 // TEST(Optional_VoidIsEquivalentToBool)
 // {
