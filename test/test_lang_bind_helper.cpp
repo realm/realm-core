@@ -6798,6 +6798,33 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 }
 
 
+TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    TableRef t, t2;
+    {
+        // add a column
+        LangBindHelper::promote_to_write(sg, *hist);
+        t  = group->get_or_add_table("a_table");
+        t2 = group->get_or_add_table("b_table");
+        t->add_column_link(type_Link, "bruno", *t2);
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        // ... but then regret it
+        LangBindHelper::promote_to_write(sg, *hist);
+        t->remove_column(0);
+        CHECK_EQUAL(0, t->get_descriptor()->get_column_count());
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    }
+}
+
+
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
