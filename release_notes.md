@@ -21,6 +21,8 @@
 * `Expression` subclasses now update `Query`s current descriptor after setting
   the table. This prevents a null dereference when adding further conditions
   to the query.
+* Fixes a crash due to an assert when rolling back a transaction in which a link
+  or linklist column was removed.
 
 ### API breaking changes:
 
