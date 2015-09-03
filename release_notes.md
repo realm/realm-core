@@ -4,6 +4,8 @@
 
 * Fixed assertion failure when TableViewBase::is_row_attached() would return
   false in a debug build.
+* Fixes a crash due to an assert when rolling back a transaction in which a link
+  or linklist column was removed.
 
 # 0.92.1 Release notes
 
