@@ -1,3 +1,14 @@
+# 0.89.9 Release notes
+
+### Bugfixes:
+
+* The check for functioning SEGV signals threw the exception only once.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.90.0, 0.92.1].**
+
+----------------------------------------------
+
 # 0.89.8 Release notes
 
 ### Enhancements:
