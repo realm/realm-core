@@ -7423,7 +7423,7 @@ TEST(Query_Link_MaximumSumAverage)
     CHECK_EQUAL(not_found, match);
 }
 
-ONLY(Query_UnaryOperatorOverLink)
+TEST(Query_OperatorsOverLink)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
@@ -7475,6 +7475,24 @@ ONLY(Query_UnaryOperatorOverLink)
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the power subexpression will not produce any results.
     q = table2->column<Int>(0) == power(table2->link(col_linklist).column<Int>(0));
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the multiplication will not produce any results.
+    q = table2->link(col_linklist).column<Int>(0) * 2 == table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the multiplication will not produce any results.
+    q = table2->column<Int>(0) == table2->link(col_linklist).column<Int>(0) * 2;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);

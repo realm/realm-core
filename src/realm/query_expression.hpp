@@ -880,14 +880,47 @@ public:
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
     {
         TOperator o;
-        size_t vals = minimum(left->m_values, right->m_values);
 
-        for (size_t t = 0; t < vals; t++) {
-            if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(t) || right->m_storage.is_null(t)))
-                m_storage.set_null(t);
-            else
-                m_storage.set(t, o(left->m_storage[t], right->m_storage[t]));
+        if (!left->from_link && !right->from_link) {
+            // Operate on values one-by-one (one value is one row; no links)
+            size_t min = std::min(left->m_values, right->m_values);
+            init(false, min);
 
+            for (size_t m = 0; m < min; m++) {
+                if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(m) || right->m_storage.is_null(m))) {
+                    m_storage.set_null(m);
+                    continue;
+                }
+                m_storage.set(m, o(left->m_storage[m], right->m_storage[m]));
+            }
+        }
+        else if (left->from_link && right->from_link) {
+            // Many-to-many links not supported yet. Need to specify behaviour
+            REALM_ASSERT_DEBUG(false);
+        }
+        else if (!left->from_link && right->from_link) {
+            // Right values come from link. Left must come from single row.
+            REALM_ASSERT_DEBUG(left->m_values > 0);
+            init(true, right->m_values);
+            for (size_t r = 0; r < right->m_values; r++) {
+                if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(0) || right->m_storage.is_null(r))) {
+                    m_storage.set_null(r);
+                    continue;
+                }
+                m_storage.set(r, o(left->m_storage[0], right->m_storage[r]));
+            }
+        }
+        else if (left->from_link && !right->from_link) {
+            // Same as above, but with left values coming from links
+            REALM_ASSERT_DEBUG(right->m_values > 0);
+            init(true, left->m_values);
+            for (size_t l = 0; l < left->m_values; l++) {
+                if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(l) || right->m_storage.is_null(0))) {
+                    m_storage.set_null(l);
+                    continue;
+                }
+                m_storage.set(l, o(left->m_storage[l], right->m_storage[0]));
+            }
         }
     }
 
