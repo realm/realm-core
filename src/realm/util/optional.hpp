@@ -37,7 +37,7 @@ template <class T, class... Args> Optional<T> some(Args&&...);
 template <class T> struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
-static REALM_CONSTEXPR struct None { REALM_CONSTEXPR None(int) {} } none { 0 };
+static REALM_CONSTEXPR struct None { REALM_CONSTEXPR explicit None(int) {} } none { 0 };
 static REALM_CONSTEXPR struct InPlace { REALM_CONSTEXPR InPlace() {} } in_place;
 
 // Note: Should conform with the future std::bad_optional_access.
@@ -319,7 +319,7 @@ REALM_CONSTEXPR Optional<T>::operator bool() const
 template <class T>
 REALM_CONSTEXPR const T& Optional<T>::value() const
 {
-    return m_engaged ? *ptr() : (throw BadOptionalAccess{"bad optional access"}, T{});
+    return m_engaged ? *ptr() : throw BadOptionalAccess{"bad optional access"};
 }
 
 template <class T>
@@ -334,7 +334,7 @@ T& Optional<T>::value()
 template <class T>
 REALM_CONSTEXPR const typename Optional<T&>::target_type& Optional<T&>::value() const
 {
-    return m_ptr ? *m_ptr : (throw BadOptionalAccess{"bad optional access"}, T{});
+    return m_ptr ? *m_ptr : throw BadOptionalAccess{"bad optional access"};
 }
 
 template <class T>
