@@ -1522,7 +1522,7 @@ public:
     {
     }
 
-    virtual Subexpr& clone()
+    virtual Subexpr& clone() override
     {
         Columns<BinaryData>& n = *new Columns<BinaryData>();
         n = *this;
@@ -1534,7 +1534,7 @@ public:
         return m_table;
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination)
+    virtual void evaluate(size_t index, ValueBase& destination) override
     {
         Value<BinaryData>& d = static_cast<Value<BinaryData>&>(destination);
 
