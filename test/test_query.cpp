@@ -6376,6 +6376,9 @@ TEST(Query_NullShowcase)
     tv = (price > 0).find_all();
     CHECK(equals(tv, { 1, 2 }));
 
+    // Show that power(null) == null
+    tv = (power(price) == null()).find_all();
+    CHECK(equals(tv, { 0 }));
 
     // Doubles
     // (null > double) == false
@@ -7492,7 +7495,7 @@ TEST(Query_OperatorsOverLink)
     CHECK_EQUAL(not_found, match);
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the multiplication will not produce any results.
-    q = table2->column<Int>(0) == table2->link(col_linklist).column<Int>(0) * 2;
+    q = table2->column<Int>(0) == 2 * table2->link(col_linklist).column<Int>(0);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
