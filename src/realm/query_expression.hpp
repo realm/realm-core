@@ -1521,9 +1521,7 @@ public:
 
     virtual Subexpr& clone() override
     {
-        Columns<BinaryData>& n = *new Columns<BinaryData>();
-        n = *this;
-        return n;
+        return *new Columns<BinaryData>(*this);
     }
 
     const Table* get_table() const override
