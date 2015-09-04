@@ -53,19 +53,19 @@ namespace _impl {
 template <class T, bool=std::is_trivially_destructible<T>::value> struct OptionalStorage;
 
 // FIXME: Callers should switch to std::move when we adopt C++14
-template <class T> inline REALM_CONSTEXPR typename std::remove_reference<T>::type&& constexpr_move(T&& t) REALM_NOEXCEPT
+template <class T> inline REALM_CONSTEXPR typename std::remove_reference<T>::type&& constexpr_move(T&& t) noexcept
 {
     return static_cast<typename std::remove_reference<T>::type&&>(t);
 }
 
 // FIXME: Callers should switch to std::forward when we adopt C++14
-template <class T> inline REALM_CONSTEXPR T&& constexpr_forward(typename std::remove_reference<T>::type& t) REALM_NOEXCEPT
+template <class T> inline REALM_CONSTEXPR T&& constexpr_forward(typename std::remove_reference<T>::type& t) noexcept
 {
     return static_cast<T&&>(t);
 }
 
 // FIXME: Callers should switch to std::forward when we adopt C++14
-template <class T> inline REALM_CONSTEXPR T&& constexpr_forward(typename std::remove_reference<T>::type&& t) REALM_NOEXCEPT
+template <class T> inline REALM_CONSTEXPR T&& constexpr_forward(typename std::remove_reference<T>::type&& t) noexcept
 {
     static_assert(!std::is_lvalue_reference<T>::value, "Can't forward rvalue as lvalue.");
     return static_cast<T&&>(t);
