@@ -25,7 +25,7 @@
 using namespace realm;
 
 
-void RowBase::attach(Table* table, size_t row_ndx) REALM_NOEXCEPT
+void RowBase::attach(Table* table, size_t row_ndx) noexcept
 {
     if (table) {
         table->register_row_accessor(this);
@@ -34,7 +34,7 @@ void RowBase::attach(Table* table, size_t row_ndx) REALM_NOEXCEPT
     }
 }
 
-void RowBase::reattach(Table* table, size_t row_ndx) REALM_NOEXCEPT
+void RowBase::reattach(Table* table, size_t row_ndx) noexcept
 {
     if (m_table.get() != table) {
         if (m_table)
@@ -46,7 +46,7 @@ void RowBase::reattach(Table* table, size_t row_ndx) REALM_NOEXCEPT
     m_row_ndx = row_ndx;
 }
 
-void RowBase::impl_detach() REALM_NOEXCEPT
+void RowBase::impl_detach() noexcept
 {
     if (m_table) {
         m_table->unregister_row_accessor(this);

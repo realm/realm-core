@@ -660,7 +660,7 @@ namespace realm {
 namespace util {
 
 #ifdef REALM_ENABLE_ENCRYPTION
-size_t round_up_to_page_size(size_t size) REALM_NOEXCEPT
+size_t round_up_to_page_size(size_t size) noexcept
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
@@ -699,7 +699,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, std::size_t offset, con
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
-void munmap(void* addr, size_t size) REALM_NOEXCEPT
+void munmap(void* addr, size_t size) noexcept
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);

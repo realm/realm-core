@@ -79,7 +79,7 @@ struct SpecBase {
     ///     template<template<int> class Col, class Init> struct ColNames {
     ///       typename Col<0>::type foo;
     ///       typename Col<1>::type bar;
-    ///       ColNames(Init i) REALM_NOEXCEPT: foo(i), bar(i) {}
+    ///       ColNames(Init i) noexcept: foo(i), bar(i) {}
     ///     };
     ///   };
     ///
@@ -90,12 +90,12 @@ struct SpecBase {
     /// any order. Multiple names may refer to the same column, and
     /// you do not have to specify a name for every column.
     template<template<int> class Col, class Init> struct ColNames {
-        ColNames(Init) REALM_NOEXCEPT {}
+        ColNames(Init) noexcept {}
     };
 
     /// FIXME: Currently we do not support absence of dynamic column
     /// names.
-    static void dyn_col_names(StringData*) REALM_NOEXCEPT {}
+    static void dyn_col_names(StringData*) noexcept {}
 
     /// This is the fallback class that is used when no convenience
     /// methods are specified in the users Spec class.
@@ -188,7 +188,7 @@ protected:
     typedef std::pair<Taboid*, std::size_t> Init;
     Taboid* const m_table;
     const std::size_t m_row_idx;
-    FieldAccessorBase(Init i) REALM_NOEXCEPT: m_table(i.first), m_row_idx(i.second) {}
+    FieldAccessorBase(Init i) noexcept: m_table(i.first), m_row_idx(i.second) {}
 };
 
 
@@ -199,7 +199,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    int64_t get() const REALM_NOEXCEPT
+    int64_t get() const noexcept
     {
         return Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
     }
@@ -208,7 +208,7 @@ public:
     {
         Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
     }
-    operator int64_t() const REALM_NOEXCEPT { return get(); }
+    operator int64_t() const noexcept { return get(); }
     const FieldAccessor& operator=(int64_t value) const { set(value); return *this; }
 
     const FieldAccessor& operator+=(int64_t value) const
@@ -249,7 +249,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -260,7 +260,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    float get() const REALM_NOEXCEPT
+    float get() const noexcept
     {
         return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx);
     }
@@ -270,7 +270,7 @@ public:
         Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value);
     }
 
-    operator float() const REALM_NOEXCEPT { return get(); }
+    operator float() const noexcept { return get(); }
     const FieldAccessor& operator=(float value) const { set(value); return *this; }
 
     const FieldAccessor& operator+=(float value) const
@@ -290,7 +290,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -301,7 +301,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    double get() const REALM_NOEXCEPT
+    double get() const noexcept
     {
         return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx);
     }
@@ -311,7 +311,7 @@ public:
         Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value);
     }
 
-    operator double() const REALM_NOEXCEPT { return get(); }
+    operator double() const noexcept { return get(); }
     const FieldAccessor& operator=(double value) const { set(value); return *this; }
 
     const FieldAccessor& operator+=(double value) const
@@ -331,7 +331,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -342,7 +342,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    bool get() const REALM_NOEXCEPT
+    bool get() const noexcept
     {
         return Base::m_table->get_impl()->get_bool(col_idx, Base::m_row_idx);
     }
@@ -352,11 +352,11 @@ public:
         Base::m_table->get_impl()->set_bool(col_idx, Base::m_row_idx, value);
     }
 
-    operator bool() const REALM_NOEXCEPT { return get(); }
+    operator bool() const noexcept { return get(); }
     const FieldAccessor& operator=(bool value) const { set(value); return *this; }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -368,7 +368,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    E get() const REALM_NOEXCEPT
+    E get() const noexcept
     {
         return static_cast<E>(Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx));
     }
@@ -378,11 +378,11 @@ public:
         Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
     }
 
-    operator E() const REALM_NOEXCEPT { return get(); }
+    operator E() const noexcept { return get(); }
     const FieldAccessor& operator=(E value) const { set(value); return *this; }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -393,7 +393,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    DateTime get() const REALM_NOEXCEPT
+    DateTime get() const noexcept
     {
         return Base::m_table->get_impl()->get_datetime(col_idx, Base::m_row_idx);
     }
@@ -403,11 +403,11 @@ public:
         Base::m_table->get_impl()->set_datetime(col_idx, Base::m_row_idx, value);
     }
 
-    operator DateTime() const REALM_NOEXCEPT { return get(); }
+    operator DateTime() const noexcept { return get(); }
     const FieldAccessor& operator=(DateTime value) const { set(value); return *this; }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -418,7 +418,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    StringData get() const REALM_NOEXCEPT
+    StringData get() const noexcept
     {
         return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
     }
@@ -428,16 +428,16 @@ public:
         Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value);
     }
 
-    operator StringData() const REALM_NOEXCEPT { return get(); }
+    operator StringData() const noexcept { return get(); }
     const FieldAccessor& operator=(StringData value) const { set(value); return *this; }
 
-    const char* data() const REALM_NOEXCEPT { return get().data(); }
-    std::size_t size() const REALM_NOEXCEPT { return get().size(); }
+    const char* data() const noexcept { return get().data(); }
+    std::size_t size() const noexcept { return get().size(); }
 
-    const char* c_str() const REALM_NOEXCEPT { return data(); }
+    const char* c_str() const noexcept { return data(); }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -448,7 +448,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    BinaryData get() const REALM_NOEXCEPT
+    BinaryData get() const noexcept
     {
         return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx);
     }
@@ -458,14 +458,14 @@ public:
         Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value);
     }
 
-    operator BinaryData() const REALM_NOEXCEPT { return get(); }
+    operator BinaryData() const noexcept { return get(); }
     const FieldAccessor& operator=(const BinaryData& value) const { set(value); return *this; }
 
-    const char* data() const REALM_NOEXCEPT { return get().data(); }
-    std::size_t size() const REALM_NOEXCEPT { return get().size(); }
+    const char* data() const noexcept { return get().data(); }
+    std::size_t size() const noexcept { return get().size(); }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -518,7 +518,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -540,7 +540,7 @@ private:
     };
 
 public:
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 
     operator typename Subtab::ConstRef() const
     {
@@ -572,7 +572,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Mixed get() const REALM_NOEXCEPT
+    Mixed get() const noexcept
     {
         return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx);
     }
@@ -582,7 +582,7 @@ public:
         Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value);
     }
 
-    operator Mixed() const REALM_NOEXCEPT { return get(); }
+    operator Mixed() const noexcept { return get(); }
 
     const FieldAccessor& operator=(const Mixed& value) const
     {
@@ -590,26 +590,26 @@ public:
         return static_cast<FieldAccessor&>(*this);
     }
 
-    DataType get_type() const REALM_NOEXCEPT
+    DataType get_type() const noexcept
     {
         return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
     }
 
-    int64_t get_int() const REALM_NOEXCEPT { return get().get_int(); }
+    int64_t get_int() const noexcept { return get().get_int(); }
 
-    bool get_bool() const REALM_NOEXCEPT { return get().get_bool(); }
+    bool get_bool() const noexcept { return get().get_bool(); }
 
-    DateTime get_datetime() const REALM_NOEXCEPT { return get().get_datetime(); }
+    DateTime get_datetime() const noexcept { return get().get_datetime(); }
 
-    float get_float() const REALM_NOEXCEPT { return get().get_float(); }
+    float get_float() const noexcept { return get().get_float(); }
 
-    double get_double() const REALM_NOEXCEPT { return get().get_double(); }
+    double get_double() const noexcept { return get().get_double(); }
 
-    StringData get_string() const REALM_NOEXCEPT { return get().get_string(); }
+    StringData get_string() const noexcept { return get().get_string(); }
 
-    BinaryData get_binary() const REALM_NOEXCEPT { return get().get_binary(); }
+    BinaryData get_binary() const noexcept { return get().get_binary(); }
 
-    bool is_subtable() const REALM_NOEXCEPT { return get_type() == type_Table; }
+    bool is_subtable() const noexcept { return get_type() == type_Table; }
 
     /// Checks whether this value is a subtable of the specified type.
     ///
@@ -625,33 +625,33 @@ public:
     }
 
     /// Generally more efficient that get_subtable()->size().
-    std::size_t get_subtable_size() const REALM_NOEXCEPT
+    std::size_t get_subtable_size() const noexcept
     {
         return Base::m_table->get_impl()->get_subtable_size(col_idx, Base::m_row_idx);
     }
 
-    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) REALM_NOEXCEPT
+    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() == b;
     }
 
-    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) REALM_NOEXCEPT
+    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() != b;
     }
 
-    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) REALM_NOEXCEPT
+    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) noexcept
     {
         return a == b.get();
     }
 
-    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) REALM_NOEXCEPT
+    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) noexcept
     {
         return a != b.get();
     }
 
 protected:
-    MixedFieldAccessorBase(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    MixedFieldAccessorBase(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -743,7 +743,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -770,7 +770,7 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) REALM_NOEXCEPT: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
 
@@ -809,7 +809,7 @@ public:
 protected:
     Taboid* const m_table;
 
-    explicit ColumnAccessorBase(Taboid* t) REALM_NOEXCEPT: m_table(t) {}
+    explicit ColumnAccessorBase(Taboid* t) noexcept: m_table(t) {}
 };
 
 
@@ -821,7 +821,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, int64_t> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
         // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
         Columns<int64_t>::m_column = col_idx;
         Columns<int64_t>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
@@ -872,12 +872,12 @@ public:
         return Base::m_table->get_impl()->average_int(col_idx);
     }
 
-    std::size_t lower_bound(int64_t value) const REALM_NOEXCEPT
+    std::size_t lower_bound(int64_t value) const noexcept
     {
         return Base::m_table->lower_bound_int(col_idx, value);
     }
 
-    std::size_t upper_bound(int64_t value) const REALM_NOEXCEPT
+    std::size_t upper_bound(int64_t value) const noexcept
     {
         return Base::m_table->upper_bound_int(col_idx, value);
     }
@@ -892,7 +892,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
         // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
         Columns<float>::m_column = col_idx;
         Columns<float>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
@@ -949,12 +949,12 @@ public:
         return *this;
     }
 
-    std::size_t lower_bound(float value) const REALM_NOEXCEPT
+    std::size_t lower_bound(float value) const noexcept
     {
         return Base::m_table->lower_bound_float(col_idx, value);
     }
 
-    std::size_t upper_bound(float value) const REALM_NOEXCEPT
+    std::size_t upper_bound(float value) const noexcept
     {
         return Base::m_table->upper_bound_float(col_idx, value);
     }
@@ -969,7 +969,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
         // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
         Columns<double>::m_column = col_idx;
         Columns<double>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
@@ -1026,12 +1026,12 @@ public:
         return *this;
     }
 
-    std::size_t lower_bound(float value) const REALM_NOEXCEPT
+    std::size_t lower_bound(float value) const noexcept
     {
         return Base::m_table->lower_bound_double(col_idx, value);
     }
 
-    std::size_t upper_bound(float value) const REALM_NOEXCEPT
+    std::size_t upper_bound(float value) const noexcept
     {
         return Base::m_table->upper_bound_double(col_idx, value);
     }
@@ -1045,7 +1045,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, bool> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
     std::size_t find_first(bool value) const
     {
@@ -1057,12 +1057,12 @@ public:
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
     }
 
-    std::size_t lower_bound(bool value) const REALM_NOEXCEPT
+    std::size_t lower_bound(bool value) const noexcept
     {
         return Base::m_table->lower_bound_bool(col_idx, value);
     }
 
-    std::size_t upper_bound(bool value) const REALM_NOEXCEPT
+    std::size_t upper_bound(bool value) const noexcept
     {
         return Base::m_table->upper_bound_bool(col_idx, value);
     }
@@ -1082,7 +1082,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
     std::size_t find_first(E value) const
     {
@@ -1108,7 +1108,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, DateTime> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
     DateTime maximum(std::size_t* return_ndx = 0) const
     {
@@ -1144,7 +1144,7 @@ class ColumnAccessor<Taboid, col_idx, StringData>:
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, StringData> Base;
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
         // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
         Columns<StringData>::m_column = col_idx;
         Columns<StringData>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
@@ -1170,12 +1170,12 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    std::size_t lower_bound(StringData value) const REALM_NOEXCEPT
+    std::size_t lower_bound(StringData value) const noexcept
     {
         return Base::m_table->lower_bound_string(col_idx, value);
     }
 
-    std::size_t upper_bound(StringData value) const REALM_NOEXCEPT
+    std::size_t upper_bound(StringData value) const noexcept
     {
         return Base::m_table->upper_bound_string(col_idx, value);
     }
@@ -1190,7 +1190,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, BinaryData> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
     std::size_t find_first(const BinaryData &value) const
     {
@@ -1212,7 +1212,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 };
 
 
@@ -1223,7 +1223,7 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, Mixed> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) REALM_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 };
 
 
@@ -1243,7 +1243,7 @@ template<class Taboid, int col_idx, class Type> class QueryColumnBase {
 protected:
     typedef typename Taboid::Query Query;
     Query* const m_query;
-    explicit QueryColumnBase(Query* q) REALM_NOEXCEPT: m_query(q) {}
+    explicit QueryColumnBase(Query* q) noexcept: m_query(q) {}
 
     Query& equal(const Type& value) const
     {
@@ -1267,7 +1267,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
 
     // Todo, these do not turn up in Visual Studio 2013 intellisense
     using Base::equal;
@@ -1340,7 +1340,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
     using Base::equal;
     using Base::not_equal;
 
@@ -1411,7 +1411,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
     using Base::equal;
     using Base::not_equal;
 
@@ -1482,7 +1482,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
     using Base::equal;
     using Base::not_equal;
 };
@@ -1497,7 +1497,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
     using Base::equal;
     using Base::not_equal;
 };
@@ -1511,7 +1511,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
 
     Query& equal(DateTime value) const
     {
@@ -1580,7 +1580,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
 
     Query& equal(StringData value, bool case_sensitive=true) const
     {
@@ -1623,7 +1623,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept: Base(q) {}
 
     Query& equal(BinaryData value) const
     {
@@ -1665,7 +1665,7 @@ private:
     Query* const m_query;
 
 public:
-    explicit QueryColumn(Query* q) REALM_NOEXCEPT: m_query(q) {}
+    explicit QueryColumn(Query* q) noexcept: m_query(q) {}
 
     Query& subtable()
     {
@@ -1681,7 +1681,7 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query*) REALM_NOEXCEPT {}
+    explicit QueryColumn(Query*) noexcept {}
 };
 
 

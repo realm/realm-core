@@ -38,8 +38,8 @@ namespace realm {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() REALM_NOEXCEPT : m_data(0), m_size(0) {}
-    BinaryData(const char* data, std::size_t size) REALM_NOEXCEPT: m_data(data), m_size(size) {}
+    BinaryData() noexcept : m_data(0), m_size(0) {}
+    BinaryData(const char* data, std::size_t size) noexcept: m_data(data), m_size(size) {}
     template<std::size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
     template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
 
@@ -47,10 +47,10 @@ public:
     template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
 #endif
 
-    char operator[](std::size_t i) const REALM_NOEXCEPT { return m_data[i]; }
+    char operator[](std::size_t i) const noexcept { return m_data[i]; }
 
-    const char* data() const REALM_NOEXCEPT { return m_data; }
-    std::size_t size() const REALM_NOEXCEPT { return m_size; }
+    const char* data() const noexcept { return m_data; }
+    std::size_t size() const noexcept { return m_size; }
 
     /// Is this a null reference?
     ///
@@ -74,31 +74,31 @@ public:
     /// makes no distinction between a null reference and a reference to the
     /// empty byte sequence. These functions and operators never look at the
     /// stored pointer if the stored size is zero.
-    bool is_null() const REALM_NOEXCEPT;
+    bool is_null() const noexcept;
 
-    friend bool operator==(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
-    friend bool operator!=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
+    friend bool operator==(const BinaryData&, const BinaryData&) noexcept;
+    friend bool operator!=(const BinaryData&, const BinaryData&) noexcept;
 
     //@{
     /// Trivial bytewise lexicographical comparison.
-    friend bool operator<(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
-    friend bool operator>(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
-    friend bool operator<=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
-    friend bool operator>=(const BinaryData&, const BinaryData&) REALM_NOEXCEPT;
+    friend bool operator<(const BinaryData&, const BinaryData&) noexcept;
+    friend bool operator>(const BinaryData&, const BinaryData&) noexcept;
+    friend bool operator<=(const BinaryData&, const BinaryData&) noexcept;
+    friend bool operator>=(const BinaryData&, const BinaryData&) noexcept;
     //@}
 
-    bool begins_with(BinaryData) const REALM_NOEXCEPT;
-    bool ends_with(BinaryData) const REALM_NOEXCEPT;
-    bool contains(BinaryData) const REALM_NOEXCEPT;
+    bool begins_with(BinaryData) const noexcept;
+    bool ends_with(BinaryData) const noexcept;
+    bool contains(BinaryData) const noexcept;
 
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
 
 #ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    explicit operator bool() const REALM_NOEXCEPT;
+    explicit operator bool() const noexcept;
 #else
     typedef const char* BinaryData::*unspecified_bool_type;
-    operator unspecified_bool_type() const REALM_NOEXCEPT;
+    operator unspecified_bool_type() const noexcept;
 #endif
 
 private:
@@ -125,22 +125,22 @@ template<class T, class A> inline BinaryData::operator std::basic_string<char, T
 
 #endif
 
-inline bool BinaryData::is_null() const REALM_NOEXCEPT
+inline bool BinaryData::is_null() const noexcept
 {
     return !m_data;
 }
 
-inline bool operator==(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
+inline bool operator==(const BinaryData& a, const BinaryData& b) noexcept
 {
     return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
-inline bool operator!=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
+inline bool operator!=(const BinaryData& a, const BinaryData& b) noexcept
 {
     return !(a == b);
 }
 
-inline bool operator<(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
+inline bool operator<(const BinaryData& a, const BinaryData& b) noexcept
 {
     if (a.is_null() || b.is_null())
         return !a.is_null() < !b.is_null();
@@ -149,22 +149,22 @@ inline bool operator<(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
                                         b.m_data, b.m_data + b.m_size);
 }
 
-inline bool operator>(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
+inline bool operator>(const BinaryData& a, const BinaryData& b) noexcept
 {
     return b < a;
 }
 
-inline bool operator<=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
+inline bool operator<=(const BinaryData& a, const BinaryData& b) noexcept
 {
     return !(b < a);
 }
 
-inline bool operator>=(const BinaryData& a, const BinaryData& b) REALM_NOEXCEPT
+inline bool operator>=(const BinaryData& a, const BinaryData& b) noexcept
 {
     return !(a < b);
 }
 
-inline bool BinaryData::begins_with(BinaryData d) const REALM_NOEXCEPT
+inline bool BinaryData::begins_with(BinaryData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
@@ -172,7 +172,7 @@ inline bool BinaryData::begins_with(BinaryData d) const REALM_NOEXCEPT
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
-inline bool BinaryData::ends_with(BinaryData d) const REALM_NOEXCEPT
+inline bool BinaryData::ends_with(BinaryData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
@@ -180,7 +180,7 @@ inline bool BinaryData::ends_with(BinaryData d) const REALM_NOEXCEPT
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
-inline bool BinaryData::contains(BinaryData d) const REALM_NOEXCEPT
+inline bool BinaryData::contains(BinaryData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
@@ -197,12 +197,12 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
 }
 
 #ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-inline BinaryData::operator bool() const REALM_NOEXCEPT
+inline BinaryData::operator bool() const noexcept
 {
     return !is_null();
 }
 #else
-inline BinaryData::operator unspecified_bool_type() const REALM_NOEXCEPT
+inline BinaryData::operator unspecified_bool_type() const noexcept
 {
     return is_null() ? 0 : &BinaryData::m_data;
 }

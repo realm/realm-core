@@ -189,7 +189,7 @@ public:
     {
     }
 
-    ~CustomReporter() REALM_NOEXCEPT
+    ~CustomReporter() noexcept
     {
     }
 

@@ -131,7 +131,7 @@ public:
     {
     }
 
-    ~ShortCircuitHistory() REALM_NOEXCEPT
+    ~ShortCircuitHistory() noexcept
     {
     }
 
@@ -147,7 +147,7 @@ public:
         m_changesets[new_version]; // Throws
     }
 
-    void finalize_changeset() REALM_NOEXCEPT override
+    void finalize_changeset() noexcept override
     {
         // The following operation will not throw due to the space reservation
         // carried out in prepare_new_changeset().
@@ -155,7 +155,7 @@ public:
     }
 
     void get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer)
-        const REALM_NOEXCEPT override
+        const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i != n; ++i) {
@@ -168,7 +168,7 @@ public:
         }
     }
 
-    BinaryData get_uncommitted_changes() REALM_NOEXCEPT override
+    BinaryData get_uncommitted_changes() noexcept override
     {
         REALM_ASSERT(false);
         return BinaryData(); // FIXME: Not yet implemented

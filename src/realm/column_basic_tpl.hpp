@@ -51,7 +51,7 @@ BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref, bool nullable) : m_n
 }
 
 template<class T>
-inline std::size_t BasicColumn<T>::size() const REALM_NOEXCEPT
+inline std::size_t BasicColumn<T>::size() const noexcept
 {
     if (root_is_leaf())
         return m_array->size();
@@ -60,7 +60,7 @@ inline std::size_t BasicColumn<T>::size() const REALM_NOEXCEPT
 
 
 template<class T>
-T BasicColumn<T>::get(std::size_t ndx) const REALM_NOEXCEPT
+T BasicColumn<T>::get(std::size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf())
@@ -78,7 +78,7 @@ class BasicColumn<T>::SetLeafElem: public Array::UpdateHandler {
 public:
     Allocator& m_alloc;
     const T m_value;
-    SetLeafElem(Allocator& alloc, T value) REALM_NOEXCEPT: m_alloc(alloc), m_value(value) {}
+    SetLeafElem(Allocator& alloc, T value) noexcept: m_alloc(alloc), m_value(value) {}
     void update(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
                 std::size_t elem_ndx_in_leaf) override
     {
@@ -159,7 +159,7 @@ template<class T>
 class BasicColumn<T>::EraseLeafElem: public Array::EraseHandler {
 public:
     BasicColumn<T>& m_column;
-    EraseLeafElem(BasicColumn<T>& column) REALM_NOEXCEPT:
+    EraseLeafElem(BasicColumn<T>& column) noexcept:
         m_column(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          std::size_t leaf_ndx_in_parent,
@@ -178,7 +178,7 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
+    void destroy_leaf(MemRef leaf_mem) noexcept override
     {
         Array::destroy(leaf_mem, m_column.get_alloc()); // Shallow
     }
@@ -623,7 +623,7 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 }
 
 
-template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const REALM_NOEXCEPT
+template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const noexcept
 {
     if (root_is_leaf()) {
         return static_cast<const BasicArray<T>*>(m_array.get())->lower_bound(value);
@@ -631,7 +631,7 @@ template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const 
     return ColumnBase::lower_bound(*this, value);
 }
 
-template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const REALM_NOEXCEPT
+template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const noexcept
 {
     if (root_is_leaf()) {
         return static_cast<const BasicArray<T>*>(m_array.get())->upper_bound(value);
