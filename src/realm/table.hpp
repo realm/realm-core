@@ -1620,7 +1620,7 @@ template<class T> inline Columns<T> Table::column(std::size_t column)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
         throw(LogicError::type_mismatch);
-    else if (std::is_same<T, realm::DataType>::value && ct != type_DateTime)
+    else if (std::is_same<T, realm::DateTime>::value && ct != type_DateTime)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, float>::value && ct != type_Float)
         throw(LogicError::type_mismatch);
