@@ -850,7 +850,7 @@ template<> inline void NullableVector<BinaryData>::set_null(size_t index)
 }
 
 template <typename Operator>
-struct OperatorOptionalAdapater {
+struct OperatorOptionalAdapter {
     template <typename L, typename R>
     util::Optional<typename Operator::type> operator()(const util::Optional<L>& left, const util::Optional<R>& right)
     {
@@ -914,19 +914,19 @@ public:
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
     {
-        OperatorOptionalAdapater<TOperator> o;
+        OperatorOptionalAdapter<TOperator> o;
 
         if (!left->from_link && !right->from_link) {
             // Operate on values one-by-one (one value is one row; no links)
             size_t min = std::min(left->m_values, right->m_values);
             init(false, min);
 
-            for (size_t m = 0; m < min; m++) {
-                m_storage.set(m, o(left->m_storage.get(m), right->m_storage.get(m)));
+            for (size_t i = 0; i < min; i++) {
+                m_storage.set(i, o(left->m_storage.get(i), right->m_storage.get(i)));
             }
         }
         else if (left->from_link && right->from_link) {
-            // Many-to-many links not supported yet. Need to specify behaviour
+            // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             REALM_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
@@ -935,8 +935,8 @@ public:
             init(true, right->m_values);
 
             auto left_value = left->m_storage.get(0);
-            for (size_t r = 0; r < right->m_values; r++) {
-                m_storage.set(r, o(left_value, right->m_storage.get(r)));
+            for (size_t i = 0; i < right->m_values; i++) {
+                m_storage.set(i, o(left_value, right->m_storage.get(i)));
             }
         }
         else if (left->from_link && !right->from_link) {
@@ -945,8 +945,8 @@ public:
             init(true, left->m_values);
 
             auto right_value = right->m_storage.get(0);
-            for (size_t l = 0; l < left->m_values; l++) {
-                m_storage.set(l, o(left->m_storage.get(l), right_value));
+            for (size_t i = 0; i < left->m_values; i++) {
+                m_storage.set(i, o(left->m_storage.get(i), right_value));
             }
         }
     }
@@ -955,9 +955,9 @@ public:
     {
         init(value->from_link, value->m_values);
 
-        OperatorOptionalAdapater<TOperator> o;
-        for (size_t t = 0; t < value->m_values; t++) {
-            m_storage.set(t, o(value->m_storage.get(t)));
+        OperatorOptionalAdapter<TOperator> o;
+        for (size_t i = 0; i < value->m_values; i++) {
+            m_storage.set(i, o(value->m_storage.get(i)));
         }
     }
 
@@ -1062,7 +1062,7 @@ public:
             }
         }
         else if (left->from_link && right->from_link) {
-            // Many-to-many links not supported yet. Need to specify behaviour
+            // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             REALM_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
