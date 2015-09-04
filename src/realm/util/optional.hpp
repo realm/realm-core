@@ -46,6 +46,8 @@ struct BadOptionalAccess : std::logic_error {
     explicit BadOptionalAccess(const char* what_arg) : std::logic_error(what_arg) {}
 };
 
+} // namespace util
+
 namespace _impl {
 
 template <class T, bool=std::is_trivially_destructible<T>::value> struct OptionalStorage;
@@ -69,7 +71,9 @@ template <class T> inline REALM_CONSTEXPR T&& constexpr_forward(typename std::re
     return static_cast<T&&>(t);
 }
 
-}
+} // namespace _impl
+
+namespace util {
 
 // Note: Should conform with the future std::optional.
 template <class T>
@@ -502,6 +506,8 @@ auto operator>>(Optional<T> lhs, F&& rhs) -> decltype(fmap(lhs, std::forward<F>(
     return fmap(lhs, std::forward<F>(rhs));
 }
 
+} // namespace util
+
 namespace _impl {
 
 struct Empty {};
@@ -545,8 +551,6 @@ struct OptionalStorage<T, false> {
 };
 
 } // namespace _impl
-
-} // namespace util
 
 using util::none;
 
