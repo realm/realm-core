@@ -3394,6 +3394,140 @@ TEST(Table_Aggregates2)
     CHECK_EQUAL(s, table.column().c_count.sum());
 }
 
+TEST(Table_Aggregates3)
+{
+    bool nullable = false;
+    
+    for (int i = 0; i < 2; i++) {
+        nullable = (i == 1);
+
+        Group g;
+        TableRef table = g.add_table("Inventory");
+
+        table->insert_column(0, type_Int, "Price", nullable);
+        table->insert_column(1, type_Float, "Shipping", nullable);
+        table->insert_column(2, type_Double, "Rating", nullable);
+        table->insert_column(3, type_DateTime, "Delivery date", nullable);
+
+        table->add_empty_row(3);
+
+        table->set_int(0, 0, 1);
+        // table->set_null(0, 1);
+        table->set_int(0, 2, 3);
+
+        // table->set_null(1, 0);
+        // table->set_null(1, 1);
+        table->set_float(1, 2, 30.f);
+
+        table->set_double(2, 0, 1.1);
+        table->set_double(2, 1, 2.2);
+        // table->set_null(2, 2);
+
+        table->set_datetime(3, 0, DateTime(2016, 2, 2));
+        // table->set_null(3, 1);
+        table->set_datetime(3, 2, DateTime(2016, 6, 6));
+
+        size_t count;
+        size_t pos;
+        if (i == 1) {
+            // max
+            pos = 123;
+            CHECK_EQUAL(table->maximum_int(0, &pos), 3);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_datetime(3, &pos), DateTime(2016, 6, 6));
+            CHECK_EQUAL(pos, 2);
+
+            // min
+            pos = 123;
+            CHECK_EQUAL(table->minimum_int(0, &pos), 1);
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_float(1, &pos), 30.f);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_double(2, &pos), 1.1);
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_datetime(3, &pos), DateTime(2016, 2, 2));
+            CHECK_EQUAL(pos, 0);
+
+            // average
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3) / 2., 0.01);
+            CHECK_EQUAL(count, 2);
+
+            count = 123;
+            CHECK_EQUAL(table->average_float(1, &count), 30.f);
+            CHECK_EQUAL(count, 1);
+
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2) / 2., 0.01);
+            CHECK_EQUAL(count, 2);
+        }
+        else {
+            // max
+            pos = 123;
+            CHECK_EQUAL(table->maximum_int(0, &pos), 3);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_datetime(3, &pos), DateTime(2016, 6, 6));
+            CHECK_EQUAL(pos, 2);
+
+            // min
+            pos = 123;
+            CHECK_EQUAL(table->minimum_int(0, &pos), 0);
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_float(1, &pos), 0.f);
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_double(2, &pos), 0.);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_datetime(3, &pos), DateTime(0));
+            CHECK_EQUAL(pos, 1);
+
+            // average
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3 + 0) / 3., 0.01);
+            CHECK_EQUAL(count, 3);
+
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_float(1, &count), 30.f / 3., 0.01);
+            CHECK_EQUAL(count, 3);
+
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2 + 0.) / 3., 0.01);
+            CHECK_EQUAL(count, 3);
+        }
+    }
+}
+
 TEST(Table_LanguageBindings)
 {
    Table* table = LangBindHelper::new_table();

@@ -572,8 +572,10 @@ double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t l
     if (limit < size)
         size = limit;
 
-    auto s = sum(begin, end, limit, return_ndx);
-    size_t cnt = aggregate<T, int64_t, act_Count, NotNull>(*this, 0, begin, end, limit, return_ndx);
+    auto s = sum(begin, end, limit, nullptr);
+    size_t cnt = aggregate<T, int64_t, act_Count, NotNull>(*this, 0, begin, end, limit, nullptr);
+    if (return_ndx)
+        *return_ndx = cnt;
     double avg = double(s) / (cnt == 0 ? 1 : cnt);
     return avg;
 }
