@@ -179,37 +179,35 @@ TEST(Optional_ValueDoesntGenerateWarning)
     CHECK(*ii);
 }
 
-#if REALM_HAVE_CXX11_CONSTEXPR
 TEST(Optional_ConstExpr) {
     // Should compile:
-    REALM_CONSTEXPR Optional<int> a;
-    REALM_CONSTEXPR Optional<int> b { none };
-    REALM_CONSTEXPR Optional<int> c { 1 };
+    constexpr Optional<int> a;
+    constexpr Optional<int> b { none };
+    constexpr Optional<int> c { 1 };
     CHECK_EQUAL(bool(c), true);
-    REALM_CONSTEXPR int d = *c;
+    constexpr int d = *c;
     CHECK_EQUAL(1, d);
-    REALM_CONSTEXPR bool e { Optional<int>{ 1 } };
+    constexpr bool e { Optional<int>{ 1 } };
     CHECK_EQUAL(true, e);
-    REALM_CONSTEXPR bool f { Optional<int>{ none } };
+    constexpr bool f { Optional<int>{ none } };
     CHECK_EQUAL(false, f);
-    REALM_CONSTEXPR int g = b.value_or(1234);
+    constexpr int g = b.value_or(1234);
     CHECK_EQUAL(1234, g);
 }
 
 TEST(Optional_ReferenceConstExpr) {
     // Should compile:
-    REALM_CONSTEXPR Optional<const int&> a;
-    REALM_CONSTEXPR Optional<const int&> b { none };
-    REALM_CONSTEXPR Optional<const int&> c { global_i };
+    constexpr Optional<const int&> a;
+    constexpr Optional<const int&> b { none };
+    constexpr Optional<const int&> c { global_i };
     CHECK_EQUAL(bool(c), true);
-    REALM_CONSTEXPR int d = *c;
+    constexpr int d = *c;
     CHECK_EQUAL(0, d);
-    REALM_CONSTEXPR bool e { Optional<const int&>{ global_i } };
+    constexpr bool e { Optional<const int&>{ global_i } };
     CHECK_EQUAL(true, e);
-    REALM_CONSTEXPR bool f { Optional<const int&>{ none } };
+    constexpr bool f { Optional<const int&>{ none } };
     CHECK_EQUAL(false, f);
 }
-#endif
 
 // Disabled for compliance with std::optional
 // TEST(Optional_VoidIsEquivalentToBool)

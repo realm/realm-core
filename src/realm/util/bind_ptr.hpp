@@ -56,7 +56,7 @@ namespace util {
 /// destructor never throws.
 template<class T> class bind_ptr {
 public:
-    REALM_CONSTEXPR bind_ptr() noexcept: m_ptr(0) {}
+    constexpr bind_ptr() noexcept: m_ptr(0) {}
     explicit bind_ptr(T* p) noexcept { bind(p); }
     template<class U> explicit bind_ptr(U* p) noexcept { bind(p); }
     ~bind_ptr() noexcept { unbind(); }
