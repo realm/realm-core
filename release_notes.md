@@ -22,8 +22,10 @@
   the table. This prevents a null dereference when adding further conditions
   to the query.
 * A bug in `Query` copying has been fixed. The bug could cause references to
-  Tables which should stay under the supervision of one SharedGroup to leak 
+  Tables which should stay under the supervision of one SharedGroup to leak
   to another during handover_export() leading to corruption.
+* Query expression operators now give correct results when an argument comes
+  from a link.
 
 ### API breaking changes:
 
