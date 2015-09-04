@@ -154,7 +154,7 @@ inline int log2(std::size_t x) {
 // Implementation:
 
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
-inline std::size_t to_size_t(int_fast64_t v) REALM_NOEXCEPT
+inline std::size_t to_size_t(int_fast64_t v) noexcept
 {
     REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
@@ -162,7 +162,7 @@ inline std::size_t to_size_t(int_fast64_t v) REALM_NOEXCEPT
 
 
 template<typename ReturnType, typename OriginalType>
-ReturnType type_punning(OriginalType variable) REALM_NOEXCEPT
+ReturnType type_punning(OriginalType variable) noexcept
 {
     union Both {
         OriginalType in;

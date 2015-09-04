@@ -444,7 +444,7 @@ uint64_t TableViewBase::outside_version() const
     }
 }
 
-bool TableViewBase::is_in_sync() const REALM_NOEXCEPT
+bool TableViewBase::is_in_sync() const noexcept
 {
     check_cookie();
 
@@ -466,13 +466,13 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 
 
 
-void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) noexcept
 {
     m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
 }
 
 
-void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) noexcept
 {
     std::size_t it = 0;
     for (;;) {
@@ -486,7 +486,7 @@ void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
 }
 
 
-void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) noexcept
 {
     std::size_t it = 0;
     // kill any refs to the target row ndx

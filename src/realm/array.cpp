@@ -174,7 +174,7 @@ size_t Array::bit_width(int64_t v)
 }
 
 
-void Array::init_from_mem(MemRef mem) REALM_NOEXCEPT
+void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.m_addr;
 
@@ -230,7 +230,7 @@ void Array::set_type(Type type)
 }
 
 
-bool Array::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+bool Array::update_from_parent(size_t old_baseline) noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG(m_parent);
@@ -326,7 +326,7 @@ void Array::preset(int64_t min, int64_t max, size_t count)
 }
 
 
-void Array::destroy_children(size_t offset) REALM_NOEXCEPT
+void Array::destroy_children(size_t offset) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
@@ -1198,7 +1198,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
     return s;
 }
 
-size_t Array::count(int64_t value) const REALM_NOEXCEPT
+size_t Array::count(int64_t value) const noexcept
 {
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t count = 0;
@@ -1418,7 +1418,7 @@ size_t Array::calc_byte_len(size_t count, size_t width) const
     return bytes + header_size; // add room for 8 byte header
 }
 
-size_t Array::calc_item_count(size_t bytes, size_t width) const REALM_NOEXCEPT
+size_t Array::calc_item_count(size_t bytes, size_t width) const noexcept
 {
     if (width == 0)
         return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
@@ -1535,7 +1535,7 @@ void Array::copy_on_write()
 namespace {
 
 template<size_t width>
-void set_direct(char* data, size_t ndx, int_fast64_t value) REALM_NOEXCEPT
+void set_direct(char* data, size_t ndx, int_fast64_t value) noexcept
 {
     // FIXME: The code below makes the non-portable assumption that
     // negative number are represented using two's complement. See
@@ -1599,7 +1599,7 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) REALM_NOEXCEPT
 }
 
 template<size_t width>
-void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) REALM_NOEXCEPT
+void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) noexcept
 {
     for (size_t i = begin; i != end; ++i)
         set_direct<width>(data, i, value);
@@ -1702,13 +1702,13 @@ void Array::alloc(size_t size, size_t width)
     set_header_size(size);
 }
 
-int_fast64_t Array::lbound_for_width(size_t width) REALM_NOEXCEPT
+int_fast64_t Array::lbound_for_width(size_t width) noexcept
 {
     REALM_TEMPEX(return lbound_for_width, width, ());
 }
 
 template <size_t width>
-int_fast64_t Array::lbound_for_width() REALM_NOEXCEPT
+int_fast64_t Array::lbound_for_width() noexcept
 {
     if (width == 0) {
         return 0;
@@ -1739,13 +1739,13 @@ int_fast64_t Array::lbound_for_width() REALM_NOEXCEPT
     }
 }
 
-int_fast64_t Array::ubound_for_width(size_t width) REALM_NOEXCEPT
+int_fast64_t Array::ubound_for_width(size_t width) noexcept
 {
     REALM_TEMPEX(return ubound_for_width, width, ());
 }
 
 template <size_t width>
-int_fast64_t Array::ubound_for_width() REALM_NOEXCEPT
+int_fast64_t Array::ubound_for_width() noexcept
 {
     if (width == 0) {
         return 0;
@@ -1797,12 +1797,12 @@ struct Array::VTableForWidth {
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
-void Array::set_width(size_t width) REALM_NOEXCEPT
+void Array::set_width(size_t width) noexcept
 {
     REALM_TEMPEX(set_width, width, ());
 }
 
-template<size_t width> void Array::set_width() REALM_NOEXCEPT
+template<size_t width> void Array::set_width() noexcept
 {
     m_lbound = lbound_for_width<width>();
     m_ubound = ubound_for_width<width>();
@@ -1815,7 +1815,7 @@ template<size_t width> void Array::set_width() REALM_NOEXCEPT
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be left untouched.
-template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
+template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
@@ -1876,7 +1876,7 @@ template<size_t width> void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
-bool Array::compare_int(const Array& a) const REALM_NOEXCEPT
+bool Array::compare_int(const Array& a) const noexcept
 {
     if (a.size() != size())
         return false;
@@ -2393,7 +2393,7 @@ namespace {
 
 // Direct access methods
 
-template<int w> int64_t get_direct(const char* data, size_t ndx) REALM_NOEXCEPT
+template<int w> int64_t get_direct(const char* data, size_t ndx) noexcept
 {
     if (w == 0) {
         return 0;
@@ -2429,33 +2429,33 @@ template<int w> int64_t get_direct(const char* data, size_t ndx) REALM_NOEXCEPT
     return int64_t(-1);
 }
 
-inline int64_t get_direct(const char* data, size_t width, size_t ndx) REALM_NOEXCEPT
+inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
 {
     REALM_TEMPEX(return get_direct, width, (data, ndx));
 }
 
 
-template<int width> inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) REALM_NOEXCEPT
+template<int width> inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
 {
     return std::make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
                      to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
-inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) REALM_NOEXCEPT
+inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) noexcept
 {
     REALM_TEMPEX(return get_two, width, (data, ndx));
 }
 
 
 template<int width>
-inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
 {
     v0 = to_ref(get_direct<width>(data, ndx + 0));
     v1 = to_ref(get_direct<width>(data, ndx + 1));
     v2 = to_ref(get_direct<width>(data, ndx + 2));
 }
 
-inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
 {
     REALM_TEMPEX(get_three, width, (data, ndx, v0, v1, v2));
 }
@@ -2483,7 +2483,7 @@ inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, 
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
 template<int width>
-inline size_t lower_bound(const char* data, size_t size, int64_t value) REALM_NOEXCEPT
+inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 {
 // The binary search used here is carefully optimized. Key trick is to use a single
 // loop controlling variable (size) instead of high/low pair, and to keep updates
@@ -2569,7 +2569,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) REALM_NO
 
 // See lower_bound()
 template<int width>
-inline size_t upper_bound(const char* data, size_t size, int64_t value) REALM_NOEXCEPT
+inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 {
     size_t low = 0;
     while (size >= 8) {
@@ -2615,12 +2615,12 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) REALM_NO
 
 
 
-size_t Array::lower_bound_int(int64_t value) const REALM_NOEXCEPT
+size_t Array::lower_bound_int(int64_t value) const noexcept
 {
     REALM_TEMPEX(return ::lower_bound, m_width, (m_data, m_size, value));
 }
 
-size_t Array::upper_bound_int(int64_t value) const REALM_NOEXCEPT
+size_t Array::upper_bound_int(int64_t value) const noexcept
 {
     REALM_TEMPEX(return ::upper_bound, m_width, (m_data, m_size, value));
 }
@@ -2989,7 +2989,7 @@ namespace {
 //
 // Returns (child_ndx, ndx_in_child).
 template<int width> inline std::pair<size_t, size_t>
-find_child_from_offsets(const char* offsets_header, size_t elem_ndx) REALM_NOEXCEPT
+find_child_from_offsets(const char* offsets_header, size_t elem_ndx) noexcept
 {
     const char* offsets_data = Array::get_data_from_header(offsets_header);
     size_t offsets_size = Array::get_size_from_header(offsets_header);
@@ -3003,7 +3003,7 @@ find_child_from_offsets(const char* offsets_header, size_t elem_ndx) REALM_NOEXC
 
 // Returns (child_ndx, ndx_in_child)
 inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t ndx,
-                                              const Allocator& alloc) REALM_NOEXCEPT
+                                              const Allocator& alloc) noexcept
 {
     size_t child_ndx;
     size_t ndx_in_child;
@@ -3031,7 +3031,7 @@ inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, siz
 
 
 // Returns (child_ndx, ndx_in_child)
-inline std::pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) REALM_NOEXCEPT
+inline std::pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) noexcept
 {
     int_fast64_t first_value = node.get(0);
     return find_bptree_child(first_value, ndx, node.get_alloc());
@@ -3041,7 +3041,7 @@ inline std::pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) REAL
 // Returns (child_ref, ndx_in_child)
 template<int width>
 inline std::pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
-                                                const Allocator& alloc) REALM_NOEXCEPT
+                                                const Allocator& alloc) noexcept
 {
     int_fast64_t first_value = get_direct<width>(data, 0);
     std::pair<size_t, size_t> p = find_bptree_child(first_value, ndx, alloc);
@@ -3086,7 +3086,7 @@ inline std::pair<ref_type, size_t> find_bptree_child(const char* data, size_t nd
 template<class Handler>
 bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
                          Handler handler, size_t start_offset)
-    REALM_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
+    noexcept(noexcept(handler(Array::NodeInfo())))
 {
     REALM_ASSERT(node.is_inner_bptree_node());
 
@@ -3175,7 +3175,7 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
 // calculated. With these simplification it is possible to avoid any
 // access to the `offsets` array.
 template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler handler)
-    REALM_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
+    noexcept(noexcept(handler(Array::NodeInfo())))
 {
     REALM_ASSERT(node.is_inner_bptree_node());
 
@@ -3214,7 +3214,7 @@ template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler
 
 
 inline void destroy_inner_bptree_node(MemRef mem, int_fast64_t first_value,
-                                      Allocator& alloc) REALM_NOEXCEPT
+                                      Allocator& alloc) noexcept
 {
     alloc.free_(mem);
     if (first_value % 2 == 0) {
@@ -3225,7 +3225,7 @@ inline void destroy_inner_bptree_node(MemRef mem, int_fast64_t first_value,
 }
 
 void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
-                                   Array::EraseHandler& handler) REALM_NOEXCEPT
+                                   Array::EraseHandler& handler) noexcept
 {
     MemRef mem_2 = mem;
     for (;;) {
@@ -3311,7 +3311,7 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
 } // anonymous namespace
 
 
-std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const REALM_NOEXCEPT
+std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const noexcept
 {
     REALM_ASSERT(is_inner_bptree_node());
 
@@ -3341,7 +3341,7 @@ namespace {
 
 class VisitAdapter {
 public:
-    VisitAdapter(Array::VisitHandler& handler) REALM_NOEXCEPT:
+    VisitAdapter(Array::VisitHandler& handler) noexcept:
         m_handler(handler)
     {
     }
@@ -3371,7 +3371,7 @@ namespace {
 
 class UpdateAdapter {
 public:
-    UpdateAdapter(Array::UpdateHandler& handler) REALM_NOEXCEPT:
+    UpdateAdapter(Array::UpdateHandler& handler) noexcept:
         m_handler(handler)
     {
     }
@@ -3590,7 +3590,7 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
 }
 
 
-int_fast64_t Array::get(const char* header, size_t ndx) REALM_NOEXCEPT
+int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
@@ -3598,7 +3598,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) REALM_NOEXCEPT
 }
 
 
-std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) REALM_NOEXCEPT
+std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
@@ -3607,7 +3607,7 @@ std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) REALM
 }
 
 
-void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT
+void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);

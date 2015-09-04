@@ -64,7 +64,7 @@ public:
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
-    virtual ~Query() REALM_NOEXCEPT;
+    virtual ~Query() noexcept;
 
     Query& operator = (const Query& source);
 
@@ -317,7 +317,7 @@ private:
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
-    void delete_nodes() REALM_NOEXCEPT;
+    void delete_nodes() noexcept;
 
     bool supports_export_for_handover() { return m_view == 0; };
 

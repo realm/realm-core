@@ -28,11 +28,11 @@ namespace realm {
 /// types like float, double.
 template<class T> class BasicArray: public Array {
 public:
-    explicit BasicArray(Allocator&) REALM_NOEXCEPT;
-    explicit BasicArray(no_prealloc_tag) REALM_NOEXCEPT;
-    ~BasicArray() REALM_NOEXCEPT override {}
+    explicit BasicArray(Allocator&) noexcept;
+    explicit BasicArray(no_prealloc_tag) noexcept;
+    ~BasicArray() noexcept override {}
 
-    T get(std::size_t ndx) const REALM_NOEXCEPT;
+    T get(std::size_t ndx) const noexcept;
     void add(T value);
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value);
@@ -55,12 +55,12 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static T get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
+    static T get(const char* header, std::size_t ndx) noexcept;
 
     ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
 
-    std::size_t lower_bound(T value) const REALM_NOEXCEPT;
-    std::size_t upper_bound(T value) const REALM_NOEXCEPT;
+    std::size_t lower_bound(T value) const noexcept;
+    std::size_t upper_bound(T value) const noexcept;
 
     /// Construct a basic array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
@@ -87,7 +87,7 @@ private:
     std::size_t find(T target, std::size_t begin, std::size_t end) const;
 
     std::size_t calc_byte_len(std::size_t count, std::size_t width) const override;
-    virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT override;
+    virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const noexcept override;
     virtual WidthType GetWidthType() const override { return wtype_Multiply; }
 
     template<bool find_max> bool minmax(T& result, std::size_t begin, std::size_t end) const;

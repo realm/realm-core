@@ -34,17 +34,17 @@ namespace _impl {
 /// `DeepArrayDestroyGuard` for an alternative.
 template<class T> class DestroyGuard {
 public:
-    DestroyGuard() REALM_NOEXCEPT;
+    DestroyGuard() noexcept;
 
-    DestroyGuard(T*) REALM_NOEXCEPT;
+    DestroyGuard(T*) noexcept;
 
-    ~DestroyGuard() REALM_NOEXCEPT;
+    ~DestroyGuard() noexcept;
 
-    void reset(T*) REALM_NOEXCEPT;
+    void reset(T*) noexcept;
 
-    T* get() const REALM_NOEXCEPT;
+    T* get() const noexcept;
 
-    T* release() REALM_NOEXCEPT;
+    T* release() noexcept;
 
 private:
     T* m_ptr;
@@ -57,17 +57,17 @@ typedef DestroyGuard<Array> ShallowArrayDestroyGuard;
 /// is not null when the guard is destroyed.
 class DeepArrayDestroyGuard {
 public:
-    DeepArrayDestroyGuard() REALM_NOEXCEPT;
+    DeepArrayDestroyGuard() noexcept;
 
-    DeepArrayDestroyGuard(Array*) REALM_NOEXCEPT;
+    DeepArrayDestroyGuard(Array*) noexcept;
 
-    ~DeepArrayDestroyGuard() REALM_NOEXCEPT;
+    ~DeepArrayDestroyGuard() noexcept;
 
-    void reset(Array*) REALM_NOEXCEPT;
+    void reset(Array*) noexcept;
 
-    Array* get() const REALM_NOEXCEPT;
+    Array* get() const noexcept;
 
-    Array* release() REALM_NOEXCEPT;
+    Array* release() noexcept;
 
 private:
     Array* m_ptr;
@@ -78,17 +78,17 @@ private:
 /// (`ref`) is not zero when the guard is destroyed.
 class DeepArrayRefDestroyGuard {
 public:
-    DeepArrayRefDestroyGuard(Allocator&) REALM_NOEXCEPT;
+    DeepArrayRefDestroyGuard(Allocator&) noexcept;
 
-    DeepArrayRefDestroyGuard(ref_type, Allocator&) REALM_NOEXCEPT;
+    DeepArrayRefDestroyGuard(ref_type, Allocator&) noexcept;
 
-    ~DeepArrayRefDestroyGuard() REALM_NOEXCEPT;
+    ~DeepArrayRefDestroyGuard() noexcept;
 
-    void reset(ref_type) REALM_NOEXCEPT;
+    void reset(ref_type) noexcept;
 
-    ref_type get() const REALM_NOEXCEPT;
+    ref_type get() const noexcept;
 
-    ref_type release() REALM_NOEXCEPT;
+    ref_type release() noexcept;
 
 private:
     ref_type m_ref;
@@ -103,35 +103,35 @@ private:
 
 // DestroyGuard<T>
 
-template<class T> inline DestroyGuard<T>::DestroyGuard() REALM_NOEXCEPT:
+template<class T> inline DestroyGuard<T>::DestroyGuard() noexcept:
     m_ptr(0)
 {
 }
 
-template<class T> inline DestroyGuard<T>::DestroyGuard(T* ptr) REALM_NOEXCEPT:
+template<class T> inline DestroyGuard<T>::DestroyGuard(T* ptr) noexcept:
     m_ptr(ptr)
 {
 }
 
-template<class T> inline DestroyGuard<T>::~DestroyGuard() REALM_NOEXCEPT
+template<class T> inline DestroyGuard<T>::~DestroyGuard() noexcept
 {
     if (m_ptr)
         m_ptr->destroy();
 }
 
-template<class T> inline void DestroyGuard<T>::reset(T* ptr) REALM_NOEXCEPT
+template<class T> inline void DestroyGuard<T>::reset(T* ptr) noexcept
 {
     if (m_ptr)
         m_ptr->destroy();
     m_ptr = ptr;
 }
 
-template<class T> inline T* DestroyGuard<T>::get() const REALM_NOEXCEPT
+template<class T> inline T* DestroyGuard<T>::get() const noexcept
 {
     return m_ptr;
 }
 
-template<class T> inline T* DestroyGuard<T>::release() REALM_NOEXCEPT
+template<class T> inline T* DestroyGuard<T>::release() noexcept
 {
     T* ptr = m_ptr;
     m_ptr = nullptr;
@@ -141,35 +141,35 @@ template<class T> inline T* DestroyGuard<T>::release() REALM_NOEXCEPT
 
 // DeepArrayDestroyGuard
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() REALM_NOEXCEPT:
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() noexcept:
     m_ptr(0)
 {
 }
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) REALM_NOEXCEPT:
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) noexcept:
     m_ptr(ptr)
 {
 }
 
-inline DeepArrayDestroyGuard::~DeepArrayDestroyGuard() REALM_NOEXCEPT
+inline DeepArrayDestroyGuard::~DeepArrayDestroyGuard() noexcept
 {
     if (m_ptr)
         m_ptr->destroy_deep();
 }
 
-inline void DeepArrayDestroyGuard::reset(Array* ptr) REALM_NOEXCEPT
+inline void DeepArrayDestroyGuard::reset(Array* ptr) noexcept
 {
     if (m_ptr)
         m_ptr->destroy_deep();
     m_ptr = ptr;
 }
 
-inline Array* DeepArrayDestroyGuard::get() const REALM_NOEXCEPT
+inline Array* DeepArrayDestroyGuard::get() const noexcept
 {
     return m_ptr;
 }
 
-inline Array* DeepArrayDestroyGuard::release() REALM_NOEXCEPT
+inline Array* DeepArrayDestroyGuard::release() noexcept
 {
     Array* ptr = m_ptr;
     m_ptr = nullptr;
@@ -179,38 +179,38 @@ inline Array* DeepArrayDestroyGuard::release() REALM_NOEXCEPT
 
 // DeepArrayRefDestroyGuard
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) REALM_NOEXCEPT:
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) noexcept:
     m_ref(0),
     m_alloc(alloc)
 {
 }
 
 inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref,
-                                                          Allocator& alloc) REALM_NOEXCEPT:
+                                                          Allocator& alloc) noexcept:
     m_ref(ref),
     m_alloc(alloc)
 {
 }
 
-inline DeepArrayRefDestroyGuard::~DeepArrayRefDestroyGuard() REALM_NOEXCEPT
+inline DeepArrayRefDestroyGuard::~DeepArrayRefDestroyGuard() noexcept
 {
     if (m_ref)
         Array::destroy_deep(m_ref, m_alloc);
 }
 
-inline void DeepArrayRefDestroyGuard::reset(ref_type ref) REALM_NOEXCEPT
+inline void DeepArrayRefDestroyGuard::reset(ref_type ref) noexcept
 {
     if (m_ref)
         Array::destroy_deep(m_ref, m_alloc);
     m_ref = ref;
 }
 
-inline ref_type DeepArrayRefDestroyGuard::get() const REALM_NOEXCEPT
+inline ref_type DeepArrayRefDestroyGuard::get() const noexcept
 {
     return m_ref;
 }
 
-inline ref_type DeepArrayRefDestroyGuard::release() REALM_NOEXCEPT
+inline ref_type DeepArrayRefDestroyGuard::release() noexcept
 {
     ref_type ref = m_ref;
     m_ref = 0;

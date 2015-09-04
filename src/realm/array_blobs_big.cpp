@@ -81,7 +81,7 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
 
 
 size_t ArrayBigBlobs::count(BinaryData value, bool is_string,
-                            size_t begin, size_t end) const REALM_NOEXCEPT
+                            size_t begin, size_t end) const noexcept
 {
     size_t num_matches = 0;
 
@@ -99,7 +99,7 @@ size_t ArrayBigBlobs::count(BinaryData value, bool is_string,
 
 
 size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
-                                 size_t begin, size_t end) const REALM_NOEXCEPT
+                                 size_t begin, size_t end) const noexcept
 {
     if (end == npos)
         end = m_size;

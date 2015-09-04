@@ -72,7 +72,7 @@ TestPathGuard::TestPathGuard(const std::string& path):
     File::try_remove(m_path);
 }
 
-TestPathGuard::~TestPathGuard() REALM_NOEXCEPT
+TestPathGuard::~TestPathGuard() noexcept
 {
     if (keep_files)
         return;

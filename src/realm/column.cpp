@@ -19,12 +19,12 @@ using namespace std;
 using namespace realm;
 using namespace realm::util;
 
-bool ColumnBase::is_nullable() const REALM_NOEXCEPT
+bool ColumnBase::is_nullable() const noexcept
 {
     return false;
 }
 
-bool ColumnBase::is_null(size_t) const REALM_NOEXCEPT
+bool ColumnBase::is_null(size_t) const noexcept
 {
     return false;
 }
@@ -34,12 +34,12 @@ void ColumnBase::set_null(size_t)
     throw LogicError{LogicError::column_not_nullable};
 }
 
-void ColumnBase::move_assign(ColumnBase&) REALM_NOEXCEPT
+void ColumnBase::move_assign(ColumnBase&) noexcept
 {
     destroy();
 }
 
-void ColumnBaseWithIndex::move_assign(ColumnBaseWithIndex& col) REALM_NOEXCEPT
+void ColumnBaseWithIndex::move_assign(ColumnBaseWithIndex& col) noexcept
 {
     ColumnBase::move_assign(col);
     m_search_index = std::move(col.m_search_index);
@@ -50,14 +50,14 @@ void ColumnBase::set_string(size_t, StringData)
     throw LogicError(LogicError::type_mismatch);
 }
 
-void ColumnBaseWithIndex::set_ndx_in_parent(size_t ndx) REALM_NOEXCEPT
+void ColumnBaseWithIndex::set_ndx_in_parent(size_t ndx) noexcept
 {
     if (m_search_index) {
         m_search_index->set_ndx_in_parent(ndx + 1);
     }
 }
 
-void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) noexcept
 {
     if (m_search_index) {
         m_search_index->update_from_parent(old_baseline);
@@ -83,7 +83,7 @@ void ColumnBase::cascade_break_backlinks_to_all_rows(size_t, CascadeState&)
     // No-op by default
 }
 
-void ColumnBaseWithIndex::destroy() REALM_NOEXCEPT
+void ColumnBaseWithIndex::destroy() noexcept
 {
     if (m_search_index) {
         m_search_index->destroy();
@@ -118,7 +118,7 @@ struct GetSizeFromRef {
     Allocator& m_alloc;
     size_t m_size;
     GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
-    template<class Col> void call() REALM_NOEXCEPT
+    template<class Col> void call() noexcept
     {
         m_size = Col::get_size_from_ref(m_ref, m_alloc);
     }
@@ -166,8 +166,8 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
 
 class TreeWriter {
 public:
-    TreeWriter(_impl::OutputStream&) REALM_NOEXCEPT;
-    ~TreeWriter() REALM_NOEXCEPT;
+    TreeWriter(_impl::OutputStream&) noexcept;
+    ~TreeWriter() noexcept;
 
     void add_leaf_ref(ref_type child_ref, size_t elems_in_child, ref_type* is_last);
 
@@ -181,7 +181,7 @@ private:
 class TreeWriter::ParentLevel {
 public:
     ParentLevel(Allocator&, _impl::OutputStream&, size_t max_elems_per_child);
-    ~ParentLevel() REALM_NOEXCEPT;
+    ~ParentLevel() noexcept;
 
     void add_child_ref(ref_type child_ref, size_t elems_in_child,
                        bool leaf_or_compact, ref_type* is_last);
@@ -197,13 +197,13 @@ private:
 };
 
 
-inline TreeWriter::TreeWriter(_impl::OutputStream& out) REALM_NOEXCEPT:
+inline TreeWriter::TreeWriter(_impl::OutputStream& out) noexcept:
     m_alloc(Allocator::get_default()),
     m_out(out)
 {
 }
 
-inline TreeWriter::~TreeWriter() REALM_NOEXCEPT
+inline TreeWriter::~TreeWriter() noexcept
 {
 }
 
@@ -234,7 +234,7 @@ inline TreeWriter::ParentLevel::ParentLevel(Allocator& alloc, _impl::OutputStrea
     m_main.create(Array::type_InnerBptreeNode); // Throws
 }
 
-inline TreeWriter::ParentLevel::~ParentLevel() REALM_NOEXCEPT
+inline TreeWriter::ParentLevel::~ParentLevel() noexcept
 {
     m_offsets.destroy(); // Shallow
     m_main.destroy(); // Shallow
@@ -340,7 +340,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
 
 
 size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
-                                              Allocator& alloc) REALM_NOEXCEPT
+                                              Allocator& alloc) noexcept
 {
     GetSizeFromRef op(ref, alloc);
     col_type_deleg(op, type);
@@ -352,7 +352,7 @@ class ColumnBase::WriteSliceHandler: public Array::VisitHandler {
 public:
     WriteSliceHandler(size_t offset, size_t size, Allocator& alloc,
                       ColumnBase::SliceHandler &slice_handler,
-                      _impl::OutputStream& out) REALM_NOEXCEPT:
+                      _impl::OutputStream& out) noexcept:
         m_begin(offset), m_end(offset + size),
         m_leaf_cache(alloc),
         m_slice_handler(slice_handler),
@@ -361,7 +361,7 @@ public:
         m_top_ref(0)
     {
     }
-    ~WriteSliceHandler() REALM_NOEXCEPT
+    ~WriteSliceHandler() noexcept
     {
     }
     bool visit(const Array::NodeInfo& leaf_info) override
@@ -397,7 +397,7 @@ public:
         m_tree_writer.add_leaf_ref(ref, size, is_last); // Throws
         return !is_last;
     }
-    ref_type get_top_ref() const REALM_NOEXCEPT
+    ref_type get_top_ref() const noexcept
     {
         return m_top_ref;
     }
@@ -550,7 +550,7 @@ void IntegerColumn::reference_sort(size_t start, size_t end, Column& ref)
 */
 
 
-void ColumnBaseWithIndex::destroy_search_index() REALM_NOEXCEPT
+void ColumnBaseWithIndex::destroy_search_index() noexcept
 {
     m_search_index.reset();
 }

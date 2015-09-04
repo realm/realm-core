@@ -40,10 +40,10 @@ struct Table##Spec: ::realm::SpecBase { \
  \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i) {} \
+        ColNames(Init i) noexcept: name1(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
     } \
@@ -80,10 +80,10 @@ struct Table##Spec: ::realm::SpecBase { \
     template<template<int> class Col, class Init> struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -123,10 +123,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -169,10 +169,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
         typename Col<3>::type name4; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -218,10 +218,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<2>::type name3; \
         typename Col<3>::type name4; \
         typename Col<4>::type name5; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -270,10 +270,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<3>::type name4; \
         typename Col<4>::type name5; \
         typename Col<5>::type name6; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -325,10 +325,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<4>::type name5; \
         typename Col<5>::type name6; \
         typename Col<6>::type name7; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -383,10 +383,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<5>::type name6; \
         typename Col<6>::type name7; \
         typename Col<7>::type name8; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -444,10 +444,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<6>::type name7; \
         typename Col<7>::type name8; \
         typename Col<8>::type name9; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -508,10 +508,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<7>::type name8; \
         typename Col<8>::type name9; \
         typename Col<9>::type name10; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -575,10 +575,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<8>::type name9; \
         typename Col<9>::type name10; \
         typename Col<10>::type name11; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -645,10 +645,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<9>::type name10; \
         typename Col<10>::type name11; \
         typename Col<11>::type name12; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -718,10 +718,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<10>::type name11; \
         typename Col<11>::type name12; \
         typename Col<12>::type name13; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -794,10 +794,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<11>::type name12; \
         typename Col<12>::type name13; \
         typename Col<13>::type name14; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \
@@ -873,10 +873,10 @@ struct Table##Spec: ::realm::SpecBase { \
         typename Col<12>::type name13; \
         typename Col<13>::type name14; \
         typename Col<14>::type name15; \
-        ColNames(Init i) REALM_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i), name15(i) {} \
+        ColNames(Init i) noexcept: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i), name15(i) {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
         names[0] = realm::StringData(#name1, sizeof #name1 - 1); \
         names[1] = realm::StringData(#name2, sizeof #name2 - 1); \

@@ -151,14 +151,14 @@ Query& Query::operator = (const Query& source)
     return *this;
 }
 
-Query::~Query() REALM_NOEXCEPT
+Query::~Query() noexcept
 {
     if (m_owns_source_table_view)
         delete m_source_table_view;
     delete_nodes();
 }
 
-void Query::delete_nodes() REALM_NOEXCEPT
+void Query::delete_nodes() noexcept
 {
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
