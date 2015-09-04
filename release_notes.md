@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Bugfixes:
-
+* Fixed all aggregate methods on Table (min, max, etc) that hadn't been 
+  updated/kept in sync for a long while.
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
   same file if opened from two places simultaneously)
 * `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
@@ -44,7 +45,8 @@
   Android) are likely to want to use unordered mode everywhere.
 
 ### Enhancements:
-
+* Added argument to Table::average() and TableView::average() that returns number
+  of values that were used for computing the average
 * Full null support everywhere and on all column types. See
   `TEST(Query_NullShowcase)` in `test_query.cpp` in core repo.
 * Added `Descriptor::get_link_target()`, for completeness.
