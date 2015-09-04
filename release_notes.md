@@ -265,7 +265,8 @@ is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
 
 ### Bugfixes:
 
-* The check for functioning SEGV signals threw the exception only once.
+* The check for functioning SEGV signals threw the exception only once. Now it
+always throws when trying to use encryption.
 
 **NOTE: This is a hotfix release. The above bugfixes are not present in
 versions [0.90.0, 0.92.1].**
