@@ -168,7 +168,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     REALM_ASSERT(column_ndx < m_table->get_column_count());
     if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
         if (return_ndx) {
-            if(function == act_Average)
+            if (function == act_Average)
                 *return_ndx = 0;
             else
                 *return_ndx = npos;
