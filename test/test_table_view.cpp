@@ -301,6 +301,23 @@ TEST(TableView_Sum)
     CHECK_EQUAL(10, sum);
 }
 
+TEST(TableView_Average)
+{
+    TestTableInt table;
+
+    table.add(2);
+    table.add(2);
+    table.add(2);
+    table.add(2);
+    table.add(2);
+
+    TestTableInt::View v = table.column().first.find_all(2);
+    CHECK_EQUAL(5, v.size());
+
+    int64_t sum = v.column().first.average();
+    CHECK_EQUAL(2, sum);
+}
+
 TEST(TableView_SumNegative)
 {
     TestTableInt table;
