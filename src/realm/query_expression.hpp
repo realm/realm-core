@@ -1503,17 +1503,14 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
 {
 public:
-    Columns(size_t column, const Table* table, std::vector<size_t> links) :
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links) :
         m_column(column), m_link_map(table, links)
     {
         m_table = table;
         REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), == , type_Binary);
     }
 
-    Columns(size_t column, const Table* table) : m_column(column)
-    {
-        m_table = table;
-    }
+    Columns(size_t column, const Table* table) : m_table(table), m_column(column) { }
 
     explicit Columns() { }
 
@@ -1524,9 +1521,7 @@ public:
 
     virtual Subexpr& clone() override
     {
-        Columns<BinaryData>& n = *new Columns<BinaryData>();
-        n = *this;
-        return n;
+        return *new Columns<BinaryData>(*this);
     }
 
     const Table* get_table() const override
@@ -1554,8 +1549,6 @@ public:
             }
         }
     }
-
-    const Table* m_table_linked_from = nullptr;
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
     const Table* m_table = nullptr;
