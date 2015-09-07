@@ -520,17 +520,17 @@ public:
     int64_t sum_int(std::size_t column_ndx) const;
     double  sum_float(std::size_t column_ndx) const;
     double  sum_double(std::size_t column_ndx) const;
-    int64_t maximum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    float   maximum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    double  maximum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
-    int64_t minimum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    float   minimum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
-    double  minimum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
+    int64_t maximum_int(std::size_t column_ndx, std::size_t* return_ndx = nullptr) const;
+    float   maximum_float(std::size_t column_ndx, std::size_t* return_ndx = nullptr) const;
+    double  maximum_double(std::size_t column_ndx, std::size_t* return_ndx = nullptr) const;
+    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    int64_t minimum_int(std::size_t column_ndx, std::size_t* return_ndx = nullptr) const;
+    float   minimum_float(std::size_t column_ndx, std::size_t* return_ndx = nullptr) const;
+    double  minimum_double(std::size_t column_ndx, std::size_t* return_ndx = nullptr) const;
     DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
-    double  average_int(std::size_t column_ndx) const;
-    double  average_float(std::size_t column_ndx) const;
-    double  average_double(std::size_t column_ndx) const;
+    double  average_int(std::size_t column_ndx, size_t* value_count = nullptr) const;
+    double  average_float(std::size_t column_ndx, size_t* value_count = nullptr) const;
+    double  average_double(std::size_t column_ndx, size_t* value_count = nullptr) const;
 
     // Searching
     std::size_t    find_first_link(std::size_t target_row_index) const;

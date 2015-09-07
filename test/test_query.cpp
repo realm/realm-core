@@ -6461,6 +6461,7 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, { }));
 
     // TableView
+    size_t count;
     int64_t i;
     double d;
     DateTime dt;
@@ -6469,20 +6470,31 @@ TEST(Query_NullShowcase)
     // Integer column
     i = tv.maximum_int(0);
     CHECK_EQUAL(i, 20);
+
     i = tv.minimum_int(0);
     CHECK_EQUAL(i, 10);
-    d = tv.average_int(0);
+
+    count = 123;
+    d = tv.average_int(0, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 15., 0.001);
+    CHECK_EQUAL(count, 2);
+
     i = tv.sum_int(0);
     CHECK_EQUAL(i, 30);
+
 
     // Float column
     d = tv.maximum_float(1);
     CHECK_EQUAL(d, 30.);
+
     d = tv.minimum_float(1);
     CHECK_EQUAL(d, 30.);
-    d = tv.average_float(1);
+
+    count = 123;
+    d = tv.average_float(1, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+    CHECK_EQUAL(count, 1);
+
     d = tv.sum_float(1);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
 
@@ -6816,7 +6828,7 @@ TEST(Query_Null_Two_Columns)
 }
 
 // Between, count, min and max
-TEST(Query_Null_BetweenMinMax)
+TEST(Query_Null_BetweenMinMax_Nullable)
 {
     Group g;
     TableRef table = g.add_table("Inventory");
@@ -6831,6 +6843,7 @@ TEST(Query_Null_BetweenMinMax)
 
     TableView tv;
     size_t match;
+    size_t count;
 
     // Here we test max/min/average with 0 rows used to compute the value, either becuase all inputs are null or
     // becuase 0 rows exist.
@@ -6845,7 +6858,9 @@ TEST(Query_Null_BetweenMinMax)
         CHECK_EQUAL(match, npos);
 
         CHECK_EQUAL(tv.sum_int(0), 0);
-        CHECK_EQUAL(tv.average_int(0), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_int(0, &count), 0.);
+        CHECK_EQUAL(count, 0);
 
         // float
         match = 123;
@@ -6857,7 +6872,9 @@ TEST(Query_Null_BetweenMinMax)
         CHECK_EQUAL(match, npos);
 
         CHECK_EQUAL(tv.sum_float(1), 0.);
-        CHECK_EQUAL(tv.average_float(1), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_float(1, &count), 0.);
+        CHECK_EQUAL(count, 0);
 
         // double
         match = 123;
@@ -6869,7 +6886,9 @@ TEST(Query_Null_BetweenMinMax)
         CHECK_EQUAL(match, npos);
 
         CHECK_EQUAL(tv.sum_double(3), 0.);
-        CHECK_EQUAL(tv.average_double(3), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_double(3, &count), 0.);
+        CHECK_EQUAL(count, 0);
 
         // date
         match = 123;
@@ -6903,10 +6922,17 @@ TEST(Query_Null_BetweenMinMax)
     table->set_double(3, 1, 10.);
 
     tv = table->where().find_all();
-    CHECK_EQUAL(tv.average_int(0), 10);
-    CHECK_EQUAL(tv.average_float(1), 10.);
-    CHECK_EQUAL(tv.average_double(3), 10.);
+    count = 123;
+    CHECK_EQUAL(tv.average_int(0, &count), 10);
+    CHECK_EQUAL(count, 1);
+    count = 123;
+    CHECK_EQUAL(tv.average_float(1, &count), 10.);
+    CHECK_EQUAL(count, 1);
+    count = 123;
+    CHECK_EQUAL(tv.average_double(3, &count), 10.);
+    CHECK_EQUAL(count, 1); 
 }
+
 
 // If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works by
 // creating a large table with nulls in arbitrary places and query for nulls. Verify the search result manually.

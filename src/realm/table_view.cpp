@@ -167,8 +167,12 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
     if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
-        if (return_ndx)
-            *return_ndx = npos;
+        if (return_ndx) {
+            if (function == act_Average)
+                *return_ndx = 0;
+            else
+                *return_ndx = npos;
+        }
         return 0;
     }
 
@@ -314,22 +318,21 @@ DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) 
         return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
-// Average
-
-double TableViewBase::average_int(size_t column_ndx) const
+// Average. The number of values used to compute the result is written to `value_count` by callee
+double TableViewBase::average_int(size_t column_ndx, size_t* value_count) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0);
+        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0, value_count);
     else
-        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0);
+        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0, value_count);
 }
-double TableViewBase::average_float(size_t column_ndx) const
+double TableViewBase::average_float(size_t column_ndx, size_t* value_count) const
 {
-    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0);
+    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0, value_count);
 }
-double TableViewBase::average_double(size_t column_ndx) const
+double TableViewBase::average_double(size_t column_ndx, size_t* value_count) const
 {
-    return aggregate<act_Average, double>(&DoubleColumn::average, column_ndx, 0);
+    return aggregate<act_Average, double>(&DoubleColumn::average, column_ndx, 0, value_count);
 }
 
 // Count

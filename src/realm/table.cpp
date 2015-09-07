@@ -2902,8 +2902,14 @@ int64_t Table::sum_int(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.sum();
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.sum();
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.sum();
+    }
 }
 double Table::sum_float(size_t col_ndx) const
 {
@@ -2924,29 +2930,35 @@ double Table::sum_double(size_t col_ndx) const
 
 // average ----------------------------------------------
 
-double Table::average_int(size_t col_ndx) const
+double Table::average_int(size_t col_ndx, size_t* value_count) const
 {
     if (!m_columns.is_attached())
         return 0;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.average();
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.average(0, -1, -1, value_count);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.average(0, -1, -1, value_count);
+    }
 }
-double Table::average_float(size_t col_ndx) const
+double Table::average_float(size_t col_ndx, size_t* value_count) const
 {
     if (!m_columns.is_attached())
         return 0.f;
 
     const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return column.average();
+    return column.average(0, -1, -1, value_count);
 }
-double Table::average_double(size_t col_ndx) const
+double Table::average_double(size_t col_ndx, size_t* value_count) const
 {
     if (!m_columns.is_attached())
         return 0.;
 
     const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return column.average();
+    return column.average(0, -1, -1, value_count);
 }
 
 // minimum ----------------------------------------------
