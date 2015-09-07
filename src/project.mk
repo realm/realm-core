@@ -17,8 +17,7 @@ ifeq ($(OS),Darwin)
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
 endif
 
-# FIXME: '-fno-elide-constructors' currently causes Realm to fail
-#CFLAGS_DEBUG += -fno-elide-constructors
+CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
 CFLAGS_GENERAL += -Wextra -pedantic
 CFLAGS_CXX = -std=c++11
@@ -57,7 +56,9 @@ ifneq ($(REALM_HAVE_CONFIG),)
 endif
 
 PROJECT_CFLAGS_DEBUG = -DREALM_DEBUG
-PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER -fno-inline -fno-inline-small-functions -fno-default-inline -fno-elide-constructors
+PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER \
+                       -fno-inline -fno-inline-small-functions \
+                       -fno-default-inline -fno-elide-constructors
 
 # Load dynamic configuration
 ifneq ($(REALM_HAVE_CONFIG),)
@@ -73,7 +74,7 @@ ifneq ($(REALM_HAVE_CONFIG),)
   ifeq ($(ENABLE_ENCRYPTION),yes)
     PROJECT_CFLAGS += -DREALM_ENABLE_ENCRYPTION
     ifeq ($(OS),Linux)
-      PROJECT_LDFLAGS += -ldl
+      PROJECT_LDFLAGS += -lcrypto
     endif
   endif
 else
@@ -85,4 +86,7 @@ endif
 ifneq ($(REALM_ANDROID),)
   PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden -DANDROID
   CFLAGS_OPTIM = -Os -flto -DNDEBUG
+  ifeq ($(ENABLE_ENCRYPTION),yes)
+	PROJECT_CFLAGS += -I../../openssl/include
+  endif
 endif

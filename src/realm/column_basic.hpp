@@ -60,10 +60,40 @@ class BasicColumn : public ColumnBaseSimple, public ColumnTemplate<T> {
 public:
     using LeafType = typename GetLeafType<T, false>::type;
     using value_type = T;
-    BasicColumn(Allocator&, ref_type);
 
-    std::size_t size() const REALM_NOEXCEPT final;
-    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+    // The FloatColumn and DoubleColumn only exists as class types that support
+    // null (there is no separate typed nullable and non-nullable versions).
+    // Both have a `bool m_nullable` flag which is set in their constructor
+    // according to the m_spec
+    static const bool nullable = true;
+    
+    BasicColumn(Allocator&, ref_type, bool nullable);
+
+    std::size_t size() const noexcept final;
+    bool is_empty() const noexcept { return size() == 0; }
+
+    bool is_nullable() const noexcept override
+    {
+        return m_nullable;
+    }
+    bool is_null(size_t index) const noexcept override
+    {
+        if (!m_nullable)
+            return false;
+
+        return null::is_null_float(get(index));
+    }
+
+    void set_null(size_t index) override
+    {
+        REALM_ASSERT(m_nullable);
+        if (!m_array->is_inner_bptree_node()) {
+            static_cast<BasicArray<T>*>(m_array.get())->set(index, null::get_null_float<T>()); // Throws
+            return;
+        }
+        SetLeafElem set_leaf_elem(m_array->get_alloc(), null::get_null_float<T>());
+        m_array->update_bptree_elem(index, set_leaf_elem); // Throws
+    }
 
     struct LeafInfo {
         const BasicArray<T>** out_leaf_ptr;
@@ -71,10 +101,10 @@ public:
     };
 
     void get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                          LeafInfo& inout_leaf_info) const REALM_NOEXCEPT;
+                          LeafInfo& inout_leaf_info) const noexcept;
 
-    T get(std::size_t ndx) const REALM_NOEXCEPT;
-    StringData get_index_data(std::size_t, char* buffer) const REALM_NOEXCEPT final;
+    T get(std::size_t ndx) const noexcept;
+    StringData get_index_data(std::size_t, char* buffer) const noexcept final;
     void add(T value = T());
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value = T());
@@ -105,8 +135,8 @@ public:
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order.
-    std::size_t lower_bound(T value) const REALM_NOEXCEPT;
-    std::size_t upper_bound(T value) const REALM_NOEXCEPT;
+    std::size_t lower_bound(T value) const noexcept;
+    std::size_t upper_bound(T value) const noexcept;
     //@{
 
     /// Compare two columns for equality.
@@ -150,6 +180,8 @@ private:
     void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
     void do_clear();
 
+    bool m_nullable;
+
 #ifdef REALM_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -163,7 +195,7 @@ private:
 
 template <class T>
 void BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                                         LeafInfo& leaf) const REALM_NOEXCEPT
+                                         LeafInfo& leaf) const noexcept
 {
     if (!m_array->is_inner_bptree_node()) {
         ndx_in_leaf = ndx;
@@ -177,7 +209,7 @@ void BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
 }
 
 template <class T>
-StringData BasicColumn<T>::get_index_data(std::size_t, char*) const REALM_NOEXCEPT
+StringData BasicColumn<T>::get_index_data(std::size_t, char*) const noexcept
 {
     REALM_ASSERT(false && "Index not supported for floating-point columns yet.");
     REALM_UNREACHABLE();

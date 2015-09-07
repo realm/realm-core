@@ -70,7 +70,7 @@ ${j+1}%slurp
 %for $j in range($num_cols)
         typename Col<$j>::type name${j+1}; \
 %end for
-        ColNames(Init i) REALM_NOEXCEPT: %slurp
+        ColNames(Init i) noexcept: %slurp
 %for $j in range($num_cols)
 %if 0 < $j
 , %slurp
@@ -81,7 +81,7 @@ name${j+1}%slurp
  {} \
     }; \
  \
-    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) noexcept \
     { \
 %for $j in range($num_cols)
         names[$j] = realm::StringData(#name${j+1}, sizeof #name${j+1} - 1); \

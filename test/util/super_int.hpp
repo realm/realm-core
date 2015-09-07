@@ -42,36 +42,36 @@ public:
     /// Number of value bits (excluding the sign bit).
     static const int digits = val_lim::digits;
 
-    super_int() REALM_NOEXCEPT;
-    template<class T> explicit super_int(T value) REALM_NOEXCEPT;
+    super_int() noexcept;
+    template<class T> explicit super_int(T value) noexcept;
 
-    template<class T> bool cast_has_overflow() const REALM_NOEXCEPT;
-    template<class T> bool get_as(T&) const REALM_NOEXCEPT;
+    template<class T> bool cast_has_overflow() const noexcept;
+    template<class T> bool get_as(T&) const noexcept;
 
     //@{
 
     /// Arithmetic is done on the `N+1`-bit two's complement
     /// representation of each argument where `N` is the value of
     /// `digits`. The result is reduced modulo `2**(N+1)`.
-    friend super_int operator+(super_int, super_int) REALM_NOEXCEPT;
-    friend super_int operator-(super_int, super_int) REALM_NOEXCEPT;
-    friend super_int operator*(super_int, super_int) REALM_NOEXCEPT;
+    friend super_int operator+(super_int, super_int) noexcept;
+    friend super_int operator-(super_int, super_int) noexcept;
+    friend super_int operator*(super_int, super_int) noexcept;
 
     //@}
 
-    friend bool operator==(super_int, super_int) REALM_NOEXCEPT;
-    friend bool operator!=(super_int, super_int) REALM_NOEXCEPT;
-    friend bool operator<(super_int, super_int) REALM_NOEXCEPT;
-    friend bool operator<=(super_int, super_int) REALM_NOEXCEPT;
-    friend bool operator>(super_int, super_int) REALM_NOEXCEPT;
-    friend bool operator>=(super_int, super_int) REALM_NOEXCEPT;
+    friend bool operator==(super_int, super_int) noexcept;
+    friend bool operator!=(super_int, super_int) noexcept;
+    friend bool operator<(super_int, super_int) noexcept;
+    friend bool operator<=(super_int, super_int) noexcept;
+    friend bool operator>(super_int, super_int) noexcept;
+    friend bool operator>=(super_int, super_int) noexcept;
 
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, super_int);
 
-    bool add_with_overflow_detect(super_int) REALM_NOEXCEPT;
-    bool subtract_with_overflow_detect(super_int) REALM_NOEXCEPT;
-//    bool multiply_with_overflow_detect(super_int) REALM_NOEXCEPT;
+    bool add_with_overflow_detect(super_int) noexcept;
+    bool subtract_with_overflow_detect(super_int) noexcept;
+//    bool multiply_with_overflow_detect(super_int) noexcept;
 
 private:
     // Value bits (not including the sign bit) of the two's complement
@@ -89,13 +89,13 @@ private:
 
 // Implementation
 
-inline super_int::super_int() REALM_NOEXCEPT
+inline super_int::super_int() noexcept
 {
     m_value    = 0;
     m_sign_bit = false;
 }
 
-template<class T> inline super_int::super_int(T value) REALM_NOEXCEPT
+template<class T> inline super_int::super_int(T value) noexcept
 {
     typedef std::numeric_limits<T> lim_t;
     // C++11 (through its inclusion of C99) guarantees that the
@@ -108,7 +108,7 @@ template<class T> inline super_int::super_int(T value) REALM_NOEXCEPT
     m_sign_bit = lim_t::is_signed && util::is_negative(value);
 }
 
-template<class T> inline bool super_int::cast_has_overflow() const REALM_NOEXCEPT
+template<class T> inline bool super_int::cast_has_overflow() const noexcept
 {
     typedef std::numeric_limits<T> lim_t;
     if (*this < super_int(lim_t::min()))
@@ -118,7 +118,7 @@ template<class T> inline bool super_int::cast_has_overflow() const REALM_NOEXCEP
     return false;
 }
 
-template<class T> bool super_int::get_as(T& v) const REALM_NOEXCEPT
+template<class T> bool super_int::get_as(T& v) const noexcept
 {
     // Ensure that the value represented by `*this` is also be
     // representable in T.
@@ -152,7 +152,7 @@ template<class T> bool super_int::get_as(T& v) const REALM_NOEXCEPT
     return true;
 }
 
-inline super_int operator+(super_int a, super_int b) REALM_NOEXCEPT
+inline super_int operator+(super_int a, super_int b) noexcept
 {
     super_int c;
     c.m_value = a.m_value + b.m_value;
@@ -161,7 +161,7 @@ inline super_int operator+(super_int a, super_int b) REALM_NOEXCEPT
     return c;
 }
 
-inline super_int operator-(super_int a, super_int b) REALM_NOEXCEPT
+inline super_int operator-(super_int a, super_int b) noexcept
 {
     super_int c;
     c.m_value = a.m_value - b.m_value;
@@ -170,7 +170,7 @@ inline super_int operator-(super_int a, super_int b) REALM_NOEXCEPT
     return c;
 }
 
-inline super_int operator*(super_int a, super_int b) REALM_NOEXCEPT
+inline super_int operator*(super_int a, super_int b) noexcept
 {
     typedef super_int::val_uint val_uint;
     int msb_pos = super_int::digits - 1;
@@ -185,17 +185,17 @@ inline super_int operator*(super_int a, super_int b) REALM_NOEXCEPT
     return c;
 }
 
-inline bool operator==(super_int a, super_int b) REALM_NOEXCEPT
+inline bool operator==(super_int a, super_int b) noexcept
 {
     return a.m_value == b.m_value && a.m_sign_bit == b.m_sign_bit;
 }
 
-inline bool operator!=(super_int a, super_int b) REALM_NOEXCEPT
+inline bool operator!=(super_int a, super_int b) noexcept
 {
     return !(a == b);
 }
 
-inline bool operator<(super_int a, super_int b) REALM_NOEXCEPT
+inline bool operator<(super_int a, super_int b) noexcept
 {
     if (a.m_sign_bit > b.m_sign_bit)
         return true;
@@ -206,17 +206,17 @@ inline bool operator<(super_int a, super_int b) REALM_NOEXCEPT
     return false;
 }
 
-inline bool operator<=(super_int a, super_int b) REALM_NOEXCEPT
+inline bool operator<=(super_int a, super_int b) noexcept
 {
     return !(b < a);
 }
 
-inline bool operator>(super_int a, super_int b) REALM_NOEXCEPT
+inline bool operator>(super_int a, super_int b) noexcept
 {
     return b < a;
 }
 
-inline bool operator>=(super_int a, super_int b) REALM_NOEXCEPT
+inline bool operator>=(super_int a, super_int b) noexcept
 {
     return !(a < b);
 }
@@ -255,7 +255,7 @@ std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, super_int i)
     return out;
 }
 
-inline bool super_int::add_with_overflow_detect(super_int v) REALM_NOEXCEPT
+inline bool super_int::add_with_overflow_detect(super_int v) noexcept
 {
     super_int v_2 = *this + v;
     bool carry = v_2.m_value < m_value;
@@ -266,7 +266,7 @@ inline bool super_int::add_with_overflow_detect(super_int v) REALM_NOEXCEPT
     return false;
 }
 
-inline bool super_int::subtract_with_overflow_detect(super_int v) REALM_NOEXCEPT
+inline bool super_int::subtract_with_overflow_detect(super_int v) noexcept
 {
     super_int v_2 = *this - v;
     bool borrow = v_2.m_value > m_value;

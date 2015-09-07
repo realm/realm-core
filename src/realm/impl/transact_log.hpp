@@ -268,7 +268,7 @@ private:
 
     char* reserve(std::size_t size);
     /// \param ptr Must be in the range [m_transact_log_free_begin, m_transact_log_free_end]
-    void advance(char* ptr) REALM_NOEXCEPT;
+    void advance(char* ptr) noexcept;
     void append(const char* data, std::size_t size);
 
     void string_cmd(Instruction, std::size_t col_ndx, std::size_t ndx, const char* data, std::size_t size);
@@ -351,9 +351,9 @@ public:
 
     //@}
 
-    void on_table_destroyed(const Table*) REALM_NOEXCEPT;
-    void on_spec_destroyed(const Spec*) REALM_NOEXCEPT;
-    void on_link_list_destroyed(const LinkView&) REALM_NOEXCEPT;
+    void on_table_destroyed(const Table*) noexcept;
+    void on_spec_destroyed(const Spec*) noexcept;
+    void on_link_list_destroyed(const LinkView&) noexcept;
 
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
@@ -387,7 +387,7 @@ public:
     class BadTransactLog; // Exception
 
     TransactLogParser();
-    ~TransactLogParser() REALM_NOEXCEPT;
+    ~TransactLogParser() noexcept;
 
     /// See `TransactLogEncoder` for a list of methods that the `InstructionHandler` must define.
     /// parse() promises that the path passed by reference to
@@ -418,7 +418,7 @@ private:
     REALM_NORETURN void parser_error() const;
 
     template<class InstructionHandler> void parse_one(InstructionHandler&);
-    bool has_next() REALM_NOEXCEPT;
+    bool has_next() noexcept;
 
     template<class T> T read_int();
 
@@ -445,7 +445,7 @@ private:
 
 class TransactLogParser::BadTransactLog: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
+    const char* what() const noexcept override
     {
         return "Bad transaction log";
     }
@@ -507,7 +507,7 @@ inline char* TransactLogEncoder::reserve(std::size_t n)
     return m_transact_log_free_begin;
 }
 
-inline void TransactLogEncoder::advance(char* ptr) REALM_NOEXCEPT
+inline void TransactLogEncoder::advance(char* ptr) noexcept
 {
     REALM_ASSERT_DEBUG(m_transact_log_free_begin <= ptr);
     REALM_ASSERT_DEBUG(ptr <= m_transact_log_free_end);
@@ -1271,20 +1271,20 @@ inline bool TransactLogEncoder::link_list_clear(std::size_t old_list_size)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) REALM_NOEXCEPT
+inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) noexcept
 {
     if (m_selected_table == t)
         m_selected_table = nullptr;
 }
 
-inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) REALM_NOEXCEPT
+inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) noexcept
 {
     if (m_selected_spec == s)
         m_selected_spec = nullptr;
 }
 
 
-inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) REALM_NOEXCEPT
+inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) noexcept
 {
     if (m_selected_link_list == &list)
         m_selected_link_list = nullptr;
@@ -1312,7 +1312,7 @@ inline TransactLogParser::TransactLogParser():
 }
 
 
-inline TransactLogParser::~TransactLogParser() REALM_NOEXCEPT
+inline TransactLogParser::~TransactLogParser() noexcept
 {
 }
 
@@ -1334,7 +1334,7 @@ void TransactLogParser::parse(InputStream& in, InstructionHandler& handler)
     parse(in_2, handler); // Throws
 }
 
-inline bool TransactLogParser::has_next() REALM_NOEXCEPT
+inline bool TransactLogParser::has_next() noexcept
 {
     return m_input_begin != m_input_end || next_input_buffer();
 }
@@ -1761,7 +1761,7 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     size_t size = read_int<size_t>(); // Throws
 
     const std::size_t avail = m_input_end - m_input_begin;
-    if (avail >= std::size_t(size)) {
+    if (avail >= size) {
         m_input_begin += size;
         return StringData(m_input_begin - size, size);
     }
@@ -2072,7 +2072,9 @@ public:
     bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx,
                            std::size_t backlink_col_idx)
     {
-        m_encoder.insert_link_column(col_idx, DataType(), "", target_table_idx, backlink_col_idx);
+        DataType type = type_Link; // The real type of the column doesn't matter here,
+                                   // but the encoder asserts that it's actually a link type.
+        m_encoder.insert_link_column(col_idx, type, "", target_table_idx, backlink_col_idx);
         append_instruction();
         return true;
     }

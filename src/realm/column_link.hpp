@@ -35,11 +35,11 @@ namespace realm {
 class LinkColumn: public LinkColumnBase {
 public:
     using LinkColumnBase::LinkColumnBase;
-    ~LinkColumn() REALM_NOEXCEPT override;
+    ~LinkColumn() noexcept override;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    bool is_nullable() const REALM_NOEXCEPT override;
+    bool is_nullable() const noexcept override;
 
     //@{
 
@@ -49,9 +49,9 @@ public:
     /// `insert_link(realm::npos)`. set_link() returns the original link, with
     /// `realm::npos` indicating that it was null.
 
-    std::size_t get_link(std::size_t row_ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t row_ndx) const REALM_NOEXCEPT override;
-    bool is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT;
+    std::size_t get_link(std::size_t row_ndx) const noexcept;
+    bool is_null(std::size_t row_ndx) const noexcept override;
+    bool is_null_link(std::size_t row_ndx) const noexcept;
     std::size_t set_link(std::size_t row_ndx, std::size_t target_row_ndx);
     void set_null(std::size_t row_ndx) override;
     void nullify_link(std::size_t row_ndx);
@@ -84,11 +84,11 @@ private:
 
 // Implementation
 
-inline LinkColumn::~LinkColumn() REALM_NOEXCEPT
+inline LinkColumn::~LinkColumn() noexcept
 {
 }
 
-inline bool LinkColumn::is_nullable() const REALM_NOEXCEPT
+inline bool LinkColumn::is_nullable() const noexcept
 {
     return true;
 }
@@ -98,19 +98,19 @@ inline ref_type LinkColumn::create(Allocator& alloc, std::size_t size)
     return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
 }
 
-inline bool LinkColumn::is_null(std::size_t row_ndx) const REALM_NOEXCEPT
+inline bool LinkColumn::is_null(std::size_t row_ndx) const noexcept
 {
     // Null is represented by zero
     return LinkColumnBase::get(row_ndx) == 0;
 }
 
-inline std::size_t LinkColumn::get_link(std::size_t row_ndx) const REALM_NOEXCEPT
+inline std::size_t LinkColumn::get_link(std::size_t row_ndx) const noexcept
 {
     // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
     return to_size_t(LinkColumnBase::get(row_ndx)) - size_t(1);
 }
 
-inline bool LinkColumn::is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT
+inline bool LinkColumn::is_null_link(std::size_t row_ndx) const noexcept
 {
     return is_null(row_ndx);
 }

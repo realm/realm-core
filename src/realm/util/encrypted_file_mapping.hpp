@@ -29,19 +29,6 @@
 
 #ifdef __APPLE__
 #include <CommonCrypto/CommonCrypto.h>
-#elif defined(REALM_ANDROID)
-// OpenSSL headers aren't part of the NDK, so declare the bits we need manually
-#define AES_ENCRYPT    1
-#define AES_DECRYPT    0
-#define SHA224_DIGEST_LENGTH 28
-
-typedef struct aes_key_st {
-    unsigned long data[61];
-} AES_KEY;
-
-typedef struct SHA256state_st {
-    unsigned int data[28];
-} SHA256_CTX;
 #elif !defined(_WIN32)
 #include <openssl/aes.h>
 #include <openssl/sha.h>
@@ -57,13 +44,13 @@ struct iv_table;
 class AESCryptor {
 public:
     AESCryptor(const uint8_t* key);
-    ~AESCryptor() REALM_NOEXCEPT;
+    ~AESCryptor() noexcept;
 
     void set_file_size(off_t new_size);
 
     bool try_read(int fd, off_t pos, char* dst, size_t size);
-    bool read(int fd, off_t pos, char* dst, size_t size) REALM_NOEXCEPT;
-    void write(int fd, off_t pos, const char* src, size_t size) REALM_NOEXCEPT;
+    bool read(int fd, off_t pos, char* dst, size_t size) noexcept;
+    void write(int fd, off_t pos, const char* src, size_t size) noexcept;
 
 private:
     enum EncryptionMode {
@@ -84,27 +71,15 @@ private:
     AES_KEY m_dctx;
 #endif
 
-#if defined(__linux__)
-    // Loaded at runtime with dysym
-    int (*AES_set_encrypt_key)(const unsigned char *, const int, AES_KEY *);
-    int (*AES_set_decrypt_key)(const unsigned char *, const int, AES_KEY *);
-    void (*AES_cbc_encrypt)(const unsigned char *, unsigned char *,
-                            const unsigned long, const AES_KEY *,
-                            unsigned char *, const int);
-
-    int (*SHA224_Init)(SHA256_CTX *);
-    int (*SHA256_Update)(SHA256_CTX *, const void *, size_t);
-    int (*SHA256_Final)(unsigned char *, SHA256_CTX *);
-#endif
-
     uint8_t m_hmacKey[32];
     std::vector<iv_table> m_iv_buffer;
+    std::unique_ptr<char[]> m_rw_buffer;
 
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
-               const char* stored_iv) REALM_NOEXCEPT;
-    iv_table& get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT;
+               const char* stored_iv) noexcept;
+    iv_table& get_iv_table(int fd, off_t data_pos) noexcept;
 };
 
 class EncryptedFileMapping;
@@ -120,23 +95,24 @@ struct SharedFileInfo {
 class EncryptedFileMapping {
 public:
     // Adds the newly-created object to file.mappings iff it's successfully constructed
-    EncryptedFileMapping(SharedFileInfo& file, void* addr, size_t size, File::AccessMode access);
+    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, 
+                         void* addr, size_t size, File::AccessMode access);
     ~EncryptedFileMapping();
 
     // Write all dirty pages to disk and mark them read-only
     // Does not call fsync
-    void flush() REALM_NOEXCEPT;
+    void flush() noexcept;
 
     // Sync this file to disk
-    void sync() REALM_NOEXCEPT;
+    void sync() noexcept;
 
     // Handle a SEGV or BUS at the given address, which must be within this
     // object's mapping
-    void handle_access(void* addr) REALM_NOEXCEPT;
+    void handle_access(void* addr) noexcept;
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
-    void set(void* new_addr, size_t new_size);
+    void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
 private:
     SharedFileInfo& m_file;
@@ -146,6 +122,7 @@ private:
 
     void* m_addr;
     size_t m_size;
+    size_t m_file_offset = 0;
 
     uintptr_t m_first_page;
     size_t m_page_count;
@@ -160,18 +137,18 @@ private:
     std::unique_ptr<char[]> m_validate_buffer;
 #endif
 
-    char* page_addr(size_t i) const REALM_NOEXCEPT;
+    char* page_addr(size_t i) const noexcept;
 
-    void mark_unreadable(size_t i) REALM_NOEXCEPT;
-    void mark_readable(size_t i) REALM_NOEXCEPT;
-    void mark_unwritable(size_t i) REALM_NOEXCEPT;
+    void mark_unreadable(size_t i) noexcept;
+    void mark_readable(size_t i) noexcept;
+    void mark_unwritable(size_t i) noexcept;
 
-    bool copy_read_page(size_t i) REALM_NOEXCEPT;
-    void read_page(size_t i) REALM_NOEXCEPT;
-    void write_page(size_t i) REALM_NOEXCEPT;
+    bool copy_read_page(size_t i) noexcept;
+    void read_page(size_t i) noexcept;
+    void write_page(size_t i) noexcept;
 
-    void validate_page(size_t i) REALM_NOEXCEPT;
-    void validate() REALM_NOEXCEPT;
+    void validate_page(size_t i) noexcept;
+    void validate() noexcept;
 };
 
 }
@@ -185,7 +162,7 @@ namespace util {
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
 /// contain valid encrypted data
 struct DecryptionFailed: util::File::AccessError {
-    DecryptionFailed(): util::File::AccessError("Decryption failed") {}
+    DecryptionFailed(): util::File::AccessError("Decryption failed", std::string()) {}
 };
 
 }

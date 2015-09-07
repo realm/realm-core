@@ -67,26 +67,32 @@ namespace _impl { class DescriptorFriend; }
 class Descriptor {
 public:
     /// Get the number of columns in the associated tables.
-    std::size_t get_column_count() const REALM_NOEXCEPT;
+    std::size_t get_column_count() const noexcept;
 
     /// Get the type of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    DataType get_column_type(std::size_t column_ndx) const REALM_NOEXCEPT;
+    DataType get_column_type(std::size_t column_ndx) const noexcept;
 
     /// Get the name of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    StringData get_column_name(std::size_t column_ndx) const REALM_NOEXCEPT;
+    StringData get_column_name(std::size_t column_ndx) const noexcept;
 
     /// Search for a column with the specified name.
     ///
     /// This function finds the first column with the specified name,
     /// and returns its index. If there are no such columns, it
     /// returns `not_found`.
-    std::size_t get_column_index(StringData name) const REALM_NOEXCEPT;
+    std::size_t get_column_index(StringData name) const noexcept;
+
+    /// Get whether or not the specified column is nullable.
+    ///
+    /// The consequences of specifying a column index that is out of
+    /// range, are undefined.
+    bool is_nullable(std::size_t column_ndx) const noexcept;
 
     //@{
 
@@ -114,7 +120,7 @@ public:
     /// or `type_LinkList`. A link-type column is associated with a particular
     /// target table. All links in a link-type column refer to rows in the
     /// target table of that column. The target table must also be a group-level
-    /// table.
+    /// table, and it must belong to the same group as the origin table.
     ///
     /// \param name Name of new column. All strings are valid column names as
     /// long as they are valid UTF-8 encodings and the number of bytes does not
@@ -128,6 +134,11 @@ public:
     /// subtable column, and stores a reference to its accessor in
     /// `*subdesc`.
     ///
+    /// \param col_ndx Insert the new column at this index. Preexisting columns
+    /// at indexes equal to, or greater than `col_ndx` will be shifted to the
+    /// next higher index. It is an error to specify an index that is greater
+    /// than the number of columns prior to the insertion.
+    ///
     /// \param link_type See set_link_type().
     ///
     /// \sa Table::add_column()
@@ -140,12 +151,12 @@ public:
 
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
 
-    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+    void insert_column(std::size_t col_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0, bool nullable = false);
 
     std::size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
-    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
+    void insert_column_link(std::size_t col_ndx, DataType type, StringData name, Table& target,
                             LinkType = link_Weak);
     //@}
 
@@ -167,9 +178,13 @@ public:
     /// table will remain attached. The root table is the table
     /// associated with the root descriptor.
     ///
+    /// \param col_ndx The index of the column to be removed. It is an error to
+    /// specify an index that is greater than, or equal to the number of
+    /// columns.
+    ///
     /// \sa is_root()
     /// \sa Table::remove_column()
-    void remove_column(std::size_t column_ndx);
+    void remove_column(std::size_t col_ndx);
 
     /// Rename the specified column.
     ///
@@ -182,9 +197,13 @@ public:
     /// attached. The root table is the table associated with the root
     /// descriptor.
     ///
+    /// \param col_ndx The index of the column to be renamed. It is an error to
+    /// specify an index that is greater than, or equal to the number of
+    /// columns.
+    ///
     /// \sa is_root()
     /// \sa Table::rename_column()
-    void rename_column(std::size_t column_ndx, StringData new_name);
+    void rename_column(std::size_t col_ndx, StringData new_name);
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
     /// that implies ownership, i.e., that the origin row (parent) owns the
@@ -253,7 +272,12 @@ public:
     ///     row.set_link(col_ndx_1, ...);
     ///     if (row)
     ///         row.set_int(col_ndx_2, ...); // Ok, because we check whether the row has disappeared
-    void set_link_type(std::size_t column_ndx, LinkType);
+    ///
+    /// \param col_ndx The index of the link column (`type_Link` or
+    /// `type_LinkList`) to be modified. It is an error to specify an index that
+    /// is greater than, or equal to the number of columns, or to specify the
+    /// index of a non-link column.
+    void set_link_type(std::size_t col_ndx, LinkType);
 
     //@{
     /// Get the descriptor for the specified subtable column.
@@ -283,8 +307,8 @@ public:
     /// the parent descriptor.
     ///
     /// \sa is_root()
-    DescriptorRef get_parent() REALM_NOEXCEPT;
-    ConstDescriptorRef get_parent() const REALM_NOEXCEPT;
+    DescriptorRef get_parent() noexcept;
+    ConstDescriptorRef get_parent() const noexcept;
     //@}
 
     //@{
@@ -292,8 +316,16 @@ public:
     ///
     /// \sa get_parent()
     /// \sa is_root()
-    TableRef get_root_table() REALM_NOEXCEPT;
-    ConstTableRef get_root_table() const REALM_NOEXCEPT;
+    TableRef get_root_table() noexcept;
+    ConstTableRef get_root_table() const noexcept;
+    //@}
+
+    //@{
+    /// Get the target table associated with the specified link column. This
+    /// descriptor must be a root descriptor (is_root()), and the specified column must be a
+    /// link column (`type_Link` or `type_LinkList`).
+    TableRef get_link_target(size_t col_ndx) noexcept;
+    ConstTableRef get_link_target(size_t col_ndx) const noexcept;
     //@}
 
     /// Is this a root descriptor?
@@ -319,7 +351,7 @@ public:
     /// dynamic type descriptor.
     ///
     /// \sa Table::has_shared_type()
-    bool is_root() const REALM_NOEXCEPT;
+    bool is_root() const noexcept;
 
     /// Determine whether this accessor is still attached.
     ///
@@ -339,17 +371,26 @@ public:
     /// accessor becomes detached, or if the corresponding subtable
     /// column is removed. A descriptor accessor does not get detached
     /// under any other circumstances.
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     //@{
-    /// Compare two table descriptors. Two descriptors are equal if,
-    /// and only if they contain the same number of columns, and each
-    /// corresponding pair of columns have the same name and type.
+    /// \brief Compare two table descriptors.
+    ///
+    /// Two table descriptors are equal if they have the same number of columns,
+    /// and for each column index, the two columns have the same name, data
+    /// type, and set of attributes.
+    ///
+    /// For link columns (`type_Link` and `type_LinkList`), the target table
+    /// (get_link_target()) of the two columns must be the same.
+    ///
+    /// For subtable columns (`type_Table`), the two corresponding
+    /// subdescriptors must themselves be equal, as if by a recursive call to
+    /// operator==().
     ///
     /// The consequences of comparing a detached descriptor are
     /// undefined.
-    bool operator==(const Descriptor&) const REALM_NOEXCEPT;
-    bool operator!=(const Descriptor&) const REALM_NOEXCEPT;
+    bool operator==(const Descriptor&) const noexcept;
+    bool operator!=(const Descriptor&) const noexcept;
     //@}
 
     /// If the specified column is optimized to store only unique values, then
@@ -358,7 +399,7 @@ public:
     /// debugging purposes.
     std::size_t get_num_unique_values(std::size_t column_ndx) const;
 
-    ~Descriptor() REALM_NOEXCEPT;
+    ~Descriptor() noexcept;
 
 
 private:
@@ -384,10 +425,10 @@ private:
     typedef std::vector<subdesc_entry> subdesc_map;
     mutable subdesc_map m_subdesc_map;
 
-    Descriptor() REALM_NOEXCEPT;
+    Descriptor() noexcept;
 
-    void bind_ref() const REALM_NOEXCEPT;
-    void unbind_ref() const REALM_NOEXCEPT;
+    void bind_ref() const noexcept;
+    void unbind_ref() const noexcept;
 
     // Called by the root table if this becomes the root
     // descriptor. Otherwise it is called by the descriptor that
@@ -411,7 +452,7 @@ private:
     // When the specified spec is the spec of the root table, the
     // parent must be specified as null. When the specified spec is
     // not the root spec, a proper parent must be specified.
-    void attach(Table*, Descriptor* parent, Spec*) REALM_NOEXCEPT;
+    void attach(Table*, Descriptor* parent, Spec*) noexcept;
 
     // Detach accessor from underlying descriptor. Caller must ensure
     // that a reference count exists upon return, for example by
@@ -426,16 +467,16 @@ private:
     // returns, is_attached() will return false.
     //
     // Not idempotent.
-    void detach() REALM_NOEXCEPT;
+    void detach() noexcept;
 
     // Recursively detach all subtable descriptor accessors that
     // exist, that is, all subtable descriptor accessors that have
     // this descriptor as ancestor.
-    void detach_subdesc_accessors() REALM_NOEXCEPT;
+    void detach_subdesc_accessors() noexcept;
 
     // Remove the entry from m_subdesc_map that refers to the
     // specified subtable descriptor. It must be there.
-    void remove_subdesc_entry(Descriptor* subdesc) const REALM_NOEXCEPT;
+    void remove_subdesc_entry(Descriptor* subdesc) const noexcept;
 
     // Record the path in terms of subtable column indexes from the
     // root descriptor to this descriptor. If this descriptor is a
@@ -443,15 +484,15 @@ private:
     // too long to fit in the specified buffer. Otherwise the path
     // indexes will be stored between `begin_2`and `end`, where
     // `begin_2` is the returned pointer.
-    std::size_t* record_subdesc_path(std::size_t* begin, std::size_t* end) const REALM_NOEXCEPT;
+    std::size_t* record_subdesc_path(std::size_t* begin, std::size_t* end) const noexcept;
 
     // Returns a pointer to the accessor of the specified
     // subdescriptor if that accessor exists, otherwise this function
     // return null.
-    Descriptor* get_subdesc_accessor(std::size_t column_ndx) REALM_NOEXCEPT;
+    Descriptor* get_subdesc_accessor(std::size_t column_ndx) noexcept;
 
-    void adj_insert_column(std::size_t col_ndx) REALM_NOEXCEPT;
-    void adj_erase_column(std::size_t col_ndx) REALM_NOEXCEPT;
+    void adj_insert_column(std::size_t col_ndx) noexcept;
+    void adj_erase_column(std::size_t col_ndx) noexcept;
 
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
@@ -463,99 +504,135 @@ private:
 
 // Implementation:
 
-inline std::size_t Descriptor::get_column_count() const REALM_NOEXCEPT
+inline std::size_t Descriptor::get_column_count() const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_public_column_count();
 }
 
-inline StringData Descriptor::get_column_name(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData Descriptor::get_column_name(std::size_t ndx) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_column_name(ndx);
 }
 
-inline DataType Descriptor::get_column_type(std::size_t ndx) const REALM_NOEXCEPT
+inline DataType Descriptor::get_column_type(std::size_t ndx) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_public_column_type(ndx);
 }
 
-inline std::size_t Descriptor::get_column_index(StringData name) const REALM_NOEXCEPT
+inline bool Descriptor::is_nullable(std::size_t ndx) const noexcept
+{
+    REALM_ASSERT(is_attached());
+    return m_spec->get_column_attr(ndx) & col_attr_Nullable;
+}
+
+inline std::size_t Descriptor::get_column_index(StringData name) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_column_index(name);
 }
 
-inline std::size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
+inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc,
+                                     bool nullable)
 {
-    std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column(column_ndx, type, name, subdesc, nullable); // Throws
-    return column_ndx;
+    size_t col_ndx = m_spec->get_public_column_count();
+    insert_column(col_ndx, type, name, subdesc, nullable); // Throws
+    return col_ndx;
 }
 
-inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, StringData name,
+inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData name,
                                       DescriptorRef* subdesc, bool nullable)
 {
     typedef _impl::TableFriend tf;
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
-    REALM_ASSERT(!tf::is_link_type(ColumnType(type)));
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx > get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(tf::is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
 
     Table* link_target_table = nullptr;
-    tf::insert_column(*this, column_ndx, type, name, link_target_table, nullable); // Throws
-    adj_insert_column(column_ndx);
+    tf::insert_column(*this, col_ndx, type, name, link_target_table, nullable); // Throws
+    adj_insert_column(col_ndx);
     if (subdesc && type == type_Table)
-        *subdesc = get_subdescriptor(column_ndx);
+        *subdesc = get_subdescriptor(col_ndx);
 }
 
-inline std::size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
-                                               LinkType link_type)
+inline size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
+                                          LinkType link_type)
 {
-    std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column_link(column_ndx, type, name, target, link_type); // Throws
-    return column_ndx;
+    size_t col_ndx = m_spec->get_public_column_count();
+    insert_column_link(col_ndx, type, name, target, link_type); // Throws
+    return col_ndx;
 }
 
-inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type, StringData name,
+inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, StringData name,
                                            Table& target, LinkType link_type)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
-    REALM_ASSERT(tf::is_link_type(ColumnType(type)));
-    // Both origin and target must be group-level tables
-    REALM_ASSERT(is_root() && get_root_table()->is_group_level());
-    REALM_ASSERT(target.is_group_level());
 
-    tf::insert_column(*this, column_ndx, type, name, &target); // Throws
-    adj_insert_column(column_ndx);
+    if (REALM_UNLIKELY(!is_attached() || !target.is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx > get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(!tf::is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
+    if (REALM_UNLIKELY(!is_root()))
+        throw LogicError(LogicError::wrong_kind_of_descriptor);
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = tf::get_parent_group(*get_root_table());
+    Group* target_group = tf::get_parent_group(target);
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
 
-    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
+    tf::insert_column(*this, col_ndx, type, name, &target); // Throws
+    adj_insert_column(col_ndx);
+
+    tf::set_link_type(*get_root_table(), col_ndx, link_type); // Throws
 }
 
-inline void Descriptor::remove_column(std::size_t column_ndx)
+inline void Descriptor::remove_column(size_t col_ndx)
 {
-    REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
-    tf::erase_column(*this, column_ndx); // Throws
-    adj_erase_column(column_ndx);
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx >= get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    tf::erase_column(*this, col_ndx); // Throws
+    adj_erase_column(col_ndx);
 }
 
-inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
+inline void Descriptor::rename_column(size_t col_ndx, StringData name)
 {
-    REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
-    tf::rename_column(*this, column_ndx, name); // Throws
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx >= get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    tf::rename_column(*this, col_ndx, name); // Throws
 }
 
-inline void Descriptor::set_link_type(std::size_t column_ndx, LinkType link_type)
+inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
-    REALM_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_ndx))));
-    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx >= get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(!tf::is_link_type(ColumnType(get_column_type(col_ndx)))))
+        throw LogicError(LogicError::illegal_type);
+
+    tf::set_link_type(*get_root_table(), col_ndx, link_type); // Throws
 }
 
 inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) const
@@ -563,47 +640,61 @@ inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) 
     return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
 }
 
-inline DescriptorRef Descriptor::get_parent() REALM_NOEXCEPT
+inline DescriptorRef Descriptor::get_parent() noexcept
 {
     return m_parent;
 }
 
-inline ConstDescriptorRef Descriptor::get_parent() const REALM_NOEXCEPT
+inline ConstDescriptorRef Descriptor::get_parent() const noexcept
 {
     return const_cast<Descriptor*>(this)->get_parent();
 }
 
-inline TableRef Descriptor::get_root_table() REALM_NOEXCEPT
+inline TableRef Descriptor::get_root_table() noexcept
 {
     return m_root_table;
 }
 
-inline ConstTableRef Descriptor::get_root_table() const REALM_NOEXCEPT
+inline ConstTableRef Descriptor::get_root_table() const noexcept
 {
     return const_cast<Descriptor*>(this)->get_root_table();
 }
 
-inline bool Descriptor::is_root() const REALM_NOEXCEPT
+inline TableRef Descriptor::get_link_target(size_t col_ndx) noexcept
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(is_root());
+    return get_root_table()->get_link_target(col_ndx);
+}
+
+inline ConstTableRef Descriptor::get_link_target(size_t col_ndx) const noexcept
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT(is_root());
+    return get_root_table()->get_link_target(col_ndx);
+}
+
+inline bool Descriptor::is_root() const noexcept
 {
     return !m_parent;
 }
 
-inline Descriptor::Descriptor() REALM_NOEXCEPT: m_ref_count(0)
+inline Descriptor::Descriptor() noexcept: m_ref_count(0)
 {
 }
 
-inline void Descriptor::bind_ref() const REALM_NOEXCEPT
+inline void Descriptor::bind_ref() const noexcept
 {
     ++m_ref_count;
 }
 
-inline void Descriptor::unbind_ref() const REALM_NOEXCEPT
+inline void Descriptor::unbind_ref() const noexcept
 {
     if (--m_ref_count == 0)
         delete this;
 }
 
-inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) REALM_NOEXCEPT
+inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) noexcept
 {
     REALM_ASSERT(!is_attached());
     REALM_ASSERT(!table->has_shared_type());
@@ -612,7 +703,7 @@ inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) REA
     m_spec = spec;
 }
 
-inline bool Descriptor::is_attached() const REALM_NOEXCEPT
+inline bool Descriptor::is_attached() const noexcept
 {
     return bool(m_root_table);
 }
@@ -623,14 +714,14 @@ inline Descriptor::subdesc_entry::subdesc_entry(std::size_t n, Descriptor* d):
 {
 }
 
-inline bool Descriptor::operator==(const Descriptor& d) const REALM_NOEXCEPT
+inline bool Descriptor::operator==(const Descriptor& d) const noexcept
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT(d.is_attached());
     return *m_spec == *d.m_spec;
 }
 
-inline bool Descriptor::operator!=(const Descriptor& d) const REALM_NOEXCEPT
+inline bool Descriptor::operator!=(const Descriptor& d) const noexcept
 {
     return !(*this == d);
 }
@@ -645,54 +736,54 @@ public:
     }
 
     static void attach(Descriptor& desc, Table* table, Descriptor* parent, Spec* spec)
-        REALM_NOEXCEPT
+        noexcept
     {
         desc.attach(table, parent, spec);
     }
 
-    static void detach(Descriptor& desc) REALM_NOEXCEPT
+    static void detach(Descriptor& desc) noexcept
     {
         desc.detach();
     }
 
-    static Table& get_root_table(Descriptor& desc) REALM_NOEXCEPT
+    static Table& get_root_table(Descriptor& desc) noexcept
     {
         return *desc.m_root_table;
     }
 
-    static const Table& get_root_table(const Descriptor& desc) REALM_NOEXCEPT
+    static const Table& get_root_table(const Descriptor& desc) noexcept
     {
         return *desc.m_root_table;
     }
 
-    static Spec& get_spec(Descriptor& desc) REALM_NOEXCEPT
+    static Spec& get_spec(Descriptor& desc) noexcept
     {
         return *desc.m_spec;
     }
 
-    static const Spec& get_spec(const Descriptor& desc) REALM_NOEXCEPT
+    static const Spec& get_spec(const Descriptor& desc) noexcept
     {
         return *desc.m_spec;
     }
 
     static std::size_t* record_subdesc_path(const Descriptor& desc, std::size_t* begin,
-                                            std::size_t* end) REALM_NOEXCEPT
+                                            std::size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
     }
 
     static Descriptor* get_subdesc_accessor(Descriptor& desc, std::size_t column_ndx)
-        REALM_NOEXCEPT
+        noexcept
     {
         return desc.get_subdesc_accessor(column_ndx);
     }
 
-    static void adj_insert_column(Descriptor& desc, std::size_t col_ndx) REALM_NOEXCEPT
+    static void adj_insert_column(Descriptor& desc, std::size_t col_ndx) noexcept
     {
         desc.adj_insert_column(col_ndx);
     }
 
-    static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) REALM_NOEXCEPT
+    static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) noexcept
     {
         desc.adj_erase_column(col_ndx);
     }

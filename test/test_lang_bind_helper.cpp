@@ -131,7 +131,7 @@ public:
     {
     }
 
-    ~ShortCircuitHistory() REALM_NOEXCEPT
+    ~ShortCircuitHistory() noexcept
     {
     }
 
@@ -147,7 +147,7 @@ public:
         m_changesets[new_version]; // Throws
     }
 
-    void finalize_changeset() REALM_NOEXCEPT override
+    void finalize_changeset() noexcept override
     {
         // The following operation will not throw due to the space reservation
         // carried out in prepare_new_changeset().
@@ -155,7 +155,7 @@ public:
     }
 
     void get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer)
-        const REALM_NOEXCEPT override
+        const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i != n; ++i) {
@@ -168,7 +168,7 @@ public:
         }
     }
 
-    BinaryData get_uncommitted_changes() REALM_NOEXCEPT override
+    BinaryData get_uncommitted_changes() noexcept override
     {
         REALM_ASSERT(false);
         return BinaryData(); // FIXME: Not yet implemented
@@ -6429,19 +6429,6 @@ public:
     bool set_null(size_t, size_t) { return false; }
     bool nullify_link(size_t, size_t) { return false; }
     bool optimize_table() { return false; }
-    bool row_insert_complete() { return false; }
-    bool add_int_to_column(size_t, int_fast64_t) { return false; }
-    bool insert_int(size_t, size_t, size_t, int_fast64_t) { return false; }
-    bool insert_bool(size_t, size_t, size_t, bool) { return false; }
-    bool insert_float(size_t, size_t, size_t, float) { return false; }
-    bool insert_double(size_t, size_t, size_t, double) { return false; }
-    bool insert_string(size_t, size_t, size_t, StringData) { return false; }
-    bool insert_binary(size_t, size_t, size_t, BinaryData) { return false; }
-    bool insert_date_time(size_t, size_t, size_t, DateTime) { return false; }
-    bool insert_table(size_t, size_t, size_t) { return false; }
-    bool insert_mixed(size_t, size_t, size_t, const Mixed&) { return false; }
-    bool insert_link(size_t, size_t, size_t, size_t) { return false; }
-    bool insert_link_list(size_t, size_t, size_t) { return false; }
 };
 
 struct AdvanceReadTransact {
@@ -6808,6 +6795,33 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
         CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
     }
     group->verify();
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    TableRef t, t2;
+    {
+        // add a column
+        LangBindHelper::promote_to_write(sg, *hist);
+        t  = group->get_or_add_table("a_table");
+        t2 = group->get_or_add_table("b_table");
+        t->add_column_link(type_Link, "bruno", *t2);
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        // ... but then regret it
+        LangBindHelper::promote_to_write(sg, *hist);
+        t->remove_column(0);
+        CHECK_EQUAL(0, t->get_descriptor()->get_column_count());
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    }
 }
 
 
@@ -7585,8 +7599,10 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         // Encrypted files are always at least a 4096 byte header plus an encrypted page
         CHECK_LESS_EQUAL(File(path).get_size(), page_size() + 4096);
     else
+        CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
+#else
+    CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
 #endif // REALM_ENABLE_ENCRYPTION
-        CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
 }
 
 
@@ -8151,7 +8167,7 @@ void handover_writer(std::string path)
     Group& g = const_cast<Group&>(sg.begin_read());
     TheTable::Ref table = g.get_table<TheTable>("table");
     Random random(random_int<unsigned long>());
-    for (int i = 1; i < 500; ++i)
+    for (int i = 1; i < 5000; ++i)
     {
         LangBindHelper::promote_to_write(sg, *hist);
         // table holds random numbers >= 1, until the writing process
@@ -8174,7 +8190,12 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
     TestResults& test_results = *test_results_ptr;
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    // We need to ensure that the initial version observed is *before* the final
+    // one written by the writer thread. We do this (simplisticly) by locking on
+    // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
+    Thread writer;
+    writer.start(bind(&handover_writer, path));
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -8194,11 +8215,13 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         // here we need to allow the reciever to get hold on the proper version before
         // we go through the loop again and advance_read().
         control->wait_feedback();
+        sched_yield();
 
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
     }
     sg.end_read();
+    writer.join();
 }
 
 void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control, 
@@ -8211,7 +8234,11 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID version;
         control->get(handover, version);
+        CHECK_EQUAL(version.version, handover->version.version);
+        CHECK(version == handover->version);
         Group& g = const_cast<Group&>(sg.begin_read(version));
+        CHECK_EQUAL(version.version, sg.get_version_of_current_transaction().version);
+        CHECK(version == sg.get_version_of_current_transaction());
         control->signal_feedback();
         TableRef table = g.get_table("table");
         TableView tv = table->where().greater(0,50).find_all();
@@ -8219,16 +8246,16 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
-        CHECK(tv.size() == tv2->size());
+        CHECK_EQUAL(tv.size(), tv2->size());
         for (std::size_t k=0; k<tv.size(); ++k)
-            CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
+            CHECK_EQUAL(tv.get_int(0,k), tv2->get_int(0,k));
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
         sg.end_read();
     }
 }
 
-}
+} // anonymous namespace
 
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
@@ -8245,11 +8272,9 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     sg.end_read();
 
     HandoverControl<SharedGroup::Handover<TableView>> control;
-    Thread writer, querier, verifier;
-    writer.start(bind(&handover_writer, path));
+    Thread querier, verifier;
     querier.start(bind(&handover_querier, &control, &test_results, path));
     verifier.start(bind(&handover_verifier, &control, &test_results, path));
-    writer.join();
     querier.join();
     verifier.join();
 
@@ -8266,13 +8291,18 @@ struct StealingInfo {
 };
 
 
-void stealing_querier(HandoverControl<StealingInfo>* control, 
+void stealing_querier(HandoverControl<StealingInfo>* control,
                       TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    // We need to ensure that the initial version observed is *before* the final
+    // one written by the writer thread. We do this (simplisticly) by locking on
+    // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
+    Thread writer;
+    writer.start(bind(&handover_writer, path));
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -8300,9 +8330,10 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
         }
     }
     sg.end_read();
+    writer.join();
 }
 
-void stealing_verifier(HandoverControl<StealingInfo>* control, 
+void stealing_verifier(HandoverControl<StealingInfo>* control,
                        TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
@@ -8340,13 +8371,13 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
             sg.commit();
             control->signal_feedback();
             break;
-        } 
+        }
         else
             sg.end_read();
     }
 }
 
-}
+} // anonymous namespace
 
 TEST(LangBindHelper_HandoverStealing)
 {
@@ -8362,12 +8393,10 @@ TEST(LangBindHelper_HandoverStealing)
     CHECK(bool(table));
     sg.end_read();
     HandoverControl<StealingInfo> control;
-    Thread writer, querier, verifier;
-    writer.start(bind(&handover_writer, path));
 
+    Thread querier, verifier;
     querier.start(bind(&stealing_querier, &control, &test_results, path));
     verifier.start(bind(&stealing_verifier, &control, &test_results, path));
-    writer.join();
     querier.join();
     verifier.join();
 

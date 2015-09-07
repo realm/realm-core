@@ -638,7 +638,9 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
     col.destroy();
 }
 
-
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
 TEST(StringIndex_FindAllNoCopy2_Int)
 {
     // Create a column with duplcate values
@@ -674,6 +676,54 @@ TEST(StringIndex_FindAllNoCopy2_Int)
                 CHECK_EQUAL(ints[t], ints[results2.get(y)]);
         }
     }
+
+    // Clean up
+    col.destroy();
+}
+
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
+TEST(StringIndex_FindAllNoCopy2_IntNull)
+{
+    // Create a column with duplcate values
+    ref_type ref = IntNullColumn::create(Allocator::get_default());
+    IntNullColumn col(Allocator::get_default(), ref);
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
+        col.add(ints[t]);
+    col.insert(npos, null{});
+
+    // Create a new index on column
+    col.create_search_index();
+    StringIndex& ndx = *col.get_search_index();
+    size_t results = not_found;
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
+        FindRes res = ndx.find_all(ints[t], results);
+
+        size_t real = 0;
+        for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
+            if (ints[t] == ints[y])
+                real++;
+        }
+
+        if (real == 1) {
+            CHECK_EQUAL(res, FindRes_single);
+            CHECK_EQUAL(ints[t], ints[results]);
+        }
+        else if (real > 1) {
+            CHECK_EQUAL(FindRes_column, res);
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results));
+            CHECK_EQUAL(real, results2.size());
+            for (size_t y = 0; y < real; y++)
+                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
+        }
+    }
+
+    FindRes res = ndx.find_all(null{}, results);
+    CHECK_EQUAL(FindRes_single, res);
+    CHECK_EQUAL(results, col.size()-1);
 
     // Clean up
     col.destroy();
@@ -879,7 +929,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 
     col.destroy();
 }
-#endif
 
 // Tests for a bug with strings containing zeroes
 TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
@@ -891,7 +940,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     StringColumn col2(Allocator::get_default(), ref2, nullable);
     const StringIndex& ndx2 = *col2.create_search_index();
 
-#if REALM_NULL_STRINGS == 1
     // FIXME: re-enable once embedded nuls work
     col2.add(StringData("\0", 1));
     col2.add(StringData("\1", 1));
@@ -906,10 +954,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     CHECK_EQUAL(ndx2.find_first(StringData("\0\1", 2)), 3);
     CHECK_EQUAL(ndx2.find_first(StringData("\1\0", 2)), 4);
     CHECK_EQUAL(ndx2.find_first(StringData("\1\0\0", 3)), not_found);
-#else
-    static_cast<void>(ndx2);
-    CHECK_THROW_ANY(col2.add(StringData("\0", 1)));
-#endif
 
     // Integer index (uses String index internally)
     int64_t v = 1ULL << 41;
@@ -925,7 +969,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     col2.destroy();
 }
 
-#if REALM_NULL_STRINGS == 1
 TEST(StringIndex_Null)
 {
     // Create a column with string values

@@ -3,7 +3,7 @@
 
 using namespace realm;
 
-const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
+const char* LogicError::what() const noexcept
 {
     switch (m_kind) {
         case string_too_big:
@@ -20,12 +20,20 @@ const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
             return "Row index out of range";
         case column_index_out_of_range:
             return "Column index out of range";
+        case link_index_out_of_range:
+            return "Link index out of range";
         case bad_version:
             return "Bad version number";
+        case illegal_type:
+            return "Illegal data type";
         case illegal_combination:
             return "Illegal combination";
         case type_mismatch:
-            return "Type mismatch";
+            return "Data type mismatch";
+        case group_mismatch:
+            return "Tables are in different groups";
+        case wrong_kind_of_descriptor:
+            return "Wrong kind of descriptor";
         case wrong_kind_of_table:
             return "Wrong kind of table";
         case detached_accessor:

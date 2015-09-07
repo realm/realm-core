@@ -72,22 +72,22 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
     return r;
 }
 
-void ArrayIntNull::init_from_ref(ref_type ref) REALM_NOEXCEPT
+void ArrayIntNull::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
     init_from_mem(MemRef{header, ref});
 }
 
-void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
+void ArrayIntNull::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
-    
+
     if (m_size == 0) {
         // This can only happen when mem is being reused from another
         // array (which happens when shrinking the B+tree), so we need
         // to add the "magic" null value to the beginning.
-        
+
         // Since init_* functions are noexcept, but insert() isn't, we
         // need to ensure that insert() will not allocate.
         REALM_ASSERT(m_capacity != 0);
@@ -95,7 +95,7 @@ void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
     }
 }
 
-void ArrayIntNull::init_from_parent() REALM_NOEXCEPT
+void ArrayIntNull::init_from_parent() noexcept
 {
     init_from_ref(get_ref_from_parent());
 }
@@ -106,7 +106,7 @@ namespace {
         // Increment by a prime number. This guarantees that we will
         // eventually hit every possible integer in the 2^64 range.
         x += 0xfffffffbULL;
-        return static_cast<int64_t>(x);
+        return util::from_twos_compl<int64_t>(x);
     }
 }
 
@@ -192,11 +192,11 @@ void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t co
     // in the result column. Since find_all may be invoked many times for different leaves in the
     // B+tree with the same result column, we also can't simply adjust indices after finding them
     // (because then the first indices would be adjusted multiple times for each subsequent leaf)
-    
+
     if (end == npos) {
         end = size();
     }
-    
+
     for (size_t i = begin; i < end; ++i) {
         if (get(i) == value) {
             result->add(col_offset + i);
@@ -204,8 +204,14 @@ void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t co
     }
 }
 
+
+void ArrayIntNull::get_chunk(size_t ndx, int64_t res[8]) const noexcept
+{
+    Array::get_chunk(ndx + 1, res);
+}
+
 namespace {
-    
+
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
     template <class T>

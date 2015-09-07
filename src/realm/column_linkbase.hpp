@@ -32,31 +32,31 @@ class LinkColumnBase: public IntegerColumn {
 public:
     // Create unattached root array aaccessor.
     LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx);
-    ~LinkColumnBase() REALM_NOEXCEPT override;
+    ~LinkColumnBase() noexcept override;
 
-    bool is_nullable() const REALM_NOEXCEPT override = 0;
+    bool is_nullable() const noexcept override = 0;
     void set_null(std::size_t) override = 0;
-    bool is_null(std::size_t) const REALM_NOEXCEPT override = 0;
+    bool is_null(std::size_t) const noexcept override = 0;
 
     StringIndex* create_search_index() override;
 
-    bool get_weak_links() const REALM_NOEXCEPT;
-    void set_weak_links(bool) REALM_NOEXCEPT;
+    bool get_weak_links() const noexcept;
+    void set_weak_links(bool) noexcept;
 
-    Table& get_target_table() const REALM_NOEXCEPT;
-    void set_target_table(Table&) REALM_NOEXCEPT;
-    BacklinkColumn& get_backlink_column() const REALM_NOEXCEPT;
-    void set_backlink_column(BacklinkColumn&) REALM_NOEXCEPT;
+    Table& get_target_table() const noexcept;
+    void set_target_table(Table&) noexcept;
+    BacklinkColumn& get_backlink_column() const noexcept;
+    void set_backlink_column(BacklinkColumn&) noexcept;
 
     virtual void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) = 0;
     virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                                 std::size_t new_target_row_ndx) = 0;
 
-    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
-    void mark(int) REALM_NOEXCEPT override;
+    void adj_acc_insert_rows(std::size_t, std::size_t) noexcept override;
+    void adj_acc_erase_row(std::size_t) noexcept override;
+    void adj_acc_move_over(std::size_t, std::size_t) noexcept override;
+    void adj_acc_clear_root_table() noexcept override;
+    void mark(int) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -94,7 +94,7 @@ inline LinkColumnBase::LinkColumnBase(Allocator& alloc, ref_type ref, Table* tab
 {
 }
 
-inline LinkColumnBase::~LinkColumnBase() REALM_NOEXCEPT
+inline LinkColumnBase::~LinkColumnBase() noexcept
 {
 }
 
@@ -103,39 +103,39 @@ inline StringIndex* LinkColumnBase::create_search_index()
     return nullptr;
 }
 
-inline bool LinkColumnBase::get_weak_links() const REALM_NOEXCEPT
+inline bool LinkColumnBase::get_weak_links() const noexcept
 {
     return m_weak_links;
 }
 
-inline void LinkColumnBase::set_weak_links(bool value) REALM_NOEXCEPT
+inline void LinkColumnBase::set_weak_links(bool value) noexcept
 {
     m_weak_links = value;
 }
 
-inline Table& LinkColumnBase::get_target_table() const REALM_NOEXCEPT
+inline Table& LinkColumnBase::get_target_table() const noexcept
 {
     return *m_target_table;
 }
 
-inline void LinkColumnBase::set_target_table(Table& table) REALM_NOEXCEPT
+inline void LinkColumnBase::set_target_table(Table& table) noexcept
 {
     REALM_ASSERT(!m_target_table);
     m_target_table = table.get_table_ref();
 }
 
-inline BacklinkColumn& LinkColumnBase::get_backlink_column() const REALM_NOEXCEPT
+inline BacklinkColumn& LinkColumnBase::get_backlink_column() const noexcept
 {
     return *m_backlink_column;
 }
 
-inline void LinkColumnBase::set_backlink_column(BacklinkColumn& column) REALM_NOEXCEPT
+inline void LinkColumnBase::set_backlink_column(BacklinkColumn& column) noexcept
 {
     m_backlink_column = &column;
 }
 
 inline void LinkColumnBase::adj_acc_insert_rows(std::size_t row_ndx,
-                                                std::size_t num_rows) REALM_NOEXCEPT
+                                                std::size_t num_rows) noexcept
 {
     IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
 
@@ -143,7 +143,7 @@ inline void LinkColumnBase::adj_acc_insert_rows(std::size_t row_ndx,
     tf::mark(*m_target_table);
 }
 
-inline void LinkColumnBase::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+inline void LinkColumnBase::adj_acc_erase_row(size_t row_ndx) noexcept
 {
     IntegerColumn::adj_acc_erase_row(row_ndx);
 
@@ -152,7 +152,7 @@ inline void LinkColumnBase::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 }
 
 inline void LinkColumnBase::adj_acc_move_over(std::size_t from_row_ndx,
-                                              std::size_t to_row_ndx) REALM_NOEXCEPT
+                                              std::size_t to_row_ndx) noexcept
 {
     IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
@@ -160,7 +160,7 @@ inline void LinkColumnBase::adj_acc_move_over(std::size_t from_row_ndx,
     tf::mark(*m_target_table);
 }
 
-inline void LinkColumnBase::adj_acc_clear_root_table() REALM_NOEXCEPT
+inline void LinkColumnBase::adj_acc_clear_root_table() noexcept
 {
     IntegerColumn::adj_acc_clear_root_table();
 
@@ -168,7 +168,7 @@ inline void LinkColumnBase::adj_acc_clear_root_table() REALM_NOEXCEPT
     tf::mark(*m_target_table);
 }
 
-inline void LinkColumnBase::mark(int type) REALM_NOEXCEPT
+inline void LinkColumnBase::mark(int type) noexcept
 {
     if (type & mark_LinkTargets) {
         typedef _impl::TableFriend tf;

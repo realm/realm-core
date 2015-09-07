@@ -30,16 +30,16 @@ class ArrayInteger: public Array {
 public:
     typedef int64_t value_type;
 
-    explicit ArrayInteger(no_prealloc_tag) REALM_NOEXCEPT;
-    explicit ArrayInteger(Allocator&) REALM_NOEXCEPT;
-    ~ArrayInteger() REALM_NOEXCEPT override {}
+    explicit ArrayInteger(no_prealloc_tag) noexcept;
+    explicit ArrayInteger(Allocator&) noexcept;
+    ~ArrayInteger() noexcept override {}
 
     void add(int64_t value);
     void set(std::size_t ndx, int64_t value);
-    void set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT;
-    int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
-    uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
-    static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
+    void set_uint(std::size_t ndx, uint64_t value) noexcept;
+    int64_t get(std::size_t ndx) const noexcept;
+    uint64_t get_uint(std::size_t ndx) const noexcept;
+    static int64_t get(const char* header, std::size_t ndx) noexcept;
 
     /// Add \a diff to the element at the specified index.
     void adjust(std::size_t ndx, int_fast64_t diff);
@@ -51,12 +51,12 @@ public:
     /// limit.
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
-    int64_t operator[](std::size_t ndx) const REALM_NOEXCEPT { return get(ndx); }
-    int64_t front() const REALM_NOEXCEPT;
-    int64_t back() const REALM_NOEXCEPT;
+    int64_t operator[](std::size_t ndx) const noexcept { return get(ndx); }
+    int64_t front() const noexcept;
+    int64_t back() const noexcept;
 
-    std::size_t lower_bound(int64_t value) const REALM_NOEXCEPT;
-    std::size_t upper_bound(int64_t value) const REALM_NOEXCEPT;
+    std::size_t lower_bound(int64_t value) const noexcept;
+    std::size_t upper_bound(int64_t value) const noexcept;
 
     std::vector<int64_t> to_vector() const;
 
@@ -69,9 +69,9 @@ class ArrayIntNull: public Array {
 public:
     typedef int64_t value_type;
 
-    explicit ArrayIntNull(no_prealloc_tag) REALM_NOEXCEPT;
-    explicit ArrayIntNull(Allocator&) REALM_NOEXCEPT;
-    ~ArrayIntNull() REALM_NOEXCEPT override;
+    explicit ArrayIntNull(no_prealloc_tag) noexcept;
+    explicit ArrayIntNull(Allocator&) noexcept;
+    ~ArrayIntNull() noexcept override;
 
     /// Construct an array of the specified type and size, and return just the
     /// reference to the underlying memory. All elements will be initialized to
@@ -80,31 +80,31 @@ public:
                                Allocator&);
     void create(Type, bool context_flag = false);
 
-    void init_from_ref(ref_type) REALM_NOEXCEPT;
-    void init_from_mem(MemRef) REALM_NOEXCEPT;
-    void init_from_parent() REALM_NOEXCEPT;
+    void init_from_ref(ref_type) noexcept;
+    void init_from_mem(MemRef) noexcept;
+    void init_from_parent() noexcept;
 
-    std::size_t size() const REALM_NOEXCEPT;
-    bool is_empty() const REALM_NOEXCEPT;
+    std::size_t size() const noexcept;
+    bool is_empty() const noexcept;
 
     void insert(std::size_t ndx, int_fast64_t value);
     void insert(std::size_t ndx, null);
     void add(int64_t value);
     void add(null);
-    void set(std::size_t ndx, int64_t value) REALM_NOEXCEPT;
-    void set(std::size_t ndx, null) REALM_NOEXCEPT;
-    void set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT;
-    int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
-    uint64_t get_uint(std::size_t ndx) const REALM_NOEXCEPT;
-    static int64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
+    void set(std::size_t ndx, int64_t value) noexcept;
+    void set(std::size_t ndx, null) noexcept;
+    void set_uint(std::size_t ndx, uint64_t value) noexcept;
+    int64_t get(std::size_t ndx) const noexcept;
+    uint64_t get_uint(std::size_t ndx) const noexcept;
+    static int64_t get(const char* header, std::size_t ndx) noexcept;
+    void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
+    void set_null(std::size_t ndx) noexcept;
+    bool is_null(std::size_t ndx) const noexcept;
+    int64_t null_value() const noexcept;
 
-    void set_null(std::size_t ndx) REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
-    int64_t null_value() const REALM_NOEXCEPT;
-
-    int64_t operator[](std::size_t ndx) const REALM_NOEXCEPT;
-    int64_t front() const REALM_NOEXCEPT;
-    int64_t back() const REALM_NOEXCEPT;
+    int64_t operator[](std::size_t ndx) const noexcept;
+    int64_t front() const noexcept;
+    int64_t back() const noexcept;
     void erase(std::size_t ndx);
     void erase(std::size_t begin, std::size_t end);
     void truncate(std::size_t size);
@@ -114,11 +114,11 @@ public:
     void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
     void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
 
-    std::size_t lower_bound(int64_t value) const REALM_NOEXCEPT;
-    std::size_t upper_bound(int64_t value) const REALM_NOEXCEPT;
+    std::size_t lower_bound(int64_t value) const noexcept;
+    std::size_t upper_bound(int64_t value) const noexcept;
 
     int64_t sum(std::size_t start = 0, std::size_t end = npos) const;
-    std::size_t count(int64_t value) const REALM_NOEXCEPT;
+    std::size_t count(int64_t value) const noexcept;
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = npos,
         std::size_t* return_ndx = nullptr) const;
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = npos,
@@ -126,9 +126,16 @@ public:
 
     bool find(int cond, Action action, int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state) const;
+    // FIXME: Use Optional instead of null.
+    bool find(int cond, Action action, null, std::size_t start, std::size_t end, std::size_t baseindex,
+              QueryState<int64_t>* state) const;
 
     template<class cond, Action action, std::size_t bitwidth, class Callback>
     bool find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
+              QueryState<int64_t>* state, Callback callback) const;
+    // FIXME: Use Optional instead of null.
+    template<class cond, Action action, std::size_t bitwidth, class Callback>
+    bool find(null, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
     // This is the one installed into the m_finder slots.
@@ -138,6 +145,10 @@ public:
 
     template<class cond, Action action, class Callback>
     bool find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex,
+              QueryState<int64_t>* state, Callback callback) const;
+    // FIXME: Use Optional instead of the null bool.
+    template<class cond, Action action, class Callback>
+    bool find(null, std::size_t start, std::size_t end, std::size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
     // Optimized implementation for release mode
@@ -156,6 +167,9 @@ public:
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
+    template<class cond> std::size_t find_first(null, std::size_t start = 0, std::size_t end = npos) const;
+
+
     template<class cond>
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = npos) const;
@@ -163,8 +177,10 @@ public:
     void find_all(IntegerColumn* result, int64_t value, std::size_t col_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
-    std::size_t find_first(int64_t value, std::size_t begin = 0,
-                           std::size_t end = npos) const;
+
+    std::size_t find_first(int64_t value, std::size_t begin = 0, std::size_t end = npos) const;
+    std::size_t find_first(null, std::size_t begin = 0, std::size_t end = npos) const;
+
 
     // Overwrite Array::bptree_leaf_insert to correctly split nodes.
     ref_type bptree_leaf_insert(std::size_t ndx, int64_t value, TreeInsertBase& state);
@@ -191,12 +207,12 @@ private:
 
 // Implementation:
 
-inline ArrayInteger::ArrayInteger(Array::no_prealloc_tag) REALM_NOEXCEPT:
+inline ArrayInteger::ArrayInteger(Array::no_prealloc_tag) noexcept:
     Array(Array::no_prealloc_tag())
 {
 }
 
-inline ArrayInteger::ArrayInteger(Allocator& alloc) REALM_NOEXCEPT:
+inline ArrayInteger::ArrayInteger(Allocator& alloc) noexcept:
     Array(alloc)
 {
 }
@@ -206,17 +222,17 @@ inline void ArrayInteger::add(int64_t value)
     Array::add(value);
 }
 
-inline int64_t ArrayInteger::get(size_t ndx) const REALM_NOEXCEPT
+inline int64_t ArrayInteger::get(size_t ndx) const noexcept
 {
     return Array::get(ndx);
 }
 
-inline uint64_t ArrayInteger::get_uint(std::size_t ndx) const REALM_NOEXCEPT
+inline uint64_t ArrayInteger::get_uint(std::size_t ndx) const noexcept
 {
     return get(ndx);
 }
 
-inline int64_t ArrayInteger::get(const char* header, size_t ndx) REALM_NOEXCEPT
+inline int64_t ArrayInteger::get(const char* header, size_t ndx) noexcept
 {
     return Array::get(header, ndx);
 }
@@ -226,7 +242,7 @@ inline void ArrayInteger::set(size_t ndx, int64_t value)
     Array::set(ndx, value);
 }
 
-inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value) REALM_NOEXCEPT
+inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value) noexcept
 {
     // When a value of a signed type is converted to an unsigned type, the C++
     // standard guarantees that negative values are converted from the native
@@ -239,12 +255,12 @@ inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value) REALM_N
 }
 
 
-inline int64_t ArrayInteger::front() const REALM_NOEXCEPT
+inline int64_t ArrayInteger::front() const noexcept
 {
     return Array::front();
 }
 
-inline int64_t ArrayInteger::back() const REALM_NOEXCEPT
+inline int64_t ArrayInteger::back() const noexcept
 {
     return Array::back();
 }
@@ -264,29 +280,29 @@ inline void ArrayInteger::adjust_ge(int_fast64_t limit, int_fast64_t diff)
     Array::adjust_ge(limit, diff);
 }
 
-inline std::size_t ArrayInteger::lower_bound(int64_t value) const REALM_NOEXCEPT
+inline std::size_t ArrayInteger::lower_bound(int64_t value) const noexcept
 {
     return lower_bound_int(value);
 }
 
-inline std::size_t ArrayInteger::upper_bound(int64_t value) const REALM_NOEXCEPT
+inline std::size_t ArrayInteger::upper_bound(int64_t value) const noexcept
 {
     return upper_bound_int(value);
 }
 
 
 inline
-ArrayIntNull::ArrayIntNull(no_prealloc_tag tag) REALM_NOEXCEPT: Array(tag)
+ArrayIntNull::ArrayIntNull(no_prealloc_tag tag) noexcept: Array(tag)
 {
 }
 
 inline
-ArrayIntNull::ArrayIntNull(Allocator& alloc) REALM_NOEXCEPT: Array(alloc)
+ArrayIntNull::ArrayIntNull(Allocator& alloc) noexcept: Array(alloc)
 {
 }
 
 inline
-ArrayIntNull::~ArrayIntNull() REALM_NOEXCEPT
+ArrayIntNull::~ArrayIntNull() noexcept
 {
 }
 
@@ -297,14 +313,16 @@ void ArrayIntNull::create(Type type, bool context_flag)
     init_from_mem(r);
 }
 
+
+
 inline
-std::size_t ArrayIntNull::size() const REALM_NOEXCEPT
+std::size_t ArrayIntNull::size() const noexcept
 {
     return Array::size() - 1;
 }
 
 inline
-bool ArrayIntNull::is_empty() const REALM_NOEXCEPT
+bool ArrayIntNull::is_empty() const noexcept
 {
     return size() == 0;
 }
@@ -336,75 +354,75 @@ void ArrayIntNull::add(null)
 }
 
 inline
-void ArrayIntNull::set(std::size_t ndx, int64_t value) REALM_NOEXCEPT
+void ArrayIntNull::set(std::size_t ndx, int64_t value) noexcept
 {
     avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
 inline
-void ArrayIntNull::set(std::size_t ndx, null) REALM_NOEXCEPT
+void ArrayIntNull::set(std::size_t ndx, null) noexcept
 {
     Array::set(ndx + 1, null_value());
 }
 
 inline
-void ArrayIntNull::set_null(std::size_t ndx) REALM_NOEXCEPT
+void ArrayIntNull::set_null(std::size_t ndx) noexcept
 {
     Array::set(ndx + 1, null_value());
 }
 
 inline
-void ArrayIntNull::set_uint(std::size_t ndx, uint64_t value) REALM_NOEXCEPT
+void ArrayIntNull::set_uint(std::size_t ndx, uint64_t value) noexcept
 {
     avoid_null_collision(value);
     Array::set(ndx + 1, value);
 }
 
 inline
-int64_t ArrayIntNull::get(std::size_t ndx) const REALM_NOEXCEPT
+int64_t ArrayIntNull::get(std::size_t ndx) const noexcept
 {
     return Array::get(ndx + 1);
 }
 
 inline
-uint64_t ArrayIntNull::get_uint(std::size_t ndx) const REALM_NOEXCEPT
+uint64_t ArrayIntNull::get_uint(std::size_t ndx) const noexcept
 {
     return Array::get(ndx + 1);
 }
 
 inline
-int64_t ArrayIntNull::get(const char* header, std::size_t ndx) REALM_NOEXCEPT
+int64_t ArrayIntNull::get(const char* header, std::size_t ndx) noexcept
 {
     return Array::get(header, ndx + 1);
 }
 
 inline
-bool ArrayIntNull::is_null(std::size_t ndx) const REALM_NOEXCEPT
+bool ArrayIntNull::is_null(std::size_t ndx) const noexcept
 {
     return Array::get(ndx + 1) == null_value();
 }
 
 inline
-int64_t ArrayIntNull::null_value() const REALM_NOEXCEPT
+int64_t ArrayIntNull::null_value() const noexcept
 {
     return Array::get(0);
 }
 
 inline
-int64_t ArrayIntNull::operator[](std::size_t ndx) const REALM_NOEXCEPT
+int64_t ArrayIntNull::operator[](std::size_t ndx) const noexcept
 {
     return get(ndx);
 }
 
 inline
-int64_t ArrayIntNull::front() const REALM_NOEXCEPT
+int64_t ArrayIntNull::front() const noexcept
 {
     return get(0);
 }
 
 inline
-int64_t ArrayIntNull::back() const REALM_NOEXCEPT
+int64_t ArrayIntNull::back() const noexcept
 {
     return Array::back();
 }
@@ -455,7 +473,7 @@ void ArrayIntNull::move_backward(std::size_t begin, std::size_t end, std::size_t
 }
 
 inline
-std::size_t ArrayIntNull::lower_bound(int64_t value) const REALM_NOEXCEPT
+std::size_t ArrayIntNull::lower_bound(int64_t value) const noexcept
 {
     // FIXME: Consider this behaviour with NULLs.
     // Array::lower_bound_int assumes an already sorted array, but
@@ -464,7 +482,7 @@ std::size_t ArrayIntNull::lower_bound(int64_t value) const REALM_NOEXCEPT
 }
 
 inline
-std::size_t ArrayIntNull::upper_bound(int64_t value) const REALM_NOEXCEPT
+std::size_t ArrayIntNull::upper_bound(int64_t value) const noexcept
 {
     // FIXME: see lower_bound
     return Array::upper_bound_int(value);
@@ -488,7 +506,7 @@ int64_t ArrayIntNull::sum(std::size_t start, std::size_t end) const
 }
 
 inline
-std::size_t ArrayIntNull::count(int64_t value) const REALM_NOEXCEPT
+std::size_t ArrayIntNull::count(int64_t value) const noexcept
 {
     std::size_t count = Array::count(value);
     if (value == null_value()) {
@@ -560,91 +578,114 @@ bool ArrayIntNull::minimum(int64_t& result, std::size_t start, std::size_t end, 
 inline
 bool ArrayIntNull::find(int cond, Action action, int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find(cond, action, value, start, end, baseindex, state);
+    return Array::find(cond, action, value, start, end, baseindex, state, 
+                       true /*treat as nullable array*/, 
+                       false /*search parameter given in 'value' argument*/);
+}
+
+inline
+bool ArrayIntNull::find(int cond, Action action, null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
+{
+    return Array::find(cond, action, 0 /* unused dummy*/, start, end, baseindex, state,
+                       true /*treat as nullable array*/,
+                       true /*search for null, ignore value argument*/);
 }
 
 
 template<class cond, Action action, std::size_t bitwidth, class Callback>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find<cond, Action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback),
+                                     true /*treat as nullable array*/,
+                                     false /*search parameter given in 'value' argument*/);
+}
+
+template<class cond, Action action, std::size_t bitwidth, class Callback>
+bool ArrayIntNull::find(null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
+    return Array::find<cond, action>(0 /*ignored*/, start, end, baseindex, state, std::forward<Callback>(callback),
+                                     true /*treat as nullable array*/,
+                                     true /*search for null, ignore value argument*/);
 }
 
 
 template<class cond, Action action, std::size_t bitwidth>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find<cond, Action, bitwidth>(value, start, end, baseindex, state);
+    return Array::find<cond, action>(value, start, end, baseindex, state,
+                                     true /*treat as nullable array*/,
+                                     false /*search parameter given in 'value' argument*/);
 }
 
 
 template<class cond, Action action, class Callback>
 bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    return Array::find<cond, Action, Callback>(value, start, end, baseindex, state, callback);
+    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback), 
+                                     true /*treat as nullable array*/,
+                                     false /*search parameter given in 'value' argument*/);
+}
+
+template<class cond, Action action, class Callback>
+bool ArrayIntNull::find(null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
+    return find<cond, action>(null{}, start, end, baseindex, state, std::forward<Callback>(callback));
 }
 
 
 template<Action action, class Callback>
 bool ArrayIntNull::find_action(std::size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
 {
-    ++index;
-    return Array::find_action<Action, Callback>(index, value, state, callback);
+    return Array::find_action<action, Callback>(index, value, state, callback,
+                                                true /*treat as nullable array*/,
+                                                false /*search parameter given in 'value' argument*/);
 }
 
 
 template<Action action, class Callback>
 bool ArrayIntNull::find_action_pattern(std::size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
-    ++index;
-    return Array::find_action_pattern<Action, Callback>(index, pattern, state, callback);
+    return Array::find_action_pattern<action, Callback>(index, pattern, state, callback,
+                                                        true /*treat as nullable array*/,
+                                                        false /*search parameter given in 'value' argument*/);
 }
 
 
-template<class cond>
-std::size_t ArrayIntNull::find_first(int64_t value, std::size_t start, std::size_t end) const
+template<class cond> std::size_t ArrayIntNull::find_first(null, std::size_t start, std::size_t end) const
 {
-    ++start;
-    if (end != npos) {
-        ++end;
-    }
-    std::size_t found = Array::find_first<cond>(value, start, end);
-    if (found != npos) {
-        --found;
-    }
-    return found;
+    QueryState<int64_t> state;
+    state.init(act_ReturnFirst, nullptr, 1);
+    Array::find<cond, act_ReturnFirst>(0 /*ignored*/, start, end, 0, &state, Array::CallbackDummy(),
+                                       true /*treat as nullable array*/,
+                                       true /*search for null, ignore value argument*/);
+    if (state.m_match_count > 0)
+        return state.m_state;
+    else
+        return not_found;
 }
 
-inline
-std::size_t ArrayIntNull::find_first(int64_t value, std::size_t begin, std::size_t end) const
+template<class cond> std::size_t ArrayIntNull::find_first(int64_t value, std::size_t start, std::size_t end) const
 {
-    ++begin;
-    if (end != npos) {
-        ++end;
-    }
-    std::size_t found = Array::find_first(value, begin, end);
-    if (found != npos) {
-        --found;
-    }
-    return found;
+    QueryState<int64_t> state;
+    state.init(act_ReturnFirst, nullptr, 1);
+    Array::find<cond, act_ReturnFirst>(value, start, end, 0, &state, Array::CallbackDummy(),
+                                       true /*treat as nullable array*/,
+                                       false /*search parameter given in 'value' argument*/);
+    if (state.m_match_count > 0)
+        return state.m_state;
+    else
+        return not_found;
 }
 
+inline std::size_t ArrayIntNull::find_first(null, std::size_t begin, std::size_t end) const
+{
+    return find_first<Equal>(null(), begin, end);
+}
+
+inline std::size_t ArrayIntNull::find_first(int64_t value, std::size_t begin, std::size_t end) const
+{
+    return find_first<Equal>(value, begin, end);
+}
 
 }
 

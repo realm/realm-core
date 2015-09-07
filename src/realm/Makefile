@@ -2,6 +2,7 @@ nobase_subinclude_HEADERS = \
 util/features.h \
 util/meta.hpp \
 util/assert.hpp \
+util/encryption_not_supported_exception.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
 util/tuple.hpp \
@@ -97,6 +98,7 @@ column_linkbase.hpp \
 column_backlink.hpp \
 column_mixed.hpp \
 column_mixed_tpl.hpp \
+column_type_traits.hpp \
 group_writer.hpp \
 index_string.hpp \
 query_engine.hpp \

@@ -99,15 +99,12 @@ public:
     /// is_attached(). Calling any other method (except the
     /// destructor) while in the unattached state has undefined
     /// behavior.
-    Group(unattached_tag) REALM_NOEXCEPT;
+    Group(unattached_tag) noexcept;
 
     // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&) = delete;
 
-    ~Group() REALM_NOEXCEPT override;
-
-    void upgrade_file_format();
-    unsigned char get_file_format() const;
+    ~Group() noexcept override;
 
     /// Attach this Group instance to the specified database file.
     ///
@@ -225,11 +222,11 @@ public:
     /// attached to a file with a call to open(). Calling any method
     /// other than open(), and is_attached() on an unattached instance
     /// results in undefined behavior.
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     /// Returns true if, and only if the number of tables in this
     /// group is zero.
-    bool is_empty() const REALM_NOEXCEPT;
+    bool is_empty() const noexcept;
 
     /// Returns the number of tables in this group.
     std::size_t size() const;
@@ -315,8 +312,8 @@ public:
 
     static const std::size_t max_table_name_length = 63;
 
-    bool has_table(StringData name) const REALM_NOEXCEPT;
-    std::size_t find_table(StringData name) const REALM_NOEXCEPT;
+    bool has_table(StringData name) const noexcept;
+    std::size_t find_table(StringData name) const noexcept;
     StringData get_table_name(std::size_t table_ndx) const;
 
     TableRef get_table(std::size_t index);
@@ -428,11 +425,11 @@ public:
 
             row(): is_ordered_removal(0) {}
 
-            bool operator==(const row&) const REALM_NOEXCEPT;
-            bool operator!=(const row&) const REALM_NOEXCEPT;
+            bool operator==(const row&) const noexcept;
+            bool operator!=(const row&) const noexcept;
 
             /// Trivial lexicographic order
-            bool operator<(const row&) const REALM_NOEXCEPT;
+            bool operator<(const row&) const noexcept;
         };
 
         struct link {
@@ -453,8 +450,8 @@ public:
         std::vector<link> links;
     };
 
-    bool has_cascade_notification_handler() const REALM_NOEXCEPT;
-    void set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) REALM_NOEXCEPT;
+    bool has_cascade_notification_handler() const noexcept;
+    void set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) noexcept;
 
     //@}
 
@@ -521,9 +518,9 @@ private:
     std::function<void (const CascadeNotification&)> m_notify_handler;
 
     struct shared_tag {};
-    Group(shared_tag) REALM_NOEXCEPT;
+    Group(shared_tag) noexcept;
 
-    void init_array_parents() REALM_NOEXCEPT;
+    void init_array_parents() noexcept;
 
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero, create a new node
@@ -535,7 +532,7 @@ private:
     /// Detach this group accessor from the underlying node structure. If this
     /// group accessors is already in the detached state, this function does
     /// nothing (idempotency).
-    void detach() REALM_NOEXCEPT;
+    void detach() noexcept;
 
     void attach_shared(ref_type new_top_ref, size_t new_file_size);
 
@@ -550,22 +547,22 @@ private:
     /// that exists across Group::commit() will remain valid. This
     /// function is not appropriate for use in conjunction with
     /// commits via shared group.
-    void update_refs(ref_type top_ref, std::size_t old_baseline) REALM_NOEXCEPT;
+    void update_refs(ref_type top_ref, std::size_t old_baseline) noexcept;
 
     // Overriding method in ArrayParent
     void update_child_ref(std::size_t, ref_type) override;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT override;
+    ref_type get_child_ref(std::size_t) const noexcept override;
 
     // Overriding method in Table::Parent
-    StringData get_child_name(std::size_t) const REALM_NOEXCEPT override;
+    StringData get_child_name(std::size_t) const noexcept override;
 
     // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) REALM_NOEXCEPT override;
+    void child_accessor_destroyed(Table*) noexcept override;
 
     // Overriding method in Table::Parent
-    Group* get_parent_group() REALM_NOEXCEPT override;
+    Group* get_parent_group() noexcept override;
 
     class TableWriter;
     class DefaultTableWriter;
@@ -587,22 +584,27 @@ private:
     std::size_t create_table(StringData name); // Returns index of new table
     Table* create_table_accessor(std::size_t table_ndx);
 
-    void detach_table_accessors() REALM_NOEXCEPT; // Idempotent
+    void detach_table_accessors() noexcept; // Idempotent
 
-    void mark_all_table_accessors() REALM_NOEXCEPT;
+    void mark_all_table_accessors() noexcept;
 
     void write(const std::string& file, const char* encryption_key,
                uint_fast64_t version_number) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
 
-    Replication* get_replication() const REALM_NOEXCEPT;
-    void set_replication(Replication*) REALM_NOEXCEPT;
+    Replication* get_replication() const noexcept;
+    void set_replication(Replication*) noexcept;
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
 
-    bool file_format_upgrade_required() const;
+    int get_file_format() const noexcept;
+    void set_file_format(int) noexcept;
+    int get_committed_file_format() const noexcept;
+
+    /// Must be called from within a write transaction
+    void upgrade_file_format();
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
@@ -650,12 +652,6 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     init_array_parents();
 
     open(file, key, mode); // Throws
-
-    // Fixme / Review: We assume that database files opened with read-only access are using Group and that
-    // read/write access makes the language binding use SharedGroup instead (which will perform the auto-upgrade)
-    if (m_alloc.get_file_format() < default_file_format_version)
-        throw std::runtime_error("You attempted to open a database file of an older format. Please open it with \
-        write access flags and make sure it resides on writable storage in order for it to be auto-upgraded");
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):
@@ -669,7 +665,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
     open(buffer, take_ownership); // Throws
 }
 
-inline Group::Group(unattached_tag) REALM_NOEXCEPT:
+inline Group::Group(unattached_tag) noexcept:
     m_alloc(), // Throws
     m_top(m_alloc),
     m_tables(m_alloc),
@@ -679,12 +675,12 @@ inline Group::Group(unattached_tag) REALM_NOEXCEPT:
     init_array_parents();
 }
 
-inline Group* Group::get_parent_group() REALM_NOEXCEPT
+inline Group* Group::get_parent_group() noexcept
 {
     return this;
 }
 
-inline Group::Group(shared_tag) REALM_NOEXCEPT:
+inline Group::Group(shared_tag) noexcept:
     m_alloc(), // Throws
     m_top(m_alloc),
     m_tables(m_alloc),
@@ -694,12 +690,12 @@ inline Group::Group(shared_tag) REALM_NOEXCEPT:
     init_array_parents();
 }
 
-inline bool Group::is_attached() const REALM_NOEXCEPT
+inline bool Group::is_attached() const noexcept
 {
     return m_top.is_attached();
 }
 
-inline bool Group::is_empty() const REALM_NOEXCEPT
+inline bool Group::is_empty() const noexcept
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -722,13 +718,13 @@ inline StringData Group::get_table_name(std::size_t table_ndx) const
     return m_table_names.get(table_ndx);
 }
 
-inline bool Group::has_table(StringData name) const REALM_NOEXCEPT
+inline bool Group::has_table(StringData name) const noexcept
 {
     size_t ndx = find_table(name);
     return ndx != not_found;
 }
 
-inline std::size_t Group::find_table(StringData name) const REALM_NOEXCEPT
+inline std::size_t Group::find_table(StringData name) const noexcept
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -884,7 +880,7 @@ void Group::to_json(S& out, std::size_t link_depth,
     out << "}";
 }
 
-inline void Group::init_array_parents() REALM_NOEXCEPT
+inline void Group::init_array_parents() noexcept
 {
     m_table_names.set_parent(&m_top, 0);
     m_tables.set_parent(&m_top, 1);
@@ -895,27 +891,27 @@ inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
     m_tables.set(child_ndx, new_ref);
 }
 
-inline ref_type Group::get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT
+inline ref_type Group::get_child_ref(std::size_t child_ndx) const noexcept
 {
     return m_tables.get_as_ref(child_ndx);
 }
 
-inline StringData Group::get_child_name(std::size_t child_ndx) const REALM_NOEXCEPT
+inline StringData Group::get_child_name(std::size_t child_ndx) const noexcept
 {
     return m_table_names.get(child_ndx);
 }
 
-inline void Group::child_accessor_destroyed(Table*) REALM_NOEXCEPT
+inline void Group::child_accessor_destroyed(Table*) noexcept
 {
     // Ignore
 }
 
-inline bool Group::has_cascade_notification_handler() const REALM_NOEXCEPT
+inline bool Group::has_cascade_notification_handler() const noexcept
 {
     return !!m_notify_handler;
 }
 
-inline void Group::set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) REALM_NOEXCEPT
+inline void Group::set_cascade_notification_handler(std::function<void (const CascadeNotification&)> new_handler) noexcept
 {
     m_notify_handler = std::move(new_handler);
 }
@@ -930,7 +926,7 @@ class Group::TableWriter {
 public:
     virtual std::size_t write_names(_impl::OutputStream&) = 0;
     virtual std::size_t write_tables(_impl::OutputStream&) = 0;
-    virtual ~TableWriter() REALM_NOEXCEPT {}
+    virtual ~TableWriter() noexcept {}
 };
 
 inline const Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher) const
@@ -948,12 +944,12 @@ inline void Group::reset_free_space_tracking()
     m_alloc.reset_free_space_tracking(); // Throws
 }
 
-inline Replication* Group::get_replication() const REALM_NOEXCEPT
+inline Replication* Group::get_replication() const noexcept
 {
     return m_alloc.get_replication();
 }
 
-inline void Group::set_replication(Replication* repl) REALM_NOEXCEPT
+inline void Group::set_replication(Replication* repl) noexcept
 {
     m_alloc.set_replication(repl);
 }
@@ -1011,17 +1007,17 @@ public:
         group.send_cascade_notification(notification);
     }
 
-    static Replication* get_replication(const Group& group) REALM_NOEXCEPT
+    static Replication* get_replication(const Group& group) noexcept
     {
         return group.get_replication();
     }
 
-    static void set_replication(Group& group, Replication* repl) REALM_NOEXCEPT
+    static void set_replication(Group& group, Replication* repl) noexcept
     {
         group.set_replication(repl);
     }
 
-    static void detach(Group& group) REALM_NOEXCEPT
+    static void detach(Group& group) noexcept
     {
         group.detach();
     }
@@ -1076,17 +1072,17 @@ struct CascadeState: Group::CascadeNotification {
     bool track_link_nullifications = false;
 };
 
-inline bool Group::CascadeNotification::row::operator==(const row& r) const REALM_NOEXCEPT
+inline bool Group::CascadeNotification::row::operator==(const row& r) const noexcept
 {
     return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
 }
 
-inline bool Group::CascadeNotification::row::operator!=(const row& r) const REALM_NOEXCEPT
+inline bool Group::CascadeNotification::row::operator!=(const row& r) const noexcept
 {
     return !(*this == r);
 }
 
-inline bool Group::CascadeNotification::row::operator<(const row& r) const REALM_NOEXCEPT
+inline bool Group::CascadeNotification::row::operator<(const row& r) const noexcept
 {
     return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
 }

@@ -28,17 +28,23 @@ TEST(LinkList_Basic1)
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
     table1->add_column(type_String, "str1");
+    table1->add_column(type_Binary, "bin1", true /*nullable*/);
 
     // add some rows
     table1->add_empty_row();
     table1->set_int(0, 0, 100);
     table1->set_string(1, 0, "foo");
+    table1->set_binary(2, 0, BinaryData("foo"));
+
     table1->add_empty_row();
     table1->set_int(0, 1, 200);
     table1->set_string(1, 1, "!");
+    table1->set_binary(2, 1, BinaryData("", 0)); // empty binary
+
     table1->add_empty_row();
     table1->set_int(0, 2, 300);
     table1->set_string(1, 2, "bar");
+    table1->set_binary(2, 2, BinaryData()); // null binary
 
     size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
     table2->add_empty_row();
@@ -52,13 +58,28 @@ TEST(LinkList_Basic1)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv[0].get_index(), 0);
 
+    q = table2->link(col_link2).column<BinaryData>(2) == BinaryData(); // == null
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 1);
+
+    q = table2->link(col_link2).column<BinaryData>(2) == BinaryData("", 0); // == empty binary
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
+
+    q = table2->link(col_link2).column<BinaryData>(2) != BinaryData(); // != null
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
+
     Query q2 = table2->link(col_link2).column<Int>(0) == 200;
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(tv2.size(), 1);
     CHECK_EQUAL(tv2[0].get_index(), 0);
 
     // Just a few tests for the new string conditions to see if they work with links too.
-    // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp 
+    // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp
     Query q3 = table2->link(col_link2).column<String>(1).contains("A", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(tv3.size(), 1);
@@ -346,7 +367,7 @@ TEST(LinkList_ClearView1)
 
         TableView tv = (table2->link(col_link2).column<String>(1) != "!").find_all();
 
-        tv.clear();
+        tv.clear(RemoveMode::unordered);
         CHECK_EQUAL(1, table2->size());
     }
 
@@ -392,7 +413,7 @@ TEST(LinkList_ClearView1)
 
         TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
 
-        tv.clear();
+        tv.clear(RemoveMode::unordered);
         CHECK_EQUAL(1, table2->size());
     }
 
@@ -1344,6 +1365,81 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 
+TEST(LinkList_QueryLinkNull)
+{
+    Group group;
+
+    TableRef data_table = group.add_table("data");
+    data_table->add_column(type_String, "string", true);
+    data_table->add_column_link(type_Link, "link", *data_table);
+    data_table->add_column(type_Int, "int", true);
+    data_table->add_column(type_Double, "double", true);
+    data_table->add_column(type_DateTime, "date", true);
+
+    // +-+--------+------+------+--------+------+
+    // | |   0    |  1   |   2  |  3     |  4   |
+    // +-+--------+------+------+--------+------+
+    // | | string | link | int  | double | date |
+    // +-+--------+------+------+--------+------+
+    // |0| Fish   |    0 |   1  |   1.0  |  1   | 
+    // |1| null   | null | null |  null  | null |
+    // |2| Horse  |    1 |   2  |   2.0  |  2   |
+    // +-+--------+------+------+--------+------+
+
+    data_table->add_empty_row();
+    data_table->set_string(0, 0, "Fish");
+    data_table->set_link(1, 0, 0);
+    data_table->set_int(2, 0, 1);
+    data_table->set_double(3, 0, 1.0);
+    data_table->set_datetime(4, 0, DateTime(1));
+
+    data_table->add_empty_row();
+    data_table->set_string(0, 1, realm::null());
+    data_table->nullify_link(1, 1);
+    data_table->set_null(2, 1);
+    data_table->set_null(3, 1);
+    data_table->set_null(4, 1);
+
+    data_table->add_empty_row();
+    data_table->set_string(0, 2, "Horse");
+    data_table->set_link(1, 2, 1);
+    data_table->set_int(2, 2, 2);
+    data_table->set_double(3, 2, 2.0);
+    data_table->set_datetime(4, 2, DateTime(2));
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<String>(0) == realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->column<String>(0) != realm::null()).count());
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Int>(2) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Double>(3) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<DateTime>(4) == realm::null()).count());
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).count());
+    CHECK_EQUAL(0, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).find_all().get_source_ndx(0));
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) != realm::null()).count());
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) != realm::null()).count());
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<DateTime>(4) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<DateTime>(4) != realm::null()).count());
+
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
+
+    CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
+    CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).find_all().get_source_ndx(0));
+    CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).find_all().get_source_ndx(1));
+
+    CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
+    CHECK_EQUAL(0, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(0));
+    CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(1));
+}
+
+
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
 {
     Group group;
@@ -1445,4 +1541,26 @@ TEST(LinkList_QueryUnsortedListWithOr)
     CHECK_EQUAL(2, tv[2].get_index());
 }
 
+TEST(LinkList_QueryDateTime)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("first");
+    TableRef table2 = group.add_table("second");
+
+    table1->add_column_link(type_LinkList, "link", *table2);
+
+    table2->add_column(type_DateTime, "date");
+    
+    table2->add_empty_row();
+    table2->set_datetime(0, 0, DateTime(1));
+    
+    table1->add_empty_row();
+    LinkViewRef lvr = table1->get_linklist(0, 0);
+    lvr->add(0);
+
+    TableView tv = (table1->link(0).column<DateTime>(0) >= DateTime(1)).find_all();
+
+    CHECK_EQUAL(1, tv.size());
+}
 #endif

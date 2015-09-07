@@ -31,7 +31,7 @@ wildcard_pattern::wildcard_pattern(const std::string& text):
     m_cards.push_back(card(pos, m_text.size()));
 }
 
-bool wildcard_pattern::match(const char* begin, const char* end) const REALM_NOEXCEPT
+bool wildcard_pattern::match(const char* begin, const char* end) const noexcept
 {
     const char* begin_2 = begin;
     const char* end_2   = end;

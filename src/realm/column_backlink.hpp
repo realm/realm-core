@@ -38,13 +38,13 @@ namespace realm {
 class BacklinkColumn: public IntegerColumn, public ArrayParent {
 public:
     BacklinkColumn(Allocator&, ref_type);
-    ~BacklinkColumn() REALM_NOEXCEPT override {}
+    ~BacklinkColumn() noexcept override {}
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    bool has_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t get_backlink_count(std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t get_backlink(std::size_t row_ndx, std::size_t backlink_ndx) const REALM_NOEXCEPT;
+    bool has_backlinks(std::size_t row_ndx) const noexcept;
+    std::size_t get_backlink_count(std::size_t row_ndx) const noexcept;
+    std::size_t get_backlink(std::size_t row_ndx, std::size_t backlink_ndx) const noexcept;
 
     void add_backlink(std::size_t row_ndx, std::size_t origin_row_ndx);
     void remove_one_backlink(std::size_t row_ndx, std::size_t origin_row_ndx);
@@ -55,22 +55,22 @@ public:
     void add_row();
 
     // Link origination info
-    Table& get_origin_table() const REALM_NOEXCEPT;
-    void set_origin_table(Table&) REALM_NOEXCEPT;
-    LinkColumnBase& get_origin_column() const REALM_NOEXCEPT;
-    void set_origin_column(LinkColumnBase& column, std::size_t col_ndx) REALM_NOEXCEPT;
+    Table& get_origin_table() const noexcept;
+    void set_origin_table(Table&) noexcept;
+    LinkColumnBase& get_origin_column() const noexcept;
+    void set_origin_column(LinkColumnBase& column, std::size_t col_ndx) noexcept;
 
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
-    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
-    void mark(int) REALM_NOEXCEPT override;
+    void adj_acc_insert_rows(std::size_t, std::size_t) noexcept override;
+    void adj_acc_erase_row(std::size_t) noexcept override;
+    void adj_acc_move_over(std::size_t, std::size_t) noexcept override;
+    void adj_acc_clear_root_table() noexcept override;
+    void mark(int) noexcept override;
 
-    void bump_link_origin_table_version() REALM_NOEXCEPT override;
+    void bump_link_origin_table_version() noexcept override;
 
     void cascade_break_backlinks_to(size_t row_ndx, CascadeState& state) override;
     void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&) override;
@@ -80,7 +80,7 @@ public:
     void verify(const Table&, std::size_t) const override;
     struct VerifyPair {
         std::size_t origin_row_ndx, target_row_ndx;
-        bool operator<(const VerifyPair&) const REALM_NOEXCEPT;
+        bool operator<(const VerifyPair&) const noexcept;
     };
     void get_backlinks(std::vector<VerifyPair>&); // Sorts
 #endif
@@ -88,7 +88,7 @@ public:
 protected:
     // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
-    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT override;
+    ref_type get_child_ref(std::size_t child_ndx) const noexcept override;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
@@ -118,28 +118,28 @@ inline ref_type BacklinkColumn::create(Allocator& alloc, std::size_t size)
     return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
-inline bool BacklinkColumn::has_backlinks(std::size_t ndx) const REALM_NOEXCEPT
+inline bool BacklinkColumn::has_backlinks(std::size_t ndx) const noexcept
 {
     return IntegerColumn::get(ndx) != 0;
 }
 
-inline Table& BacklinkColumn::get_origin_table() const REALM_NOEXCEPT
+inline Table& BacklinkColumn::get_origin_table() const noexcept
 {
     return *m_origin_table;
 }
 
-inline void BacklinkColumn::set_origin_table(Table& table) REALM_NOEXCEPT
+inline void BacklinkColumn::set_origin_table(Table& table) noexcept
 {
     REALM_ASSERT(!m_origin_table);
     m_origin_table = table.get_table_ref();
 }
 
-inline LinkColumnBase& BacklinkColumn::get_origin_column() const REALM_NOEXCEPT
+inline LinkColumnBase& BacklinkColumn::get_origin_column() const noexcept
 {
     return *m_origin_column;
 }
 
-inline void BacklinkColumn::set_origin_column(LinkColumnBase& column, std::size_t col_ndx) REALM_NOEXCEPT
+inline void BacklinkColumn::set_origin_column(LinkColumnBase& column, std::size_t col_ndx) noexcept
 {
     m_origin_column = &column;
     m_origin_column_ndx = col_ndx;
@@ -151,7 +151,7 @@ inline void BacklinkColumn::add_row()
 }
 
 inline void BacklinkColumn::adj_acc_insert_rows(std::size_t row_ndx,
-                                                std::size_t num_rows) REALM_NOEXCEPT
+                                                std::size_t num_rows) noexcept
 {
     IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
 
@@ -159,7 +159,7 @@ inline void BacklinkColumn::adj_acc_insert_rows(std::size_t row_ndx,
     tf::mark(*m_origin_table);
 }
 
-inline void BacklinkColumn::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+inline void BacklinkColumn::adj_acc_erase_row(size_t row_ndx) noexcept
 {
     IntegerColumn::adj_acc_erase_row(row_ndx);
 
@@ -168,7 +168,7 @@ inline void BacklinkColumn::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 }
 
 inline void BacklinkColumn::adj_acc_move_over(std::size_t from_row_ndx,
-                                              std::size_t to_row_ndx) REALM_NOEXCEPT
+                                              std::size_t to_row_ndx) noexcept
 {
     IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
@@ -176,7 +176,7 @@ inline void BacklinkColumn::adj_acc_move_over(std::size_t from_row_ndx,
     tf::mark(*m_origin_table);
 }
 
-inline void BacklinkColumn::adj_acc_clear_root_table() REALM_NOEXCEPT
+inline void BacklinkColumn::adj_acc_clear_root_table() noexcept
 {
     IntegerColumn::adj_acc_clear_root_table();
 
@@ -184,7 +184,7 @@ inline void BacklinkColumn::adj_acc_clear_root_table() REALM_NOEXCEPT
     tf::mark(*m_origin_table);
 }
 
-inline void BacklinkColumn::mark(int type) REALM_NOEXCEPT
+inline void BacklinkColumn::mark(int type) noexcept
 {
     if (type & mark_LinkOrigins) {
         typedef _impl::TableFriend tf;
@@ -192,7 +192,7 @@ inline void BacklinkColumn::mark(int type) REALM_NOEXCEPT
     }
 }
 
-inline void BacklinkColumn::bump_link_origin_table_version() REALM_NOEXCEPT
+inline void BacklinkColumn::bump_link_origin_table_version() noexcept
 {
     typedef _impl::TableFriend tf;
     if (m_origin_table) {
@@ -203,7 +203,7 @@ inline void BacklinkColumn::bump_link_origin_table_version() REALM_NOEXCEPT
 
 #ifdef REALM_DEBUG
 
-inline bool BacklinkColumn::VerifyPair::operator<(const VerifyPair& p) const REALM_NOEXCEPT
+inline bool BacklinkColumn::VerifyPair::operator<(const VerifyPair& p) const noexcept
 {
     return origin_row_ndx < p.origin_row_ndx;
 }

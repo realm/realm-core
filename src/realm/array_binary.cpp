@@ -11,7 +11,7 @@
 
 using namespace realm;
 
-void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT
+void ArrayBinary::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0);
@@ -43,7 +43,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
     m_offsets.add(offset);
 
-    if(!legacy_array_type())
+    if (!legacy_array_type())
         m_nulls.add(value.is_null());
 }
 
@@ -100,11 +100,11 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 
-    if(!legacy_array_type())
+    if (!legacy_array_type())
         m_nulls.erase(ndx);
 }
 
-BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) REALM_NOEXCEPT
+BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) noexcept
 {
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
     // See comment in legacy_array_type() and also in array_binary.hpp.

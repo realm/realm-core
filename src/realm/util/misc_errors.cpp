@@ -8,13 +8,13 @@ using namespace realm::util;
 namespace {
 
 class misc_category: public std::error_category {
-    const char* name() const REALM_NOEXCEPT override;
+    const char* name() const noexcept override;
     std::string message(int) const override;
 };
 
 misc_category g_misc_category;
 
-const char* misc_category::name() const REALM_NOEXCEPT
+const char* misc_category::name() const noexcept
 {
     return "tigthdb.misc";
 }

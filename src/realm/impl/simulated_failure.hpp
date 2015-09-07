@@ -43,7 +43,7 @@ public:
     static void prime(type);
 
     // Unprime the specified failure type on the calling thread.
-    static void unprime(type) REALM_NOEXCEPT;
+    static void unprime(type) noexcept;
 
     // If the specified failure type was primed on the calling thread and
     // REALM_DEBUG was defined during compilation, then this throw
@@ -54,7 +54,7 @@ public:
 private:
 #ifdef REALM_DEBUG
     static void do_prime(type);
-    static void do_unprime(type) REALM_NOEXCEPT;
+    static void do_unprime(type) noexcept;
     static void do_check(type);
 #endif
 };
@@ -68,7 +68,7 @@ public:
         prime(m_type);
     }
 
-    ~PrimeGuard() REALM_NOEXCEPT
+    ~PrimeGuard() noexcept
     {
         unprime(m_type);
     }
@@ -92,7 +92,7 @@ inline void SimulatedFailure::prime(type failure_type)
 #endif
 }
 
-inline void SimulatedFailure::unprime(type failure_type) REALM_NOEXCEPT
+inline void SimulatedFailure::unprime(type failure_type) noexcept
 {
 #ifdef REALM_DEBUG
     do_unprime(failure_type);

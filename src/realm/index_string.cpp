@@ -12,7 +12,7 @@ using namespace realm::util;
 
 namespace {
 
-void get_child(Array& parent, size_t child_ref_ndx, Array& child) REALM_NOEXCEPT
+void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 {
     ref_type child_ref = parent.get_as_ref(child_ref_ndx);
     child.init_from_ref(child_ref);
@@ -28,7 +28,7 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) REALM_NOEXCEPT
 // allow users to do so until the index is fixed (which requires a breaking
 // change to how values are indexed). Once the bug is fixed, validate_value()
 // should be removed.
-void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
+void StringIndex::validate_value(int64_t) const noexcept
 {
     // no-op: All ints are valid
 }
@@ -66,7 +66,7 @@ Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 }
 
 
-void StringIndex::set_target(ColumnBase* target_column) REALM_NOEXCEPT
+void StringIndex::set_target(ColumnBase* target_column) noexcept
 {
     REALM_ASSERT(target_column);
     m_target_column = target_column;
@@ -701,7 +701,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
 namespace {
 
-bool has_duplicate_values(const Array& node) REALM_NOEXCEPT
+bool has_duplicate_values(const Array& node) noexcept
 {
     Allocator& alloc = node.get_alloc();
     Array child(alloc);
@@ -747,7 +747,7 @@ bool has_duplicate_values(const Array& node) REALM_NOEXCEPT
 } // anonymous namespace
 
 
-bool StringIndex::has_duplicate_values() const REALM_NOEXCEPT
+bool StringIndex::has_duplicate_values() const noexcept
 {
     return ::has_duplicate_values(*m_array);
 }

@@ -1,4 +1,5 @@
 #include <realm/descriptor.hpp>
+#include <realm/group.hpp>
 
 #include "test.hpp"
 
@@ -467,4 +468,246 @@ TEST(Descriptor_DeeplyNested)
         CHECK_EQUAL(desc, subdesc->get_parent());
         desc = subdesc;
     }
+}
+
+
+TEST(Descriptor_IllegalOps)
+{
+    // Detached accessor
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_Link, "link", *table);
+        DescriptorRef desc = table->get_descriptor();
+        group.remove_table("table");
+        if (CHECK(!desc->is_attached())) {
+            CHECK_LOGIC_ERROR(desc->add_column(type_Int, ""), LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->insert_column(0, type_Int, ""), LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *table),
+                              LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->insert_column_link(0, type_Link, "", *table),
+                              LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->remove_column(0), LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->rename_column(0, "foo"), LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->set_link_type(0, link_Strong), LogicError::detached_accessor);
+        }
+    }
+
+    // Detached link target
+    {
+        Group group;
+        TableRef origin = group.add_table("origin");
+        TableRef target = group.add_table("target");
+        group.remove_table("target");
+        DescriptorRef desc = origin->get_descriptor();
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *target),
+                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(desc->insert_column_link(0, type_Link, "", *target),
+                          LogicError::detached_accessor);
+    }
+
+    // Column index out of range
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column_link(type_Link, "link", *table);
+        DescriptorRef desc = table->get_descriptor();
+        CHECK_LOGIC_ERROR(desc->insert_column(2, type_Int, ""),
+                          LogicError::column_index_out_of_range);
+        CHECK_LOGIC_ERROR(desc->insert_column_link(2, type_Link, "", *table),
+                          LogicError::column_index_out_of_range);
+        CHECK_LOGIC_ERROR(desc->remove_column(1), LogicError::column_index_out_of_range);
+        CHECK_LOGIC_ERROR(desc->rename_column(1, "foo"), LogicError::column_index_out_of_range);
+        CHECK_LOGIC_ERROR(desc->set_link_type(1, link_Strong),
+                          LogicError::column_index_out_of_range);
+    }
+
+    // Illegal data type
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column(type_Int, "int");
+        DescriptorRef desc = table->get_descriptor();
+        CHECK_LOGIC_ERROR(desc->add_column(type_Link, ""), LogicError::illegal_type);
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Int, "", *table), LogicError::illegal_type);
+        CHECK_LOGIC_ERROR(desc->set_link_type(0, link_Strong), LogicError::illegal_type);
+    }
+
+    // Wrong kind of descriptor
+    {
+        // Link origin is a subtable descriptor
+        Group group;
+        TableRef table = group.add_table("table");
+        DescriptorRef subdesc;
+        table->add_column(type_Table, "subtable", &subdesc);
+        CHECK_LOGIC_ERROR(subdesc->add_column_link(type_Link, "link", *table),
+                          LogicError::wrong_kind_of_descriptor);
+    }
+
+    // Wrong kind of table
+    {
+        // Free-standing link origin
+        Table origin;
+        Group group;
+        TableRef target = group.add_table("target");
+        DescriptorRef desc = origin.get_descriptor();
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *target),
+                          LogicError::wrong_kind_of_table);
+    }
+    {
+        // Free-standing link target
+        Group group;
+        TableRef origin = group.add_table("origin");
+        Table target;
+        DescriptorRef desc = origin->get_descriptor();
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", target),
+                          LogicError::wrong_kind_of_table);
+    }
+    {
+        // Link target is a subtable
+        Group group;
+        TableRef table = group.add_table("table");
+        DescriptorRef desc = table->get_descriptor();
+        DescriptorRef subdesc;
+        desc->add_column(type_Table, "subtable", &subdesc);
+        subdesc->add_column(type_Int, "int");
+        table->add_empty_row();
+        TableRef subtable = table->get_subtable(0,0);
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *subtable),
+                          LogicError::wrong_kind_of_table);
+    }
+
+    // Different groups
+    {
+        Group group_1, group_2;
+        TableRef table_1 = group_1.add_table("table_1");
+        TableRef table_2 = group_2.add_table("table_2");
+        DescriptorRef desc = table_1->get_descriptor();
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *table_2),
+                          LogicError::group_mismatch);
+    }
+}
+
+
+TEST(Descriptor_Links)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_Link, "link", *target);
+    CHECK_EQUAL(target, origin->get_link_target(0));
+    ConstTableRef const_origin = origin;
+    CHECK_EQUAL(target, const_origin->get_link_target(0));
+}
+
+
+#if REALM_NULL_STRINGS == 1
+
+TEST(Descriptor_DescriptorEqualityNulls)
+{
+    Table t1;
+    t1.add_column(type_Int, "int");
+    t1.add_column(type_String, "str");
+
+    Table t2;
+    t2.add_column(type_Int, "int", true);
+    t2.add_column(type_String, "str");
+
+    Table t3;
+    t3.add_column(type_Int, "int", true);
+    t3.add_column(type_String, "str");
+
+    CHECK(*t1.get_descriptor() != *t2.get_descriptor());
+    CHECK(*t2.get_descriptor() == *t3.get_descriptor());
+}
+
+#endif
+
+
+TEST(Descriptor_SubTableEquality)
+{
+    DescriptorRef sub;
+
+    Table t1;
+    t1.add_column(type_Table, "sub", false, &sub);
+
+    sub->add_column(type_Int, "int");
+
+    Table t2;
+    t2.add_column(type_Table, "sub", false, &sub);
+
+    sub->add_column(type_String, "str");
+
+    CHECK(*t1.get_descriptor() != *t2.get_descriptor());
+
+}
+
+
+TEST(Descriptor_TwoStringColumnTypesEquality)
+{
+    Table t1;
+    Table t2;
+    Table t3;
+    t1.add_column(type_String, "str");
+    t2.add_column(type_String, "str");
+    t3.add_column(type_String, "str");
+    t1.add_empty_row(10);
+    t2.add_empty_row(10);
+    t3.add_empty_row(10);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        t1.set_string(0, i, StringData("a", 1));
+        t2.set_string(0, i, StringData("a", 1));
+        t3.set_string(0, i, StringData("a", 1));
+    }
+
+    CHECK(*t1.get_descriptor() == *t2.get_descriptor()); // (col_type_String == col_type_String)
+
+    t2.optimize();
+
+    CHECK(*t1.get_descriptor() == *t2.get_descriptor()); // (col_type_String == col_type_StringEnum)
+
+    t1.optimize();
+
+    CHECK(*t1.get_descriptor() == *t3.get_descriptor()); // (col_type_StringEnum == col_type_String)
+
+    t3.optimize();
+
+    CHECK(*t1.get_descriptor() == *t3.get_descriptor()); // (col_type_StringEnum == col_type_StringEunm)
+
+}
+
+
+TEST(Descriptor_LinkEquality)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+    TableRef t4 = g.add_table("t4");
+    t1->add_column(type_String, "str");
+    t2->add_column(type_Int, "int");
+
+    t3->add_column_link(type_Link, "link", *t1, link_Strong);
+    t4->add_column_link(type_Link, "link", *t2, link_Strong);
+
+    CHECK(*t3->get_descriptor() != *t4->get_descriptor());
+}
+
+
+TEST(Descriptor_LinkListEquality)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+    TableRef t4 = g.add_table("t4");
+    t1->add_column(type_String, "str");
+    t2->add_column(type_Int, "int");
+
+    t3->add_column_link(type_LinkList, "links", *t1, link_Strong);
+    t4->add_column_link(type_LinkList, "links", *t2, link_Strong);
+
+    CHECK(*t3->get_descriptor() != *t4->get_descriptor());
 }

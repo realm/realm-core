@@ -43,26 +43,22 @@ public:
     struct unattached_tag {};
 
     // Accessor concept:
-    Allocator& get_alloc() const REALM_NOEXCEPT;
-    void destroy() REALM_NOEXCEPT;
+    Allocator& get_alloc() const noexcept;
+    void destroy() noexcept;
     void detach();
-    bool is_attached() const REALM_NOEXCEPT;
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT;
-    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT;
-    void set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT;
-    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept;
+    std::size_t get_ndx_in_parent() const noexcept;
+    void set_ndx_in_parent(std::size_t ndx) noexcept;
+    void update_from_parent(std::size_t old_baseline) noexcept;
     MemRef clone_deep(Allocator& alloc) const;
 
     // BpTree interface:
-    const Array& root() const REALM_NOEXCEPT;
-    Array& root() REALM_NOEXCEPT;
-    bool root_is_leaf() const REALM_NOEXCEPT;
+    const Array& root() const noexcept;
+    Array& root() noexcept;
+    bool root_is_leaf() const noexcept;
     void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append);
     void replace_root(std::unique_ptr<Array> leaf);
-
-    // FIXME: This is only applicable for linklist columns, which
-    // derive from the integer Column.
-    void destroy_subtree(std::size_t ndx, bool clear_value);
 
 protected:
     explicit BpTreeBase(std::unique_ptr<Array> root);
@@ -73,7 +69,7 @@ protected:
     struct SliceHandler {
         virtual MemRef slice_leaf(MemRef leaf_mem, std::size_t offset, std::size_t size,
                                   Allocator& target_alloc) = 0;
-        ~SliceHandler() REALM_NOEXCEPT {}
+        ~SliceHandler() noexcept {}
     };
     static ref_type write_subtree(const Array& root, std::size_t slice_offset,
                                   std::size_t slice_size, std::size_t table_size,
@@ -120,11 +116,11 @@ public:
     void init_from_mem(Allocator& alloc, MemRef mem);
     void init_from_parent();
 
-    std::size_t size() const REALM_NOEXCEPT;
-    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+    std::size_t size() const noexcept;
+    bool is_empty() const noexcept { return size() == 0; }
 
-    T get(std::size_t ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT;
+    T get(std::size_t ndx) const noexcept;
+    bool is_null(std::size_t ndx) const noexcept;
     void set(std::size_t, T value);
     void set(std::size_t, null);
     void set_null(std::size_t);
@@ -133,8 +129,8 @@ public:
     void erase(std::size_t ndx, bool is_last = false);
     void move_last_over(std::size_t ndx, std::size_t last_row_ndx);
     void clear();
-    T front() const REALM_NOEXCEPT;
-    T back() const REALM_NOEXCEPT;
+    T front() const noexcept;
+    T back() const noexcept;
 
     std::size_t find_first(T value, std::size_t begin = 0, std::size_t end = npos) const;
     void find_all(IntegerColumn& out_indices, T value,
@@ -151,7 +147,7 @@ public:
     /// be accessed through the returned const-qualified reference,
     /// and never directly through the specfied fallback accessor.
     void get_leaf(std::size_t ndx, std::size_t& out_ndx_in_leaf,
-                  LeafInfo& inout_leaf) const REALM_NOEXCEPT;
+                  LeafInfo& inout_leaf) const noexcept;
 
     void update_each(Array::UpdateHandler&);
     void update_elem(std::size_t, Array::UpdateHandler&);
@@ -198,13 +194,13 @@ inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> root) : m_root(std::move(ro
 }
 
 inline
-Allocator& BpTreeBase::get_alloc() const REALM_NOEXCEPT
+Allocator& BpTreeBase::get_alloc() const noexcept
 {
     return m_root->get_alloc();
 }
 
 inline
-void BpTreeBase::destroy() REALM_NOEXCEPT
+void BpTreeBase::destroy() noexcept
 {
     if (m_root)
         m_root->destroy_deep();
@@ -217,37 +213,37 @@ void BpTreeBase::detach()
 }
 
 inline
-bool BpTreeBase::is_attached() const REALM_NOEXCEPT
+bool BpTreeBase::is_attached() const noexcept
 {
     return m_root->is_attached();
 }
 
 inline
-bool BpTreeBase::root_is_leaf() const REALM_NOEXCEPT
+bool BpTreeBase::root_is_leaf() const noexcept
 {
     return !m_root->is_inner_bptree_node();
 }
 
 inline
-void BpTreeBase::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
+void BpTreeBase::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept
 {
     m_root->set_parent(parent, ndx_in_parent);
 }
 
 inline
-std::size_t BpTreeBase::get_ndx_in_parent() const REALM_NOEXCEPT
+std::size_t BpTreeBase::get_ndx_in_parent() const noexcept
 {
     return m_root->get_ndx_in_parent();
 }
 
 inline
-void BpTreeBase::set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT
+void BpTreeBase::set_ndx_in_parent(std::size_t ndx) noexcept
 {
     m_root->set_ndx_in_parent(ndx);
 }
 
 inline
-void BpTreeBase::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
+void BpTreeBase::update_from_parent(std::size_t old_baseline) noexcept
 {
     m_root->update_from_parent(old_baseline);
 }
@@ -259,13 +255,13 @@ MemRef BpTreeBase::clone_deep(Allocator& alloc) const
 }
 
 inline
-const Array& BpTreeBase::root() const REALM_NOEXCEPT
+const Array& BpTreeBase::root() const noexcept
 {
     return *m_root;
 }
 
 inline
-Array& BpTreeBase::root() REALM_NOEXCEPT
+Array& BpTreeBase::root() noexcept
 {
     return *m_root;
 }
@@ -361,7 +357,7 @@ BpTree<T,N>::root_as_leaf() const
 }
 
 template <class T, bool N>
-std::size_t BpTree<T, N>::size() const REALM_NOEXCEPT
+std::size_t BpTree<T, N>::size() const noexcept
 {
     if (root_is_leaf()) {
         return root_as_leaf().size();
@@ -370,7 +366,7 @@ std::size_t BpTree<T, N>::size() const REALM_NOEXCEPT
 }
 
 template <class T, bool N>
-T BpTree<T, N>::back() const REALM_NOEXCEPT
+T BpTree<T, N>::back() const noexcept
 {
     // FIXME: slow
     return get(size()-1);
@@ -410,7 +406,7 @@ struct NullableOrNothing<Leaf, false> {
 }
 
 template <class T, bool N>
-bool BpTree<T, N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
+bool BpTree<T, N>::is_null(std::size_t ndx) const noexcept
 {
     if (!N) {
         // Don't bother traversing the tree if we know it can't be null.
@@ -429,7 +425,7 @@ bool BpTree<T, N>::is_null(std::size_t ndx) const REALM_NOEXCEPT
 }
 
 template <class T, bool N>
-T BpTree<T, N>::get(std::size_t ndx) const REALM_NOEXCEPT
+T BpTree<T, N>::get(std::size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
@@ -529,7 +525,7 @@ struct BpTree<T,N>::UpdateHandler : Array::UpdateHandler
 {
     LeafType m_leaf;
     const T m_value;
-    UpdateHandler(BpTreeBase& tree, T value) REALM_NOEXCEPT:
+    UpdateHandler(BpTreeBase& tree, T value) noexcept:
         m_leaf(tree.get_alloc()), m_value(std::move(value)) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                 size_t elem_ndx_in_leaf) override
@@ -544,7 +540,7 @@ template <class T, bool N>
 struct BpTree<T,N>::SetNullHandler : Array::UpdateHandler
 {
     LeafType m_leaf;
-    SetNullHandler(BpTreeBase& tree) REALM_NOEXCEPT: m_leaf(tree.get_alloc()) {}
+    SetNullHandler(BpTreeBase& tree) noexcept: m_leaf(tree.get_alloc()) {}
     void update(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
                 std::size_t elem_ndx_in_leaf) override
     {
@@ -593,7 +589,7 @@ struct BpTree<T,N>::EraseHandler : Array::EraseHandler {
     BpTreeBase& m_tree;
     LeafType m_leaf;
     bool m_leaves_have_refs; // FIXME: Should be able to eliminate this.
-    EraseHandler(BpTreeBase& tree) REALM_NOEXCEPT:
+    EraseHandler(BpTreeBase& tree) noexcept:
         m_tree(tree),
         m_leaf(tree.get_alloc()),
         m_leaves_have_refs(false) {}
@@ -615,7 +611,7 @@ struct BpTree<T,N>::EraseHandler : Array::EraseHandler {
         m_leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
+    void destroy_leaf(MemRef leaf_mem) noexcept override
     {
         // FIXME: Seems like this would cause file space leaks if
         // m_leaves_have_refs is true, but consider carefully how
@@ -796,7 +792,7 @@ MemRef BpTree<T, N>::create_leaf(Array::Type leaf_type, std::size_t size, T valu
 
 template <class T, bool N>
 void BpTree<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
-                                  LeafInfo& inout_leaf_info) const REALM_NOEXCEPT
+                                  LeafInfo& inout_leaf_info) const noexcept
 {
     if (root_is_leaf()) {
         ndx_in_leaf = ndx;

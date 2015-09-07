@@ -43,7 +43,7 @@ size_t Descriptor::get_num_unique_values(size_t column_ndx) const
 }
 
 
-Descriptor::~Descriptor() REALM_NOEXCEPT
+Descriptor::~Descriptor() noexcept
 {
     if (!is_attached())
         return;
@@ -59,7 +59,7 @@ Descriptor::~Descriptor() REALM_NOEXCEPT
 }
 
 
-void Descriptor::detach() REALM_NOEXCEPT
+void Descriptor::detach() noexcept
 {
     REALM_ASSERT(is_attached());
     detach_subdesc_accessors();
@@ -71,7 +71,7 @@ void Descriptor::detach() REALM_NOEXCEPT
 }
 
 
-void Descriptor::detach_subdesc_accessors() REALM_NOEXCEPT
+void Descriptor::detach_subdesc_accessors() noexcept
 {
     if (!m_subdesc_map.empty()) {
         typedef subdesc_map::const_iterator iter;
@@ -86,7 +86,7 @@ void Descriptor::detach_subdesc_accessors() REALM_NOEXCEPT
 }
 
 
-void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const REALM_NOEXCEPT
+void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const noexcept
 {
     typedef subdesc_map::iterator iter;
     iter end = m_subdesc_map.end();
@@ -100,7 +100,7 @@ void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const REALM_NOEXCEPT
 }
 
 
-size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const REALM_NOEXCEPT
+size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexcept
 {
     size_t* begin_2 = end;
     const Descriptor* desc = this;
@@ -126,7 +126,7 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const REALM_
 }
 
 
-Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) REALM_NOEXCEPT
+Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
 
@@ -140,7 +140,7 @@ Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) REALM_NOEXCEPT
 }
 
 
-void Descriptor::adj_insert_column(size_t col_ndx) REALM_NOEXCEPT
+void Descriptor::adj_insert_column(size_t col_ndx) noexcept
 {
     // Adjust the column indexes of subdescriptor accessors at higher
     // column indexes.
@@ -153,7 +153,7 @@ void Descriptor::adj_insert_column(size_t col_ndx) REALM_NOEXCEPT
 }
 
 
-void Descriptor::adj_erase_column(size_t col_ndx) REALM_NOEXCEPT
+void Descriptor::adj_erase_column(size_t col_ndx) noexcept
 {
     // If it exists, remove and detach the subdescriptor accessor
     // associated with the removed column. Also adjust the column

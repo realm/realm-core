@@ -36,12 +36,12 @@ public:
     typedef typename Tab::spec_type spec_type;
     typedef Tab table_type;
 
-    bool is_empty() const REALM_NOEXCEPT { return m_impl.is_empty(); }
-    bool is_attached() const REALM_NOEXCEPT { return m_impl.is_attached(); }
-    size_t size() const REALM_NOEXCEPT { return m_impl.size(); }
+    bool is_empty() const noexcept { return m_impl.is_empty(); }
+    bool is_attached() const noexcept { return m_impl.is_attached(); }
+    size_t size() const noexcept { return m_impl.size(); }
 
     // Get row index in the source table this view is "looking" at.
-    size_t get_source_ndx(size_t row_ndx) const REALM_NOEXCEPT
+    size_t get_source_ndx(size_t row_ndx) const noexcept
     {
         return m_impl.get_source_ndx(row_ndx);
     }
@@ -72,12 +72,12 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const View*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() REALM_NOEXCEPT
+    ColsAccessor column() noexcept
     {
         return ColsAccessor(static_cast<View*>(this));
     }
 
-    ConstColsAccessor column() const REALM_NOEXCEPT
+    ConstColsAccessor column() const noexcept
     {
         return ConstColsAccessor(static_cast<const View*>(this));
     }
@@ -98,12 +98,12 @@ private:
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
 public:
-    RowAccessor operator[](std::size_t row_idx) REALM_NOEXCEPT
+    RowAccessor operator[](std::size_t row_idx) noexcept
     {
         return RowAccessor(std::make_pair(static_cast<View*>(this), row_idx));
     }
 
-    ConstRowAccessor operator[](std::size_t row_idx) const REALM_NOEXCEPT
+    ConstRowAccessor operator[](std::size_t row_idx) const noexcept
     {
         return ConstRowAccessor(std::make_pair(static_cast<const View*>(this), row_idx));
     }
@@ -124,8 +124,8 @@ protected:
         : m_impl(tv.m_impl, patch, mode) { }
     BasicTableViewBase(Impl i): m_impl(std::move(i)) {}
 
-    Impl* get_impl() REALM_NOEXCEPT { return &m_impl; }
-    const Impl* get_impl() const REALM_NOEXCEPT { return &m_impl; }
+    Impl* get_impl() noexcept { return &m_impl; }
+    const Impl* get_impl() const noexcept { return &m_impl; }
 };
 
 
@@ -166,23 +166,23 @@ private:
 
 public:
     BasicTableView() {}
-    BasicTableView& operator=(BasicTableView tv) { Base::m_impl = std::move(tv.m_impl); return *this; }
+    BasicTableView& operator=(BasicTableView);
     friend BasicTableView move(BasicTableView& tv) { return BasicTableView(&tv); }
 
     // Deleting
-    void clear() { Base::m_impl.clear(); }
-    void remove(size_t ndx) { Base::m_impl.remove(ndx); }
-    void remove_last() { Base::m_impl.remove_last(); }
+    void remove(size_t ndx, RemoveMode underlying_mode = RemoveMode::ordered);
+    void remove_last(RemoveMode underlying_mode = RemoveMode::ordered);
+    void clear(RemoveMode underlying_mode = RemoveMode::ordered);
 
     // Resort after requery
-    void apply_same_order(BasicTableView& order) { Base::m_impl.apply_same_order(order.m_impl); };
+    void apply_same_order(BasicTableView& order) { Base::m_impl.apply_same_order(order.m_impl); }
 
-    Tab& get_parent() REALM_NOEXCEPT
+    Tab& get_parent() noexcept
     {
         return static_cast<Tab&>(Base::m_impl.get_parent());
     }
 
-    const Tab& get_parent() const REALM_NOEXCEPT
+    const Tab& get_parent() const noexcept
     {
         return static_cast<const Tab&>(Base::m_impl.get_parent());
     }
@@ -217,15 +217,17 @@ public:
         patch.reset();
     }
 
-    BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch, 
-                   ConstSourcePayload mode)
-        : Base(source, patch, mode)
-    {}
+    BasicTableView(const BasicTableView<Tab>& source, Handover_patch& patch,
+                   ConstSourcePayload mode):
+        Base(source, patch, mode)
+    {
+    }
 
-    BasicTableView(BasicTableView<Tab>& source, Handover_patch& patch, 
-                   MutableSourcePayload mode)
-        : Base(source, patch, mode)
-    {}
+    BasicTableView(BasicTableView<Tab>& source, Handover_patch& patch,
+                   MutableSourcePayload mode):
+        Base(source, patch, mode)
+    {
+    }
 
     void apply_patch(TableView::Handover_patch& patch, Group& group)
     {
@@ -283,7 +285,7 @@ public:
         return *this;
     }
 
-    const Tab& get_parent() const REALM_NOEXCEPT
+    const Tab& get_parent() const noexcept
     {
         return static_cast<const Tab&>(Base::m_impl.get_parent());
     }
@@ -305,6 +307,35 @@ private:
     friend class Tab::Query;
 };
 
+
+
+
+// Implementation
+
+template<class Tab>
+inline BasicTableView<Tab>& BasicTableView<Tab>::operator=(BasicTableView tv)
+{
+    Base::m_impl = std::move(tv.m_impl);
+    return *this;
+}
+
+template<class Tab>
+inline void BasicTableView<Tab>::remove(size_t ndx, RemoveMode underlying_mode)
+{
+    Base::m_impl.remove(ndx, underlying_mode);
+}
+
+template<class Tab>
+inline void BasicTableView<Tab>::remove_last(RemoveMode underlying_mode)
+{
+    Base::m_impl.remove_last(underlying_mode);
+}
+
+template<class Tab>
+inline void BasicTableView<Tab>::clear(RemoveMode underlying_mode)
+{
+    Base::m_impl.clear(underlying_mode);
+}
 
 } // namespace realm
 

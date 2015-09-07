@@ -115,11 +115,31 @@ Caveats, notes and todos
       ColumnAccessor<> extending Columns. So m_table is redundant, but this is in order to keep class dependencies and
       entanglement low so that the design is flexible (if you perhaps later want a Columns class that is not dependent
       on ColumnAccessor)
-*/
 
+Nulls
+-----------------------------------------------------------------------------------------------------------------------
+First note that at array level, nulls are distinguished between non-null in different ways:
+String:
+    m_data == 0 && m_size == 0
+
+Integer, Bool, DateTime stored in ArrayIntNull:
+    value == get(0) (entry 0 determins a magic value that represents nulls)
+
+Float/double:
+    null::is_null(value) which tests if value bit-matches one specific bit pattern reserved for null
+
+The Columns class encapsulates all this into a simple class that, for any type T has
+    evaluate(size_t index) that reads values from a column, taking nulls in count
+    get(index)
+    set(index)
+    is_null(index)
+    set_null(index)
+*/
 
 #ifndef REALM_QUERY_EXPRESSION_HPP
 #define REALM_QUERY_EXPRESSION_HPP
+
+#include <realm/column_type_traits.hpp>
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
@@ -129,7 +149,7 @@ Caveats, notes and todos
 
 #define REALM_OLDQUERY_FALLBACK
 
-// namespace realm {
+namespace realm {
 
 template <class T> T minimum(T a, T b)
 {
@@ -145,30 +165,22 @@ typedef double              Double;
 typedef realm::StringData String;
 typedef realm::BinaryData Binary;
 
-
-// Return StringData if either T or U is StringData, else return T. See description of usage in export2().
-template<class T, class U> struct EitherIsString
-{
-    typedef T type;
-};
-
-template<class T> struct EitherIsString<T, StringData>
-{
-    typedef StringData type;
-};
-
-// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric and
-// EitherIsString somehow
+// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
 namespace {
 template<class T, class U> T only_numeric(U in)
 {
     return static_cast<T>(in);
 }
 
-template<class T> int only_numeric(const StringData& in)
+template<class T> int only_numeric(const StringData&)
 {
     REALM_ASSERT(false);
-    static_cast<void>(in);
+    return 0;
+}
+
+template<class T> int only_numeric(const BinaryData&)
+{
+    REALM_ASSERT(false);
     return 0;
 }
 
@@ -233,9 +245,9 @@ template<class T>struct Pow {
 
 // Finds a common type for T1 and T2 according to C++ conversion/promotion in arithmetic (float + int => float, etc)
 template<class T1, class T2,
-    bool T1_is_int = std::numeric_limits<T1>::is_integer,
-    bool T2_is_int = std::numeric_limits<T2>::is_integer,
-    bool T1_is_widest = (sizeof(T1) > sizeof(T2)) > struct Common;
+    bool T1_is_int = std::numeric_limits<T1>::is_integer || std::is_same<T1, null>::value,
+    bool T2_is_int = std::numeric_limits<T2>::is_integer || std::is_same<T2, null>::value,
+    bool T1_is_widest = (sizeof(T1) > sizeof(T2)   ||     std::is_same<T2, null>::value    ) > struct Common;
 template<class T1, class T2, bool b> struct Common<T1, T2, b, b, true > {
     typedef T1 type;
 };
@@ -245,9 +257,11 @@ template<class T1, class T2, bool b> struct Common<T1, T2, b, b, false> {
 template<class T1, class T2, bool b> struct Common<T1, T2, false, true , b> {
     typedef T1 type;
 };
-template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
+template<class T1, class T2, bool b> struct Common<T1, T2, true, false, b> {
     typedef T2 type;
 };
+
+
 
 
 struct ValueBase
@@ -259,6 +273,8 @@ struct ValueBase
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void export_StringData(ValueBase& destination) const = 0;
+    virtual void export_BinaryData(ValueBase& destination) const = 0;
+    virtual void export_null(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
     // If true, all values in the class come from a link of a single field in the parent table (m_table). If
@@ -276,7 +292,7 @@ public:
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table() = 0;
-    virtual const Table* get_table() = 0;
+    virtual const Table* get_table() const = 0;
     virtual ~Expression() {}
 };
 
@@ -296,15 +312,13 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    virtual const Table* get_table() const
     {
         return nullptr;
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
-
-class ColumnsBase {};
 
 template <class T> class Columns;
 template <class T> class Value;
@@ -332,10 +346,11 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
         ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
-        (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value))
+        (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
+        (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value))
         &&
         column->m_link_map.m_tables.size() == 0) {
-        const Table* t = (const_cast<Columns<R>*>(column))->get_table();
+        const Table* t = column->get_table();
         Query q = Query(*t);
 
         if (std::is_same<Cond, Less>::value)
@@ -473,9 +488,10 @@ public:
         const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
-        // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=}
-        if (left_col && right_col && std::is_same<L, R>::value) {
-            const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
+        // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
+        // but only if both columns are non-nullable
+        if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable) {
+            const Table* t = left_col->get_table();
             Query q = Query(*t);
 
             if (std::numeric_limits<L>::is_integer || std::is_same<L, DateTime>::value) {
@@ -574,16 +590,248 @@ public:
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 5 * 20 = 100. Todo: We can
 // consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
-    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
-    public Overloads<T, bool>, public Overloads<T, DateTime>
+Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
+public Overloads<T, bool>, public Overloads<T, DateTime>, public Overloads<T, null>
 {
 public:
     virtual ~Subexpr2() {};
 
-    #define RLM_U2(t, o) using Overloads<T, t>::operator o;
-    #define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o)
-    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
+#define RLM_U2(t, o) using Overloads<T, t>::operator o;
+#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o) RLM_U2(null, o)
+    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
 };
+
+
+/*
+This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
+to be null too. It's used by the Value class for internal storage.
+
+To indicate nulls, we could have chosen a separate bool vector or some other bitmask construction. But for
+performance, we customize indication of nulls to match the same indication that is used in the persisted database
+file
+
+Queries in query_expression.hpp execute by processing chunks of 8 rows at a time. Assume you have a column:
+
+    price (int) = {1, 2, 3, null, 1, 6, 6, 9, 5, 2, null}
+
+And perform a query:
+
+    Query q = (price + 2 == 5);
+
+query_expression.hpp will then create a NullableVector<int> = {5, 5, 5, 5, 5, 5, 5, 5} and then read values
+NullableVector<int> = {1, 2, 3, null, 1, 6, 6, 9} from the column, and then perform `+` and `==` on these chunks.
+
+See the top of this file for more information on all this.
+
+Assume the user specifies the null constant in a query:
+
+Query q = (price == null)
+
+The query system will then construct a NullableVector of type `null` (NullableVector<null>). This allows compile
+time optimizations for these cases.
+*/
+
+template <class T, size_t prealloc = 8> struct NullableVector
+{
+    typedef typename std::conditional<std::is_same<T, bool>::value
+        || std::is_same<T, int>::value, int64_t, T>::type t_storage;
+
+    NullableVector() {};
+
+    NullableVector& operator= (const NullableVector& other)
+    {
+        if (this != &other) {
+            init(other.m_size);
+            std::copy(other.m_first, other.m_first + other.m_size, m_first);
+            m_null = other.m_null;
+        }
+        return *this;
+    }
+
+    NullableVector(const NullableVector& other)
+    {
+        init(other.m_size);
+        std::copy(other.m_first, other.m_first + other.m_size, m_first);
+        m_null = other.m_null;
+    }
+
+    ~NullableVector()
+    {
+        dealloc();
+    }
+
+    T operator[](size_t index) const
+    {
+        REALM_ASSERT_3(index, <, m_size);
+        return static_cast<T>(m_first[index]);
+    }
+
+    inline bool is_null(size_t index) const
+    {
+        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
+        return m_first[index] == m_null;
+    }
+
+    inline void set_null(size_t index)
+    {
+        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
+        m_first[index] = m_null;
+    }
+
+    inline void set(size_t index, t_storage value)
+    {
+        REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
+
+        // If value collides with magic null value, then switch to a new unique representation for null
+        if (REALM_UNLIKELY(value == m_null)) {
+            // adding a prime will generate 2^64 unique values. Todo: Only works on 2's complement architecture
+            uint64_t candidate = static_cast<uint64_t>(m_null) + 0xfffffffbULL;
+            while (std::find(m_first, m_first + m_size, static_cast<int64_t>(candidate)) != m_first + m_size)
+                candidate += 0xfffffffbULL;
+            std::replace(m_first, m_first + m_size, m_null, static_cast<int64_t>(candidate));
+        }
+        m_first[index] = value;
+    }
+
+    void fill(T value)
+    {
+        for (size_t t = 0; t < m_size; t++) {
+            if (std::is_same<T, null>::value)
+                set_null(t);
+            else
+                set(t, value);
+        }
+    }
+
+    void init(size_t size)
+    {
+        if (size == m_size)
+            return;
+
+        dealloc();
+        m_size = size;
+        if (m_size > 0) {
+            if (m_size > prealloc)
+                m_first = reinterpret_cast<t_storage*>(new T[m_size]);
+            else
+                m_first = m_cache;
+        }
+    }
+
+    void init(size_t size, T values)
+    {
+        init(size);
+        fill(values);
+    }
+
+    void dealloc()
+    {
+        if (m_first) {
+            if (m_size > prealloc)
+                delete[] m_first;
+            m_first = nullptr;
+        }
+    }
+
+    t_storage m_cache[prealloc];
+    t_storage* m_first = &m_cache[0];
+    size_t m_size = 0;
+
+    int64_t m_null = reinterpret_cast<int64_t>(&m_null); // choose magic value to represent nulls
+};
+
+// Double
+// NOTE: fails in gcc 4.8 without `inline`. Do not remove. Same applies for all methods below.
+template<> inline void NullableVector<double>::set(size_t index, double value)
+{
+    m_first[index] = value;
+}
+
+template<> inline bool NullableVector<double>::is_null(size_t index) const
+{
+    return null::is_null_float(m_first[index]);
+}
+
+template<> inline void NullableVector<double>::set_null(size_t index)
+{
+    m_first[index] = null::get_null_float<double>();
+}
+
+// Float
+template<> inline bool NullableVector<float>::is_null(size_t index) const
+{
+    return null::is_null_float(m_first[index]);
+}
+
+template<> inline void NullableVector<float>::set_null(size_t index)
+{
+    m_first[index] = null::get_null_float<float>();
+}
+
+template<> inline void NullableVector<float>::set(size_t index, float value)
+{
+    m_first[index] = value;
+}
+
+// Null
+template<> inline void NullableVector<null>::set_null(size_t)
+{
+    return;
+}
+template<> inline bool NullableVector<null>::is_null(size_t) const
+{
+    return true;
+}
+template<> inline void NullableVector<null>::set(size_t, null)
+{
+}
+
+// DateTime
+template<> inline bool NullableVector<DateTime>::is_null(size_t index) const
+{
+    return m_first[index].get_datetime() == m_null;
+}
+
+template<> inline void NullableVector<DateTime>::set(size_t index, DateTime value)
+{
+    m_first[index] = value;
+}
+
+template<> inline void NullableVector<DateTime>::set_null(size_t index)
+{
+    m_first[index] = m_null;
+}
+
+// StringData
+template<> inline void NullableVector<StringData>::set(size_t index, StringData value)
+{
+    m_first[index] = value;
+}
+template<> inline bool NullableVector<StringData>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template<> inline void NullableVector<StringData>::set_null(size_t index)
+{
+    m_first[index] = StringData();
+}
+
+// BinaryData
+template<> inline void NullableVector<BinaryData>::set(size_t index, BinaryData value)
+{
+    m_first[index] = value;
+}
+template<> inline bool NullableVector<BinaryData>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template<> inline void NullableVector<BinaryData>::set_null(size_t index)
+{
+    m_first[index] = BinaryData();
+}
+
 
 // Stores N values of type T. Can also exchange data with other ValueBase of different types
 template<class T> class Value : public ValueBase, public Subexpr2<T>
@@ -591,120 +839,134 @@ template<class T> class Value : public ValueBase, public Subexpr2<T>
 public:
     Value()
     {
-        m_v = nullptr;
-        init(false, ValueBase::default_size, 0);
+        init(false, ValueBase::default_size, T());
     }
     Value(T v)
     {
-        m_v = nullptr;
         init(false, ValueBase::default_size, v);
     }
+
     Value(bool link, size_t values)
     {
-        m_v = nullptr;
-        init(link, values, 0);
+        init(link, values, T());
     }
 
     Value(bool link, size_t values, T v)
     {
-        m_v = nullptr;
         init(link, values, v);
     }
 
-    ~Value()
-    {
-        // If we store more than default_size elements then we used 'new', else we used m_cache
-        if (m_values > ValueBase::default_size)
-            delete[] m_v;
-        m_v = nullptr;
-    }
+    Value(const Value&) = default;
+    Value& operator=(const Value&) = default;
 
     void init(bool link, size_t values, T v) {
-        if (m_v) {
-            // If we store more than default_size elements then we used 'new', else we used m_cache
-            if (m_values > ValueBase::default_size)
-                delete[] m_v;
-            m_v = nullptr;
-        }
+        m_storage.init(values, v);
         ValueBase::from_link = link;
         ValueBase::m_values = values;
-        if (m_values > 0) {
-            // If we store more than default_size elements then use 'new', else use m_cache
-            if (m_values > ValueBase::default_size)
-                m_v = new T[m_values];
-            else
-                m_v = m_cache;
-            std::fill(m_v, m_v + ValueBase::m_values, v);
-        }
     }
 
-    void evaluate(size_t, ValueBase& destination)
+    void init(bool link, size_t values) {
+        m_storage.init(values);
+        ValueBase::from_link = link;
+        ValueBase::m_values = values;
+    }
+
+    void evaluate(size_t, ValueBase& destination) override
     {
         destination.import(*this);
     }
+
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
     {
         TOperator o;
         size_t vals = minimum(left->m_values, right->m_values);
-        for (size_t t = 0; t < vals; t++)
-            m_v[t] = o(left->m_v[t], right->m_v[t]);
+
+        for (size_t t = 0; t < vals; t++) {
+            if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(t) || right->m_storage.is_null(t)))
+                m_storage.set_null(t);
+            else
+                m_storage.set(t, o(left->m_storage[t], right->m_storage[t]));
+
+        }
     }
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* value)
     {
         TOperator o;
-        for (size_t t = 0; t < value->m_values; t++)
-            m_v[t] = o(value->m_v[t]);
+        for (size_t t = 0; t < value->m_values; t++) {
+            if (std::is_same<T, int64_t>::value && value->m_storage.is_null(t))
+                m_storage.set_null(t);
+            else
+                m_storage.set(t, o(value->m_storage[t]));
+        }
     }
 
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
-    template<class D> REALM_FORCEINLINE void export2(ValueBase& destination) const
+    template<class D>
+    typename std::enable_if<std::is_convertible<T, D>::value>::type
+    REALM_FORCEINLINE export2(ValueBase& destination) const
     {
-        // export2 is also instantiated for impossible conversions like T = StringData, D = int64_t. These are never
-        // performed at runtime but still result in compiler errors. We therefore introduce EitherIsString which turns
-        // both T and D into StringData if just one of them are
-        typedef typename EitherIsString <D, T>::type dst_t;
-        typedef typename EitherIsString <T, D>::type src_t;
-        Value<dst_t>& d = static_cast<Value<dst_t>&>(destination);
-        d.init(ValueBase::from_link, ValueBase::m_values, 0);
+        Value<D>& d = static_cast<Value<D>&>(destination);
+        d.init(ValueBase::from_link, ValueBase::m_values, D());
         for (size_t t = 0; t < ValueBase::m_values; t++) {
-            src_t* source = reinterpret_cast<src_t*>(m_v);
-            d.m_v[t] = static_cast<dst_t>(source[t]);
+            if (m_storage.is_null(t))
+                d.m_storage.set_null(t);
+            else {
+                d.m_storage.set(t, static_cast<D>(m_storage[t]));
+            }
         }
     }
 
-    REALM_FORCEINLINE void export_bool(ValueBase& destination) const
+    template<class D>
+    typename std::enable_if<!std::is_convertible<T, D>::value>::type
+    REALM_FORCEINLINE export2(ValueBase&) const
+    {
+        // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
+        // performed at runtime but would result in a compiler error if we did not provide this implementation.
+        REALM_ASSERT_DEBUG(false);
+    }
+
+    REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
     {
         export2<bool>(destination);
     }
 
-    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const
+    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const override
     {
         export2<int64_t>(destination);
     }
 
-    REALM_FORCEINLINE void export_float(ValueBase& destination) const
+    REALM_FORCEINLINE void export_float(ValueBase& destination) const override
     {
         export2<float>(destination);
     }
 
-    REALM_FORCEINLINE void export_int(ValueBase& destination) const
+    REALM_FORCEINLINE void export_int(ValueBase& destination) const override
     {
         export2<int>(destination);
     }
 
-    REALM_FORCEINLINE void export_double(ValueBase& destination) const
+    REALM_FORCEINLINE void export_double(ValueBase& destination) const override
     {
         export2<double>(destination);
     }
-    REALM_FORCEINLINE void export_StringData(ValueBase& destination) const
+    REALM_FORCEINLINE void export_StringData(ValueBase& destination) const override
     {
-        export2<StringData>(destination); 
+        export2<StringData>(destination);
+    }
+    REALM_FORCEINLINE void export_BinaryData(ValueBase& destination) const override
+    {
+        export2<BinaryData>(destination);
+    }
+    REALM_FORCEINLINE void export_null(ValueBase& destination) const override
+    {
+        Value<null>& d = static_cast<Value<null>&>(destination);
+        d.init(from_link, m_values);
     }
 
-    REALM_FORCEINLINE void import(const ValueBase& source)
+    REALM_FORCEINLINE void import(const ValueBase& source) override
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
@@ -714,10 +976,14 @@ public:
             source.export_float(*this);
         else if (std::is_same<T, double>::value)
             source.export_double(*this);
-        else if (std::is_same<T, int64_t>::value || std::is_same<T, DateTime>::value)
+        else if (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value ||  std::is_same<T, DateTime>::value)
             source.export_int64_t(*this);
         else if (std::is_same<T, StringData>::value)
             source.export_StringData(*this);
+        else if (std::is_same<T, BinaryData>::value)
+            source.export_BinaryData(*this);
+        else if (std::is_same<T, null>::value)
+            source.export_null(*this);
         else
             REALM_ASSERT_DEBUG(false);
     }
@@ -731,7 +997,8 @@ public:
             // Compare values one-by-one (one value is one row; no links)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
-                if (c(left->m_v[m], right->m_v[m]))
+
+                if (c(left->m_storage[m], right->m_storage[m], left->m_storage.is_null(m), right->m_storage.is_null(m)))
                     return m;
             }
         }
@@ -740,11 +1007,11 @@ public:
             REALM_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
-            // Right values come from link. Left must come from single row. Semantics: Match if at least 1 
+            // Right values come from link. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
-                if (c(left->m_v[0], right->m_v[r]))
+                if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0), right->m_storage.is_null(r)))
                     return 0;
             }
         }
@@ -752,7 +1019,7 @@ public:
             // Same as above, right left values coming from links
             REALM_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
-                if (c(left->m_v[l], right->m_v[0]))
+                if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l), right->m_storage.is_null(0)))
                     return 0;
             }
         }
@@ -760,26 +1027,12 @@ public:
         return not_found; // no match
     }
 
-    virtual Subexpr& clone()
+    Subexpr& clone() override
     {
-        Value<T>& n = *new Value<T>();
-
-        // Copy all members, except the m_v pointer which the above Value constructor allocated
-        T* tmp = n.m_v;
-        n = *this;
-        n.m_v = tmp;
-
-        // Copy payload
-        memcpy(n.m_v, m_v, sizeof(T)* m_values);
-
-        return n;
+        return *new Value<T>(*this);
     }
 
-    // Pointer to value payload
-    T *m_v;
-
-    // If there is less than default_size elements in payload, then use this cache, else use 'new'
-    T m_cache[ValueBase::default_size];
+    NullableVector<T> m_storage;
 };
 
 
@@ -923,7 +1176,7 @@ template <class T> UnaryOperator<Pow<T>>& power (Subexpr2<T>& left) {
 // Classes used for LinkMap (see below).
 struct LinkMapFunction
 {
-    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or 
+    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or
     // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
     // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
@@ -934,7 +1187,8 @@ struct FindNullLinks : public LinkMapFunction
 {
     FindNullLinks() : m_has_link(false) {};
 
-    virtual bool consume(size_t row_index) {
+    bool consume(size_t row_index) override
+    {
         static_cast<void>(row_index);
         m_has_link = true;
         return false; // we've found a row index, so this can't be a null-link, so exit link harvesting
@@ -947,11 +1201,25 @@ struct MakeLinkVector : public LinkMapFunction
 {
     MakeLinkVector(std::vector<size_t>& result) : m_links(result) {}
 
-    virtual bool consume(size_t row_index) {
+    bool consume(size_t row_index) override
+    {
         m_links.push_back(row_index);
         return true; // continue evaluation
     }
     std::vector<size_t> &m_links;
+};
+
+struct CountLinks : public LinkMapFunction
+{
+    bool consume(size_t) override
+    {
+        m_link_count++;
+        return true;
+    }
+
+    size_t result() const { return m_link_count; }
+
+    size_t m_link_count = 0;
 };
 
 
@@ -960,10 +1228,10 @@ The LinkMap and LinkMapFunction classes are used for query conditions on links t
 the value payload they point at).
 
 MapLink::map_links() takes a row index of the link column as argument and follows any link chain stated in the query
-(through the link()->link() methods) until the final payload table is reached, and then applies LinkMapFunction on 
-the linked-to row index(es). 
+(through the link()->link() methods) until the final payload table is reached, and then applies LinkMapFunction on
+the linked-to row index(es).
 
-If all link columns are type_Link, then LinkMapFunction is only invoked for a single row index. If one or more 
+If all link columns are type_Link, then LinkMapFunction is only invoked for a single row index. If one or more
 columns are type_LinkList, then it may result in multiple row indexes.
 
 The reason we use this map pattern is that we can exit the link-tree-traversal as early as possible, e.g. when we've
@@ -973,22 +1241,21 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap
 {
 public:
-    LinkMap() : m_table(nullptr) {};
-
-    void init(Table* table, std::vector<size_t> columns)
+    LinkMap() : m_table(nullptr) {}
+    LinkMap(const Table* table, const std::vector<size_t>& columns)
     {
         for (size_t t = 0; t < columns.size(); t++) {
             // Link column can be either LinkList or single Link
             ColumnType type = table->get_real_column_type(columns[t]);
             if (type == col_type_LinkList) {
-                LinkListColumn& cll = table->get_column_link_list(columns[t]);
+                const LinkListColumn& cll = table->get_column_link_list(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
                 m_link_types.push_back(realm::type_LinkList);
                 table = &cll.get_target_table();
             }
             else {
-                LinkColumn& cl = table->get_column_link(columns[t]);
+                const LinkColumn& cl = table->get_column_link(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link(columns[t])));
                 m_link_types.push_back(realm::type_Link);
@@ -1005,21 +1272,28 @@ public:
         return res;
     }
 
+    size_t count_links(size_t row)
+    {
+        CountLinks counter;
+        map_links(row, counter);
+        return counter.result();
+    }
+
     void map_links(size_t row, LinkMapFunction& lm)
     {
         map_links(0, row, lm);
     }
 
     const Table* m_table;
-    std::vector<LinkColumnBase*> m_link_columns;
-    std::vector<Table*> m_tables;
+    std::vector<const LinkColumnBase*> m_link_columns;
+    std::vector<const Table*> m_tables;
 
 private:
     void map_links(size_t column, size_t row, LinkMapFunction& lm)
     {
         bool last = (column + 1 == m_link_columns.size());
         if (m_link_types[column] == type_Link) {
-            LinkColumn& cl = *static_cast<LinkColumn*>(m_link_columns[column]);
+            const LinkColumn& cl = *static_cast<const LinkColumn*>(m_link_columns[column]);
             size_t r = to_size_t(cl.get(row));
             if (r == 0)
                 return;
@@ -1033,8 +1307,8 @@ private:
                 map_links(column + 1, r, lm);
         }
         else {
-            LinkListColumn& cll = *static_cast<LinkListColumn*>(m_link_columns[column]);
-            LinkViewRef lvr = cll.get(row);
+            const LinkListColumn& cll = *static_cast<const LinkListColumn*>(m_link_columns[column]);
+            ConstLinkViewRef lvr = cll.get(row);
             for (size_t t = 0; t < lvr->size(); t++) {
                 size_t r = lvr->get(t).get_index();
                 if (last) {
@@ -1065,40 +1339,34 @@ template <class S, class I> Query string_compare(const Columns<StringData>& left
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr),
-                                                                            m_table(nullptr), 
-                                                                            m_column(column)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+        m_link_map(table, links), m_table(table), m_column(column)
     {
-        m_link_map.init(const_cast<Table*>(table), links);
-        m_table = table;
         REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), ==, type_String);
     }
 
-    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), m_column(column)
-    {
-        m_table = table;
-    }
-
-    explicit Columns() : m_table_linked_from(nullptr), m_table(nullptr) { }
-
-
-    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), m_column(column)
+    Columns(size_t column, const Table* table): m_table(table), m_column(column)
     {
     }
 
-    virtual Subexpr& clone()
+    explicit Columns() { }
+
+
+    explicit Columns(size_t column): m_column(column)
     {
-        Columns<StringData>& n = *new Columns<StringData>();
-        n = *this;
-        return n;
     }
 
-    virtual const Table* get_table()
+    Subexpr& clone() override
+    {
+        return *new Columns<StringData>(*this);
+    }
+
+    const Table* get_table() const override
     {
         return m_table;
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<StringData>& d = static_cast<Value<StringData>&>(destination);
 
@@ -1107,14 +1375,14 @@ public:
             Value<StringData> v(true, links.size());
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                v.m_v[t] = m_link_map.m_table->get_string(m_column, link_to);
+                v.m_storage.set(t, m_link_map.m_table->get_string(m_column, link_to));
             }
             destination.import(v);
         }
         else {
             // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
-                d.m_v[t] = m_table->get_string(m_column, index + t);
+                d.m_storage.set(t, m_table->get_string(m_column, index + t));
             }
         }
     }
@@ -1138,7 +1406,7 @@ public:
     {
         return string_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
     }
-    
+
     Query begins_with(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
@@ -1158,7 +1426,7 @@ public:
     {
         return string_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
     }
-    
+
     Query contains(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
@@ -1168,16 +1436,14 @@ public:
     {
         return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
     }
-    
-    const Table* m_table_linked_from;
+
+    LinkMap m_link_map;
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
-    const Table* m_table;
+    const Table* m_table = nullptr;
 
     // Column index of payload column of m_table
     size_t m_column;
-
-    LinkMap m_link_map;
 };
 
 
@@ -1230,7 +1496,87 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
     return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
 }
 
-// This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
+
+// Handling of BinaryData columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
+//
+// FIXME: See if we can merge it with Columns<StringData> because they are very similiar
+template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
+{
+public:
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links) :
+        m_column(column), m_link_map(table, links)
+    {
+        m_table = table;
+        REALM_ASSERT_3(m_link_map.m_table->get_column_type(column), == , type_Binary);
+    }
+
+    Columns(size_t column, const Table* table) : m_table(table), m_column(column) { }
+
+    explicit Columns() { }
+
+
+    explicit Columns(size_t column) : m_column(column)
+    {
+    }
+
+    virtual Subexpr& clone() override
+    {
+        return *new Columns<BinaryData>(*this);
+    }
+
+    const Table* get_table() const override
+    {
+        return m_table;
+    }
+
+    virtual void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<BinaryData>& d = static_cast<Value<BinaryData>&>(destination);
+
+        if (m_link_map.m_link_columns.size() > 0) {
+            std::vector<size_t> links = m_link_map.get_links(index);
+            Value<BinaryData> v(true, links.size());
+            for (size_t t = 0; t < links.size(); t++) {
+                size_t link_to = links[t];
+                v.m_storage.set(t, m_link_map.m_table->get_binary(m_column, link_to));
+            }
+            destination.import(v);
+        }
+        else {
+            // Not a link column
+            for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
+                d.m_storage.set(t, m_table->get_binary(m_column, index + t));
+            }
+        }
+    }
+
+    // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
+    const Table* m_table = nullptr;
+
+    // Column index of payload column of m_table
+    size_t m_column;
+
+    LinkMap m_link_map;
+};
+
+inline Query operator==(const Columns<BinaryData>& left, BinaryData right) {
+    return create<BinaryData, Equal, BinaryData>(right, left);
+}
+
+inline Query operator==(BinaryData left, const Columns<BinaryData>& right) {
+    return create<BinaryData, Equal, BinaryData>(left, right);
+}
+
+inline Query operator!=(const Columns<BinaryData>& left, BinaryData right) {
+    return create<BinaryData, NotEqual, BinaryData>(right, left);
+}
+
+inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
+    return create<BinaryData, NotEqual, BinaryData>(left, right);
+}
+
+
+// This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload*
 // in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
 // only "find first null-link" is supported. More will be added later.
 class UnaryLinkCompare : public Expression
@@ -1240,21 +1586,21 @@ public:
     {
         Query::expression(this);
         Table* t = const_cast<Table*>(get_table());
-        Query::m_table = t->get_table_ref();
+        Query::set_table(t->get_table_ref());
     }
 
-    void set_table()
+    void set_table() override
     {
     }
 
-    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as 
+    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
     // any linked-to payload tables
-    virtual const Table* get_table()
+    const Table* get_table() const override
     {
         return m_link_map.m_tables[0];
     }
 
-    size_t find_first(size_t start, size_t end) const
+    size_t find_first(size_t start, size_t end) const override
     {
         for (; start < end;) {
             std::vector<size_t> l = m_link_map.get_links(start);
@@ -1264,7 +1610,7 @@ public:
             m_link_map.map_links(start, fnl);
             if (!fnl.m_has_link)
                 return start;
-            
+
             start++;
         }
 
@@ -1274,6 +1620,34 @@ public:
 private:
     mutable LinkMap m_link_map;
 };
+
+class LinkCount : public Subexpr2<Int> {
+public:
+    LinkCount(LinkMap link_map): m_link_map(link_map) { }
+
+    Subexpr& clone() override
+    {
+        return *new LinkCount(*this);
+    }
+
+    const Table* get_table() const override
+    {
+        return m_link_map.m_tables[0];
+    }
+
+    void set_table() override { }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        size_t count = m_link_map.count_links(index);
+        destination.import(Value<Int>(false, 1, count));
+    }
+
+private:
+    LinkMap m_link_map;
+};
+
+template <typename T> class SubColumns;
 
 // This is for LinkList too because we have 'typedef List LinkList'
 template <> class Columns<Link> : public Subexpr2<Link>
@@ -1286,117 +1660,148 @@ public:
         return *new UnaryLinkCompare(m_link_map);
     }
 
+    LinkCount count() const
+    {
+        return LinkCount(m_link_map);
+    }
+
+    template <typename C>
+    SubColumns<C> column(size_t column) const
+    {
+        return SubColumns<C>(Columns<C>(column, m_link_map.m_table), m_link_map);
+    }
+
 private:
-    Columns(size_t column, const Table* table, std::vector<size_t> links) :
-        m_table(nullptr)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+        m_link_map(table, links), m_table(table)
     {
         static_cast<void>(column);
-        m_link_map.init(const_cast<Table*>(table), links);
-        m_table = table;
     }
 
-    Columns() : m_table(nullptr) { }
+    Columns() { }
 
-    explicit Columns(size_t column) : m_table(nullptr) { static_cast<void>(column); }
+    explicit Columns(size_t column) { static_cast<void>(column); }
 
-    Columns(size_t column, const Table* table) : m_table(nullptr)
+    Columns(size_t column, const Table* table): m_table(table)
     {
         static_cast<void>(column);
-        m_table = table;
     }
 
-    virtual Subexpr& clone()
+    Subexpr& clone() override
     {
         return *this;
     }
 
-    virtual const Table* get_table()
+    const Table* get_table() const override
     {
         return m_table;
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         static_cast<void>(index);
         static_cast<void>(destination);
         REALM_ASSERT(false);
     }
 
-    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
-    const Table* m_table;
-
-    // Column index of payload column of m_table
-    size_t m_column;
-
     LinkMap m_link_map;
-    bool auto_delete;
+
+    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
+    const Table* m_table = nullptr;
 
    friend class Table;
 };
 
 
-template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
+template <class T> class Columns : public Subexpr2<T>
 {
 public:
-    using ColType = typename ColumnTypeTraits<T>::column_type;
+    using ColType = typename ColumnTypeTraits<T, false>::column_type;
+    using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
 
-    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(nullptr), 
-                                                                            m_table(nullptr), sg(nullptr),
-                                                                            m_column(column)
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+        m_link_map(table, links), m_table(table), m_column(column),
+        m_nullable(m_link_map.m_table->is_nullable(m_column))
     {
-        m_link_map.init(const_cast<Table*>(table), links);
-        m_table = table; 
     }
 
-    Columns(size_t column, const Table* table) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
-                                                 m_column(column)
+    Columns(size_t column, const Table* table):
+        m_table(table), m_column(column), m_nullable(m_table->is_nullable(m_column))
     {
-        m_table = table;
     }
 
+    Columns() { }
 
-    Columns() : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr) { }
+    explicit Columns(size_t column) : m_column(column) {}
 
-    explicit Columns(size_t column) : m_table_linked_from(nullptr), m_table(nullptr), sg(nullptr),
-                                      m_column(column) {}
-
-    ~Columns()
+    Columns(const Columns& other):
+        m_link_map(other.m_link_map), m_table(other.m_table), m_column(other.m_column), m_nullable(other.m_nullable)
     {
-        delete sg;
     }
 
-    virtual Subexpr& clone()
+    Columns& operator=(const Columns& other)
     {
-        Columns<T>& n = *new Columns<T>();
-        n = *this;
-        SequentialGetter<ColType> *s = new SequentialGetter<ColType>();
-        n.sg = s;
-        return n;
+        if (this != &other) {
+            m_link_map = other.m_link_map;
+            m_table = other.m_table;
+            m_sg.reset();
+            m_column = other.m_column;
+            m_nullable = other.m_nullable;
+        }
+        return *this;
+    }
+
+    Subexpr& clone() override
+    {
+        return *new Columns<T>(*this);
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table()
+    void set_table() override
     {
-        const ColType* c;
-        if (m_link_map.m_link_columns.size() == 0)
-            c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
-        else
-            c = static_cast<const ColType*>(&m_link_map.m_table->get_column_base(m_column));
+        const ColumnBase* c;
+        if (m_link_map.m_link_columns.size() == 0) {
+            m_nullable = m_table->is_nullable(m_column);
+            c = &m_table->get_column_base(m_column);
+        }
+        else {
+            m_nullable = m_link_map.m_table->is_nullable(m_column);
+            c = &m_link_map.m_table->get_column_base(m_column);
+        }
 
-        if (sg == nullptr)
-            sg = new SequentialGetter<ColType>();
-        sg->init(c);
+        if (m_sg == nullptr) {
+            if (m_nullable)
+                m_sg.reset(new SequentialGetter<ColTypeN>());
+            else
+                m_sg.reset(new SequentialGetter<ColType>());
+        }
+
+        if (m_nullable)
+            static_cast<SequentialGetter<ColTypeN>*>(m_sg.get())->init(static_cast<const ColTypeN*>(c));
+        else
+            static_cast<SequentialGetter<ColType>*>(m_sg.get())->init(static_cast<const ColType*>(c));
     }
 
-    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
-    // binds it to a Query at a later time
-    virtual const Table* get_table()
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
+    // and binds it to a Query at a later time
+    const Table* get_table() const override
     {
         return m_table;
     }
 
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        if (m_nullable)
+            evaluate<ColTypeN>(index, destination);
+        else
+            evaluate<ColType>(index, destination);
+    }
+
     // Load values from Column into destination
-    void evaluate(size_t index, ValueBase& destination) {
+    template<class C> void evaluate(size_t index, ValueBase& destination) {
+        SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(m_sg.get());
+
         if (m_link_map.m_link_columns.size() > 0) {
             // LinkList with more than 0 values. Create Value with payload for all fields
 
@@ -1405,53 +1810,256 @@ public:
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                sg->cache_next(link_to); // todo, needed?
-                v.m_v[t] = sg->get_next(link_to);
+                sgc->cache_next(link_to);
+
+                if (sgc->m_column->is_null(link_to))
+                    v.m_storage.set_null(t);
+                else
+                    v.m_storage.set(t, sgc->get_next(link_to));
             }
             destination.import(v);
         }
         else {
             // Not a Link column
-            sg->cache_next(index);
-            size_t colsize = sg->m_column->size();
+            // make sequential getter load the respective leaf to access data at column row 'index'
+            sgc->cache_next(index);
+            size_t colsize = sgc->m_column->size();
 
-            if (std::is_same<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
+            // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer
+            // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
+            // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
+            if (std::is_same<T, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
                 Value<T> v;
-                REALM_ASSERT_3(ValueBase::default_size, ==, 8); // If you want to modify 'default_size' then update Array::get_chunk()
-                // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-                sg->m_leaf_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+
+                // If you want to modify 'default_size' then update Array::get_chunk()
+                REALM_ASSERT_3(ValueBase::default_size, ==, 8);
+
+                sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start,
+                    static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
+
+                if (m_nullable)
+                   v.m_storage.m_null = reinterpret_cast<const ArrayIntNull*>(sgc->m_leaf_ptr)->null_value();
+
                 destination.import(v);
             }
-            else {
-                // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
-                // if an unconditional zero out is faster
+            else
+            {
                 size_t rows = colsize - index;
                 if (rows > ValueBase::default_size)
                     rows = ValueBase::default_size;
                 Value<T> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++)
-                    v.m_v[t] = sg->get_next(index + t);
+                    v.m_storage.set(t, sgc->get_next(index + t));
+
+                if (m_nullable && (std::is_same<T, int64_t>::value ||
+                                   std::is_same<T, bool>::value ||
+                                   std::is_same<T, realm::DateTime>::value)) {
+                    v.m_storage.m_null = reinterpret_cast<const ArrayIntNull*>(sgc->m_leaf_ptr)->null_value();
+                }
 
                 destination.import(v);
             }
         }
     }
 
-    const Table* m_table_linked_from;
+    LinkMap m_link_map;
 
-    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
-    const Table* m_table;
+    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class
+    // dependency/entanglement
+    const Table* m_table = nullptr;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
-    SequentialGetter<ColType>* sg;
+    std::unique_ptr<SequentialGetterBase> m_sg;
 
     // Column index of payload column of m_table
     size_t m_column;
 
+    // set to false by default for stand-alone Columns declaration that are not yet associated with any table
+    // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
+    bool m_nullable = false;
+};
+
+template <typename T, typename Operation> class SubColumnAggregate;
+namespace aggregate_operations {
+    template <typename T> class Minimum;
+    template <typename T> class Maximum;
+    template <typename T> class Sum;
+    template <typename T> class Average;
+}
+
+template <typename T>
+class SubColumns : public Subexpr {
+public:
+    SubColumns(Columns<T> column, LinkMap link_map)
+        : m_column(column)
+        , m_link_map(link_map)
+    {
+    }
+
+    Subexpr& clone() override
+    {
+        return *new SubColumns<T>(*this);
+    }
+
+    const Table* get_table() const override
+    {
+        return m_column.get_table();
+    }
+
+    void set_table() override
+    {
+        m_column.set_table();
+    }
+
+    void evaluate(size_t, ValueBase&) override
+    {
+        // SubColumns can only be used in an expression in conjunction with its aggregate methods.
+        REALM_ASSERT(false);
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Minimum<T>>(m_column, m_link_map);
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Maximum<T>>(m_column, m_link_map);
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Sum<T>>(m_column, m_link_map);
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Average<T>> average() const
+    {
+        return SubColumnAggregate<T, aggregate_operations::Average<T>>(m_column, m_link_map);
+    }
+
+private:
+    Columns<T> m_column;
     LinkMap m_link_map;
 };
 
+template <typename  T, typename Operation>
+class SubColumnAggregate : public Subexpr2<typename Operation::ResultType>
+{
+public:
+    SubColumnAggregate(Columns<T> column, LinkMap link_map)
+        : m_column(column)
+        , m_link_map(link_map)
+    {
+    }
+
+    Subexpr& clone() override
+    {
+        return *new SubColumnAggregate<T, Operation>(*this);
+    }
+
+    const Table* get_table() const override
+    {
+        return m_column.get_table();
+    }
+
+    void set_table() override
+    {
+        m_column.set_table();
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        std::vector<size_t> links = m_link_map.get_links(index);
+        std::sort(links.begin(), links.end());
+
+        Operation op;
+        for (size_t link_index = 0; link_index < links.size(); ) {
+            Value<T> value;
+            size_t link = links[link_index];
+            m_column.evaluate(link, value);
+
+            // Columns<T>::evaluate fetches values in chunks of ValueBase::default_size. Process all values
+            // within the chunk that came from rows that we link to.
+            const auto& value_storage = value.m_storage;
+            for (size_t value_index = 0; value_index < value.m_values; ) {
+                if (!value_storage.is_null(value_index)) {
+                    op.accumulate(value_storage[value_index]);
+                }
+                if (++link_index >= links.size()) {
+                    break;
+                }
+
+                size_t previous_link = link;
+                link = links[link_index];
+                value_index += link - previous_link;
+            }
+        }
+        if (op.is_null()) {
+            destination.import(Value<null>(false, 1, null()));
+        } else {
+            destination.import(Value<typename Operation::ResultType>(false, 1, op.result()));
+        }
+    }
+
+private:
+    Columns<T> m_column;
+    LinkMap m_link_map;
+};
+
+namespace aggregate_operations {
+    template <typename T, typename Derived, typename R=T>
+    class BaseAggregateOperation {
+        static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
+                      "Numeric aggregates can only be used with subcolumns of numeric types");
+    public:
+        using ResultType = R;
+
+        void accumulate(T value)
+        {
+            m_count++;
+            m_result = Derived::apply(m_result, value);
+        }
+
+        bool is_null() const { return m_count == 0; }
+        ResultType result() const { return m_result; }
+
+    protected:
+        size_t m_count = 0;
+        ResultType m_result = Derived::initial_value();
+    };
+
+    template <typename T>
+    class Minimum : public BaseAggregateOperation<T, Minimum<T>> {
+    public:
+        static T initial_value() { return std::numeric_limits<T>::max(); }
+        static T apply(T a, T b) { return std::min(a, b); }
+    };
+
+    template <typename T>
+    class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
+    public:
+        static T initial_value() { return std::numeric_limits<T>::min(); }
+        static T apply(T a, T b) { return std::max(a, b); }
+    };
+
+    template <typename T>
+    class Sum : public BaseAggregateOperation<T, Sum<T>> {
+    public:
+        static T initial_value() { return T(); }
+        static T apply(T a, T b) { return a + b; }
+        bool is_null() const { return false; }
+    };
+
+    template <typename T>
+    class Average : public BaseAggregateOperation<T, Average<T>, double> {
+        using Base = BaseAggregateOperation<T, Average<T>, double>;
+    public:
+        static double initial_value() { return 0; }
+        static double apply(double a, T b) { return a + b; }
+        double result() const { return Base::m_result / Base::m_count; }
+    };
+}
 
 template <class oper, class TLeft> class UnaryOperator : public Subexpr2<typename oper::type>
 {
@@ -1465,21 +2073,20 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table()
+    void set_table() override
     {
         m_left.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    const Table* get_table() const override
     {
-        const Table* l = m_left.get_table();
-        return l;
+        return m_left.get_table();
     }
 
     // destination = operator(left)
-    void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<T> result;
         Value<T> left;
@@ -1513,7 +2120,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table()
+    void set_table() override
     {
         m_left.set_table();
         m_right.set_table();
@@ -1521,7 +2128,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    const Table* get_table() const override
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
@@ -1534,7 +2141,7 @@ public:
     }
 
     // destination = operator(left, right)
-    void evaluate(size_t index, ValueBase& destination)
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<T> result;
         Value<T> left;
@@ -1566,9 +2173,8 @@ public:
         m_auto_delete = auto_delete;
         Query::expression(this);
         Table* t = const_cast<Table*>(get_table()); // todo, const
-
         if (t)
-            Query::m_table = t->get_table_ref();
+            Query::set_table(t->get_table_ref());
     }
 
     ~Compare()
@@ -1581,7 +2187,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table()
+    void set_table() override
     {
         m_left.set_table();
         m_right.set_table();
@@ -1589,7 +2195,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table()
+    const Table* get_table() const override
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
@@ -1601,7 +2207,7 @@ public:
         return l ? l : r;
     }
 
-    size_t find_first(size_t start, size_t end) const
+    size_t find_first(size_t start, size_t end) const override
     {
         size_t match;
         Value<T> right;
@@ -1627,13 +2233,12 @@ private:
     TLeft& m_left;
     TRight& m_right;
 
-    // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in 
-    // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this 
-    // Compare object is destructed and the copy is no longer needed. 
+    // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in
+    // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this
+    // Compare object is destructed and the copy is no longer needed.
     const char* m_compare_string;
 };
 
-
-//}
+}
 #endif // REALM_QUERY_EXPRESSION_HPP
 
