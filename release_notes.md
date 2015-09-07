@@ -75,6 +75,8 @@
 
 * Added argument to SharedGroup to prevent automatic file format upgrade. If an
   upgrade is required, the constructor will throw `FileFormatUpgradeRequired`.
+* Let `LinkColumn` and `LinkListColumn` adhere to the same nullability interface
+  as the rest of the column types.
 * The code coverage CI job now builds with the `-fno-elide-constructors` flag,
   which should improve the depth of the coverage analysis. All bugs that were
   blocking the use of this flag have been fixed.
