@@ -744,7 +744,6 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
 {
     if (end == size_t(-1))
         end = size();
-    size_t size = end - start;
 
     auto s = sum(start, end, limit);
     size_t cnt = aggregate<T, int64_t, act_Count, NotNull>(*this, 0, start, end, limit, nullptr);
