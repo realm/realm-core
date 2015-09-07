@@ -8884,4 +8884,34 @@ TEST(LangBindHelper_RollbackToInitialState2)
     sg_w.rollback();
 }
 
+
+// A condensed version of Java's opening a Realm file
+ONLY(LangBindHelper_ImplicitTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    size_t N = 100;
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    Replication *r = hist_w.release();
+
+    SharedGroup *sg_w = new SharedGroup(*r, SharedGroup::durability_Full, crypt_key());
+
+    Group& group = const_cast<Group&>(sg_w->begin_read());
+
+    LangBindHelper::promote_to_write(*sg_w, *reinterpret_cast<ClientHistory*>(r));
+    for (size_t i = 0; i < N; ++i) {
+        std::string s = "Hello" + std::to_string(i);
+        if (!group.has_table(s)) {
+            Table *table = LangBindHelper::get_or_add_table(group, s);
+            table->add_column(type_String, "string", true);
+            table->add_column(type_Int, "int", true);
+            table->add_empty_row();
+            table->set_string(0, 0, "Fish");
+            table->set_int(1, 0, 4);
+        }
+    }
+    LangBindHelper::commit_and_continue_as_read(*sg_w);
+    CHECK_EQUAL(N, group.size());
+}
+
 #endif
