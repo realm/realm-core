@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Bugfixes:
-* Fixed all aggregate methods on Table (min, max, etc) that hadn't been 
+* Fixed all aggregate methods on Table (min, max, etc) that hadn't been
   updated/kept in sync for a long while (null support, return_ndx argument,..).
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
   same file if opened from two places simultaneously)
@@ -22,8 +22,10 @@
 * `Expression` subclasses now update `Query`s current descriptor after setting
   the table. This prevents a null dereference when adding further conditions
   to the query.
+* Fixes a crash due to an assert when rolling back a transaction in which a link
+  or linklist column was removed.
 * A bug in `Query` copying has been fixed. The bug could cause references to
-  Tables which should stay under the supervision of one SharedGroup to leak 
+  Tables which should stay under the supervision of one SharedGroup to leak
   to another during handover_export() leading to corruption.
 
 ### API breaking changes:
