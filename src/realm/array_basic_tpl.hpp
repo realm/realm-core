@@ -30,13 +30,13 @@
 namespace realm {
 
 template<class T>
-inline BasicArray<T>::BasicArray(Allocator& alloc) REALM_NOEXCEPT:
+inline BasicArray<T>::BasicArray(Allocator& alloc) noexcept:
     Array(alloc)
 {
 }
 
 template<class T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) REALM_NOEXCEPT:
+inline BasicArray<T>::BasicArray(no_prealloc_tag) noexcept:
     Array(no_prealloc_tag())
 {
 }
@@ -100,14 +100,14 @@ inline void BasicArray<T>::add(T value)
 }
 
 
-template<class T> inline T BasicArray<T>::get(std::size_t ndx) const REALM_NOEXCEPT
+template<class T> inline T BasicArray<T>::get(std::size_t ndx) const noexcept
 {
     return *(reinterpret_cast<const T*>(m_data) + ndx);
 }
 
 
 template<class T>
-inline T BasicArray<T>::get(const char* header, std::size_t ndx) REALM_NOEXCEPT
+inline T BasicArray<T>::get(const char* header, std::size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
     // FIXME: This casting assumes that T can be aliged on an 8-bype
@@ -223,7 +223,7 @@ std::size_t BasicArray<T>::calc_byte_len(std::size_t size, std::size_t) const
 }
 
 template<class T>
-std::size_t BasicArray<T>::calc_item_count(std::size_t bytes, std::size_t) const REALM_NOEXCEPT
+std::size_t BasicArray<T>::calc_item_count(std::size_t bytes, std::size_t) const noexcept
 {
     // FIXME: ??? what about width = 0? return -1?
 
@@ -351,7 +351,7 @@ ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& 
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::lower_bound(T value) const REALM_NOEXCEPT
+inline std::size_t BasicArray<T>::lower_bound(T value) const noexcept
 {
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();
@@ -359,7 +359,7 @@ inline std::size_t BasicArray<T>::lower_bound(T value) const REALM_NOEXCEPT
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::upper_bound(T value) const REALM_NOEXCEPT
+inline std::size_t BasicArray<T>::upper_bound(T value) const noexcept
 {
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();

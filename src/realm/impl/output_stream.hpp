@@ -36,9 +36,9 @@ namespace _impl {
 class OutputStream: public ArrayWriterBase {
 public:
     OutputStream(std::ostream&);
-    ~OutputStream() REALM_NOEXCEPT;
+    ~OutputStream() noexcept;
 
-    size_t get_pos() const REALM_NOEXCEPT;
+    size_t get_pos() const noexcept;
 
     void write(const char* data, size_t size);
 
@@ -60,11 +60,11 @@ inline OutputStream::OutputStream(std::ostream& out):
 {
 }
 
-inline OutputStream::~OutputStream() REALM_NOEXCEPT
+inline OutputStream::~OutputStream() noexcept
 {
 }
 
-inline std::size_t OutputStream::get_pos() const REALM_NOEXCEPT
+inline std::size_t OutputStream::get_pos() const noexcept
 {
     return m_pos;
 }

@@ -12,7 +12,7 @@
 using namespace realm;
 
 
-void ArrayStringLong::init_from_mem(MemRef mem) REALM_NOEXCEPT
+void ArrayStringLong::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0);
@@ -104,7 +104,7 @@ void ArrayStringLong::set_null(size_t ndx)
 }
 
 size_t ArrayStringLong::count(StringData value, size_t begin,
-                              size_t end) const REALM_NOEXCEPT
+                              size_t end) const noexcept
 {
     size_t num_matches = 0;
 
@@ -121,7 +121,7 @@ size_t ArrayStringLong::count(StringData value, size_t begin,
 }
 
 size_t ArrayStringLong::find_first(StringData value, size_t begin,
-                                   size_t end) const REALM_NOEXCEPT
+                                   size_t end) const noexcept
 {
     size_t n = size();
     if (end == npos)
@@ -152,7 +152,7 @@ void ArrayStringLong::find_all(IntegerColumn& result, StringData value, size_t a
 }
 
 
-StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc, bool nullable) REALM_NOEXCEPT
+StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc, bool nullable) noexcept
 {
     ref_type offsets_ref;
     ref_type blob_ref;

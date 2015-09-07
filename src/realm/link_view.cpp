@@ -389,7 +389,7 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
 }
 
 
-void LinkView::repl_unselect() REALM_NOEXCEPT
+void LinkView::repl_unselect() noexcept
 {
     if (Replication* repl = get_repl())
         repl->on_link_list_destroyed(*this);

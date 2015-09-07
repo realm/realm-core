@@ -60,7 +60,7 @@ namespace util {
 class PlatformSpecificCondVar {
 public:
     PlatformSpecificCondVar();
-    ~PlatformSpecificCondVar() REALM_NOEXCEPT;
+    ~PlatformSpecificCondVar() noexcept;
 
     /// To use the PlatformSpecificCondVar, you also must place a structure of type
     /// PlatformSpecificCondVar::SharedPart in memory shared by multiple processes
@@ -90,18 +90,18 @@ public:
     static void init_shared_part(SharedPart& shared_part);
 
     /// Wait for another thread to call notify() or notify_all().
-    void wait(LockGuard& l) REALM_NOEXCEPT;
+    void wait(LockGuard& l) noexcept;
 
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
     /// If any threads are waiting for this condition, wake up at least one.
-    void notify() REALM_NOEXCEPT;
+    void notify() noexcept;
 
     /// Wake up every thread that is currently waiting on this condition.
-    void notify_all() REALM_NOEXCEPT;
+    void notify_all() noexcept;
 
     /// Cleanup and release system resources if possible. 
-    void close() REALM_NOEXCEPT;
+    void close() noexcept;
 
     /// For platforms imposing naming restrictions on system resources,
     /// a prefix can be set. This must be done before setting any SharedParts.
@@ -126,7 +126,7 @@ private:
 // Implementation:
 
 
-inline void PlatformSpecificCondVar::wait(LockGuard& l) REALM_NOEXCEPT
+inline void PlatformSpecificCondVar::wait(LockGuard& l) noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
@@ -205,7 +205,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
 
 
 
-inline void PlatformSpecificCondVar::notify() REALM_NOEXCEPT
+inline void PlatformSpecificCondVar::notify() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
@@ -223,7 +223,7 @@ inline void PlatformSpecificCondVar::notify() REALM_NOEXCEPT
 
 
 
-inline void PlatformSpecificCondVar::notify_all() REALM_NOEXCEPT
+inline void PlatformSpecificCondVar::notify_all() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION

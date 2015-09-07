@@ -3394,6 +3394,155 @@ TEST(Table_Aggregates2)
     CHECK_EQUAL(s, table.column().c_count.sum());
 }
 
+// Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
+TEST(Table_Aggregates3)
+{
+    bool nullable = false;
+    
+    for (int i = 0; i < 2; i++) {
+        // First we test everything with columns being nullable and with each column having at least 1 null
+        // Then we test everything with non-nullable columns where the null entries will instead be just
+        // 0, 0.0, etc.
+        nullable = (i == 1);
+
+        Group g;
+        TableRef table = g.add_table("Inventory");
+
+        table->insert_column(0, type_Int, "Price", nullable);
+        table->insert_column(1, type_Float, "Shipping", nullable);
+        table->insert_column(2, type_Double, "Rating", nullable);
+        table->insert_column(3, type_DateTime, "Delivery date", nullable);
+
+        table->add_empty_row(3);
+
+        table->set_int(0, 0, 1);
+        // table->set_null(0, 1);
+        table->set_int(0, 2, 3);
+
+        // table->set_null(1, 0);
+        // table->set_null(1, 1);
+        table->set_float(1, 2, 30.f);
+
+        table->set_double(2, 0, 1.1);
+        table->set_double(2, 1, 2.2);
+        // table->set_null(2, 2);
+
+        table->set_datetime(3, 0, DateTime(2016, 2, 2));
+        // table->set_null(3, 1);
+        table->set_datetime(3, 2, DateTime(2016, 6, 6));
+
+        size_t count;
+        size_t pos;
+        if (i == 1) {
+            // This i == 1 is the NULLABLE case where columns are nullable
+            // max
+            pos = 123;
+            CHECK_EQUAL(table->maximum_int(0, &pos), 3);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_datetime(3, &pos), DateTime(2016, 6, 6));
+            CHECK_EQUAL(pos, 2);
+
+            // min
+            pos = 123;
+            CHECK_EQUAL(table->minimum_int(0, &pos), 1);
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_float(1, &pos), 30.f);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_double(2, &pos), 1.1);
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_datetime(3, &pos), DateTime(2016, 2, 2));
+            CHECK_EQUAL(pos, 0);
+
+            // average
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3) / 2., 0.01);
+            CHECK_EQUAL(count, 2);
+
+            count = 123;
+            CHECK_EQUAL(table->average_float(1, &count), 30.f);
+            CHECK_EQUAL(count, 1);
+
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2) / 2., 0.01);
+            CHECK_EQUAL(count, 2);
+
+            // sum
+            CHECK_EQUAL(table->sum_int(0), 4);
+            CHECK_EQUAL(table->sum_float(1), 30.f);
+            CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
+        }
+        else {
+            // max
+            pos = 123;
+            CHECK_EQUAL(table->maximum_int(0, &pos), 3);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_datetime(3, &pos), DateTime(2016, 6, 6));
+            CHECK_EQUAL(pos, 2);
+
+            // min
+            pos = 123;
+            CHECK_EQUAL(table->minimum_int(0, &pos), 0);
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_float(1, &pos), 0.f);
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_double(2, &pos), 0.);
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_datetime(3, &pos), DateTime(0));
+            CHECK_EQUAL(pos, 1);
+
+            // average
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3 + 0) / 3., 0.01);
+            CHECK_EQUAL(count, 3);
+
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_float(1, &count), 30.f / 3., 0.01);
+            CHECK_EQUAL(count, 3);
+
+            count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2 + 0.) / 3., 0.01);
+            CHECK_EQUAL(count, 3);
+
+            // sum
+            CHECK_EQUAL(table->sum_int(0), 4);
+            CHECK_EQUAL(table->sum_float(1), 30.f);
+            CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
+        }
+    }
+}
+
 TEST(Table_LanguageBindings)
 {
    Table* table = LangBindHelper::new_table();
@@ -5999,5 +6148,62 @@ TEST(Table_Nulls)
     }
 }
 #endif
+
+TEST(Table_RowAccessor_Null)
+{
+    Table table;
+    size_t col_bool   = table.add_column(type_Bool,     "bool",   true);
+    size_t col_int    = table.add_column(type_Int,      "int",    true);
+    size_t col_string = table.add_column(type_String,   "string", true);
+    size_t col_float  = table.add_column(type_Float,    "float",  true);
+    size_t col_double = table.add_column(type_Double,   "double", true);    
+    size_t col_date   = table.add_column(type_DateTime, "date",   true);
+    size_t col_binary = table.add_column(type_Binary,   "binary", true);
+
+    {
+        table.add_empty_row();
+        Row row = table[0];
+        row.set_null(col_bool);
+        row.set_null(col_int);
+        row.set_string(col_string, realm::null());
+        row.set_null(col_float);
+        row.set_null(col_double);
+        row.set_null(col_date);
+        row.set_binary(col_binary, BinaryData());
+    }
+    {
+        table.add_empty_row();
+        Row row = table[1];
+        row.set_bool(col_bool, true);
+        row.set_int(col_int, 1);
+        row.set_string(col_string, "1");
+        row.set_float(col_float, 1.0);
+        row.set_double(col_double, 1.0);
+        row.set_datetime(col_date, DateTime(1));
+        row.set_binary(col_binary, BinaryData("a"));
+    }
+
+    {
+        Row row = table[0];
+        CHECK(row.is_null(col_bool));
+        CHECK(row.is_null(col_int));
+        CHECK(row.is_null(col_string));
+        CHECK(row.is_null(col_float));
+        CHECK(row.is_null(col_double));
+        CHECK(row.is_null(col_date));
+        CHECK(row.is_null(col_binary));
+    }
+
+    {
+        Row row = table[1];
+        CHECK_EQUAL(true,            row.get_bool(col_bool));
+        CHECK_EQUAL(1,               row.get_int(col_int));
+        CHECK_EQUAL("1",             row.get_string(col_string));
+        CHECK_EQUAL(1.0,             row.get_float(col_float));
+        CHECK_EQUAL(1.0,             row.get_double(col_double));
+        CHECK_EQUAL(DateTime(1),     row.get_datetime(col_date));
+        CHECK_EQUAL(BinaryData("a"), row.get_binary(col_binary));
+    }
+}
 
 #endif // TEST_TABLE

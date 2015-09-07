@@ -6,7 +6,7 @@
 using namespace realm;
 using namespace realm::util;
 
-void SubtableColumnBase::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void SubtableColumnBase::update_from_parent(size_t old_baseline) noexcept
 {
     IntegerColumn::update_from_parent(old_baseline);
     m_subtable_map.update_from_parent(old_baseline);
@@ -97,7 +97,7 @@ Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
 }
 
 
-void SubtableColumnBase::child_accessor_destroyed(Table* child) REALM_NOEXCEPT
+void SubtableColumnBase::child_accessor_destroyed(Table* child) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -117,7 +117,7 @@ void SubtableColumnBase::child_accessor_destroyed(Table* child) REALM_NOEXCEPT
 }
 
 
-Table* SubtableColumnBase::get_parent_table(size_t* column_ndx_out) REALM_NOEXCEPT
+Table* SubtableColumnBase::get_parent_table(size_t* column_ndx_out) noexcept
 {
     if (column_ndx_out)
         *column_ndx_out = m_column_ndx;
@@ -125,7 +125,7 @@ Table* SubtableColumnBase::get_parent_table(size_t* column_ndx_out) REALM_NOEXCE
 }
 
 
-Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const REALM_NOEXCEPT
+Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const noexcept
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -136,7 +136,7 @@ Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const REALM_NO
 }
 
 
-bool SubtableColumnBase::SubtableMap::detach_and_remove_all() REALM_NOEXCEPT
+bool SubtableColumnBase::SubtableMap::detach_and_remove_all() noexcept
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -152,7 +152,7 @@ bool SubtableColumnBase::SubtableMap::detach_and_remove_all() REALM_NOEXCEPT
 }
 
 
-bool SubtableColumnBase::SubtableMap::detach_and_remove(size_t subtable_ndx) REALM_NOEXCEPT
+bool SubtableColumnBase::SubtableMap::detach_and_remove(size_t subtable_ndx) noexcept
 {
     typedef entries::iterator iter;
     iter i = m_entries.begin(), end = m_entries.end();
@@ -175,7 +175,7 @@ bool SubtableColumnBase::SubtableMap::detach_and_remove(size_t subtable_ndx) REA
 }
 
 
-bool SubtableColumnBase::SubtableMap::remove(Table* subtable) REALM_NOEXCEPT
+bool SubtableColumnBase::SubtableMap::remove(Table* subtable) noexcept
 {
     typedef entries::iterator iter;
     iter i = m_entries.begin(), end = m_entries.end();
@@ -193,7 +193,7 @@ bool SubtableColumnBase::SubtableMap::remove(Table* subtable) REALM_NOEXCEPT
 
 
 void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline)
-    const REALM_NOEXCEPT
+    const noexcept
 {
     typedef _impl::TableFriend tf;
     typedef entries::const_iterator iter;
@@ -218,7 +218,7 @@ update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
 }
 
 
-void SubtableColumnBase::SubtableMap::recursive_mark() REALM_NOEXCEPT
+void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -260,7 +260,7 @@ std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_
 #endif
 
 
-size_t SubtableColumn::get_subtable_size(size_t ndx) const REALM_NOEXCEPT
+size_t SubtableColumn::get_subtable_size(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, size());
 
@@ -358,7 +358,7 @@ void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 }
 
 
-void SubtableColumn::destroy_subtable(size_t ndx) REALM_NOEXCEPT
+void SubtableColumn::destroy_subtable(size_t ndx) noexcept
 {
     if (ref_type ref = get_as_ref(ndx))
         Array::destroy_deep(ref, get_alloc());
@@ -380,7 +380,7 @@ bool SubtableColumn::compare_table(const SubtableColumn& c) const
 }
 
 
-void SubtableColumn::do_discard_child_accessors() REALM_NOEXCEPT
+void SubtableColumn::do_discard_child_accessors() noexcept
 {
     discard_child_accessors();
 }

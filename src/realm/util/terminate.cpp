@@ -58,7 +58,7 @@ void nslog(const char *message) {
 }
 #endif
 
-REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
+REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
 {
 
 #if defined(__APPLE__)

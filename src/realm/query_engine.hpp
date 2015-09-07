@@ -139,7 +139,7 @@ typedef bool (*CallbackDummy)(int64_t);
 
 class SequentialGetterBase {
 public:
-    virtual ~SequentialGetterBase() REALM_NOEXCEPT {}
+    virtual ~SequentialGetterBase() noexcept {}
 };
 
 template <class ColType>
@@ -162,7 +162,7 @@ public:
         init(column);
     }
 
-    ~SequentialGetter() REALM_NOEXCEPT override {}
+    ~SequentialGetter() noexcept override {}
 
     void init(const ColType* column)
     {
@@ -264,7 +264,7 @@ public:
 
     size_t find_first(size_t start, size_t end);
 
-    virtual ~ParentNode() REALM_NOEXCEPT {}
+    virtual ~ParentNode() noexcept {}
 
     virtual void init(const Table& table)
     {
@@ -378,7 +378,7 @@ protected:
 class ListviewNode: public ParentNode {
 public:
     ListviewNode(TableView& tv) : m_size(tv.size()), m_tv(tv) { m_dT = 0.0; }
-    ~ListviewNode() REALM_NOEXCEPT override {  }
+    ~ListviewNode() noexcept override {  }
 
     // Return the n'th table row index contained in the TableView.
     size_t tableindex(size_t n)
@@ -439,7 +439,7 @@ class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) { m_dT = 100.0; }
     SubtableNode() {};
-    ~SubtableNode() REALM_NOEXCEPT override {}
+    ~SubtableNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -931,7 +931,7 @@ public:
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    ~FloatDoubleNode() REALM_NOEXCEPT override {}
+    ~FloatDoubleNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -1007,7 +1007,7 @@ public:
     {
     }
 
-    ~BinaryNode() REALM_NOEXCEPT override
+    ~BinaryNode() noexcept override
     {
         delete[] m_value.data();
     }
@@ -1087,7 +1087,7 @@ public:
         m_value = StringData(data, v.size());
     }
 
-    ~StringNodeBase() REALM_NOEXCEPT override
+    ~StringNodeBase() noexcept override
     {
         delete[] m_value.data();
     }
@@ -1155,7 +1155,7 @@ public:
         m_lcase = lower;
     }
 
-    ~StringNode() REALM_NOEXCEPT override
+    ~StringNode() noexcept override
     {
         delete[] m_ucase;
         delete[] m_lcase;
@@ -1250,12 +1250,12 @@ public:
     StringNode(StringData v, size_t column): StringNodeBase(v,column)
     {
     }
-    ~StringNode() REALM_NOEXCEPT override
+    ~StringNode() noexcept override
     {
         deallocate();
     }
 
-    void deallocate() REALM_NOEXCEPT
+    void deallocate() noexcept
     {
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
@@ -1437,7 +1437,7 @@ public:
     }
 
 private:
-    inline BinaryData str_to_bin(const StringData& s) REALM_NOEXCEPT
+    inline BinaryData str_to_bin(const StringData& s) noexcept
     {
         return BinaryData(s.data(), s.size());
     }
@@ -1476,7 +1476,7 @@ public:
         m_dT = 50.0;
     }
 
-    ~OrNode() REALM_NOEXCEPT override {}
+    ~OrNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -1594,7 +1594,7 @@ public:
     }
 
     NotNode() {m_child = nullptr; m_cond = nullptr; m_dT = 50.0;}
-    ~NotNode() REALM_NOEXCEPT override {}
+    ~NotNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -1691,7 +1691,7 @@ public:
         m_child = nullptr;
     }
 
-    ~TwoColumnsNode() REALM_NOEXCEPT override
+    ~TwoColumnsNode() noexcept override
     {
         delete[] m_value.data();
     }
@@ -1795,7 +1795,7 @@ protected:
 class ExpressionNode: public ParentNode {
 
 public:
-    ~ExpressionNode() REALM_NOEXCEPT { }
+    ~ExpressionNode() noexcept { }
 
     ExpressionNode(Expression* compare)
     {

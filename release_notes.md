@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Bugfixes:
-
+* Fixed all aggregate methods on Table (min, max, etc) that hadn't been
+  updated/kept in sync for a long while (null support, return_ndx argument,..).
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
   same file if opened from two places simultaneously)
 * `Spec` and thereby `Descriptor` and `Table` equality has been fixed. Now
@@ -23,6 +24,9 @@
   to the query.
 * Fixes a crash due to an assert when rolling back a transaction in which a link
   or linklist column was removed.
+* A bug in `Query` copying has been fixed. The bug could cause references to
+  Tables which should stay under the supervision of one SharedGroup to leak
+  to another during handover_export() leading to corruption.
 
 ### API breaking changes:
 
@@ -46,7 +50,8 @@
   Android) are likely to want to use unordered mode everywhere.
 
 ### Enhancements:
-
+* Added argument to Table::average() and TableView::average() that returns number
+  of values that were used for computing the average
 * Full null support everywhere and on all column types. See
   `TEST(Query_NullShowcase)` in `test_query.cpp` in core repo.
 * Added `Descriptor::get_link_target()`, for completeness.
@@ -75,6 +80,8 @@
   blocking the use of this flag have been fixed.
 * SharedGroup no longer needs to remap the database file when it grows. This is
   a key requirement for reusing the memory mapping across threads.
+* `NOEXCEPT*` macros have been replaced by the C++11 `noexcept` specifier
+
 ----------------------------------------------
 
 # 0.92.1 Release notes
@@ -260,6 +267,18 @@ StringData (in Query, Table::find(), get(), set(), etc) for that column. You can
 also call Table::is_null(), Table::set_null() and StringData::is_null(). This
 upgrades the database file from version 2 to 3 initially the first time a file
 is opened. NOTE NOTE NOTE: This may take some time. It rebuilds all indexes.
+
+----------------------------------------------
+
+# 0.89.9 Release notes
+
+### Bugfixes:
+
+* The check for functioning SEGV signals threw the exception only once. Now it
+always throws when trying to use encryption.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.90.0, 0.92.1].**
 
 ----------------------------------------------
 

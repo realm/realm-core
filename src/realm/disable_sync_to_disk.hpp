@@ -31,7 +31,7 @@ void disable_sync_to_disk();
 
 /// Returns true after disable_sync_to_disk() has been called. This function is
 /// thread safe.
-bool get_disable_sync_to_disk() REALM_NOEXCEPT;
+bool get_disable_sync_to_disk() noexcept;
 
 } // namespace realm
 

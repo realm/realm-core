@@ -33,9 +33,9 @@ namespace util {
 class MemoryInputStreambuf: public std::streambuf {
 public:
     MemoryInputStreambuf();
-    ~MemoryInputStreambuf() REALM_NOEXCEPT;
+    ~MemoryInputStreambuf() noexcept;
 
-    void set_buffer(const char *begin, const char *end) REALM_NOEXCEPT;
+    void set_buffer(const char *begin, const char *end) noexcept;
 
 private:
     int_type underflow() override;
@@ -52,25 +52,25 @@ private:
 class MemoryOutputStreambuf: public std::streambuf {
 public:
     MemoryOutputStreambuf();
-    ~MemoryOutputStreambuf() REALM_NOEXCEPT;
+    ~MemoryOutputStreambuf() noexcept;
 
-    void set_buffer(char* begin, char* end) REALM_NOEXCEPT;
+    void set_buffer(char* begin, char* end) noexcept;
 
     /// Returns the amount of data written to the buffer.
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const noexcept;
 };
 
 
 class MemoryInputStream: public std::istream {
 public:
     MemoryInputStream();
-    ~MemoryInputStream() REALM_NOEXCEPT;
+    ~MemoryInputStream() noexcept;
 
-    void set_buffer(const char *begin, const char *end) REALM_NOEXCEPT;
+    void set_buffer(const char *begin, const char *end) noexcept;
 
     void set_string(const std::string&);
 
-    void set_c_string(const char *c_str) REALM_NOEXCEPT;
+    void set_c_string(const char *c_str) noexcept;
 
 private:
     MemoryInputStreambuf m_streambuf;
@@ -80,14 +80,14 @@ private:
 class MemoryOutputStream: public std::ostream {
 public:
     MemoryOutputStream();
-    ~MemoryOutputStream() REALM_NOEXCEPT;
+    ~MemoryOutputStream() noexcept;
 
-    void set_buffer(char *begin, char *end) REALM_NOEXCEPT;
+    void set_buffer(char *begin, char *end) noexcept;
 
-    template<std::size_t N> void set_buffer(char (&buffer)[N]) REALM_NOEXCEPT;
+    template<std::size_t N> void set_buffer(char (&buffer)[N]) noexcept;
 
     /// Returns the amount of data written to the underlying buffer.
-    std::size_t size() const REALM_NOEXCEPT;
+    std::size_t size() const noexcept;
 
 private:
     MemoryOutputStreambuf m_streambuf;
@@ -106,11 +106,11 @@ inline MemoryInputStreambuf::MemoryInputStreambuf():
 {
 }
 
-inline MemoryInputStreambuf::~MemoryInputStreambuf() REALM_NOEXCEPT
+inline MemoryInputStreambuf::~MemoryInputStreambuf() noexcept
 {
 }
 
-inline void MemoryInputStreambuf::set_buffer(const char *begin, const char *end) REALM_NOEXCEPT
+inline void MemoryInputStreambuf::set_buffer(const char *begin, const char *end) noexcept
 {
     m_begin = begin;
     m_end   = end;
@@ -122,16 +122,16 @@ inline MemoryOutputStreambuf::MemoryOutputStreambuf()
 {
 }
 
-inline MemoryOutputStreambuf::~MemoryOutputStreambuf() REALM_NOEXCEPT
+inline MemoryOutputStreambuf::~MemoryOutputStreambuf() noexcept
 {
 }
 
-inline void MemoryOutputStreambuf::set_buffer(char* begin, char* end) REALM_NOEXCEPT
+inline void MemoryOutputStreambuf::set_buffer(char* begin, char* end) noexcept
 {
     setp(begin, end);
 }
 
-inline std::size_t MemoryOutputStreambuf::size() const REALM_NOEXCEPT
+inline std::size_t MemoryOutputStreambuf::size() const noexcept
 {
     return pptr() - pbase();
 }
@@ -142,11 +142,11 @@ inline MemoryInputStream::MemoryInputStream():
 {
 }
 
-inline MemoryInputStream::~MemoryInputStream() REALM_NOEXCEPT
+inline MemoryInputStream::~MemoryInputStream() noexcept
 {
 }
 
-inline void MemoryInputStream::set_buffer(const char *begin, const char *end) REALM_NOEXCEPT
+inline void MemoryInputStream::set_buffer(const char *begin, const char *end) noexcept
 {
     m_streambuf.set_buffer(begin, end);
     clear();
@@ -159,7 +159,7 @@ inline void MemoryInputStream::set_string(const std::string& str)
     set_buffer(begin, end);
 }
 
-inline void MemoryInputStream::set_c_string(const char *c_str) REALM_NOEXCEPT
+inline void MemoryInputStream::set_c_string(const char *c_str) noexcept
 {
     const char* begin = c_str;
     const char* end   = begin + traits_type::length(c_str);
@@ -172,23 +172,23 @@ inline MemoryOutputStream::MemoryOutputStream():
 {
 }
 
-inline MemoryOutputStream::~MemoryOutputStream() REALM_NOEXCEPT
+inline MemoryOutputStream::~MemoryOutputStream() noexcept
 {
 }
 
-inline void MemoryOutputStream::set_buffer(char *begin, char *end) REALM_NOEXCEPT
+inline void MemoryOutputStream::set_buffer(char *begin, char *end) noexcept
 {
     m_streambuf.set_buffer(begin, end);
     clear();
 }
 
 template<std::size_t N>
-inline void MemoryOutputStream::set_buffer(char (&buffer)[N]) REALM_NOEXCEPT
+inline void MemoryOutputStream::set_buffer(char (&buffer)[N]) noexcept
 {
     set_buffer(buffer, buffer+N);
 }
 
-inline std::size_t MemoryOutputStream::size() const REALM_NOEXCEPT
+inline std::size_t MemoryOutputStream::size() const noexcept
 {
     return m_streambuf.size();
 }
