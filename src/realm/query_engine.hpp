@@ -830,13 +830,9 @@ public:
                 this->get_leaf(*this->m_condition_column, start);
             }
 
-            // Do search directly on cached leaf array
-            if (start + 1 == end) {
-                if (condition(this->m_leaf_ptr->get(start - this->m_leaf_start), this->m_value))
-                    return start;
-                else
-                    return not_found;
-            }
+            // FIXME: Create a fast bypass when you just need to check 1 row, which is used alot from within core. 
+            // It should just call array::get and save the initial overhead of find_first() which has become quite 
+            // big. Do this when we have cleaned up core a bit more.
 
             size_t end2;
             if (end > this->m_leaf_end)
@@ -844,7 +840,11 @@ public:
             else
                 end2 = end - this->m_leaf_start;
 
-            size_t s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start - this->m_leaf_start, end2);
+            size_t s;
+            if(m_null)
+                s = this->m_leaf_ptr->template find_first<TConditionFunction>(null(), start - this->m_leaf_start, end2);
+            else
+                s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start - this->m_leaf_start, end2);
 
             if (s == not_found) {
                 start = this->m_leaf_end;

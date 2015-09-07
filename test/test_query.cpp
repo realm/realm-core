@@ -6733,6 +6733,9 @@ TEST(Query_Null_Two_Columns)
     tv = table->where().equal(3, null()).find_all();
     CHECK(equals(tv, { 2 }));
 
+    tv = table->where().equal(0, null()).find_all();
+    CHECK(equals(tv, { 1 }));
+
     tv = table->where().not_equal(3, null()).find_all();
     CHECK(equals(tv, { 0, 1 }));
 
