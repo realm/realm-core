@@ -7624,4 +7624,66 @@ TEST(Query_OperatorsOverLink)
     CHECK_EQUAL(not_found, match);
 }
 
+TEST(Query_CompareLinkedColumnVsColumn)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Double, "double");
+
+    // table1
+    // 0: 2 2.0
+    // 1: 3 3.0
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 2);
+    table1->set_double(1, 0, 2.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 3);
+    table1->set_double(1, 1, 3.0);
+
+    TableRef table2 = group.add_table("table2");
+    table2->add_column(type_Int, "int");
+    size_t col_link1 = table2->add_column_link(type_Link, "link1", *table1);
+    size_t col_link2 = table2->add_column_link(type_Link, "link2", *table1);
+
+    // table2
+    // 0: 0 {   } { 0 }
+    // 1: 4 { 0 } { 1 }
+    // 2: 4 { 1 } {   }
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 0);
+    table2->set_link(col_link2, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(0, 1, 4);
+    table2->set_link(col_link1, 1, 0);
+    table2->set_link(col_link2, 1, 1);
+
+    table2->add_empty_row();
+    table2->set_int(0, 2, 4);
+    table2->set_link(col_link1, 2, 1);
+
+    Query q;
+    size_t match;
+
+    q = table2->link(col_link1).column<Int>(0) < table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->link(col_link1).column<Double>(1) < table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+
 #endif // TEST_QUERY

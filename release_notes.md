@@ -29,6 +29,8 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
+* Query expression comparisons now give correct results when comparing a linked
+  column with a column in the base table.
 
 ### API breaking changes:
 

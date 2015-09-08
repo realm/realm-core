@@ -350,7 +350,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
         (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
         (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value))
         &&
-        column->m_link_map.m_tables.size() == 0) {
+        !column->requires_traversing_link()) {
         const Table* t = column->get_table();
         Query q = Query(*t);
 
@@ -490,8 +490,9 @@ public:
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
-        // but only if both columns are non-nullable
-        if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable) {
+        // but only if both columns are non-nullable, and aren't in linked tables.
+        if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable
+            && !left_col->requires_traversing_link() && !right_col->requires_traversing_link()) {
             const Table* t = left_col->get_table();
             Query q = Query(*t);
 
@@ -1429,7 +1430,7 @@ public:
     {
         Value<StringData>& d = static_cast<Value<StringData>&>(destination);
 
-        if (m_link_map.m_link_columns.size() > 0) {
+        if (requires_traversing_link()) {
             std::vector<size_t> links = m_link_map.get_links(index);
             Value<StringData> v(true, links.size());
             for (size_t t = 0; t < links.size(); t++) {
@@ -1494,6 +1495,11 @@ public:
     Query contains(const Columns<StringData>& col, bool case_sensitive = true)
     {
         return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
+    }
+
+    bool requires_traversing_link() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
     }
 
     LinkMap m_link_map;
@@ -1592,7 +1598,7 @@ public:
     {
         Value<BinaryData>& d = static_cast<Value<BinaryData>&>(destination);
 
-        if (m_link_map.m_link_columns.size() > 0) {
+        if (requires_traversing_link()) {
             std::vector<size_t> links = m_link_map.get_links(index);
             Value<BinaryData> v(true, links.size());
             for (size_t t = 0; t < links.size(); t++) {
@@ -1607,6 +1613,11 @@ public:
                 d.m_storage.set(t, m_table->get_binary(m_column, index + t));
             }
         }
+    }
+
+    bool requires_traversing_link() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
     }
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
@@ -1819,7 +1830,7 @@ public:
     void set_table() override
     {
         const ColumnBase* c;
-        if (m_link_map.m_link_columns.size() == 0) {
+        if (!requires_traversing_link()) {
             m_nullable = m_table->is_nullable(m_column);
             c = &m_table->get_column_base(m_column);
         }
@@ -1861,7 +1872,7 @@ public:
     template<class C> void evaluate(size_t index, ValueBase& destination) {
         SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(m_sg.get());
 
-        if (m_link_map.m_link_columns.size() > 0) {
+        if (requires_traversing_link()) {
             // LinkList with more than 0 values. Create Value with payload for all fields
 
             std::vector<size_t> links = m_link_map.get_links(index);
@@ -1920,6 +1931,11 @@ public:
                 destination.import(v);
             }
         }
+    }
+
+    bool requires_traversing_link() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
     }
 
     LinkMap m_link_map;
