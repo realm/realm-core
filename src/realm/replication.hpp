@@ -96,7 +96,7 @@ public:
     /// recycled, to keep the commit log management in sync with what versions
     /// can possibly be interesting in the future.
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
-        REALM_NOEXCEPT;
+        noexcept;
 
 
     //@{
@@ -171,8 +171,8 @@ public:
 
     void initiate_transact(SharedGroup& shared_group, version_type current_version);
     version_type prepare_commit(SharedGroup& shared_group, version_type current_version);
-    void finalize_commit(SharedGroup& shared_group) REALM_NOEXCEPT;
-    void abort_transact(SharedGroup& shared_group) REALM_NOEXCEPT;
+    void finalize_commit(SharedGroup& shared_group) noexcept;
+    void abort_transact(SharedGroup& shared_group) noexcept;
 
     //@}
 
@@ -192,12 +192,12 @@ public:
     /// destructor. If a client, after having received an interruption
     /// indication, calls abort_transact() and then clear_interrupt(), it may
     /// resume normal operation through this Replication instance.
-    void interrupt() REALM_NOEXCEPT;
+    void interrupt() noexcept;
 
     /// May be called by a client to reset this replication instance after an
     /// interrupted transaction. It is not an error to call this function in a
     /// situation where no interruption has occured.
-    void clear_interrupt() REALM_NOEXCEPT;
+    void clear_interrupt() noexcept;
 
     /// Called by the local coordinator to apply a transaction log received from
     /// another local coordinator.
@@ -211,7 +211,7 @@ public:
     static void apply_changeset(InputStream& transact_log, Group& target,
                                 std::ostream* apply_log = 0);
 
-    virtual ~Replication() REALM_NOEXCEPT {}
+    virtual ~Replication() noexcept {}
 
 protected:
     Replication();
@@ -241,21 +241,21 @@ protected:
 
     virtual void do_initiate_transact(SharedGroup&, version_type current_version) = 0;
     virtual version_type do_prepare_commit(SharedGroup&, version_type orig_version) = 0;
-    virtual void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT = 0;
-    virtual void do_abort_transact(SharedGroup&) REALM_NOEXCEPT = 0;
+    virtual void do_finalize_commit(SharedGroup&) noexcept = 0;
+    virtual void do_abort_transact(SharedGroup&) noexcept = 0;
 
     //@}
 
 
-    virtual void do_interrupt() REALM_NOEXCEPT = 0;
+    virtual void do_interrupt() noexcept = 0;
 
-    virtual void do_clear_interrupt() REALM_NOEXCEPT = 0;
+    virtual void do_clear_interrupt() noexcept = 0;
 
     // Part of a temporary ugly hack to avoid generating new transaction logs
     // during application of ones that have olready been created elsewhere. See
     // ReplicationImpl::do_initiate_transact() in
     // realm/replication/simplified/provider.cpp for more on this.
-    static void set_replication(Group&, Replication*) REALM_NOEXCEPT;
+    static void set_replication(Group&, Replication*) noexcept;
 
     /// Must be called only from do_initiate_transact(), do_prepare_commit(), or
     /// do_abort_transact().
@@ -272,7 +272,7 @@ protected:
 
 class Replication::Interrupted: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
+    const char* what() const noexcept override
     {
         return "Interrupted";
     }
@@ -281,7 +281,7 @@ public:
 
 class TrivialReplication: public Replication {
 public:
-    ~TrivialReplication() REALM_NOEXCEPT {}
+    ~TrivialReplication() noexcept {}
 
 protected:
     typedef Replication::version_type version_type;
@@ -291,7 +291,7 @@ protected:
     virtual void prepare_changeset(const char* data, std::size_t size,
                                    version_type new_version) = 0;
 
-    virtual void finalize_changeset() REALM_NOEXCEPT = 0;
+    virtual void finalize_changeset() noexcept = 0;
 
     static void apply_changeset(const char* data, std::size_t size, SharedGroup& target,
                                 std::ostream* apply_log = 0);
@@ -303,10 +303,10 @@ private:
     std::string do_get_database_path() override;
     void do_initiate_transact(SharedGroup&, version_type) override;
     version_type do_prepare_commit(SharedGroup&, version_type orig_version) override;
-    void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT override;
-    void do_abort_transact(SharedGroup&) REALM_NOEXCEPT override;
-    void do_interrupt() REALM_NOEXCEPT override;
-    void do_clear_interrupt() REALM_NOEXCEPT override;
+    void do_finalize_commit(SharedGroup&) noexcept override;
+    void do_abort_transact(SharedGroup&) noexcept override;
+    void do_interrupt() noexcept override;
+    void do_clear_interrupt() noexcept override;
     void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, std::size_t size, char** new_begin,
                              char** new_end) override;
@@ -342,7 +342,7 @@ inline void Replication::stop_logging()
 {
 }
 
-inline void Replication::set_last_version_seen_locally(version_type) REALM_NOEXCEPT
+inline void Replication::set_last_version_seen_locally(version_type) noexcept
 {
 }
 
@@ -358,22 +358,22 @@ Replication::prepare_commit(SharedGroup& sg, version_type orig_version)
     return do_prepare_commit(sg, orig_version);
 }
 
-inline void Replication::finalize_commit(SharedGroup& sg) REALM_NOEXCEPT
+inline void Replication::finalize_commit(SharedGroup& sg) noexcept
 {
     do_finalize_commit(sg);
 }
 
-inline void Replication::abort_transact(SharedGroup& sg) REALM_NOEXCEPT
+inline void Replication::abort_transact(SharedGroup& sg) noexcept
 {
     do_abort_transact(sg);
 }
 
-inline void Replication::interrupt() REALM_NOEXCEPT
+inline void Replication::interrupt() noexcept
 {
     do_interrupt();
 }
 
-inline void Replication::clear_interrupt() REALM_NOEXCEPT
+inline void Replication::clear_interrupt() noexcept
 {
     do_clear_interrupt();
 }

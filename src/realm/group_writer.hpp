@@ -53,7 +53,7 @@ public:
     // in Group::m_top).
     GroupWriter(Group&);
 
-    void set_versions(uint64_t current, uint64_t read_lock) REALM_NOEXCEPT;
+    void set_versions(uint64_t current, uint64_t read_lock) noexcept;
 
     /// Write all changed array nodes into free space.
     ///
@@ -66,7 +66,7 @@ public:
     /// returned by write_group().
     void commit(ref_type new_top_ref);
 
-    std::size_t get_file_size() const REALM_NOEXCEPT;
+    std::size_t get_file_size() const noexcept;
 
     /// Write the specified chunk into free space.
     void write(const char* data, std::size_t size);
@@ -144,12 +144,12 @@ private:
 
 // Implementation:
 
-inline std::size_t GroupWriter::get_file_size() const REALM_NOEXCEPT
+inline std::size_t GroupWriter::get_file_size() const noexcept
 {
     return m_file_map.get_size();
 }
 
-inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) REALM_NOEXCEPT
+inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept
 {
     REALM_ASSERT(read_lock <= current);
     m_current_version  = current;

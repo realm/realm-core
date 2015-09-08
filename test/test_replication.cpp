@@ -56,7 +56,7 @@ public:
     {
     }
 
-    ~MyTrivialReplication() REALM_NOEXCEPT
+    ~MyTrivialReplication() noexcept
     {
     }
 
@@ -78,7 +78,7 @@ private:
         m_changesets.reserve(m_changesets.size() + 1); // Throws
     }
 
-    void finalize_changeset() REALM_NOEXCEPT override
+    void finalize_changeset() noexcept override
     {
         // The following operation will not throw due to the space reservation
         // carried out in prepare_new_changeset().

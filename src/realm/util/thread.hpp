@@ -52,7 +52,7 @@ namespace util {
 class Thread {
 public:
     Thread();
-    ~Thread() REALM_NOEXCEPT;
+    ~Thread() noexcept;
 
     template<class F> explicit Thread(F func);
 
@@ -64,7 +64,7 @@ public:
     /// details.
     template<class F> void start(F func);
 
-    bool joinable() REALM_NOEXCEPT;
+    bool joinable() noexcept;
 
     void join();
 
@@ -76,7 +76,7 @@ private:
 
     void start(entry_func_type, void* arg);
 
-    template<class> static void* entry_point(void*) REALM_NOEXCEPT;
+    template<class> static void* entry_point(void*) noexcept;
 
     REALM_NORETURN static void create_failed(int);
     REALM_NORETURN static void join_failed(int);
@@ -87,7 +87,7 @@ private:
 class Mutex {
 public:
     Mutex();
-    ~Mutex() REALM_NOEXCEPT;
+    ~Mutex() noexcept;
 
     struct process_shared_tag {};
 
@@ -112,13 +112,13 @@ protected:
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
 
-    void lock() REALM_NOEXCEPT;
-    void unlock() REALM_NOEXCEPT;
+    void lock() noexcept;
+    void unlock() noexcept;
 
     REALM_NORETURN static void init_failed(int);
     REALM_NORETURN static void attr_init_failed(int);
-    REALM_NORETURN static void destroy_failed(int) REALM_NOEXCEPT;
-    REALM_NORETURN static void lock_failed(int) REALM_NOEXCEPT;
+    REALM_NORETURN static void destroy_failed(int) noexcept;
+    REALM_NORETURN static void lock_failed(int) noexcept;
 
     friend class CondVar;
     friend class PlatformSpecificCondVar;
@@ -128,8 +128,8 @@ protected:
 /// A simple mutex ownership wrapper.
 class LockGuard {
 public:
-    LockGuard(Mutex&) REALM_NOEXCEPT;
-    ~LockGuard() REALM_NOEXCEPT;
+    LockGuard(Mutex&) noexcept;
+    ~LockGuard() noexcept;
 
 private:
     Mutex& m_mutex;
@@ -145,12 +145,12 @@ struct defer_lock_tag {};
 /// locking as well as repeated unlocking and relocking.
 class UniqueLock {
 public:
-    UniqueLock(Mutex&) REALM_NOEXCEPT;
-    UniqueLock(Mutex&, defer_lock_tag) REALM_NOEXCEPT;
-    ~UniqueLock() REALM_NOEXCEPT;
+    UniqueLock(Mutex&) noexcept;
+    UniqueLock(Mutex&, defer_lock_tag) noexcept;
+    ~UniqueLock() noexcept;
 
-    void lock() REALM_NOEXCEPT;
-    void unlock() REALM_NOEXCEPT;
+    void lock() noexcept;
+    void unlock() noexcept;
 
 private:
     Mutex* m_mutex;
@@ -170,9 +170,9 @@ private:
 class RobustMutex: private Mutex {
 public:
     RobustMutex();
-    ~RobustMutex() REALM_NOEXCEPT;
+    ~RobustMutex() noexcept;
 
-    static bool is_robust_on_this_platform() REALM_NOEXCEPT;
+    static bool is_robust_on_this_platform() noexcept;
 
     class NotRecoverable;
 
@@ -192,7 +192,7 @@ public:
     /// function.
     template<class Func> void lock(Func recover_func);
 
-    void unlock() REALM_NOEXCEPT;
+    void unlock() noexcept;
 
     /// Low-level locking of robust mutex.
     ///
@@ -218,7 +218,7 @@ public:
     /// \note Most application should never call this function
     /// directly. It is called automatically when using the ordinary
     /// lock() function.
-    void mark_as_consistent() REALM_NOEXCEPT;
+    void mark_as_consistent() noexcept;
 
     /// Attempt to check if this mutex is a valid object.
     ///
@@ -230,14 +230,14 @@ public:
     /// involve undefined behavior, so it is only safe to assume that this
     /// function will run correctly when it is known that the mutex object is
     /// valid.
-    bool is_valid() REALM_NOEXCEPT;
+    bool is_valid() noexcept;
 
     friend class CondVar;
 };
 
 class RobustMutex::NotRecoverable: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
+    const char* what() const noexcept override
     {
         return "Failed to recover consistent state of shared memory";
     }
@@ -250,7 +250,7 @@ public:
     /// \param recover_func See RobustMutex::lock().
     template<class TFunc>
     RobustLockGuard(RobustMutex&, TFunc func);
-    ~RobustLockGuard() REALM_NOEXCEPT;
+    ~RobustLockGuard() noexcept;
 
 private:
     RobustMutex& m_mutex;
@@ -264,7 +264,7 @@ private:
 class CondVar {
 public:
     CondVar();
-    ~CondVar() REALM_NOEXCEPT;
+    ~CondVar() noexcept;
 
     struct process_shared_tag {};
 
@@ -279,24 +279,24 @@ public:
     CondVar(process_shared_tag);
 
     /// Wait for another thread to call notify() or notify_all().
-    void wait(LockGuard& l) REALM_NOEXCEPT;
+    void wait(LockGuard& l) noexcept;
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
-    void notify() REALM_NOEXCEPT;
+    void notify() noexcept;
 
     /// Wake up every thread that is currently wating on this
     /// condition.
-    void notify_all() REALM_NOEXCEPT;
+    void notify_all() noexcept;
 
 private:
     pthread_cond_t m_impl;
 
     REALM_NORETURN static void init_failed(int);
     REALM_NORETURN static void attr_init_failed(int);
-    REALM_NORETURN static void destroy_failed(int) REALM_NOEXCEPT;
+    REALM_NORETURN static void destroy_failed(int) noexcept;
     void handle_wait_error(int error);
 };
 
@@ -330,13 +330,13 @@ template<class F> inline void Thread::start(F func)
     m_joinable = true;
 }
 
-inline Thread::~Thread() REALM_NOEXCEPT
+inline Thread::~Thread() noexcept
 {
     if (m_joinable)
         std::terminate();
 }
 
-inline bool Thread::joinable() REALM_NOEXCEPT
+inline bool Thread::joinable() noexcept
 {
     return m_joinable;
 }
@@ -349,7 +349,7 @@ inline void Thread::start(entry_func_type entry_func, void* arg)
         create_failed(r); // Throws
 }
 
-template<class F> inline void* Thread::entry_point(void* cookie) REALM_NOEXCEPT
+template<class F> inline void* Thread::entry_point(void* cookie) noexcept
 {
     std::unique_ptr<F> func(static_cast<F*>(cookie));
     try {
@@ -373,7 +373,7 @@ inline Mutex::Mutex(process_shared_tag)
     init_as_process_shared(robust_if_available);
 }
 
-inline Mutex::~Mutex() REALM_NOEXCEPT
+inline Mutex::~Mutex() noexcept
 {
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
@@ -387,7 +387,7 @@ inline void Mutex::init_as_regular()
         init_failed(r);
 }
 
-inline void Mutex::lock() REALM_NOEXCEPT
+inline void Mutex::lock() noexcept
 {
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
@@ -395,7 +395,7 @@ inline void Mutex::lock() REALM_NOEXCEPT
     lock_failed(r);
 }
 
-inline void Mutex::unlock() REALM_NOEXCEPT
+inline void Mutex::unlock() noexcept
 {
     int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);
@@ -403,44 +403,44 @@ inline void Mutex::unlock() REALM_NOEXCEPT
 }
 
 
-inline LockGuard::LockGuard(Mutex& m) REALM_NOEXCEPT:
+inline LockGuard::LockGuard(Mutex& m) noexcept:
     m_mutex(m)
 {
     m_mutex.lock();
 }
 
-inline LockGuard::~LockGuard() REALM_NOEXCEPT
+inline LockGuard::~LockGuard() noexcept
 {
     m_mutex.unlock();
 }
 
 
-inline UniqueLock::UniqueLock(Mutex& m) REALM_NOEXCEPT:
+inline UniqueLock::UniqueLock(Mutex& m) noexcept:
     m_mutex(&m)
 {
     m_mutex->lock();
     m_is_locked = true;
 }
 
-inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) REALM_NOEXCEPT:
+inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) noexcept:
     m_mutex(&m)
 {
     m_is_locked = false;
 }
 
-inline UniqueLock::~UniqueLock() REALM_NOEXCEPT
+inline UniqueLock::~UniqueLock() noexcept
 {
     if (m_is_locked)
         m_mutex->unlock();
 }
 
-inline void UniqueLock::lock() REALM_NOEXCEPT
+inline void UniqueLock::lock() noexcept
 {
     m_mutex->lock();
     m_is_locked = true;
 }
 
-inline void UniqueLock::unlock() REALM_NOEXCEPT
+inline void UniqueLock::unlock() noexcept
 {
     m_mutex->unlock();
     m_is_locked = false;
@@ -453,7 +453,7 @@ inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
     m_mutex.lock(func);
 }
 
-inline RobustLockGuard::~RobustLockGuard() REALM_NOEXCEPT
+inline RobustLockGuard::~RobustLockGuard() noexcept
 {
     m_mutex.unlock();
 }
@@ -467,7 +467,7 @@ inline RobustMutex::RobustMutex():
     init_as_process_shared(robust_if_available);
 }
 
-inline RobustMutex::~RobustMutex() REALM_NOEXCEPT
+inline RobustMutex::~RobustMutex() noexcept
 {
 }
 
@@ -494,7 +494,7 @@ template<class Func> inline void RobustMutex::lock(Func recover_func)
     }
 }
 
-inline void RobustMutex::unlock() REALM_NOEXCEPT
+inline void RobustMutex::unlock() noexcept
 {
     Mutex::unlock();
 }
@@ -510,14 +510,14 @@ inline CondVar::CondVar()
         init_failed(r);
 }
 
-inline CondVar::~CondVar() REALM_NOEXCEPT
+inline CondVar::~CondVar() noexcept
 {
     int r = pthread_cond_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
 }
 
-inline void CondVar::wait(LockGuard& l) REALM_NOEXCEPT
+inline void CondVar::wait(LockGuard& l) noexcept
 {
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (REALM_UNLIKELY(r != 0))
@@ -557,14 +557,14 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
     }
 }
 
-inline void CondVar::notify() REALM_NOEXCEPT
+inline void CondVar::notify() noexcept
 {
     int r = pthread_cond_signal(&m_impl);
     REALM_ASSERT(r == 0);
     static_cast<void>(r);
 }
 
-inline void CondVar::notify_all() REALM_NOEXCEPT
+inline void CondVar::notify_all() noexcept
 {
     int r = pthread_cond_broadcast(&m_impl);
     REALM_ASSERT(r == 0);

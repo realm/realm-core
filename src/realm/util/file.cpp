@@ -316,7 +316,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
 }
 
 
-void File::close() REALM_NOEXCEPT
+void File::close() noexcept
 {
 #ifdef _WIN32 // Windows version
 
@@ -739,7 +739,7 @@ bool File::lock(bool exclusive, bool non_blocking)
 }
 
 
-void File::unlock() REALM_NOEXCEPT
+void File::unlock() noexcept
 {
 #ifdef _WIN32 // Windows version
 
@@ -813,7 +813,7 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
 }
 
 
-void File::unmap(void* addr, size_t size) REALM_NOEXCEPT
+void File::unmap(void* addr, size_t size) noexcept
 {
 #ifdef _WIN32 // Windows version
 

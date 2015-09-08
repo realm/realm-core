@@ -3,7 +3,7 @@
 
 using namespace realm;
 
-const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
+const char* LogicError::what() const noexcept
 {
     switch (m_kind) {
         case string_too_big:

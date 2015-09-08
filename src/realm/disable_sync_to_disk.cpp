@@ -15,7 +15,7 @@ void realm::disable_sync_to_disk()
     g_disable_sync_to_disk = true;
 }
 
-bool realm::get_disable_sync_to_disk() REALM_NOEXCEPT
+bool realm::get_disable_sync_to_disk() noexcept
 {
     return g_disable_sync_to_disk;
 }

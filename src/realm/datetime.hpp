@@ -28,22 +28,22 @@ namespace realm {
 
 class DateTime {
 public:
-    DateTime() REALM_NOEXCEPT: m_time(0) {}
+    DateTime() noexcept: m_time(0) {}
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
     /// FIXME: See if we can make this private again. Required by query_expression.hpp
-    DateTime(int_fast64_t d) REALM_NOEXCEPT : m_time(d) {}
+    DateTime(int_fast64_t d) noexcept : m_time(d) {}
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
-    int_fast64_t get_datetime() const REALM_NOEXCEPT { return m_time; }
+    int_fast64_t get_datetime() const noexcept { return m_time; }
 
-    friend bool operator==(const DateTime&, const DateTime&) REALM_NOEXCEPT;
-    friend bool operator!=(const DateTime&, const DateTime&) REALM_NOEXCEPT;
-    friend bool operator< (const DateTime&, const DateTime&) REALM_NOEXCEPT;
-    friend bool operator<= (const DateTime&, const DateTime&) REALM_NOEXCEPT;
-    friend bool operator> (const DateTime&, const DateTime&) REALM_NOEXCEPT;
-    friend bool operator>= (const DateTime&, const DateTime&) REALM_NOEXCEPT;
+    friend bool operator==(const DateTime&, const DateTime&) noexcept;
+    friend bool operator!=(const DateTime&, const DateTime&) noexcept;
+    friend bool operator< (const DateTime&, const DateTime&) noexcept;
+    friend bool operator<= (const DateTime&, const DateTime&) noexcept;
+    friend bool operator> (const DateTime&, const DateTime&) noexcept;
+    friend bool operator>= (const DateTime&, const DateTime&) noexcept;
 
     /// Construct from broken down local time.
     ///
@@ -71,7 +71,7 @@ public:
 
     // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed 
     // because DateTime is internally stored in an int64_t column.
-    operator int_fast64_t() REALM_NOEXCEPT;
+    operator int_fast64_t() noexcept;
 
 private:
     int_fast64_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.
@@ -82,37 +82,37 @@ private:
 
 // Implementation:
 
-inline bool operator==(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
+inline bool operator==(const DateTime& a, const DateTime& b) noexcept
 {
     return a.m_time == b.m_time;
 }
 
-inline bool operator!=(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
+inline bool operator!=(const DateTime& a, const DateTime& b) noexcept
 {
     return a.m_time != b.m_time;
 }
 
-inline bool operator<(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
+inline bool operator<(const DateTime& a, const DateTime& b) noexcept
 {
     return a.m_time < b.m_time;
 }
 
-inline bool operator<=(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
+inline bool operator<=(const DateTime& a, const DateTime& b) noexcept
 {
     return a.m_time <= b.m_time;
 }
 
-inline bool operator>(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
+inline bool operator>(const DateTime& a, const DateTime& b) noexcept
 {
     return a.m_time > b.m_time;
 }
 
-inline bool operator>=(const DateTime& a, const DateTime& b) REALM_NOEXCEPT
+inline bool operator>=(const DateTime& a, const DateTime& b) noexcept
 {
     return a.m_time >= b.m_time;
 }
 
-inline DateTime::operator int_fast64_t() REALM_NOEXCEPT
+inline DateTime::operator int_fast64_t() noexcept
 {
     return m_time;
 }

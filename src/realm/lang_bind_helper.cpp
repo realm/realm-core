@@ -15,7 +15,7 @@ Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, size_t col_ndx, 
 }
 
 
-const char* LangBindHelper::get_data_type_name(DataType type) REALM_NOEXCEPT
+const char* LangBindHelper::get_data_type_name(DataType type) noexcept
 {
     switch (type) {
         case type_Int:      return "int";

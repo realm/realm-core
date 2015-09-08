@@ -20,7 +20,7 @@ void SimulatedFailure::do_prime(type failure_type)
     primed_failure_types[failure_type] = true;
 }
 
-void SimulatedFailure::do_unprime(type failure_type) REALM_NOEXCEPT
+void SimulatedFailure::do_unprime(type failure_type) noexcept
 {
     primed_failure_types[failure_type] = false;
 }
@@ -60,7 +60,7 @@ void SimulatedFailure::do_prime(type failure_type)
     get_threadlocal_primed_failure_types()[failure_type] = true;
 }
 
-void SimulatedFailure::do_unprime(type failure_type) REALM_NOEXCEPT
+void SimulatedFailure::do_unprime(type failure_type) noexcept
 {
     get_threadlocal_primed_failure_types()[failure_type] = false;
 }

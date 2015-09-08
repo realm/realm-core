@@ -97,10 +97,6 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 
 void Query::copy_nodes(const Query& source)
 {
-        m_table = source.m_table;
-        m_view = source.m_view;
-        m_source_link_view = source.m_source_link_view;
-
         create();
 
         first = source.first;
@@ -146,19 +142,20 @@ Query& Query::operator = (const Query& source)
         m_view = source.m_view;
         m_source_link_view = source.m_source_link_view;
         m_source_table_view = source.m_source_table_view;
+
         copy_nodes(source);
     }
     return *this;
 }
 
-Query::~Query() REALM_NOEXCEPT
+Query::~Query() noexcept
 {
     if (m_owns_source_table_view)
         delete m_source_table_view;
     delete_nodes();
 }
 
-void Query::delete_nodes() REALM_NOEXCEPT
+void Query::delete_nodes() noexcept
 {
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {

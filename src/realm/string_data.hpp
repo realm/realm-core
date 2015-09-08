@@ -77,22 +77,22 @@ namespace realm {
 class StringData {
 public:
     /// Construct a null reference.
-    StringData() REALM_NOEXCEPT;
+    StringData() noexcept;
 
     /// If \a data is 'null', \a size must be zero.
-    StringData(const char* data, std::size_t size) REALM_NOEXCEPT;
+    StringData(const char* data, std::size_t size) noexcept;
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
 
     /// Initialize from a zero terminated C style string. Pass null to construct
     /// a null reference.
-    StringData(const char* c_str) REALM_NOEXCEPT;
+    StringData(const char* c_str) noexcept;
 
-    char operator[](std::size_t i) const REALM_NOEXCEPT;
+    char operator[](std::size_t i) const noexcept;
 
-    const char* data() const REALM_NOEXCEPT;
-    std::size_t size() const REALM_NOEXCEPT;
+    const char* data() const noexcept;
+    std::size_t size() const noexcept;
 
     /// Is this a null reference?
     ///
@@ -110,40 +110,40 @@ public:
     /// of the result of calling this function. In other words, a StringData
     /// object is converted to true if it is not the null reference, otherwise
     /// it is converted to false.
-    bool is_null() const REALM_NOEXCEPT;
+    bool is_null() const noexcept;
 
-    friend bool operator==(const StringData&, const StringData&) REALM_NOEXCEPT;
-    friend bool operator!=(const StringData&, const StringData&) REALM_NOEXCEPT;
+    friend bool operator==(const StringData&, const StringData&) noexcept;
+    friend bool operator!=(const StringData&, const StringData&) noexcept;
 
     //@{
     /// Trivial bytewise lexicographical comparison.
-    friend bool operator<(const StringData&, const StringData&) REALM_NOEXCEPT;
-    friend bool operator>(const StringData&, const StringData&) REALM_NOEXCEPT;
-    friend bool operator<=(const StringData&, const StringData&) REALM_NOEXCEPT;
-    friend bool operator>=(const StringData&, const StringData&) REALM_NOEXCEPT;
+    friend bool operator<(const StringData&, const StringData&) noexcept;
+    friend bool operator>(const StringData&, const StringData&) noexcept;
+    friend bool operator<=(const StringData&, const StringData&) noexcept;
+    friend bool operator>=(const StringData&, const StringData&) noexcept;
     //@}
 
-    bool begins_with(StringData) const REALM_NOEXCEPT;
-    bool ends_with(StringData) const REALM_NOEXCEPT;
-    bool contains(StringData) const REALM_NOEXCEPT;
+    bool begins_with(StringData) const noexcept;
+    bool ends_with(StringData) const noexcept;
+    bool contains(StringData) const noexcept;
 
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
     /// size().
-    StringData prefix(std::size_t n) const REALM_NOEXCEPT;
-    StringData suffix(std::size_t n) const REALM_NOEXCEPT;
-    StringData substr(std::size_t i, std::size_t n) const REALM_NOEXCEPT;
-    StringData substr(std::size_t i) const REALM_NOEXCEPT;
+    StringData prefix(std::size_t n) const noexcept;
+    StringData suffix(std::size_t n) const noexcept;
+    StringData substr(std::size_t i, std::size_t n) const noexcept;
+    StringData substr(std::size_t i) const noexcept;
     //@}
 
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
 
 #ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    explicit operator bool() const REALM_NOEXCEPT;
+    explicit operator bool() const noexcept;
 #else
     typedef const char* StringData::*unspecified_bool_type;
-    operator unspecified_bool_type() const REALM_NOEXCEPT;
+    operator unspecified_bool_type() const noexcept;
 #endif
 
 private:
@@ -155,13 +155,13 @@ private:
 
 // Implementation:
 
-inline StringData::StringData() REALM_NOEXCEPT:
+inline StringData::StringData() noexcept:
     m_data(0),
     m_size(0)
 {
 }
 
-inline StringData::StringData(const char* data, std::size_t size) REALM_NOEXCEPT:
+inline StringData::StringData(const char* data, std::size_t size) noexcept:
     m_data(data),
     m_size(size)
 {
@@ -179,7 +179,7 @@ template<class T, class A> inline StringData::operator std::basic_string<char, T
     return std::basic_string<char, T, A>(m_data, m_size);
 }
 
-inline StringData::StringData(const char* c_str) REALM_NOEXCEPT:
+inline StringData::StringData(const char* c_str) noexcept:
     m_data(c_str),
     m_size(0)
 {
@@ -187,37 +187,37 @@ inline StringData::StringData(const char* c_str) REALM_NOEXCEPT:
         m_size = std::char_traits<char>::length(c_str);
 }
 
-inline char StringData::operator[](std::size_t i) const REALM_NOEXCEPT
+inline char StringData::operator[](std::size_t i) const noexcept
 {
     return m_data[i];
 }
 
-inline const char* StringData::data() const REALM_NOEXCEPT
+inline const char* StringData::data() const noexcept
 {
     return m_data;
 }
 
-inline std::size_t StringData::size() const REALM_NOEXCEPT
+inline std::size_t StringData::size() const noexcept
 {
     return m_size;
 }
 
-inline bool StringData::is_null() const REALM_NOEXCEPT
+inline bool StringData::is_null() const noexcept
 {
     return !m_data;
 }
 
-inline bool operator==(const StringData& a, const StringData& b) REALM_NOEXCEPT
+inline bool operator==(const StringData& a, const StringData& b) noexcept
 {
     return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
-inline bool operator!=(const StringData& a, const StringData& b) REALM_NOEXCEPT
+inline bool operator!=(const StringData& a, const StringData& b) noexcept
 {
     return !(a == b);
 }
 
-inline bool operator<(const StringData& a, const StringData& b) REALM_NOEXCEPT
+inline bool operator<(const StringData& a, const StringData& b) noexcept
 {
     if (a.is_null() && !b.is_null()) {
         // Null strings are smaller than all other strings, and not
@@ -228,36 +228,36 @@ inline bool operator<(const StringData& a, const StringData& b) REALM_NOEXCEPT
                                         b.m_data, b.m_data + b.m_size);
 }
 
-inline bool operator>(const StringData& a, const StringData& b) REALM_NOEXCEPT
+inline bool operator>(const StringData& a, const StringData& b) noexcept
 {
     return b < a;
 }
 
-inline bool operator<=(const StringData& a, const StringData& b) REALM_NOEXCEPT
+inline bool operator<=(const StringData& a, const StringData& b) noexcept
 {
     return !(b < a);
 }
 
-inline bool operator>=(const StringData& a, const StringData& b) REALM_NOEXCEPT
+inline bool operator>=(const StringData& a, const StringData& b) noexcept
 {
     return !(a < b);
 }
 
-inline bool StringData::begins_with(StringData d) const REALM_NOEXCEPT
+inline bool StringData::begins_with(StringData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
-inline bool StringData::ends_with(StringData d) const REALM_NOEXCEPT
+inline bool StringData::ends_with(StringData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
-inline bool StringData::contains(StringData d) const REALM_NOEXCEPT
+inline bool StringData::contains(StringData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
@@ -266,22 +266,22 @@ inline bool StringData::contains(StringData d) const REALM_NOEXCEPT
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
-inline StringData StringData::prefix(std::size_t n) const REALM_NOEXCEPT
+inline StringData StringData::prefix(std::size_t n) const noexcept
 {
     return substr(0,n);
 }
 
-inline StringData StringData::suffix(std::size_t n) const REALM_NOEXCEPT
+inline StringData StringData::suffix(std::size_t n) const noexcept
 {
     return substr(m_size - n);
 }
 
-inline StringData StringData::substr(std::size_t i, std::size_t n) const REALM_NOEXCEPT
+inline StringData StringData::substr(std::size_t i, std::size_t n) const noexcept
 {
     return StringData(m_data + i, n);
 }
 
-inline StringData StringData::substr(std::size_t i) const REALM_NOEXCEPT
+inline StringData StringData::substr(std::size_t i) const noexcept
 {
     return substr(i, m_size - i);
 }
@@ -295,12 +295,12 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const S
 }
 
 #ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-inline StringData::operator bool() const REALM_NOEXCEPT
+inline StringData::operator bool() const noexcept
 {
     return !is_null();
 }
 #else
-inline StringData::operator unspecified_bool_type() const REALM_NOEXCEPT
+inline StringData::operator unspecified_bool_type() const noexcept
 {
     return is_null() ? 0 : &StringData::m_data;
 }

@@ -20,11 +20,11 @@ StringEnumColumn::StringEnumColumn(Allocator& alloc, ref_type ref, ref_type keys
 {
 }
 
-StringEnumColumn::~StringEnumColumn() REALM_NOEXCEPT
+StringEnumColumn::~StringEnumColumn() noexcept
 {
 }
 
-void StringEnumColumn::destroy() REALM_NOEXCEPT
+void StringEnumColumn::destroy() noexcept
 {
     m_keys.destroy();
     IntegerColumn::destroy();
@@ -45,18 +45,18 @@ MemRef StringEnumColumn::clone_deep(Allocator& alloc) const
     return MemRef{new_col.get_ref(), alloc};
 }
 
-void StringEnumColumn::adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT
+void StringEnumColumn::adjust_keys_ndx_in_parent(int diff) noexcept
 {
     m_keys.get_root_array()->adjust_ndx_in_parent(diff);
 }
 
-void StringEnumColumn::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void StringEnumColumn::update_from_parent(size_t old_baseline) noexcept
 {
     IntegerColumn::update_from_parent(old_baseline);
     m_keys.update_from_parent(old_baseline);
 }
 
-bool StringEnumColumn::is_nullable() const REALM_NOEXCEPT
+bool StringEnumColumn::is_nullable() const noexcept
 {
     return m_nullable;
 }
@@ -281,25 +281,25 @@ StringIndex* StringEnumColumn::create_search_index()
     return m_search_index.get();
 }
 
-void StringEnumColumn::destroy_search_index() REALM_NOEXCEPT
+void StringEnumColumn::destroy_search_index() noexcept
 {
     m_search_index.reset();
 }
 
 
-StringData StringEnumColumn::get_index_data(std::size_t ndx, char*) const REALM_NOEXCEPT
+StringData StringEnumColumn::get_index_data(std::size_t ndx, char*) const noexcept
 {
     return get(ndx);
 }
 
 
-void StringEnumColumn::set_search_index_allow_duplicate_values(bool allow) REALM_NOEXCEPT
+void StringEnumColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
 {
     m_search_index->set_allow_duplicate_values(allow);
 }
 
 
-void StringEnumColumn::install_search_index(std::unique_ptr<StringIndex> index) REALM_NOEXCEPT
+void StringEnumColumn::install_search_index(std::unique_ptr<StringIndex> index) noexcept
 {
     REALM_ASSERT(!m_search_index);
 

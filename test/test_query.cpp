@@ -6003,6 +6003,35 @@ TEST(Query_BinaryNull)
     
     TableView t;
 
+    // Next gen syntax
+    t = (table.column<BinaryData>(0) == BinaryData()).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+
+    t = (BinaryData() == table.column<BinaryData>(0)).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+
+    t = (table.column<BinaryData>(0) == BinaryData("", 0)).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+
+    t = (BinaryData("", 0) == table.column<BinaryData>(0)).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+
+    t = (table.column<BinaryData>(0) != BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = (BinaryData("", 0) != table.column<BinaryData>(0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+
+    // Old syntax
     t = table.where().equal(0, BinaryData()).find_all();
     CHECK_EQUAL(0, t.get_source_ndx(0));
     CHECK_EQUAL(1, t.size());
@@ -6178,12 +6207,13 @@ TEST(Query_64BitValues)
 
 void create_columns(TableRef table, bool nullable = true)
 {
-    table->insert_column(0, type_Int, "Price", nullable);               // nullable = true
-    table->insert_column(1, type_Float, "Shipping", nullable);          // nullable = true
-    table->insert_column(2, type_String, "Description", nullable);      // nullable = true
-    table->insert_column(3, type_Double, "Rating", nullable);           // nullable = true
-    table->insert_column(4, type_Bool, "Stock", nullable);              // nullable = true
-    table->insert_column(5, type_DateTime, "Delivery date", nullable);  // nullable = true
+    table->insert_column(0, type_Int, "Price", nullable);
+    table->insert_column(1, type_Float, "Shipping", nullable);
+    table->insert_column(2, type_String, "Description", nullable);
+    table->insert_column(3, type_Double, "Rating", nullable);
+    table->insert_column(4, type_Bool, "Stock", nullable);
+    table->insert_column(5, type_DateTime, "Delivery date", nullable);
+    table->insert_column(6, type_Binary, "Photo", nullable);
 }
 
 bool equals(TableView& tv, std::vector<size_t> indexes)
@@ -6247,11 +6277,11 @@ TEST(Query_NullShowcase)
 
     NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
-        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
-        ----------------------------------------------------------------------------------------------------------------
-    0   null            null                null                    1.1                 true          2016-2-2
-    1   10              null                "foo"                   2.2                 null          null
-    2   20              30.0                "bar"                   3.3                 false         2016-6-6
+        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>   Photo<BinaryData>
+        -------------------------------------------------------------------------------------------------------------------------------------
+    0   null            null                null                    1.1                 true          2016-2-2             "foo"
+    1   10              null                "foo"                   2.2                 null          null                 zero-lenght non-null
+    2   20              30.0                "bar"                   3.3                 false         2016-6-6             null
     */
 
     Group g;
@@ -6267,6 +6297,7 @@ TEST(Query_NullShowcase)
     CHECK(table->is_null(3, 0));
     CHECK(table->is_null(4, 0));
     CHECK(table->is_null(5, 0));
+    CHECK(table->is_null(6, 0));
 
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
@@ -6292,11 +6323,16 @@ TEST(Query_NullShowcase)
     table->set_null(5, 1);
     table->set_datetime(5, 2, DateTime(2016, 6, 6));
 
+    table->set_binary(6, 0, BinaryData("foo"));
+    table->set_binary(6, 1, BinaryData("", 0)); // remember 0, else it will have length of 1 due to 0 termination of c++
+    table->set_null(6, 2);
+
     Columns<Int> price = table->column<Int>(0);
     Columns<Float> shipping = table->column<Float>(1);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<BinaryData> photo = table->column<BinaryData>(6);
 
     // check int/double type mismatch error handling
     Columns<Int> dummy1;
@@ -6379,6 +6415,21 @@ TEST(Query_NullShowcase)
     tv = (delivery != null()).find_all();
     CHECK(equals(tv, { 0, 2 }));
 
+    // BinaryData
+    //
+    // BinaryData only supports == and !=, and you cannot compare two columns - only a column and a constant
+    tv = (photo == BinaryData("foo")).find_all();
+    CHECK(equals(tv, { 0 }));
+
+    tv = (photo == BinaryData("", 0)).find_all();
+    CHECK(equals(tv, { 1 }));
+
+    tv = (photo == BinaryData()).find_all();
+    CHECK(equals(tv, { 2 }));
+
+    tv = (photo != BinaryData("foo")).find_all();
+    CHECK(equals(tv, { 1, 2 }));
+
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
     CHECK(equals(tv, { 0 }));
@@ -6410,6 +6461,7 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, { }));
 
     // TableView
+    size_t count;
     int64_t i;
     double d;
     DateTime dt;
@@ -6418,20 +6470,31 @@ TEST(Query_NullShowcase)
     // Integer column
     i = tv.maximum_int(0);
     CHECK_EQUAL(i, 20);
+
     i = tv.minimum_int(0);
     CHECK_EQUAL(i, 10);
-    d = tv.average_int(0);
+
+    count = 123;
+    d = tv.average_int(0, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 15., 0.001);
+    CHECK_EQUAL(count, 2);
+
     i = tv.sum_int(0);
     CHECK_EQUAL(i, 30);
+
 
     // Float column
     d = tv.maximum_float(1);
     CHECK_EQUAL(d, 30.);
+
     d = tv.minimum_float(1);
     CHECK_EQUAL(d, 30.);
-    d = tv.average_float(1);
+
+    count = 123;
+    d = tv.average_float(1, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+    CHECK_EQUAL(count, 1);
+
     d = tv.sum_float(1);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
 
@@ -6768,7 +6831,7 @@ TEST(Query_Null_Two_Columns)
 }
 
 // Between, count, min and max
-TEST(Query_Null_BetweenMinMax)
+TEST(Query_Null_BetweenMinMax_Nullable)
 {
     Group g;
     TableRef table = g.add_table("Inventory");
@@ -6783,6 +6846,7 @@ TEST(Query_Null_BetweenMinMax)
 
     TableView tv;
     size_t match;
+    size_t count;
 
     // Here we test max/min/average with 0 rows used to compute the value, either becuase all inputs are null or
     // becuase 0 rows exist.
@@ -6797,7 +6861,9 @@ TEST(Query_Null_BetweenMinMax)
         CHECK_EQUAL(match, npos);
 
         CHECK_EQUAL(tv.sum_int(0), 0);
-        CHECK_EQUAL(tv.average_int(0), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_int(0, &count), 0.);
+        CHECK_EQUAL(count, 0);
 
         // float
         match = 123;
@@ -6809,7 +6875,9 @@ TEST(Query_Null_BetweenMinMax)
         CHECK_EQUAL(match, npos);
 
         CHECK_EQUAL(tv.sum_float(1), 0.);
-        CHECK_EQUAL(tv.average_float(1), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_float(1, &count), 0.);
+        CHECK_EQUAL(count, 0);
 
         // double
         match = 123;
@@ -6821,7 +6889,9 @@ TEST(Query_Null_BetweenMinMax)
         CHECK_EQUAL(match, npos);
 
         CHECK_EQUAL(tv.sum_double(3), 0.);
-        CHECK_EQUAL(tv.average_double(3), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_double(3, &count), 0.);
+        CHECK_EQUAL(count, 0);
 
         // date
         match = 123;
@@ -6855,10 +6925,17 @@ TEST(Query_Null_BetweenMinMax)
     table->set_double(3, 1, 10.);
 
     tv = table->where().find_all();
-    CHECK_EQUAL(tv.average_int(0), 10);
-    CHECK_EQUAL(tv.average_float(1), 10.);
-    CHECK_EQUAL(tv.average_double(3), 10.);
+    count = 123;
+    CHECK_EQUAL(tv.average_int(0, &count), 10);
+    CHECK_EQUAL(count, 1);
+    count = 123;
+    CHECK_EQUAL(tv.average_float(1, &count), 10.);
+    CHECK_EQUAL(count, 1);
+    count = 123;
+    CHECK_EQUAL(tv.average_double(3, &count), 10.);
+    CHECK_EQUAL(count, 1); 
 }
+
 
 // If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works by
 // creating a large table with nulls in arbitrary places and query for nulls. Verify the search result manually.

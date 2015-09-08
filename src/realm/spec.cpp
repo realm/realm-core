@@ -5,7 +5,7 @@
 using namespace realm;
 
 
-Spec::~Spec() REALM_NOEXCEPT
+Spec::~Spec() noexcept
 {
     if (m_top.is_attached()) {
         if (Replication* repl = m_top.get_alloc().get_replication())
@@ -14,7 +14,7 @@ Spec::~Spec() REALM_NOEXCEPT
 }
 
 
-void Spec::init(MemRef mem) REALM_NOEXCEPT
+void Spec::init(MemRef mem) noexcept
 {
     m_top.init_from_mem(mem);
     size_t top_size = m_top.size();
@@ -46,7 +46,7 @@ void Spec::init(MemRef mem) REALM_NOEXCEPT
 }
 
 
-void Spec::update_has_strong_link_columns() REALM_NOEXCEPT
+void Spec::update_has_strong_link_columns() noexcept
 {
     size_t n = m_types.size();
     for (size_t i = 0; i < n; ++i) {
@@ -59,7 +59,7 @@ void Spec::update_has_strong_link_columns() REALM_NOEXCEPT
 }
 
 
-void Spec::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void Spec::update_from_parent(size_t old_baseline) noexcept
 {
     if (!m_top.update_from_parent(old_baseline))
         return;
@@ -233,7 +233,7 @@ void Spec::erase_column(size_t column_ndx)
 }
 
 
-size_t Spec::get_subspec_ndx(size_t column_ndx) const REALM_NOEXCEPT
+size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx <= get_column_count());
     REALM_ASSERT(column_ndx == get_column_count() ||
@@ -289,7 +289,7 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
 }
 
 
-size_t Spec::get_enumkeys_ndx(size_t column_ndx) const REALM_NOEXCEPT
+size_t Spec::get_enumkeys_ndx(size_t column_ndx) const noexcept
 {
     // The enumkeys array only keep info for stringEnum columns
     // so we need to count up to it's position
@@ -303,7 +303,7 @@ size_t Spec::get_enumkeys_ndx(size_t column_ndx) const REALM_NOEXCEPT
 
 
 ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
-                                size_t* keys_ndx) REALM_NOEXCEPT
+                                size_t* keys_ndx) noexcept
 {
     size_t enumkeys_ndx = get_enumkeys_ndx(column_ndx);
 
@@ -317,7 +317,7 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
 }
 
 
-size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const REALM_NOEXCEPT
+size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
@@ -363,7 +363,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
 }
 
 
-size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const REALM_NOEXCEPT
+size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 {
     REALM_ASSERT(backlink_col_ndx < get_column_count());
     REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
@@ -379,7 +379,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const REALM_NOEXCEPT
 
 
 size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const
-    REALM_NOEXCEPT
+    noexcept
 {
     size_t backlinks_column_start = m_names.size();
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
@@ -402,7 +402,7 @@ size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx
 }
 
 
-DataType Spec::get_public_column_type(size_t ndx) const REALM_NOEXCEPT
+DataType Spec::get_public_column_type(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
 
@@ -431,7 +431,7 @@ size_t Spec::get_column_ndx_in_parent(size_t column_ndx) const
 }
 
 
-Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const REALM_NOEXCEPT
+Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const noexcept
 {
     ColumnInfo info;
     info.m_column_ref_ndx = get_column_ndx_in_parent(column_ndx);
@@ -440,7 +440,7 @@ Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const REALM_NOEXCEPT
 }
 
 
-bool Spec::operator==(const Spec& spec) const REALM_NOEXCEPT
+bool Spec::operator==(const Spec& spec) const noexcept
 {
     if (!m_attr.compare_int(spec.m_attr))
         return false;
