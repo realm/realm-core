@@ -69,7 +69,7 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
     cryptor.set_file_size(16);
 
     const char data[4096] = "test data";
-    char raw_buffer_1[8192] = {0}, raw_buffer_2[9192] = {0};
+    char raw_buffer_1[8192] = {0}, raw_buffer_2[8192] = {0};
     int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 
     cryptor.write(fd, 0, data, sizeof(data));
