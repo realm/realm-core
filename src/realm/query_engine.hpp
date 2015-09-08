@@ -820,7 +820,6 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        TConditionFunction condition;
         REALM_ASSERT(this->m_table);
 
         while (start < end) {
