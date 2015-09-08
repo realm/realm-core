@@ -794,10 +794,10 @@ inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t c
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
-    m_linkview_source(tv.m_linkview_source),
     m_linked_table(tv.m_linked_table),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
+    m_linkview_source(tv.m_linkview_source),
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
     m_sorting_predicate(tv.m_sorting_predicate),
@@ -823,10 +823,10 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) REALM_NOEXCEPT:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(move(tv.m_table)),
-    m_linkview_source(tv.m_linkview_source),
     m_linked_table(move(tv.m_linked_table)),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
+    m_linkview_source(tv.m_linkview_source),
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
     m_last_seen_version(tv.m_last_seen_version),
