@@ -20,6 +20,7 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
+class Snapshot;
 
 class Realm {
 public:
@@ -29,28 +30,32 @@ public:
         durability_Async    ///< Not yet supported on windows.
     };
 
-    // Create a Realm which isn't attached to any file
-    Realm();
+    struct Config {
+        bool is_read_only = false;
+        bool no_create = false;
+        DurabilityLevel durability = durability_Full;
+        bool compact_file_if_possible = false;
+        bool allow_file_format_upgrade = true;
+    }
 
     // Delete it.
-    ~Realm();
+    virtual ~Realm();
 
     // Attach a Realm to a specific file with selected policies
-    void open(const std::string& file, bool no_create = false,
-              DurabilityLevel = durability_Full,
-              const char* encryption_key = 0,
-              bool compact_file_if_possible = false,
-              bool allow_file_format_upgrade = true);
+    void open(const std::string& file, Config& cfg, const char* encryption_key = 0);
 
-    // Close the Realm, detaching it from any Realm object.
+    // Close the Realm, detaching it from any file.
     void close();
 
     bool is_attached();
 
-private:
-    class impl_Realm;
-    std::unique_ptr<impl_Realm> m_impl;
+    // Get a readable snapshot
+    std::shared_ptr<Snapshot> get_newest_snapshot();
+
+    // Make a new writable snapshot
+    std::shared_ptr<Snapshot> get_writable_snapshot();
 };
 
+std::unique_ptr<Realm> make_realm();
 
 #endif
