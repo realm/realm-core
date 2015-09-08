@@ -7431,15 +7431,18 @@ TEST(Query_OperatorsOverLink)
     Group group;
     TableRef table1 = group.add_table("table1");
     table1->add_column(type_Int, "int");
+    table1->add_column(type_Double, "double");
 
     // table1
-    // 0: 2
-    // 1: 3
+    // 0: 2 2.0
+    // 1: 3 3.0
 
     table1->add_empty_row();
     table1->set_int(0, 0, 2);
+    table1->set_double(1, 0, 2.0);
     table1->add_empty_row();
     table1->set_int(0, 1, 3);
+    table1->set_double(1, 1, 3.0);
 
     TableRef table2 = group.add_table("table2");
     table2->add_column(type_Int, "int");
@@ -7467,7 +7470,10 @@ TEST(Query_OperatorsOverLink)
     Query q;
     size_t match;
 
-    // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the power subexpression will not produce any results.
+    // Unary operators.
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the power subexpression will not produce any results.
     q = power(table2->link(col_linklist).column<Int>(0)) == table2->column<Int>(0);
     match = q.find();
     CHECK_EQUAL(1, match);
@@ -7476,7 +7482,8 @@ TEST(Query_OperatorsOverLink)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the power subexpression will not produce any results.
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the power subexpression will not produce any results.
     q = table2->column<Int>(0) == power(table2->link(col_linklist).column<Int>(0));
     match = q.find();
     CHECK_EQUAL(1, match);
@@ -7485,7 +7492,32 @@ TEST(Query_OperatorsOverLink)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the multiplication will not produce any results.
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = power(table2->link(col_linklist).column<Double>(1)) == table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = table2->column<Int>(0) == power(table2->link(col_linklist).column<Double>(1));
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Binary operators.
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the multiplication will not produce any results.
     q = table2->link(col_linklist).column<Int>(0) * 2 == table2->column<Int>(0);
     match = q.find();
     CHECK_EQUAL(1, match);
@@ -7494,8 +7526,29 @@ TEST(Query_OperatorsOverLink)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    // Rows 1 and 2 should match this query as 2 * 2 == 4. Row 0 should not as the multiplication will not produce any results.
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the multiplication will not produce any results.
     q = table2->column<Int>(0) == 2 * table2->link(col_linklist).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->link(col_linklist).column<Double>(1) * 2 == table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->column<Int>(0) == 2 * table2->link(col_linklist).column<Double>(1);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
