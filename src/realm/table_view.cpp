@@ -32,10 +32,10 @@ using namespace realm;
 TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
                              MutableSourcePayload mode)
     : RowIndexes(src, mode),
-      m_linkview_source(LinkViewRef()),
       m_linked_table(TableRef()),
-      m_linked_row(src.m_linked_row),
       m_linked_column(src.m_linked_column),
+      m_linked_row(src.m_linked_row),
+      m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
     patch.was_in_sync = src.is_in_sync();
@@ -63,10 +63,10 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
 TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
                              ConstSourcePayload mode)
     : RowIndexes(src, mode),
-      m_linkview_source(LinkViewRef()),
       m_linked_table(TableRef()),
-      m_linked_row(src.m_linked_row),
       m_linked_column(src.m_linked_column),
+      m_linked_row(src.m_linked_row),
+      m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
     if (mode == ConstSourcePayload::Stay)
