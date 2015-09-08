@@ -76,7 +76,8 @@
   blocking the use of this flag have been fixed.
 * SharedGroup no longer needs to remap the database file when it grows. This is
   a key requirement for reusing the memory mapping across threads.
-* `NOEXCEPT*` macros have been replaced by the C++11 `noexcept` specifier
+* `NOEXCEPT*` macros have been replaced by the C++11 `noexcept` specifier.
+* The `REALM_CONSTEXPR` macro has been replaced by the C++11 `constexpr` keyword.
 
 ----------------------------------------------
 
