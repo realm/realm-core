@@ -1,5 +1,7 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
+# Just a test
+
 # Enable tracing if REALM_SCRIPT_DEBUG is set
 if [ -e $HOME/.realm ]; then
     . $HOME/.realm
