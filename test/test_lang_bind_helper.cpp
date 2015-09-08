@@ -8640,7 +8640,6 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    sg.begin_read();
 
     std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
@@ -8677,9 +8676,12 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
                 CHECK_EQUAL(i, tv.get_link(0, 0));
                 handover1 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
                 CHECK(tv.is_attached());
-                auto tv2 = sg_w.import_from_handover(std::move(handover1));
+                sg.begin_read(vid);
+                auto tv2 = sg.import_from_handover(std::move(handover1));
                 CHECK(tv2->is_attached());
+                CHECK_EQUAL(1, tv2->size());
                 CHECK_EQUAL(i, tv2->get_link(0, 0));
+                sg.end_read();
             }
         }
     }
