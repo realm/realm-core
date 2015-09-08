@@ -841,7 +841,7 @@ public:
                 end2 = end - this->m_leaf_start;
 
             size_t s;
-            if (m_null)
+            if (IntegerNodeBase<ColType>::m_null)
                 s = this->m_leaf_ptr->template find_first<TConditionFunction>(null(), start - this->m_leaf_start, end2);
             else
                 s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start - this->m_leaf_start, end2);
