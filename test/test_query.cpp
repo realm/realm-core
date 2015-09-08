@@ -7031,6 +7031,44 @@ TEST(Query_Null_ManyRows)
     CHECK(equals(tv, non_nulls));
 }
 
+TEST(Query_Null_Sort)
+{
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    create_columns(table);
+
+    table->add_empty_row(3);
+
+    table->set_int(0, 0, 0);
+    table->set_float(1, 0, 0.f);
+    table->set_string(2, 0, "0");
+    table->set_double(3, 0, 0.0);
+    table->set_bool(4, 0, false);
+    table->set_datetime(5, 0, DateTime(0));
+
+    table->set_int(0, 2, 2);
+    table->set_float(1, 2, 2.f);
+    table->set_string(2, 2, "2");
+    table->set_double(3, 2, 2.0);
+    table->set_bool(4, 2, true);
+    table->set_datetime(5, 2, DateTime(2000));
+
+    for (int i = 0; i <= 5; i++) {
+        TableView tv = table->where().find_all();
+        CHECK(tv.size() == 3);
+
+        tv.sort(i, true);
+        CHECK_EQUAL(tv.get_source_ndx(0), 1);
+        CHECK_EQUAL(tv.get_source_ndx(1), 0);
+        CHECK_EQUAL(tv.get_source_ndx(2), 2);
+
+        tv.sort(i, false);
+        CHECK_EQUAL(tv.get_source_ndx(0), 2);
+        CHECK_EQUAL(tv.get_source_ndx(1), 0);
+        CHECK_EQUAL(tv.get_source_ndx(2), 1);
+    }
+}
+
 TEST(Query_LinkCounts)
 {
     Group group;

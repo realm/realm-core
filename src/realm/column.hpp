@@ -64,6 +64,14 @@ template <class T> struct ColumnTemplate : public ColumnTemplateBase
     // Overridden in column_string.* because == operator of StringData isn't yet locale aware; todo
     virtual int compare_values(size_t row1, size_t row2) const
     {
+        // we negate nullability such that the two ternary statements in this method can look identical to reduce 
+        // risk of bugs
+        bool v1 = !is_null(row1);
+        bool v2 = !is_null(row2);
+
+        if (!v1 || !v2)
+            return v1 == v2 ? 0 : v1 < v2 ? 1 : -1;
+
         T a = get_val(row1);
         T b = get_val(row2);
         return a == b ? 0 : a < b ? 1 : -1;
@@ -72,6 +80,7 @@ template <class T> struct ColumnTemplate : public ColumnTemplateBase
     // We cannot use already-existing get() methods because StringEnumColumn and LinkList inherit from
     // Column and overload get() with different return type than int64_t. Todo, find a way to simplify
     virtual T get_val(size_t row) const = 0;
+    virtual bool is_null(size_t row) const = 0;
 };
 
 /// Base class for all column types.
