@@ -246,38 +246,6 @@ using namespace realm::util;
 
 
 // fixme, we need to gather all these typetraits definitions to just 1 single
-template<class T> struct ColumnTypeTraits3;
-
-template<> struct ColumnTypeTraits3<int64_t> {
-    const static ColumnType ct_id = col_type_Int;
-    const static ColumnType ct_id_real = col_type_Int;
-    typedef IntegerColumn column_type;
-};
-template<> struct ColumnTypeTraits3<bool> {
-    const static ColumnType ct_id = col_type_Bool;
-    const static ColumnType ct_id_real = col_type_Bool;
-    typedef IntegerColumn column_type;
-};
-template<> struct ColumnTypeTraits3<float> {
-    const static ColumnType ct_id = col_type_Float;
-    const static ColumnType ct_id_real = col_type_Float;
-    typedef FloatColumn column_type;
-};
-template<> struct ColumnTypeTraits3<double> {
-    const static ColumnType ct_id = col_type_Double;
-    const static ColumnType ct_id_real = col_type_Double;
-    typedef DoubleColumn column_type;
-};
-template<> struct ColumnTypeTraits3<DateTime> {
-    const static ColumnType ct_id = col_type_DateTime;
-    const static ColumnType ct_id_real = col_type_Int;
-    typedef IntegerColumn column_type;
-};
-template<> struct ColumnTypeTraits3<BinaryData> {
-    const static ColumnType ct_id = col_type_Binary;
-    const static ColumnType ct_id_real = col_type_Binary;
-    typedef BinaryColumn column_type;
-};
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -3149,16 +3117,17 @@ size_t Table::do_find_pkey_string(StringData value) const
 }
 
 
-template<class T> size_t Table::find_first(size_t col_ndx, T value) const
+template<class T, bool Nullable> size_t Table::find_first(size_t col_ndx, T value) const
 {
+    using type_traits = ColumnTypeTraits<T, Nullable>;
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnTypeTraits3<T>::ct_id_real);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, type_traits::column_id);
 
     if (!m_columns.is_attached())
         return not_found;
 
-    typedef typename ColumnTypeTraits3<T>::column_type ColType;
-    const ColType& column = get_column<ColType, ColumnTypeTraits3<T>::ct_id>(col_ndx);
+    typedef typename type_traits::column_type ColType;
+    const ColType& column = get_column<ColType, type_traits::column_id>(col_ndx);
     return column.find_first(value);
 }
 
@@ -3171,35 +3140,42 @@ size_t Table::find_first_link(size_t target_row_index) const
 
 size_t Table::find_first_int(size_t col_ndx, int64_t value) const
 {
-    return find_first<int64_t>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<int64_t, true>(col_ndx, value);
+    else
+        return find_first<int64_t, false>(col_ndx, value);
 }
 
 size_t Table::find_first_bool(size_t col_ndx, bool value) const
 {
-    return find_first<bool>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<bool, true>(col_ndx, value);
+    else
+        return find_first<bool, false>(col_ndx, value);
 }
 
 size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
 {
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
-
-    if (!m_columns.is_attached())
-        return not_found;
-
-    const IntegerColumn& column = get_column(col_ndx);
-
-    return column.find_first(int64_t(value.get_datetime()));
+    if (is_nullable(col_ndx))
+        return find_first<DateTime, true>(col_ndx, value);
+    else
+        return find_first<DateTime, false>(col_ndx, value);
 }
 
 size_t Table::find_first_float(size_t col_ndx, float value) const
 {
-    return find_first<float>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<Float, true>(col_ndx, value);
+    else
+        return find_first<Float, false>(col_ndx, value);
 }
 
 size_t Table::find_first_double(size_t col_ndx, double value) const
 {
-    return find_first<double>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<Double, true>(col_ndx, value);
+    else
+        return find_first<Double, false>(col_ndx, value);
 }
 
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
@@ -3220,7 +3196,10 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 
 size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<BinaryData, true>(col_ndx, value);
+    else
+        return find_first<BinaryData, false>(col_ndx, value);
 }
 
 size_t Table::find_first_null(size_t column_ndx) const
