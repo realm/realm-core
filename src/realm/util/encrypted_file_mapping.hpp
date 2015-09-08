@@ -120,12 +120,11 @@ private:
     size_t m_page_size;
     size_t m_blocks_per_page;
 
-    void* m_addr;
-    size_t m_size;
+    void* m_addr = nullptr;
     size_t m_file_offset = 0;
 
     uintptr_t m_first_page;
-    size_t m_page_count;
+    size_t m_page_count = 0;
 
     std::vector<bool> m_read_pages;
     std::vector<bool> m_write_pages;
