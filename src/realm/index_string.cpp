@@ -389,7 +389,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     if (slot_value % 2 != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
         // for integer index, get_func fills out 'buffer' and makes str point at it
-        char buffer[8];
+        char buffer[8]; // 8 is the biggest element size of any non-string/binary Realm type
         StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
             if (m_deny_duplicate_values)
@@ -420,7 +420,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
         size_t r1 = to_size_t(sub.get(0));
         // for integer index, get_func fills out 'buffer' and makes str point at it
-        char buffer[8];
+        char buffer[8]; // 8 is the biggest element size of any non-string/binary Realm type
         StringData v2 = get(r1, buffer);
         if (v2 == value) {
             if (m_deny_duplicate_values)

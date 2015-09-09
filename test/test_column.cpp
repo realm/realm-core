@@ -770,7 +770,7 @@ TEST(Column_IndexCrash)
     // Trying to reproduce bug found by Samuel / segiddins: "Assertion when setting value on indexed IntNullColumn"
     ref_type ref = IntNullColumn::create(Allocator::get_default());
     IntNullColumn col(Allocator::get_default(), ref);
-    
+
     col.create_search_index();
     col.insert_rows(0, 1, 0);
     col.set(0, 0);
