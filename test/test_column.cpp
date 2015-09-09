@@ -983,6 +983,8 @@ TEST(ColumnIntNull_MoveLastOverPreservesNull)
     c.set_null(2);
     c.move_last_over(0, 2);
     CHECK(c.is_null(0));
+    c.move_last_over(0, 1);
+    CHECK_EQUAL(c.get(0), 456);
     c.destroy();
 }
 
