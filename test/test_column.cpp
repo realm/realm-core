@@ -1006,6 +1006,9 @@ TEST(ColumnIntNull_CompareInts)
     c2.set(0, 0);
     CHECK(c1.compare_int(c2));
 
+    c2.set(0, 1);
+    CHECK_NOT(c1.compare_int(c2));
+
     c1.destroy();
     c2.destroy();
 }
