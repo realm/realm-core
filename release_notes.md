@@ -29,6 +29,8 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
+* Fixed a bug in the way the new memory mapping machinery interacted with 
+  encryption.
 
 ### API breaking changes:
 
