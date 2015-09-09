@@ -23,54 +23,31 @@
 
 class Snapshot {
 public:
-    // Get a new Snapshot object referring to same database state
-    std::shared_ptr<Snapshot> get_same_snapshot();
+    // Accessor manipulation goes through a Group object. The Group object
+    // is still owned by and dies with the Snapshot.
+    const Group& get_group();
 
-    // Check if a newer snapshot has become available
-    bool newer_snapshot_available();
-
-    // Commit any changes made inside a writable Snapshot to the database
-    // After a call to commit() all accessors obtained from this Snapshot
-    // become detached, and the only valid operation left is to relinguish
-    // the Snapshot reference.
-    void commit();
-
-    // Roll back any changes made inside a writable Snapshot.
-    // After a call to rollback() all accessors obtained from this Snapshot
-    // become detached, and the only valid operation left is to relinguish
-    // the Snapshot reference.
-    void rollback();
-
-    // Close snapshot ref. If the Snapshot was writable, and commit()
-    // or rollback was not called, a call to rollback() is implied.
-    // Note, that this only relinguishes the ref. The actual Snapshot object
+    // Close snapshot access to the file. This will cause subsequent access through
+    // accessors obtained from the Snapshot to fail. The actual Snapshot object
     // is ref-counted and remains available until all its accessors have
     // been deallocated.
     void close();
 
     ~Snapshot();
+};
 
+class SnapshotToBe {
     // Accessor manipulation goes through a Group object. The Group object
     // is still owned by and dies with the Snapshot.
     Group& get_group();
 
-    // advance Snapshot to latest commit in the database
-    bool advance_to_newest();
+    // Commit any changes done through accessors obtained from the SnapshotToBe
+    // to the database. Then close the Snapshot.
+    void commit();
 
-    // advance Snapshot to the same commit as a selected other Snapshot.
-    bool advance_to_match(Snapshot&);
-
-    // Make this Snapshot writable. As a side effect, it is advanced (as in advance_to_latest())
-    // to the latest commit in the database.
-    bool promote_to_write();
-
-    // Commit changes made and shift to being read-only
-    void commit_and_continue_as_read();
-
-    // Discard changes made and shift to being read-only
-    void rollback_and_continue_as_read();
+    // Close the Snapshot without committing changes to the database.
+    void rollback();
 };
-
 
 
 // Helper class which ensures that Snapshot::close() is called when the
@@ -80,6 +57,30 @@ public:
     ScopedSnapshot(std::shared_ptr<Snapshot>);
     void release();
     ~ScopedSnapshot();
-}
+};
+
+// Helper class which ensures that SnapshotToBe::rollback() is called when the
+// helper goes out of scope.
+class ScopedSnapshotToBe {
+public:
+    ScopedSnapshotToBe(std::shared_ptr<SnapshotToBe>);
+    void release();
+    ~ScopedSnapshotToBe();
+};
+
+// Additions to Table, LinkView, Query, Row, ConstRow, TableView and ConstTableView
+// A refresh() method is added, which allows the accessor to be "ported forward in time" 
+// to a different Snapshot or SnapshotToBe. This is highly generic and allows for
+// easy re-implementation of continuous transactions on top.
+class MyAccessor {
+public:
+    // ...
+
+    // Get a new const table accessor for the same table, but in a different snapshot.
+    std::shared_ptr<const MyAccessor> refresh(std::shared_ptr<Snapshot>& target_snapshot) const;
+
+    // Get a new non-const table accessor for the same table, but in a SnapshotToBe.
+    std::shared_ptr<MyAccessor> refresh(std::shared_ptr<SnapshotToBe>& target_snapshot) const;
+};
 
 #endif

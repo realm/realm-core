@@ -21,6 +21,7 @@
 #define REALM_REALM_HPP
 
 class Snapshot;
+class SnapshotToBe;
 
 class Realm {
 public:
@@ -49,12 +50,15 @@ public:
 
     bool is_attached();
 
-    // Get a readable snapshot
+    // Get a snapshot
     std::shared_ptr<Snapshot> get_newest_snapshot();
 
-    // Make a new writable snapshot
-    std::shared_ptr<Snapshot> get_writable_snapshot();
+    std::shared_ptr<SnapshotToBe> build_new_snapshot();
+
+    // Check if a newer snapshot has become available
+    bool newer_snapshot_available();
 };
+
 
 std::unique_ptr<Realm> make_realm();
 
