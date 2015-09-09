@@ -68,7 +68,7 @@ public:
     ~ScopedSnapshotToBe();
 };
 
-// Additions to Table, LinkView, Query, Row, ConstRow, TableView and ConstTableView
+// Additions to Table, LinkView, Query, Row, ConstRow, TableView and ConstTableView:
 // A refresh() method is added, which allows the accessor to be "ported forward in time" 
 // to a different Snapshot or SnapshotToBe. This is highly generic and allows for
 // easy re-implementation of continuous transactions on top.
