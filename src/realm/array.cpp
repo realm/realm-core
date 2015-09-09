@@ -1660,13 +1660,19 @@ void Array::alloc(size_t size, size_t width)
     REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = calc_byte_len(size, width);
+
+        REALM_ASSERT_3(needed_bytes, <= , max_array_payload);
+
         size_t orig_capacity_bytes = get_capacity_from_header();
         size_t capacity_bytes = orig_capacity_bytes;
 
         if (capacity_bytes < needed_bytes) {
-            // Double to avoid too many reallocs (or initialize to initial size)
-            capacity_bytes = capacity_bytes * 2; // FIXME: Highly prone to overflow on 32-bit systems
-
+            // Double to avoid too many reallocs (or initialize to initial size), but truncate if that exceeds the
+            // maximum allowed payload (measured in bytes) for arrays. This limitation is due to 24-bit capacity
+            // field in the header.
+            // FIXME: Highly prone to overflow on 32-bit systems
+            capacity_bytes = (capacity_bytes * 2 <= max_array_payload) ? capacity_bytes * 2 : max_array_payload;
+            
             // If doubling is not enough, expand enough to fit
             if (capacity_bytes < needed_bytes) {
                 size_t rest = (~needed_bytes & 0x7) + 1;
