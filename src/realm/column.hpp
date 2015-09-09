@@ -1165,8 +1165,13 @@ void Column<T,N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 
         // update index to point to new location
         if (row_ndx != last_row_ndx) {
-            int_fast64_t moved_value = get(last_row_ndx);
-            m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
+            if (is_null(last_row_ndx)) {
+                m_search_index->update_ref(null{}, last_row_ndx, row_ndx); // Throws
+            }
+            else {
+                int_fast64_t moved_value = get(last_row_ndx);
+                m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
+            }
         }
     }
 
@@ -1287,8 +1292,15 @@ bool Column<T,N>::compare_int(const Column<T,N>& c) const noexcept
     if (c.size() != n)
         return false;
     for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i))
+        bool left_is_null = is_null(i);
+        bool right_is_null = c.is_null(i);
+        if (left_is_null != right_is_null) {
             return false;
+        }
+        if (!left_is_null) {
+            if (get(i) != c.get(i))
+                return false;
+        }
     }
     return true;
 }

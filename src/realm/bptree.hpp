@@ -652,8 +652,13 @@ template <class T, bool N>
 void BpTree<T, N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     // Copy value from last row over
-    int_fast64_t value = get(last_row_ndx);
-    set(row_ndx, value);
+    if (is_null(last_row_ndx)) {
+        set_null(row_ndx);
+    }
+    else {
+        int_fast64_t value = get(last_row_ndx);
+        set(row_ndx, value);
+    }
     erase(last_row_ndx, true);
 }
 
