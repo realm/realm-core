@@ -101,44 +101,44 @@ namespace realm {
 /// \sa StringData
 class Mixed {
 public:
-    Mixed() REALM_NOEXCEPT;
+    Mixed() noexcept;
 
-    Mixed(bool)       REALM_NOEXCEPT;
-    Mixed(int64_t)    REALM_NOEXCEPT;
-    Mixed(float)      REALM_NOEXCEPT;
-    Mixed(double)     REALM_NOEXCEPT;
-    Mixed(StringData) REALM_NOEXCEPT;
-    Mixed(BinaryData) REALM_NOEXCEPT;
-    Mixed(DateTime)   REALM_NOEXCEPT;
+    Mixed(bool)       noexcept;
+    Mixed(int64_t)    noexcept;
+    Mixed(float)      noexcept;
+    Mixed(double)     noexcept;
+    Mixed(StringData) noexcept;
+    Mixed(BinaryData) noexcept;
+    Mixed(DateTime)   noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
-    Mixed(      char* c_str) REALM_NOEXCEPT { set_string(c_str); }
-    Mixed(const char* c_str) REALM_NOEXCEPT { set_string(c_str); }
+    Mixed(      char* c_str) noexcept { set_string(c_str); }
+    Mixed(const char* c_str) noexcept { set_string(c_str); }
 
     struct subtable_tag {};
-    Mixed(subtable_tag) REALM_NOEXCEPT: m_type(type_Table) {}
+    Mixed(subtable_tag) noexcept: m_type(type_Table) {}
 
-    ~Mixed() REALM_NOEXCEPT {}
+    ~Mixed() noexcept {}
 
-    DataType get_type() const REALM_NOEXCEPT { return m_type; }
+    DataType get_type() const noexcept { return m_type; }
 
-    int64_t     get_int()      const REALM_NOEXCEPT;
-    bool        get_bool()     const REALM_NOEXCEPT;
-    float       get_float()    const REALM_NOEXCEPT;
-    double      get_double()   const REALM_NOEXCEPT;
-    StringData  get_string()   const REALM_NOEXCEPT;
-    BinaryData  get_binary()   const REALM_NOEXCEPT;
-    DateTime    get_datetime() const REALM_NOEXCEPT;
+    int64_t     get_int()      const noexcept;
+    bool        get_bool()     const noexcept;
+    float       get_float()    const noexcept;
+    double      get_double()   const noexcept;
+    StringData  get_string()   const noexcept;
+    BinaryData  get_binary()   const noexcept;
+    DateTime    get_datetime() const noexcept;
 
-    void set_int(int64_t) REALM_NOEXCEPT;
-    void set_bool(bool) REALM_NOEXCEPT;
-    void set_float(float) REALM_NOEXCEPT;
-    void set_double(double) REALM_NOEXCEPT;
-    void set_string(StringData) REALM_NOEXCEPT;
-    void set_binary(BinaryData) REALM_NOEXCEPT;
-    void set_binary(const char* data, std::size_t size) REALM_NOEXCEPT;
-    void set_datetime(DateTime) REALM_NOEXCEPT;
+    void set_int(int64_t) noexcept;
+    void set_bool(bool) noexcept;
+    void set_float(float) noexcept;
+    void set_double(double) noexcept;
+    void set_string(StringData) noexcept;
+    void set_binary(BinaryData) noexcept;
+    void set_binary(const char* data, std::size_t size) noexcept;
+    void set_datetime(DateTime) noexcept;
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
@@ -166,16 +166,16 @@ private:
 // of Mixed are not explicit.
 
 // Compare mixed with integer
-template<class T> bool operator==(Wrap<Mixed>, const T&) REALM_NOEXCEPT;
-template<class T> bool operator!=(Wrap<Mixed>, const T&) REALM_NOEXCEPT;
-template<class T> bool operator==(const T&, Wrap<Mixed>) REALM_NOEXCEPT;
-template<class T> bool operator!=(const T&, Wrap<Mixed>) REALM_NOEXCEPT;
+template<class T> bool operator==(Wrap<Mixed>, const T&) noexcept;
+template<class T> bool operator!=(Wrap<Mixed>, const T&) noexcept;
+template<class T> bool operator==(const T&, Wrap<Mixed>) noexcept;
+template<class T> bool operator!=(const T&, Wrap<Mixed>) noexcept;
 
 // Compare mixed with boolean
-bool operator==(Wrap<Mixed>, bool) REALM_NOEXCEPT;
-bool operator!=(Wrap<Mixed>, bool) REALM_NOEXCEPT;
-bool operator==(bool, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator!=(bool, Wrap<Mixed>) REALM_NOEXCEPT;
+bool operator==(Wrap<Mixed>, bool) noexcept;
+bool operator!=(Wrap<Mixed>, bool) noexcept;
+bool operator==(bool, Wrap<Mixed>) noexcept;
+bool operator!=(bool, Wrap<Mixed>) noexcept;
 
 // Compare mixed with float
 bool operator==(Wrap<Mixed>, float);
@@ -190,174 +190,174 @@ bool operator==(double, Wrap<Mixed>);
 bool operator!=(double, Wrap<Mixed>);
 
 // Compare mixed with string
-bool operator==(Wrap<Mixed>, StringData) REALM_NOEXCEPT;
-bool operator!=(Wrap<Mixed>, StringData) REALM_NOEXCEPT;
-bool operator==(StringData, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator!=(StringData, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator==(Wrap<Mixed>, const char* c_str) REALM_NOEXCEPT;
-bool operator!=(Wrap<Mixed>, const char* c_str) REALM_NOEXCEPT;
-bool operator==(const char* c_str, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator!=(const char* c_str, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator==(Wrap<Mixed>, char* c_str) REALM_NOEXCEPT;
-bool operator!=(Wrap<Mixed>, char* c_str) REALM_NOEXCEPT;
-bool operator==(char* c_str, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator!=(char* c_str, Wrap<Mixed>) REALM_NOEXCEPT;
+bool operator==(Wrap<Mixed>, StringData) noexcept;
+bool operator!=(Wrap<Mixed>, StringData) noexcept;
+bool operator==(StringData, Wrap<Mixed>) noexcept;
+bool operator!=(StringData, Wrap<Mixed>) noexcept;
+bool operator==(Wrap<Mixed>, const char* c_str) noexcept;
+bool operator!=(Wrap<Mixed>, const char* c_str) noexcept;
+bool operator==(const char* c_str, Wrap<Mixed>) noexcept;
+bool operator!=(const char* c_str, Wrap<Mixed>) noexcept;
+bool operator==(Wrap<Mixed>, char* c_str) noexcept;
+bool operator!=(Wrap<Mixed>, char* c_str) noexcept;
+bool operator==(char* c_str, Wrap<Mixed>) noexcept;
+bool operator!=(char* c_str, Wrap<Mixed>) noexcept;
 
 // Compare mixed with binary data
-bool operator==(Wrap<Mixed>, BinaryData) REALM_NOEXCEPT;
-bool operator!=(Wrap<Mixed>, BinaryData) REALM_NOEXCEPT;
-bool operator==(BinaryData, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator!=(BinaryData, Wrap<Mixed>) REALM_NOEXCEPT;
+bool operator==(Wrap<Mixed>, BinaryData) noexcept;
+bool operator!=(Wrap<Mixed>, BinaryData) noexcept;
+bool operator==(BinaryData, Wrap<Mixed>) noexcept;
+bool operator!=(BinaryData, Wrap<Mixed>) noexcept;
 
 // Compare mixed with date
-bool operator==(Wrap<Mixed>, DateTime) REALM_NOEXCEPT;
-bool operator!=(Wrap<Mixed>, DateTime) REALM_NOEXCEPT;
-bool operator==(DateTime, Wrap<Mixed>) REALM_NOEXCEPT;
-bool operator!=(DateTime, Wrap<Mixed>) REALM_NOEXCEPT;
+bool operator==(Wrap<Mixed>, DateTime) noexcept;
+bool operator!=(Wrap<Mixed>, DateTime) noexcept;
+bool operator==(DateTime, Wrap<Mixed>) noexcept;
+bool operator!=(DateTime, Wrap<Mixed>) noexcept;
 
 
 
 
 // Implementation:
 
-inline Mixed::Mixed() REALM_NOEXCEPT
+inline Mixed::Mixed() noexcept
 {
     m_type = type_Int;
     m_int  = 0;
 }
 
-inline Mixed::Mixed(int64_t v) REALM_NOEXCEPT
+inline Mixed::Mixed(int64_t v) noexcept
 {
     m_type = type_Int;
     m_int  = v;
 }
 
-inline Mixed::Mixed(bool v) REALM_NOEXCEPT
+inline Mixed::Mixed(bool v) noexcept
 {
     m_type = type_Bool;
     m_bool = v;
 }
 
-inline Mixed::Mixed(float v) REALM_NOEXCEPT
+inline Mixed::Mixed(float v) noexcept
 {
     m_type = type_Float;
     m_float = v;
 }
 
-inline Mixed::Mixed(double v) REALM_NOEXCEPT
+inline Mixed::Mixed(double v) noexcept
 {
    m_type = type_Double;
    m_double = v;
 }
 
-inline Mixed::Mixed(StringData v) REALM_NOEXCEPT
+inline Mixed::Mixed(StringData v) noexcept
 {
     m_type = type_String;
     m_data = v.data();
     m_size = v.size();
 }
 
-inline Mixed::Mixed(BinaryData v) REALM_NOEXCEPT
+inline Mixed::Mixed(BinaryData v) noexcept
 {
     m_type = type_Binary;
     m_data = v.data();
     m_size = v.size();
 }
 
-inline Mixed::Mixed(DateTime v) REALM_NOEXCEPT
+inline Mixed::Mixed(DateTime v) noexcept
 {
     m_type = type_DateTime;
     m_date = v.get_datetime();
 }
 
 
-inline int64_t Mixed::get_int() const REALM_NOEXCEPT
+inline int64_t Mixed::get_int() const noexcept
 {
     REALM_ASSERT(m_type == type_Int);
     return m_int;
 }
 
-inline bool Mixed::get_bool() const REALM_NOEXCEPT
+inline bool Mixed::get_bool() const noexcept
 {
     REALM_ASSERT(m_type == type_Bool);
     return m_bool;
 }
 
-inline float Mixed::get_float() const REALM_NOEXCEPT
+inline float Mixed::get_float() const noexcept
 {
     REALM_ASSERT(m_type == type_Float);
     return m_float;
 }
 
-inline double Mixed::get_double() const REALM_NOEXCEPT
+inline double Mixed::get_double() const noexcept
 {
     REALM_ASSERT(m_type == type_Double);
     return m_double;
 }
 
-inline StringData Mixed::get_string() const REALM_NOEXCEPT
+inline StringData Mixed::get_string() const noexcept
 {
     REALM_ASSERT(m_type == type_String);
     return StringData(m_data, m_size);
 }
 
-inline BinaryData Mixed::get_binary() const REALM_NOEXCEPT
+inline BinaryData Mixed::get_binary() const noexcept
 {
     REALM_ASSERT(m_type == type_Binary);
     return BinaryData(m_data, m_size);
 }
 
-inline DateTime Mixed::get_datetime() const REALM_NOEXCEPT
+inline DateTime Mixed::get_datetime() const noexcept
 {
     REALM_ASSERT(m_type == type_DateTime);
     return m_date;
 }
 
 
-inline void Mixed::set_int(int64_t v) REALM_NOEXCEPT
+inline void Mixed::set_int(int64_t v) noexcept
 {
     m_type = type_Int;
     m_int = v;
 }
 
-inline void Mixed::set_bool(bool v) REALM_NOEXCEPT
+inline void Mixed::set_bool(bool v) noexcept
 {
     m_type = type_Bool;
     m_bool = v;
 }
 
-inline void Mixed::set_float(float v) REALM_NOEXCEPT
+inline void Mixed::set_float(float v) noexcept
 {
     m_type = type_Float;
     m_float = v;
 }
 
-inline void Mixed::set_double(double v) REALM_NOEXCEPT
+inline void Mixed::set_double(double v) noexcept
 {
     m_type = type_Double;
     m_double = v;
 }
 
-inline void Mixed::set_string(StringData v) REALM_NOEXCEPT
+inline void Mixed::set_string(StringData v) noexcept
 {
     m_type = type_String;
     m_data = v.data();
     m_size = v.size();
 }
 
-inline void Mixed::set_binary(BinaryData v) REALM_NOEXCEPT
+inline void Mixed::set_binary(BinaryData v) noexcept
 {
     set_binary(v.data(), v.size());
 }
 
-inline void Mixed::set_binary(const char* data, std::size_t size) REALM_NOEXCEPT
+inline void Mixed::set_binary(const char* data, std::size_t size) noexcept
 {
     m_type = type_Binary;
     m_data = data;
     m_size = size;
 }
 
-inline void Mixed::set_datetime(DateTime v) REALM_NOEXCEPT
+inline void Mixed::set_datetime(DateTime v) noexcept
 {
     m_type = type_DateTime;
     m_date = v.get_datetime();
@@ -389,22 +389,22 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 
 // Compare mixed with integer
 
-template<class T> inline bool operator==(Wrap<Mixed> a, const T& b) REALM_NOEXCEPT
+template<class T> inline bool operator==(Wrap<Mixed> a, const T& b) noexcept
 {
     return Mixed(a).get_type() == type_Int && Mixed(a).get_int() == b;
 }
 
-template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b) REALM_NOEXCEPT
+template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b) noexcept
 {
     return Mixed(a).get_type() != type_Int || Mixed(a).get_int() != b;
 }
 
-template<class T> inline bool operator==(const T& a, Wrap<Mixed> b) REALM_NOEXCEPT
+template<class T> inline bool operator==(const T& a, Wrap<Mixed> b) noexcept
 {
     return type_Int == Mixed(b).get_type() && a == Mixed(b).get_int();
 }
 
-template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b) REALM_NOEXCEPT
+template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b) noexcept
 {
     return type_Int != Mixed(b).get_type() || a != Mixed(b).get_int();
 }
@@ -412,22 +412,22 @@ template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b) REALM_NOEXCE
 
 // Compare mixed with boolean
 
-inline bool operator==(Wrap<Mixed> a, bool b) REALM_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, bool b) noexcept
 {
     return Mixed(a).get_type() == type_Bool && Mixed(a).get_bool() == b;
 }
 
-inline bool operator!=(Wrap<Mixed> a, bool b) REALM_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, bool b) noexcept
 {
     return Mixed(a).get_type() != type_Bool || Mixed(a).get_bool() != b;
 }
 
-inline bool operator==(bool a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator==(bool a, Wrap<Mixed> b) noexcept
 {
     return type_Bool == Mixed(b).get_type() && a == Mixed(b).get_bool();
 }
 
-inline bool operator!=(bool a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator!=(bool a, Wrap<Mixed> b) noexcept
 {
     return type_Bool != Mixed(b).get_type() || a != Mixed(b).get_bool();
 }
@@ -481,62 +481,62 @@ inline bool operator!=(double a, Wrap<Mixed> b)
 
 // Compare mixed with string
 
-inline bool operator==(Wrap<Mixed> a, StringData b) REALM_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, StringData b) noexcept
 {
     return Mixed(a).get_type() == type_String && Mixed(a).get_string() == b;
 }
 
-inline bool operator!=(Wrap<Mixed> a, StringData b) REALM_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, StringData b) noexcept
 {
     return Mixed(a).get_type() != type_String || Mixed(a).get_string() != b;
 }
 
-inline bool operator==(StringData a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator==(StringData a, Wrap<Mixed> b) noexcept
 {
     return type_String == Mixed(b).get_type() && a == Mixed(b).get_string();
 }
 
-inline bool operator!=(StringData a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator!=(StringData a, Wrap<Mixed> b) noexcept
 {
     return type_String != Mixed(b).get_type() || a != Mixed(b).get_string();
 }
 
-inline bool operator==(Wrap<Mixed> a, const char* b) REALM_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, const char* b) noexcept
 {
     return a == StringData(b);
 }
 
-inline bool operator!=(Wrap<Mixed> a, const char* b) REALM_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, const char* b) noexcept
 {
     return a != StringData(b);
 }
 
-inline bool operator==(const char* a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator==(const char* a, Wrap<Mixed> b) noexcept
 {
     return StringData(a) == b;
 }
 
-inline bool operator!=(const char* a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator!=(const char* a, Wrap<Mixed> b) noexcept
 {
     return StringData(a) != b;
 }
 
-inline bool operator==(Wrap<Mixed> a, char* b) REALM_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, char* b) noexcept
 {
     return a == StringData(b);
 }
 
-inline bool operator!=(Wrap<Mixed> a, char* b) REALM_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, char* b) noexcept
 {
     return a != StringData(b);
 }
 
-inline bool operator==(char* a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator==(char* a, Wrap<Mixed> b) noexcept
 {
     return StringData(a) == b;
 }
 
-inline bool operator!=(char* a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator!=(char* a, Wrap<Mixed> b) noexcept
 {
     return StringData(a) != b;
 }
@@ -544,22 +544,22 @@ inline bool operator!=(char* a, Wrap<Mixed> b) REALM_NOEXCEPT
 
 // Compare mixed with binary data
 
-inline bool operator==(Wrap<Mixed> a, BinaryData b) REALM_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, BinaryData b) noexcept
 {
     return Mixed(a).get_type() == type_Binary && Mixed(a).get_binary() == b;
 }
 
-inline bool operator!=(Wrap<Mixed> a, BinaryData b) REALM_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, BinaryData b) noexcept
 {
     return Mixed(a).get_type() != type_Binary || Mixed(a).get_binary() != b;
 }
 
-inline bool operator==(BinaryData a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator==(BinaryData a, Wrap<Mixed> b) noexcept
 {
     return type_Binary == Mixed(b).get_type() && a == Mixed(b).get_binary();
 }
 
-inline bool operator!=(BinaryData a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator!=(BinaryData a, Wrap<Mixed> b) noexcept
 {
     return type_Binary != Mixed(b).get_type() || a != Mixed(b).get_binary();
 }
@@ -567,22 +567,22 @@ inline bool operator!=(BinaryData a, Wrap<Mixed> b) REALM_NOEXCEPT
 
 // Compare mixed with date
 
-inline bool operator==(Wrap<Mixed> a, DateTime b) REALM_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, DateTime b) noexcept
 {
     return Mixed(a).get_type() == type_DateTime && DateTime(Mixed(a).get_datetime()) == b;
 }
 
-inline bool operator!=(Wrap<Mixed> a, DateTime b) REALM_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, DateTime b) noexcept
 {
     return Mixed(a).get_type() != type_DateTime || DateTime(Mixed(a).get_datetime()) != b;
 }
 
-inline bool operator==(DateTime a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator==(DateTime a, Wrap<Mixed> b) noexcept
 {
     return type_DateTime == Mixed(b).get_type() && a == DateTime(Mixed(b).get_datetime());
 }
 
-inline bool operator!=(DateTime a, Wrap<Mixed> b) REALM_NOEXCEPT
+inline bool operator!=(DateTime a, Wrap<Mixed> b) noexcept
 {
     return type_DateTime != Mixed(b).get_type() || a != DateTime(Mixed(b).get_datetime());
 }

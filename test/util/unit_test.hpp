@@ -207,14 +207,14 @@ public:
     virtual void fail(const TestDetails&, const std::string& message);
     virtual void end(const TestDetails&, double elapsed_seconds);
     virtual void summary(const Summary&);
-    virtual ~Reporter() REALM_NOEXCEPT {}
+    virtual ~Reporter() noexcept {}
 };
 
 
 class Filter {
 public:
     virtual bool include(const TestDetails&) = 0;
-    virtual ~Filter() REALM_NOEXCEPT {}
+    virtual ~Filter() noexcept {}
 };
 
 

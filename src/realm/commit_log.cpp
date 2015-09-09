@@ -77,24 +77,24 @@ namespace _impl {
 class WriteLogCollector: public ClientHistory {
 public:
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
-    ~WriteLogCollector() REALM_NOEXCEPT;
+    ~WriteLogCollector() noexcept;
     std::string do_get_database_path() override { return m_database_name; }
     void do_initiate_transact(SharedGroup&, version_type) override;
     version_type do_prepare_commit(SharedGroup& sg, version_type orig_version)
         override;
-    void do_finalize_commit(SharedGroup&) REALM_NOEXCEPT override;
-    void do_abort_transact(SharedGroup&) REALM_NOEXCEPT override;
-    BinaryData get_uncommitted_changes() REALM_NOEXCEPT override;
-    void do_interrupt() REALM_NOEXCEPT override {};
-    void do_clear_interrupt() REALM_NOEXCEPT override {};
+    void do_finalize_commit(SharedGroup&) noexcept override;
+    void do_abort_transact(SharedGroup&) noexcept override;
+    BinaryData get_uncommitted_changes() noexcept override;
+    void do_interrupt() noexcept override {};
+    void do_clear_interrupt() noexcept override {};
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
     void stop_logging() override;
     void reset_log_management(version_type last_version) override;
     void set_last_version_seen_locally(version_type last_seen_version_number)
-        REALM_NOEXCEPT override;
+        noexcept override;
 
-    void get_changesets(version_type, version_type, BinaryData*) const REALM_NOEXCEPT override;
+    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
 
 protected:
     // file and memory mappings are always multiples of this size
@@ -249,7 +249,7 @@ protected:
 
     template<typename T>
     void get_commit_entries_internal(version_type from_version, version_type to_version,
-                                     T* logs_buffer) const REALM_NOEXCEPT;
+                                     T* logs_buffer) const noexcept;
 
     // Determine if one of the log files hold only stale log entries.  If so,
     // recycle said log file.
@@ -482,7 +482,7 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
 // Public methods:
 
-WriteLogCollector::~WriteLogCollector() REALM_NOEXCEPT
+WriteLogCollector::~WriteLogCollector() noexcept
 {
 }
 
@@ -511,7 +511,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 // FIXME: Finn, `map_header_if_needed()` can throw, so it is an error to declare
 // this one `noexcept`
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number)
-    REALM_NOEXCEPT
+    noexcept
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -536,7 +536,7 @@ void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
 
 
 void WriteLogCollector::get_changesets(version_type from_version, version_type to_version,
-                                       BinaryData* logs_buffer) const REALM_NOEXCEPT
+                                       BinaryData* logs_buffer) const noexcept
 {
     get_commit_entries_internal(from_version, to_version, logs_buffer);
 }
@@ -545,7 +545,7 @@ void WriteLogCollector::get_changesets(version_type from_version, version_type t
 template<typename T>
 void WriteLogCollector::get_commit_entries_internal(version_type from_version,
                                                     version_type to_version,
-                                                    T* logs_buffer) const REALM_NOEXCEPT
+                                                    T* logs_buffer) const noexcept
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -646,19 +646,19 @@ WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_ty
 }
 
 
-void WriteLogCollector::do_finalize_commit(SharedGroup&) REALM_NOEXCEPT
+void WriteLogCollector::do_finalize_commit(SharedGroup&) noexcept
 {
     // See note in do_prepare_commit().
 }
 
 
-void WriteLogCollector::do_abort_transact(SharedGroup&) REALM_NOEXCEPT
+void WriteLogCollector::do_abort_transact(SharedGroup&) noexcept
 {
     // See note in do_prepare_commit().
 }
 
 
-BinaryData WriteLogCollector::get_uncommitted_changes() REALM_NOEXCEPT
+BinaryData WriteLogCollector::get_uncommitted_changes() noexcept
 {
     return BinaryData(m_transact_log_buffer.data(),
                       write_position() - m_transact_log_buffer.data());

@@ -25,7 +25,7 @@ std::map<ref_type, void*> malloc_debug_map;
 
 class InvalidFreeSpace: std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
+    const char* what() const noexcept override
     {
         return "Free space tracking was lost due to out-of-memory";
     }
@@ -64,11 +64,11 @@ const SlabAlloc::Header SlabAlloc::streaming_header = {
 
 class SlabAlloc::ChunkRefEq {
 public:
-    ChunkRefEq(ref_type ref) REALM_NOEXCEPT:
+    ChunkRefEq(ref_type ref) noexcept:
         m_ref(ref)
     {
     }
-    bool operator()(const Chunk& chunk) const REALM_NOEXCEPT
+    bool operator()(const Chunk& chunk) const noexcept
     {
         return chunk.ref == m_ref;
     }
@@ -79,11 +79,11 @@ private:
 
 class SlabAlloc::ChunkRefEndEq {
 public:
-    ChunkRefEndEq(ref_type ref) REALM_NOEXCEPT:
+    ChunkRefEndEq(ref_type ref) noexcept:
         m_ref(ref)
     {
     }
-    bool operator()(const Chunk& chunk) const REALM_NOEXCEPT
+    bool operator()(const Chunk& chunk) const noexcept
     {
         return chunk.ref + chunk.size == m_ref;
     }
@@ -94,11 +94,11 @@ private:
 
 class SlabAlloc::SlabRefEndEq {
 public:
-    SlabRefEndEq(ref_type ref) REALM_NOEXCEPT:
+    SlabRefEndEq(ref_type ref) noexcept:
         m_ref(ref)
     {
     }
-    bool operator()(const Slab& slab) const REALM_NOEXCEPT
+    bool operator()(const Slab& slab) const noexcept
     {
         return slab.ref_end == m_ref;
     }
@@ -107,7 +107,7 @@ private:
 };
 
 
-void SlabAlloc::detach() REALM_NOEXCEPT
+void SlabAlloc::detach() noexcept
 {
     switch (m_attach_mode) {
         case attach_None:
@@ -133,7 +133,7 @@ void SlabAlloc::detach() REALM_NOEXCEPT
 }
 
 
-SlabAlloc::~SlabAlloc() REALM_NOEXCEPT
+SlabAlloc::~SlabAlloc() noexcept
 {
 #ifdef REALM_DEBUG
     if (is_attached()) {
@@ -265,7 +265,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 }
 
 
-void SlabAlloc::do_free(ref_type ref, const char* addr) REALM_NOEXCEPT
+void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 {
     REALM_ASSERT_3(translate(ref), ==, addr);
 
@@ -375,7 +375,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
-char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
+char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
@@ -402,7 +402,7 @@ char* SlabAlloc::do_translate(ref_type ref) const REALM_NOEXCEPT
     return i->addr + (ref - slab_ref);
 }
 
-int SlabAlloc::get_committed_file_format() const REALM_NOEXCEPT
+int SlabAlloc::get_committed_file_format() const noexcept
 {
     Header* header = reinterpret_cast<Header*>(m_data);
     int select_field = header->m_flags & SlabAlloc::flags_SelectBit;
@@ -552,6 +552,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     if (cfg.session_initiator && m_file_on_streaming_form) {
 
         Header* header = reinterpret_cast<Header*>(m_data);
+        static_cast<void>(header);
 
         // Don't compare file format version fields as they are allowed to differ. 
         // Also don't compare reserved fields (todo, is it correct to ignore?)
@@ -684,7 +685,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
 }
 
 
-size_t SlabAlloc::get_total_size() const REALM_NOEXCEPT
+size_t SlabAlloc::get_total_size() const noexcept
 {
     return m_slabs.empty() ? m_baseline : m_slabs.back().ref_end;
 }
@@ -784,7 +785,7 @@ const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 // Please note that the file is not necessarily mmapped with a separate mapping
 // for each section, multiple sections may be mmapped with a single mmap.
 
-size_t SlabAlloc::get_section_index(size_t pos) const REALM_NOEXCEPT
+size_t SlabAlloc::get_section_index(size_t pos) const noexcept
 {
     // size_t section_base_number = pos/m_initial_section_size;
     size_t section_base_number = pos >> m_section_shifts;
@@ -803,7 +804,7 @@ size_t SlabAlloc::get_section_index(size_t pos) const REALM_NOEXCEPT
     return index;
 }
 
-size_t SlabAlloc::compute_section_base(size_t index) const REALM_NOEXCEPT
+size_t SlabAlloc::compute_section_base(size_t index) const noexcept
 {
     size_t base;
     if (index < 16) {
@@ -822,7 +823,7 @@ size_t SlabAlloc::compute_section_base(size_t index) const REALM_NOEXCEPT
 
 size_t SlabAlloc::find_section_in_range(size_t start_pos, 
                                              size_t free_chunk_size,
-                                             size_t request_size) const REALM_NOEXCEPT
+                                             size_t request_size) const noexcept
 {
     size_t end_of_block = start_pos + free_chunk_size;
     size_t alloc_pos = start_pos;

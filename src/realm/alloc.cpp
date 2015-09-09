@@ -71,12 +71,12 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
     }
 
-    void do_free(ref_type, const char* addr) REALM_NOEXCEPT override
+    void do_free(ref_type, const char* addr) noexcept override
     {
         ::free(const_cast<char*>(addr));
     }
 
-    char* do_translate(ref_type ref) const REALM_NOEXCEPT override
+    char* do_translate(ref_type ref) const noexcept override
     {
         return reinterpret_cast<char*>(ref);
     }
@@ -90,7 +90,7 @@ public:
 
 
 
-Allocator& Allocator::get_default() REALM_NOEXCEPT
+Allocator& Allocator::get_default() noexcept
 {
     static DefaultAllocator default_alloc;
     return default_alloc;

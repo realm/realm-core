@@ -45,7 +45,7 @@ PlatformSpecificCondVar::PlatformSpecificCondVar()
 
 
 
-void PlatformSpecificCondVar::close() REALM_NOEXCEPT
+void PlatformSpecificCondVar::close() noexcept
 {
     if (m_sem) { // true if emulating a process shared condvar
         sem_close(m_sem);
@@ -57,7 +57,7 @@ void PlatformSpecificCondVar::close() REALM_NOEXCEPT
 }
 
 
-PlatformSpecificCondVar::~PlatformSpecificCondVar() REALM_NOEXCEPT
+PlatformSpecificCondVar::~PlatformSpecificCondVar() noexcept
 {
     close();
 }

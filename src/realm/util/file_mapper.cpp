@@ -39,6 +39,7 @@
 #include <atomic>
 
 #include <realm/util/errno.hpp>
+#include <realm/util/encryption_not_supported_exception.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
@@ -397,8 +398,24 @@ int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sig
 struct sigaction old_segv;
 struct sigaction old_bus;
 
+void* expected_si_addr;
+
+enum {
+    signal_test_state_Untested,
+    signal_test_state_Works,
+    signal_test_state_Broken
+};
+
+volatile sig_atomic_t signal_test_state = signal_test_state_Untested;
+
 void signal_handler(int code, siginfo_t* info, void* ctx)
 {
+    if (signal_test_state == signal_test_state_Untested) {
+        signal_test_state = info->si_addr == expected_si_addr ? signal_test_state_Works : signal_test_state_Broken;
+        mprotect(expected_si_addr, page_size(), PROT_READ | PROT_WRITE);
+        return;
+    }
+
     if (handle_access(info->si_addr))
         return;
 
@@ -426,19 +443,43 @@ void signal_handler(int code, siginfo_t* info, void* ctx)
 void install_handler()
 {
     static bool has_installed_handler = false;
-    if (!has_installed_handler) {
-        has_installed_handler = true;
+    // Test failed before, just throw the exception
+    if (signal_test_state == signal_test_state_Broken)
+        throw EncryptionNotSupportedOnThisDevice();
 
-        struct sigaction action;
-        memset(&action, 0, sizeof(action));
-        action.sa_sigaction = signal_handler;
-        action.sa_flags = SA_SIGINFO;
+    if (has_installed_handler)
+        return;
 
-        if (sigaction_wrapper(SIGSEGV, &action, &old_segv) != 0)
-            REALM_TERMINATE("sigaction SEGV failed");
-        if (sigaction_wrapper(SIGBUS, &action, &old_bus) != 0)
-            REALM_TERMINATE("sigaction SIGBUS");
+    has_installed_handler = true;
+
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_sigaction = signal_handler;
+    action.sa_flags = SA_SIGINFO;
+
+    if (sigaction_wrapper(SIGSEGV, &action, &old_segv) != 0)
+        REALM_TERMINATE("sigaction SEGV failed");
+    if (sigaction_wrapper(SIGBUS, &action, &old_bus) != 0)
+        REALM_TERMINATE("sigaction SIGBUS failed");
+
+    // Test if the SIGSEGV handler is actually sent the address, as on some
+    // devices it's always 0
+    size_t size = page_size();
+
+    // Allocate an unreadable/unwritable block of address space
+    expected_si_addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (expected_si_addr == MAP_FAILED) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
+
+    // Should produce a SIGSEGV with si_addr = expected_si_addr
+    mprotect(expected_si_addr, size, PROT_NONE);
+    *static_cast<char *>(expected_si_addr) = 0;
+
+    ::munmap(expected_si_addr, size);
+    if (signal_test_state != signal_test_state_Works)
+        throw EncryptionNotSupportedOnThisDevice();
 }
 
 #endif // __APPLE__
@@ -619,7 +660,7 @@ namespace realm {
 namespace util {
 
 #ifdef REALM_ENABLE_ENCRYPTION
-size_t round_up_to_page_size(size_t size) REALM_NOEXCEPT
+size_t round_up_to_page_size(size_t size) noexcept
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
@@ -658,7 +699,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, std::size_t offset, con
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
-void munmap(void* addr, size_t size) REALM_NOEXCEPT
+void munmap(void* addr, size_t size) noexcept
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);

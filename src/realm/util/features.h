@@ -151,46 +151,6 @@
 #endif
 
 
-/* Support for the C++11 'constexpr' keyword.
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 6) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_constexpr)
-#  define REALM_HAVE_CXX11_CONSTEXPR 1
-#endif
-#if REALM_HAVE_CXX11_CONSTEXPR
-#  define REALM_CONSTEXPR constexpr
-#else
-#  define REALM_CONSTEXPR
-#endif
-
-
-/* Support for the C++11 'noexcept' specifier.
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 6) || defined(_MSC_VER) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_noexcept)
-#  define REALM_HAVE_CXX11_NOEXCEPT 1
-#endif
-#if REALM_HAVE_CXX11_NOEXCEPT
-#  define REALM_NOEXCEPT noexcept
-#elif defined REALM_DEBUG
-#  define REALM_NOEXCEPT throw()
-#else
-#  define REALM_NOEXCEPT
-#endif
-#if REALM_HAVE_CXX11_NOEXCEPT
-#  define REALM_NOEXCEPT_IF(cond) noexcept (cond)
-#else
-#  define REALM_NOEXCEPT_IF(cond)
-#endif
-#if REALM_HAVE_CXX11_NOEXCEPT
-#  define REALM_NOEXCEPT_OR_NOTHROW noexcept
-#else
-#  define REALM_NOEXCEPT_OR_NOTHROW throw ()
-#endif
-
-
 /* The way to specify that a function never returns.
  *
  * NOTE: C++11 generalized attributes are not yet fully supported in

@@ -43,21 +43,21 @@ class TransactLogConvenientEncoder;
 /// FIXME: Rename this class to `LinkList`.
 class LinkView : public RowIndexes {
 public:
-    ~LinkView() REALM_NOEXCEPT;
-    bool is_attached() const REALM_NOEXCEPT;
+    ~LinkView() noexcept;
+    bool is_attached() const noexcept;
 
     // Size info
-    bool is_empty() const REALM_NOEXCEPT;
-    std::size_t size() const REALM_NOEXCEPT;
+    bool is_empty() const noexcept;
+    std::size_t size() const noexcept;
 
-    bool operator==(const LinkView&) const REALM_NOEXCEPT;
-    bool operator!=(const LinkView&) const REALM_NOEXCEPT;
+    bool operator==(const LinkView&) const noexcept;
+    bool operator!=(const LinkView&) const noexcept;
 
     // Getting links
-    Table::ConstRowExpr operator[](std::size_t link_ndx) const REALM_NOEXCEPT;
-    Table::RowExpr operator[](std::size_t link_ndx) REALM_NOEXCEPT;
-    Table::ConstRowExpr get(std::size_t link_ndx) const REALM_NOEXCEPT;
-    Table::RowExpr get(std::size_t link_ndx) REALM_NOEXCEPT;
+    Table::ConstRowExpr operator[](std::size_t link_ndx) const noexcept;
+    Table::RowExpr operator[](std::size_t link_ndx) noexcept;
+    Table::ConstRowExpr get(std::size_t link_ndx) const noexcept;
+    Table::RowExpr get(std::size_t link_ndx) noexcept;
 
     // Modifiers
     void add(std::size_t target_row_ndx);
@@ -92,16 +92,16 @@ public:
     /// by its index in the target table). If found, the index of the link to
     /// that row within this list is returned, otherwise `realm::not_found` is
     /// returned.
-    std::size_t find(std::size_t target_row_ndx, std::size_t start=0) const REALM_NOEXCEPT;
+    std::size_t find(std::size_t target_row_ndx, std::size_t start=0) const noexcept;
 
     const ColumnBase& get_column_base(size_t index) const; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
-    const Table& get_origin_table() const REALM_NOEXCEPT;
-    Table& get_origin_table() REALM_NOEXCEPT;
+    const Table& get_origin_table() const noexcept;
+    Table& get_origin_table() noexcept;
 
-    std::size_t get_origin_row_index() const REALM_NOEXCEPT;
+    std::size_t get_origin_row_index() const noexcept;
 
-    const Table& get_target_table() const REALM_NOEXCEPT;
-    Table& get_target_table() REALM_NOEXCEPT;
+    const Table& get_target_table() const noexcept;
+    Table& get_target_table() noexcept;
 
 private:
     TableRef m_origin_table;
@@ -116,7 +116,7 @@ private:
     LinkView(Table* origin_table, LinkListColumn&, std::size_t row_ndx);
 
     void detach();
-    void set_origin_row_index(std::size_t row_ndx) REALM_NOEXCEPT;
+    void set_origin_row_index(std::size_t row_ndx) noexcept;
 
     std::size_t do_set(std::size_t link_ndx, std::size_t target_row_ndx);
     std::size_t do_remove(std::size_t link_ndx);
@@ -125,15 +125,15 @@ private:
     void do_nullify_link(std::size_t old_target_row_ndx);
     void do_update_link(std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
 
-    void bind_ref() const REALM_NOEXCEPT;
-    void unbind_ref() const REALM_NOEXCEPT;
+    void bind_ref() const noexcept;
+    void unbind_ref() const noexcept;
 
-    void refresh_accessor_tree(std::size_t new_row_ndx) REALM_NOEXCEPT;
+    void refresh_accessor_tree(std::size_t new_row_ndx) noexcept;
 
-    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
+    void update_from_parent(std::size_t old_baseline) noexcept;
 
-    Replication* get_repl() REALM_NOEXCEPT;
-    void repl_unselect() REALM_NOEXCEPT;
+    Replication* get_repl() noexcept;
+    void repl_unselect() noexcept;
     friend class _impl::TransactLogConvenientEncoder;
 
 #ifdef REALM_DEBUG
@@ -165,7 +165,7 @@ inline LinkView::LinkView(Table* origin_table, LinkListColumn& column, std::size
         root.init_from_ref(ref);
 }
 
-inline LinkView::~LinkView() REALM_NOEXCEPT
+inline LinkView::~LinkView() noexcept
 {
     if (is_attached()) {
         repl_unselect();
@@ -173,12 +173,12 @@ inline LinkView::~LinkView() REALM_NOEXCEPT
     }
 }
 
-inline void LinkView::bind_ref() const REALM_NOEXCEPT
+inline void LinkView::bind_ref() const noexcept
 {
     ++m_ref_count;
 }
 
-inline void LinkView::unbind_ref() const REALM_NOEXCEPT
+inline void LinkView::unbind_ref() const noexcept
 {
     if (--m_ref_count > 0)
         return;
@@ -194,12 +194,12 @@ inline void LinkView::detach()
     m_row_indexes.detach();
 }
 
-inline bool LinkView::is_attached() const REALM_NOEXCEPT
+inline bool LinkView::is_attached() const noexcept
 {
     return static_cast<bool>(m_origin_table);
 }
 
-inline bool LinkView::is_empty() const REALM_NOEXCEPT
+inline bool LinkView::is_empty() const noexcept
 {
     REALM_ASSERT(is_attached());
 
@@ -209,7 +209,7 @@ inline bool LinkView::is_empty() const REALM_NOEXCEPT
     return m_row_indexes.is_empty();
 }
 
-inline std::size_t LinkView::size() const REALM_NOEXCEPT
+inline std::size_t LinkView::size() const noexcept
 {
     REALM_ASSERT(is_attached());
 
@@ -219,7 +219,7 @@ inline std::size_t LinkView::size() const REALM_NOEXCEPT
     return m_row_indexes.size();
 }
 
-inline bool LinkView::operator==(const LinkView& link_list) const REALM_NOEXCEPT
+inline bool LinkView::operator==(const LinkView& link_list) const noexcept
 {
     Table& target_table_1 = m_origin_column.get_target_table();
     Table& target_table_2 = link_list.m_origin_column.get_target_table();
@@ -233,17 +233,17 @@ inline bool LinkView::operator==(const LinkView& link_list) const REALM_NOEXCEPT
         m_row_indexes.compare_int(link_list.m_row_indexes);
 }
 
-inline bool LinkView::operator!=(const LinkView& link_list) const REALM_NOEXCEPT
+inline bool LinkView::operator!=(const LinkView& link_list) const noexcept
 {
     return !(*this == link_list);
 }
 
-inline Table::ConstRowExpr LinkView::get(std::size_t link_ndx) const REALM_NOEXCEPT
+inline Table::ConstRowExpr LinkView::get(std::size_t link_ndx) const noexcept
 {
     return const_cast<LinkView*>(this)->get(link_ndx);
 }
 
-inline Table::RowExpr LinkView::get(std::size_t link_ndx) REALM_NOEXCEPT
+inline Table::RowExpr LinkView::get(std::size_t link_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT(m_row_indexes.is_attached());
@@ -254,12 +254,12 @@ inline Table::RowExpr LinkView::get(std::size_t link_ndx) REALM_NOEXCEPT
     return target_table[target_row_ndx];
 }
 
-inline Table::ConstRowExpr LinkView::operator[](std::size_t link_ndx) const REALM_NOEXCEPT
+inline Table::ConstRowExpr LinkView::operator[](std::size_t link_ndx) const noexcept
 {
     return get(link_ndx);
 }
 
-inline Table::RowExpr LinkView::operator[](std::size_t link_ndx) REALM_NOEXCEPT
+inline Table::RowExpr LinkView::operator[](std::size_t link_ndx) noexcept
 {
     return get(link_ndx);
 }
@@ -271,7 +271,7 @@ inline void LinkView::add(std::size_t target_row_ndx)
     insert(ins_pos, target_row_ndx);
 }
 
-inline std::size_t LinkView::find(std::size_t target_row_ndx, std::size_t start) const REALM_NOEXCEPT
+inline std::size_t LinkView::find(std::size_t target_row_ndx, std::size_t start) const noexcept
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column.get_target_table().size());
@@ -288,39 +288,39 @@ inline const ColumnBase& LinkView::get_column_base(size_t index) const
     return get_target_table().get_column_base(index);
 }
 
-inline const Table& LinkView::get_origin_table() const REALM_NOEXCEPT
+inline const Table& LinkView::get_origin_table() const noexcept
 {
     return *m_origin_table;
 }
 
-inline Table& LinkView::get_origin_table() REALM_NOEXCEPT
+inline Table& LinkView::get_origin_table() noexcept
 {
     return *m_origin_table;
 }
 
-inline std::size_t LinkView::get_origin_row_index() const REALM_NOEXCEPT
+inline std::size_t LinkView::get_origin_row_index() const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_row_indexes.get_root_array()->get_ndx_in_parent();
 }
 
-inline void LinkView::set_origin_row_index(std::size_t row_ndx) REALM_NOEXCEPT
+inline void LinkView::set_origin_row_index(std::size_t row_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
     m_row_indexes.get_root_array()->set_ndx_in_parent(row_ndx);
 }
 
-inline const Table& LinkView::get_target_table() const REALM_NOEXCEPT
+inline const Table& LinkView::get_target_table() const noexcept
 {
     return m_origin_column.get_target_table();
 }
 
-inline Table& LinkView::get_target_table() REALM_NOEXCEPT
+inline Table& LinkView::get_target_table() noexcept
 {
     return m_origin_column.get_target_table();
 }
 
-inline void LinkView::refresh_accessor_tree(std::size_t new_row_ndx) REALM_NOEXCEPT
+inline void LinkView::refresh_accessor_tree(std::size_t new_row_ndx) noexcept
 {
     Array& root = *m_row_indexes.get_root_array();
     root.set_ndx_in_parent(new_row_ndx);
@@ -332,13 +332,13 @@ inline void LinkView::refresh_accessor_tree(std::size_t new_row_ndx) REALM_NOEXC
     }
 }
 
-inline void LinkView::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
+inline void LinkView::update_from_parent(std::size_t old_baseline) noexcept
 {
     if (m_row_indexes.is_attached())
         m_row_indexes.update_from_parent(old_baseline);
 }
 
-inline Replication* LinkView::get_repl() REALM_NOEXCEPT
+inline Replication* LinkView::get_repl() noexcept
 {
     typedef _impl::TableFriend tf;
     return tf::get_repl(*m_origin_table);

@@ -36,17 +36,17 @@ class Replication;
 
 typedef std::size_t ref_type;
 
-ref_type to_ref(int64_t) REALM_NOEXCEPT;
+ref_type to_ref(int64_t) noexcept;
 
 class MemRef {
 public:
     char* m_addr;
     ref_type m_ref;
 
-    MemRef() REALM_NOEXCEPT;
-    ~MemRef() REALM_NOEXCEPT;
-    MemRef(char* addr, ref_type ref) REALM_NOEXCEPT;
-    MemRef(ref_type ref, Allocator& alloc) REALM_NOEXCEPT;
+    MemRef() noexcept;
+    ~MemRef() noexcept;
+    MemRef(char* addr, ref_type ref) noexcept;
+    MemRef(ref_type ref, Allocator& alloc) noexcept;
 };
 
 
@@ -83,28 +83,28 @@ public:
     ///
     /// Note: The underscore has been added because the name `free
     /// would conflict with a macro on the Windows platform.
-    void free_(ref_type, const char* addr) REALM_NOEXCEPT;
+    void free_(ref_type, const char* addr) noexcept;
 
     /// Shorthand for free_(mem.m_ref, mem.m_addr).
-    void free_(MemRef mem) REALM_NOEXCEPT;
+    void free_(MemRef mem) noexcept;
 
     /// Calls do_translate().
-    char* translate(ref_type ref) const REALM_NOEXCEPT;
+    char* translate(ref_type ref) const noexcept;
 
     /// Returns true if, and only if the object at the specified 'ref'
     /// is in the immutable part of the memory managed by this
     /// allocator. The method by which some objects become part of the
     /// immuatble part is entirely up to the class that implements
     /// this interface.
-    bool is_read_only(ref_type) const REALM_NOEXCEPT;
+    bool is_read_only(ref_type) const noexcept;
 
     /// Returns a simple allocator that can be used with free-standing
     /// Realm objects (such as a free-standing table). A
     /// free-standing object is one that is not part of a Group, and
     /// therefore, is not part of an actual database.
-    static Allocator& get_default() REALM_NOEXCEPT;
+    static Allocator& get_default() noexcept;
 
-    virtual ~Allocator() REALM_NOEXCEPT;
+    virtual ~Allocator() noexcept;
 
 #ifdef REALM_DEBUG
     virtual void verify() const = 0;
@@ -117,7 +117,7 @@ public:
     void watch(ref_type);
 #endif
 
-    Replication* get_replication() REALM_NOEXCEPT;
+    Replication* get_replication() noexcept;
 
 protected:
     std::size_t m_baseline = 0; // Separation line between immutable and mutable refs.
@@ -146,16 +146,16 @@ protected:
                               std::size_t new_size);
 
     /// Release the specified chunk of memory.
-    virtual void do_free(ref_type, const char* addr) REALM_NOEXCEPT = 0;
+    virtual void do_free(ref_type, const char* addr) noexcept = 0;
 
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
     /// referenced object is to be considered immutable, and it is
     /// then entirely the responsibility of the caller that the memory
     /// is not modified by way of the returned memory pointer.
-    virtual char* do_translate(ref_type ref) const REALM_NOEXCEPT = 0;
+    virtual char* do_translate(ref_type ref) const noexcept = 0;
 
-    Allocator() REALM_NOEXCEPT;
+    Allocator() noexcept;
 
     // FIXME: This really doesn't belong in an allocator, but it is the best
     // place for now, because every table has a pointer leading here. It would
@@ -166,25 +166,25 @@ protected:
     /// Bump the global version counter. This method should be called when
     /// version bumping is initiated. Then following calls to should_propagate_version()
     /// can be used to prune the version bumping.
-    uint_fast64_t bump_global_version() REALM_NOEXCEPT;
+    uint_fast64_t bump_global_version() noexcept;
 
     /// Determine if the "local_version" is out of sync, so that it should
     /// be updated. In that case: also update it. Called from Table::bump_version
     /// to control propagation of version updates on tables within the group.
-    bool should_propagate_version(uint_fast64_t& local_version) REALM_NOEXCEPT;
+    bool should_propagate_version(uint_fast64_t& local_version) noexcept;
 
     friend class Table;
     friend class Group;
 };
 
-inline uint_fast64_t Allocator::bump_global_version() REALM_NOEXCEPT
+inline uint_fast64_t Allocator::bump_global_version() noexcept
 {
     ++m_table_versioning_counter;
     return m_table_versioning_counter;
 }
 
 
-inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) REALM_NOEXCEPT
+inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) noexcept
 {
     if (local_version != m_table_versioning_counter) {
         local_version = m_table_versioning_counter;
@@ -199,14 +199,14 @@ inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) RE
 
 // Implementation:
 
-inline int_fast64_t from_ref(ref_type v) REALM_NOEXCEPT
+inline int_fast64_t from_ref(ref_type v) noexcept
 {
     // Check that v is divisible by 8 (64-bit aligned).
     REALM_ASSERT_DEBUG(v % 8 == 0);
     return util::from_twos_compl<int_fast64_t>(v);
 }
 
-inline ref_type to_ref(int_fast64_t v) REALM_NOEXCEPT
+inline ref_type to_ref(int_fast64_t v) noexcept
 {
     REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<ref_type>(v));
     // Check that v is divisible by 8 (64-bit aligned).
@@ -214,23 +214,23 @@ inline ref_type to_ref(int_fast64_t v) REALM_NOEXCEPT
     return ref_type(v);
 }
 
-inline MemRef::MemRef() REALM_NOEXCEPT:
+inline MemRef::MemRef() noexcept:
     m_addr(nullptr),
     m_ref(0)
 {
 }
 
-inline MemRef::~MemRef() REALM_NOEXCEPT
+inline MemRef::~MemRef() noexcept
 {
 }
 
-inline MemRef::MemRef(char* addr, ref_type ref) REALM_NOEXCEPT:
+inline MemRef::MemRef(char* addr, ref_type ref) noexcept:
     m_addr(addr),
     m_ref(ref)
 {
 }
 
-inline MemRef::MemRef(ref_type ref, Allocator& alloc) REALM_NOEXCEPT:
+inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
     m_addr(alloc.translate(ref)),
     m_ref(ref)
 {
@@ -252,7 +252,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, std::size_t ol
     return do_realloc(ref, addr, old_size, new_size);
 }
 
-inline void Allocator::free_(ref_type ref, const char* addr) REALM_NOEXCEPT
+inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 {
 #ifdef REALM_DEBUG
     if (ref == m_watch)
@@ -261,24 +261,24 @@ inline void Allocator::free_(ref_type ref, const char* addr) REALM_NOEXCEPT
     return do_free(ref, addr);
 }
 
-inline void Allocator::free_(MemRef mem) REALM_NOEXCEPT
+inline void Allocator::free_(MemRef mem) noexcept
 {
     free_(mem.m_ref, mem.m_addr);
 }
 
-inline char* Allocator::translate(ref_type ref) const REALM_NOEXCEPT
+inline char* Allocator::translate(ref_type ref) const noexcept
 {
     return do_translate(ref);
 }
 
-inline bool Allocator::is_read_only(ref_type ref) const REALM_NOEXCEPT
+inline bool Allocator::is_read_only(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(ref != 0);
     REALM_ASSERT_DEBUG(m_baseline != 0); // Attached SlabAlloc
     return ref < m_baseline;
 }
 
-inline Allocator::Allocator() REALM_NOEXCEPT:
+inline Allocator::Allocator() noexcept:
     m_replication(nullptr)
 {
 #ifdef REALM_DEBUG
@@ -287,11 +287,11 @@ inline Allocator::Allocator() REALM_NOEXCEPT:
     m_table_versioning_counter = 0;
 }
 
-inline Allocator::~Allocator() REALM_NOEXCEPT
+inline Allocator::~Allocator() noexcept
 {
 }
 
-inline Replication* Allocator::get_replication() REALM_NOEXCEPT
+inline Replication* Allocator::get_replication() noexcept
 {
     return m_replication;
 }

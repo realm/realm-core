@@ -12,6 +12,21 @@ bool keep_files = false;
 std::string path_prefix;
 std::string resource_path;
 
+#ifdef _WIN32
+std::string sanitize_for_file_name(std::string str)
+{
+    static const std::string invalid("<>:\"|?*\\/");
+    std::transform(str.begin(), str.end(), str.begin(), [](char c) {
+        if (invalid.find(c) != std::string::npos)
+            return '-';
+        return c;
+    });
+    return str;
+}
+#else
+std::string sanitize_for_file_name(const std::string& str) { return str; }
+#endif
+
 } // anonymous namespace
 
 namespace realm {
@@ -26,7 +41,7 @@ void keep_test_files()
 std::string get_test_path(const TestDetails& test_details, const std::string& suffix)
 {
     std::string path = path_prefix;
-    path += test_details.test_name;
+    path += sanitize_for_file_name(test_details.test_name);
     path += suffix;
     return path;
 }
@@ -57,7 +72,7 @@ TestPathGuard::TestPathGuard(const std::string& path):
     File::try_remove(m_path);
 }
 
-TestPathGuard::~TestPathGuard() REALM_NOEXCEPT
+TestPathGuard::~TestPathGuard() noexcept
 {
     if (keep_files)
         return;

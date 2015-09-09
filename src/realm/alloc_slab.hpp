@@ -74,7 +74,7 @@ public:
     static constexpr int library_file_format = 2;
 #endif
 
-    ~SlabAlloc() REALM_NOEXCEPT override;
+    ~SlabAlloc() noexcept override;
     SlabAlloc();
     /// Attach this allocator to the specified file.
     ///
@@ -146,7 +146,7 @@ public:
 
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
-    int get_committed_file_format() const REALM_NOEXCEPT;
+    int get_committed_file_format() const noexcept;
 
     /// Attach this allocator to an empty buffer.
     ///
@@ -162,7 +162,7 @@ public:
     ///
     /// This function has no effect if the allocator is already in the
     /// detached state (idempotency).
-    void detach() REALM_NOEXCEPT;
+    void detach() noexcept;
 
     class DetachGuard;
 
@@ -172,16 +172,16 @@ public:
     /// one that is not attached using attach_buffer(), or one for
     /// which this function has already been called during the latest
     /// attachment.
-    void own_buffer() REALM_NOEXCEPT;
+    void own_buffer() noexcept;
 
     /// Returns true if, and only if this allocator is currently
     /// in the attached state.
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     /// Returns true if, and only if this allocator is currently in
     /// the attached state and attachment was not established using
     /// attach_empty().
-    bool nonempty_attachment() const REALM_NOEXCEPT;
+    bool nonempty_attachment() const noexcept;
 
     /// Reserve disk space now to avoid allocation errors at a later
     /// point in time, and to minimize on-disk fragmentation. In some
@@ -229,14 +229,14 @@ public:
     /// It is an error to call this function on a detached allocator,
     /// or one that was attached using attach_empty(). Doing so will
     /// result in undefined behavior.
-    std::size_t get_baseline() const REALM_NOEXCEPT;
+    std::size_t get_baseline() const noexcept;
 
     /// Get the total amount of managed memory. This is the baseline plus the
     /// sum of the sizes of the allocated slabs. It includes any free space.
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
-    std::size_t get_total_size() const REALM_NOEXCEPT;
+    std::size_t get_total_size() const noexcept;
 
     /// Mark all managed memory (except the attached file) as free
     /// space.
@@ -269,8 +269,8 @@ protected:
     MemRef do_realloc(ref_type, const char*, std::size_t old_size,
                     std::size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void do_free(ref_type, const char*) REALM_NOEXCEPT override;
-    char* do_translate(ref_type) const REALM_NOEXCEPT override;
+    void do_free(ref_type, const char*) noexcept override;
+    char* do_translate(ref_type) const noexcept override;
 
 private:
     enum AttachMode {
@@ -404,41 +404,41 @@ private:
     class ChunkRefEq;
     class ChunkRefEndEq;
     class SlabRefEndEq;
-    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) REALM_NOEXCEPT;
+    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
-    Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
-    void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
+    Replication* get_replication() const noexcept { return m_replication; }
+    void set_replication(Replication* r) noexcept { m_replication = r; }
 
     /// Returns the first section boundary *above* the given position.
-    std::size_t get_upper_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
+    std::size_t get_upper_section_boundary(std::size_t start_pos) const noexcept;
 
     /// Returns the first section boundary *at or below* the given position.
-    std::size_t get_lower_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT;
+    std::size_t get_lower_section_boundary(std::size_t start_pos) const noexcept;
 
     /// Returns true if the given position is at a section boundary
-    bool matches_section_boundary(std::size_t pos) const REALM_NOEXCEPT;
+    bool matches_section_boundary(std::size_t pos) const noexcept;
 
     /// Returns the index of the section holding a given address.
     /// The section index is determined solely by the minimal section size,
     /// and does not necessarily reflect the mapping. A mapping may
     /// cover multiple sections - the initial mapping often does.
-    std::size_t get_section_index(std::size_t pos) const REALM_NOEXCEPT;
+    std::size_t get_section_index(std::size_t pos) const noexcept;
 
     /// Reverse: get the base offset of a section at a given index. Since the
     /// computation is very time critical, this method just looks it up in
     /// a table. The actual computation and setup of that table is done
     /// during initialization with the help of compute_section_base() below.
-    inline std::size_t get_section_base(std::size_t index) const REALM_NOEXCEPT;
+    inline std::size_t get_section_base(std::size_t index) const noexcept;
 
     /// Actually compute the starting offset of a section. Only used to initialize
     /// a table of predefined results, which are then used by get_section_base().
-    std::size_t compute_section_base(std::size_t index) const REALM_NOEXCEPT;
+    std::size_t compute_section_base(std::size_t index) const noexcept;
 
     /// Find a possible allocation of 'request_size' that will fit into a section
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
     std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size, 
-                                      std::size_t request_size) const REALM_NOEXCEPT;
+                                      std::size_t request_size) const noexcept;
 
     friend class Group;
     friend class GroupWriter;
@@ -447,9 +447,9 @@ private:
 
 class SlabAlloc::DetachGuard {
 public:
-    DetachGuard(SlabAlloc& alloc) REALM_NOEXCEPT: m_alloc(&alloc) {}
-    ~DetachGuard() REALM_NOEXCEPT;
-    SlabAlloc* release() REALM_NOEXCEPT;
+    DetachGuard(SlabAlloc& alloc) noexcept: m_alloc(&alloc) {}
+    ~DetachGuard() noexcept;
+    SlabAlloc* release() noexcept;
 private:
     SlabAlloc* m_alloc;
 };
@@ -465,7 +465,7 @@ struct InvalidDatabase: util::File::AccessError {
     }
 };
 
-inline void SlabAlloc::own_buffer() REALM_NOEXCEPT
+inline void SlabAlloc::own_buffer() noexcept
 {
     REALM_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
     REALM_ASSERT(m_data);
@@ -473,17 +473,17 @@ inline void SlabAlloc::own_buffer() REALM_NOEXCEPT
     m_attach_mode = attach_OwnedBuffer;
 }
 
-inline bool SlabAlloc::is_attached() const REALM_NOEXCEPT
+inline bool SlabAlloc::is_attached() const noexcept
 {
     return m_attach_mode != attach_None;
 }
 
-inline bool SlabAlloc::nonempty_attachment() const REALM_NOEXCEPT
+inline bool SlabAlloc::nonempty_attachment() const noexcept
 {
     return is_attached() && m_data;
 }
 
-inline std::size_t SlabAlloc::get_baseline() const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_baseline() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_baseline;
@@ -505,40 +505,40 @@ inline void SlabAlloc::reserve_disk_space(size_t size)
         m_file.sync(); // Throws
 }
 
-inline SlabAlloc::DetachGuard::~DetachGuard() REALM_NOEXCEPT
+inline SlabAlloc::DetachGuard::~DetachGuard() noexcept
 {
     if (m_alloc)
         m_alloc->detach();
 }
 
-inline SlabAlloc* SlabAlloc::DetachGuard::release() REALM_NOEXCEPT
+inline SlabAlloc* SlabAlloc::DetachGuard::release() noexcept
 {
     SlabAlloc* alloc = m_alloc;
     m_alloc = nullptr;
     return alloc;
 }
 
-inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab) REALM_NOEXCEPT
+inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab) noexcept
 {
     return ref < slab.ref_end;
 }
 
-inline std::size_t SlabAlloc::get_upper_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_upper_section_boundary(std::size_t start_pos) const noexcept
 {
     return get_section_base(1+get_section_index(start_pos));
 }
 
-inline std::size_t SlabAlloc::get_lower_section_boundary(std::size_t start_pos) const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_lower_section_boundary(std::size_t start_pos) const noexcept
 {
     return get_section_base(get_section_index(start_pos));
 }
 
-inline bool SlabAlloc::matches_section_boundary(std::size_t pos) const REALM_NOEXCEPT
+inline bool SlabAlloc::matches_section_boundary(std::size_t pos) const noexcept
 {
     return pos == get_lower_section_boundary(pos);
 }
 
-inline std::size_t SlabAlloc::get_section_base(std::size_t index) const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_section_base(std::size_t index) const noexcept
 {
     return m_section_bases[index];
 }

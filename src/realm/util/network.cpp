@@ -79,13 +79,13 @@ struct getaddrinfo_result_owner {
 
 
 class network_error_category: public std::error_category {
-    const char* name() const REALM_NOEXCEPT override;
+    const char* name() const noexcept override;
     std::string message(int) const override;
 };
 
 network_error_category g_network_error_category;
 
-const char* network_error_category::name() const REALM_NOEXCEPT
+const char* network_error_category::name() const noexcept
 {
     return "realm.network";
 }
@@ -479,7 +479,7 @@ io_service::io_service():
 {
 }
 
-io_service::~io_service() REALM_NOEXCEPT
+io_service::~io_service() noexcept
 {
 }
 
@@ -747,7 +747,7 @@ std::error_code socket::connect(const endpoint& ep, std::error_code& ec)
 }
 
 
-size_t socket::read_some(char* buffer, size_t size, std::error_code& ec) REALM_NOEXCEPT
+size_t socket::read_some(char* buffer, size_t size, std::error_code& ec) noexcept
 {
     int flags = 0;
     ssize_t ret = recv(m_sock_fd, buffer, size, flags);
@@ -764,7 +764,7 @@ size_t socket::read_some(char* buffer, size_t size, std::error_code& ec) REALM_N
 }
 
 
-size_t socket::write_some(const char* data, size_t size, std::error_code& ec) REALM_NOEXCEPT
+size_t socket::write_some(const char* data, size_t size, std::error_code& ec) noexcept
 {
     int flags = 0;
 #ifdef __linux__
@@ -837,7 +837,7 @@ std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_code& ec
 
 
 size_t buffered_input_stream::read(char* buffer, size_t size, int delim,
-                                   std::error_code& ec) REALM_NOEXCEPT
+                                   std::error_code& ec) noexcept
 {
     char* out_begin = buffer;
     char* out_end = buffer + size;
@@ -869,7 +869,7 @@ size_t buffered_input_stream::read(char* buffer, size_t size, int delim,
 }
 
 
-void buffered_input_stream::read_handler_base::process_input() REALM_NOEXCEPT
+void buffered_input_stream::read_handler_base::process_input() noexcept
 {
     REALM_ASSERT(!m_complete);
     size_t in_avail = m_stream.m_end - m_stream.m_begin;
@@ -890,7 +890,7 @@ void buffered_input_stream::read_handler_base::process_input() REALM_NOEXCEPT
 }
 
 
-void buffered_input_stream::read_handler_base::read_some(std::error_code& ec) REALM_NOEXCEPT
+void buffered_input_stream::read_handler_base::read_some(std::error_code& ec) noexcept
 {
     REALM_ASSERT(!m_complete);
     size_t n = m_stream.m_socket.read_some(m_stream.m_buffer.get(), s_buffer_size, ec);
@@ -936,7 +936,7 @@ std::string host_name()
 }
 
 std::error_code write(socket& sock, const char* data, size_t size, std::error_code& ec)
-    REALM_NOEXCEPT
+    noexcept
 {
     const char* begin = data;
     const char* end = data + size;

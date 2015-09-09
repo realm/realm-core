@@ -6003,6 +6003,35 @@ TEST(Query_BinaryNull)
     
     TableView t;
 
+    // Next gen syntax
+    t = (table.column<BinaryData>(0) == BinaryData()).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+
+    t = (BinaryData() == table.column<BinaryData>(0)).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+
+    t = (table.column<BinaryData>(0) == BinaryData("", 0)).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+
+    t = (BinaryData("", 0) == table.column<BinaryData>(0)).find_all();
+    CHECK_EQUAL(1, t.size());
+    CHECK_EQUAL(1, t.get_source_ndx(0));
+
+    t = (table.column<BinaryData>(0) != BinaryData("", 0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+    t = (BinaryData("", 0) != table.column<BinaryData>(0)).find_all();
+    CHECK_EQUAL(2, t.size());
+    CHECK_EQUAL(0, t.get_source_ndx(0));
+    CHECK_EQUAL(2, t.get_source_ndx(1));
+
+
+    // Old syntax
     t = table.where().equal(0, BinaryData()).find_all();
     CHECK_EQUAL(0, t.get_source_ndx(0));
     CHECK_EQUAL(1, t.size());
@@ -6178,12 +6207,13 @@ TEST(Query_64BitValues)
 
 void create_columns(TableRef table, bool nullable = true)
 {
-    table->insert_column(0, type_Int, "Price", nullable);               // nullable = true
-    table->insert_column(1, type_Float, "Shipping", nullable);          // nullable = true
-    table->insert_column(2, type_String, "Description", nullable);      // nullable = true
-    table->insert_column(3, type_Double, "Rating", nullable);           // nullable = true
-    table->insert_column(4, type_Bool, "Stock", nullable);              // nullable = true
-    table->insert_column(5, type_DateTime, "Delivery date", nullable);  // nullable = true
+    table->insert_column(0, type_Int, "Price", nullable);
+    table->insert_column(1, type_Float, "Shipping", nullable);
+    table->insert_column(2, type_String, "Description", nullable);
+    table->insert_column(3, type_Double, "Rating", nullable);
+    table->insert_column(4, type_Bool, "Stock", nullable);
+    table->insert_column(5, type_DateTime, "Delivery date", nullable);
+    table->insert_column(6, type_Binary, "Photo", nullable);
 }
 
 bool equals(TableView& tv, std::vector<size_t> indexes)
@@ -6228,37 +6258,37 @@ void fill_data(TableRef table) {
 
 TEST(Query_NullShowcase)
 {
-/*
-Here we show how comparisons and arithmetic with null works in queries. Basic rules:
+    /*
+    Here we show how comparisons and arithmetic with null works in queries. Basic rules:
 
-null    +, -, *, /          value   ==   null
-null    +, -, *, /          null    ==   null
+    null    +, -, *, /          value   ==   null
+    null    +, -, *, /          null    ==   null
 
-null    ==, >=, <=]         null    ==   true
-null    !=, >, <            null    ==   false
+    null    ==, >=, <=]         null    ==   true
+    null    !=, >, <            null    ==   false
 
-null    ==, >=, <=, >, <    value   ==   false
-null    !=                  value   ==   true
+    null    ==, >=, <=, >, <    value   ==   false
+    null    !=                  value   ==   true
 
-This does NOT follow SQL! In particular, (null == null) == true and
-(null != value) == true.
+    This does NOT follow SQL! In particular, (null == null) == true and
+    (null != value) == true.
 
-NOTE NOTE: There is currently only very little syntax checking.
+    NOTE NOTE: There is currently only very little syntax checking.
 
-NOTE NOTE: For BinaryData, use BinaryData() instead of null().
+    NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
-    ----------------------------------------------------------------------------------------------------------------
-0   null            null                null                    1.1                 true          2016-2-2
-1   10              null                "foo"                   2.2                 null          null
-2   20              30.0                "bar"                   3.3                 false         2016-6-6
-*/
+        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>   Photo<BinaryData>
+        -------------------------------------------------------------------------------------------------------------------------------------
+    0   null            null                null                    1.1                 true          2016-2-2             "foo"
+    1   10              null                "foo"                   2.2                 null          null                 zero-lenght non-null
+    2   20              30.0                "bar"                   3.3                 false         2016-6-6             null
+    */
 
     Group g;
     TableRef table = g.add_table("Inventory");
     create_columns(table);
 
-    table->add_empty_row(3); 
+    table->add_empty_row(3);
 
     // Default values for all nullable columns
     CHECK(table->is_null(0, 0));
@@ -6267,6 +6297,7 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     CHECK(table->is_null(3, 0));
     CHECK(table->is_null(4, 0));
     CHECK(table->is_null(5, 0));
+    CHECK(table->is_null(6, 0));
 
     table->set_null(0, 0);
     table->set_int(0, 1, 10);
@@ -6292,23 +6323,28 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     table->set_null(5, 1);
     table->set_datetime(5, 2, DateTime(2016, 6, 6));
 
+    table->set_binary(6, 0, BinaryData("foo"));
+    table->set_binary(6, 1, BinaryData("", 0)); // remember 0, else it will have length of 1 due to 0 termination of c++
+    table->set_null(6, 2);
+
     Columns<Int> price = table->column<Int>(0);
     Columns<Float> shipping = table->column<Float>(1);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
     Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<BinaryData> photo = table->column<BinaryData>(6);
 
     // check int/double type mismatch error handling
     Columns<Int> dummy1;
     CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
 
     TableView tv;
-    
+
     tv = (price == null()).find_all();
     CHECK(equals(tv, { 0 }));
 
     tv = (price != null()).find_all();
-    CHECK(equals(tv, { 1, 2}));
+    CHECK(equals(tv, { 1, 2 }));
 
     // Note that this returns rows with null, which differs from SQL!
     tv = (price == shipping).find_all();
@@ -6320,7 +6356,7 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
     tv = (price != shipping).find_all();
     CHECK(equals(tv, { 1, 2 })); // 10 != null
-    
+
     tv = (price < 0 || price > 0).find_all();
     CHECK(equals(tv, { 1, 2 }));
 
@@ -6340,12 +6376,15 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     tv = (price > 0).find_all();
     CHECK(equals(tv, { 1, 2 }));
 
+    // Show that power(null) == null
+    tv = (power(price) == null()).find_all();
+    CHECK(equals(tv, { 0 }));
 
     // Doubles
     // (null > double) == false
     tv = (price > rating).find_all();
     CHECK(equals(tv, { 1, 2 }));
-    
+
     tv = (price + rating == null()).find_all();
     CHECK(equals(tv, { 0 }));
 
@@ -6379,10 +6418,20 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     tv = (delivery != null()).find_all();
     CHECK(equals(tv, { 0, 2 }));
 
+    // BinaryData
+    //
+    // BinaryData only supports == and !=, and you cannot compare two columns - only a column and a constant
+    tv = (photo == BinaryData("foo")).find_all();
+    CHECK(equals(tv, { 0 }));
 
-    // Not valid syntaxes. Only == and != can be used with user-given null argument.
-    CHECK_THROW_ANY(tv = (price > null()).find_all());
-    CHECK_THROW_ANY(tv = (price + rating > null()).find_all());
+    tv = (photo == BinaryData("", 0)).find_all();
+    CHECK(equals(tv, { 1 }));
+
+    tv = (photo == BinaryData()).find_all();
+    CHECK(equals(tv, { 2 }));
+
+    tv = (photo != BinaryData("foo")).find_all();
+    CHECK(equals(tv, { 1, 2 }));
 
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
@@ -6390,8 +6439,15 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
     tv = table->where().not_equal(0, null()).find_all();
     CHECK(equals(tv, { 1, 2 }));
-    
-    // Not valid syntaxes! Only .equal() and .not_equal() can be used with user-given null argument.
+
+    // You can also compare against user-given null with > and <, but only in the expression syntax!
+    tv = (price > null()).find_all();
+    CHECK(equals(tv, { }));
+    tv = (price + rating > null()).find_all();
+    CHECK(equals(tv, { }));
+
+    // As stated above, if you want to use `> null()`, you cannot do it in the old syntax. This is for source
+    // code simplicity (would need tons of new method overloads that also need unit test testing, etc).
     CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
@@ -6408,6 +6464,7 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     CHECK(equals(tv, { }));
 
     // TableView
+    size_t count;
     int64_t i;
     double d;
     DateTime dt;
@@ -6416,20 +6473,31 @@ NOTE NOTE: For BinaryData, use BinaryData() instead of null().
     // Integer column
     i = tv.maximum_int(0);
     CHECK_EQUAL(i, 20);
+
     i = tv.minimum_int(0);
     CHECK_EQUAL(i, 10);
-    d = tv.average_int(0);
+
+    count = 123;
+    d = tv.average_int(0, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 15., 0.001);
+    CHECK_EQUAL(count, 2);
+
     i = tv.sum_int(0);
     CHECK_EQUAL(i, 30);
+
 
     // Float column
     d = tv.maximum_float(1);
     CHECK_EQUAL(d, 30.);
+
     d = tv.minimum_float(1);
     CHECK_EQUAL(d, 30.);
-    d = tv.average_float(1);
+
+    count = 123;
+    d = tv.average_float(1, &count);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
+    CHECK_EQUAL(count, 1);
+
     d = tv.sum_float(1);
     CHECK_APPROXIMATELY_EQUAL(d, 30., 0.001);
 
@@ -6731,6 +6799,9 @@ TEST(Query_Null_Two_Columns)
     tv = table->where().equal(3, null()).find_all();
     CHECK(equals(tv, { 2 }));
 
+    tv = table->where().equal(0, null()).find_all();
+    CHECK(equals(tv, { 1 }));
+
     tv = table->where().not_equal(3, null()).find_all();
     CHECK(equals(tv, { 0, 1 }));
 
@@ -6763,23 +6834,111 @@ TEST(Query_Null_Two_Columns)
 }
 
 // Between, count, min and max
-TEST(Query_Null_BetweenMinMax)
+TEST(Query_Null_BetweenMinMax_Nullable)
 {
     Group g;
     TableRef table = g.add_table("Inventory");
     create_columns(table);
-    fill_data(table);
+    table->add_empty_row();
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
     ----------------------------------------------------------------------------------------------------------------
-    0   1           null                null                    1.1                 true          2016-2-2
-    1   null        null                "foo"                   2.2                 null          null
-    2   3           30.0                "bar"                   null                false         2016-6-6
+    null            null                null                    null                null            null
     */
 
-    
+    TableView tv;
+    size_t match;
+    size_t count;
+
+    // Here we test max/min/average with 0 rows used to compute the value, either becuase all inputs are null or
+    // becuase 0 rows exist.
+    auto test_tv = [&]() {
+        // int
+        match = 123;
+        tv.maximum_int(0, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_int(0, &match);
+        CHECK_EQUAL(match, npos);
+
+        CHECK_EQUAL(tv.sum_int(0), 0);
+        count = 123;
+        CHECK_EQUAL(tv.average_int(0, &count), 0.);
+        CHECK_EQUAL(count, 0);
+
+        // float
+        match = 123;
+        tv.maximum_float(1, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_float(1, &match);
+        CHECK_EQUAL(match, npos);
+
+        CHECK_EQUAL(tv.sum_float(1), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_float(1, &count), 0.);
+        CHECK_EQUAL(count, 0);
+
+        // double
+        match = 123;
+        tv.maximum_double(3, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_double(3, &match);
+        CHECK_EQUAL(match, npos);
+
+        CHECK_EQUAL(tv.sum_double(3), 0.);
+        count = 123;
+        CHECK_EQUAL(tv.average_double(3, &count), 0.);
+        CHECK_EQUAL(count, 0);
+
+        // date
+        match = 123;
+        tv.maximum_datetime(5, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_datetime(5, &match);
+        CHECK_EQUAL(match, npos);
+    };
+
+    // There are rows in TableView but they all point to null
+    tv = table->where().find_all();
+    test_tv();
+
+    // There are 0 rows in TableView
+    tv = table->where().equal(0, 123).find_all();
+    test_tv();
+
+    // Now we test that average does not include nulls in row count:
+    /*
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
+    ----------------------------------------------------------------------------------------------------------------
+    null            null                null                    null                null            null
+    10              10.f                null                    10.                 null            null
+    */
+
+    table->add_empty_row();
+    table->set_int(0, 1, 10);
+    table->set_float(1, 1, 10.f);
+    table->set_double(3, 1, 10.);
+
+    tv = table->where().find_all();
+    count = 123;
+    CHECK_EQUAL(tv.average_int(0, &count), 10);
+    CHECK_EQUAL(count, 1);
+    count = 123;
+    CHECK_EQUAL(tv.average_float(1, &count), 10.);
+    CHECK_EQUAL(count, 1);
+    count = 123;
+    CHECK_EQUAL(tv.average_double(3, &count), 10.);
+    CHECK_EQUAL(count, 1); 
 }
+
 
 // If number of rows is larger than 8, they can be loaded in chunks by the query system. Test if this works by
 // creating a large table with nulls in arbitrary places and query for nulls. Verify the search result manually.
@@ -6878,6 +7037,44 @@ TEST(Query_Null_ManyRows)
     CHECK(equals(tv, non_nulls));
 }
 
+TEST(Query_Null_Sort)
+{
+    Group g;
+    TableRef table = g.add_table("Inventory");
+    create_columns(table);
+
+    table->add_empty_row(3);
+
+    table->set_int(0, 0, 0);
+    table->set_float(1, 0, 0.f);
+    table->set_string(2, 0, "0");
+    table->set_double(3, 0, 0.0);
+    table->set_bool(4, 0, false);
+    table->set_datetime(5, 0, DateTime(0));
+
+    table->set_int(0, 2, 2);
+    table->set_float(1, 2, 2.f);
+    table->set_string(2, 2, "2");
+    table->set_double(3, 2, 2.0);
+    table->set_bool(4, 2, true);
+    table->set_datetime(5, 2, DateTime(2000));
+
+    for (int i = 0; i <= 5; i++) {
+        TableView tv = table->where().find_all();
+        CHECK(tv.size() == 3);
+
+        tv.sort(i, true);
+        CHECK_EQUAL(tv.get_source_ndx(0), 1);
+        CHECK_EQUAL(tv.get_source_ndx(1), 0);
+        CHECK_EQUAL(tv.get_source_ndx(2), 2);
+
+        tv.sort(i, false);
+        CHECK_EQUAL(tv.get_source_ndx(0), 2);
+        CHECK_EQUAL(tv.get_source_ndx(1), 0);
+        CHECK_EQUAL(tv.get_source_ndx(2), 1);
+    }
+}
+
 TEST(Query_LinkCounts)
 {
     Group group;
@@ -6966,6 +7163,463 @@ TEST(Query_LinkCounts)
     q = table2->column<LinkList>(col_linklist).count() == 1 && table2->column<Int>(col_int) == 1;
     match = q.find();
     CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+TEST(Query_Link_Minimum)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int", /* nullable */ true);
+    table1->add_column(type_Float, "float", /* nullable */ true);
+    table1->add_column(type_Double, "double", /* nullable */ true);
+
+    // table1
+    // 0: 789 789.0f 789.0
+    // 1: 456 456.0f 456.0
+    // 2: 123 123.0f 123.0
+    // 3: null null null
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 789);
+    table1->set_float(1, 0, 789.0f);
+    table1->set_double(2, 0, 789.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 456);
+    table1->set_float(1, 1, 456.0f);
+    table1->set_double(2, 1, 456.0);
+    table1->add_empty_row();
+    table1->set_int(0, 2, 123);
+    table1->set_float(1, 2, 123.0f);
+    table1->set_double(2, 2, 123.0);
+    table1->add_empty_row();
+    table1->set_null(0, 3);
+    table1->set_null(1, 3);
+    table1->set_null(2, 3);
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    // table2
+    // 0: { }
+    // 1: { 1 }
+    // 2: { 1, 2 }
+    // 3: { 1, 2, 3 }
+
+    table2->add_empty_row();
+
+    table2->add_empty_row();
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    table2->add_empty_row();
+    links = table2->get_linklist(col_linklist, 3);
+    links->add(1);
+    links->add(2);
+    links->add(3);
+
+    Query q;
+    size_t match;
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == 123;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == null();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).min() == 123.0f;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).min() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).min() == 123.0;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).min() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+TEST(Query_Link_MaximumSumAverage)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int", /* nullable */ true);
+    table1->add_column(type_Float, "float", /* nullable */ true);
+    table1->add_column(type_Double, "double", /* nullable */ true);
+
+    // table1
+    // 0: 123 123.0f 123.0
+    // 1: 456 456.0f 456.0
+    // 2: 789 789.0f 789.0
+    // 3: null null null
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 123);
+    table1->set_float(1, 0, 123.0f);
+    table1->set_double(2, 0, 123.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 456);
+    table1->set_float(1, 1, 456.0f);
+    table1->set_double(2, 1, 456.0);
+    table1->add_empty_row();
+    table1->set_int(0, 2, 789);
+    table1->set_float(1, 2, 789.0f);
+    table1->set_double(2, 2, 789.0);
+    table1->add_empty_row();
+    table1->set_null(0, 3);
+    table1->set_null(1, 3);
+    table1->set_null(2, 3);
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    // table2
+    // 0: { }
+    // 1: { 1 }
+    // 2: { 1, 2 }
+    // 3: { 1, 2, 3 }
+
+    table2->add_empty_row();
+
+    table2->add_empty_row();
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(1);
+
+    table2->add_empty_row();
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(2);
+
+    table2->add_empty_row();
+    links = table2->get_linklist(col_linklist, 3);
+    links->add(1);
+    links->add(2);
+    links->add(3);
+
+    Query q;
+    size_t match;
+
+    // Maximum.
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == 789;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == null();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).max() == 789.0f;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).max() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).max() == 789.0;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).max() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Sum.
+    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler flags.
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 1245;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).sum() == 1245.0f;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).sum() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).sum() == 1245.0;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).sum() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Average.
+    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler flags.
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 622.5;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == null();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).average() == 622.5;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Float>(1).average() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).average() == 622.5;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Double>(2).average() == 456.0;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
+TEST(Query_OperatorsOverLink)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Double, "double");
+
+    // table1
+    // 0: 2 2.0
+    // 1: 3 3.0
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 2);
+    table1->set_double(1, 0, 2.0);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 3);
+    table1->set_double(1, 1, 3.0);
+
+    TableRef table2 = group.add_table("table2");
+    table2->add_column(type_Int, "int");
+    size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    // table2
+    // 0:  0 { }
+    // 1:  4 { 0 }
+    // 2:  4 { 1, 0 }
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_int(0, 1, 4);
+    LinkViewRef links = table2->get_linklist(col_linklist, 1);
+    links->add(0);
+
+    table2->add_empty_row();
+    table2->set_int(0, 2, 4);
+    links = table2->get_linklist(col_linklist, 2);
+    links->add(1);
+    links->add(0);
+
+    Query q;
+    size_t match;
+
+    // Unary operators.
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = power(table2->link(col_linklist).column<Int>(0)) == table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = table2->column<Int>(0) == power(table2->link(col_linklist).column<Int>(0));
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = power(table2->link(col_linklist).column<Double>(1)) == table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = table2->column<Int>(0) == power(table2->link(col_linklist).column<Double>(1));
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    // Binary operators.
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->link(col_linklist).column<Int>(0) * 2 == table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->column<Int>(0) == 2 * table2->link(col_linklist).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->link(col_linklist).column<Double>(1) * 2 == table2->column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->column<Int>(0) == 2 * table2->link(col_linklist).column<Double>(1);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 }

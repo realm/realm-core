@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,22 +17,20 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef REALM_DISABLE_SYNC_TO_DISK_HPP
-#define REALM_DISABLE_SYNC_TO_DISK_HPP
 
-#include <realm/util/features.h>
+#ifndef REALM_UTIL_ENCRYPTION_NOT_SUPPORTED_EXCEPTION_HPP
+#define REALM_UTIL_ENCRYPTION_NOT_SUPPORTED_EXCEPTION_HPP
+
+#include <stdexcept>
 
 namespace realm {
+namespace util {
 
-/// Completely disable synchronization with storage device to speed up unit
-/// testing. This is an unsafe mode of operation, and should never be used in
-/// production. This function is thread safe.
-void disable_sync_to_disk();
+struct EncryptionNotSupportedOnThisDevice: std::runtime_error {
+    EncryptionNotSupportedOnThisDevice(): std::runtime_error("Encryption is not supported on this device") { }
+};
 
-/// Returns true after disable_sync_to_disk() has been called. This function is
-/// thread safe.
-bool get_disable_sync_to_disk() noexcept;
+}
+}
 
-} // namespace realm
-
-#endif // REALM_DISABLE_SYNC_TO_DISK_HPP
+#endif //REALM_UTIL_ENCRYPTION_NOT_SUPPORTED_EXCEPTION_HPP

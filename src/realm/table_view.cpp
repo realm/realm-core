@@ -185,8 +185,15 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
               || function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
-    if ((m_row_indexes.size() - m_num_detached_refs) == 0)
+    if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
+        if (return_ndx) {
+            if (function == act_Average)
+                *return_ndx = 0;
+            else
+                *return_ndx = npos;
+        }
         return 0;
+    }
 
     typedef typename ColumnTypeTraits<T, ColType::nullable>::leaf_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
@@ -330,23 +337,21 @@ DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) 
         return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
-// Average
-
-double TableViewBase::average_int(size_t column_ndx) const
+// Average. The number of values used to compute the result is written to `value_count` by callee
+double TableViewBase::average_int(size_t column_ndx, size_t* value_count) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0);
+        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0, value_count);
     else
-        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0);
+        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0, value_count);
 }
-double TableViewBase::average_float(size_t column_ndx) const
+double TableViewBase::average_float(size_t column_ndx, size_t* value_count) const
 {
-    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0);
+    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0, value_count);
 }
-double TableViewBase::average_double(size_t column_ndx) const
+double TableViewBase::average_double(size_t column_ndx, size_t* value_count) const
 {
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0)
-        / static_cast<double>(num_attached_rows());
+    return aggregate<act_Average, double>(&DoubleColumn::average, column_ndx, 0, value_count);
 }
 
 // Count
@@ -461,7 +466,7 @@ uint64_t TableViewBase::outside_version() const
     }
 }
 
-bool TableViewBase::is_in_sync() const REALM_NOEXCEPT
+bool TableViewBase::is_in_sync() const noexcept
 {
     check_cookie();
 
@@ -483,13 +488,13 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 
 
 
-void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) noexcept
 {
     m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
 }
 
 
-void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) noexcept
 {
     std::size_t it = 0;
     for (;;) {
@@ -503,7 +508,7 @@ void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) REALM_NOEXCEPT
 }
 
 
-void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) REALM_NOEXCEPT
+void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) noexcept
 {
     std::size_t it = 0;
     // kill any refs to the target row ndx

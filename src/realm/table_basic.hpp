@@ -92,13 +92,13 @@ public:
 
     BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()): Table(t, alloc) {}
 
-    ~BasicTable() REALM_NOEXCEPT {}
+    ~BasicTable() noexcept {}
 
     static Ref create(Allocator& = Allocator::get_default());
 
     Ref copy(Allocator& = Allocator::get_default()) const;
 
-    static int get_column_count() REALM_NOEXCEPT
+    static int get_column_count() noexcept
     {
         return util::TypeCount<typename Spec::Columns>::value;
     }
@@ -121,8 +121,8 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() REALM_NOEXCEPT { return ColsAccessor(this); }
-    ConstColsAccessor column() const REALM_NOEXCEPT { return ConstColsAccessor(this); }
+    ColsAccessor column() noexcept { return ColsAccessor(this); }
+    ConstColsAccessor column() const noexcept { return ConstColsAccessor(this); }
 
 private:
     template<int col_idx> struct Field {
@@ -141,22 +141,22 @@ public:
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
-    RowAccessor operator[](std::size_t row_idx) REALM_NOEXCEPT
+    RowAccessor operator[](std::size_t row_idx) noexcept
     {
         return RowAccessor(std::make_pair(this, row_idx));
     }
 
-    ConstRowAccessor operator[](std::size_t row_idx) const REALM_NOEXCEPT
+    ConstRowAccessor operator[](std::size_t row_idx) const noexcept
     {
         return ConstRowAccessor(std::make_pair(this, row_idx));
     }
 
-    RowAccessor front() REALM_NOEXCEPT
+    RowAccessor front() noexcept
     {
         return RowAccessor(std::make_pair(this, 0));
     }
 
-    ConstRowAccessor front() const REALM_NOEXCEPT
+    ConstRowAccessor front() const noexcept
     {
         return ConstRowAccessor(std::make_pair(this, 0));
     }
@@ -167,12 +167,12 @@ public:
     /// to the end. Thus, <tt>table.back(rel_idx)</tt> is the same as
     /// <tt>table[table.size() + rel_idx]</tt>.
     ///
-    RowAccessor back(int rel_idx = -1) REALM_NOEXCEPT
+    RowAccessor back(int rel_idx = -1) noexcept
     {
         return RowAccessor(std::make_pair(this, size()+rel_idx));
     }
 
-    ConstRowAccessor back(int rel_idx = -1) const REALM_NOEXCEPT
+    ConstRowAccessor back(int rel_idx = -1) const noexcept
     {
         return ConstRowAccessor(std::make_pair(this, size()+rel_idx));
     }
@@ -244,13 +244,13 @@ public:
     /// where it is desirable to be able to cast to a table type with
     /// different column names. Similar changes are needed in the Java
     /// and Objective-C language bindings.
-    template<class T> friend bool is_a(const Table&) REALM_NOEXCEPT;
+    template<class T> friend bool is_a(const Table&) noexcept;
 
     //@{
     /// These functions return null if the specified table is not
     /// compatible with the specified table type.
-    template<class T> friend BasicTableRef<T> checked_cast(TableRef) REALM_NOEXCEPT;
-    template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) REALM_NOEXCEPT;
+    template<class T> friend BasicTableRef<T> checked_cast(TableRef) noexcept;
+    template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) noexcept;
     //@}
 
     using Table::verify;
@@ -267,8 +267,8 @@ private:
     };
 
     // These are intende to be used only by accessor classes
-    Table* get_impl() REALM_NOEXCEPT { return this; }
-    const Table* get_impl() const REALM_NOEXCEPT { return this; }
+    Table* get_impl() noexcept { return this; }
+    const Table* get_impl() const noexcept { return this; }
 
     template<class Subtab> Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx)
     {
@@ -290,7 +290,7 @@ private:
         ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&*desc, dyn_col_names); // Throws
     }
 
-    static bool matches_dynamic_type(const realm::Spec& spec) REALM_NOEXCEPT
+    static bool matches_dynamic_type(const realm::Spec& spec) noexcept
     {
         using namespace realm::util;
         const int num_cols = util::TypeCount<typename Spec::Columns>::value;
@@ -336,7 +336,7 @@ template<class Spec> class BasicTable<Spec>::Query:
         public Spec::template ColNames<QueryCol, Query*> {
 public:
     Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
-    virtual ~Query() REALM_NOEXCEPT {}
+    virtual ~Query() noexcept {}
 
     Query& group() { m_impl.group(); return *this; }
 
@@ -627,14 +627,14 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) c
 }
 
 
-template<class T> inline bool is_a(const Table& t) REALM_NOEXCEPT
+template<class T> inline bool is_a(const Table& t) noexcept
 {
     typedef _impl::TableFriend tf;
     return T::matches_dynamic_type(tf::get_spec(t));
 }
 
 
-template<class T> inline BasicTableRef<T> checked_cast(TableRef t) REALM_NOEXCEPT
+template<class T> inline BasicTableRef<T> checked_cast(TableRef t) noexcept
 {
     if (!is_a<T>(*t))
         return BasicTableRef<T>(); // Null
@@ -642,7 +642,7 @@ template<class T> inline BasicTableRef<T> checked_cast(TableRef t) REALM_NOEXCEP
 }
 
 
-template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) REALM_NOEXCEPT
+template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) noexcept
 {
     if (!is_a<T>(*t))
         return BasicTableRef<const T>(); // Null

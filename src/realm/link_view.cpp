@@ -144,24 +144,31 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
         repl->link_list_move(*this, old_link_ndx, new_link_ndx); // Throws
 }
 
-void LinkView::swap(size_t link1_ndx, size_t link2_ndx)
+void LinkView::swap(size_t link_ndx_1, size_t link_ndx_2)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached());
-    REALM_ASSERT_3(link1_ndx, <, m_row_indexes.size());
-    REALM_ASSERT_3(link2_ndx, <, m_row_indexes.size());
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(!m_row_indexes.is_attached() || link_ndx_1 >= m_row_indexes.size() ||
+                       link_ndx_2 >= m_row_indexes.size()))
+        throw LogicError(LogicError::link_index_out_of_range);
 
-    if (link1_ndx == link2_ndx)
+    // Internally, core requires that the first link index is strictly less than
+    // the second one. The changeset merge mechanism is written to take
+    // advantage of it, and requires it.
+    if (link_ndx_1 == link_ndx_2)
         return;
+    if (link_ndx_1 > link_ndx_2)
+        std::swap(link_ndx_1, link_ndx_2);
+
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
-    size_t target_row_ndx = m_row_indexes.get(link1_ndx);
-    m_row_indexes.set(link1_ndx, m_row_indexes.get(link2_ndx));
-    m_row_indexes.set(link2_ndx, target_row_ndx);
+    size_t target_row_ndx = m_row_indexes.get(link_ndx_1);
+    m_row_indexes.set(link_ndx_1, m_row_indexes.get(link_ndx_2));
+    m_row_indexes.set(link_ndx_2, target_row_ndx);
 
     if (Replication* repl = get_repl())
-        repl->link_list_swap(*this, link1_ndx, link2_ndx); // Throws
+        repl->link_list_swap(*this, link_ndx_1, link_ndx_2); // Throws
 }
 
 
@@ -382,7 +389,7 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
 }
 
 
-void LinkView::repl_unselect() REALM_NOEXCEPT
+void LinkView::repl_unselect() noexcept
 {
     if (Replication* repl = get_repl())
         repl->on_link_list_destroyed(*this);

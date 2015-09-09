@@ -47,11 +47,11 @@ public:
     /// indefinitely. It is the responsibility of the implementing subclass to
     /// specify the rules that govern the period of validity of this memory.
     virtual void get_changesets(version_type begin_version, version_type end_version,
-                                BinaryData* buffer) const REALM_NOEXCEPT = 0;
+                                BinaryData* buffer) const noexcept = 0;
 
-    virtual BinaryData get_uncommitted_changes() REALM_NOEXCEPT = 0;
+    virtual BinaryData get_uncommitted_changes() noexcept = 0;
 
-    virtual ~History() REALM_NOEXCEPT {}
+    virtual ~History() noexcept {}
 };
 
 

@@ -157,9 +157,9 @@ public:
     /// attached state by calling is_attached(). Calling any other
     /// function (except the destructor) while in the unattached state
     /// has undefined behavior.
-    SharedGroup(unattached_tag) REALM_NOEXCEPT;
+    SharedGroup(unattached_tag) noexcept;
 
-    ~SharedGroup() REALM_NOEXCEPT;
+    ~SharedGroup() noexcept;
 
     /// Attach this SharedGroup instance to the specified database file.
     ///
@@ -211,13 +211,13 @@ public:
               const char* encryption_key = 0, bool allow_file_format_upgrade = true);
 
     /// Close any open database, returning to the unattached state.
-    void close() REALM_NOEXCEPT;
+    void close() noexcept;
 
     /// A SharedGroup may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
     /// function other than open(), is_attached(), and ~SharedGroup()
     /// on an unattached instance results in undefined behavior.
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     /// Reserve disk space now to avoid allocation errors at a later
     /// point in time, and to minimize on-disk fragmentation. In some
@@ -370,10 +370,10 @@ public:
     /// not correspond to a bound (or tethered) snapshot.
 
     const Group& begin_read(VersionID version = VersionID());
-    void end_read() REALM_NOEXCEPT;
+    void end_read() noexcept;
     Group& begin_write();
     version_type commit();
-    void rollback() REALM_NOEXCEPT;
+    void rollback() noexcept;
 
     //@}
 
@@ -542,15 +542,15 @@ private:
                    const char* encryption_key);
 
     // Ring buffer managment
-    bool        ringbuf_is_empty() const REALM_NOEXCEPT;
-    std::size_t ringbuf_size() const REALM_NOEXCEPT;
-    std::size_t ringbuf_capacity() const REALM_NOEXCEPT;
-    bool        ringbuf_is_first(std::size_t ndx) const REALM_NOEXCEPT;
-    void        ringbuf_remove_first() REALM_NOEXCEPT;
-    std::size_t ringbuf_find(uint64_t version) const REALM_NOEXCEPT;
-    ReadCount&  ringbuf_get(std::size_t ndx) REALM_NOEXCEPT;
-    ReadCount&  ringbuf_get_first() REALM_NOEXCEPT;
-    ReadCount&  ringbuf_get_last() REALM_NOEXCEPT;
+    bool        ringbuf_is_empty() const noexcept;
+    std::size_t ringbuf_size() const noexcept;
+    std::size_t ringbuf_capacity() const noexcept;
+    bool        ringbuf_is_first(std::size_t ndx) const noexcept;
+    void        ringbuf_remove_first() noexcept;
+    std::size_t ringbuf_find(uint64_t version) const noexcept;
+    ReadCount&  ringbuf_get(std::size_t ndx) noexcept;
+    ReadCount&  ringbuf_get_first() noexcept;
+    ReadCount&  ringbuf_get_last() noexcept;
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
@@ -569,13 +569,13 @@ private:
 
     // Release a specific readlock. The readlock info MUST have been obtained by a
     // call to grab_latest_readlock() or grab_specific_readlock().
-    void release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT;
+    void release_readlock(ReadLockInfo& readlock) noexcept;
 
     void do_begin_read(VersionID);
-    void do_end_read() REALM_NOEXCEPT;
+    void do_end_read() noexcept;
     void do_begin_write();
     version_type do_commit();
-    void do_end_write() REALM_NOEXCEPT;
+    void do_end_write() noexcept;
 
 public:
     // return the current version of the database - note, this is not necessarily
@@ -607,7 +607,7 @@ private:
     // between the old version and the given version, or nullptr if none.
     std::unique_ptr<BinaryData[]> advance_readlock(History&, VersionID specific_version);
 
-    int get_file_format() const REALM_NOEXCEPT;
+    int get_file_format() const noexcept;
 
     friend class _impl::SharedGroupFriend;
 };
@@ -622,12 +622,12 @@ public:
         m_shared_group.begin_read(); // Throws
     }
 
-    ~ReadTransaction() REALM_NOEXCEPT
+    ~ReadTransaction() noexcept
     {
         m_shared_group.end_read();
     }
 
-    bool has_table(StringData name) const REALM_NOEXCEPT
+    bool has_table(StringData name) const noexcept
     {
         return get_group().has_table(name);
     }
@@ -647,7 +647,7 @@ public:
         return get_group().get_table<T>(name); // Throws
     }
 
-    const Group& get_group() const REALM_NOEXCEPT;
+    const Group& get_group() const noexcept;
 
 private:
     SharedGroup& m_shared_group;
@@ -662,13 +662,13 @@ public:
         m_shared_group->begin_write(); // Throws
     }
 
-    ~WriteTransaction() REALM_NOEXCEPT
+    ~WriteTransaction() noexcept
     {
         if (m_shared_group)
             m_shared_group->rollback();
     }
 
-    bool has_table(StringData name) const REALM_NOEXCEPT
+    bool has_table(StringData name) const noexcept
     {
         return get_group().has_table(name);
     }
@@ -709,7 +709,7 @@ public:
         return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
 
-    Group& get_group() const REALM_NOEXCEPT;
+    Group& get_group() const noexcept;
 
     SharedGroup::version_type commit()
     {
@@ -719,7 +719,7 @@ public:
         return new_version;
     }
 
-    void rollback() REALM_NOEXCEPT
+    void rollback() noexcept
     {
         REALM_ASSERT(m_shared_group);
         m_shared_group->rollback();
@@ -747,7 +747,7 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
     open(file, no_create, durability, encryption_key, allow_file_format_upgrade); // Throws
 }
 
-inline SharedGroup::SharedGroup(unattached_tag) REALM_NOEXCEPT:
+inline SharedGroup::SharedGroup(unattached_tag) noexcept:
     m_group(Group::shared_tag())
 {
 }
@@ -787,24 +787,24 @@ inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
               allow_file_format_upgrade); // Throws
 }
 
-inline bool SharedGroup::is_attached() const REALM_NOEXCEPT
+inline bool SharedGroup::is_attached() const noexcept
 {
     return m_file_map.is_attached();
 }
 
 class SharedGroup::ReadLockUnlockGuard {
 public:
-    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) REALM_NOEXCEPT:
+    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept:
         m_shared_group(shared_group),
         m_read_lock(&read_lock)
     {
     }
-    ~ReadLockUnlockGuard() REALM_NOEXCEPT
+    ~ReadLockUnlockGuard() noexcept
     {
         if (m_read_lock)
             m_shared_group.release_readlock(*m_read_lock);
     }
-    void release() REALM_NOEXCEPT
+    void release() noexcept
     {
         m_read_lock = 0;
     }
@@ -1044,7 +1044,7 @@ inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
     }
 }
 
-inline int SharedGroup::get_file_format() const REALM_NOEXCEPT
+inline int SharedGroup::get_file_format() const noexcept
 {
     return m_group.get_file_format();
 }
@@ -1054,7 +1054,7 @@ inline int SharedGroup::get_file_format() const REALM_NOEXCEPT
 // not all of the non-public parts of the SharedGroup class.
 class _impl::SharedGroupFriend {
 public:
-    static Group& get_group(SharedGroup& sg) REALM_NOEXCEPT
+    static Group& get_group(SharedGroup& sg) noexcept
     {
         return sg.m_group;
     }
@@ -1092,19 +1092,19 @@ public:
                      allow_file_format_upgrade); // Throws
     }
 
-    static int get_file_format(const SharedGroup& sg) REALM_NOEXCEPT
+    static int get_file_format(const SharedGroup& sg) noexcept
     {
         return sg.get_file_format();
     }
 };
 
-inline const Group& ReadTransaction::get_group() const REALM_NOEXCEPT
+inline const Group& ReadTransaction::get_group() const noexcept
 {
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_group(m_shared_group);
 }
 
-inline Group& WriteTransaction::get_group() const REALM_NOEXCEPT
+inline Group& WriteTransaction::get_group() const noexcept
 {
     REALM_ASSERT(m_shared_group);
     using sgf = _impl::SharedGroupFriend;
