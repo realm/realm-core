@@ -64,7 +64,7 @@ template <class T> struct ColumnTemplate : public ColumnTemplateBase
     // Overridden in column_string.* because == operator of StringData isn't yet locale aware; todo
     virtual int compare_values(size_t row1, size_t row2) const
     {
-        // we negate nullability such that the two ternary statements in this method can look identical to reduce 
+        // we negate nullability such that the two ternary statements in this method can look identical to reduce
         // risk of bugs
         bool v1 = !is_null(row1);
         bool v2 = !is_null(row2);

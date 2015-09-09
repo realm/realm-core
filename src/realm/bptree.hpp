@@ -168,7 +168,7 @@ public:
 private:
     LeafType& root_as_leaf();
     const LeafType& root_as_leaf() const;
-    
+
     std::unique_ptr<Array> create_root_from_ref(Allocator& alloc, ref_type ref);
     std::unique_ptr<Array> create_root_from_mem(Allocator& alloc, MemRef mem);
 
@@ -431,7 +431,7 @@ T BpTree<T, N>::get(std::size_t ndx) const noexcept
     if (root_is_leaf()) {
         return root_as_leaf().get(ndx);
     }
-    
+
     // Use direct getter to avoid initializing leaf array:
     std::pair<MemRef, std::size_t> p = root().get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
@@ -677,7 +677,7 @@ void BpTree<T,N>::clear()
     }
     else {
         root().clear_and_destroy_children();
-        
+
         // Reinitialize the root's memory as a leaf.
         Allocator& alloc = get_alloc();
         std::unique_ptr<LeafType> new_root(new LeafType(alloc));
