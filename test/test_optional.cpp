@@ -195,6 +195,8 @@ TEST(Optional_ConstExpr) {
     CHECK_EQUAL(1234, g);
 }
 
+// FIXME: Visual Studio 2015's constexpr support isn't sufficient to allow Optional<T&> to compile.
+#ifndef _WIN32
 TEST(Optional_ReferenceConstExpr) {
     // Should compile:
     constexpr Optional<const int&> a;
@@ -208,6 +210,7 @@ TEST(Optional_ReferenceConstExpr) {
     constexpr bool f { Optional<const int&>{ none } };
     CHECK_EQUAL(false, f);
 }
+#endif
 
 // Disabled for compliance with std::optional
 // TEST(Optional_VoidIsEquivalentToBool)
