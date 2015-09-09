@@ -6264,7 +6264,7 @@ TEST(Table_RowAccessor_Null)
 
 // This triggers a severe bug in the Array::alloc() allocator in which its capacity-doubling
 // scheme forgets to test of the doubling has overflowed the maximum allowed size of an
-// array which is 2^20 - 1 bytes
+// array which is 2^24 - 1 bytes
 TEST(Table_AllocatorCapacityBug)
 {
     char* buf = new char[20000000];
