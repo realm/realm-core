@@ -119,11 +119,8 @@ void SlabAlloc::detach() noexcept
         case attach_SharedFile:
         case attach_UnsharedFile:
             File::unmap(m_data, m_initial_mapping_size);
-            if (m_additional_mappings) {
-                // running the destructors on the mappings will cause them to unmap:
-                delete[] m_additional_mappings;
-                m_additional_mappings = 0;
-            }
+            // running the destructors on the mappings will cause them to unmap:
+            m_additional_mappings = nullptr;
             m_file.close();
             goto found;
     }
@@ -738,8 +735,7 @@ void SlabAlloc::remap(size_t file_size)
         new_mappings.reset(new util::File::Map<char>[m_capacity_additional_mappings]);
         for (size_t j = 0; j < m_num_additional_mappings; ++j)
             new_mappings[j] = std::move(m_additional_mappings[j]);
-        delete[] m_additional_mappings;
-        m_additional_mappings = new_mappings.release();
+        m_additional_mappings = std::move(new_mappings);
     }
     for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
     {

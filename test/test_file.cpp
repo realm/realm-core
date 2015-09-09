@@ -169,6 +169,39 @@ TEST(File_ReaderAndWriter)
     }
 }
 
+TEST(File_Offset)
+{
+    const size_t size = page_size();
+    const size_t count_per_page = size / sizeof(size_t);
+    // two blocks of IV tables
+    const size_t page_count = 256 * 2 / (size / 4096);
+
+    TEST_PATH(path);
+    {
+        File f(path, File::mode_Write);
+        f.set_encryption_key(crypt_key(true));
+        f.resize(page_count * size);
+
+        for (size_t i = 0; i < page_count; ++i) {
+            File::Map<size_t> map(f, i * size, File::access_ReadWrite, size);
+            for (size_t j = 0; j < count_per_page; ++j)
+                map.get_addr()[j] = i * size + j;
+        }
+    }
+    {
+        File f(path, File::mode_Read);
+        f.set_encryption_key(crypt_key(true));
+        for (size_t i = 0; i < page_count; ++i) {
+            File::Map<size_t> map(f, i * size, File::access_ReadOnly, size);
+            for (size_t j = 0; j < count_per_page; ++j) {
+                CHECK_EQUAL(map.get_addr()[j], i * size + j);
+                if (map.get_addr()[j] != i * size + j)
+                    return;
+            }
+        }
+    }
+}
+
 
 TEST(File_MultipleWriters)
 {
