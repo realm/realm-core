@@ -162,7 +162,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
     using ColTypeTraits = ColumnTypeTraits<T, ColType::nullable>;
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
-    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count 
+    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count
               || function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
