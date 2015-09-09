@@ -18,6 +18,7 @@ util/misc_errors.hpp \
 util/basic_system_errors.hpp \
 util/thread.hpp \
 util/file.hpp \
+util/optional.hpp \
 util/network.hpp \
 util/utf8.hpp \
 util/platform_specific_condvar.hpp \
