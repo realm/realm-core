@@ -6269,7 +6269,7 @@ TEST(Table_AllocatorCapacityBug)
 {
     char* buf = new char[20000000];
 
-    // First a simple trigger of `Assertion failed: value <= 0xFFFFFL [26000016, 16777215]`
+    // First a simple trigger of `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`
     {
         ref_type ref = BinaryColumn::create(Allocator::get_default());
         BinaryColumn c(Allocator::get_default(), ref, true);

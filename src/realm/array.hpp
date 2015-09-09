@@ -83,7 +83,7 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 const std::size_t npos = std::size_t(-1);
 
 // Maximum number of bytes that the payload of an array can be
-const size_t max_array_payload = 0xFFFFFFL;
+const size_t max_array_payload = 0x00ffffffL;
 
 /// Alias for realm::npos.
 const std::size_t not_found = npos;
