@@ -975,9 +975,11 @@ TEST(ColumnIntNull_MoveLastOverPreservesNull)
 {
     ref_type ref = IntNullColumn::create(Allocator::get_default());
     IntNullColumn c(Allocator::get_default(), ref);
+    c.create_search_index();
     c.insert(0, 0, 3);
     c.set(0, 123);
     c.set(1, 456);
+    c.set(2, 4776);
     c.set_null(2);
     c.move_last_over(0, 2);
     CHECK(c.is_null(0));
