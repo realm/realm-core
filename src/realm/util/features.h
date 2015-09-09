@@ -151,20 +151,6 @@
 #endif
 
 
-/* Support for the C++11 'constexpr' keyword.
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 6) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_constexpr)
-#  define REALM_HAVE_CXX11_CONSTEXPR 1
-#endif
-#if REALM_HAVE_CXX11_CONSTEXPR
-#  define REALM_CONSTEXPR constexpr
-#else
-#  define REALM_CONSTEXPR
-#endif
-
-
 /* The way to specify that a function never returns.
  *
  * NOTE: C++11 generalized attributes are not yet fully supported in

@@ -140,6 +140,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #define REALM_QUERY_EXPRESSION_HPP
 
 #include <realm/column_type_traits.hpp>
+#include <realm/util/optional.hpp>
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
@@ -693,6 +694,22 @@ template <class T, size_t prealloc = 8> struct NullableVector
         m_first[index] = value;
     }
 
+    inline util::Optional<T> get(size_t index) const
+    {
+        if (is_null(index))
+            return util::none;
+
+        return util::make_optional((*this)[index]);
+    }
+
+    inline void set(size_t index, util::Optional<T> value)
+    {
+        if (value)
+            set(index, *value);
+        else
+            set_null(index);
+    }
+
     void fill(T value)
     {
         for (size_t t = 0; t < m_size; t++) {
@@ -832,6 +849,24 @@ template<> inline void NullableVector<BinaryData>::set_null(size_t index)
     m_first[index] = BinaryData();
 }
 
+template <typename Operator>
+struct OperatorOptionalAdapter {
+    template <typename L, typename R>
+    util::Optional<typename Operator::type> operator()(const util::Optional<L>& left, const util::Optional<R>& right)
+    {
+        if (!left || !right)
+            return util::none;
+        return Operator()(*left, *right);
+    }
+
+    template <typename T>
+    util::Optional<typename Operator::type> operator()(const util::Optional<T>& arg)
+    {
+        if (!arg)
+            return util::none;
+        return Operator()(*arg);
+    }
+};
 
 // Stores N values of type T. Can also exchange data with other ValueBase of different types
 template<class T> class Value : public ValueBase, public Subexpr2<T>
@@ -879,26 +914,50 @@ public:
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
     {
-        TOperator o;
-        size_t vals = minimum(left->m_values, right->m_values);
+        OperatorOptionalAdapter<TOperator> o;
 
-        for (size_t t = 0; t < vals; t++) {
-            if (std::is_same<T, int64_t>::value && (left->m_storage.is_null(t) || right->m_storage.is_null(t)))
-                m_storage.set_null(t);
-            else
-                m_storage.set(t, o(left->m_storage[t], right->m_storage[t]));
+        if (!left->from_link && !right->from_link) {
+            // Operate on values one-by-one (one value is one row; no links)
+            size_t min = std::min(left->m_values, right->m_values);
+            init(false, min);
 
+            for (size_t i = 0; i < min; i++) {
+                m_storage.set(i, o(left->m_storage.get(i), right->m_storage.get(i)));
+            }
+        }
+        else if (left->from_link && right->from_link) {
+            // FIXME: Many-to-many links not supported yet. Need to specify behaviour
+            REALM_ASSERT_DEBUG(false);
+        }
+        else if (!left->from_link && right->from_link) {
+            // Right values come from link. Left must come from single row.
+            REALM_ASSERT_DEBUG(left->m_values > 0);
+            init(true, right->m_values);
+
+            auto left_value = left->m_storage.get(0);
+            for (size_t i = 0; i < right->m_values; i++) {
+                m_storage.set(i, o(left_value, right->m_storage.get(i)));
+            }
+        }
+        else if (left->from_link && !right->from_link) {
+            // Same as above, but with left values coming from links
+            REALM_ASSERT_DEBUG(right->m_values > 0);
+            init(true, left->m_values);
+
+            auto right_value = right->m_storage.get(0);
+            for (size_t i = 0; i < left->m_values; i++) {
+                m_storage.set(i, o(left->m_storage.get(i), right_value));
+            }
         }
     }
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* value)
     {
-        TOperator o;
-        for (size_t t = 0; t < value->m_values; t++) {
-            if (std::is_same<T, int64_t>::value && value->m_storage.is_null(t))
-                m_storage.set_null(t);
-            else
-                m_storage.set(t, o(value->m_storage[t]));
+        init(value->from_link, value->m_values);
+
+        OperatorOptionalAdapter<TOperator> o;
+        for (size_t i = 0; i < value->m_values; i++) {
+            m_storage.set(i, o(value->m_storage.get(i)));
         }
     }
 
@@ -1003,22 +1062,22 @@ public:
             }
         }
         else if (left->from_link && right->from_link) {
-            // Many-to-many links not supported yet. Need to specify behaviour
+            // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             REALM_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
             // Right values come from link. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
-            REALM_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
-            for (size_t r = 0; r < right->ValueBase::m_values; r++) {
+            REALM_ASSERT_DEBUG(left->m_values > 0);
+            for (size_t r = 0; r < right->m_values; r++) {
                 if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0), right->m_storage.is_null(r)))
                     return 0;
             }
         }
         else if (left->from_link && !right->from_link) {
-            // Same as above, right left values coming from links
-            REALM_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
-            for (size_t l = 0; l < left->ValueBase::m_values; l++) {
+            // Same as above, but with left values coming from links
+            REALM_ASSERT_DEBUG(right->m_values > 0);
+            for (size_t l = 0; l < left->m_values; l++) {
                 if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l), right->m_storage.is_null(0)))
                     return 0;
             }
@@ -1167,8 +1226,8 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type>>& operator / 
 }
 
 // Unary operators
-template <class T> UnaryOperator<Pow<T>>& power (Subexpr2<T>& left) {
-    return *new UnaryOperator<Pow<T>>(left.clone(), true);
+template <class T> UnaryOperator<Pow<T>>& power (const Subexpr2<T>& left) {
+    return *new UnaryOperator<Pow<T>>(const_cast<Subexpr2<T>&>(left).clone(), true);
 }
 
 

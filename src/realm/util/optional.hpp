@@ -37,8 +37,8 @@ template <class T, class... Args> Optional<T> some(Args&&...);
 template <class T> struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
-static REALM_CONSTEXPR struct None { REALM_CONSTEXPR explicit None(int) {} } none { 0 };
-static REALM_CONSTEXPR struct InPlace { REALM_CONSTEXPR InPlace() {} } in_place;
+static constexpr struct None { constexpr explicit None(int) {} } none { 0 };
+static constexpr struct InPlace { constexpr InPlace() {} } in_place;
 
 // Note: Should conform with the future std::bad_optional_access.
 struct BadOptionalAccess : std::logic_error {
@@ -53,19 +53,19 @@ namespace _impl {
 template <class T, bool=std::is_trivially_destructible<T>::value> struct OptionalStorage;
 
 // FIXME: Callers should switch to std::move when we adopt C++14
-template <class T> inline REALM_CONSTEXPR typename std::remove_reference<T>::type&& constexpr_move(T&& t) noexcept
+template <class T> inline constexpr typename std::remove_reference<T>::type&& constexpr_move(T&& t) noexcept
 {
     return static_cast<typename std::remove_reference<T>::type&&>(t);
 }
 
 // FIXME: Callers should switch to std::forward when we adopt C++14
-template <class T> inline REALM_CONSTEXPR T&& constexpr_forward(typename std::remove_reference<T>::type& t) noexcept
+template <class T> inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type& t) noexcept
 {
     return static_cast<T&&>(t);
 }
 
 // FIXME: Callers should switch to std::forward when we adopt C++14
-template <class T> inline REALM_CONSTEXPR T&& constexpr_forward(typename std::remove_reference<T>::type&& t) noexcept
+template <class T> inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type&& t) noexcept
 {
     static_assert(!std::is_lvalue_reference<T>::value, "Can't forward rvalue as lvalue.");
     return static_cast<T&&>(t);
@@ -81,16 +81,16 @@ class Optional : private _impl::OptionalStorage<T> {
 public:
     using value_type = T;
 
-    REALM_CONSTEXPR Optional();
-    REALM_CONSTEXPR Optional(None);
+    constexpr Optional();
+    constexpr Optional(None);
     Optional(Optional<T>&& other);
     Optional(const Optional<T>& other);
 
-    REALM_CONSTEXPR Optional(T&& value);
-    REALM_CONSTEXPR Optional(const T& value);
+    constexpr Optional(T&& value);
+    constexpr Optional(const T& value);
 
     template <class... Args>
-    REALM_CONSTEXPR Optional(InPlace tag, Args&&...);
+    constexpr Optional(InPlace tag, Args&&...);
     // FIXME: std::optional specifies an std::initializer_list constructor overload as well.
 
     Optional<T>& operator=(None);
@@ -99,16 +99,16 @@ public:
     template <class U>
     Optional<T>& operator=(U&& value);
 
-    explicit REALM_CONSTEXPR operator bool() const;
-    REALM_CONSTEXPR const T& value() const; // Throws
+    explicit constexpr operator bool() const;
+    constexpr const T& value() const; // Throws
     T& value(); // Throws, FIXME: Can be constexpr with C++14
-    REALM_CONSTEXPR const T& operator*() const; // Throws
+    constexpr const T& operator*() const; // Throws
     T& operator*(); // Throws, FIXME: Can be constexpr with C++14
-    REALM_CONSTEXPR const T* operator->() const; // Throws
+    constexpr const T* operator->() const; // Throws
     T* operator->(); // Throws, FIXME: Can be constexpr with C++14
 
     template <class U>
-    REALM_CONSTEXPR T value_or(U&& value) const&;
+    constexpr T value_or(U&& value) const&;
 
     template <class U>
     T value_or(U&& value) &&;
@@ -123,7 +123,7 @@ private:
     using Storage::m_engaged;
     using Storage::m_value;
 
-    REALM_CONSTEXPR bool is_engaged() const { return m_engaged; }
+    constexpr bool is_engaged() const { return m_engaged; }
     void set_engaged(bool b) { m_engaged = b; }
     void clear();
 };
@@ -152,15 +152,15 @@ public:
     using value_type = T&;
     using target_type = typename std::decay<T>::type;
 
-    REALM_CONSTEXPR Optional() {}
-    REALM_CONSTEXPR Optional(None) : Optional() {}
+    constexpr Optional() {}
+    constexpr Optional(None) : Optional() {}
     Optional(const Optional<T&>& other) = default;
     template <class U>
     Optional(const Optional<U&>& other) : m_ptr(other.m_ptr) {}
     template <class U>
     Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get()) {}
 
-    REALM_CONSTEXPR Optional(T& value) : m_ptr(&value) {}
+    constexpr Optional(T& value) : m_ptr(&value) {}
     Optional(T&& value) = delete; // Catches accidental references to rvalue temporaries.
 
     Optional<T&>& operator=(None) { m_ptr = nullptr; return *this; }
@@ -169,12 +169,12 @@ public:
     template <class U>
     Optional<T&>& operator=(std::reference_wrapper<U> ref) { m_ptr = &ref.get(); return *this; }
 
-    explicit REALM_CONSTEXPR operator bool() const { return m_ptr; }
-    REALM_CONSTEXPR const target_type& value() const; // Throws
+    explicit constexpr operator bool() const { return m_ptr; }
+    constexpr const target_type& value() const; // Throws
     target_type& value(); // Throws
-    REALM_CONSTEXPR const target_type& operator*() const { return value(); }
+    constexpr const target_type& operator*() const { return value(); }
     target_type& operator*() { return value(); }
-    REALM_CONSTEXPR const target_type* operator->() const { return &value(); }
+    constexpr const target_type* operator->() const { return &value(); }
     target_type* operator->() { return &value(); }
 
     void swap(Optional<T&> other); // FIXME: Add noexcept() clause
@@ -214,12 +214,12 @@ Optional<T> some(Args&&... args)
 
 
 template <class T>
-REALM_CONSTEXPR Optional<T>::Optional(): Storage(none)
+constexpr Optional<T>::Optional(): Storage(none)
 {
 }
 
 template <class T>
-REALM_CONSTEXPR Optional<T>::Optional(None): Storage(none)
+constexpr Optional<T>::Optional(None): Storage(none)
 {
 }
 
@@ -242,18 +242,18 @@ Optional<T>::Optional(const Optional<T>& other): Storage(none)
 }
 
 template <class T>
-REALM_CONSTEXPR Optional<T>::Optional(T&& value): Storage(_impl::constexpr_move(value))
+constexpr Optional<T>::Optional(T&& value): Storage(_impl::constexpr_move(value))
 {
 }
 
 template <class T>
-REALM_CONSTEXPR Optional<T>::Optional(const T& value): Storage(value)
+constexpr Optional<T>::Optional(const T& value): Storage(value)
 {
 }
 
 template <class T>
 template <class... Args>
-REALM_CONSTEXPR Optional<T>::Optional(InPlace, Args&&... args): Storage(std::forward<Args>(args)...)
+constexpr Optional<T>::Optional(InPlace, Args&&... args): Storage(std::forward<Args>(args)...)
 {
 }
 
@@ -326,13 +326,13 @@ Optional<T>& Optional<T>::operator=(U&& value)
 }
 
 template <class T>
-REALM_CONSTEXPR Optional<T>::operator bool() const
+constexpr Optional<T>::operator bool() const
 {
     return m_engaged;
 }
 
 template <class T>
-REALM_CONSTEXPR const T& Optional<T>::value() const
+constexpr const T& Optional<T>::value() const
 {
     return m_engaged ? m_value : (throw BadOptionalAccess{"bad optional access"}, m_value);
 }
@@ -347,7 +347,7 @@ T& Optional<T>::value()
 }
 
 template <class T>
-REALM_CONSTEXPR const typename Optional<T&>::target_type& Optional<T&>::value() const
+constexpr const typename Optional<T&>::target_type& Optional<T&>::value() const
 {
     return m_ptr ? *m_ptr : (throw BadOptionalAccess{"bad optional access"}, *m_ptr);
 }
@@ -362,7 +362,7 @@ typename Optional<T&>::target_type& Optional<T&>::value()
 }
 
 template <class T>
-REALM_CONSTEXPR const T& Optional<T>::operator*() const
+constexpr const T& Optional<T>::operator*() const
 {
     // Note: This differs from std::optional, which doesn't throw.
     return value();
@@ -376,7 +376,7 @@ T& Optional<T>::operator*()
 }
 
 template <class T>
-REALM_CONSTEXPR const T* Optional<T>::operator->() const
+constexpr const T* Optional<T>::operator->() const
 {
     // Note: This differs from std::optional, which doesn't throw.
     return &value();
@@ -391,7 +391,7 @@ T* Optional<T>::operator->()
 
 template <class T>
 template <class U>
-REALM_CONSTEXPR T Optional<T>::value_or(U&& otherwise) const&
+constexpr T Optional<T>::value_or(U&& otherwise) const&
 {
     return m_engaged ? T{m_value} : T{_impl::constexpr_forward<U>(otherwise)};
 }
@@ -428,7 +428,7 @@ void Optional<T>::emplace(Args&&... args)
 
 
 template <class T>
-REALM_CONSTEXPR Optional<typename std::decay<T>::type>
+constexpr Optional<typename std::decay<T>::type>
 make_optional(T&& value)
 {
     using Type = typename std::decay<T>::type;
@@ -521,11 +521,11 @@ struct OptionalStorage<T, true> {
     };
     bool m_engaged = false;
 
-    REALM_CONSTEXPR OptionalStorage(realm::util::None) : m_null_state() { }
-    REALM_CONSTEXPR OptionalStorage(T&& value) : m_value(constexpr_move(value)), m_engaged(true) { }
+    constexpr OptionalStorage(realm::util::None) : m_null_state() { }
+    constexpr OptionalStorage(T&& value) : m_value(constexpr_move(value)), m_engaged(true) { }
 
     template <class... Args>
-    REALM_CONSTEXPR OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
+    constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
 };
 
 // T is not trivially destructible.
@@ -537,11 +537,11 @@ struct OptionalStorage<T, false> {
     };
     bool m_engaged = false;
 
-    REALM_CONSTEXPR OptionalStorage(realm::util::None) : m_null_state() { }
-    REALM_CONSTEXPR OptionalStorage(T&& value) : m_value(constexpr_move(value)), m_engaged(true) { }
+    constexpr OptionalStorage(realm::util::None) : m_null_state() { }
+    constexpr OptionalStorage(T&& value) : m_value(constexpr_move(value)), m_engaged(true) { }
 
     template <class... Args>
-    REALM_CONSTEXPR OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
+    constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
 
     ~OptionalStorage()
     {
