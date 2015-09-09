@@ -6301,9 +6301,8 @@ TEST(Table_AllocatorCapacityBug)
                 t.clear();
             }
         }
-
-        delete buf;
     }
+    delete buf;  
 }
 
 
