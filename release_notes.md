@@ -1,6 +1,8 @@
 # NEXT RELEASE
 
 ### Bugfixes:
+* Fixed assert that could happen in rare cases when calling set_null() on an
+  indexed nullable column.
 * Fixed all aggregate methods on Table (min, max, etc) that hadn't been
   updated/kept in sync for a long while (null support, return_ndx argument,..).
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
