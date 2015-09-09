@@ -311,6 +311,10 @@ protected:
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
+    mutable TableRef m_linked_table;
+    size_t m_linked_column;
+    size_t m_linked_row;
+
     // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
     mutable ConstLinkViewRef m_linkview_source;
 
@@ -337,6 +341,7 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
+    TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -560,6 +565,7 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
+    TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
@@ -765,9 +771,32 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
+inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx):
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
+    m_table(parent->get_table_ref()), // Throws
+    m_linked_table(linked_table->get_table_ref()), // Throws
+    m_linked_column(column),
+    m_linked_row(row_ndx),
+    m_last_seen_version(m_table ? m_table->m_version : 0),
+    m_distinct_column_source(npos),
+    m_auto_sort(false)
+{
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
+    // RAII idiom (nor should it).
+    Allocator& alloc = m_row_indexes.get_alloc();
+    _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
+    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
+    parent->register_view(this); // Throws
+    m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
+}
+
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
+    m_linked_table(tv.m_linked_table),
+    m_linked_column(tv.m_linked_column),
+    m_linked_row(tv.m_linked_row),
     m_linkview_source(tv.m_linkview_source),
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
@@ -794,6 +823,9 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(move(tv.m_table)),
+    m_linked_table(move(tv.m_linked_table)),
+    m_linked_column(tv.m_linked_column),
+    m_linked_row(tv.m_linked_row),
     m_linkview_source(tv.m_linkview_source),
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
@@ -1147,6 +1179,11 @@ inline TableView::TableView(Table& parent):
 
 inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit):
     TableViewBase(&parent, query, start, end, limit)
+{
+}
+
+inline TableView::TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx):
+    TableViewBase(parent, linked_table, column, row_ndx)
 {
 }
 
