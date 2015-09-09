@@ -699,7 +699,7 @@ inline bool TableViewBase::is_attached() const noexcept
 
 inline bool TableViewBase::is_row_attached(std::size_t row_ndx) const noexcept
 {
-    return get_source_ndx(row_ndx) != detached_ref;
+    return size_t(m_row_indexes.get(row_ndx)) != detached_ref;
 }
 
 inline std::size_t TableViewBase::size() const noexcept

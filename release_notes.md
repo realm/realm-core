@@ -33,6 +33,8 @@
   encryption.
 * Query expression comparisons now give correct results when comparing a linked
   column with a column in the base table.
+* Fixed assertion failure when TableViewBase::is_row_attached() would return
+  false in a debug build.
 
 ### API breaking changes:
 
