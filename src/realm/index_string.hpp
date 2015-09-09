@@ -300,7 +300,7 @@ template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_
 
 template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 {
-    char buffer[sizeof(T)];
+    char buffer[8];
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);
 
@@ -317,7 +317,7 @@ template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 
 template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 {
-    char buffer[sizeof(T)];
+    char buffer[8];
     StringData value = get(row_ndx, buffer);
 
     do_delete(row_ndx, value, 0);
