@@ -69,16 +69,18 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
     cryptor.set_file_size(16);
 
     const char data[4096] = "test data";
-    char raw_buffer_1[8192] = {0}, raw_buffer_2[9192] = {0};
+    char raw_buffer_1[8192] = {0}, raw_buffer_2[8192] = {0};
     int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 
     cryptor.write(fd, 0, data, sizeof(data));
     lseek(fd, 0, SEEK_SET);
-    read(fd, raw_buffer_1, sizeof(raw_buffer_1));
+    ssize_t actual_read_1 = read(fd, raw_buffer_1, sizeof(raw_buffer_1));
+    CHECK_EQUAL(actual_read_1, sizeof(raw_buffer_1));
 
     cryptor.write(fd, 0, data, sizeof(data));
     lseek(fd, 0, SEEK_SET);
-    read(fd, raw_buffer_2, sizeof(raw_buffer_2));
+    ssize_t actual_read_2 = read(fd, raw_buffer_2, sizeof(raw_buffer_2));
+    CHECK_EQUAL(actual_read_2, sizeof(raw_buffer_2));
 
     CHECK(memcmp(raw_buffer_1, raw_buffer_2, sizeof(raw_buffer_1)) != 0);
 
@@ -123,10 +125,13 @@ TEST(EncryptedFile_InterruptedWrite)
 
     // Fake an interrupted write which updates the IV table but not the data
     char buffer[4096];
-    pread(fd, buffer, 64, 0);
+    ssize_t actual_pread = pread(fd, buffer, 64, 0);
+    CHECK_EQUAL(actual_pread, 64);
+
     memcpy(buffer + 32, buffer, 32);
     buffer[5]++; // first byte of "hmac1" field in iv table
-    pwrite(fd, buffer, 64, 0);
+    ssize_t actual_pwrite = pwrite(fd, buffer, 64, 0);
+    CHECK_EQUAL(actual_pwrite, 64);
 
     {
         AESCryptor cryptor(test_key);
