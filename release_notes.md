@@ -31,6 +31,8 @@
   from a link.
 * Fixed a bug in the way the new memory mapping machinery interacted with 
   encryption.
+* Query expression comparisons now give correct results when comparing a linked
+  column with a column in the base table.
 
 ### API breaking changes:
 
