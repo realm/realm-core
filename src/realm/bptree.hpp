@@ -719,6 +719,7 @@ void BpTree<T, N>::adjust(T diff)
 template <class T, bool N>
 void BpTree<T, N>::adjust(std::size_t ndx, T diff)
 {
+    static_assert(!N, "adjust is undefined for nullable integer arrays.");
     set(ndx, get(ndx) + diff);
 }
 
