@@ -49,6 +49,9 @@ IPHONE_DIR="iphone-lib"
 WATCHOS_PLATFORMS="WatchOS WatchSimulator"
 WATCHOS_DIR="watchos-lib"
 
+TVOS_PLATFORMS="AppleTVOS AppleTVSimulator"
+TVOS_DIR="tvos-lib"
+
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
@@ -58,76 +61,77 @@ usage()
     cat 1>&2 << EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
-    config:                             
-    clean:                              
-    build:                              
-    build-config-progs:                 
-    build-osx:                          
-    build-iphone:                       
+    config:
+    clean:
+    build:
+    build-config-progs:
+    build-osx:
+    build-iphone:
     build-watchos:
-    build-android:                      
-    build-cocoa:                        
-    build-osx-framework:                
-    test:                               
-    test-debug:                         
-    check:                              
-    check-debug:                        
-    memcheck:                           
-    memcheck-debug:                     
-    check-doc-examples:                 
-    check-testcase:                     
-    check-testcase-debug:               
-    memcheck-testcase:                  
-    memcheck-testcase-debug:            
-    asan:                               
-    asan-debug:                         
+    build-tvos:
+    build-android:
+    build-cocoa:
+    build-osx-framework:
+    test:
+    test-debug:
+    check:
+    check-debug:
+    memcheck:
+    memcheck-debug:
+    check-doc-examples:
+    check-testcase:
+    check-testcase-debug:
+    memcheck-testcase:
+    memcheck-testcase-debug:
+    asan:
+    asan-debug:
     build-test-ios-app:                 build an iOS app for testing core on device
     test-ios-app:                       execute the core tests on device
     leak-test-ios-app:                  execute the core tests on device, monitor for leaks
-    gdb:                                
-    gdb-debug:                          
-    gdb-testcase:                       
-    gdb-testcase-debug:                 
-    performance:                        
-    benchmark:                          
-    benchmark-*:                        
-    lcov:                               
-    gcovr:                              
-    show-install:                       
-    release-notes-prerelease:           
-    release-notes-postrelease:          
-    get-version:                        
-    set-version:                        
-    copy-tools:                         
-    install:                            
-    install-prod:                       
-    install-devel:                      
-    uninstall:                          
-    uninstall-prod:                     
-    uninstall-devel:                    
-    test-installed:                     
-    wipe-installed:                     
-    src-dist:                           
-    bin-dist:                           
-    dist-config:                        
-    dist-clean:                         
-    dist-build:                         
-    dist-build-iphone:                  
-    dist-test:                          
-    dist-test-debug:                    
-    dist-install:                       
-    dist-uninstall:                     
-    dist-test-installed:                
-    dist-status:                        
-    dist-pull:                          
-    dist-checkout:                      
-    dist-copy:                          
-    dist-deb:                           
+    gdb:
+    gdb-debug:
+    gdb-testcase:
+    gdb-testcase-debug:
+    performance:
+    benchmark:
+    benchmark-*:
+    lcov:
+    gcovr:
+    show-install:
+    release-notes-prerelease:
+    release-notes-postrelease:
+    get-version:
+    set-version:
+    copy-tools:
+    install:
+    install-prod:
+    install-devel:
+    uninstall:
+    uninstall-prod:
+    uninstall-devel:
+    test-installed:
+    wipe-installed:
+    src-dist:
+    bin-dist:
+    dist-config:
+    dist-clean:
+    dist-build:
+    dist-build-iphone:
+    dist-test:
+    dist-test-debug:
+    dist-install:
+    dist-uninstall:
+    dist-test-installed:
+    dist-status:
+    dist-pull:
+    dist-checkout:
+    dist-copy:
+    dist-deb:
     jenkins-pull-request:               Run by Jenkins for each pull request whenever it changes
     jenkins-pipeline-unit-tests:        Run by Jenkins as part of the core pipeline whenever master changes
     jenkins-pipeline-coverage:          Run by Jenkins as part of the core pipeline whenever master changes
     jenkins-pipeline-address-sanitizer: Run by Jenkins as part of the core pipeline whenever master changes
-    jenkins-valgrind:                   
+    jenkins-valgrind:
 EOF
 }
 
@@ -600,6 +604,36 @@ case "$MODE" in
             done
         fi
 
+        # Find tvOS SDKs
+        tvos_sdks=""
+        tvos_sdks_avail="no"
+        if [ "$xcode_home" != "none" ]; then
+            # Xcode provides the tvOS SDK
+            tvos_sdks_avail="yes"
+            for x in $TVOS_PLATFORMS; do
+                platform_home="$xcode_home/Platforms/$x.platform"
+                if ! [ -e "$platform_home/Info.plist" ]; then
+                    echo "Failed to find '$platform_home/Info.plist'"
+                    tvos_sdks_avail="no"
+                else
+                    sdk="$(find_iphone_sdk "$platform_home")" || exit 1
+                    if ! [ "$sdk" ]; then
+                        echo "Found no SDKs in '$platform_home'"
+                        tvos_sdks_avail="no"
+                    else
+                        if [ "$x" = "AppleTVSimulator" ]; then
+                            archs="x86_64"
+                        elif [ "$x" = "AppleTVOS" ]; then
+                            archs="arm64"
+                        else
+                            continue
+                        fi
+                        word_list_append "tvos_sdks" "$x:$sdk:$archs" || exit 1
+                    fi
+                fi
+            done
+        fi
+
         # Find Android NDK
         if [ "$ANDROID_NDK_HOME" ]; then
             android_ndk_home="$ANDROID_NDK_HOME"
@@ -625,6 +659,8 @@ IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
 WATCHOS_SDKS          = ${watchos_sdks:-none}
 WATCHOS_SDKS_AVAIL    = $watchos_sdks_avail
+TVOS_SDKS             = ${tvos_sdks:-none}
+TVOS_SDKS_AVAIL       = $tvos_sdks_avail
 ANDROID_NDK_HOME      = $android_ndk_home
 EOF
         if ! [ "$INTERACTIVE" ]; then
@@ -661,6 +697,17 @@ EOF
                 rm -f "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" || exit 1
                 rm -f "$WATCHOS_DIR/realm-config" "$WATCHOS_DIR/realm-config-dbg" || exit 1
                 rmdir "$WATCHOS_DIR" || exit 1
+            fi
+            for x in $TVOS_PLATFORMS; do
+                $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
+            done
+            $MAKE -C "src/realm" clean BASE_DENOM="tv" || exit 1
+            if [ -e "$TVOS_DIR" ]; then
+                echo "Removing '$TVOS_DIR'"
+                rm -fr "$TVOS_DIR/include" || exit 1
+                rm -f "$TVOS_DIR/librealm-tvos.a" "$TVOS_DIR/librealm-tvos-dbg.a" || exit 1
+                rm -f "$TVOS_DIR/realm-config" "$TVOS_DIR/realm-config-dbg" || exit 1
+                rmdir "$TVOS_DIR" || exit 1
             fi
         fi
         for x in $ANDROID_PLATFORMS; do
@@ -812,6 +859,61 @@ EOF
             echo "Creating '$WATCHOS_DIR/$x'"
             y="$(printf "%s\n" "$x" | sed 's/realm-config/realm-config-watchos/')" || exit 1
             cp "src/realm/$y" "$REALM_HOME/$WATCHOS_DIR/$x" || exit 1
+        done
+        echo "Done building"
+        exit 0
+        ;;
+
+    "build-tvos")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        tvos_sdks_avail="$(get_config_param "TVOS_SDKS_AVAIL")" || exit 1
+        if [ "$tvos_sdks_avail" != "yes" ]; then
+            echo "ERROR: Required watchOS SDKs are not available" 1>&2
+            exit 1
+        fi
+        temp_dir="$(mktemp -d /tmp/realm.build-tvos.XXXX)" || exit 1
+        mkdir "$temp_dir/platforms" || exit 1
+        xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
+        tvos_sdks="$(get_config_param "TVOS_SDKS")" || exit 1
+        for x in $tvos_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
+            archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
+            cflags_arch="-stdlib=libc++"
+            for y in $archs; do
+                word_list_append "cflags_arch" "-arch $y" || exit 1
+            done
+            if [ "$platform" = 'WatchOS' ]; then
+                word_list_append "cflags_arch" "-mstrict-align" || exit 1
+                word_list_append "cflags_arch" "-mtvos-version-min=9.0" || exit 1
+                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+            else
+                word_list_append "cflags_arch" "-mtvos-simulator-version-min=9.0" || exit 1
+            fi
+            sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
+            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
+            mkdir "$temp_dir/platforms/$platform" || exit 1
+            cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
+            cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
+        done
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-tvos" "realm-config-tvos-dbg" BASE_DENOM="tvos" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_TVOS" AR="libtool" ARFLAGS="-o" || exit 1
+        mkdir -p "$TVOS_DIR" || exit 1
+        echo "Creating '$TVOS_DIR/librealm-tvos.a'"
+        libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$TVOS_DIR/librealm-tvos.a"     || exit 1
+        echo "Creating '$TVOS_DIR/librealm-tvos-dbg.a'"
+        libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$TVOS_DIR/librealm-tvos-dbg.a" || exit 1
+        echo "Copying headers to '$TVOS_DIR/include'"
+        mkdir -p "$TVOS_DIR/include" || exit 1
+        cp "src/realm.hpp" "$TVOS_DIR/include/" || exit 1
+        mkdir -p "$TVOS_DIR/include/realm" || exit 1
+        inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+        (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+        (cd "$REALM_HOME/$TVOS_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        for x in "realm-config" "realm-config-dbg"; do
+            echo "Creating '$TVOS_DIR/$x'"
+            y="$(printf "%s\n" "$x" | sed 's/realm-config/realm-config-tvos/')" || exit 1
+            cp "src/realm/$y" "$REALM_HOME/$TVOS_DIR/$x" || exit 1
         done
         echo "Done building"
         exit 0
@@ -995,6 +1097,7 @@ EOF
         sh build.sh build-osx || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-watchos || exit 1
+        sh build.sh build-tvos || exit 1
 
         echo "Copying files"
         tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
@@ -1006,6 +1109,8 @@ EOF
         cp "$IPHONE_DIR/librealm-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp "$WATCHOS_DIR/librealm-watchos.a" "$tmpdir/$BASENAME" || exit 1
         cp "$WATCHOS_DIR/librealm-watchos-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$TVOS_DIR/librealm-tvos.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$TVOS_DIR/librealm-tvos-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
         for x in $iphone_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
@@ -1013,6 +1118,11 @@ EOF
             cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
         done
         for x in $watchos_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
+            cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        done
+        for x in $tvos_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1

@@ -70,6 +70,13 @@ Static library*/
 /watchos-lib/realm-config
 /watchos-lib/realm-config-dbg
 
+# sh build.sh build-tvos
+/tvos-lib/include
+/tvos-lib/librealm-tvos.a
+/tvos-lib/librealm-tvos-dbg.a
+/tvos-lib/realm-config
+/tvos-lib/realm-config-dbg
+
 # sh build.sh build-android
 /android-lib/
 /openssl/
