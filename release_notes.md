@@ -1,6 +1,9 @@
 # NEXT RELEASE
 
 ### Bugfixes:
+* Fixed severe bug in Array allocator that could give asserts like 
+  `Assertion failed: value <= 0xFFFFFL [26000016, 16777215]`, especially
+  for BinaryData columns
 * Fixed all aggregate methods on Table (min, max, etc) that hadn't been
   updated/kept in sync for a long while (null support, return_ndx argument,..).
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
