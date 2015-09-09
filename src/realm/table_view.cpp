@@ -176,7 +176,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         return 0;
     }
 
-    typedef typename ColumnTypeTraits<T, ColType::nullable>::leaf_type ArrType;
+    typedef typename ColTypeTraits::leaf_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
     if (m_num_detached_refs == 0 && m_row_indexes.size() == column->size()) {
