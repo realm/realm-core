@@ -133,7 +133,7 @@ template<class> class BasicTable;
 /// \sa TableRef
 template<class T> class BasicTableRef: util::bind_ptr<T> {
 public:
-    REALM_CONSTEXPR BasicTableRef() noexcept {}
+    constexpr BasicTableRef() noexcept {}
     ~BasicTableRef() noexcept {}
 
 #ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
