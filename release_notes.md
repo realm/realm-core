@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.93.0 Release notes
 
 ### Bugfixes:
 * Fixed severe bug in Array allocator that could give asserts like 
