@@ -82,7 +82,8 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// found'. It is similar in function to std::string::npos.
 const std::size_t npos = std::size_t(-1);
 
-
+// Maximum number of bytes that the payload of an array can be
+const size_t max_array_payload = 0x00ffffffL;
 
 /// Alias for realm::npos.
 const std::size_t not_found = npos;
@@ -1726,7 +1727,7 @@ inline void Array::set_header_width(int value, char* header) noexcept
 
 inline void Array::set_header_size(std::size_t value, char* header) noexcept
 {
-    REALM_ASSERT_3(value, <=, 0xFFFFFFL);
+    REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[5] = uchar((value >> 16) & 0x000000FF);
@@ -1737,7 +1738,7 @@ inline void Array::set_header_size(std::size_t value, char* header) noexcept
 // Note: There is a copy of this function is test_alloc.cpp
 inline void Array::set_header_capacity(std::size_t value, char* header) noexcept
 {
-    REALM_ASSERT_3(value, <=, 0xFFFFFFL);
+    REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 16) & 0x000000FF);
