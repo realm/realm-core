@@ -35,7 +35,6 @@ Initialization initialization;
 
 void Group::upgrade_file_format()
 {
-#if REALM_NULL_STRINGS == 1
     REALM_ASSERT(is_attached());
 
     // SlabAlloc::validate_buffer() ensures this
@@ -47,7 +46,6 @@ void Group::upgrade_file_format()
         TableRef table = get_table(t);
         table->upgrade_file_format();
     }
-#endif
 }
 
 

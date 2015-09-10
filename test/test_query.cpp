@@ -5870,10 +5870,8 @@ TEST(Query_NullStrings)
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(2, v.get_source_ndx(0));
-    
-}
 
-#if REALM_NULL_STRINGS == 1
+}
 
 TEST(Query_Nulls_Fuzzy)
 {
@@ -5990,7 +5988,6 @@ TEST(Query_Nulls_Fuzzy)
     }
 }
 
-#endif
 
 TEST(Query_BinaryNull)
 {
@@ -6538,7 +6535,7 @@ TEST(Query_NullShowcase)
 
 #ifndef _WIN32 // signaling_NaN() broken in VS2015
     CHECK(!null::is_signaling(table->get_float(1, 1)));
-#endif 
+#endif
 
     CHECK(!table->is_null(1, 0));
     CHECK(!table->is_null(1, 1));
@@ -6551,7 +6548,7 @@ TEST(Query_NullShowcase)
 #ifndef _WIN32 // signaling_NaN() broken in VS2015
     CHECK(null::is_signaling(table->get_double(3, 0)));
     CHECK(!null::is_signaling(table->get_double(3, 1)));
-#endif 
+#endif
 
     CHECK(!table->is_null(3, 0));
     CHECK(!table->is_null(3, 1));

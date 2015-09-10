@@ -876,7 +876,6 @@ TEST(StringIndex_FuzzyTest_Int)
     col.destroy();
 }
 
-#if REALM_NULL_STRINGS == 1
 namespace {
 
 // Generate string where the bit pattern in bits is converted to NUL bytes. E.g. (length=2):
@@ -985,9 +984,7 @@ TEST(StringIndex_Null)
 
     col.destroy();
 }
-#endif
 
-#if REALM_NULL_STRINGS == 1
 TEST_TYPES(StringIndex_Zero_Crash, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1013,9 +1010,7 @@ TEST_TYPES(StringIndex_Zero_Crash, non_nullable, nullable)
     t = table.find_first_string(0, StringData("\0\0", 2));
     CHECK_EQUAL(2, t);
 }
-#endif
 
-#if REALM_NULL_STRINGS == 1
 TEST(StringIndex_Zero_Crash2)
 {
     Random random(random_int<unsigned long>());
@@ -1094,7 +1089,6 @@ TEST(StringIndex_Zero_Crash2)
         }
     }
 }
-#endif
 
 TEST(StringIndex_Integer_Increasing)
 {

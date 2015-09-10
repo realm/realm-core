@@ -6023,7 +6023,7 @@ TEST(Table_IndexStringDelete)
     }
 }
 
-#if REALM_NULL_STRINGS == 1
+
 TEST(Table_Nulls)
 {
     // 'round' lets us run this entire test both with and without index and with/without optimize/enum
@@ -6202,7 +6202,7 @@ TEST(Table_Nulls)
         CHECK(t.is_null(1, 0));
     }
 }
-#endif
+
 
 TEST(Table_RowAccessor_Null)
 {
