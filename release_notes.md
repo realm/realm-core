@@ -98,6 +98,7 @@
   a key requirement for reusing the memory mapping across threads.
 * `NOEXCEPT*` macros have been replaced by the C++11 `noexcept` specifier.
 * The `REALM_CONSTEXPR` macro has been replaced by the C++11 `constexpr` keyword.
+* Removed conditional compilation of null string support.
 
 ----------------------------------------------
 
