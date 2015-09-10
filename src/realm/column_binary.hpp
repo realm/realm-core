@@ -43,7 +43,7 @@ public:
 
     BinaryData get(std::size_t ndx) const noexcept;
     bool is_null(std::size_t ndx) const noexcept override;
-    StringData get_index_data(std::size_t, char*) const noexcept final;
+    StringData get_index_data(std::size_t, StringIndex::StringConversionBuffer& ) const noexcept final;
 
     void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -128,7 +128,7 @@ private:
 
 // Implementation
 
-inline StringData BinaryColumn::get_index_data(std::size_t, char*) const noexcept
+inline StringData BinaryColumn::get_index_data(std::size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not implemented for BinaryColumn.");
     REALM_UNREACHABLE();
