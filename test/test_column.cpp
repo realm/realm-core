@@ -985,4 +985,48 @@ TEST(ColumnIntNull_Null)
 
 }
 
+TEST(ColumnIntNull_MoveLastOverPreservesNull)
+{
+    ref_type ref = IntNullColumn::create(Allocator::get_default());
+    IntNullColumn c(Allocator::get_default(), ref);
+    c.create_search_index();
+    c.insert(0, 0, 3);
+    c.set(0, 123);
+    c.set(1, 456);
+    c.set(2, 4776);
+    c.set_null(2);
+    c.move_last_over(0, 2);
+    CHECK(c.is_null(0));
+    c.move_last_over(0, 1);
+    CHECK_EQUAL(c.get(0), 456);
+    c.destroy();
+}
+
+TEST(ColumnIntNull_CompareInts)
+{
+    ref_type ref1 = IntNullColumn::create(Allocator::get_default());
+    IntNullColumn c1(Allocator::get_default(), ref1);
+    ref_type ref2 = IntNullColumn::create(Allocator::get_default());
+    IntNullColumn c2(Allocator::get_default(), ref2);
+
+    c1.insert(0, null{}, 3);
+    c2.insert(0, null{}, 3);
+    CHECK(c1.is_null(0));
+    CHECK(c2.is_null(0));
+
+    CHECK(c1.compare_int(c2));
+
+    c1.set(0, 0);
+    CHECK_NOT(c1.is_null(0));
+    CHECK_NOT(c1.compare_int(c2));
+    c2.set(0, 0);
+    CHECK(c1.compare_int(c2));
+
+    c2.set(0, 1);
+    CHECK_NOT(c1.compare_int(c2));
+
+    c1.destroy();
+    c2.destroy();
+}
+
 #endif // TEST_COLUMN

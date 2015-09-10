@@ -168,7 +168,7 @@ public:
 private:
     LeafType& root_as_leaf();
     const LeafType& root_as_leaf() const;
-    
+
     std::unique_ptr<Array> create_root_from_ref(Allocator& alloc, ref_type ref);
     std::unique_ptr<Array> create_root_from_mem(Allocator& alloc, MemRef mem);
 
@@ -431,7 +431,7 @@ T BpTree<T, N>::get(std::size_t ndx) const noexcept
     if (root_is_leaf()) {
         return root_as_leaf().get(ndx);
     }
-    
+
     // Use direct getter to avoid initializing leaf array:
     std::pair<MemRef, std::size_t> p = root().get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
@@ -652,8 +652,13 @@ template <class T, bool N>
 void BpTree<T, N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
     // Copy value from last row over
-    int_fast64_t value = get(last_row_ndx);
-    set(row_ndx, value);
+    if (is_null(last_row_ndx)) {
+        set_null(row_ndx);
+    }
+    else {
+        int_fast64_t value = get(last_row_ndx);
+        set(row_ndx, value);
+    }
     erase(last_row_ndx, true);
 }
 
@@ -672,7 +677,7 @@ void BpTree<T,N>::clear()
     }
     else {
         root().clear_and_destroy_children();
-        
+
         // Reinitialize the root's memory as a leaf.
         Allocator& alloc = get_alloc();
         std::unique_ptr<LeafType> new_root(new LeafType(alloc));
@@ -714,6 +719,7 @@ void BpTree<T, N>::adjust(T diff)
 template <class T, bool N>
 void BpTree<T, N>::adjust(std::size_t ndx, T diff)
 {
+    static_assert(!N, "adjust is undefined for nullable integer arrays.");
     set(ndx, get(ndx) + diff);
 }
 
