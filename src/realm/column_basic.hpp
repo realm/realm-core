@@ -66,7 +66,7 @@ public:
     // Both have a `bool m_nullable` flag which is set in their constructor
     // according to the m_spec
     static const bool nullable = true;
-    
+
     BasicColumn(Allocator&, ref_type, bool nullable);
 
     std::size_t size() const noexcept final;
@@ -104,7 +104,7 @@ public:
                           LeafInfo& inout_leaf_info) const noexcept;
 
     T get(std::size_t ndx) const noexcept;
-    StringData get_index_data(std::size_t, char* buffer) const noexcept final;
+    StringData get_index_data(std::size_t, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     void add(T value = T());
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value = T());
@@ -209,7 +209,7 @@ void BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
 }
 
 template <class T>
-StringData BasicColumn<T>::get_index_data(std::size_t, char*) const noexcept
+StringData BasicColumn<T>::get_index_data(std::size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not supported for floating-point columns yet.");
     REALM_UNREACHABLE();

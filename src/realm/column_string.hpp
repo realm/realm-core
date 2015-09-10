@@ -93,7 +93,7 @@ public:
     bool is_nullable() const noexcept final;
 
     // Search index
-    StringData get_index_data(std::size_t ndx, char* buffer) const noexcept final;
+    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     bool has_search_index() const noexcept override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
     void set_search_index_allow_duplicate_values(bool) noexcept override;

@@ -5,6 +5,8 @@
   `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`, especially
   for BinaryData columns. This bug could be triggered by using binary data
   blobs with a size in the range between 8M and 16M.
+* Fixed assert that could happen in rare cases when calling set_null() on an
+  indexed nullable column.
 * Fixed all aggregate methods on Table (min, max, etc) that hadn't been
   updated/kept in sync for a long while (null support, return_ndx argument,..).
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
@@ -33,6 +35,12 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
+* Fixed a bug in the way the new memory mapping machinery interacted with 
+  encryption.
+* Query expression comparisons now give correct results when comparing a linked
+  column with a column in the base table.
+* Fixed assertion failure when TableViewBase::is_row_attached() would return
+  false in a debug build.
 
 ### API breaking changes:
 

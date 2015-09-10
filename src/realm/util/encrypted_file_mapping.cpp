@@ -331,9 +331,6 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 : m_file(file)
 , m_page_size(realm::util::page_size())
 , m_blocks_per_page(m_page_size / block_size)
-, m_addr(nullptr)
-, m_size(0)
-, m_page_count(0)
 , m_access(access)
 #ifdef REALM_DEBUG
 , m_validate_buffer(new char[m_page_size])
@@ -353,7 +350,7 @@ EncryptedFileMapping::~EncryptedFileMapping()
 
 char* EncryptedFileMapping::page_addr(size_t i) const noexcept
 {
-    return reinterpret_cast<char*>(((m_first_page + i) * m_page_size));
+    return reinterpret_cast<char*>((m_first_page + i) * m_page_size);
 }
 
 void EncryptedFileMapping::mark_unreadable(size_t i) noexcept
@@ -413,7 +410,7 @@ void EncryptedFileMapping::read_page(size_t i) noexcept
     mprotect(addr, m_page_size, PROT_READ | PROT_WRITE);
 
     if (!copy_read_page(i))
-        m_file.cryptor.read(m_file.fd, m_file_offset + i * m_page_size, addr, m_page_size);
+        m_file.cryptor.read(m_file.fd, i * m_page_size, addr, m_page_size);
 
     mprotect(page_addr(i), m_page_size, PROT_READ);
     m_read_pages[i] = true;
@@ -439,7 +436,7 @@ void EncryptedFileMapping::validate_page(size_t page) noexcept
     if (!m_read_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, m_file_offset + page * m_page_size, 
+    if (!m_file.cryptor.read(m_file.fd, page * m_page_size,
                              m_validate_buffer.get(), m_page_size))
         return;
 
@@ -487,7 +484,7 @@ void EncryptedFileMapping::flush() noexcept
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, m_file_offset + i * m_page_size, page_addr(i), m_page_size);
+        m_file.cryptor.write(m_file.fd, i * m_page_size, page_addr(i), m_page_size);
         m_dirty_pages[i] = false;
         m_write_pages[i] = false;
     }
@@ -529,22 +526,20 @@ void EncryptedFileMapping::handle_access(void* addr) noexcept
 
 void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
-    // FIXME: size is no longer the full file size - is that a problem?
-    // if cryptor is already independent of the actual file, then the set_file_size()
-    // need a new name
-    m_file.cryptor.set_file_size(new_size);
+    REALM_ASSERT(new_file_offset % m_page_size == 0);
     REALM_ASSERT(new_size % m_page_size == 0);
     REALM_ASSERT(new_size > 0);
+
+    m_file.cryptor.set_file_size(new_size + new_file_offset);
 
     bool first_init = m_addr == nullptr;
 
     flush();
     m_addr = new_addr;
-    m_size = new_size;
     m_file_offset = new_file_offset;
 
-    m_first_page = reinterpret_cast<uintptr_t>(m_addr) / m_page_size;
-    m_page_count = m_size / m_page_size;
+    m_first_page = (reinterpret_cast<uintptr_t>(m_addr) - m_file_offset) / m_page_size;
+    m_page_count = (new_size + m_file_offset) / m_page_size;
 
     m_read_pages.clear();
     m_write_pages.clear();
@@ -554,15 +549,15 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_write_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
 
-    if (first_init) {
+    if (first_init && m_file_offset == 0) {
         if (!copy_read_page(0))
             m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
         mark_readable(0);
-        if (m_page_count > 0)
+        if (m_page_count > 1)
             mprotect(page_addr(1), (m_page_count - 1) * m_page_size, PROT_NONE);
     }
     else
-        mprotect(m_addr, m_page_count * m_page_size, PROT_NONE);
+        mprotect(m_addr, m_page_count * m_page_size - m_file_offset, PROT_NONE);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

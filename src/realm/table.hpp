@@ -575,6 +575,8 @@ public:
     TableView      get_range_view(std::size_t begin, std::size_t end);
     ConstTableView get_range_view(std::size_t begin, std::size_t end) const;
 
+    TableView      get_backlink_view(std::size_t row_ndx, Table *src_table,
+                                     std::size_t src_col_ndx);
 
     //@{
 

@@ -2551,6 +2551,10 @@
 				HEADER_SEARCH_PATHS = src;
 				MACOSX_DEPLOYMENT_TARGET = 10.7;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fno-elide-constructors",
+				);
 				SDKROOT = macosx;
 			};
 			name = Debug;
