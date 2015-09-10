@@ -6267,15 +6267,15 @@ TEST(Table_RowAccessor_Null)
 // array which is 2^24 - 1 bytes
 TEST(Table_AllocatorCapacityBug)
 {
-    char* buf = new char[20000000];
+    std::unique_ptr<char[]> buf(new char[20000000]);
 
     // First a simple trigger of `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`
     {
         ref_type ref = BinaryColumn::create(Allocator::get_default());
         BinaryColumn c(Allocator::get_default(), ref, true);
 
-        c.add(BinaryData(buf, 13000000));
-        c.set(0, BinaryData(buf, 14000000));
+        c.add(BinaryData(buf.get(), 13000000));
+        c.set(0, BinaryData(buf.get(), 14000000));
     }
 
     // Now a small fuzzy test to catch other such bugs
@@ -6294,7 +6294,7 @@ TEST(Table_AllocatorCapacityBug)
                 size_t row = (j * 123456789 + 123456789) % t.size();
                 size_t len = (j * 123456789 + 123456789) % 16000000;
                 BinaryData bd;
-                bd = BinaryData(buf, len);
+                bd = BinaryData(buf.get(), len);
                 t.set_binary(0, row, bd);
             }
             else if (t.size() >= 4) {
@@ -6302,7 +6302,6 @@ TEST(Table_AllocatorCapacityBug)
             }
         }
     }
-    delete buf;  
 }
 
 
