@@ -2853,7 +2853,7 @@ top:
             size_t row_ref = size_t(uint64_t(ref) >> 1);
 
             // for integer index, get_index_data fills out 'buffer' and makes str point at it
-            char buffer[8]; // 8 is the biggest element size of any non-string/binary Realm type
+            StringIndex::StringConversionBuffer buffer;
             StringData str = column->get_index_data(row_ref, buffer);
             if (str == value) {
                 result_ref = row_ref;
@@ -2883,7 +2883,7 @@ top:
                 const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
 
                 // for integer index, get_index_data fills out 'buffer' and makes str point at it
-                char buffer[8]; // 8 is the biggest element size of any non-string/binary Realm type
+                StringIndex::StringConversionBuffer buffer;
                 StringData str = column->get_index_data(first_row_ref, buffer);
                 if (str.is_null() != value.is_null() || str != value) {
                     if (count)
@@ -2915,7 +2915,7 @@ top:
                     sub_count = sub.size();
 
                 // for integer index, get_index_data fills out 'buffer' and makes str point at it
-                char buffer[8]; // 8 is the biggest element size of any non-string/binary Realm type
+                StringIndex::StringConversionBuffer buffer;
                 StringData str = column->get_index_data(first_row_ref, buffer);
                 if (str != value)
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;

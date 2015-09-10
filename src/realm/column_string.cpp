@@ -171,7 +171,7 @@ bool StringColumn::is_null(std::size_t ndx) const noexcept
     return sd.is_null();
 }
 
-StringData StringColumn::get_index_data(std::size_t ndx, char*) const noexcept
+StringData StringColumn::get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
 {
     return get(ndx);
 }

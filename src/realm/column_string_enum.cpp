@@ -287,7 +287,7 @@ void StringEnumColumn::destroy_search_index() noexcept
 }
 
 
-StringData StringEnumColumn::get_index_data(std::size_t ndx, char*) const noexcept
+StringData StringEnumColumn::get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
 {
     return get(ndx);
 }
