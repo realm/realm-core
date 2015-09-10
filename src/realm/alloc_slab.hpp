@@ -67,12 +67,8 @@ public:
     ///       character to all strings except the null string, to be able to distinguish between null and
     ///       empty string.
 
-#if REALM_NULL_STRINGS == 1
     // Bumped to 3 because of null support of String columns and because of new format of index
     static constexpr int library_file_format = 3;
-#else
-    static constexpr int library_file_format = 2;
-#endif
 
     ~SlabAlloc() noexcept override;
     SlabAlloc();

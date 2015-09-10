@@ -515,11 +515,6 @@ case "$MODE" in
             enable_assertions="yes"
         fi
 
-        enable_null_strings="yes"
-        if [ "$REALM_DISABLE_NULL_STRINGS" ]; then
-            enable_null_strings="no"
-        fi
-
         # Find Xcode
         xcode_home="none"
         arm64_supported=""
@@ -625,7 +620,6 @@ MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_ASSERTIONS     = $enable_assertions
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
-ENABLE_NULL_STRINGS   = $enable_null_strings
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
