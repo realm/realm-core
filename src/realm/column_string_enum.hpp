@@ -112,7 +112,7 @@ public:
     void adjust_keys_ndx_in_parent(int diff) noexcept;
 
     // Search index
-    StringData get_index_data(std::size_t ndx, char* buffer) const noexcept final;
+    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     void set_search_index_allow_duplicate_values(bool) noexcept override;
     StringIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) noexcept;

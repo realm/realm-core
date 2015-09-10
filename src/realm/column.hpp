@@ -149,7 +149,7 @@ public:
     // Getter function for index. For integer index, the caller must supply a buffer that we can store the
     // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
     // String index).
-    virtual StringData get_index_data(std::size_t, char*) const noexcept = 0;
+    virtual StringData get_index_data(std::size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
     virtual bool has_search_index() const noexcept;
@@ -457,7 +457,7 @@ public:
     void clear();
 
     // Index support
-    StringData get_index_data(std::size_t ndx, char* buffer) const noexcept override;
+    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept override;
 
     // FIXME: Remove these
     uint64_t get_uint(std::size_t ndx) const noexcept;
@@ -782,15 +782,15 @@ void Column<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
 }
 
 template <class T, bool N>
-StringData Column<T, N>::get_index_data(std::size_t ndx, char* buffer) const noexcept
+StringData Column<T, N>::get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
 {
-    static_assert(sizeof(T) == 8, "not filling buffer");
+    static_assert(sizeof(T) == StringIndex::string_conversion_buffer_size, "not filling buffer");
     if (N && is_null(ndx)) {
         return StringData{nullptr, 0};
     }
     T x = get(ndx);
-    *reinterpret_cast<T*>(buffer) = x;
-      return StringData(buffer, sizeof(T));
+    *reinterpret_cast<T*>(buffer.data()) = x;
+    return StringData(buffer.data(), sizeof(T));
 }
 
 template <class T, bool N>

@@ -1,6 +1,8 @@
 # NEXT RELEASE
 
 ### Bugfixes:
+* Fixed assert that could happen in rare cases when calling set_null() on an
+  indexed nullable column.
 * Fixed all aggregate methods on Table (min, max, etc) that hadn't been
   updated/kept in sync for a long while (null support, return_ndx argument,..).
 * Bug in upgrading from version 2 -> 3 (upgrade could be invoked twice for the
@@ -31,6 +33,10 @@
   from a link.
 * Fixed a bug in the way the new memory mapping machinery interacted with 
   encryption.
+* Query expression comparisons now give correct results when comparing a linked
+  column with a column in the base table.
+* Fixed assertion failure when TableViewBase::is_row_attached() would return
+  false in a debug build.
 
 ### API breaking changes:
 

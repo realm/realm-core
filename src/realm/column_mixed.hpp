@@ -71,7 +71,7 @@ public:
     double get_double(std::size_t ndx) const noexcept;
     StringData get_string(std::size_t ndx) const noexcept;
     BinaryData get_binary(std::size_t ndx) const noexcept;
-    StringData get_index_data(std::size_t ndx, char* buffer) const noexcept override;
+    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept override;
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.
@@ -216,7 +216,7 @@ private:
 #endif
 };
 
-inline StringData MixedColumn::get_index_data(std::size_t, char*) const noexcept
+inline StringData MixedColumn::get_index_data(std::size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not supported for MixedColumn yet.");
     REALM_UNREACHABLE();

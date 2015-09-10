@@ -37,8 +37,10 @@ template <class T, class... Args> Optional<T> some(Args&&...);
 template <class T> struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
-static constexpr struct None { constexpr explicit None(int) {} } none { 0 };
-static constexpr struct InPlace { constexpr InPlace() {} } in_place;
+struct None { constexpr explicit None(int) {} };
+static constexpr None none { 0 };
+struct InPlace { constexpr InPlace() {} };
+static constexpr InPlace in_place;
 
 // Note: Should conform with the future std::bad_optional_access.
 struct BadOptionalAccess : std::logic_error {
@@ -146,6 +148,8 @@ private:
 // };
 
 /// An Optional<T&> is a non-owning nullable pointer that throws on dereference.
+// FIXME: Visual Studio 2015's constexpr support isn't sufficient to allow Optional<T&> to compile
+// in constexpr contexts.
 template <class T>
 class Optional<T&> {
 public:
@@ -510,14 +514,12 @@ auto operator>>(Optional<T> lhs, F&& rhs) -> decltype(fmap(lhs, std::forward<F>(
 
 namespace _impl {
 
-struct Empty {};
-
 // T is trivially destructible.
 template <class T>
 struct OptionalStorage<T, true> {
     union {
         T m_value;
-        Empty m_null_state;
+        char m_null_state;
     };
     bool m_engaged = false;
 
@@ -533,7 +535,7 @@ template <class T>
 struct OptionalStorage<T, false> {
     union {
         T m_value;
-        Empty m_null_state;
+        char m_null_state;
     };
     bool m_engaged = false;
 

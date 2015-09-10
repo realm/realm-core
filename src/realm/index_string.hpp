@@ -23,6 +23,7 @@
 #include <iostream>
 #include <cstring>
 #include <memory>
+#include <array>
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
@@ -77,6 +78,9 @@ public:
     ref_type get_ref() const noexcept;
 
     // StringIndex interface:
+
+    static const size_t string_conversion_buffer_size = 8; // 8 is the biggest element size of any non-string/binary Realm type
+    using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 
     bool is_empty() const;
 
@@ -173,7 +177,7 @@ private:
     void do_delete(size_t ndx, StringData, size_t offset);
     void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
-    StringData get(size_t ndx, char* buffer) const;
+    StringData get(size_t ndx, StringConversionBuffer& buffer) const;
 
     void node_add_key(ref_type ref);
 
@@ -222,7 +226,7 @@ inline void StringIndex::set_allow_duplicate_values(bool allow) noexcept
 }
 
 // Byte order of the key is *reversed*, so that for the integer index, the least significant
-// byte comes first, so that it fits little-endian machines. That way we can perform fast 
+// byte comes first, so that it fits little-endian machines. That way we can perform fast
 // range-lookups and iterate in order, etc, as future features. This, however, makes the same
 // features slower for string indexes. Todo, we should reverse the order conditionally, depending
 // on the column type.
@@ -253,7 +257,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) noexcept
     return key;
 }
 
-// Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So 
+// Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So
 // "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) noexcept
 {
@@ -300,7 +304,7 @@ template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_
 
 template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 {
-    char buffer[16];
+    StringConversionBuffer buffer;
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);
 
@@ -317,7 +321,7 @@ template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 
 template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 {
-    char buffer[16];
+    StringConversionBuffer buffer;
     StringData value = get(row_ndx, buffer);
 
     do_delete(row_ndx, value, 0);
