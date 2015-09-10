@@ -1661,6 +1661,8 @@ void Array::alloc(size_t size, size_t width)
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = calc_byte_len(size, width);
 
+        // this method is not public and callers must (and currently do) ensure that
+        // needed_bytes are never larger than max_array_payload.
         REALM_ASSERT_3(needed_bytes, <= , max_array_payload);
 
         size_t orig_capacity_bytes = get_capacity_from_header();
@@ -1670,8 +1672,12 @@ void Array::alloc(size_t size, size_t width)
             // Double to avoid too many reallocs (or initialize to initial size), but truncate if that exceeds the
             // maximum allowed payload (measured in bytes) for arrays. This limitation is due to 24-bit capacity
             // field in the header.
-            // FIXME: Highly prone to overflow on 32-bit systems
-            capacity_bytes = (capacity_bytes * 2 <= max_array_payload) ? capacity_bytes * 2 : max_array_payload;
+            size_t new_capacity_bytes = capacity_bytes * 2;
+            if (new_capacity_bytes < capacity_bytes) // overflow detected, clamp to max
+                new_capacity_bytes = max_array_payload;
+            if (new_capacity_bytes > max_array_payload) // cap at max allowed allocation
+                new_capacity_bytes = max_array_payload;
+            capacity_bytes = new_capacity_bytes;
             
             // If doubling is not enough, expand enough to fit
             if (capacity_bytes < needed_bytes) {
