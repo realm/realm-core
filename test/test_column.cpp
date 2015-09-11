@@ -777,6 +777,8 @@ TEST(Column_IndexCrash)
     
     StringIndex& ndx = *col.get_search_index();    
     CHECK_EQUAL(ndx.count(int64_t(0)), 1);
+
+    col.destroy();
 }
 
 /*
