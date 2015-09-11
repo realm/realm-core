@@ -617,9 +617,6 @@ public:
     /// of this function is exactly the number returned by get_byte_size().
     size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
 
-    /// Compare two arrays for equality.
-    bool compare_int(const Array&) const noexcept;
-
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, bool nullable_array = false, bool find_null = false) const;

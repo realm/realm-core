@@ -1888,19 +1888,6 @@ template<size_t width> void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
-bool Array::compare_int(const Array& a) const noexcept
-{
-    if (a.size() != size())
-        return false;
-
-    for (size_t i = 0; i < size(); ++i) {
-        if (get(i) != a.get(i))
-            return false;
-    }
-
-    return true;
-}
-
 
 ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
                                     ref_type new_sibling_ref, TreeInsertBase& state)
