@@ -442,7 +442,7 @@ Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const noexcept
 
 bool Spec::operator==(const Spec& spec) const noexcept
 {
-    if (!m_attr.compare_int(spec.m_attr))
+    if (!m_attr.compare(spec.m_attr))
         return false;
     if (!m_names.compare_string(spec.m_names))
         return false;

@@ -40,6 +40,7 @@ public:
     int64_t get(std::size_t ndx) const noexcept;
     uint64_t get_uint(std::size_t ndx) const noexcept;
     static int64_t get(const char* header, std::size_t ndx) noexcept;
+    bool compare(const ArrayInteger& a) const noexcept;
 
     /// Add \a diff to the element at the specified index.
     void adjust(std::size_t ndx, int_fast64_t diff);
@@ -254,6 +255,18 @@ inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value) noexcep
     set(ndx, util::from_twos_compl<int_fast64_t>(value));
 }
 
+inline bool ArrayInteger::compare(const ArrayInteger& a) const noexcept
+{
+    if (a.size() != size())
+        return false;
+
+    for (size_t i = 0; i < size(); ++i) {
+        if (get(i) != a.get(i))
+            return false;
+    }
+
+    return true;
+}
 
 inline int64_t ArrayInteger::front() const noexcept
 {
