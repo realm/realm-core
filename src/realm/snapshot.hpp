@@ -36,12 +36,12 @@ public:
     ~Snapshot();
 };
 
-class SnapshotToBe {
+class Transaction {
     // Accessor manipulation goes through a Group object. The Group object
     // is still owned by and dies with the Snapshot.
     Group& get_group();
 
-    // Commit any changes done through accessors obtained from the SnapshotToBe
+    // Commit any changes done through accessors obtained from the Transaction
     // to the database. Then close the Snapshot.
     void commit();
 
@@ -59,18 +59,18 @@ public:
     ~ScopedSnapshot();
 };
 
-// Helper class which ensures that SnapshotToBe::rollback() is called when the
+// Helper class which ensures that Transaction::rollback() is called when the
 // helper goes out of scope.
-class ScopedSnapshotToBe {
+class ScopedTransaction {
 public:
-    ScopedSnapshotToBe(std::shared_ptr<SnapshotToBe>);
+    ScopedTransaction(std::shared_ptr<Transaction>);
     void release();
-    ~ScopedSnapshotToBe();
+    ~ScopedTransaction();
 };
 
 // Additions to Table, LinkView, Query, Row, ConstRow, TableView and ConstTableView:
 // A refresh() method is added, which allows the accessor to be "ported forward in time" 
-// to a different Snapshot or SnapshotToBe. This is highly generic and allows for
+// to a different Snapshot or Transaction. This is highly generic and allows for
 // easy re-implementation of continuous transactions on top.
 class MyAccessor {
 public:
@@ -79,8 +79,8 @@ public:
     // Get a new const table accessor for the same table, but in a different snapshot.
     std::shared_ptr<const MyAccessor> refresh(std::shared_ptr<Snapshot>& target_snapshot) const;
 
-    // Get a new non-const table accessor for the same table, but in a SnapshotToBe.
-    std::shared_ptr<MyAccessor> refresh(std::shared_ptr<SnapshotToBe>& target_snapshot) const;
+    // Get a new non-const table accessor for the same table, but in a Transaction.
+    std::shared_ptr<MyAccessor> refresh(std::shared_ptr<Transaction>& target_snapshot) const;
 };
 
 #endif

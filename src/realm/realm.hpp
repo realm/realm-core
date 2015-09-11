@@ -1,6 +1,6 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
+ * Realm CONFIDENTIAL
  * __________________
  *
  *  [2011] - [2012] Realm Inc
@@ -21,7 +21,7 @@
 #define REALM_REALM_HPP
 
 class Snapshot;
-class SnapshotToBe;
+class Transaction;
 
 class Realm {
 public:
@@ -53,7 +53,7 @@ public:
     // Get a snapshot
     std::shared_ptr<Snapshot> get_newest_snapshot();
 
-    std::shared_ptr<SnapshotToBe> build_new_snapshot();
+    std::shared_ptr<Transaction> build_new_snapshot();
 
     // Check if a newer snapshot has become available
     bool newer_snapshot_available();
