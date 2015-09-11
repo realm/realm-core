@@ -6276,6 +6276,8 @@ TEST(Table_AllocatorCapacityBug)
 
         c.add(BinaryData(buf.get(), 13000000));
         c.set(0, BinaryData(buf.get(), 14000000));
+
+        c.destroy();
     }
 
     // Now a small fuzzy test to catch other such bugs
