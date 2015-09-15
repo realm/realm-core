@@ -136,10 +136,11 @@ TEST(File_NoSpuriousTryLockFailures)
     };
 
     TEST_PATH(path);
+    std::string str_path = path;
     ThreadWrapper slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
-        slaves[i].start([=] { slave(i, std::string(path)); });
+        slaves[i].start([=] { slave(i, str_path); });
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
