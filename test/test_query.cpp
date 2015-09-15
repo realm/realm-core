@@ -7682,5 +7682,80 @@ TEST(Query_CompareLinkedColumnVsColumn)
     CHECK_EQUAL(not_found, match);
 }
 
+TEST(Query_CompareThroughUnaryLinks)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Double, "double");
+    table1->add_column(type_String, "string");
+
+    // table1
+    // 0: 2 2.0 "abc"
+    // 1: 3 3.0 "def"
+    // 2: 8 8.0 "def"
+
+    table1->add_empty_row();
+    table1->set_int(0, 0, 2);
+    table1->set_double(1, 0, 2.0);
+    table1->set_string(2, 0, "abc");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 3);
+    table1->set_double(1, 1, 3.0);
+    table1->set_string(2, 1, "def");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 8);
+    table1->set_double(1, 2, 8.0);
+    table1->set_string(2, 2, "def");
+
+    TableRef table2 = group.add_table("table2");
+    size_t col_link1 = table2->add_column_link(type_Link, "link1", *table1);
+    size_t col_link2 = table2->add_column_link(type_Link, "link2", *table1);
+
+    // table2
+    // 0: {   } { 0 }
+    // 1: { 0 } { 1 }
+    // 2: { 1 } { 2 }
+    // 3: { 2 } {   }
+
+    table2->add_empty_row();
+    table2->set_link(col_link2, 0, 0);
+
+    table2->add_empty_row();
+    table2->set_link(col_link1, 1, 0);
+    table2->set_link(col_link2, 1, 1);
+
+    table2->add_empty_row();
+    table2->set_link(col_link1, 2, 1);
+    table2->set_link(col_link2, 2, 2);
+
+    table2->add_empty_row();
+    table2->set_link(col_link1, 3, 2);
+
+    Query q;
+    size_t match;
+
+    q = table2->link(col_link1).column<Int>(0) < table2->link(col_link2).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->link(col_link1).column<Double>(1) < table2->link(col_link2).column<Double>(1);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->link(col_link1).column<String>(2) == table2->link(col_link2).column<String>(2);
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
 
 #endif // TEST_QUERY

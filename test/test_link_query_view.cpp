@@ -1414,29 +1414,28 @@ TEST(LinkList_QueryLinkNull)
     CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Double>(3) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->column<DateTime>(4) == realm::null()).count());
 
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) == realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).count());
     CHECK_EQUAL(0, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).find_all().get_source_ndx(0));
 
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) == realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<Int>(2) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) != realm::null()).count());
 
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) == realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<Double>(3) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) != realm::null()).count());
 
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<DateTime>(4) == realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<DateTime>(4) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<DateTime>(4) != realm::null()).count());
 
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
 
     CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
     CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).find_all().get_source_ndx(0));
     CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).find_all().get_source_ndx(1));
 
-    CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
+    CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
     CHECK_EQUAL(0, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(0));
-    CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(1));
 }
 
 

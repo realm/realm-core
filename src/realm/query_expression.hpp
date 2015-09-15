@@ -1344,6 +1344,11 @@ public:
         map_links(0, row, lm);
     }
 
+    bool only_unary_links() const
+    {
+        return std::find(m_link_types.begin(), m_link_types.end(), type_LinkList) == m_link_types.end();
+    }
+
     const Table* m_table;
     std::vector<const LinkColumnBase*> m_link_columns;
     std::vector<const Table*> m_tables;
@@ -1395,6 +1400,20 @@ private:
 template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);
 template <class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_insensitive);
 
+template <class T>
+Value<T> make_value_for_link(bool only_unary_links, size_t size)
+{
+    Value<T> value;
+    if (only_unary_links) {
+        REALM_ASSERT(size <= 1);
+        value.init(false, 1);
+        value.m_storage.set_null(0);
+    } else {
+        value.init(true, size);
+    }
+    return value;
+}
+
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
@@ -1432,7 +1451,8 @@ public:
 
         if (links_exist()) {
             std::vector<size_t> links = m_link_map.get_links(index);
-            Value<StringData> v(true, links.size());
+            Value<StringData> v = make_value_for_link<StringData>(m_link_map.only_unary_links(), links.size());
+
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
                 v.m_storage.set(t, m_link_map.m_table->get_string(m_column, link_to));
@@ -1600,7 +1620,8 @@ public:
 
         if (links_exist()) {
             std::vector<size_t> links = m_link_map.get_links(index);
-            Value<BinaryData> v(true, links.size());
+            Value<BinaryData> v = make_value_for_link<BinaryData>(m_link_map.only_unary_links(), links.size());
+
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
                 v.m_storage.set(t, m_link_map.m_table->get_binary(m_column, link_to));
@@ -1876,7 +1897,7 @@ public:
             // LinkList with more than 0 values. Create Value with payload for all fields
 
             std::vector<size_t> links = m_link_map.get_links(index);
-            Value<T> v(true, links.size());
+            Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
