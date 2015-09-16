@@ -70,6 +70,8 @@ public:
     {
         return m_path.c_str();
     }
+    TestPathGuard(const TestPathGuard&) = delete;
+    TestPathGuard& operator=(const TestPathGuard&) = delete;
 protected:
     std::string m_path;
 };
