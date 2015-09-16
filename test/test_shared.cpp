@@ -1111,7 +1111,7 @@ TEST(Shared_ManyReaders)
 
 
 namespace {
-    void Many_ConcurrentReaders_reader_thread(const std::string& path, const int thread_ndx) {
+    void Many_ConcurrentReaders_reader_thread(const std::string& path) {
         try {
             for (int i = 0; i < 1000; ++i) {
                 SharedGroup sg(path);
@@ -1142,7 +1142,7 @@ TEST(Many_ConcurrentReaders)
     constexpr int num_threads = 4;
     Thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        threads[i].start(std::bind(&Many_ConcurrentReaders_reader_thread, path_str, i));
+        threads[i].start(std::bind(&Many_ConcurrentReaders_reader_thread, path_str));
     }
     for (int i = 0; i < num_threads; ++i) {
         threads[i].join();
