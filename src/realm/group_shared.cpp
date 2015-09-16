@@ -286,6 +286,16 @@ public:
         return get(last());
     }
 
+    // This should only be called under lock or during initialization
+    // where you know the caller is the single thread/process doing the
+    // access.
+    ReadCount& reinit_last() noexcept
+    {
+        ReadCount& r = data[last()];
+        r.count.store(0, std::memory_order_relaxed);
+        return r;
+    }
+
     const ReadCount& get_oldest() const  noexcept
     {
         return get(old_pos.load(std::memory_order_relaxed));
@@ -407,11 +417,17 @@ struct SharedGroup::SharedInfo
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
+        Ringbuffer::ReadCount& r = readers.reinit_last();
+        r.filesize = file_size;
+        r.version = initial_version;
+        r.current_top = top_ref;
+        /*
         Ringbuffer::ReadCount& r = readers.get_next();
         r.filesize = file_size;
         r.version = initial_version;
         r.current_top = top_ref;
         readers.use_next();
+        */
     }
     uint_fast64_t get_current_version_unchecked() const
     {
