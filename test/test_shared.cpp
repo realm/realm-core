@@ -1124,6 +1124,7 @@ namespace {
 ONLY(Many_ConcurrentReaders)
 {
     SHARED_GROUP_TEST_PATH(path);
+    std::string path_str = path;
 
     // setup
     SharedGroup sg(path);
@@ -1133,11 +1134,12 @@ ONLY(Many_ConcurrentReaders)
     t->add_empty_row(1);
     t->set_string(col_ndx, 0, StringData("string"));
     wt.commit();
+    sg.close();
 
     constexpr int num_threads = 4;
     Thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        threads[i].start(std::bind(&Many_ConcurrentReaders_reader_thread, path, i));
+        threads[i].start(std::bind(&Many_ConcurrentReaders_reader_thread, path_str, i));
     }
     for (int i = 0; i < num_threads; ++i) {
         threads[i].join();
