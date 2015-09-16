@@ -421,13 +421,6 @@ struct SharedGroup::SharedInfo
         r.filesize = file_size;
         r.version = initial_version;
         r.current_top = top_ref;
-        /*
-        Ringbuffer::ReadCount& r = readers.get_next();
-        r.filesize = file_size;
-        r.version = initial_version;
-        r.current_top = top_ref;
-        readers.use_next();
-        */
     }
     uint_fast64_t get_current_version_unchecked() const
     {
