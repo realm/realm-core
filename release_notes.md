@@ -2,7 +2,10 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a crash bug that could be triggered if a Realm is rapidly opened
+  and closed and reopened many times on multiple threads. The bug caused
+  the internal version information structure to overflow, causing an assert
+  or a crash (if assert was disabled).
 
 ### API breaking changes:
 
