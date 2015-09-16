@@ -1129,7 +1129,6 @@ TEST(Many_ConcurrentReaders)
     auto reader = [path_str]() {
         try {
             for (int i = 0; i < 1000; ++i) {
-                printf("%d\n", i);
                 SharedGroup sg(path_str);
                 ReadTransaction rt(sg);
                 rt.get_group().verify();
