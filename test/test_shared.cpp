@@ -1112,16 +1112,19 @@ TEST(Shared_ManyReaders)
 
 namespace {
     void Many_ConcurrentReaders_reader_thread(const std::string& path, const int thread_ndx) {
-        for (int i = 0; i < 1000; ++i) {
-            printf("thread: %d: %d\n", thread_ndx, i);
-            SharedGroup sg(path);
-            ReadTransaction rt(sg);
-            rt.get_group().verify();
+        try {
+            for (int i = 0; i < 1000; ++i) {
+                SharedGroup sg(path);
+                ReadTransaction rt(sg);
+                rt.get_group().verify();
+            }
+        } catch (...) {
+            REALM_ASSERT(false);
         }
     }
 }
 
-ONLY(Many_ConcurrentReaders)
+TEST(Many_ConcurrentReaders)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string path_str = path;
