@@ -1110,6 +1110,7 @@ TEST(Shared_ManyReaders)
 }
 
 
+// This test is a minimal repro. of core issue #842.
 TEST(Many_ConcurrentReaders)
 {
     SHARED_GROUP_TEST_PATH(path);
