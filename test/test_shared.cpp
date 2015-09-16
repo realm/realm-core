@@ -1110,27 +1110,13 @@ TEST(Shared_ManyReaders)
 }
 
 
-namespace {
-    void Many_ConcurrentReaders_reader_thread(const std::string& path) {
-        try {
-            for (int i = 0; i < 1000; ++i) {
-                SharedGroup sg(path);
-                ReadTransaction rt(sg);
-                rt.get_group().verify();
-            }
-        } catch (...) {
-            REALM_ASSERT(false);
-        }
-    }
-}
-
 TEST(Many_ConcurrentReaders)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::string path_str = path;
+    const std::string path_str = path;
 
     // setup
-    SharedGroup sg(path);
+    SharedGroup sg(path_str);
     WriteTransaction wt(sg);
     TableRef t = wt.add_table("table");
     size_t col_ndx = t->add_column(type_String, "column");
@@ -1139,10 +1125,23 @@ TEST(Many_ConcurrentReaders)
     wt.commit();
     sg.close();
 
+    auto reader = [path_str]() {
+        try {
+            for (int i = 0; i < 1000; ++i) {
+                printf("%d\n", i);
+                SharedGroup sg(path_str);
+                ReadTransaction rt(sg);
+                rt.get_group().verify();
+            }
+        } catch (...) {
+            REALM_ASSERT(false);
+        }
+    };
+
     constexpr int num_threads = 4;
     Thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        threads[i].start(std::bind(&Many_ConcurrentReaders_reader_thread, path_str));
+        threads[i].start(reader);
     }
     for (int i = 0; i < num_threads; ++i) {
         threads[i].join();
