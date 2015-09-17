@@ -286,9 +286,9 @@ public:
         return get(last());
     }
 
-    // This should only be called under lock or during initialization
-    // where you know the caller is the single thread/process doing the
-    // access.
+    // This method is only safe to call when you have exclusive access to the ringbuffer
+    // It is called from init_versioning, which is called by open() under the condition
+    // that it is the session initiator. The controlmutex ensures mutual exclusion.
     ReadCount& reinit_last() noexcept
     {
         ReadCount& r = data[last()];
