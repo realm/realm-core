@@ -869,7 +869,7 @@ EOF
         export REALM_HAVE_CONFIG="1"
         tvos_sdks_avail="$(get_config_param "TVOS_SDKS_AVAIL")" || exit 1
         if [ "$tvos_sdks_avail" != "yes" ]; then
-            echo "ERROR: Required watchOS SDKs are not available" 1>&2
+            echo "ERROR: Required tvOS SDKs are not available" 1>&2
             exit 1
         fi
         temp_dir="$(mktemp -d /tmp/realm.build-tvos.XXXX)" || exit 1
@@ -884,7 +884,7 @@ EOF
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
-            if [ "$platform" = 'WatchOS' ]; then
+            if [ "$platform" = 'AppleTVOS' ]; then
                 word_list_append "cflags_arch" "-mstrict-align" || exit 1
                 word_list_append "cflags_arch" "-mtvos-version-min=9.0" || exit 1
                 word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
