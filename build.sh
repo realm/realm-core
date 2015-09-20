@@ -61,77 +61,77 @@ usage()
     cat 1>&2 << EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
-    config:
-    clean:
-    build:
-    build-config-progs:
-    build-osx:
-    build-iphone:
-    build-watchos:
-    build-tvos:
-    build-android:
-    build-cocoa:
-    build-osx-framework:
-    test:
-    test-debug:
-    check:
-    check-debug:
-    memcheck:
-    memcheck-debug:
-    check-doc-examples:
-    check-testcase:
-    check-testcase-debug:
-    memcheck-testcase:
-    memcheck-testcase-debug:
-    asan:
-    asan-debug:
+    config:                             
+    clean:                              
+    build:                              
+    build-config-progs:                 
+    build-osx:                          
+    build-iphone:                       
+    build-watchos:                      
+    build-tvos:                         
+    build-android:                      
+    build-cocoa:                        
+    build-osx-framework:                
+    test:                               
+    test-debug:                         
+    check:                              
+    check-debug:                        
+    memcheck:                           
+    memcheck-debug:                     
+    check-doc-examples:                 
+    check-testcase:                     
+    check-testcase-debug:               
+    memcheck-testcase:                  
+    memcheck-testcase-debug:            
+    asan:                               
+    asan-debug:                         
     build-test-ios-app:                 build an iOS app for testing core on device
     test-ios-app:                       execute the core tests on device
     leak-test-ios-app:                  execute the core tests on device, monitor for leaks
-    gdb:
-    gdb-debug:
-    gdb-testcase:
-    gdb-testcase-debug:
-    performance:
-    benchmark:
-    benchmark-*:
-    lcov:
-    gcovr:
-    show-install:
-    release-notes-prerelease:
-    release-notes-postrelease:
-    get-version:
-    set-version:
-    copy-tools:
-    install:
-    install-prod:
-    install-devel:
-    uninstall:
-    uninstall-prod:
-    uninstall-devel:
-    test-installed:
-    wipe-installed:
-    src-dist:
-    bin-dist:
-    dist-config:
-    dist-clean:
-    dist-build:
-    dist-build-iphone:
-    dist-test:
-    dist-test-debug:
-    dist-install:
-    dist-uninstall:
-    dist-test-installed:
-    dist-status:
-    dist-pull:
-    dist-checkout:
-    dist-copy:
-    dist-deb:
+    gdb:                                
+    gdb-debug:                          
+    gdb-testcase:                       
+    gdb-testcase-debug:                 
+    performance:                        
+    benchmark:                          
+    benchmark-*:                        
+    lcov:                               
+    gcovr:                              
+    show-install:                       
+    release-notes-prerelease:           
+    release-notes-postrelease:          
+    get-version:                        
+    set-version:                        
+    copy-tools:                         
+    install:                            
+    install-prod:                       
+    install-devel:                      
+    uninstall:                          
+    uninstall-prod:                     
+    uninstall-devel:                    
+    test-installed:                     
+    wipe-installed:                     
+    src-dist:                           
+    bin-dist:                           
+    dist-config:                        
+    dist-clean:                         
+    dist-build:                         
+    dist-build-iphone:                  
+    dist-test:                          
+    dist-test-debug:                    
+    dist-install:                       
+    dist-uninstall:                     
+    dist-test-installed:                
+    dist-status:                        
+    dist-pull:                          
+    dist-checkout:                      
+    dist-copy:                          
+    dist-deb:                           
     jenkins-pull-request:               Run by Jenkins for each pull request whenever it changes
     jenkins-pipeline-unit-tests:        Run by Jenkins as part of the core pipeline whenever master changes
     jenkins-pipeline-coverage:          Run by Jenkins as part of the core pipeline whenever master changes
     jenkins-pipeline-address-sanitizer: Run by Jenkins as part of the core pipeline whenever master changes
-    jenkins-valgrind:
+    jenkins-valgrind:                   
 EOF
 }
 
