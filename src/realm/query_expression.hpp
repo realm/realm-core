@@ -278,9 +278,9 @@ struct ValueBase
     virtual void export_null(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
-    // If true, all values in the class come from a link of a single field in the parent table (m_table). If
+    // If true, all values in the class come from a link list of a single field in the parent table (m_table). If
     // false, then values come from successive rows of m_table (query operations are operated on in bulks for speed)
-    bool from_link;
+    bool m_from_link_list;
 
     // Number of values stored in the class.
     size_t m_values;
@@ -882,28 +882,28 @@ public:
         init(false, ValueBase::default_size, v);
     }
 
-    Value(bool link, size_t values)
+    Value(bool from_link_list, size_t values)
     {
-        init(link, values, T());
+        init(from_link_list, values, T());
     }
 
-    Value(bool link, size_t values, T v)
+    Value(bool from_link_list, size_t values, T v)
     {
-        init(link, values, v);
+        init(from_link_list, values, v);
     }
 
     Value(const Value&) = default;
     Value& operator=(const Value&) = default;
 
-    void init(bool link, size_t values, T v) {
+    void init(bool from_link_list, size_t values, T v) {
         m_storage.init(values, v);
-        ValueBase::from_link = link;
+        ValueBase::m_from_link_list = from_link_list;
         ValueBase::m_values = values;
     }
 
-    void init(bool link, size_t values) {
+    void init(bool from_link_list, size_t values) {
         m_storage.init(values);
-        ValueBase::from_link = link;
+        ValueBase::m_from_link_list = from_link_list;
         ValueBase::m_values = values;
     }
 
@@ -917,7 +917,7 @@ public:
     {
         OperatorOptionalAdapter<TOperator> o;
 
-        if (!left->from_link && !right->from_link) {
+        if (!left->m_from_link_list && !right->m_from_link_list) {
             // Operate on values one-by-one (one value is one row; no links)
             size_t min = std::min(left->m_values, right->m_values);
             init(false, min);
@@ -926,11 +926,11 @@ public:
                 m_storage.set(i, o(left->m_storage.get(i), right->m_storage.get(i)));
             }
         }
-        else if (left->from_link && right->from_link) {
+        else if (left->m_from_link_list && right->m_from_link_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             REALM_ASSERT_DEBUG(false);
         }
-        else if (!left->from_link && right->from_link) {
+        else if (!left->m_from_link_list && right->m_from_link_list) {
             // Right values come from link. Left must come from single row.
             REALM_ASSERT_DEBUG(left->m_values > 0);
             init(true, right->m_values);
@@ -940,7 +940,7 @@ public:
                 m_storage.set(i, o(left_value, right->m_storage.get(i)));
             }
         }
-        else if (left->from_link && !right->from_link) {
+        else if (left->m_from_link_list && !right->m_from_link_list) {
             // Same as above, but with left values coming from links
             REALM_ASSERT_DEBUG(right->m_values > 0);
             init(true, left->m_values);
@@ -954,7 +954,7 @@ public:
 
     template <class TOperator> REALM_FORCEINLINE void fun(const Value* value)
     {
-        init(value->from_link, value->m_values);
+        init(value->m_from_link_list, value->m_values);
 
         OperatorOptionalAdapter<TOperator> o;
         for (size_t i = 0; i < value->m_values; i++) {
@@ -969,7 +969,7 @@ public:
     REALM_FORCEINLINE export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
-        d.init(ValueBase::from_link, ValueBase::m_values, D());
+        d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
         for (size_t t = 0; t < ValueBase::m_values; t++) {
             if (m_storage.is_null(t))
                 d.m_storage.set_null(t);
@@ -1023,7 +1023,7 @@ public:
     REALM_FORCEINLINE void export_null(ValueBase& destination) const override
     {
         Value<null>& d = static_cast<Value<null>&>(destination);
-        d.init(from_link, m_values);
+        d.init(m_from_link_list, m_values);
     }
 
     REALM_FORCEINLINE void import(const ValueBase& source) override
@@ -1053,8 +1053,8 @@ public:
     {
         TCond c;
 
-        if (!left->from_link && !right->from_link) {
-            // Compare values one-by-one (one value is one row; no links)
+        if (!left->m_from_link_list && !right->m_from_link_list) {
+            // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
 
@@ -1062,12 +1062,12 @@ public:
                     return m;
             }
         }
-        else if (left->from_link && right->from_link) {
+        else if (left->m_from_link_list && right->m_from_link_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
             REALM_ASSERT_DEBUG(false);
         }
-        else if (!left->from_link && right->from_link) {
-            // Right values come from link. Left must come from single row. Semantics: Match if at least 1
+        else if (!left->m_from_link_list && right->m_from_link_list) {
+            // Right values come from link list. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values > 0);
             for (size_t r = 0; r < right->m_values; r++) {
@@ -1075,8 +1075,8 @@ public:
                     return 0;
             }
         }
-        else if (left->from_link && !right->from_link) {
-            // Same as above, but with left values coming from links
+        else if (left->m_from_link_list && !right->m_from_link_list) {
+            // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right->m_values > 0);
             for (size_t l = 0; l < left->m_values; l++) {
                 if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l), right->m_storage.is_null(0)))
@@ -2317,7 +2317,7 @@ public:
             if (match != not_found && match + start < end)
                 return start + match;
 
-            size_t rows = (left.from_link || right.from_link) ? 1 : minimum(right.m_values, left.m_values);
+            size_t rows = (left.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.m_values, left.m_values);
             start += rows;
         }
 
