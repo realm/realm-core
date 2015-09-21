@@ -693,39 +693,21 @@ EOF
         export REALM_HAVE_CONFIG="1"
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
-            for x in $IPHONE_PLATFORMS; do
+            for x in $IPHONE_PLATFORMS $WATCHOS_PLATFORMS $TVOS_PLATFORMS; do
                 $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
             done
             $MAKE -C "src/realm" clean BASE_DENOM="ios" || exit 1
-            if [ -e "$IPHONE_DIR" ]; then
-                echo "Removing '$IPHONE_DIR'"
-                rm -fr "$IPHONE_DIR/include" || exit 1
-                rm -f "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" || exit 1
-                rm -f "$IPHONE_DIR/realm-config" "$IPHONE_DIR/realm-config-dbg" || exit 1
-                rmdir "$IPHONE_DIR" || exit 1
-            fi
-            for x in $WATCHOS_PLATFORMS; do
-                $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
-            done
             $MAKE -C "src/realm" clean BASE_DENOM="watch" || exit 1
-            if [ -e "$WATCHOS_DIR" ]; then
-                echo "Removing '$WATCHOS_DIR'"
-                rm -fr "$WATCHOS_DIR/include" || exit 1
-                rm -f "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" || exit 1
-                rm -f "$WATCHOS_DIR/realm-config" "$WATCHOS_DIR/realm-config-dbg" || exit 1
-                rmdir "$WATCHOS_DIR" || exit 1
-            fi
-            for x in $TVOS_PLATFORMS; do
-                $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
-            done
             $MAKE -C "src/realm" clean BASE_DENOM="tv" || exit 1
-            if [ -e "$TVOS_DIR" ]; then
-                echo "Removing '$TVOS_DIR'"
-                rm -fr "$TVOS_DIR/include" || exit 1
-                rm -f "$TVOS_DIR/librealm-tvos.a" "$TVOS_DIR/librealm-tvos-dbg.a" || exit 1
-                rm -f "$TVOS_DIR/realm-config" "$TVOS_DIR/realm-config-dbg" || exit 1
-                rmdir "$TVOS_DIR" || exit 1
-            fi
+            for dir in "$IPHONE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
+                if [ -e "$dir" ]; then
+                    echo "Removing '$dir'"
+                    rm -rf "$dir/include" || exit 1
+                    rm -f "$dir/librealm-*.a" || exit 1
+                    rm -f "$dir/realm-config*" || exit 1
+                    rmdir "$dir" || exit 1
+                fi
+            done
         fi
         for x in $ANDROID_PLATFORMS; do
             denom="android-$x"
@@ -998,20 +980,15 @@ EOF
         BASENAME="core"
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR/librealm-ios.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$IPHONE_DIR/librealm-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$WATCHOS_DIR/librealm-watchos.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$WATCHOS_DIR/librealm-watchos-dbg.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$TVOS_DIR/librealm-tvos.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$TVOS_DIR/librealm-tvos-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
+        for original in "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" "$TVOS_DIR/librealm-tvos.a" "$TVOS_DIR/librealm-tvos-dbg.a" "src/realm/librealm.a" "src/realm/librealm-dbg.a"; do
+            cp "$original" "$tmpdir/$BASENAME" || exit 1
+        done
         for sdk in $iphone_sdks $watchos_sdks $tvos_sdks; do
             platform="$(printf "%s\n" "$sdk" | cut -d: -f1)" || exit 1
             cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
         done
-        cp src/realm/librealm.a "$tmpdir/$BASENAME" || exit 1
-        cp src/realm/librealm-dbg.a "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
