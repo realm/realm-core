@@ -46,7 +46,7 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line,
 
     ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " [" << first_info;
     (void) variadics_unpacker { 0, (ss << ", " << other_infos, void(), 0)... };
-    ss << "]" << std::endl;
+    ss << "]" << '\n';
 
     terminate_internal(ss);
 }
