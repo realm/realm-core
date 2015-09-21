@@ -34,7 +34,7 @@ REALM_NORETURN void terminate_internal(std::stringstream&) noexcept;
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept;
 
-template<typename T, typename... Ts>
+template<class T, class... Ts>
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
                               T first_info, Ts... other_infos) noexcept
 {
