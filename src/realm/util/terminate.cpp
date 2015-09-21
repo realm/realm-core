@@ -66,14 +66,14 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
     int frames = backtrace(callstack, 128);
     char** strs = backtrace_symbols(callstack, frames);
     for (int i = 0; i < frames; ++i) {
-        ss << strs[i] << std::endl;
+        ss << strs[i] << '\n';
     }
     free(strs);
 #endif
 
     ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
 #ifdef REALM_DEBUG
-    std::cerr << ss.rdbuf() << std::endl;
+    std::cerr << ss.rdbuf() << '\n';
 #endif
 
 #if defined(__APPLE__)
@@ -88,7 +88,7 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
 REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept
 {
     std::stringstream ss;
-    ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << std::endl;
+    ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << '\n';
     terminate_internal(ss);
 }
 
