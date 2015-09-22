@@ -7,6 +7,12 @@
 * Fixes a crash due to an assert when rolling back a transaction in which a link
   or linklist column was removed.
 
+-----------
+
+### Internals:
+
+* Now built for Apple platforms with the non-beta version of Xcode 7.
+
 # 0.92.1 Release notes
 
 ### Bugfixes:
@@ -14,14 +20,6 @@
 * Reverted prelinking of static libraries on Apple platforms as it caused
   `dynamic_cast<>()` and `typeid()` checks to fail in some scenarios, including
   when sorting by integer or floating point columns.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
 
 -----------
 
