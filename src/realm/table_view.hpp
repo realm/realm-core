@@ -663,7 +663,7 @@ inline bool TableViewBase::is_attached() const REALM_NOEXCEPT
 
 inline bool TableViewBase::is_row_attached(std::size_t row_ndx) const REALM_NOEXCEPT
 {
-    return get_source_ndx(row_ndx) != detached_ref;
+    return size_t(m_row_indexes.get(row_ndx)) != detached_ref;
 }
 
 inline std::size_t TableViewBase::size() const REALM_NOEXCEPT

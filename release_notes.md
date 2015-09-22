@@ -1,3 +1,10 @@
+# 0.92.2 Release notes
+
+### Bugfixes:
+
+* Fixed assertion failure when TableViewBase::is_row_attached() would return
+  false in a debug build.
+
 # 0.92.1 Release notes
 
 ### Bugfixes:
