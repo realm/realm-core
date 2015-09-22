@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Comparisons involving unary links on each side of the operator are now supported
+  by query_expression.hpp.
 
 -----------
 
