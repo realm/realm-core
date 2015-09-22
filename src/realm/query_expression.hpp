@@ -1400,7 +1400,7 @@ private:
 template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);
 template <class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_insensitive);
 
-template <class T>
+template<class T>
 Value<T> make_value_for_link(bool only_unary_links, size_t size)
 {
     Value<T> value;
@@ -1408,7 +1408,8 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
         REALM_ASSERT(size <= 1);
         value.init(false, 1);
         value.m_storage.set_null(0);
-    } else {
+    }
+    else {
         value.init(true, size);
     }
     return value;
