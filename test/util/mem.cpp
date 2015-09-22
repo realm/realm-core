@@ -5,8 +5,7 @@
 #  include <psapi.h>
 #elif defined __APPLE__
 #  include <mach/mach.h>
-#elif defined REALM_HAVE_LIBPROCPS
-// Requires libprocps (formerly known as libproc)
+#else
 #  include <proc/readproc.h>
 #endif
 
@@ -128,17 +127,13 @@ size_t get_mem_usage()
     // either, yet we will yse the resident size for now.
     return t_info.resident_size;
 
-#elif defined REALM_HAVE_LIBPROCPS
+#else
 
     struct proc_t usage;
     look_up_our_self(&usage);
     // The header file says 'vsize' is in number of pages, yet it
     // definitely appears to be in bytes.
     return usage.vsize;
-
-#else
-
-    throw std::runtime_error("Not supported");
 
 #endif
 }

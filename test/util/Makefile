@@ -29,10 +29,8 @@ PROCPS_LDFLAGS := $(shell pkg-config libprocps --libs)
 test_util_a_CFLAGS  += $(PROCPS_CFLAGS)
 test_util_a_LDFLAGS += $(PROCPS_LDFLAGS)
 else
-test_util_a_LDFLAGS += -lproc
+test_util_a_LDFLAGS += -lprocps
 endif
-
-mem_o_CFLAGS = -DREALM_HAVE_LIBPROCPS
 
 endif
 
