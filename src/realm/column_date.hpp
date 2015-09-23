@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <realm/column.hpp>
+#include <realm/universal_date.hpp>
 
 namespace realm {
 
