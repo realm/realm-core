@@ -30,7 +30,7 @@ namespace realm {
     class DateColumn : public IntegerColumn {
     public:
         DateColumn(Allocator& alloc, ref_type ref_types, ref_type ref_dates, ref_type ref_extra) :
-            m_types(alloc, ref_type),
+            m_types(alloc, ref_types),
             m_dates(alloc, ref_dates),
             m_dates_extra(alloc, ref_extra)
         {
@@ -38,10 +38,13 @@ namespace realm {
         }
 
         // Should return upcoming UniversalDate class
-        float add(size_t index) { 
+        int64_t get(size_t index) { 
+            return m_dates.get(0);
+        }
 
+        void add(int64_t v) {
             m_types.add(1);
-            return m_types.get(0);
+            m_dates.add(v);
         }
 
 
