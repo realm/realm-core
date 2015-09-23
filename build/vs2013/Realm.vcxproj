@@ -599,6 +599,7 @@
     <ClCompile Include="..\..\src\realm\array_string_long.cpp" />
     <ClCompile Include="..\..\src\realm\bptree.cpp" />
     <ClCompile Include="..\..\src\realm\column.cpp" />
+    <ClCompile Include="..\..\src\realm\column_date.cpp" />
     <ClCompile Include="..\..\src\realm\column_link_base.cpp" />
     <ClCompile Include="..\..\src\realm\column_backlink.cpp" />
     <ClCompile Include="..\..\src\realm\column_binary.cpp" />
@@ -1107,6 +1108,7 @@
     <ClInclude Include="..\..\src\realm\binary_data.hpp" />
     <ClInclude Include="..\..\src\realm\bptree.hpp" />
     <ClInclude Include="..\..\src\realm\column_backlink.hpp" />
+    <ClInclude Include="..\..\src\realm\column_date.hpp" />
     <ClInclude Include="..\..\src\realm\column_link.hpp" />
     <ClInclude Include="..\..\src\realm\column_linkbase.hpp" />
     <ClInclude Include="..\..\src\realm\column_linklist.hpp" />
