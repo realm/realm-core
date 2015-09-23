@@ -1110,6 +1110,45 @@ TEST(Shared_ManyReaders)
 }
 
 
+// This test is a minimal repro. of core issue #842.
+TEST(Many_ConcurrentReaders)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const std::string path_str = path;
+
+    // setup
+    SharedGroup sg(path_str);
+    WriteTransaction wt(sg);
+    TableRef t = wt.add_table("table");
+    size_t col_ndx = t->add_column(type_String, "column");
+    t->add_empty_row(1);
+    t->set_string(col_ndx, 0, StringData("string"));
+    wt.commit();
+    sg.close();
+
+    auto reader = [path_str]() {
+        try {
+            for (int i = 0; i < 1000; ++i) {
+                SharedGroup sg(path_str);
+                ReadTransaction rt(sg);
+                rt.get_group().verify();
+            }
+        } catch (...) {
+            REALM_ASSERT(false);
+        }
+    };
+
+    constexpr int num_threads = 4;
+    Thread threads[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        threads[i].start(reader);
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        threads[i].join();
+    }
+}
+
+
 namespace {
 
 REALM_TABLE_1(MyTable_SpecialOrder, first,  Int)

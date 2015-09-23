@@ -286,6 +286,25 @@ public:
         return get(last());
     }
 
+    // This method re-initialises the last used ringbuffer entry to hold a new entry.
+    // Precondition: This should *only* be done if the caller has established that she
+    // is the only thread/process that has access to the ringbuffer. It is currently
+    // called from init_versioning(), which is called by SharedGroup::open() under the
+    // condition that it is the session initiator and under guard by the control mutex,
+    // thus ensuring the precondition.
+    // It is most likely not suited for any other use.
+    ReadCount& reinit_last() noexcept
+    {
+        ReadCount& r = data[last()];
+        // r.count is an atomic<> due to other usage constraints. Right here, we're
+        // operating under mutex protection, so the use of an atomic store is immaterial
+        // and just forced on us by the type of r.count.
+        // You'll find the full discussion of how r.count is operated and why it must be
+        // an atomic earlier in this file.
+        r.count.store(0, std::memory_order_relaxed);
+        return r;
+    }
+
     const ReadCount& get_oldest() const  noexcept
     {
         return get(old_pos.load(std::memory_order_relaxed));
@@ -407,11 +426,10 @@ struct SharedGroup::SharedInfo
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
-        Ringbuffer::ReadCount& r = readers.get_next();
+        Ringbuffer::ReadCount& r = readers.reinit_last();
         r.filesize = file_size;
         r.version = initial_version;
         r.current_top = top_ref;
-        readers.use_next();
     }
     uint_fast64_t get_current_version_unchecked() const
     {
