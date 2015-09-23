@@ -367,7 +367,7 @@ protected:
     {
         patch.reset(new Handover_patch);
         std::unique_ptr<TableViewBase> retval(new TableViewBase(*this, *patch, mode));
-        return move(retval);
+        return retval;
     }
 
     virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
@@ -375,7 +375,7 @@ protected:
     {
         patch.reset(new Handover_patch);
         std::unique_ptr<TableViewBase> retval(new TableViewBase(*this, *patch, mode));
-        return move(retval);
+        return retval;
     }
 
     virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
@@ -634,7 +634,7 @@ public:
     {
         patch.reset(new Handover_patch);
         std::unique_ptr<TableViewBase> retval(new ConstTableView(*this, *patch, mode));
-        return move(retval);
+        return retval;
     }
 
     std::unique_ptr<TableViewBase> 
@@ -642,7 +642,7 @@ public:
     {
         patch.reset(new Handover_patch);
         std::unique_ptr<TableViewBase> retval(new ConstTableView(*this, *patch, mode));
-        return move(retval);
+        return retval;
     }
 
     // this one is here to follow the general scheme, it is not really needed, the
