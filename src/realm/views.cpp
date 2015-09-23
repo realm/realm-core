@@ -27,7 +27,7 @@ void RowIndexes::sort(Sorter& sorting_predicate)
     sorting_predicate.init(this);
     std::stable_sort(v.begin(), v.end(), sorting_predicate);
     m_row_indexes.clear();
-    for (size_t t = 0; t < sz; t++)
+    for (size_t t = 0; t < sz - detached_ref_count; t++)
         m_row_indexes.add(v[t]);
     for (size_t t = 0; t < detached_ref_count; ++t)
         m_row_indexes.add(-1);

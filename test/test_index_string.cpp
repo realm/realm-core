@@ -876,7 +876,6 @@ TEST(StringIndex_FuzzyTest_Int)
     col.destroy();
 }
 
-#if REALM_NULL_STRINGS == 1
 namespace {
 
 // Generate string where the bit pattern in bits is converted to NUL bytes. E.g. (length=2):
@@ -929,7 +928,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 
     col.destroy();
 }
-#endif
 
 // Tests for a bug with strings containing zeroes
 TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
@@ -941,7 +939,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     StringColumn col2(Allocator::get_default(), ref2, nullable);
     const StringIndex& ndx2 = *col2.create_search_index();
 
-#if REALM_NULL_STRINGS == 1
     // FIXME: re-enable once embedded nuls work
     col2.add(StringData("\0", 1));
     col2.add(StringData("\1", 1));
@@ -956,10 +953,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     CHECK_EQUAL(ndx2.find_first(StringData("\0\1", 2)), 3);
     CHECK_EQUAL(ndx2.find_first(StringData("\1\0", 2)), 4);
     CHECK_EQUAL(ndx2.find_first(StringData("\1\0\0", 3)), not_found);
-#else
-    static_cast<void>(ndx2);
-    CHECK_THROW_ANY(col2.add(StringData("\0", 1)));
-#endif
 
     // Integer index (uses String index internally)
     int64_t v = 1ULL << 41;
@@ -975,7 +968,6 @@ TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
     col2.destroy();
 }
 
-#if REALM_NULL_STRINGS == 1
 TEST(StringIndex_Null)
 {
     // Create a column with string values
@@ -992,9 +984,7 @@ TEST(StringIndex_Null)
 
     col.destroy();
 }
-#endif
 
-#if REALM_NULL_STRINGS == 1
 TEST_TYPES(StringIndex_Zero_Crash, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1020,9 +1010,7 @@ TEST_TYPES(StringIndex_Zero_Crash, non_nullable, nullable)
     t = table.find_first_string(0, StringData("\0\0", 2));
     CHECK_EQUAL(2, t);
 }
-#endif
 
-#if REALM_NULL_STRINGS == 1
 TEST(StringIndex_Zero_Crash2)
 {
     Random random(random_int<unsigned long>());
@@ -1101,7 +1089,6 @@ TEST(StringIndex_Zero_Crash2)
         }
     }
 }
-#endif
 
 TEST(StringIndex_Integer_Increasing)
 {

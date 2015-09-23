@@ -330,7 +330,7 @@ void LinkListColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
 }
 
 
-ref_type LinkListColumn::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
+ref_type LinkListColumn::get_child_ref(size_t child_ndx) const noexcept
 {
     return LinkColumnBase::get_as_ref(child_ndx);
 }
@@ -348,7 +348,7 @@ void LinkListColumn::to_json_row(size_t row_ndx, std::ostream& out) const
 }
 
 
-void LinkListColumn::discard_child_accessors() REALM_NOEXCEPT
+void LinkListColumn::discard_child_accessors() noexcept
 {
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i)
@@ -367,7 +367,7 @@ void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void LinkListColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     LinkColumnBase::adj_acc_insert_rows(row_ndx, num_rows_inserted);
 
@@ -376,7 +376,7 @@ void LinkListColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserte
 }
 
 
-void LinkListColumn::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_erase_row(size_t row_ndx) noexcept
 {
     LinkColumnBase::adj_acc_erase_row(row_ndx);
 
@@ -386,7 +386,7 @@ void LinkListColumn::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
 }
 
 
-void LinkListColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     LinkColumnBase::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
@@ -396,7 +396,7 @@ void LinkListColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) R
 
 
 template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT
+void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     auto end = m_list_accessors.end();
     for (auto i = m_list_accessors.begin(); i != end; ++i) {
@@ -410,7 +410,7 @@ void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) R
 
 
 template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT
+void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
 {
     auto end = m_list_accessors.end();
     auto i = m_list_accessors.begin();
@@ -436,7 +436,7 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REAL
 
 
 template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT
+void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     size_t i = 0, n = m_list_accessors.size();
     while (i < n) {
@@ -462,14 +462,14 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM
 }
 
 
-void LinkListColumn::adj_acc_clear_root_table() REALM_NOEXCEPT
+void LinkListColumn::adj_acc_clear_root_table() noexcept
 {
     LinkColumnBase::adj_acc_clear_root_table();
     discard_child_accessors();
 }
 
 
-void LinkListColumn::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
 {
     if (!get_root_array()->update_from_parent(old_baseline))
         return;

@@ -54,8 +54,8 @@ public:
     typedef StringData value_type;
 
     StringEnumColumn(Allocator&, ref_type ref, ref_type keys_ref, bool nullable);
-    ~StringEnumColumn() REALM_NOEXCEPT override;
-    void destroy() REALM_NOEXCEPT override;
+    ~StringEnumColumn() noexcept override;
+    void destroy() noexcept override;
     MemRef clone_deep(Allocator& alloc) const override;
 
     int compare_values(size_t row1, size_t row2) const override
@@ -76,8 +76,8 @@ public:
         return utf8_compare(a, b) ? 1 : -1;
     }
 
-    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT final;
+    StringData get(std::size_t ndx) const noexcept;
+    bool is_null(std::size_t ndx) const noexcept final;
     void set(std::size_t ndx, StringData value);
     void set_null(std::size_t ndx) override;
     void add();
@@ -87,7 +87,7 @@ public:
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
-    bool is_nullable() const REALM_NOEXCEPT final;
+    bool is_nullable() const noexcept final;
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -103,20 +103,20 @@ public:
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to StringData::operator<().
-    std::size_t lower_bound_string(StringData value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_string(StringData value) const noexcept;
+    std::size_t upper_bound_string(StringData value) const noexcept;
     //@}
 
     void set_string(std::size_t, StringData) override;
 
-    void adjust_keys_ndx_in_parent(int diff) REALM_NOEXCEPT;
+    void adjust_keys_ndx_in_parent(int diff) noexcept;
 
     // Search index
-    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT final;
-    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
+    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
+    void set_search_index_allow_duplicate_values(bool) noexcept override;
     StringIndex* create_search_index() override;
-    void install_search_index(std::unique_ptr<StringIndex>) REALM_NOEXCEPT;
-    void destroy_search_index() REALM_NOEXCEPT override;
+    void install_search_index(std::unique_ptr<StringIndex>) noexcept;
+    void destroy_search_index() noexcept override;
 
     // Compare two string columns for equality
     bool compare_string(const StringColumn&) const;
@@ -126,7 +126,7 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
+    void update_from_parent(std::size_t) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
     std::size_t get_key_ndx(StringData value) const;
@@ -173,7 +173,7 @@ private:
 
 // Implementation:
 
-inline StringData StringEnumColumn::get(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData StringEnumColumn::get(std::size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, IntegerColumn::size());
     std::size_t key_ndx = to_size_t(IntegerColumn::get(ndx));
@@ -182,7 +182,7 @@ inline StringData StringEnumColumn::get(std::size_t ndx) const REALM_NOEXCEPT
     return sd;
 }
 
-inline bool StringEnumColumn::is_null(std::size_t ndx) const REALM_NOEXCEPT
+inline bool StringEnumColumn::is_null(std::size_t ndx) const noexcept
 {
     return is_nullable() ? get(ndx).is_null() : false;
 }
@@ -276,12 +276,12 @@ inline void StringEnumColumn::clear(std::size_t, bool)
     do_clear(); // Throws
 }
 
-inline std::size_t StringEnumColumn::lower_bound_string(StringData value) const REALM_NOEXCEPT
+inline std::size_t StringEnumColumn::lower_bound_string(StringData value) const noexcept
 {
     return ColumnBase::lower_bound(*this, value);
 }
 
-inline std::size_t StringEnumColumn::upper_bound_string(StringData value) const REALM_NOEXCEPT
+inline std::size_t StringEnumColumn::upper_bound_string(StringData value) const noexcept
 {
     return ColumnBase::upper_bound(*this, value);
 }

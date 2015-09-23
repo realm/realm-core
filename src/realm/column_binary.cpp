@@ -58,7 +58,7 @@ struct SetLeafElem: Array::UpdateHandler {
     Allocator& m_alloc;
     const BinaryData m_value;
     const bool m_add_zero_term;
-    SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) REALM_NOEXCEPT:
+    SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) noexcept:
         m_alloc(alloc), m_value(value), m_add_zero_term(add_zero_term) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                 size_t elem_ndx_in_leaf) override
@@ -201,7 +201,7 @@ ref_type BinaryColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 class BinaryColumn::EraseLeafElem: public Array::EraseHandler {
 public:
     BinaryColumn& m_column;
-    EraseLeafElem(BinaryColumn& column) REALM_NOEXCEPT:
+    EraseLeafElem(BinaryColumn& column) noexcept:
         m_column(column) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
@@ -237,7 +237,7 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
+    void destroy_leaf(MemRef leaf_mem) noexcept override
     {
         Array::destroy_deep(leaf_mem, m_column.get_alloc());
     }

@@ -97,10 +97,6 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 
 void Query::copy_nodes(const Query& source)
 {
-        m_table = source.m_table;
-        m_view = source.m_view;
-        m_source_link_view = source.m_source_link_view;
-
         create();
 
         first = source.first;
@@ -146,19 +142,20 @@ Query& Query::operator = (const Query& source)
         m_view = source.m_view;
         m_source_link_view = source.m_source_link_view;
         m_source_table_view = source.m_source_table_view;
+
         copy_nodes(source);
     }
     return *this;
 }
 
-Query::~Query() REALM_NOEXCEPT
+Query::~Query() noexcept
 {
     if (m_owns_source_table_view)
         delete m_source_table_view;
     delete_nodes();
 }
 
-void Query::delete_nodes() REALM_NOEXCEPT
+void Query::delete_nodes() noexcept
 {
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
@@ -214,6 +211,21 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
     copy_nodes(source);
 }
 
+void Query::set_table(TableRef tr)
+{
+    if (tr == m_table) {
+        return;
+    }
+
+    m_table = tr;
+    if (m_table) {
+        fetch_descriptor();
+    }
+    else {
+        m_current_descriptor.reset(nullptr);
+    }
+}
+
 
 void Query::apply_patch(Handover_patch& patch, Group& group)
 {
@@ -223,7 +235,7 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
     m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, group);
     m_view = m_source_link_view.get();
     if (patch.m_has_table) {
-        m_table = group.get_table(patch.m_table_num);
+        set_table(group.get_table(patch.m_table_num));
     }
 }
 
@@ -374,6 +386,7 @@ void Query::fetch_descriptor()
 template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
+    REALM_ASSERT_DEBUG(m_current_descriptor);
     ParentNode* const parent = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
     update_pointers(parent, &parent->m_child);
     return *this;

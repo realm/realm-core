@@ -98,9 +98,9 @@ public:
 
     /// Create an instance that is not initially attached to an open
     /// file.
-    File() REALM_NOEXCEPT;
+    File() noexcept;
 
-    ~File() REALM_NOEXCEPT;
+    ~File() noexcept;
 
     /// Calling this function on an instance that is already attached
     /// to an open file has undefined behavior.
@@ -115,11 +115,11 @@ public:
     /// This function is idempotent, that is, it is valid to call it
     /// regardless of whether this instance currently is attached to
     /// an open file.
-    void close() REALM_NOEXCEPT;
+    void close() noexcept;
 
     /// Check whether this File instance is currently attached to an
     /// open file.
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     enum AccessMode {
         access_ReadOnly,
@@ -282,7 +282,7 @@ public:
 
     /// Release a previously acquired lock on this file. This function
     /// is idempotent.
-    void unlock() REALM_NOEXCEPT;
+    void unlock() noexcept;
 
     /// Set the encryption key used for this file. Must be called before any
     /// mappings are created or any data is read from or written to the file.
@@ -320,7 +320,7 @@ public:
     ///
     /// Calling this function with a size that is greater than the
     /// size of the file has undefined behavior.
-    void* map(AccessMode, std::size_t size, int map_flags = 0) const;
+    void* map(AccessMode, std::size_t size, int map_flags = 0, std::size_t offset = 0) const;
 
     /// The same as unmap(old_addr, old_size) followed by map(a,
     /// new_size, map_flags), but more efficient on some systems.
@@ -335,15 +335,15 @@ public:
     /// If this function throws, the old address range will remain
     /// mapped.
     void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size,
-                int map_flags = 0) const;
+                int map_flags = 0, size_t file_offset = 0) const;
 
     /// Unmap the specified address range which must have been
     /// previously returned by map().
-    static void unmap(void* addr, std::size_t size) REALM_NOEXCEPT;
+    static void unmap(void* addr, std::size_t size) noexcept;
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete. The specified
-    /// address range must be one that was previously returned by
+    /// address range must be (a subset of) one that was previously returned by
     /// map().
     static void sync_map(void* addr, std::size_t size);
 
@@ -435,12 +435,12 @@ private:
         void* m_addr;
         std::size_t m_size;
 
-        MapBase() REALM_NOEXCEPT;
-        ~MapBase() REALM_NOEXCEPT;
+        MapBase() noexcept;
+        ~MapBase() noexcept;
 
-        void map(const File&, AccessMode, std::size_t size, int map_flags);
+        void map(const File&, AccessMode, std::size_t size, int map_flags, std::size_t offset = 0);
         void remap(const File&, AccessMode, std::size_t size, int map_flags);
-        void unmap() REALM_NOEXCEPT;
+        void unmap() noexcept;
         void sync();
     };
 };
@@ -450,7 +450,7 @@ private:
 class File::ExclusiveLock {
 public:
     ExclusiveLock(File& f): m_file(f) { f.lock_exclusive(); }
-    ~ExclusiveLock() REALM_NOEXCEPT { m_file.unlock(); }
+    ~ExclusiveLock() noexcept { m_file.unlock(); }
 private:
     File& m_file;
 };
@@ -458,7 +458,7 @@ private:
 class File::SharedLock {
 public:
     SharedLock(File& f): m_file(f) { f.lock_shared(); }
-    ~SharedLock() REALM_NOEXCEPT { m_file.unlock(); }
+    ~SharedLock() noexcept { m_file.unlock(); }
 private:
     File& m_file;
 };
@@ -486,11 +486,25 @@ public:
     explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
                  int map_flags = 0);
 
+    explicit Map(const File&, std::size_t offset, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+                 int map_flags = 0);
+
     /// Create an instance that is not initially attached to a memory
     /// mapped file.
-    Map() REALM_NOEXCEPT;
+    Map() noexcept;
 
-    ~Map() REALM_NOEXCEPT;
+    ~Map() noexcept;
+
+    /// Move the mapping from another Map object to this Map object
+    File::Map<T>& operator=(File::Map<T>&& other) 
+    {
+        if (m_addr) unmap();
+        m_addr = other.m_addr;
+        m_size = other.m_size;
+        other.m_addr = 0;
+        other.m_size = 0;
+        return *this;
+    }
 
     /// See File::map().
     ///
@@ -499,12 +513,12 @@ public:
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
     T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
-           int map_flags = 0);
+           int map_flags = 0, std::size_t offset = 0);
 
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
     /// currently attached to a memory mapped file.
-    void unmap() REALM_NOEXCEPT;
+    void unmap() noexcept;
 
     /// See File::remap().
     ///
@@ -523,23 +537,23 @@ public:
 
     /// Check whether this Map instance is currently attached to a
     /// memory mapped file.
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     /// Returns a pointer to the beginning of the memory mapped file,
     /// or null if this instance is not currently attached.
-    T* get_addr() const REALM_NOEXCEPT;
+    T* get_addr() const noexcept;
 
     /// Returns the size of the mapped region, or zero if this
     /// instance does not currently refer to a memory mapped
     /// file. When this instance refers to a memory mapped file, the
     /// returned value will always be identical to the size passed to
     /// the constructor or to map().
-    std::size_t get_size() const REALM_NOEXCEPT;
+    std::size_t get_size() const noexcept;
 
     /// Release the currently attached memory mapped file from this
     /// Map instance. The address range may then be unmapped later by
     /// a call to File::unmap().
-    T* release() REALM_NOEXCEPT;
+    T* release() noexcept;
 
     friend class UnmapGuard;
 };
@@ -547,9 +561,9 @@ public:
 
 class File::CloseGuard {
 public:
-    CloseGuard(File& f) REALM_NOEXCEPT: m_file(&f) {}
-    ~CloseGuard()  REALM_NOEXCEPT { if (m_file) m_file->close(); }
-    void release() REALM_NOEXCEPT { m_file = 0; }
+    CloseGuard(File& f) noexcept: m_file(&f) {}
+    ~CloseGuard()  noexcept { if (m_file) m_file->close(); }
+    void release() noexcept { m_file = 0; }
 private:
     File* m_file;
 };
@@ -557,9 +571,9 @@ private:
 
 class File::UnlockGuard {
 public:
-    UnlockGuard(File& f) REALM_NOEXCEPT: m_file(&f) {}
-    ~UnlockGuard()  REALM_NOEXCEPT { if (m_file) m_file->unlock(); }
-    void release() REALM_NOEXCEPT { m_file = 0; }
+    UnlockGuard(File& f) noexcept: m_file(&f) {}
+    ~UnlockGuard()  noexcept { if (m_file) m_file->unlock(); }
+    void release() noexcept { m_file = 0; }
 private:
     File* m_file;
 };
@@ -567,9 +581,9 @@ private:
 
 class File::UnmapGuard {
 public:
-    template<class T> UnmapGuard(Map<T>& m) REALM_NOEXCEPT: m_map(&m) {}
-    ~UnmapGuard()  REALM_NOEXCEPT { if (m_map) m_map->unmap(); }
-    void release() REALM_NOEXCEPT { m_map = 0; }
+    template<class T> UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
+    ~UnmapGuard()  noexcept { if (m_map) m_map->unmap(); }
+    void release() noexcept { m_map = 0; }
 private:
     MapBase* m_map;
 };
@@ -657,7 +671,7 @@ inline File::File(const std::string& path, Mode m)
     open(path, m);
 }
 
-inline File::File() REALM_NOEXCEPT
+inline File::File() noexcept
 {
 #ifdef _WIN32
     m_handle = 0;
@@ -666,7 +680,7 @@ inline File::File() REALM_NOEXCEPT
 #endif
 }
 
-inline File::~File() REALM_NOEXCEPT
+inline File::~File() noexcept
 {
     close();
 }
@@ -708,7 +722,7 @@ inline void File::open(const std::string& path, bool& was_created)
     }
 }
 
-inline bool File::is_attached() const REALM_NOEXCEPT
+inline bool File::is_attached() const noexcept
 {
 #ifdef _WIN32
     return (m_handle != nullptr);
@@ -737,25 +751,25 @@ inline bool File::try_lock_shared()
     return lock(false, true);
 }
 
-inline File::MapBase::MapBase() REALM_NOEXCEPT
+inline File::MapBase::MapBase() noexcept
 {
     m_addr = nullptr;
 }
 
-inline File::MapBase::~MapBase() REALM_NOEXCEPT
+inline File::MapBase::~MapBase() noexcept
 {
     unmap();
 }
 
-inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
 {
     REALM_ASSERT(!m_addr);
 
-    m_addr = f.map(a, size, map_flags);
+    m_addr = f.map(a, size, map_flags, offset);
     m_size = size;
 }
 
-inline void File::MapBase::unmap() REALM_NOEXCEPT
+inline void File::MapBase::unmap() noexcept
 {
     if (!m_addr) return;
     File::unmap(m_addr, m_size);
@@ -783,18 +797,24 @@ inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size, int map_
     map(f, a, size, map_flags);
 }
 
-template<class T> inline File::Map<T>::Map() REALM_NOEXCEPT {}
+template<class T>
+inline File::Map<T>::Map(const File& f, std::size_t offset, AccessMode a, std::size_t size, int map_flags)
+{
+    map(f, a, size, map_flags, offset);
+}
 
-template<class T> inline File::Map<T>::~Map() REALM_NOEXCEPT {}
+template<class T> inline File::Map<T>::Map() noexcept {}
+
+template<class T> inline File::Map<T>::~Map() noexcept {}
 
 template<class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
 {
-    MapBase::map(f, a, size, map_flags);
+    MapBase::map(f, a, size, map_flags, offset);
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::unmap() REALM_NOEXCEPT
+template<class T> inline void File::Map<T>::unmap() noexcept
 {
     MapBase::unmap();
 }
@@ -811,22 +831,22 @@ template<class T> inline void File::Map<T>::sync()
     MapBase::sync();
 }
 
-template<class T> inline bool File::Map<T>::is_attached() const REALM_NOEXCEPT
+template<class T> inline bool File::Map<T>::is_attached() const noexcept
 {
     return (m_addr != nullptr);
 }
 
-template<class T> inline T* File::Map<T>::get_addr() const REALM_NOEXCEPT
+template<class T> inline T* File::Map<T>::get_addr() const noexcept
 {
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline std::size_t File::Map<T>::get_size() const REALM_NOEXCEPT
+template<class T> inline std::size_t File::Map<T>::get_size() const noexcept
 {
     return m_addr ? m_size : 0;
 }
 
-template<class T> inline T* File::Map<T>::release() REALM_NOEXCEPT
+template<class T> inline T* File::Map<T>::release() noexcept
 {
     T* addr = static_cast<T*>(m_addr);
     m_addr = nullptr;

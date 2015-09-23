@@ -135,7 +135,7 @@ AESCryptor::AESCryptor(const uint8_t* key)
     memcpy(m_hmacKey, key + 32, 32);
 }
 
-AESCryptor::~AESCryptor() REALM_NOEXCEPT {
+AESCryptor::~AESCryptor() noexcept {
 #ifdef __APPLE__
     CCCryptorRelease(m_encr);
     CCCryptorRelease(m_decr);
@@ -149,7 +149,7 @@ void AESCryptor::set_file_size(off_t new_size)
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
-iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) REALM_NOEXCEPT
+iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
 {
     size_t idx = data_pos / block_size;
     if (idx < m_iv_buffer.size())
@@ -181,7 +181,7 @@ bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) REALM_NOEXCEPT
+bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) noexcept
 {
     try {
         return try_read(fd, pos, dst, size);
@@ -244,7 +244,7 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size)
     return true;
 }
 
-void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) REALM_NOEXCEPT
+void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -274,7 +274,7 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) REALM_NO
 }
 
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
-                         const char* src, const char* stored_iv) REALM_NOEXCEPT
+                         const char* src, const char* stored_iv) noexcept
 {
     uint8_t iv[aes_block_size] = {0};
     memcpy(iv, stored_iv, 4);
@@ -326,20 +326,18 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 #endif
 }
 
-EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, size_t size, File::AccessMode access)
+EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, 
+                                           File::AccessMode access)
 : m_file(file)
 , m_page_size(realm::util::page_size())
 , m_blocks_per_page(m_page_size / block_size)
-, m_addr(nullptr)
-, m_size(0)
-, m_page_count(0)
 , m_access(access)
 #ifdef REALM_DEBUG
 , m_validate_buffer(new char[m_page_size])
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == m_page_size);
-    set(addr, size); // throws
+    set(addr, size, file_offset); // throws
     file.mappings.push_back(this);
 }
 
@@ -350,12 +348,12 @@ EncryptedFileMapping::~EncryptedFileMapping()
     m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
 
-char* EncryptedFileMapping::page_addr(size_t i) const REALM_NOEXCEPT
+char* EncryptedFileMapping::page_addr(size_t i) const noexcept
 {
-    return reinterpret_cast<char*>(((m_first_page + i) * m_page_size));
+    return reinterpret_cast<char*>((m_first_page + i) * m_page_size);
 }
 
-void EncryptedFileMapping::mark_unreadable(size_t i) REALM_NOEXCEPT
+void EncryptedFileMapping::mark_unreadable(size_t i) noexcept
 {
     if (i >= m_page_count)
         return;
@@ -369,7 +367,7 @@ void EncryptedFileMapping::mark_unreadable(size_t i) REALM_NOEXCEPT
     }
 }
 
-void EncryptedFileMapping::mark_readable(size_t i) REALM_NOEXCEPT
+void EncryptedFileMapping::mark_readable(size_t i) noexcept
 {
     if (i >= m_read_pages.size() || (m_read_pages[i] && !m_write_pages[i]))
         return;
@@ -379,7 +377,7 @@ void EncryptedFileMapping::mark_readable(size_t i) REALM_NOEXCEPT
     m_write_pages[i] = false;
 }
 
-void EncryptedFileMapping::mark_unwritable(size_t i) REALM_NOEXCEPT
+void EncryptedFileMapping::mark_unwritable(size_t i) noexcept
 {
     if (i >= m_write_pages.size() || !m_write_pages[i])
         return;
@@ -390,7 +388,7 @@ void EncryptedFileMapping::mark_unwritable(size_t i) REALM_NOEXCEPT
     // leave dirty bit set
 }
 
-bool EncryptedFileMapping::copy_read_page(size_t page) REALM_NOEXCEPT
+bool EncryptedFileMapping::copy_read_page(size_t page) noexcept
 {
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
@@ -406,7 +404,7 @@ bool EncryptedFileMapping::copy_read_page(size_t page) REALM_NOEXCEPT
     return false;
 }
 
-void EncryptedFileMapping::read_page(size_t i) REALM_NOEXCEPT
+void EncryptedFileMapping::read_page(size_t i) noexcept
 {
     char* addr = page_addr(i);
     mprotect(addr, m_page_size, PROT_READ | PROT_WRITE);
@@ -419,7 +417,7 @@ void EncryptedFileMapping::read_page(size_t i) REALM_NOEXCEPT
     m_write_pages[i] = false;
 }
 
-void EncryptedFileMapping::write_page(size_t page) REALM_NOEXCEPT
+void EncryptedFileMapping::write_page(size_t page) noexcept
 {
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
@@ -432,13 +430,14 @@ void EncryptedFileMapping::write_page(size_t page) REALM_NOEXCEPT
     m_dirty_pages[page] = true;
 }
 
-void EncryptedFileMapping::validate_page(size_t page) REALM_NOEXCEPT
+void EncryptedFileMapping::validate_page(size_t page) noexcept
 {
 #ifdef REALM_DEBUG
     if (!m_read_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, page * m_page_size, m_validate_buffer.get(), m_page_size))
+    if (!m_file.cryptor.read(m_file.fd, page * m_page_size,
+                             m_validate_buffer.get(), m_page_size))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
@@ -460,7 +459,7 @@ void EncryptedFileMapping::validate_page(size_t page) REALM_NOEXCEPT
 #endif
 }
 
-void EncryptedFileMapping::validate() REALM_NOEXCEPT
+void EncryptedFileMapping::validate() noexcept
 {
 #ifdef REALM_DEBUG
     for (size_t i = 0; i < m_page_count; ++i)
@@ -468,7 +467,7 @@ void EncryptedFileMapping::validate() REALM_NOEXCEPT
 #endif
 }
 
-void EncryptedFileMapping::flush() REALM_NOEXCEPT
+void EncryptedFileMapping::flush() noexcept
 {
     size_t start = 0;
     for (size_t i = 0; i < m_page_count; ++i) {
@@ -495,7 +494,7 @@ void EncryptedFileMapping::flush() REALM_NOEXCEPT
     validate();
 }
 
-void EncryptedFileMapping::sync() REALM_NOEXCEPT
+void EncryptedFileMapping::sync() noexcept
 {
     fsync(m_file.fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
@@ -509,7 +508,7 @@ void EncryptedFileMapping::sync() REALM_NOEXCEPT
     // for a discussion of this related to core data.
 }
 
-void EncryptedFileMapping::handle_access(void* addr) REALM_NOEXCEPT
+void EncryptedFileMapping::handle_access(void* addr) noexcept
 {
     size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
 
@@ -525,20 +524,22 @@ void EncryptedFileMapping::handle_access(void* addr) REALM_NOEXCEPT
     }
 }
 
-void EncryptedFileMapping::set(void* new_addr, size_t new_size)
+void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
-    m_file.cryptor.set_file_size(new_size);
+    REALM_ASSERT(new_file_offset % m_page_size == 0);
     REALM_ASSERT(new_size % m_page_size == 0);
     REALM_ASSERT(new_size > 0);
+
+    m_file.cryptor.set_file_size(new_size + new_file_offset);
 
     bool first_init = m_addr == nullptr;
 
     flush();
     m_addr = new_addr;
-    m_size = new_size;
+    m_file_offset = new_file_offset;
 
-    m_first_page = reinterpret_cast<uintptr_t>(m_addr) / m_page_size;
-    m_page_count = m_size / m_page_size;
+    m_first_page = (reinterpret_cast<uintptr_t>(m_addr) - m_file_offset) / m_page_size;
+    m_page_count = (new_size + m_file_offset) / m_page_size;
 
     m_read_pages.clear();
     m_write_pages.clear();
@@ -548,25 +549,25 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size)
     m_write_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
 
-    if (first_init) {
+    if (first_init && m_file_offset == 0) {
         if (!copy_read_page(0))
-            m_file.cryptor.try_read(m_file.fd, 0, page_addr(0), m_page_size);
+            m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
         mark_readable(0);
-        if (m_page_count > 0)
+        if (m_page_count > 1)
             mprotect(page_addr(1), (m_page_count - 1) * m_page_size, PROT_NONE);
     }
     else
-        mprotect(m_addr, m_page_count * m_page_size, PROT_NONE);
+        mprotect(m_addr, m_page_count * m_page_size - m_file_offset, PROT_NONE);
 }
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) REALM_NOEXCEPT
+File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept
 {
     if (size == 0)
         return 0;
     return fake_offset(size);
 }
 
-File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT
+File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 {
     size_t ps = page_size();
     return real_offset((size + ps - 1) & ~(ps - 1));
@@ -577,12 +578,12 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT
 namespace realm {
 namespace util {
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) REALM_NOEXCEPT
+File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept
 {
     return size;
 }
 
-File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT
+File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 {
     return size;
 }

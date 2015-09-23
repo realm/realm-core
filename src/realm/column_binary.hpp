@@ -37,13 +37,13 @@ public:
 
     BinaryColumn(Allocator&, ref_type, bool nullable = false);
 
-    std::size_t size() const REALM_NOEXCEPT final;
-    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
-    bool is_nullable() const REALM_NOEXCEPT override;
+    std::size_t size() const noexcept final;
+    bool is_empty() const noexcept { return size() == 0; }
+    bool is_nullable() const noexcept override;
 
-    BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT override;
-    StringData get_index_data(std::size_t, char*) const REALM_NOEXCEPT final;
+    BinaryData get(std::size_t ndx) const noexcept;
+    bool is_null(std::size_t ndx) const noexcept override;
+    StringData get_index_data(std::size_t, StringIndex::StringConversionBuffer& ) const noexcept final;
 
     void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -57,7 +57,7 @@ public:
     size_t find_first(BinaryData value) const;
 
     // Requires that the specified entry was inserted as StringData.
-    StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_string(std::size_t ndx) const noexcept;
 
     void add_string(StringData value);
     void set_string(std::size_t ndx, StringData value) override;
@@ -68,7 +68,7 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) REALM_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) noexcept;
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
@@ -78,7 +78,7 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
+    void update_from_parent(std::size_t) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -129,13 +129,13 @@ private:
 
 // Implementation
 
-inline StringData BinaryColumn::get_index_data(std::size_t, char*) const REALM_NOEXCEPT
+inline StringData BinaryColumn::get_index_data(std::size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not implemented for BinaryColumn.");
     REALM_UNREACHABLE();
 }
 
-inline std::size_t BinaryColumn::size() const  REALM_NOEXCEPT
+inline std::size_t BinaryColumn::size() const  noexcept
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
@@ -152,12 +152,12 @@ inline std::size_t BinaryColumn::size() const  REALM_NOEXCEPT
     return m_array->get_bptree_size();
 }
 
-inline bool BinaryColumn::is_nullable() const REALM_NOEXCEPT
+inline bool BinaryColumn::is_nullable() const noexcept
 {
     return m_nullable;
 }
 
-inline void BinaryColumn::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
+inline void BinaryColumn::update_from_parent(std::size_t old_baseline) noexcept
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
@@ -176,7 +176,7 @@ inline void BinaryColumn::update_from_parent(std::size_t old_baseline) REALM_NOE
     m_array->update_from_parent(old_baseline);
 }
 
-inline BinaryData BinaryColumn::get(std::size_t ndx) const REALM_NOEXCEPT
+inline BinaryData BinaryColumn::get(std::size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
@@ -205,12 +205,12 @@ inline BinaryData BinaryColumn::get(std::size_t ndx) const REALM_NOEXCEPT
     return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, alloc);
 }
 
-inline bool BinaryColumn::is_null(std::size_t ndx) const REALM_NOEXCEPT
+inline bool BinaryColumn::is_null(std::size_t ndx) const noexcept
 {
     return get(ndx).is_null();
 }
 
-inline StringData BinaryColumn::get_string(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData BinaryColumn::get_string(std::size_t ndx) const noexcept
 {
     BinaryData bin = get(ndx);
     REALM_ASSERT_3(0, <, bin.size());
@@ -349,7 +349,7 @@ inline void BinaryColumn::insert_string(std::size_t row_ndx, StringData value)
 }
 
 inline std::size_t BinaryColumn::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) REALM_NOEXCEPT
+                                                   Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);

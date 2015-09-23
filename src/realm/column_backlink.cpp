@@ -58,7 +58,7 @@ void BacklinkColumn::add_backlink(size_t row_ndx, size_t origin_row_ndx)
 }
 
 
-size_t BacklinkColumn::get_backlink_count(size_t row_ndx) const REALM_NOEXCEPT
+size_t BacklinkColumn::get_backlink_count(size_t row_ndx) const noexcept
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
 
@@ -74,7 +74,7 @@ size_t BacklinkColumn::get_backlink_count(size_t row_ndx) const REALM_NOEXCEPT
 }
 
 
-size_t BacklinkColumn::get_backlink(size_t row_ndx, size_t backlink_ndx) const REALM_NOEXCEPT
+size_t BacklinkColumn::get_backlink(size_t row_ndx, size_t backlink_ndx) const noexcept
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
     REALM_ASSERT_3(value, !=, 0);
@@ -323,7 +323,7 @@ void BacklinkColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
 }
 
 
-ref_type BacklinkColumn::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
+ref_type BacklinkColumn::get_child_ref(size_t child_ndx) const noexcept
 {
     return IntegerColumn::get_as_ref(child_ndx);
 }

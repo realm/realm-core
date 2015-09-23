@@ -82,7 +82,8 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// found'. It is similar in function to std::string::npos.
 const std::size_t npos = std::size_t(-1);
 
-
+// Maximum number of bytes that the payload of an array can be
+const size_t max_array_payload = 0x00ffffffL;
 
 /// Alias for realm::npos.
 const std::size_t not_found = npos;
@@ -171,12 +172,12 @@ public:
 class ArrayParent
 {
 public:
-    virtual ~ArrayParent() REALM_NOEXCEPT {}
+    virtual ~ArrayParent() noexcept {}
 
 protected:
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
 
-    virtual ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT = 0;
+    virtual ref_type get_child_ref(std::size_t child_ndx) const noexcept = 0;
 
 #ifdef REALM_DEBUG
     // Used only by Array::to_dot().
@@ -242,14 +243,14 @@ public:
 //    bool match(int action, std::size_t index, int64_t value, QueryState *state);
 
     /// Create an array accessor in the unattached state.
-    explicit Array(Allocator&) REALM_NOEXCEPT;
+    explicit Array(Allocator&) noexcept;
 
     // Fastest way to instantiate an array, if you just want to utilize its
     // methods
     struct no_prealloc_tag {};
-    explicit Array(no_prealloc_tag) REALM_NOEXCEPT;
+    explicit Array(no_prealloc_tag) noexcept;
 
-    ~Array() REALM_NOEXCEPT override {}
+    ~Array() noexcept override {}
 
     enum Type {
         type_Normal,
@@ -279,14 +280,14 @@ public:
     /// Reinitialize this array accessor to point to the specified new
     /// underlying memory. This does not modify the parent reference information
     /// of this accessor.
-    void init_from_ref(ref_type) REALM_NOEXCEPT;
+    void init_from_ref(ref_type) noexcept;
 
     /// Same as init_from_ref(ref_type) but avoid the mapping of 'ref' to memory
     /// pointer.
-    void init_from_mem(MemRef) REALM_NOEXCEPT;
+    void init_from_mem(MemRef) noexcept;
 
     /// Same as `init_from_ref(get_ref_from_parent())`.
-    void init_from_parent() REALM_NOEXCEPT;
+    void init_from_parent() noexcept;
 
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
@@ -300,7 +301,7 @@ public:
     ///
     /// Returns true if, and only if the array has changed. If the array has not
     /// changed, then its children are guaranteed to also not have changed.
-    bool update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
+    bool update_from_parent(std::size_t old_baseline) noexcept;
 
     /// Change the type of an already attached array node.
     ///
@@ -313,7 +314,7 @@ public:
     /// underlying memory.
     MemRef clone_deep(Allocator& target_alloc) const;
 
-    void move_assign(Array&) REALM_NOEXCEPT; // Move semantics for assignment
+    void move_assign(Array&) noexcept; // Move semantics for assignment
 
     /// Construct an empty integer array of the specified type, and return just
     /// the reference to the underlying memory.
@@ -336,34 +337,34 @@ public:
                                     Allocator& target_alloc) const;
 
     // Parent tracking
-    bool has_parent() const REALM_NOEXCEPT;
-    ArrayParent* get_parent() const REALM_NOEXCEPT;
+    bool has_parent() const noexcept;
+    ArrayParent* get_parent() const noexcept;
 
     /// Setting a new parent affects ownership of the attached array node, if
     /// any. If a non-null parent is specified, and there was no parent
     /// originally, then the caller passes ownership to the parent, and vice
     /// versa. This assumes, of course, that the change in parentship reflects a
     /// corresponding change in the list of children in the affected parents.
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT;
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept;
 
-    std::size_t get_ndx_in_parent() const REALM_NOEXCEPT;
-    void set_ndx_in_parent(std::size_t) REALM_NOEXCEPT;
-    void adjust_ndx_in_parent(int diff) REALM_NOEXCEPT;
+    std::size_t get_ndx_in_parent() const noexcept;
+    void set_ndx_in_parent(std::size_t) noexcept;
+    void adjust_ndx_in_parent(int diff) noexcept;
 
     /// Get the ref of this array as known to the parent. The caller must ensure
     /// that the parent information ('pointer to parent' and 'index in parent')
     /// is correct before calling this function.
-    ref_type get_ref_from_parent() const REALM_NOEXCEPT;
+    ref_type get_ref_from_parent() const noexcept;
 
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     /// Detach from the underlying array node. This method has no effect if the
     /// accessor is currently unattached (idempotency).
-    void detach() REALM_NOEXCEPT;
+    void detach() noexcept;
 
-    std::size_t size() const REALM_NOEXCEPT;
-    bool is_empty() const REALM_NOEXCEPT;
-    Type get_type() const REALM_NOEXCEPT;
+    std::size_t size() const noexcept;
+    bool is_empty() const noexcept;
+    Type get_type() const noexcept;
 
     static void add_to_column(IntegerColumn* column, int64_t value);
 
@@ -381,15 +382,15 @@ public:
 
     template<std::size_t w> void set(std::size_t ndx, int64_t value);
 
-    int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
-    template<std::size_t w> int64_t get(std::size_t ndx) const REALM_NOEXCEPT;
-    void get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT;
-    template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT;
+    int64_t get(std::size_t ndx) const noexcept;
+    template<std::size_t w> int64_t get(std::size_t ndx) const noexcept;
+    void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
+    template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
-    ref_type get_as_ref(std::size_t ndx) const REALM_NOEXCEPT;
+    ref_type get_as_ref(std::size_t ndx) const noexcept;
 
-    int64_t front() const REALM_NOEXCEPT;
-    int64_t back() const REALM_NOEXCEPT;
+    int64_t front() const noexcept;
+    int64_t back() const noexcept;
 
     /// Remove the element at the specified index, and move elements at higher
     /// indexes to the next lower index.
@@ -520,8 +521,8 @@ public:
     ///
     /// FIXME: It may be worth considering if overall efficiency can be improved
     /// by doing a linear search for short sequences.
-    std::size_t lower_bound_int(int64_t value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_int(int64_t value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_int(int64_t value) const noexcept;
+    std::size_t upper_bound_int(int64_t value) const noexcept;
     //@}
 
     /// \brief Search the \c Array for a value greater or equal than \a target,
@@ -551,7 +552,7 @@ public:
     void preset(std::size_t bitwidth, std::size_t count);
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
-    std::size_t count(int64_t value) const REALM_NOEXCEPT;
+    std::size_t count(int64_t value) const noexcept;
 
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = nullptr) const;
@@ -560,52 +561,52 @@ public:
                  std::size_t* return_ndx = nullptr) const;
 
     /// This information is guaranteed to be cached in the array accessor.
-    bool is_inner_bptree_node() const REALM_NOEXCEPT;
+    bool is_inner_bptree_node() const noexcept;
 
     /// Returns true if type is either type_HasRefs or type_InnerColumnNode.
     ///
     /// This information is guaranteed to be cached in the array accessor.
-    bool has_refs() const REALM_NOEXCEPT;
+    bool has_refs() const noexcept;
 
     /// This information is guaranteed to be cached in the array accessor.
     ///
     /// Columns and indexes can use the context bit to differentiate leaf types.
-    bool get_context_flag() const REALM_NOEXCEPT;
-    void set_context_flag(bool) REALM_NOEXCEPT;
+    bool get_context_flag() const noexcept;
+    void set_context_flag(bool) noexcept;
 
-    ref_type get_ref() const REALM_NOEXCEPT;
-    MemRef get_mem() const REALM_NOEXCEPT;
+    ref_type get_ref() const noexcept;
+    MemRef get_mem() const noexcept;
 
     /// Destroy only the array that this accessor is attached to, not the
     /// children of that array. See non-static destroy_deep() for an
     /// alternative. If this accessor is already in the detached state, this
     /// function has no effect (idempotency).
-    void destroy() REALM_NOEXCEPT;
+    void destroy() noexcept;
 
     /// Recursively destroy children (as if calling
     /// clear_and_destroy_children()), then put this accessor into the detached
     /// state (as if calling detach()), then free the allocated memory. If this
     /// accessor is already in the detached state, this function has no effect
     /// (idempotency).
-    void destroy_deep() REALM_NOEXCEPT;
+    void destroy_deep() noexcept;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
-    static void destroy(ref_type ref, Allocator& alloc) REALM_NOEXCEPT;
+    static void destroy(ref_type ref, Allocator& alloc) noexcept;
 
     /// Destroy only the specified array node, not its children. See also
     /// destroy_deep(MemRef, Allocator&).
-    static void destroy(MemRef, Allocator&) REALM_NOEXCEPT;
+    static void destroy(MemRef, Allocator&) noexcept;
 
     /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
-    static void destroy_deep(ref_type ref, Allocator& alloc) REALM_NOEXCEPT;
+    static void destroy_deep(ref_type ref, Allocator& alloc) noexcept;
 
     /// Destroy the specified array node and all of its children, recursively.
     ///
     /// This is done by freeing the specified array node after calling
     /// destroy_deep() for every contained 'ref' element.
-    static void destroy_deep(MemRef, Allocator&) REALM_NOEXCEPT;
+    static void destroy_deep(MemRef, Allocator&) noexcept;
 
-    Allocator& get_alloc() const REALM_NOEXCEPT { return m_alloc; }
+    Allocator& get_alloc() const noexcept { return m_alloc; }
 
     // Serialization
 
@@ -615,9 +616,6 @@ public:
     /// The number of bytes that will be written by a non-recursive invocation
     /// of this function is exactly the number returned by get_byte_size().
     size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
-
-    /// Compare two arrays for equality.
-    bool compare_int(const Array&) const REALM_NOEXCEPT;
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -746,10 +744,10 @@ public:
     /// the total number of elements in the subtree. The motivation
     /// for removing it, is that it will significantly improve the
     /// efficiency when inserting after, and erasing the last element.
-    std::size_t get_bptree_size() const REALM_NOEXCEPT;
+    std::size_t get_bptree_size() const noexcept;
 
     /// The root must not be a leaf.
-    static std::size_t get_bptree_size_from_header(const char* root_header) REALM_NOEXCEPT;
+    static std::size_t get_bptree_size_from_header(const char* root_header) noexcept;
 
 
     /// Find the leaf node corresponding to the specified element
@@ -772,7 +770,7 @@ public:
     /// points to the the header of the located leaf, and
     /// `ndx_in_leaf` is the local index within that leaf
     /// corresponding to the specified element index.
-    std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const REALM_NOEXCEPT;
+    std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const noexcept;
 
 
     class NodeInfo;
@@ -870,22 +868,22 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static int_fast64_t get(const char* header, std::size_t ndx) REALM_NOEXCEPT;
+    static int_fast64_t get(const char* header, std::size_t ndx) noexcept;
 
     /// Like get(const char*, std::size_t) but gets two consecutive
     /// elements.
     static std::pair<int64_t, int64_t> get_two(const char* header,
-                                                           std::size_t ndx) REALM_NOEXCEPT;
+                                                           std::size_t ndx) noexcept;
 
-    static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) REALM_NOEXCEPT;
+    static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
-    std::size_t get_width() const REALM_NOEXCEPT { return m_width; }
+    std::size_t get_width() const noexcept { return m_width; }
 
-    static char* get_data_from_header(char*) REALM_NOEXCEPT;
-    static char* get_header_from_data(char*) REALM_NOEXCEPT;
-    static const char* get_data_from_header(const char*) REALM_NOEXCEPT;
+    static char* get_data_from_header(char*) noexcept;
+    static char* get_header_from_data(char*) noexcept;
+    static const char* get_data_from_header(const char*) noexcept;
 
     enum WidthType {
         wtype_Bits     = 0,
@@ -893,14 +891,14 @@ public:
         wtype_Ignore   = 2
     };
 
-    static bool get_is_inner_bptree_node_from_header(const char*) REALM_NOEXCEPT;
-    static bool get_hasrefs_from_header(const char*) REALM_NOEXCEPT;
-    static bool get_context_flag_from_header(const char*) REALM_NOEXCEPT;
-    static WidthType get_wtype_from_header(const char*) REALM_NOEXCEPT;
-    static int get_width_from_header(const char*) REALM_NOEXCEPT;
-    static std::size_t get_size_from_header(const char*) REALM_NOEXCEPT;
+    static bool get_is_inner_bptree_node_from_header(const char*) noexcept;
+    static bool get_hasrefs_from_header(const char*) noexcept;
+    static bool get_context_flag_from_header(const char*) noexcept;
+    static WidthType get_wtype_from_header(const char*) noexcept;
+    static int get_width_from_header(const char*) noexcept;
+    static std::size_t get_size_from_header(const char*) noexcept;
 
-    static Type get_type_from_header(const char*) REALM_NOEXCEPT;
+    static Type get_type_from_header(const char*) noexcept;
 
     /// Get the number of bytes currently in use by this array. This
     /// includes the array header, but it does not include allocated
@@ -909,13 +907,13 @@ public:
     ///
     /// This number is exactly the number of bytes that will be
     /// written by a non-recursive invocation of write().
-    std::size_t get_byte_size() const REALM_NOEXCEPT;
+    std::size_t get_byte_size() const noexcept;
 
     /// Get the maximum number of bytes that can be written by a
     /// non-recursive invocation of write() on an array with the
     /// specified number of elements, that is, the maximum value that
     /// can be returned by get_byte_size().
-    static std::size_t get_max_byte_size(std::size_t num_elems) REALM_NOEXCEPT;
+    static std::size_t get_max_byte_size(std::size_t num_elems) noexcept;
 
     /// FIXME: Belongs in IntegerArray
     static std::size_t calc_aligned_byte_size(std::size_t size, int width);
@@ -970,54 +968,54 @@ protected:
     // Includes array header. Not necessarily 8-byte aligned.
     virtual std::size_t calc_byte_len(std::size_t size, std::size_t width) const;
 
-    virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const REALM_NOEXCEPT;
+    virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const noexcept;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
-    bool get_is_inner_bptree_node_from_header() const REALM_NOEXCEPT;
-    bool get_hasrefs_from_header() const REALM_NOEXCEPT;
-    bool get_context_flag_from_header() const REALM_NOEXCEPT;
-    WidthType get_wtype_from_header() const REALM_NOEXCEPT;
-    int get_width_from_header() const REALM_NOEXCEPT;
-    std::size_t get_size_from_header() const REALM_NOEXCEPT;
+    bool get_is_inner_bptree_node_from_header() const noexcept;
+    bool get_hasrefs_from_header() const noexcept;
+    bool get_context_flag_from_header() const noexcept;
+    WidthType get_wtype_from_header() const noexcept;
+    int get_width_from_header() const noexcept;
+    std::size_t get_size_from_header() const noexcept;
 
     // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
-    std::size_t get_capacity_from_header() const REALM_NOEXCEPT;
+    std::size_t get_capacity_from_header() const noexcept;
 
-    void set_header_is_inner_bptree_node(bool value) REALM_NOEXCEPT;
-    void set_header_hasrefs(bool value) REALM_NOEXCEPT;
-    void set_header_context_flag(bool value) REALM_NOEXCEPT;
-    void set_header_wtype(WidthType value) REALM_NOEXCEPT;
-    void set_header_width(int value) REALM_NOEXCEPT;
-    void set_header_size(std::size_t value) REALM_NOEXCEPT;
-    void set_header_capacity(std::size_t value) REALM_NOEXCEPT;
+    void set_header_is_inner_bptree_node(bool value) noexcept;
+    void set_header_hasrefs(bool value) noexcept;
+    void set_header_context_flag(bool value) noexcept;
+    void set_header_wtype(WidthType value) noexcept;
+    void set_header_width(int value) noexcept;
+    void set_header_size(std::size_t value) noexcept;
+    void set_header_capacity(std::size_t value) noexcept;
 
-    static void set_header_is_inner_bptree_node(bool value, char* header) REALM_NOEXCEPT;
-    static void set_header_hasrefs(bool value, char* header) REALM_NOEXCEPT;
-    static void set_header_context_flag(bool value, char* header) REALM_NOEXCEPT;
-    static void set_header_wtype(WidthType value, char* header) REALM_NOEXCEPT;
-    static void set_header_width(int value, char* header) REALM_NOEXCEPT;
-    static void set_header_size(std::size_t value, char* header) REALM_NOEXCEPT;
-    static void set_header_capacity(std::size_t value, char* header) REALM_NOEXCEPT;
+    static void set_header_is_inner_bptree_node(bool value, char* header) noexcept;
+    static void set_header_hasrefs(bool value, char* header) noexcept;
+    static void set_header_context_flag(bool value, char* header) noexcept;
+    static void set_header_wtype(WidthType value, char* header) noexcept;
+    static void set_header_width(int value, char* header) noexcept;
+    static void set_header_size(std::size_t value, char* header) noexcept;
+    static void set_header_capacity(std::size_t value, char* header) noexcept;
 
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs,
                             bool context_flag, WidthType width_type, int width,
-                            std::size_t size, std::size_t capacity) REALM_NOEXCEPT;
+                            std::size_t size, std::size_t capacity) noexcept;
 
 
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     template <std::size_t width>
-    static int_fast64_t lbound_for_width() REALM_NOEXCEPT;
-    static int_fast64_t lbound_for_width(std::size_t width) REALM_NOEXCEPT;
+    static int_fast64_t lbound_for_width() noexcept;
+    static int_fast64_t lbound_for_width(std::size_t width) noexcept;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     template <std::size_t width>
-    static int_fast64_t ubound_for_width() REALM_NOEXCEPT;
-    static int_fast64_t ubound_for_width(std::size_t width) REALM_NOEXCEPT;
+    static int_fast64_t ubound_for_width() noexcept;
+    static int_fast64_t ubound_for_width(std::size_t width) noexcept;
 
-    template<std::size_t width> void set_width() REALM_NOEXCEPT;
-    void set_width(std::size_t) REALM_NOEXCEPT;
+    template<std::size_t width> void set_width() noexcept;
+    void set_width(std::size_t) noexcept;
     void alloc(std::size_t count, std::size_t width);
     void copy_on_write();
 
@@ -1042,21 +1040,21 @@ protected:
     static MemRef clone(MemRef header, Allocator& alloc, Allocator& target_alloc);
 
     /// Get the address of the header of this array.
-    char* get_header() REALM_NOEXCEPT;
+    char* get_header() noexcept;
 
     /// Same as get_byte_size().
-    static std::size_t get_byte_size_from_header(const char*) REALM_NOEXCEPT;
+    static std::size_t get_byte_size_from_header(const char*) noexcept;
 
     // Undefined behavior if array is in immutable memory
-    static std::size_t get_capacity_from_header(const char*) REALM_NOEXCEPT;
+    static std::size_t get_capacity_from_header(const char*) noexcept;
 
     // Overriding method in ArrayParent
     void update_child_ref(std::size_t, ref_type) override;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const REALM_NOEXCEPT override;
+    ref_type get_child_ref(std::size_t) const noexcept override;
 
-    void destroy_children(std::size_t offset = 0) REALM_NOEXCEPT;
+    void destroy_children(std::size_t offset = 0) noexcept;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t>
@@ -1133,7 +1131,7 @@ public:
 class Array::VisitHandler {
 public:
     virtual bool visit(const NodeInfo& leaf_info) = 0;
-    virtual ~VisitHandler() REALM_NOEXCEPT {}
+    virtual ~VisitHandler() noexcept {}
 };
 
 
@@ -1141,7 +1139,7 @@ class Array::UpdateHandler {
 public:
     virtual void update(MemRef, ArrayParent*, std::size_t leaf_ndx_in_parent,
                         std::size_t elem_ndx_in_leaf) = 0;
-    virtual ~UpdateHandler() REALM_NOEXCEPT {}
+    virtual ~UpdateHandler() noexcept {}
 };
 
 
@@ -1161,7 +1159,7 @@ public:
                                  std::size_t leaf_ndx_in_parent,
                                  std::size_t elem_ndx_in_leaf) = 0;
 
-    virtual void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT = 0;
+    virtual void destroy_leaf(MemRef leaf_mem) noexcept = 0;
 
     /// Must replace the current root with the specified leaf. The
     /// implementation of this function must not destroy the
@@ -1176,7 +1174,7 @@ public:
     /// it will be preceeded by a call to erase_leaf_elem().
     virtual void replace_root_by_empty_leaf() = 0;
 
-    virtual ~EraseHandler() REALM_NOEXCEPT {}
+    virtual ~EraseHandler() noexcept {}
 };
 
 
@@ -1344,7 +1342,7 @@ public:
 
 
 
-inline Array::Array(Allocator& alloc) REALM_NOEXCEPT:
+inline Array::Array(Allocator& alloc) noexcept:
     m_alloc(alloc)
 {
 }
@@ -1352,7 +1350,7 @@ inline Array::Array(Allocator& alloc) REALM_NOEXCEPT:
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(no_prealloc_tag) REALM_NOEXCEPT:
+inline Array::Array(no_prealloc_tag) noexcept:
     m_alloc(*static_cast<Allocator*>(0))
 {
 }
@@ -1365,7 +1363,7 @@ inline void Array::create(Type type, bool context_flag, size_t size, int_fast64_
 }
 
 
-inline void Array::init_from_ref(ref_type ref) REALM_NOEXCEPT
+inline void Array::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
@@ -1373,14 +1371,14 @@ inline void Array::init_from_ref(ref_type ref) REALM_NOEXCEPT
 }
 
 
-inline void Array::init_from_parent() REALM_NOEXCEPT
+inline void Array::init_from_parent() noexcept
 {
     ref_type ref = get_ref_from_parent();
     init_from_ref(ref);
 }
 
 
-inline Array::Type Array::get_type() const REALM_NOEXCEPT
+inline Array::Type Array::get_type() const noexcept
 {
     if (m_is_inner_bptree_node) {
         REALM_ASSERT_DEBUG(m_has_refs);
@@ -1392,14 +1390,14 @@ inline Array::Type Array::get_type() const REALM_NOEXCEPT
 }
 
 
-inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
+inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_size);
     (this->*(m_vtable->chunk_getter))(ndx, res);
 }
 
 
-inline int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
+inline int64_t Array::get(std::size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG(ndx < m_size);
@@ -1422,17 +1420,17 @@ inline int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
 */
 }
 
-inline int64_t Array::front() const REALM_NOEXCEPT
+inline int64_t Array::front() const noexcept
 {
     return get(0);
 }
 
-inline int64_t Array::back() const REALM_NOEXCEPT
+inline int64_t Array::back() const noexcept
 {
     return get(m_size - 1);
 }
 
-inline ref_type Array::get_as_ref(std::size_t ndx) const REALM_NOEXCEPT
+inline ref_type Array::get_as_ref(std::size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG(m_has_refs);
@@ -1440,38 +1438,38 @@ inline ref_type Array::get_as_ref(std::size_t ndx) const REALM_NOEXCEPT
     return to_ref(v);
 }
 
-inline bool Array::is_inner_bptree_node() const REALM_NOEXCEPT
+inline bool Array::is_inner_bptree_node() const noexcept
 {
     return m_is_inner_bptree_node;
 }
 
-inline bool Array::has_refs() const REALM_NOEXCEPT
+inline bool Array::has_refs() const noexcept
 {
     return m_has_refs;
 }
 
-inline bool Array::get_context_flag() const REALM_NOEXCEPT
+inline bool Array::get_context_flag() const noexcept
 {
     return m_context_flag;
 }
 
-inline void Array::set_context_flag(bool value) REALM_NOEXCEPT
+inline void Array::set_context_flag(bool value) noexcept
 {
     m_context_flag = value;
     set_header_context_flag(value);
 }
 
-inline ref_type Array::get_ref() const REALM_NOEXCEPT
+inline ref_type Array::get_ref() const noexcept
 {
     return m_ref;
 }
 
-inline MemRef Array::get_mem() const REALM_NOEXCEPT
+inline MemRef Array::get_mem() const noexcept
 {
     return MemRef(get_header_from_data(m_data), m_ref);
 }
 
-inline void Array::destroy() REALM_NOEXCEPT
+inline void Array::destroy() noexcept
 {
     if (!is_attached())
         return;
@@ -1480,7 +1478,7 @@ inline void Array::destroy() REALM_NOEXCEPT
     m_data = nullptr;
 }
 
-inline void Array::destroy_deep() REALM_NOEXCEPT
+inline void Array::destroy_deep() noexcept
 {
     if (!is_attached())
         return;
@@ -1533,22 +1531,22 @@ inline void Array::clear_and_destroy_children()
     truncate_and_destroy_children(0);
 }
 
-inline void Array::destroy(ref_type ref, Allocator& alloc) REALM_NOEXCEPT
+inline void Array::destroy(ref_type ref, Allocator& alloc) noexcept
 {
     destroy(MemRef(ref, alloc), alloc);
 }
 
-inline void Array::destroy(MemRef mem, Allocator& alloc) REALM_NOEXCEPT
+inline void Array::destroy(MemRef mem, Allocator& alloc) noexcept
 {
     alloc.free_(mem);
 }
 
-inline void Array::destroy_deep(ref_type ref, Allocator& alloc) REALM_NOEXCEPT
+inline void Array::destroy_deep(ref_type ref, Allocator& alloc) noexcept
 {
     destroy_deep(MemRef(ref, alloc), alloc);
 }
 
-inline void Array::destroy_deep(MemRef mem, Allocator& alloc) REALM_NOEXCEPT
+inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
 {
     if (!get_hasrefs_from_header(mem.m_addr)) {
         alloc.free_(mem);
@@ -1589,43 +1587,43 @@ inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 
 //-------------------------------------------------
 
-inline bool Array::get_is_inner_bptree_node_from_header(const char* header) REALM_NOEXCEPT
+inline bool Array::get_is_inner_bptree_node_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x80) != 0;
 }
-inline bool Array::get_hasrefs_from_header(const char* header) REALM_NOEXCEPT
+inline bool Array::get_hasrefs_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x40) != 0;
 }
-inline bool Array::get_context_flag_from_header(const char* header) REALM_NOEXCEPT
+inline bool Array::get_context_flag_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x20) != 0;
 }
-inline Array::WidthType Array::get_wtype_from_header(const char* header) REALM_NOEXCEPT
+inline Array::WidthType Array::get_wtype_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return WidthType((int(h[4]) & 0x18) >> 3);
 }
-inline int Array::get_width_from_header(const char* header) REALM_NOEXCEPT
+inline int Array::get_width_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (1 << (int(h[4]) & 0x07)) >> 1;
 }
-inline std::size_t Array::get_size_from_header(const char* header) REALM_NOEXCEPT
+inline std::size_t Array::get_size_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (std::size_t(h[5]) << 16) + (std::size_t(h[6]) << 8) + h[7];
 }
-inline std::size_t Array::get_capacity_from_header(const char* header) REALM_NOEXCEPT
+inline std::size_t Array::get_capacity_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
@@ -1633,72 +1631,72 @@ inline std::size_t Array::get_capacity_from_header(const char* header) REALM_NOE
 }
 
 
-inline char* Array::get_data_from_header(char* header) REALM_NOEXCEPT
+inline char* Array::get_data_from_header(char* header) noexcept
 {
     return header + header_size;
 }
-inline char* Array::get_header_from_data(char* data) REALM_NOEXCEPT
+inline char* Array::get_header_from_data(char* data) noexcept
 {
     return data - header_size;
 }
-inline const char* Array::get_data_from_header(const char* header) REALM_NOEXCEPT
+inline const char* Array::get_data_from_header(const char* header) noexcept
 {
     return get_data_from_header(const_cast<char*>(header));
 }
 
 
-inline bool Array::get_is_inner_bptree_node_from_header() const REALM_NOEXCEPT
+inline bool Array::get_is_inner_bptree_node_from_header() const noexcept
 {
     return get_is_inner_bptree_node_from_header(get_header_from_data(m_data));
 }
-inline bool Array::get_hasrefs_from_header() const REALM_NOEXCEPT
+inline bool Array::get_hasrefs_from_header() const noexcept
 {
     return get_hasrefs_from_header(get_header_from_data(m_data));
 }
-inline bool Array::get_context_flag_from_header() const REALM_NOEXCEPT
+inline bool Array::get_context_flag_from_header() const noexcept
 {
     return get_context_flag_from_header(get_header_from_data(m_data));
 }
-inline Array::WidthType Array::get_wtype_from_header() const REALM_NOEXCEPT
+inline Array::WidthType Array::get_wtype_from_header() const noexcept
 {
     return get_wtype_from_header(get_header_from_data(m_data));
 }
-inline int Array::get_width_from_header() const REALM_NOEXCEPT
+inline int Array::get_width_from_header() const noexcept
 {
     return get_width_from_header(get_header_from_data(m_data));
 }
-inline std::size_t Array::get_size_from_header() const REALM_NOEXCEPT
+inline std::size_t Array::get_size_from_header() const noexcept
 {
     return get_size_from_header(get_header_from_data(m_data));
 }
-inline std::size_t Array::get_capacity_from_header() const REALM_NOEXCEPT
+inline std::size_t Array::get_capacity_from_header() const noexcept
 {
     return get_capacity_from_header(get_header_from_data(m_data));
 }
 
 
-inline void Array::set_header_is_inner_bptree_node(bool value, char* header) REALM_NOEXCEPT
+inline void Array::set_header_is_inner_bptree_node(bool value, char* header) noexcept
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
 }
 
-inline void Array::set_header_hasrefs(bool value, char* header) REALM_NOEXCEPT
+inline void Array::set_header_hasrefs(bool value, char* header) noexcept
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
 }
 
-inline void Array::set_header_context_flag(bool value, char* header) REALM_NOEXCEPT
+inline void Array::set_header_context_flag(bool value, char* header) noexcept
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
 }
 
-inline void Array::set_header_wtype(WidthType value, char* header) REALM_NOEXCEPT
+inline void Array::set_header_wtype(WidthType value, char* header) noexcept
 {
     // Indicates how to calculate size in bytes based on width
     // 0: bits      (width/8) * size
@@ -1709,7 +1707,7 @@ inline void Array::set_header_wtype(WidthType value, char* header) REALM_NOEXCEP
     h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
 }
 
-inline void Array::set_header_width(int value, char* header) REALM_NOEXCEPT
+inline void Array::set_header_width(int value, char* header) noexcept
 {
     // Pack width in 3 bits (log2)
     int w = 0;
@@ -1724,9 +1722,9 @@ inline void Array::set_header_width(int value, char* header) REALM_NOEXCEPT
     h[4] = uchar((int(h[4]) & ~0x7) | w);
 }
 
-inline void Array::set_header_size(std::size_t value, char* header) REALM_NOEXCEPT
+inline void Array::set_header_size(std::size_t value, char* header) noexcept
 {
-    REALM_ASSERT_3(value, <=, 0xFFFFFFL);
+    REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[5] = uchar((value >> 16) & 0x000000FF);
@@ -1735,9 +1733,9 @@ inline void Array::set_header_size(std::size_t value, char* header) REALM_NOEXCE
 }
 
 // Note: There is a copy of this function is test_alloc.cpp
-inline void Array::set_header_capacity(std::size_t value, char* header) REALM_NOEXCEPT
+inline void Array::set_header_capacity(std::size_t value, char* header) noexcept
 {
-    REALM_ASSERT_3(value, <=, 0xFFFFFFL);
+    REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 16) & 0x000000FF);
@@ -1747,37 +1745,37 @@ inline void Array::set_header_capacity(std::size_t value, char* header) REALM_NO
 
 
 
-inline void Array::set_header_is_inner_bptree_node(bool value) REALM_NOEXCEPT
+inline void Array::set_header_is_inner_bptree_node(bool value) noexcept
 {
     set_header_is_inner_bptree_node(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_hasrefs(bool value) REALM_NOEXCEPT
+inline void Array::set_header_hasrefs(bool value) noexcept
 {
     set_header_hasrefs(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_context_flag(bool value) REALM_NOEXCEPT
+inline void Array::set_header_context_flag(bool value) noexcept
 {
     set_header_context_flag(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_wtype(WidthType value) REALM_NOEXCEPT
+inline void Array::set_header_wtype(WidthType value) noexcept
 {
     set_header_wtype(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_width(int value) REALM_NOEXCEPT
+inline void Array::set_header_width(int value) noexcept
 {
     set_header_width(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_size(std::size_t value) REALM_NOEXCEPT
+inline void Array::set_header_size(std::size_t value) noexcept
 {
     set_header_size(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_capacity(std::size_t value) REALM_NOEXCEPT
+inline void Array::set_header_capacity(std::size_t value) noexcept
 {
     set_header_capacity(value, get_header_from_data(m_data));
 }
 
 
-inline Array::Type Array::get_type_from_header(const char* header) REALM_NOEXCEPT
+inline Array::Type Array::get_type_from_header(const char* header) noexcept
 {
     if (get_is_inner_bptree_node_from_header(header))
         return type_InnerBptreeNode;
@@ -1787,13 +1785,13 @@ inline Array::Type Array::get_type_from_header(const char* header) REALM_NOEXCEP
 }
 
 
-inline char* Array::get_header() REALM_NOEXCEPT
+inline char* Array::get_header() noexcept
 {
     return get_header_from_data(m_data);
 }
 
 
-inline std::size_t Array::get_byte_size() const REALM_NOEXCEPT
+inline std::size_t Array::get_byte_size() const noexcept
 {
     std::size_t num_bytes = 0;
     const char* header = get_header_from_data(m_data);
@@ -1838,7 +1836,7 @@ inline std::size_t Array::get_byte_size() const REALM_NOEXCEPT
 }
 
 
-inline std::size_t Array::get_byte_size_from_header(const char* header) REALM_NOEXCEPT
+inline std::size_t Array::get_byte_size_from_header(const char* header) noexcept
 {
     std::size_t num_bytes = 0;
     std::size_t size = get_size_from_header(header);
@@ -1876,7 +1874,7 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) REALM_NO
 
 inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has_refs,
                                bool context_flag, WidthType width_type, int width,
-                               std::size_t size, std::size_t capacity) REALM_NOEXCEPT
+                               std::size_t size, std::size_t capacity) noexcept
 {
     // Note: Since the header layout contains unallocated bit and/or
     // bytes, it is important that we put the entire header into a
@@ -1900,7 +1898,7 @@ inline MemRef Array::clone_deep(Allocator& target_alloc) const
     return clone(MemRef(header, m_ref), m_alloc, target_alloc); // Throws
 }
 
-inline void Array::move_assign(Array& a) REALM_NOEXCEPT
+inline void Array::move_assign(Array& a) noexcept
 {
     REALM_ASSERT_3(&get_alloc(), ==, &a.get_alloc());
     // FIXME: Be carefull with the old parent info here. Should it be
@@ -1929,33 +1927,33 @@ inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int
     return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
-inline bool Array::has_parent() const REALM_NOEXCEPT
+inline bool Array::has_parent() const noexcept
 {
     return m_parent != 0;
 }
 
-inline ArrayParent* Array::get_parent() const REALM_NOEXCEPT
+inline ArrayParent* Array::get_parent() const noexcept
 {
     return m_parent;
 }
 
-inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) REALM_NOEXCEPT
+inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept
 {
     m_parent = parent;
     m_ndx_in_parent = ndx_in_parent;
 }
 
-inline std::size_t Array::get_ndx_in_parent() const REALM_NOEXCEPT
+inline std::size_t Array::get_ndx_in_parent() const noexcept
 {
     return m_ndx_in_parent;
 }
 
-inline void Array::set_ndx_in_parent(std::size_t ndx) REALM_NOEXCEPT
+inline void Array::set_ndx_in_parent(std::size_t ndx) noexcept
 {
     m_ndx_in_parent = ndx;
 }
 
-inline void Array::adjust_ndx_in_parent(int diff) REALM_NOEXCEPT
+inline void Array::adjust_ndx_in_parent(int diff) noexcept
 {
     // Note that `diff` is promoted to an unsigned type, and that
     // C++03 still guarantees the expected result regardless of the
@@ -1963,34 +1961,34 @@ inline void Array::adjust_ndx_in_parent(int diff) REALM_NOEXCEPT
     m_ndx_in_parent += diff;
 }
 
-inline ref_type Array::get_ref_from_parent() const REALM_NOEXCEPT
+inline ref_type Array::get_ref_from_parent() const noexcept
 {
     ref_type ref = m_parent->get_child_ref(m_ndx_in_parent);
     return ref;
 }
 
-inline bool Array::is_attached() const REALM_NOEXCEPT
+inline bool Array::is_attached() const noexcept
 {
     return m_data != nullptr;
 }
 
-inline void Array::detach() REALM_NOEXCEPT
+inline void Array::detach() noexcept
 {
     m_data = nullptr;
 }
 
-inline std::size_t Array::size() const REALM_NOEXCEPT
+inline std::size_t Array::size() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_size;
 }
 
-inline bool Array::is_empty() const REALM_NOEXCEPT
+inline bool Array::is_empty() const noexcept
 {
     return size() == 0;
 }
 
-inline std::size_t Array::get_max_byte_size(std::size_t num_elems) REALM_NOEXCEPT
+inline std::size_t Array::get_max_byte_size(std::size_t num_elems) noexcept
 {
     int max_bytes_per_elem = 8;
     return header_size + num_elems * max_bytes_per_elem; // FIXME: Prone to overflow
@@ -2008,19 +2006,19 @@ inline void Array::update_child_ref(size_t child_ndx, ref_type new_ref)
     set(child_ndx, new_ref);
 }
 
-inline ref_type Array::get_child_ref(size_t child_ndx) const REALM_NOEXCEPT
+inline ref_type Array::get_child_ref(size_t child_ndx) const noexcept
 {
     return get_as_ref(child_ndx);
 }
 
-inline std::size_t Array::get_bptree_size() const REALM_NOEXCEPT
+inline std::size_t Array::get_bptree_size() const noexcept
 {
     REALM_ASSERT_DEBUG(is_inner_bptree_node());
     int_fast64_t v = back();
     return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
-inline std::size_t Array::get_bptree_size_from_header(const char* root_header) REALM_NOEXCEPT
+inline std::size_t Array::get_bptree_size_from_header(const char* root_header) noexcept
 {
     REALM_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
     size_t root_size = get_size_from_header(root_header);
@@ -2174,7 +2172,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 // Finding code                                                                       *
 //*************************************************************************************
 
-template<std::size_t w> int64_t Array::get(std::size_t ndx) const REALM_NOEXCEPT
+template<std::size_t w> int64_t Array::get(std::size_t ndx) const noexcept
 {
     return get_universal<w>(m_data, ndx);
 }

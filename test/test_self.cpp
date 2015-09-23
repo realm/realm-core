@@ -454,7 +454,7 @@ TEST_EX(Failure_Pointer, failure_list, true) // Test #5, accum checks = 93 + 12 
 struct FooException {};
 
 struct BarException: std::exception {
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override
+    const char* what() const noexcept override
     {
         return "bar";
     }

@@ -64,7 +64,7 @@ public:
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
-    virtual ~Query() REALM_NOEXCEPT;
+    virtual ~Query() noexcept;
 
     Query& operator = (const Query& source);
 
@@ -249,8 +249,6 @@ public:
 
     std::string validate();
 
-    mutable bool do_delete;
-
 protected:
     Query(Table& table, TableViewBase* tv = nullptr);
     void create();
@@ -261,31 +259,14 @@ protected:
     size_t peek_tableview(size_t tv_index) const;
     void   update_pointers(ParentNode* p, ParentNode** newnode);
     void handle_pending_not();
+    void set_table(TableRef tr);
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
 
 public:
-    TableRef m_table;
-    std::vector<ParentNode*> first;
-    std::vector<ParentNode**> update;
-    std::vector<ParentNode**> update_override;
-    std::vector<ParentNode**> subtables;
-    std::vector<ParentNode*> all_nodes;
-
-    // points to the base class of the restricting view. If the restricting
-    // view is a link view, m_source_link_view is non-zero. If it is a table view,
-    // m_source_table_view is non-zero.
-    RowIndexes* m_view;
-
-    std::vector<bool> pending_not;
     typedef Query_Handover_patch Handover_patch;
 
-    // Used to access schema while building query:
-    std::vector<size_t> m_subtable_path;
-    ConstDescriptorRef m_current_descriptor;
-    void fetch_descriptor();
-
-    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch, 
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
                                                       ConstSourcePayload mode) const
     {
         patch.reset(new Handover_patch);
@@ -312,6 +293,8 @@ public:
     Query(Query& source, Handover_patch& patch, MutableSourcePayload mode);
 private:
     void copy_nodes(const Query& source);
+    void fetch_descriptor();
+
     template <class ColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class ColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
     template <class ColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
@@ -334,19 +317,40 @@ private:
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
-    void delete_nodes() REALM_NOEXCEPT;
+    void delete_nodes() noexcept;
 
-    void set_table(TableRef tr) { m_table = tr; }
     bool supports_export_for_handover() { return m_view == 0; };
-    std::string error_code;
 
     friend class Table;
     friend class TableViewBase;
+
+    std::string error_code;
+
+    std::vector<ParentNode*> first;
+    std::vector<ParentNode**> update;
+    std::vector<ParentNode**> update_override;
+    std::vector<ParentNode**> subtables;
+    std::vector<ParentNode*> all_nodes;
+
+    std::vector<bool> pending_not;
+
+    // Used to access schema while building query:
+    std::vector<size_t> m_subtable_path;
+
+    ConstDescriptorRef m_current_descriptor;
+    TableRef m_table;
+
+    // points to the base class of the restricting view. If the restricting
+    // view is a link view, m_source_link_view is non-zero. If it is a table view,
+    // m_source_table_view is non-zero.
+    RowIndexes* m_view;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
     LinkViewRef m_source_link_view; // link views are refcounted and shared.
     TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
     bool m_owns_source_table_view; // <--- except when indicated here
+
+    mutable bool do_delete;
 };
 
 // Implementation:

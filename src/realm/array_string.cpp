@@ -188,7 +188,7 @@ size_t ArrayString::calc_byte_len(size_t count, size_t width) const
     return header_size + (count * width);
 }
 
-size_t ArrayString::calc_item_count(size_t bytes, size_t width) const REALM_NOEXCEPT
+size_t ArrayString::calc_item_count(size_t bytes, size_t width) const noexcept
 {
     if (width == 0) return size_t(-1); // zero-width gives infinite space
 
@@ -196,7 +196,7 @@ size_t ArrayString::calc_item_count(size_t bytes, size_t width) const REALM_NOEX
     return bytes_without_header / width;
 }
 
-size_t ArrayString::count(StringData value, size_t begin, size_t end) const REALM_NOEXCEPT
+size_t ArrayString::count(StringData value, size_t begin, size_t end) const noexcept
 {
     size_t num_matches = 0;
 
@@ -212,7 +212,7 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const REAL
     return num_matches;
 }
 
-size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const REALM_NOEXCEPT
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const noexcept
 {
     if (end == size_t(-1))
         end = m_size;
@@ -279,7 +279,7 @@ void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_o
     }
 }
 
-bool ArrayString::compare_string(const ArrayString& c) const REALM_NOEXCEPT
+bool ArrayString::compare_string(const ArrayString& c) const noexcept
 {
     if (c.size() != size())
         return false;

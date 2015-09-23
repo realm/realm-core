@@ -601,8 +601,6 @@ TEST(Descriptor_Links)
 }
 
 
-#if REALM_NULL_STRINGS == 1
-
 TEST(Descriptor_DescriptorEqualityNulls)
 {
     Table t1;
@@ -620,8 +618,6 @@ TEST(Descriptor_DescriptorEqualityNulls)
     CHECK(*t1.get_descriptor() != *t2.get_descriptor());
     CHECK(*t2.get_descriptor() == *t3.get_descriptor());
 }
-
-#endif
 
 
 TEST(Descriptor_SubTableEquality)

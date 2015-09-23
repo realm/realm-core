@@ -29,9 +29,9 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
-    explicit ArrayBigBlobs(Allocator&, bool nullable) REALM_NOEXCEPT;
+    explicit ArrayBigBlobs(Allocator&, bool nullable) noexcept;
 
-    BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
+    BinaryData get(std::size_t ndx) const noexcept;
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void add(BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -41,9 +41,9 @@ public:
     void destroy();
 
     std::size_t count(BinaryData value, bool is_string = false, std::size_t begin = 0,
-                      std::size_t end = npos) const REALM_NOEXCEPT;
+                      std::size_t end = npos) const noexcept;
     std::size_t find_first(BinaryData value, bool is_string = false, std::size_t begin = 0,
-                           std::size_t end = npos) const REALM_NOEXCEPT;
+                           std::size_t end = npos) const noexcept;
     void find_all(IntegerColumn& result, BinaryData value, bool is_string = false,
                   std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = npos);
@@ -52,7 +52,7 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static BinaryData get(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
+    static BinaryData get(const char* header, std::size_t ndx, Allocator&) noexcept;
 
     ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
@@ -61,11 +61,11 @@ public:
     /// Those that return a string, discard the terminating zero from
     /// the stored value. Those that accept a string argument, add a
     /// terminating zero before storing the value.
-    StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get_string(std::size_t ndx) const noexcept;
     void add_string(StringData value);
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
-    static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool nullable) REALM_NOEXCEPT;
+    static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool nullable) noexcept;
     ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
     //@}
 
@@ -94,12 +94,12 @@ private:
 
 // Implementation:
 
-inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc, bool nullable) REALM_NOEXCEPT:
+inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc, bool nullable) noexcept:
                                     Array(alloc), m_nullable(nullable)
 {
 }
 
-inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const REALM_NOEXCEPT
+inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const noexcept
 {
     ref_type ref = get_as_ref(ndx);
     if (ref == 0)
@@ -112,7 +112,7 @@ inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const REALM_NOEXCEPT
 }
 
 inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
-                                     Allocator& alloc) REALM_NOEXCEPT
+                                     Allocator& alloc) noexcept
 {
     ref_type blob_ref = to_ref(Array::get(header, ndx));
     if (blob_ref == 0)
@@ -148,7 +148,7 @@ inline void ArrayBigBlobs::destroy()
     Array::destroy_deep();
 }
 
-inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const REALM_NOEXCEPT
+inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const noexcept
 {
     BinaryData bin = get(ndx);
     if (bin.is_null())
@@ -182,7 +182,7 @@ inline void ArrayBigBlobs::insert_string(std::size_t ndx, StringData value)
 }
 
 inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
-                                            Allocator& alloc, bool nullable) REALM_NOEXCEPT
+                                            Allocator& alloc, bool nullable) noexcept
 {
     static_cast<void>(nullable);
     BinaryData bin = get(header, ndx, alloc);

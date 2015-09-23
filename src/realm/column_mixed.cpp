@@ -8,12 +8,12 @@ using namespace realm;
 using namespace realm::util;
 
 
-MixedColumn::~MixedColumn() REALM_NOEXCEPT
+MixedColumn::~MixedColumn() noexcept
 {
 }
 
 
-void MixedColumn::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void MixedColumn::update_from_parent(size_t old_baseline) noexcept
 {
     if (!get_root_array()->update_from_parent(old_baseline))
         return;
@@ -178,7 +178,7 @@ void MixedColumn::do_clear(size_t num_rows)
 }
 
 
-DataType MixedColumn::get_type(size_t ndx) const REALM_NOEXCEPT
+DataType MixedColumn::get_type(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
@@ -306,7 +306,7 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
 }
 
 
-void MixedColumn::do_discard_child_accessors() REALM_NOEXCEPT
+void MixedColumn::do_discard_child_accessors() noexcept
 {
     discard_child_accessors();
 }
