@@ -528,6 +528,7 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
+
     if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
     }
@@ -536,9 +537,12 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
         if (r == ETIMEDOUT)
             return;
     }
+
     if (REALM_LIKELY(r == 0))
         return;
+
     handle_wait_error(r);
+
     try {
         recover_func(); // Throws
         m.mark_as_consistent();

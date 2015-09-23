@@ -2,10 +2,12 @@
 
 ### Bugfixes:
 
-* Fixed a crash bug that could be triggered if a Realm is rapidly opened
-  and closed and reopened many times on multiple threads. The bug caused
-  the internal version information structure to overflow, causing an assert
-  or a crash (if assert was disabled).
+* Fixed a crash bug that could be triggered if a Realm is rapidly opened and
+  closed and reopened many times on multiple threads. The bug caused the
+  internal version information structure to overflow, causing an assert or a
+  crash (if assert was disabled).
+* The error handling for `pthread_cond_wait()/pthread_cond_timedwait()`
+  incorrectly attributed the failure to `pthread_mutex_lock()`.
 
 ### API breaking changes:
 
@@ -13,14 +15,20 @@
 
 ### Enhancements:
 
-* Comparisons involving unary links on each side of the operator are now supported
-  by query_expression.hpp.
+* Comparisons involving unary links on each side of the operator are now
+  supported by query_expression.hpp.
+* Added version chunk information and failure reason for
+  `pthread_mutex_lock()`.
+* Termination routines now always display the library's version before the
+  error message.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* All calls to `REALM_TERMINATE` or `util::terminate()` now display the
+  library's version. It is no longer necessary to include `REALM_VER_CHUNK` in
+  calls to those functions.
 
 ----------------------------------------------
 

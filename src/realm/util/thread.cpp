@@ -169,9 +169,16 @@ REALM_NORETURN void Mutex::destroy_failed(int err) noexcept
 
 REALM_NORETURN void Mutex::lock_failed(int err) noexcept
 {
-    if (err == EDEADLK)
-        REALM_TERMINATE("Recursive locking of mutex");
-    REALM_TERMINATE("pthread_mutex_lock() failed");
+    switch (err) {
+        case EDEADLK:
+            REALM_TERMINATE("pthread_mutex_lock() failed: Recursive locking of mutex (deadlock)");
+        case EINVAL:
+            REALM_TERMINATE("pthread_mutex_lock() failed: Invalid mutex object provided");
+        case EAGAIN:
+            REALM_TERMINATE("pthread_mutex_lock() failed: Maximum number of recursive locks exceeded");
+        default:
+            REALM_TERMINATE("pthread_mutex_lock() failed");
+    }
 }
 
 
@@ -254,15 +261,21 @@ REALM_NORETURN void CondVar::init_failed(int err)
 
 void CondVar::handle_wait_error(int err)
 {
+    switch (err) {
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
-    if (err == ENOTRECOVERABLE)
-        throw RobustMutex::NotRecoverable();
-    if (err == EOWNERDEAD)
-        return;
-#else
-    static_cast<void>(err);
+        case ENOTRECOVERABLE:
+            throw RobustMutex::NotRecoverable();
+        case EOWNERDEAD:
+            return;
 #endif
-    REALM_TERMINATE("pthread_mutex_lock() failed");
+        case EINVAL:
+            REALM_TERMINATE("pthread_cond_wait()/pthread_cond_timedwait() failed: Invalid argument provided");
+        case EPERM:
+            REALM_TERMINATE("pthread_cond_wait()/pthread_cond_timedwait() failed:"
+                            "Mutex not owned by calling thread");
+        default:
+            REALM_TERMINATE("pthread_cond_wait()/pthread_cond_timedwait() failed");
+    }
 }
 
 REALM_NORETURN void CondVar::attr_init_failed(int err)

@@ -22,7 +22,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
-#include <realm/version.hpp>
 
 #if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
 #  define REALM_ASSERTIONS_ENABLED 1
@@ -30,7 +29,7 @@
 
 #define REALM_ASSERT_RELEASE(condition) \
     ((condition) ? static_cast<void>(0) : \
-    realm::util::terminate(REALM_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
+    realm::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 
 #if REALM_ASSERTIONS_ENABLED
 #  define REALM_ASSERT(condition) REALM_ASSERT_RELEASE(condition)
@@ -49,18 +48,18 @@
 #if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
 #  define REALM_ASSERT_3(left, condition, right) \
     ((left condition right) ? static_cast<void>(0) : \
-        realm::util::terminate(REALM_VER_CHUNK " Assertion failed: " #left " " #condition " " #right, \
-                                 __FILE__, __LINE__, left, right))
+        realm::util::terminate("Assertion failed: " #left " " #condition " " #right, \
+                               __FILE__, __LINE__, left, right))
 
 #  define REALM_ASSERT_7(left1, condition1, right1, logical, left2, condition2, right2) \
     ((left1 condition1 right1 logical left2 condition2 right2) ? static_cast<void>(0) : \
-        realm::util::terminate(REALM_VER_CHUNK " Assertion failed: " #left1 " " #condition1 " " #right1 " " #logical " " #left2 " " #condition2 " " #right2, \
-                                 __FILE__, __LINE__, left1, right1, left2, right2))
+        realm::util::terminate("Assertion failed: " #left1 " " #condition1 " " #right1 " " #logical " " #left2 " " #condition2 " " #right2, \
+                               __FILE__, __LINE__, left1, right1, left2, right2))
 
 #  define REALM_ASSERT_11(left1, condition1, right1, logical1, left2, condition2, right2, logical2, left3, condition3, right3) \
     ((left1 condition1 right1 logical1 left2 condition2 right2 logical2 left3 condition3 right3) ? static_cast<void>(0) : \
-        realm::util::terminate(REALM_VER_CHUNK " Assertion failed: " #left1 " " #condition1 " " #right1 " " #logical1 " " #left2 " " #condition2 " " #right2 " " #logical2 " " #left3 " " #condition3 " " #right3, \
-                                 __FILE__, __LINE__, left1, right1, left2, right2, left3, right3))
+        realm::util::terminate("Assertion failed: " #left1 " " #condition1 " " #right1 " " #logical1 " " #left2 " " #condition2 " " #right2 " " #logical2 " " #left3 " " #condition3 " " #right3, \
+                               __FILE__, __LINE__, left1, right1, left2, right2, left3, right3))
 #else
 #  define REALM_ASSERT_3(left, condition, right) static_cast<void>(0)
 #  define REALM_ASSERT_7(left1, condition1, right1, logical, left2, condition2, right2) static_cast<void>(0)
@@ -68,7 +67,7 @@
 #endif
 
 #define REALM_UNREACHABLE() \
-    realm::util::terminate(REALM_VER_CHUNK " Unreachable code", __FILE__, __LINE__)
+    realm::util::terminate("Unreachable code", __FILE__, __LINE__)
 
 
 #ifdef REALM_HAVE_CXX11_STATIC_ASSERT

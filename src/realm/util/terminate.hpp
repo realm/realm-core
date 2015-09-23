@@ -20,11 +20,11 @@
 #ifndef REALM_UTIL_TERMINATE_HPP
 #define REALM_UTIL_TERMINATE_HPP
 
-#include <sstream>
 #include <cstdlib>
-#include <string>
-#include <stdint.h>
+#include <sstream>
+
 #include <realm/util/features.h>
+#include <realm/version.hpp>
 
 #define REALM_TERMINATE(msg) realm::util::terminate((msg), __FILE__, __LINE__)
 
@@ -32,30 +32,22 @@ namespace realm {
 namespace util {
 REALM_NORETURN void terminate_internal(std::stringstream&) noexcept;
 
-REALM_NORETURN inline void terminate(const char* message, const char* file, long line) noexcept {
-    std::stringstream ss;
-    ss << file << ":" << line << ": " << message << "\n";
-    terminate_internal(ss);
-}
+REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept;
 
-template <typename T1, typename T2>
-REALM_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2) noexcept {
+template<class T, class... Ts>
+REALM_NORETURN void terminate(const char* message, const char* file, long line,
+                              T first_info, Ts... other_infos) noexcept
+{
     std::stringstream ss;
-    ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << "]\n";
-    terminate_internal(ss);
-}
+    using variadics_unpacker = int[];
 
-template <typename T1, typename T2, typename T3, typename T4>
-REALM_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2, T3 info3, T4 info4) noexcept {
-    std::stringstream ss;
-    ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << ", " << info3 << ", " << info4 << "]\n";
-    terminate_internal(ss);
-}
+    static_assert(sizeof...(other_infos) == 1 || sizeof...(other_infos) == 3 || sizeof...(other_infos) == 5,
+                  "Called realm::util::terminate() with wrong number of arguments");
 
-template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-REALM_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2, T3 info3, T4 info4, T5 info5, T6 info6) noexcept {
-    std::stringstream ss;
-    ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << ", " << info3 << ", " << info4 << ", " << info5 << ", " << info6 << "]\n";
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " [" << first_info;
+    (void) variadics_unpacker { 0, (ss << ", " << other_infos, void(), 0)... };
+    ss << "]" << '\n';
+
     terminate_internal(ss);
 }
 
