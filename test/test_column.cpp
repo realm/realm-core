@@ -8,6 +8,7 @@
 #include <realm/column.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/column_tpl.hpp>
+#include <realm/column_date.hpp>
 
 #include "test.hpp"
 
@@ -44,6 +45,17 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+// todo, move into own test file
+ONLY(UniversalDate)
+{
+    ref_type ref_types = IntegerColumn::create(Allocator::get_default());
+    ref_type ref_dates = IntegerColumn::create(Allocator::get_default());
+    ref_type ref_extra = IntegerColumn::create(Allocator::get_default());
+    DateColumn dc(Allocator::get_default(), ref_types, ref_dates, ref_extra);
+
+    dc.add(0);
+    float f = dc.get(0);
+}
 
 TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
 {

@@ -116,6 +116,7 @@
     <ClCompile Include="..\..\src\realm\impl\simulated_failure.cpp" />
     <ClCompile Include="..\..\test\test_optional.cpp" />
     <ClCompile Include="..\..\src\realm\disable_sync_to_disk.cpp" />
+    <ClCompile Include="..\..\src\realm\column_date.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
@@ -225,6 +226,8 @@
     <ClInclude Include="..\..\src\realm\util\optional.hpp" />
     <ClInclude Include="..\..\src\realm\impl\simulated_failure.hpp" />
     <ClInclude Include="..\..\src\realm\disable_sync_to_disk.hpp" />
+    <ClInclude Include="..\..\src\realm\column_date.hpp" />
+    <ClInclude Include="..\..\src\realm\universal_date.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
