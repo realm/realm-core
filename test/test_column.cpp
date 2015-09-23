@@ -48,8 +48,10 @@ using namespace realm::test_util;
 // todo, move into own test file
 ONLY(UniversalDate)
 {
-    ref_type ref = DateColumn::create(Allocator::get_default());
-    DateColumn dc(Allocator::get_default(), ref);
+    ref_type ref_types = IntegerColumn::create(Allocator::get_default());
+    ref_type ref_dates = IntegerColumn::create(Allocator::get_default());
+    ref_type ref_extra = IntegerColumn::create(Allocator::get_default());
+    DateColumn dc(Allocator::get_default(), ref_types, ref_dates, ref_extra);
 
     dc.add(0);
     float f = dc.get(0);
