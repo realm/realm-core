@@ -11,7 +11,9 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Free-standing functions `util::network::write()` and
+  `util::network::async_write()` converted to members of
+  `util::network::socket`.
 
 ### Enhancements:
 
@@ -29,6 +31,12 @@
 * All calls to `REALM_TERMINATE` or `util::terminate()` now display the
   library's version. It is no longer necessary to include `REALM_VER_CHUNK` in
   calls to those functions.
+* Various bug fixes in `util::network`, most notably, asynchronous operations
+  that complete immediately can now be canceled.
+* Improved documentation in `util::network`.
+* Improved exception safety in `util::network`.
+* `util::network::socket_base::close()` is now `noexcept`.
+* New `util::network::socket_base::cancel()`.
 
 ----------------------------------------------
 
