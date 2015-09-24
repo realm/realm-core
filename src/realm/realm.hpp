@@ -39,27 +39,24 @@ public:
         bool allow_file_format_upgrade = true;
     }
 
-    // Delete it.
-    virtual ~Realm();
-
-    // Attach a Realm to a specific file with selected policies
-    void open(const std::string& file, Config& cfg, const char* encryption_key = 0);
-
-    // Close the Realm, detaching it from any file.
-    void close();
-
-    bool is_attached();
-
     // Get a snapshot
     std::shared_ptr<Snapshot> get_newest_snapshot();
 
-    std::shared_ptr<Transaction> build_new_snapshot();
+    // Get a transaction in read-only mode
+    std::shared_ptr<Transaction> get_read_transaction();
 
-    // Check if a newer snapshot has become available
-    bool newer_snapshot_available();
+    // Get a transaction in writable mode
+    std::shared_ptr<Transaction> get_write_transaction();
+
+    // Delete it. The Realm object is reference counted and kept
+    // alive by any Snapshots or Transactions it has handed out.
+    // It is not possible to close or detach access to the database
+    // directly on the Realm object. Instead you must close all
+    // relevant Snapshots and Transactions.
+    virtual ~Realm();
 };
 
 
-std::unique_ptr<Realm> make_realm();
+std::unique_ptr<Realm> make_realm(const std::string file, Realm::Config& cfg, const char* encryption_key = 0);
 
 #endif

@@ -30,23 +30,55 @@ public:
     // Close snapshot access to the file. This will cause subsequent access through
     // accessors obtained from the Snapshot to fail. The actual Snapshot object
     // is ref-counted and remains available until all its accessors have
-    // been deallocated.
+    // been deallocated. Closing a Snapshot early (before all its accessors
+    // have been deleted) may lower use of database space, because it allows
+    // earlier release of memory used for old Snapshots.
     void close();
 
     ~Snapshot();
 };
 
 class Transaction {
+public:
     // Accessor manipulation goes through a Group object. The Group object
-    // is still owned by and dies with the Snapshot.
+    // is still owned by and dies with the Transaction.
     Group& get_group();
 
+    // If the transaction is in read-only mode, it can be made to "view"
+    // a specific database state. The specific state is indicated by a
+    // Snapshot. All applicable accessors are retained. The specific
+    // "view" requested must be the same or later than the one already
+    // "seen" by the Transaction.
+    void advance_to_snapshot(std::shared_ptr<Snapshot>);
+
+    // just advance to the latest snapshot available from the database
+    void advance_to_latest_snapshot();
+
+    // If the transaction is in read-only mode, it can be turned into a writable
+    // transaction by promote_to_write(). All accessors are retained and allow
+    // mutating operations until commit() or rollback() is called. As a side
+    // effect the transaction is first advanced (as in advance_to_snapshot()) to
+    // match the latest commit in the database.
+    void promote_to_write();
+
     // Commit any changes done through accessors obtained from the Transaction
-    // to the database. Then close the Snapshot.
+    // to the database. All accessors are retained, but after commit they allow
+    // only read access.
     void commit();
 
-    // Close the Snapshot without committing changes to the database.
+    // Abort any changes made since promote_to_write(). Accessors are retained
+    // but now allow only read access.
     void rollback();
+
+    // void close(). If in writable mode first do rollback. Then mark the
+    // Transaction as closed. This causes all accessors referring to it to
+    // become detached. A closed transaction cannot be reused.
+    void close();
+
+    // destroy the transaction. If needed, automatically call close() first.
+    // As the transaction is a refcounted object, the destructor cannot be
+    // called before all its accessors are dead.
+    virtual ~Transaction();
 };
 
 
@@ -64,7 +96,9 @@ public:
 class ScopedTransaction {
 public:
     ScopedTransaction(std::shared_ptr<Transaction>);
-    void release();
+    void commit();
+    void rollback();
+    void promote_to_write();
     ~ScopedTransaction();
 };
 
