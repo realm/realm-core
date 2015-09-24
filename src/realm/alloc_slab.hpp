@@ -67,15 +67,11 @@ public:
     ///       character to all strings except the null string, to be able to distinguish between null and
     ///       empty string.
 
-#if REALM_NULL_STRINGS == 1
     // Bumped to 3 because of null support of String columns and because of new format of index
     static constexpr int library_file_format = 3;
-#else
-    static constexpr int library_file_format = 2;
-#endif
 
-    ~SlabAlloc() REALM_NOEXCEPT override;
-
+    ~SlabAlloc() noexcept override;
+    SlabAlloc();
     /// Attach this allocator to the specified file.
     ///
     /// When used by free-standing Group instances, no concurrency is
@@ -85,6 +81,9 @@ public:
     ///
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
+    ///
+    /// Except for \a path, the parameters are passed in through a
+    /// configuration object.
     ///
     /// \param is_shared Must be true if, and only if we are called on
     /// behalf of SharedGroup.
@@ -108,11 +107,26 @@ public:
     /// that the database was created with the same setting. In case of conflict
     /// a runtime_error is thrown.
     ///
+    /// \param session_initiator if set, the caller is the session initiator and
+    /// guarantees exclusive access to the file. If attaching in read/write mode,
+    /// the file is modified: files on streaming form is changed to non-streaming
+    /// form, and if needed the file size is adjusted to match mmap boundaries.
+    /// Must be set to false if is_shared is false.
+    ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
-    ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate, const char* encryption_key, bool server_sync_mode);
+    struct Config {
+        bool is_shared = false;
+        bool read_only = false;
+        bool no_create = false;
+        bool skip_validate = false;
+        bool server_sync_mode = false;
+        bool session_initiator = false;
+        const char* encryption_key = 0;
+    };
+
+    ref_type attach_file(const std::string& path, Config& cfg);
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -128,7 +142,7 @@ public:
 
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
-    int get_committed_file_format() const REALM_NOEXCEPT;
+    int get_committed_file_format() const noexcept;
 
     /// Attach this allocator to an empty buffer.
     ///
@@ -144,7 +158,7 @@ public:
     ///
     /// This function has no effect if the allocator is already in the
     /// detached state (idempotency).
-    void detach() REALM_NOEXCEPT;
+    void detach() noexcept;
 
     class DetachGuard;
 
@@ -154,40 +168,21 @@ public:
     /// one that is not attached using attach_buffer(), or one for
     /// which this function has already been called during the latest
     /// attachment.
-    void own_buffer() REALM_NOEXCEPT;
+    void own_buffer() noexcept;
 
     /// Returns true if, and only if this allocator is currently
     /// in the attached state.
-    bool is_attached() const REALM_NOEXCEPT;
+    bool is_attached() const noexcept;
 
     /// Returns true if, and only if this allocator is currently in
     /// the attached state and attachment was not established using
     /// attach_empty().
-    bool nonempty_attachment() const REALM_NOEXCEPT;
+    bool nonempty_attachment() const noexcept;
 
-    /// Convert the attached file if the top-ref is not specified in
-    /// the header, but in the footer, that is, if the file is on the
-    /// streaming form. The streaming form is incompatible with
-    /// in-place file modification.
-    ///
-    /// If validation was disabled at the time the file was attached,
-    /// this function does nothing, as it assumes that the file is
-    /// already prepared for update in that case.
-    ///
-    /// It is an error to call this function on an allocator that is
-    /// not attached to a file. Doing so will result in undefined
-    /// behavior.
-    ///
-    /// The caller must ensure that the file is not accessed
-    /// concurrently by anyone else while this function executes.
-    ///
-    /// The specified address must be a writable memory mapping of the
-    /// attached file, and the mapped region must be at least as big
-    /// as what is returned by get_baseline().
-    void prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
-
-    /// Resize the file that this allocator is attached to using
-    /// File::prealloc(), and then call File::sync().
+    /// Reserve disk space now to avoid allocation errors at a later
+    /// point in time, and to minimize on-disk fragmentation. In some
+    /// cases, less fragmentation translates into improved
+    /// performance. On flash or SSD-drives this is likely a waste.
     ///
     /// Note: File::prealloc() may misbehave under race conditions (see
     /// documentation of File::prealloc()). For that reason, to avoid race
@@ -204,7 +199,8 @@ public:
 
     /// Reserve disk space now to avoid allocation errors at a later point in
     /// time, and to minimize on-disk fragmentation. In some cases, less
-    /// fragmentation translates into improved performance.
+    /// fragmentation translates into improved performance. On SSD-drives
+    /// preallocation is likely a waste.
     ///
     /// When supported by the system, a call to this function will make the
     /// database file at least as big as the specified size, and cause space on
@@ -229,14 +225,14 @@ public:
     /// It is an error to call this function on a detached allocator,
     /// or one that was attached using attach_empty(). Doing so will
     /// result in undefined behavior.
-    std::size_t get_baseline() const REALM_NOEXCEPT;
+    std::size_t get_baseline() const noexcept;
 
     /// Get the total amount of managed memory. This is the baseline plus the
     /// sum of the sizes of the allocated slabs. It includes any free space.
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
-    std::size_t get_total_size() const REALM_NOEXCEPT;
+    std::size_t get_total_size() const noexcept;
 
     /// Mark all managed memory (except the attached file) as free
     /// space.
@@ -250,9 +246,12 @@ public:
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
-    /// \return True if, and only if the memory address of the first
-    /// mapped byte has changed.
-    bool remap(std::size_t file_size);
+    /// The file_size argument must be aligned to a *section* boundary:
+    /// The database file is logically split into sections, each section
+    /// guaranteed to be mapped as a contiguous address range. The allocation
+    /// of memory in the file must ensure that no allocation crosses the
+    /// boundary between two sections.
+    void remap(std::size_t file_size);
 
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
@@ -266,8 +265,8 @@ protected:
     MemRef do_realloc(ref_type, const char*, std::size_t old_size,
                     std::size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void do_free(ref_type, const char*) REALM_NOEXCEPT override;
-    char* do_translate(ref_type) const REALM_NOEXCEPT override;
+    void do_free(ref_type, const char*) noexcept override;
+    char* do_translate(ref_type) const noexcept override;
 
 private:
     enum AttachMode {
@@ -329,7 +328,22 @@ private:
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
     util::File m_file;
-    char* m_data;
+
+    // The initial mapping is determined by m_data and m_initial_mapping_size,
+    // we don't use a util::File::Map for that to stay compatible with the uses
+    // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
+    char* m_data = nullptr;
+    std::size_t m_initial_mapping_size = 0;
+    // additional sections beyond those covered by the initial mapping, are
+    // managed as separate mmap allocations, each covering one section.
+    std::size_t m_first_additional_mapping = 0;
+    std::size_t m_num_additional_mappings = 0;
+    std::size_t m_capacity_additional_mappings = 0;
+    std::size_t m_initial_section_size = 0;
+    int m_section_shifts = 0;
+    std::unique_ptr<util::File::Map<char>[]> m_additional_mappings;
+    std::unique_ptr<std::size_t[]> m_section_bases;
+    int m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
 
     /// If a file or buffer is currently attached and validation was
@@ -383,32 +397,58 @@ private:
     void validate_buffer(const char* data, std::size_t len, const std::string& path,
                          ref_type& top_ref, bool is_shared);
 
-    void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
-
     class ChunkRefEq;
     class ChunkRefEndEq;
     class SlabRefEndEq;
-    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) REALM_NOEXCEPT;
+    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
-    Replication* get_replication() const REALM_NOEXCEPT { return m_replication; }
-    void set_replication(Replication* r) REALM_NOEXCEPT { m_replication = r; }
+    Replication* get_replication() const noexcept { return m_replication; }
+    void set_replication(Replication* r) noexcept { m_replication = r; }
+
+    /// Returns the first section boundary *above* the given position.
+    std::size_t get_upper_section_boundary(std::size_t start_pos) const noexcept;
+
+    /// Returns the first section boundary *at or below* the given position.
+    std::size_t get_lower_section_boundary(std::size_t start_pos) const noexcept;
+
+    /// Returns true if the given position is at a section boundary
+    bool matches_section_boundary(std::size_t pos) const noexcept;
+
+    /// Returns the index of the section holding a given address.
+    /// The section index is determined solely by the minimal section size,
+    /// and does not necessarily reflect the mapping. A mapping may
+    /// cover multiple sections - the initial mapping often does.
+    std::size_t get_section_index(std::size_t pos) const noexcept;
+
+    /// Reverse: get the base offset of a section at a given index. Since the
+    /// computation is very time critical, this method just looks it up in
+    /// a table. The actual computation and setup of that table is done
+    /// during initialization with the help of compute_section_base() below.
+    inline std::size_t get_section_base(std::size_t index) const noexcept;
+
+    /// Actually compute the starting offset of a section. Only used to initialize
+    /// a table of predefined results, which are then used by get_section_base().
+    std::size_t compute_section_base(std::size_t index) const noexcept;
+
+    /// Find a possible allocation of 'request_size' that will fit into a section
+    /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
+    /// If found return the position, if not return 0.
+    std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size, 
+                                      std::size_t request_size) const noexcept;
 
     friend class Group;
     friend class GroupWriter;
-    friend class SharedGroup;
 };
 
 
 class SlabAlloc::DetachGuard {
 public:
-    DetachGuard(SlabAlloc& alloc) REALM_NOEXCEPT: m_alloc(&alloc) {}
-    ~DetachGuard() REALM_NOEXCEPT;
-    SlabAlloc* release() REALM_NOEXCEPT;
+    DetachGuard(SlabAlloc& alloc) noexcept: m_alloc(&alloc) {}
+    ~DetachGuard() noexcept;
+    SlabAlloc* release() noexcept;
 private:
     SlabAlloc* m_alloc;
 };
-
-
 
 
 
@@ -421,7 +461,7 @@ struct InvalidDatabase: util::File::AccessError {
     }
 };
 
-inline void SlabAlloc::own_buffer() REALM_NOEXCEPT
+inline void SlabAlloc::own_buffer() noexcept
 {
     REALM_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
     REALM_ASSERT(m_data);
@@ -429,28 +469,20 @@ inline void SlabAlloc::own_buffer() REALM_NOEXCEPT
     m_attach_mode = attach_OwnedBuffer;
 }
 
-inline bool SlabAlloc::is_attached() const REALM_NOEXCEPT
+inline bool SlabAlloc::is_attached() const noexcept
 {
     return m_attach_mode != attach_None;
 }
 
-inline bool SlabAlloc::nonempty_attachment() const REALM_NOEXCEPT
+inline bool SlabAlloc::nonempty_attachment() const noexcept
 {
     return is_attached() && m_data;
 }
 
-inline std::size_t SlabAlloc::get_baseline() const REALM_NOEXCEPT
+inline std::size_t SlabAlloc::get_baseline() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_baseline;
-}
-
-inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
-{
-    REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    if (REALM_LIKELY(!m_file_on_streaming_form))
-        return;
-    do_prepare_for_update(mutable_data, mapping);
 }
 
 inline void SlabAlloc::resize_file(size_t new_file_size)
@@ -469,22 +501,42 @@ inline void SlabAlloc::reserve_disk_space(size_t size)
         m_file.sync(); // Throws
 }
 
-inline SlabAlloc::DetachGuard::~DetachGuard() REALM_NOEXCEPT
+inline SlabAlloc::DetachGuard::~DetachGuard() noexcept
 {
     if (m_alloc)
         m_alloc->detach();
 }
 
-inline SlabAlloc* SlabAlloc::DetachGuard::release() REALM_NOEXCEPT
+inline SlabAlloc* SlabAlloc::DetachGuard::release() noexcept
 {
     SlabAlloc* alloc = m_alloc;
     m_alloc = nullptr;
     return alloc;
 }
 
-inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab) REALM_NOEXCEPT
+inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab) noexcept
 {
     return ref < slab.ref_end;
+}
+
+inline std::size_t SlabAlloc::get_upper_section_boundary(std::size_t start_pos) const noexcept
+{
+    return get_section_base(1+get_section_index(start_pos));
+}
+
+inline std::size_t SlabAlloc::get_lower_section_boundary(std::size_t start_pos) const noexcept
+{
+    return get_section_base(get_section_index(start_pos));
+}
+
+inline bool SlabAlloc::matches_section_boundary(std::size_t pos) const noexcept
+{
+    return pos == get_lower_section_boundary(pos);
+}
+
+inline std::size_t SlabAlloc::get_section_base(std::size_t index) const noexcept
+{
+    return m_section_bases[index];
 }
 
 } // namespace realm

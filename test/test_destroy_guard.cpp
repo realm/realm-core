@@ -65,7 +65,7 @@ public:
         m_baseline = 8;
     }
 
-    ~FooAlloc() REALM_NOEXCEPT
+    ~FooAlloc() noexcept
     {
     }
 
@@ -79,7 +79,7 @@ public:
         return MemRef(addr, ref);
     }
 
-    void do_free(ref_type ref, const char* addr) REALM_NOEXCEPT override
+    void do_free(ref_type ref, const char* addr) noexcept override
     {
         typedef std::map<ref_type, char*>::iterator iter;
         iter i = m_map.find(ref);
@@ -91,7 +91,7 @@ public:
         delete[] addr;
     }
 
-    char* do_translate(ref_type ref) const REALM_NOEXCEPT override
+    char* do_translate(ref_type ref) const noexcept override
     {
         typedef std::map<ref_type, char*>::const_iterator iter;
         iter i = m_map.find(ref);

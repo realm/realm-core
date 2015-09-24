@@ -28,7 +28,7 @@ enum Resource {
     resource_NumOpenFiles
 };
 
-bool system_has_rlimit(Resource) REALM_NOEXCEPT;
+bool system_has_rlimit(Resource) noexcept;
 
 //@{
 

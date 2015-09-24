@@ -63,7 +63,7 @@ public:
     bool is_ip_v6() const;
 
     protocol();
-    ~protocol() REALM_NOEXCEPT {}
+    ~protocol() noexcept {}
 
 private:
     int m_family;
@@ -84,7 +84,7 @@ public:
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const address&);
 
     address();
-    ~address() REALM_NOEXCEPT {}
+    ~address() noexcept {}
 
 private:
     typedef in_addr  ip_v4_type;
@@ -110,7 +110,7 @@ public:
     port_type port() const;
 
     endpoint();
-    ~endpoint() REALM_NOEXCEPT {}
+    ~endpoint() noexcept {}
 
 private:
     class protocol m_protocol;
@@ -139,7 +139,7 @@ public:
     iterator begin() const;
     iterator end() const;
 
-    ~list() REALM_NOEXCEPT {}
+    ~list() noexcept {}
 
 private:
     Buffer<endpoint> m_endpoints;
@@ -157,7 +157,7 @@ private:
 class io_service {
 public:
     io_service();
-    ~io_service() REALM_NOEXCEPT;
+    ~io_service() noexcept;
 
     /// Wait for asynchronous operations to complete, and execute the associated
     /// completion handlers. Keep doing this until there are no more
@@ -220,7 +220,7 @@ public:
     class query;
 
     resolver(io_service&);
-    ~resolver() REALM_NOEXCEPT {}
+    ~resolver() noexcept {}
 
     io_service& service();
 
@@ -247,7 +247,7 @@ public:
     query(std::string host, std::string service, int flags = address_configured);
     query(const protocol&, std::string host, std::string service, int flags = address_configured);
 
-    ~query() REALM_NOEXCEPT {}
+    ~query() noexcept {}
 
     int flags() const;
     class protocol protocol() const;
@@ -266,7 +266,7 @@ private:
 
 class socket_base {
 public:
-    ~socket_base() REALM_NOEXCEPT;
+    ~socket_base() noexcept;
 
     io_service& service();
 
@@ -359,23 +359,23 @@ private:
 class socket: public socket_base {
 public:
     socket(io_service&);
-    ~socket() REALM_NOEXCEPT {}
+    ~socket() noexcept {}
 
     void connect(const endpoint&);
     std::error_code connect(const endpoint&, std::error_code&);
 
     std::size_t read_some(char* buffer, std::size_t size);
-    std::size_t read_some(char* buffer, std::size_t size, std::error_code&) REALM_NOEXCEPT;
+    std::size_t read_some(char* buffer, std::size_t size, std::error_code&) noexcept;
 
     std::size_t write_some(const char* data, std::size_t size);
-    std::size_t write_some(const char* data, std::size_t size, std::error_code&) REALM_NOEXCEPT;
+    std::size_t write_some(const char* data, std::size_t size, std::error_code&) noexcept;
 };
 
 
 class acceptor: public socket_base {
 public:
     acceptor(io_service&);
-    ~acceptor() REALM_NOEXCEPT {}
+    ~acceptor() noexcept {}
 
     static const int max_connections = SOMAXCONN;
 
@@ -400,14 +400,14 @@ private:
 class buffered_input_stream {
 public:
     buffered_input_stream(socket&);
-    ~buffered_input_stream() REALM_NOEXCEPT {}
+    ~buffered_input_stream() noexcept {}
 
     std::size_t read(char* buffer, std::size_t size);
-    std::size_t read(char* buffer, std::size_t size, std::error_code&) REALM_NOEXCEPT;
+    std::size_t read(char* buffer, std::size_t size, std::error_code&) noexcept;
 
     std::size_t read_until(char* buffer, std::size_t size, char delim);
     std::size_t read_until(char* buffer, std::size_t size, char delim,
-                           std::error_code&) REALM_NOEXCEPT;
+                           std::error_code&) noexcept;
 
     template<class H>
     void async_read(char* buffer, std::size_t size, const H& handler);
@@ -425,7 +425,7 @@ private:
     char* m_begin;
     char* m_end;
 
-    std::size_t read(char* buffer, std::size_t size, int delim, std::error_code&) REALM_NOEXCEPT;
+    std::size_t read(char* buffer, std::size_t size, int delim, std::error_code&) noexcept;
 
     template<class H>
     void async_read(char* buffer, std::size_t size, int delim, const H& handler);
@@ -434,7 +434,7 @@ private:
 
 
 std::error_code write(socket&, const char* data, std::size_t size, std::error_code&)
-    REALM_NOEXCEPT;
+    noexcept;
 void write(socket&, const char* data, std::size_t size);
 
 template<class H> void async_write(socket&, const char* data, std::size_t size, const H& handler);
@@ -600,7 +600,7 @@ class io_service::async_handler {
 public:
     virtual bool exec() = 0;
     virtual void cancel() = 0;
-    virtual ~async_handler() REALM_NOEXCEPT {}
+    virtual ~async_handler() noexcept {}
 };
 
 template<class H> class io_service::post_handler:
@@ -701,7 +701,7 @@ inline socket_base::socket_base(io_service& service):
 {
 }
 
-inline socket_base::~socket_base() REALM_NOEXCEPT
+inline socket_base::~socket_base() noexcept
 {
     std::error_code ec;
     close(ec);
@@ -907,7 +907,7 @@ inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size)
 }
 
 inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size,
-                                               std::error_code& ec) REALM_NOEXCEPT
+                                               std::error_code& ec) noexcept
 {
     return read(buffer, size, std::char_traits<char>::eof(), ec);
 }
@@ -922,7 +922,7 @@ inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t s
 }
 
 inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t size, char delim,
-                                                     std::error_code& ec) REALM_NOEXCEPT
+                                                     std::error_code& ec) noexcept
 {
     return read(buffer, size, std::char_traits<char>::to_int_type(delim), ec);
 }
@@ -952,7 +952,7 @@ public:
         m_complete(false)
     {
     }
-    void process_input() REALM_NOEXCEPT;
+    void process_input() noexcept;
     bool is_complete() const
     {
         return m_complete;
@@ -964,7 +964,7 @@ protected:
     char* m_out_curr;
     const int m_delim;
     bool m_complete;
-    void read_some(std::error_code& ec) REALM_NOEXCEPT;
+    void read_some(std::error_code& ec) noexcept;
 };
 
 template<class H>

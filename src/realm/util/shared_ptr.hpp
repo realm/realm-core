@@ -83,6 +83,7 @@ private:
         }
         catch (...) {
             delete p;
+            throw;
         }
     }
 

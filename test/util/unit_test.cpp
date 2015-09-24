@@ -68,7 +68,7 @@ public:
     {
     }
 
-    ~XmlReporter() REALM_NOEXCEPT
+    ~XmlReporter() noexcept
     {
     }
 
@@ -193,7 +193,7 @@ public:
             m_include.push_back(wildcard_pattern("*"));
     }
 
-    ~WildcardFilter() REALM_NOEXCEPT
+    ~WildcardFilter() noexcept
     {
     }
 
@@ -548,7 +548,7 @@ public:
             m_patterns.push_back(wildcard_pattern(*i));
     }
 
-    ~state() REALM_NOEXCEPT
+    ~state() noexcept
     {
     }
 

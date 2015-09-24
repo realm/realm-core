@@ -12,7 +12,7 @@ using namespace realm::util;
 
 namespace {
 
-void get_child(Array& parent, size_t child_ref_ndx, Array& child) REALM_NOEXCEPT
+void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 {
     ref_type child_ref = parent.get_as_ref(child_ref_ndx);
     child.init_from_ref(child_ref);
@@ -28,7 +28,7 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) REALM_NOEXCEPT
 // allow users to do so until the index is fixed (which requires a breaking
 // change to how values are indexed). Once the bug is fixed, validate_value()
 // should be removed.
-void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
+void StringIndex::validate_value(int64_t) const noexcept
 {
     // no-op: All ints are valid
 }
@@ -36,13 +36,8 @@ void StringIndex::validate_value(int64_t) const REALM_NOEXCEPT
 void StringIndex::validate_value(StringData str) const
 {
     // The "nulls on String column" branch fixed all known bugs in the index
-#if REALM_NULL_STRINGS == 1
     (void)str;
     return;
-#else
-    if (std::find(str.data(), str.data() + str.size(), '\0') != str.data() + str.size())
-        throw std::invalid_argument("Cannot add string with embedded NULs to indexed column");
-#endif
 }
 
 
@@ -66,7 +61,7 @@ Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 }
 
 
-void StringIndex::set_target(ColumnBase* target_column) REALM_NOEXCEPT
+void StringIndex::set_target(ColumnBase* target_column) noexcept
 {
     REALM_ASSERT(target_column);
     m_target_column = target_column;
@@ -389,7 +384,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     if (slot_value % 2 != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
         // for integer index, get_func fills out 'buffer' and makes str point at it
-        char buffer[8];
+        StringConversionBuffer buffer;
         StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
             if (m_deny_duplicate_values)
@@ -420,7 +415,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
         size_t r1 = to_size_t(sub.get(0));
         // for integer index, get_func fills out 'buffer' and makes str point at it
-        char buffer[8];
+        StringConversionBuffer buffer;
         StringData v2 = get(r1, buffer);
         if (v2 == value) {
             if (m_deny_duplicate_values)
@@ -499,7 +494,7 @@ void StringIndex::distinct(IntegerColumn& result) const
     }
 }
 
-StringData StringIndex::get(std::size_t ndx, char* buffer) const
+StringData StringIndex::get(std::size_t ndx, StringConversionBuffer& buffer) const
 {
     return m_target_column->get_index_data(ndx, buffer);
 }
@@ -701,7 +696,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
 namespace {
 
-bool has_duplicate_values(const Array& node) REALM_NOEXCEPT
+bool has_duplicate_values(const Array& node) noexcept
 {
     Allocator& alloc = node.get_alloc();
     Array child(alloc);
@@ -747,7 +742,7 @@ bool has_duplicate_values(const Array& node) REALM_NOEXCEPT
 } // anonymous namespace
 
 
-bool StringIndex::has_duplicate_values() const REALM_NOEXCEPT
+bool StringIndex::has_duplicate_values() const noexcept
 {
     return ::has_duplicate_values(*m_array);
 }

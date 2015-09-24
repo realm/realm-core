@@ -125,10 +125,10 @@
 ///    allows for a column accessor to be properly destroyed.
 ///
 ///  - The map of subtable accessors in a column acccessor
-///    (SubtableColumnParent::m_subtable_map). All pointers refer to existing
+///    (SubtableColumnBase:m_subtable_map). All pointers refer to existing
 ///    subtable accessors, but it is not required that the set of subtable
-///    accessors referenced from a particular parent P conincide with the set
-///    of subtables accessors specifying P as parent.
+///    accessors referenced from a particular parent P conincide with the set of
+///    subtables accessors specifying P as parent.
 ///
 ///  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
 ///    is not null, then it refers to an existing descriptor accessor.
@@ -199,7 +199,7 @@
 ///  - For each entry in the subtable map of a column accessor there must be an
 ///    underlying subtable at column `i` and row `j`, where `i` is the index of
 ///    the column accessor in `Table::m_cols`, and `j` is the value of
-///    `SubtableColumnParent::SubtableMap::entry::m_subtable_ndx`. The
+///    `SubtableColumnBase::SubtableMap::entry::m_subtable_ndx`. The
 ///    corresponding subtable accessor must satisfy all the "requirements for a
 ///    table" with respect to that underlying subtable.
 ///
@@ -246,38 +246,6 @@ using namespace realm::util;
 
 
 // fixme, we need to gather all these typetraits definitions to just 1 single
-template<class T> struct ColumnTypeTraits3;
-
-template<> struct ColumnTypeTraits3<int64_t> {
-    const static ColumnType ct_id = col_type_Int;
-    const static ColumnType ct_id_real = col_type_Int;
-    typedef IntegerColumn column_type;
-};
-template<> struct ColumnTypeTraits3<bool> {
-    const static ColumnType ct_id = col_type_Bool;
-    const static ColumnType ct_id_real = col_type_Bool;
-    typedef IntegerColumn column_type;
-};
-template<> struct ColumnTypeTraits3<float> {
-    const static ColumnType ct_id = col_type_Float;
-    const static ColumnType ct_id_real = col_type_Float;
-    typedef FloatColumn column_type;
-};
-template<> struct ColumnTypeTraits3<double> {
-    const static ColumnType ct_id = col_type_Double;
-    const static ColumnType ct_id_real = col_type_Double;
-    typedef DoubleColumn column_type;
-};
-template<> struct ColumnTypeTraits3<DateTime> {
-    const static ColumnType ct_id = col_type_DateTime;
-    const static ColumnType ct_id_real = col_type_Int;
-    typedef IntegerColumn column_type;
-};
-template<> struct ColumnTypeTraits3<BinaryData> {
-    const static ColumnType ct_id = col_type_Binary;
-    const static ColumnType ct_id_real = col_type_Binary;
-    typedef BinaryColumn column_type;
-};
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -301,7 +269,7 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 
 
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
-                                 size_t origin_col_ndx) const REALM_NOEXCEPT
+                                 size_t origin_col_ndx) const noexcept
 {
     size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
@@ -311,7 +279,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
 
 
 size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx,
-                           size_t backlink_ndx) const REALM_NOEXCEPT
+                           size_t backlink_ndx) const noexcept
 {
     size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
@@ -321,7 +289,7 @@ size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_co
 
 
 void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_table,
-                                          size_t backlink_col_ndx) REALM_NOEXCEPT
+                                          size_t backlink_col_ndx) noexcept
 {
     LinkColumnBase& link_col = get_column_link_base(link_col_ndx);
     BacklinkColumn& backlink_col = target_table.get_column_backlink(backlink_col_ndx);
@@ -332,7 +300,7 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
 }
 
 
-size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const REALM_NOEXCEPT
+size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const noexcept
 {
     size_t sum = 0;
     size_t col_ndx_begin = m_spec.get_public_column_count();
@@ -891,7 +859,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 }
 
 
-void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
+void Table::register_row_accessor(RowBase* row) const noexcept
 {
     LockGuard lock(m_accessor_mutex);
     row->m_prev = nullptr;
@@ -902,14 +870,14 @@ void Table::register_row_accessor(RowBase* row) const REALM_NOEXCEPT
 }
 
 
-void Table::unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
+void Table::unregister_row_accessor(RowBase* row) const noexcept
 {
     LockGuard lock(m_accessor_mutex);
     do_unregister_row_accessor(row);
 }
 
 
-void Table::do_unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
+void Table::do_unregister_row_accessor(RowBase* row) const noexcept
 {
     if (row->m_prev) {
         row->m_prev->m_next = row->m_next;
@@ -922,7 +890,7 @@ void Table::do_unregister_row_accessor(RowBase* row) const REALM_NOEXCEPT
 }
 
 
-void Table::discard_row_accessors() REALM_NOEXCEPT
+void Table::discard_row_accessors() noexcept
 {
     LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
@@ -1082,7 +1050,7 @@ void Table::create_degen_subtab_columns()
 }
 
 
-void Table::detach() REALM_NOEXCEPT
+void Table::detach() noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -1107,7 +1075,7 @@ void Table::detach() REALM_NOEXCEPT
 }
 
 
-void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
+void Table::unregister_view(const TableViewBase* view) noexcept
 {
     LockGuard lock(m_accessor_mutex);
     // Fixme: O(n) may be unacceptable - if so, put and maintain
@@ -1125,7 +1093,7 @@ void Table::unregister_view(const TableViewBase* view) REALM_NOEXCEPT
 
 
 void Table::move_registered_view(const TableViewBase* old_addr,
-                                 const TableViewBase* new_addr) REALM_NOEXCEPT
+                                 const TableViewBase* new_addr) noexcept
 {
     LockGuard lock(m_accessor_mutex);
     typedef views::iterator iter;
@@ -1142,7 +1110,7 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 }
 
 
-void Table::discard_views() REALM_NOEXCEPT
+void Table::discard_views() noexcept
 {
     LockGuard lock(m_accessor_mutex);
     typedef views::const_iterator iter;
@@ -1153,7 +1121,7 @@ void Table::discard_views() REALM_NOEXCEPT
 }
 
 
-void Table::discard_child_accessors() REALM_NOEXCEPT
+void Table::discard_child_accessors() noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -1169,7 +1137,7 @@ void Table::discard_child_accessors() REALM_NOEXCEPT
 }
 
 
-void Table::discard_desc_accessor() REALM_NOEXCEPT
+void Table::discard_desc_accessor() noexcept
 {
     if (m_descriptor) {
         // Must hold a reliable reference count while detaching
@@ -1268,7 +1236,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
 }
 
 
-void Table::destroy_column_accessors() REALM_NOEXCEPT
+void Table::destroy_column_accessors() noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -1283,7 +1251,7 @@ void Table::destroy_column_accessors() REALM_NOEXCEPT
 }
 
 
-Table::~Table() REALM_NOEXCEPT
+Table::~Table() noexcept
 {
     // Whenever this is not a free-standing table, the destructor must be able
     // to operate without assuming more than minimal accessor consistency This
@@ -1347,7 +1315,7 @@ Table::~Table() REALM_NOEXCEPT
 }
 
 
-bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
+bool Table::has_search_index(size_t col_ndx) const noexcept
 {
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
@@ -1359,26 +1327,46 @@ bool Table::has_search_index(size_t col_ndx) const REALM_NOEXCEPT
 
 void Table::upgrade_file_format()
 {
-    for (size_t c = 0; c < get_column_count(); c++) {
-        if (has_search_index(c)) {
-            if (get_column_type(c) == type_String) {
-                StringColumn& asc = get_column_string(c);
-                asc.get_search_index()->clear();
-                asc.populate_search_index();
-            }
-            else if (get_real_column_type(c) == col_type_Int) {
-                ColumnBase& col = get_column_base(c);
-                IntegerColumn& c = static_cast<IntegerColumn&>(col);
-                c.get_search_index()->clear();
-                c.populate_search_index();
-            }
-            else {
-                // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
-                // so this is fine for now.
-                REALM_ASSERT(false);
-            }
-
+    for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+        if (!has_search_index(col_ndx)) {
+            continue;
         }
+        ColumnType col_type = get_real_column_type(col_ndx);
+        switch (col_type) {
+            case col_type_String: {
+                StringColumn& col = get_column_string(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Bool:
+            case col_type_Int:
+            case col_type_DateTime: {
+                IntegerColumn& col = get_column(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_StringEnum: {
+                StringEnumColumn& col = get_column_string_enum(col_ndx);
+                col.get_search_index()->clear();
+                col.populate_search_index();
+                continue;
+            }
+            case col_type_Binary:
+            case col_type_Table:
+            case col_type_Mixed:
+            case col_type_Reserved1:
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Reserved4:
+            case col_type_Link:
+            case col_type_LinkList:
+            case col_type_BackLink:
+                // Indices are not support on these column types
+                break;
+        }
+        REALM_ASSERT(false);
     }
 }
 
@@ -1464,7 +1452,7 @@ void Table::remove_search_index(size_t col_ndx)
 }
 
 
-bool Table::has_primary_key() const REALM_NOEXCEPT
+bool Table::has_primary_key() const noexcept
 {
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
     size_t n = m_cols.size();
@@ -1625,7 +1613,7 @@ bool Table::is_nullable(size_t col_ndx) const
     return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
 }
 
-const ColumnBase& Table::get_column_base(size_t ndx) const REALM_NOEXCEPT
+const ColumnBase& Table::get_column_base(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_spec.get_column_count());
     REALM_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
@@ -1642,7 +1630,7 @@ ColumnBase& Table::get_column_base(size_t ndx)
 }
 
 
-const IntegerColumn& Table::get_column(size_t ndx) const REALM_NOEXCEPT
+const IntegerColumn& Table::get_column(size_t ndx) const noexcept
 {
     return get_column<IntegerColumn, col_type_Int>(ndx);
 }
@@ -1652,7 +1640,7 @@ IntegerColumn& Table::get_column(size_t ndx)
     return get_column<IntegerColumn, col_type_Int>(ndx);
 }
 
-const IntNullColumn& Table::get_column_int_null(size_t ndx) const REALM_NOEXCEPT
+const IntNullColumn& Table::get_column_int_null(size_t ndx) const noexcept
 {
     return get_column<IntNullColumn, col_type_Int>(ndx);
 }
@@ -1662,7 +1650,7 @@ IntNullColumn& Table::get_column_int_null(size_t ndx)
     return get_column<IntNullColumn, col_type_Int>(ndx);
 }
 
-const StringColumn& Table::get_column_string(size_t ndx) const REALM_NOEXCEPT
+const StringColumn& Table::get_column_string(size_t ndx) const noexcept
 {
     return get_column<StringColumn, col_type_String>(ndx);
 }
@@ -1672,7 +1660,7 @@ StringColumn& Table::get_column_string(size_t ndx)
     return get_column<StringColumn, col_type_String>(ndx);
 }
 
-const StringEnumColumn& Table::get_column_string_enum(size_t ndx) const REALM_NOEXCEPT
+const StringEnumColumn& Table::get_column_string_enum(size_t ndx) const noexcept
 {
     return get_column<StringEnumColumn, col_type_StringEnum>(ndx);
 }
@@ -1682,7 +1670,7 @@ StringEnumColumn& Table::get_column_string_enum(size_t ndx)
     return get_column<StringEnumColumn, col_type_StringEnum>(ndx);
 }
 
-const FloatColumn& Table::get_column_float(size_t ndx) const REALM_NOEXCEPT
+const FloatColumn& Table::get_column_float(size_t ndx) const noexcept
 {
     return get_column<FloatColumn, col_type_Float>(ndx);
 }
@@ -1692,7 +1680,7 @@ FloatColumn& Table::get_column_float(size_t ndx)
     return get_column<FloatColumn, col_type_Float>(ndx);
 }
 
-const DoubleColumn& Table::get_column_double(size_t ndx) const REALM_NOEXCEPT
+const DoubleColumn& Table::get_column_double(size_t ndx) const noexcept
 {
     return get_column<DoubleColumn, col_type_Double>(ndx);
 }
@@ -1702,7 +1690,7 @@ DoubleColumn& Table::get_column_double(size_t ndx)
     return get_column<DoubleColumn, col_type_Double>(ndx);
 }
 
-const BinaryColumn& Table::get_column_binary(size_t ndx) const REALM_NOEXCEPT
+const BinaryColumn& Table::get_column_binary(size_t ndx) const noexcept
 {
     return get_column<BinaryColumn, col_type_Binary>(ndx);
 }
@@ -1712,7 +1700,7 @@ BinaryColumn& Table::get_column_binary(size_t ndx)
     return get_column<BinaryColumn, col_type_Binary>(ndx);
 }
 
-const SubtableColumn &Table::get_column_table(size_t ndx) const REALM_NOEXCEPT
+const SubtableColumn &Table::get_column_table(size_t ndx) const noexcept
 {
     return get_column<SubtableColumn, col_type_Table>(ndx);
 }
@@ -1722,7 +1710,7 @@ SubtableColumn &Table::get_column_table(size_t ndx)
     return get_column<SubtableColumn, col_type_Table>(ndx);
 }
 
-const MixedColumn& Table::get_column_mixed(size_t ndx) const REALM_NOEXCEPT
+const MixedColumn& Table::get_column_mixed(size_t ndx) const noexcept
 {
     return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
@@ -1732,7 +1720,7 @@ MixedColumn& Table::get_column_mixed(size_t ndx)
     return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
 
-const LinkColumnBase& Table::get_column_link_base(size_t ndx) const REALM_NOEXCEPT
+const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
 {
     const ColumnBase& col_base = get_column_base(ndx);
     REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
@@ -1750,7 +1738,7 @@ LinkColumnBase& Table::get_column_link_base(size_t ndx)
     return col_link_base;
 }
 
-const LinkColumn& Table::get_column_link(size_t ndx) const REALM_NOEXCEPT
+const LinkColumn& Table::get_column_link(size_t ndx) const noexcept
 {
     return get_column<LinkColumn, col_type_Link>(ndx);
 }
@@ -1760,7 +1748,7 @@ LinkColumn& Table::get_column_link(size_t ndx)
     return get_column<LinkColumn, col_type_Link>(ndx);
 }
 
-const LinkListColumn& Table::get_column_link_list(size_t ndx) const REALM_NOEXCEPT
+const LinkListColumn& Table::get_column_link_list(size_t ndx) const noexcept
 {
     return get_column<LinkListColumn, col_type_LinkList>(ndx);
 }
@@ -1770,7 +1758,7 @@ LinkListColumn& Table::get_column_link_list(size_t ndx)
     return get_column<LinkListColumn, col_type_LinkList>(ndx);
 }
 
-const BacklinkColumn& Table::get_column_backlink(size_t ndx) const REALM_NOEXCEPT
+const BacklinkColumn& Table::get_column_backlink(size_t ndx) const noexcept
 {
     return get_column<BacklinkColumn, col_type_BackLink>(ndx);
 }
@@ -1798,7 +1786,7 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, 
 
 
 size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                Allocator& alloc) REALM_NOEXCEPT
+                                Allocator& alloc) noexcept
 {
     ColumnType first_col_type = ColumnType();
     if (!Spec::get_first_column_type_from_ref(spec_ref, alloc, first_col_type))
@@ -2233,7 +2221,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 }
 
 
-Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
@@ -2251,7 +2239,7 @@ Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) REALM_NOEXCE
 }
 
 
-Table* Table::get_link_target_table_accessor(size_t col_ndx) REALM_NOEXCEPT
+Table* Table::get_link_target_table_accessor(size_t col_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
     // So far, link columns can only exist in group-level tables, so this table
@@ -2266,7 +2254,7 @@ Table* Table::get_link_target_table_accessor(size_t col_ndx) REALM_NOEXCEPT
 }
 
 
-void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -2300,7 +2288,7 @@ Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
 }
 
 
-size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
+size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(row_ndx, <, m_size);
@@ -2346,7 +2334,7 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 }
 
 
-const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const REALM_NOEXCEPT
+const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
@@ -2359,7 +2347,7 @@ const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const REALM_NOE
 }
 
 
-size_t Table::get_parent_row_index() const REALM_NOEXCEPT
+size_t Table::get_parent_row_index() const noexcept
 {
     REALM_ASSERT(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
@@ -2373,7 +2361,7 @@ size_t Table::get_parent_row_index() const REALM_NOEXCEPT
 }
 
 
-Group* Table::get_parent_group() const REALM_NOEXCEPT
+Group* Table::get_parent_group() const noexcept
 {
     REALM_ASSERT(is_attached());
     if (!m_top.is_attached())
@@ -2388,7 +2376,7 @@ Group* Table::get_parent_group() const REALM_NOEXCEPT
 }
 
 
-size_t Table::get_index_in_group() const REALM_NOEXCEPT
+size_t Table::get_index_in_group() const noexcept
 {
     REALM_ASSERT(is_attached());
     if (!m_top.is_attached())
@@ -2403,7 +2391,7 @@ size_t Table::get_index_in_group() const REALM_NOEXCEPT
 }
 
 
-int64_t Table::get_int(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2440,7 +2428,7 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 }
 
 
-bool Table::get_bool(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
@@ -2478,7 +2466,7 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
 }
 
 
-DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
@@ -2516,7 +2504,7 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 }
 
 
-float Table::get_float(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2544,7 +2532,7 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value)
 }
 
 
-double Table::get_double(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+double Table::get_double(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2573,7 +2561,7 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value)
 }
 
 
-StringData Table::get_string(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+StringData Table::get_string(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2620,7 +2608,7 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 }
 
 
-BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2648,7 +2636,7 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 }
 
 
-Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2683,7 +2671,7 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
 }
 
 
-DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const REALM_NOEXCEPT
+DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2743,7 +2731,7 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 }
 
 
-size_t Table::get_link(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
+size_t Table::get_link(size_t col_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
     const LinkColumn& column = get_column_link(col_ndx);
@@ -2751,7 +2739,7 @@ size_t Table::get_link(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
 }
 
 
-TableRef Table::get_link_target(size_t col_ndx) REALM_NOEXCEPT
+TableRef Table::get_link_target(size_t col_ndx) noexcept
 {
     LinkColumnBase& column = get_column_link_base(col_ndx);
     return column.get_target_table().get_table_ref();
@@ -2826,7 +2814,7 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 }
 
 
-bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
+bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
     const LinkListColumn& column = get_column_link_list(col_ndx);
@@ -2834,7 +2822,7 @@ bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const REALM_NOEXCE
 }
 
 
-size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
+size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
     const LinkListColumn& column = get_column_link_list(col_ndx);
@@ -2842,7 +2830,7 @@ size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEP
 }
 
 
-bool Table::is_null(size_t col_ndx, size_t row_ndx) const REALM_NOEXCEPT
+bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
 {
     if (!is_nullable(col_ndx))
         return false;
@@ -2916,8 +2904,14 @@ int64_t Table::sum_int(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.sum();
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.sum();
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.sum();
+    }
 }
 double Table::sum_float(size_t col_ndx) const
 {
@@ -2938,29 +2932,35 @@ double Table::sum_double(size_t col_ndx) const
 
 // average ----------------------------------------------
 
-double Table::average_int(size_t col_ndx) const
+double Table::average_int(size_t col_ndx, size_t* value_count) const
 {
     if (!m_columns.is_attached())
         return 0;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.average();
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.average(0, -1, -1, value_count);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.average(0, -1, -1, value_count);
+    }
 }
-double Table::average_float(size_t col_ndx) const
+double Table::average_float(size_t col_ndx, size_t* value_count) const
 {
     if (!m_columns.is_attached())
         return 0.f;
 
     const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return column.average();
+    return column.average(0, -1, -1, value_count);
 }
-double Table::average_double(size_t col_ndx) const
+double Table::average_double(size_t col_ndx, size_t* value_count) const
 {
     if (!m_columns.is_attached())
         return 0.;
 
     const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return column.average();
+    return column.average(0, -1, -1, value_count);
 }
 
 // minimum ----------------------------------------------
@@ -2973,8 +2973,14 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
         return 0;
 
 #if USE_COLUMN_AGGREGATE
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 #else
     if (is_empty())
         return 0;
@@ -3013,8 +3019,14 @@ DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.minimum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.minimum(0, npos, npos, return_ndx);
+    }
 }
 
 // maximum ----------------------------------------------
@@ -3072,8 +3084,14 @@ DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
-    return column.maximum(0, npos, npos, return_ndx);
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        return column.maximum(0, npos, npos, return_ndx);
+    }
 }
 
 
@@ -3133,16 +3151,17 @@ size_t Table::do_find_pkey_string(StringData value) const
 }
 
 
-template<class T> size_t Table::find_first(size_t col_ndx, T value) const
+template<class T, bool Nullable> size_t Table::find_first(size_t col_ndx, T value) const
 {
+    using type_traits = ColumnTypeTraits<T, Nullable>;
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnTypeTraits3<T>::ct_id_real);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, type_traits::column_id);
 
     if (!m_columns.is_attached())
         return not_found;
 
-    typedef typename ColumnTypeTraits3<T>::column_type ColType;
-    const ColType& column = get_column<ColType, ColumnTypeTraits3<T>::ct_id>(col_ndx);
+    typedef typename type_traits::column_type ColType;
+    const ColType& column = get_column<ColType, type_traits::column_id>(col_ndx);
     return column.find_first(value);
 }
 
@@ -3155,35 +3174,42 @@ size_t Table::find_first_link(size_t target_row_index) const
 
 size_t Table::find_first_int(size_t col_ndx, int64_t value) const
 {
-    return find_first<int64_t>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<int64_t, true>(col_ndx, value);
+    else
+        return find_first<int64_t, false>(col_ndx, value);
 }
 
 size_t Table::find_first_bool(size_t col_ndx, bool value) const
 {
-    return find_first<bool>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<bool, true>(col_ndx, value);
+    else
+        return find_first<bool, false>(col_ndx, value);
 }
 
 size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
 {
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
-
-    if (!m_columns.is_attached())
-        return not_found;
-
-    const IntegerColumn& column = get_column(col_ndx);
-
-    return column.find_first(int64_t(value.get_datetime()));
+    if (is_nullable(col_ndx))
+        return find_first<DateTime, true>(col_ndx, value);
+    else
+        return find_first<DateTime, false>(col_ndx, value);
 }
 
 size_t Table::find_first_float(size_t col_ndx, float value) const
 {
-    return find_first<float>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<Float, true>(col_ndx, value);
+    else
+        return find_first<Float, false>(col_ndx, value);
 }
 
 size_t Table::find_first_double(size_t col_ndx, double value) const
 {
-    return find_first<double>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<Double, true>(col_ndx, value);
+    else
+        return find_first<Double, false>(col_ndx, value);
 }
 
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
@@ -3204,7 +3230,10 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 
 size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    return const_cast<Table*>(this)->find_first<BinaryData>(col_ndx, value);
+    if (is_nullable(col_ndx))
+        return find_first<BinaryData, true>(col_ndx, value);
+    else
+        return find_first<BinaryData, false>(col_ndx, value);
 }
 
 size_t Table::find_first_null(size_t column_ndx) const
@@ -3699,57 +3728,62 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
     return const_cast<Table*>(this)->get_range_view(begin, end);
 }
 
+TableView Table::get_backlink_view(std::size_t row_ndx, Table *src_table, std::size_t src_col_ndx)
+{
+    TableView tv(src_table, this, src_col_ndx, row_ndx);
+    tv.do_sync();
+    return tv;
+}
 
-
-size_t Table::lower_bound_int(size_t col_ndx, int64_t value) const REALM_NOEXCEPT
+size_t Table::lower_bound_int(size_t col_ndx, int64_t value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
 }
 
-size_t Table::upper_bound_int(size_t col_ndx, int64_t value) const REALM_NOEXCEPT
+size_t Table::upper_bound_int(size_t col_ndx, int64_t value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
 }
 
-size_t Table::lower_bound_bool(size_t col_ndx, bool value) const REALM_NOEXCEPT
+size_t Table::lower_bound_bool(size_t col_ndx, bool value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
 }
 
-size_t Table::upper_bound_bool(size_t col_ndx, bool value) const REALM_NOEXCEPT
+size_t Table::upper_bound_bool(size_t col_ndx, bool value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
 }
 
-size_t Table::lower_bound_float(size_t col_ndx, float value) const REALM_NOEXCEPT
+size_t Table::lower_bound_float(size_t col_ndx, float value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_float(col_ndx).lower_bound(value);
 }
 
-size_t Table::upper_bound_float(size_t col_ndx, float value) const REALM_NOEXCEPT
+size_t Table::upper_bound_float(size_t col_ndx, float value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_float(col_ndx).upper_bound(value);
 }
 
-size_t Table::lower_bound_double(size_t col_ndx, double value) const REALM_NOEXCEPT
+size_t Table::lower_bound_double(size_t col_ndx, double value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_double(col_ndx).lower_bound(value);
 }
 
-size_t Table::upper_bound_double(size_t col_ndx, double value) const REALM_NOEXCEPT
+size_t Table::upper_bound_double(size_t col_ndx, double value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     return !m_columns.is_attached() ? 0 : get_column_double(col_ndx).upper_bound(value);
 }
 
-size_t Table::lower_bound_string(size_t col_ndx, StringData value) const REALM_NOEXCEPT
+size_t Table::lower_bound_string(size_t col_ndx, StringData value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     if (!m_columns.is_attached())
@@ -3765,7 +3799,7 @@ size_t Table::lower_bound_string(size_t col_ndx, StringData value) const REALM_N
     return column.lower_bound_string(value);
 }
 
-size_t Table::upper_bound_string(size_t col_ndx, StringData value) const REALM_NOEXCEPT
+size_t Table::upper_bound_string(size_t col_ndx, StringData value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     if (!m_columns.is_attached())
@@ -3850,7 +3884,7 @@ void Table::optimize(bool enforce)
 class Table::SliceWriter: public Group::TableWriter {
 public:
     SliceWriter(const Table& table, StringData table_name,
-                size_t offset, size_t size) REALM_NOEXCEPT:
+                size_t offset, size_t size) noexcept:
         m_table(table),
         m_table_name(table_name),
         m_offset(offset),
@@ -3961,7 +3995,7 @@ void Table::write(std::ostream& out, size_t offset, size_t size, StringData over
 }
 
 
-void Table::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
+void Table::update_from_parent(size_t old_baseline) noexcept
 {
     REALM_ASSERT(is_attached());
 
@@ -4619,25 +4653,25 @@ bool Table::compare_rows(const Table& t) const
 }
 
 
-StringData Table::Parent::get_child_name(size_t) const REALM_NOEXCEPT
+StringData Table::Parent::get_child_name(size_t) const noexcept
 {
     return StringData("");
 }
 
 
-Group* Table::Parent::get_parent_group() REALM_NOEXCEPT
+Group* Table::Parent::get_parent_group() noexcept
 {
     return 0;
 }
 
 
-Table* Table::Parent::get_parent_table(size_t*) REALM_NOEXCEPT
+Table* Table::Parent::get_parent_table(size_t*) noexcept
 {
     return 0;
 }
 
 
-void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
+void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4654,7 +4688,7 @@ void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
 }
 
 
-void Table::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+void Table::adj_acc_erase_row(size_t row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4670,7 +4704,7 @@ void Table::adj_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     }
 }
 
-void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
+void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4688,7 +4722,7 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
 
 
 void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
-    REALM_NOEXCEPT
+    noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4704,7 +4738,7 @@ void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
 }
 
 
-void Table::adj_acc_clear_root_table() REALM_NOEXCEPT
+void Table::adj_acc_clear_root_table() noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4720,7 +4754,7 @@ void Table::adj_acc_clear_root_table() REALM_NOEXCEPT
 }
 
 
-void Table::adj_acc_clear_nonroot_table() REALM_NOEXCEPT
+void Table::adj_acc_clear_nonroot_table() noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4732,7 +4766,7 @@ void Table::adj_acc_clear_nonroot_table() REALM_NOEXCEPT
 }
 
 
-void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXCEPT
+void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4752,7 +4786,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) REALM_NOEXC
 }
 
 
-void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
+void Table::adj_row_acc_erase_row(size_t row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4779,7 +4813,7 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) REALM_NOEXCEPT
     }
 }
 
-void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEXCEPT
+void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4800,8 +4834,7 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) REALM_NOEX
 }
 
 
-void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
-    REALM_NOEXCEPT
+void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4843,7 +4876,7 @@ void Table::adj_insert_column(size_t col_ndx)
 }
 
 
-void Table::adj_erase_column(size_t col_ndx) REALM_NOEXCEPT
+void Table::adj_erase_column(size_t col_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4860,7 +4893,7 @@ void Table::adj_erase_column(size_t col_ndx) REALM_NOEXCEPT
 }
 
 
-void Table::recursive_mark() REALM_NOEXCEPT
+void Table::recursive_mark() noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4876,7 +4909,7 @@ void Table::recursive_mark() REALM_NOEXCEPT
 }
 
 
-void Table::mark_link_target_tables(size_t col_ndx_begin) REALM_NOEXCEPT
+void Table::mark_link_target_tables(size_t col_ndx_begin) noexcept
 {
     // Beyond the constraints on the specified column index, this function must
     // assume no more than minimal consistency of the accessor hierarchy. This
@@ -4893,7 +4926,7 @@ void Table::mark_link_target_tables(size_t col_ndx_begin) REALM_NOEXCEPT
 }
 
 
-void Table::mark_opposite_link_tables() REALM_NOEXCEPT
+void Table::mark_opposite_link_tables() noexcept
 {
     // Beyond the constraints on the specified column index, this function must
     // assume no more than minimal consistency of the accessor hierarchy. This
@@ -5056,7 +5089,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 }
 
 
-bool Table::is_cross_table_link_target() const REALM_NOEXCEPT
+bool Table::is_cross_table_link_target() const noexcept
 {
     size_t n = m_cols.size();
     for (size_t i = m_spec.get_public_column_count(); i < n; ++i) {

@@ -515,11 +515,6 @@ case "$MODE" in
             enable_assertions="yes"
         fi
 
-        enable_null_strings="yes"
-        if [ "$REALM_DISABLE_NULL_STRINGS" ]; then
-            enable_null_strings="no"
-        fi
-
         # Find Xcode
         xcode_home="none"
         arm64_supported=""
@@ -625,7 +620,6 @@ MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_ASSERTIONS     = $enable_assertions
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
-ENABLE_NULL_STRINGS   = $enable_null_strings
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
@@ -892,6 +886,7 @@ EOF
             denom="android-$target"
 
             # Build OpenSSL if needed
+            repodir=$(pwd)
             libcrypto_name="libcrypto-$denom.a"
             if ! [ -f "$ANDROID_DIR/$libcrypto_name" ] && [ "$enable_encryption" = "yes" ]; then
                 (
@@ -917,29 +912,31 @@ EOF
             fi
 
             # Build realm
-            PATH="$path" CC="$cc" $MAKE -C "src/realm" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "librealm-$denom.a" || exit 1
+            PATH="$path" CC="$cc" $MAKE -C "src/realm" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "librealm-$denom.a" "librealm-$denom-dbg.a" || exit 1
 
             if [ "$enable_encryption" = "yes" ]; then
                 # Merge OpenSSL and Realm into one static library
-                mkdir ar-temp
-                (
-                    AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
-                    RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
-                    cd ar-temp
-                    echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                    $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                    find \
-                      . ! -name 'aes*' \
-                      -a ! -name cbc128.o \
-                      -a ! -name sha256.o \
-                      -a ! -name sha256-586.o \
-                      -delete || exit 1
-                    rm -f aes_wrap.o
-                    $AR x "../src/realm/librealm-$denom.a" || exit 1
-                    $AR r "../$ANDROID_DIR/librealm-$denom.a" *.o || exit 1
-                    $RANLIB "../$ANDROID_DIR/librealm-$denom.a"
-                ) || exit 1
-                rm -r ar-temp
+                for lib_name in "librealm-$denom.a" "librealm-$denom-dbg.a"; do
+                    (
+                        TMP_FOLDER=$(mktemp -d /tmp/$$.XXXXXX)
+                        cd $TMP_FOLDER
+                        AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
+                        RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
+                        $AR x "$repodir/$ANDROID_DIR/$libcrypto_name" || exit 1
+                        find \
+                          . ! -name 'aes*' \
+                          -a ! -name cbc128.o \
+                          -a ! -name sha256.o \
+                          -a ! -name sha256-586.o \
+                          -delete || exit 1
+                        rm -f aes_wrap.o
+                        $AR x "$repodir/src/realm/$lib_name" || exit 1
+                        $AR r "$repodir/$ANDROID_DIR/$lib_name" *.o || exit 1
+                        $RANLIB "$repodir/$ANDROID_DIR/$lib_name"
+                        cd -
+                        rm -rf $TMP_FOLDER
+                    ) || exit 1
+                done
 
                 echo 'This product includes software developed by the OpenSSL Project for use in the OpenSSL toolkit. (http://www.openssl.org/).' > $ANDROID_DIR/OpenSSL.txt
                 echo '' >> $ANDROID_DIR/OpenSSL.txt
@@ -949,6 +946,7 @@ EOF
                 cat openssl/LICENSE >> $ANDROID_DIR/OpenSSL.txt
             else
                 cp "src/realm/librealm-$denom.a" "$ANDROID_DIR" || exit 1
+                cp "src/realm/librealm-$denom-dbg.a" "$ANDROID_DIR" || exit 1
             fi
 
             rm -rf "$temp_dir" || exit 1

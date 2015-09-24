@@ -476,7 +476,7 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(2, links->get(0).get_index());
     CHECK_EQUAL(1, links->get(1).get_index());
     CHECK_EQUAL(0, links->get(2).get_index());
-    CHECK_EQUAL(Wed, (Days)(*links)[0].get_int(3));
+    CHECK_EQUAL(Wed, Days((*links)[0].get_int(3)));
 
     // verify that backlinks was set correctly
     CHECK_EQUAL(1, target->get_backlink_count(0, *origin, col_link));
@@ -600,7 +600,7 @@ TEST(Links_LinkList_Inserts)
     CHECK_EQUAL(2, links->get(0).get_index());
     CHECK_EQUAL(1, links->get(1).get_index());
     CHECK_EQUAL(0, links->get(2).get_index());
-    CHECK_EQUAL(Wed, (Days)(*links)[0].get_int(3));
+    CHECK_EQUAL(Wed, Days((*links)[0].get_int(3)));
 
     // verify that backlinks was set correctly
     CHECK_EQUAL(1, target->get_backlink_count(0, *origin, col_link));
@@ -1653,6 +1653,83 @@ TEST(Links_OrderedRowRemoval)
         origin->get_linklist(0, 0)->add(0);
         target->remove(0);
         group.verify();
+    }
+}
+
+
+TEST(Links_LinkList_Swap)
+{
+    struct Fixture {
+        Group group;
+        TableRef origin = group.add_table("origin");
+        TableRef target = group.add_table("target");
+        LinkViewRef link_list_1, link_list_2;
+        Fixture()
+        {
+            origin->add_column_link(type_LinkList, "", *target);
+            target->add_column(type_Int, "");
+            origin->add_empty_row(2);
+            target->add_empty_row(2);
+            link_list_1 = origin->get_linklist(0,0);
+            link_list_1->add(0);
+            link_list_1->add(1);
+            link_list_2 = origin->get_linklist(0,1); // Leave it empty
+        }
+    };
+
+    // Sanity
+    {
+        Fixture f;
+        CHECK_EQUAL(2, f.link_list_1->size());
+        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
+        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        CHECK_EQUAL(0, f.link_list_2->size());
+        f.group.verify();
+    }
+
+    // No-op
+    {
+        Fixture f;
+        f.link_list_1->swap(0,0);
+        CHECK_EQUAL(2, f.link_list_1->size());
+        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
+        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        f.link_list_1->swap(1,1);
+        CHECK_EQUAL(2, f.link_list_1->size());
+        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
+        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        f.group.verify();
+    }
+
+    // Both orders of arguments mean the same this
+    {
+        Fixture f;
+        f.link_list_1->swap(0,1);
+        CHECK_EQUAL(2, f.link_list_1->size());
+        CHECK_EQUAL(1, f.link_list_1->get(0).get_index());
+        CHECK_EQUAL(0, f.link_list_1->get(1).get_index());
+        f.link_list_1->swap(1,0);
+        CHECK_EQUAL(2, f.link_list_1->size());
+        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
+        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        f.group.verify();
+    }
+
+    // Detached accessor
+    {
+        Fixture f;
+        f.origin->remove(0);
+        CHECK_LOGIC_ERROR(f.link_list_1->swap(0,1), LogicError::detached_accessor);
+        f.group.verify();
+    }
+
+    // Index out of range
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.link_list_1->swap(1,2), LogicError::link_index_out_of_range);
+        CHECK_LOGIC_ERROR(f.link_list_1->swap(2,1), LogicError::link_index_out_of_range);
+        CHECK_LOGIC_ERROR(f.link_list_2->swap(0,0), LogicError::link_index_out_of_range);
+        f.group.verify();
     }
 }
 

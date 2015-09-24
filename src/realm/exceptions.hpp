@@ -31,7 +31,7 @@ namespace realm {
 /// exist.
 class NoSuchTable: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+    const char* what() const noexcept override;
 };
 
 
@@ -39,7 +39,7 @@ public:
 /// already in use.
 class TableNameInUse: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+    const char* what() const noexcept override;
 };
 
 
@@ -47,7 +47,7 @@ public:
 // columns, unless those link columns are part of the table itself.
 class CrossTableLinkTarget: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+    const char* what() const noexcept override;
 };
 
 
@@ -55,7 +55,7 @@ public:
 /// does not match a particular other table type (dynamic or static).
 class DescriptorMismatch: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+    const char* what() const noexcept override;
 };
 
 
@@ -67,7 +67,7 @@ public:
 /// operations.
 class FileFormatUpgradeRequired: public std::exception {
 public:
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
+    const char* what() const noexcept override;
 };
 
 
@@ -113,6 +113,7 @@ public:
         table_index_out_of_range,
         row_index_out_of_range,
         column_index_out_of_range,
+        link_index_out_of_range,
         bad_version,
         illegal_type,
 
@@ -177,8 +178,8 @@ public:
 
     LogicError(ErrorKind message);
 
-    const char* what() const REALM_NOEXCEPT_OR_NOTHROW override;
-    ErrorKind kind() const REALM_NOEXCEPT_OR_NOTHROW;
+    const char* what() const noexcept override;
+    ErrorKind kind() const noexcept;
 private:
     ErrorKind m_kind;
 };
@@ -188,27 +189,27 @@ private:
 
 // Implementation:
 
-inline const char* NoSuchTable::what() const REALM_NOEXCEPT_OR_NOTHROW
+inline const char* NoSuchTable::what() const noexcept
 {
     return "No such table exists";
 }
 
-inline const char* TableNameInUse::what() const REALM_NOEXCEPT_OR_NOTHROW
+inline const char* TableNameInUse::what() const noexcept
 {
     return "The specified table name is already in use";
 }
 
-inline const char* CrossTableLinkTarget::what() const REALM_NOEXCEPT_OR_NOTHROW
+inline const char* CrossTableLinkTarget::what() const noexcept
 {
     return "Table is target of cross-table link columns";
 }
 
-inline const char* DescriptorMismatch::what() const REALM_NOEXCEPT_OR_NOTHROW
+inline const char* DescriptorMismatch::what() const noexcept
 {
     return "Table descriptor mismatch";
 }
 
-inline const char* FileFormatUpgradeRequired::what() const REALM_NOEXCEPT_OR_NOTHROW
+inline const char* FileFormatUpgradeRequired::what() const noexcept
 {
     return "Database upgrade required but prohibited";
 }
@@ -218,7 +219,7 @@ inline LogicError::LogicError(LogicError::ErrorKind kind):
 {
 }
 
-inline LogicError::ErrorKind LogicError::kind() const REALM_NOEXCEPT_OR_NOTHROW
+inline LogicError::ErrorKind LogicError::kind() const noexcept
 {
     return m_kind;
 }

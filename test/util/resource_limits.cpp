@@ -66,7 +66,7 @@ namespace test_util {
 
 #if REALM_HAVE_POSIX_RLIMIT
 
-bool system_has_rlimit(Resource) REALM_NOEXCEPT
+bool system_has_rlimit(Resource) noexcept
 {
     return true;
 }
@@ -91,7 +91,7 @@ void set_soft_rlimit(Resource resource, long value)
 
 #else // ! REALM_HAVE_POSIX_RLIMIT
 
-bool system_has_rlimit(Resource) REALM_NOEXCEPT
+bool system_has_rlimit(Resource) noexcept
 {
     return false;
 }

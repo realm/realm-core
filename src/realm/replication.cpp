@@ -15,7 +15,7 @@ using namespace realm;
 using namespace realm::util;
 
 
-void Replication::set_replication(Group& group, Replication* repl) REALM_NOEXCEPT
+void Replication::set_replication(Group& group, Replication* repl) noexcept
 {
     typedef _impl::GroupFriend gf;
     gf::set_replication(group, repl);
@@ -34,11 +34,11 @@ public:
     {
     }
 
-    ~TransactLogApplier() REALM_NOEXCEPT
+    ~TransactLogApplier() noexcept
     {
     }
 
-    void set_apply_log(std::ostream* log) REALM_NOEXCEPT
+    void set_apply_log(std::ostream* log) noexcept
     {
         m_log = log;
         if (m_log)
@@ -520,7 +520,7 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(std::size_t table_ndx, size_t num_tables) REALM_NOEXCEPT
+    bool erase_group_level_table(std::size_t table_ndx, size_t num_tables) noexcept
     {
         if (REALM_UNLIKELY(num_tables != m_group.size()))
             return false;
@@ -532,7 +532,7 @@ public:
         return true;
     }
 
-    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) REALM_NOEXCEPT
+    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) noexcept
     {
 #ifdef REALM_DEBUG
         if (m_log)
@@ -682,7 +682,7 @@ private:
     LinkViewRef m_link_list;
     std::ostream* m_log;
 
-    bool check_set_cell(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+    bool check_set_cell(size_t col_ndx, size_t row_ndx) noexcept
     {
         if (REALM_LIKELY(m_table)) {
             if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
@@ -693,7 +693,7 @@ private:
         return false;
     }
 
-    bool check_insert_cell(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+    bool check_insert_cell(size_t col_ndx, size_t row_ndx) noexcept
     {
         if (REALM_LIKELY(m_table)) {
             if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
@@ -761,10 +761,10 @@ namespace {
 
 class InputStreamImpl: public _impl::NoCopyInputStream {
 public:
-    InputStreamImpl(const char* data, size_t size) REALM_NOEXCEPT:
+    InputStreamImpl(const char* data, size_t size) noexcept:
         m_begin(data), m_end(data+size) {}
 
-    ~InputStreamImpl() REALM_NOEXCEPT {}
+    ~InputStreamImpl() noexcept {}
 
     size_t next_block(const char*& begin, const char*& end) override
     {
@@ -813,20 +813,20 @@ TrivialReplication::do_prepare_commit(SharedGroup&, version_type orig_version)
     return new_version;
 }
 
-void TrivialReplication::do_finalize_commit(SharedGroup&) REALM_NOEXCEPT
+void TrivialReplication::do_finalize_commit(SharedGroup&) noexcept
 {
     finalize_changeset();
 }
 
-void TrivialReplication::do_abort_transact(SharedGroup&) REALM_NOEXCEPT
+void TrivialReplication::do_abort_transact(SharedGroup&) noexcept
 {
 }
 
-void TrivialReplication::do_interrupt() REALM_NOEXCEPT
+void TrivialReplication::do_interrupt() noexcept
 {
 }
 
-void TrivialReplication::do_clear_interrupt() REALM_NOEXCEPT
+void TrivialReplication::do_clear_interrupt() noexcept
 {
 }
 

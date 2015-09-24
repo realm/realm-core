@@ -61,7 +61,7 @@ void set_test_resource_path(const std::string&);
 class TestPathGuard {
 public:
     TestPathGuard(const std::string& path);
-    ~TestPathGuard() REALM_NOEXCEPT;
+    ~TestPathGuard() noexcept;
     operator std::string() const
     {
         return m_path;
@@ -70,6 +70,8 @@ public:
     {
         return m_path.c_str();
     }
+    TestPathGuard(const TestPathGuard&) = delete;
+    TestPathGuard& operator=(const TestPathGuard&) = delete;
 protected:
     std::string m_path;
 };

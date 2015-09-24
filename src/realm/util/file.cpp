@@ -59,7 +59,9 @@ size_t get_page_size()
 #ifdef _WIN32
     SYSTEM_INFO sysinfo;
     GetNativeSystemInfo(&sysinfo);
-    DWORD size = sysinfo.dwPageSize;
+    //DWORD size = sysinfo.dwPageSize;
+    // On windows we use the allocation granularity instead
+    DWORD size = sysinfo.dwAllocationGranularity;
 #else
     long size = sysconf(_SC_PAGESIZE);
 #endif
@@ -239,11 +241,11 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
-            throw PermissionDenied(msg);
+            throw PermissionDenied(msg, path);
         case ERROR_FILE_NOT_FOUND:
-            throw NotFound(msg);
+            throw NotFound(msg, path);
         case ERROR_FILE_EXISTS:
-            throw Exists(msg);
+            throw Exists(msg, path);
         default:
             throw std::runtime_error(msg);
     }
@@ -314,7 +316,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
 }
 
 
-void File::close() REALM_NOEXCEPT
+void File::close() noexcept
 {
 #ifdef _WIN32 // Windows version
 
@@ -737,7 +739,7 @@ bool File::lock(bool exclusive, bool non_blocking)
 }
 
 
-void File::unlock() REALM_NOEXCEPT
+void File::unlock() noexcept
 {
 #ifdef _WIN32 // Windows version
 
@@ -760,7 +762,7 @@ void File::unlock() REALM_NOEXCEPT
 }
 
 
-void* File::map(AccessMode a, size_t size, int map_flags) const
+void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) const
 {
 #ifdef _WIN32 // Windows version
 
@@ -778,13 +780,16 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
             break;
     }
     LARGE_INTEGER large_int;
-    if (int_cast_with_overflow_detect(size, large_int.QuadPart))
+    if (int_cast_with_overflow_detect(offset+size, large_int.QuadPart))
         throw std::runtime_error("Map size is too large");
     HANDLE map_handle =
         CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
     if (REALM_UNLIKELY(!map_handle))
         throw std::runtime_error("CreateFileMapping() failed");
-    void* addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
+    if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
+        throw std::runtime_error("Map offset is too large");
+    SIZE_T _size = size;
+    void* addr = MapViewOfFile(map_handle, desired_access, large_int.HighPart, large_int.LowPart, _size);
     {
         BOOL r = CloseHandle(map_handle);
         REALM_ASSERT_RELEASE(r);
@@ -802,13 +807,13 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
-    return realm::util::mmap(m_fd, size, a, m_encryption_key.get());
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
 
 #endif
 }
 
 
-void File::unmap(void* addr, size_t size) REALM_NOEXCEPT
+void File::unmap(void* addr, size_t size) noexcept
 {
 #ifdef _WIN32 // Windows version
 
@@ -825,7 +830,7 @@ void File::unmap(void* addr, size_t size) REALM_NOEXCEPT
 
 
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
-                  int map_flags) const
+                  int map_flags, size_t file_offset) const
 {
 #ifdef _WIN32
     void* new_addr = map(a, new_size, map_flags);
@@ -833,7 +838,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     return new_addr;
 #else
     static_cast<void>(map_flags);
-    return realm::util::mremap(m_fd, old_addr, old_size, a, new_size);
+    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size);
 #endif
 }
 

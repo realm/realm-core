@@ -47,15 +47,20 @@ class TransactLogConvenientEncoder;
 class LinkListColumn: public LinkColumnBase, public ArrayParent {
 public:
     using LinkColumnBase::LinkColumnBase;
-    ~LinkListColumn() REALM_NOEXCEPT override;
+    ~LinkListColumn() noexcept override;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    bool has_links(std::size_t row_ndx) const REALM_NOEXCEPT;
-    std::size_t get_link_count(std::size_t row_ndx) const REALM_NOEXCEPT;
+    bool is_nullable() const noexcept final;
+
+    bool has_links(std::size_t row_ndx) const noexcept;
+    std::size_t get_link_count(std::size_t row_ndx) const noexcept;
 
     ConstLinkViewRef get(std::size_t row_ndx) const;
     LinkViewRef get(std::size_t row_ndx);
+
+    bool is_null(std::size_t row_ndx) const noexcept final;
+    void set_null(std::size_t row_ndx) final;
 
     /// Compare two columns for equality.
     bool compare_link_list(const LinkListColumn&) const;
@@ -68,11 +73,11 @@ public:
     void clear(std::size_t, bool) override;
     void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
-    void adj_acc_insert_rows(size_t, size_t) REALM_NOEXCEPT override;
-    void adj_acc_erase_row(size_t) REALM_NOEXCEPT override;
-    void adj_acc_move_over(size_t, size_t) REALM_NOEXCEPT override;
+    void update_from_parent(std::size_t) noexcept override;
+    void adj_acc_clear_root_table() noexcept override;
+    void adj_acc_insert_rows(size_t, size_t) noexcept override;
+    void adj_acc_erase_row(size_t) noexcept override;
+    void adj_acc_move_over(size_t, size_t) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -81,7 +86,7 @@ public:
 #endif
 
 protected:
-    void do_discard_child_accessors() REALM_NOEXCEPT override;
+    void do_discard_child_accessors() noexcept override;
 
 private:
     struct list_entry {
@@ -99,14 +104,14 @@ private:
                       std::size_t target_row_ndx_2) override;
 
     void unregister_linkview(const LinkView& view);
-    ref_type get_row_ref(std::size_t row_ndx) const REALM_NOEXCEPT;
+    ref_type get_row_ref(std::size_t row_ndx) const noexcept;
     void set_row_ref(std::size_t row_ndx, ref_type new_ref);
     void add_backlink(std::size_t target_row, std::size_t source_row);
     void remove_backlink(std::size_t target_row, std::size_t source_row);
 
     // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
-    ref_type get_child_ref(std::size_t child_ndx) const REALM_NOEXCEPT override;
+    ref_type get_child_ref(std::size_t child_ndx) const noexcept override;
 
     // These helpers are needed because of the way the B+-tree of links is
     // traversed in cascade_break_backlinks_to() and
@@ -115,14 +120,14 @@ private:
                                           CascadeState&);
     void cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState&);
 
-    void discard_child_accessors() REALM_NOEXCEPT;
+    void discard_child_accessors() noexcept;
 
     template<bool fix_ndx_in_parent>
-    void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) REALM_NOEXCEPT;
+    void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept;
     template<bool fix_ndx_in_parent>
-    void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) REALM_NOEXCEPT;
+    void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept;
     template<bool fix_ndx_in_parent>
-    void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) REALM_NOEXCEPT;
+    void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
@@ -139,7 +144,7 @@ private:
 
 // Implementation
 
-inline LinkListColumn::~LinkListColumn() REALM_NOEXCEPT
+inline LinkListColumn::~LinkListColumn() noexcept
 {
     discard_child_accessors();
 }
@@ -149,13 +154,18 @@ inline ref_type LinkListColumn::create(Allocator& alloc, std::size_t size)
     return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
-inline bool LinkListColumn::has_links(std::size_t row_ndx) const REALM_NOEXCEPT
+inline bool LinkListColumn::is_nullable() const noexcept
+{
+    return false;
+}
+
+inline bool LinkListColumn::has_links(std::size_t row_ndx) const noexcept
 {
     ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
     return (ref != 0);
 }
 
-inline std::size_t LinkListColumn::get_link_count(std::size_t row_ndx) const REALM_NOEXCEPT
+inline std::size_t LinkListColumn::get_link_count(std::size_t row_ndx) const noexcept
 {
     ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
     if (ref == 0)
@@ -175,7 +185,17 @@ inline LinkViewRef LinkListColumn::get(std::size_t row_ndx)
     return LinkViewRef(link_list);
 }
 
-inline void LinkListColumn::do_discard_child_accessors() REALM_NOEXCEPT
+inline bool LinkListColumn::is_null(std::size_t) const noexcept
+{
+    return false;
+}
+
+inline void LinkListColumn::set_null(std::size_t)
+{
+    throw LogicError{LogicError::column_not_nullable};
+}
+
+inline void LinkListColumn::do_discard_child_accessors() noexcept
 {
     discard_child_accessors();
 }
@@ -191,7 +211,7 @@ inline void LinkListColumn::unregister_linkview(const LinkView& list)
     }
 }
 
-inline ref_type LinkListColumn::get_row_ref(std::size_t row_ndx) const REALM_NOEXCEPT
+inline ref_type LinkListColumn::get_row_ref(std::size_t row_ndx) const noexcept
 {
     return LinkColumnBase::get_as_ref(row_ndx);
 }

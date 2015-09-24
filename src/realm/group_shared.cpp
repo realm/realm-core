@@ -199,7 +199,7 @@ public:
         uint32_t next;
     };
 
-    Ringbuffer() REALM_NOEXCEPT
+    Ringbuffer() noexcept
     {
         entries = init_readers_size;
         for (int i=0; i < init_readers_size; i++) {
@@ -241,7 +241,7 @@ public:
         std::cout << "--- Done" << std::endl;
     }
 
-    void expand_to(uint_fast32_t new_entries)  REALM_NOEXCEPT
+    void expand_to(uint_fast32_t new_entries)  noexcept
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
@@ -258,7 +258,7 @@ public:
         // dump();
     }
 
-    static size_t compute_required_space(uint_fast32_t num_entries)  REALM_NOEXCEPT
+    static size_t compute_required_space(uint_fast32_t num_entries)  noexcept
     {
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
@@ -266,56 +266,75 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const  REALM_NOEXCEPT
+    uint_fast32_t get_num_entries() const  noexcept
     {
         return entries;
     }
 
-    uint_fast32_t last() const  REALM_NOEXCEPT
+    uint_fast32_t last() const  noexcept
     {
         return put_pos.load(std::memory_order_acquire);
     }
 
-    const ReadCount& get(uint_fast32_t idx) const  REALM_NOEXCEPT
+    const ReadCount& get(uint_fast32_t idx) const  noexcept
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const  REALM_NOEXCEPT
+    const ReadCount& get_last() const  noexcept
     {
         return get(last());
     }
 
-    const ReadCount& get_oldest() const  REALM_NOEXCEPT
+    // This method re-initialises the last used ringbuffer entry to hold a new entry.
+    // Precondition: This should *only* be done if the caller has established that she
+    // is the only thread/process that has access to the ringbuffer. It is currently
+    // called from init_versioning(), which is called by SharedGroup::open() under the
+    // condition that it is the session initiator and under guard by the control mutex,
+    // thus ensuring the precondition.
+    // It is most likely not suited for any other use.
+    ReadCount& reinit_last() noexcept
+    {
+        ReadCount& r = data[last()];
+        // r.count is an atomic<> due to other usage constraints. Right here, we're
+        // operating under mutex protection, so the use of an atomic store is immaterial
+        // and just forced on us by the type of r.count.
+        // You'll find the full discussion of how r.count is operated and why it must be
+        // an atomic earlier in this file.
+        r.count.store(0, std::memory_order_relaxed);
+        return r;
+    }
+
+    const ReadCount& get_oldest() const  noexcept
     {
         return get(old_pos.load(std::memory_order_relaxed));
     }
 
-    bool is_full() const  REALM_NOEXCEPT
+    bool is_full() const  noexcept
     {
         uint_fast32_t idx = get(last()).next;
         return idx == old_pos.load(std::memory_order_relaxed);
     }
 
-    uint_fast32_t next() const  REALM_NOEXCEPT
+    uint_fast32_t next() const  noexcept
     { // do not call this if the buffer is full!
         uint_fast32_t idx = get(last()).next;
         return idx;
     }
 
-    ReadCount& get_next()  REALM_NOEXCEPT
+    ReadCount& get_next()  noexcept
     {
         REALM_ASSERT(!is_full());
         return data[ next() ];
     }
 
-    void use_next()  REALM_NOEXCEPT
+    void use_next()  noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
         put_pos.store(next(), std::memory_order_release);
     }
 
-    void cleanup()  REALM_NOEXCEPT
+    void cleanup()  noexcept
     {   // invariant: entry held by put_pos has count > 1.
         // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
@@ -403,15 +422,14 @@ struct SharedGroup::SharedInfo
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
     SharedInfo(DurabilityLevel);
-    ~SharedInfo() REALM_NOEXCEPT {}
+    ~SharedInfo() noexcept {}
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
-        Ringbuffer::ReadCount& r = readers.get_next();
+        Ringbuffer::ReadCount& r = readers.reinit_last();
         r.filesize = file_size;
         r.version = initial_version;
         r.current_top = top_ref;
-        readers.use_next();
     }
     uint_fast64_t get_current_version_unchecked() const
     {
@@ -561,7 +579,6 @@ void SharedGroup::do_open_1(const std::string& path, bool no_create_file, Durabi
     // throws, it must leave the file closed.
 
     do_open_2(path, no_create_file, durability, is_backend, encryption_key); // Throws
-#if REALM_NULL_STRINGS == 1
     try {
         upgrade_file_format(allow_upgrafe_file_format); // Throws
     }
@@ -569,9 +586,6 @@ void SharedGroup::do_open_1(const std::string& path, bool no_create_file, Durabi
         close();
         throw;
     }
-#else
-    static_cast<void>(allow_upgrafe_file_format);
-#endif
 }
 
 
@@ -709,37 +723,27 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             // proceed to initialize versioning and other metadata information related to
             // the database. Also create the database if we're beginning a new session
             bool begin_new_session = info->num_participants == 0;
-            bool is_shared = true;
-            bool read_only = false;
-            bool skip_validate = !begin_new_session;
+            SlabAlloc::Config cfg;
+            cfg.session_initiator = begin_new_session;
+            cfg.is_shared = true;
+            cfg.read_only = false;
+            cfg.skip_validate = !begin_new_session;
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
-            bool no_create = begin_new_session ? no_create_file : true;
+            cfg.no_create = begin_new_session ? no_create_file : true;
 
             // If replication is enabled, we need to ask it whether we're in server-sync mode
             // and check that the database is operated in the same mode.
-            bool server_sync_mode = false;
+            cfg.server_sync_mode = false;
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl)
-                server_sync_mode = repl->is_in_server_synchronization_mode();
-            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
-                                                 no_create, skip_validate,
-                                                 encryption_key, server_sync_mode); // Throws
+                cfg.server_sync_mode = repl->is_in_server_synchronization_mode();
+            cfg.encryption_key = encryption_key;
+            ref_type top_ref = alloc.attach_file(path, cfg); // Throws
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
-                // make sure the database is not on streaming format. This has to be done at
-                // session initialization, even if it means writing the database during open.
-                if (alloc.m_file_on_streaming_form) {
-                    util::File::Map<char> db_map;
-                    db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
-                    File::UnmapGuard db_ug(db_map);
-                    alloc.prepare_for_update(db_map.get_addr(), db_map);
-                    bool disable_sync = get_disable_sync_to_disk();
-                    if (!disable_sync)
-                        db_map.sync();
-                }
 
                 // determine version
                 uint_fast64_t version;
@@ -752,7 +756,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                     if (top.size() <= 5) {
                         // the database wasn't written by shared group, so no versioning info
                         version = 1;
-                        REALM_ASSERT(! server_sync_mode);
+                        REALM_ASSERT(! cfg.server_sync_mode);
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
@@ -913,13 +917,13 @@ bool SharedGroup::compact()
 
     // close and reopen the database file.
     alloc.detach();
-    bool skip_validate = false;
-    bool no_create = true;
-    bool read_only = false;
-    bool is_shared = true;
-    bool server_sync_mode = false;
-    ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create,
-                                         skip_validate, m_key, server_sync_mode); // Throws
+    SlabAlloc::Config cfg;
+    cfg.skip_validate = true;
+    cfg.no_create = true;
+    cfg.is_shared = true;
+    cfg.session_initiator = true;
+    cfg.encryption_key = m_key;
+    ref_type top_ref = alloc.attach_file(m_db_path, cfg);
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match
@@ -938,12 +942,12 @@ uint_fast64_t SharedGroup::get_number_of_versions()
     return info->number_of_versions;
 }
 
-SharedGroup::~SharedGroup() REALM_NOEXCEPT
+SharedGroup::~SharedGroup() noexcept
 {
     close();
 }
 
-void SharedGroup::close() REALM_NOEXCEPT
+void SharedGroup::close() noexcept
 {
     if (!is_attached())
         return;
@@ -1222,7 +1226,7 @@ const Group& SharedGroup::begin_read(VersionID version)
 }
 
 
-void SharedGroup::end_read() REALM_NOEXCEPT
+void SharedGroup::end_read() noexcept
 {
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
@@ -1281,7 +1285,7 @@ SharedGroup::version_type SharedGroup::commit()
 }
 
 
-void SharedGroup::rollback() REALM_NOEXCEPT
+void SharedGroup::rollback() noexcept
 {
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
@@ -1325,7 +1329,7 @@ void SharedGroup::do_begin_read(VersionID version)
 }
 
 
-void SharedGroup::do_end_read() REALM_NOEXCEPT
+void SharedGroup::do_end_read() noexcept
 {
     REALM_ASSERT(m_readlock.m_version != std::numeric_limits<size_t>::max());
     release_readlock(m_readlock);
@@ -1363,7 +1367,7 @@ void SharedGroup::do_begin_write()
 }
 
 
-void SharedGroup::do_end_write() REALM_NOEXCEPT
+void SharedGroup::do_end_write() noexcept
 {
     SharedInfo* info = m_file_map.get_addr();
     info->writemutex.unlock();
@@ -1401,7 +1405,7 @@ Replication::version_type SharedGroup::do_commit()
 }
 
 
-void SharedGroup::release_readlock(ReadLockInfo& readlock) REALM_NOEXCEPT
+void SharedGroup::release_readlock(ReadLockInfo& readlock) noexcept
 {
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
