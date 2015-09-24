@@ -131,7 +131,7 @@ public:
     {
     }
 
-    ~ShortCircuitHistory() REALM_NOEXCEPT
+    ~ShortCircuitHistory() noexcept
     {
     }
 
@@ -147,7 +147,7 @@ public:
         m_changesets[new_version]; // Throws
     }
 
-    void finalize_changeset() REALM_NOEXCEPT override
+    void finalize_changeset() noexcept override
     {
         // The following operation will not throw due to the space reservation
         // carried out in prepare_new_changeset().
@@ -155,7 +155,7 @@ public:
     }
 
     void get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer)
-        const REALM_NOEXCEPT override
+        const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i != n; ++i) {
@@ -168,7 +168,7 @@ public:
         }
     }
 
-    BinaryData get_uncommitted_changes() REALM_NOEXCEPT override
+    BinaryData get_uncommitted_changes() noexcept override
     {
         REALM_ASSERT(false);
         return BinaryData(); // FIXME: Not yet implemented
@@ -6798,6 +6798,33 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 }
 
 
+TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    TableRef t, t2;
+    {
+        // add a column
+        LangBindHelper::promote_to_write(sg, *hist);
+        t  = group->get_or_add_table("a_table");
+        t2 = group->get_or_add_table("b_table");
+        t->add_column_link(type_Link, "bruno", *t2);
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        // ... but then regret it
+        LangBindHelper::promote_to_write(sg, *hist);
+        t->remove_column(0);
+        CHECK_EQUAL(0, t->get_descriptor()->get_column_count());
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    }
+}
+
+
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -8188,6 +8215,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         // here we need to allow the reciever to get hold on the proper version before
         // we go through the loop again and advance_read().
         control->wait_feedback();
+        sched_yield();
 
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
@@ -8206,7 +8234,11 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID version;
         control->get(handover, version);
+        CHECK_EQUAL(version.version, handover->version.version);
+        CHECK(version == handover->version);
         Group& g = const_cast<Group&>(sg.begin_read(version));
+        CHECK_EQUAL(version.version, sg.get_version_of_current_transaction().version);
+        CHECK(version == sg.get_version_of_current_transaction());
         control->signal_feedback();
         TableRef table = g.get_table("table");
         TableView tv = table->where().greater(0,50).find_all();
@@ -8214,9 +8246,9 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
-        CHECK(tv.size() == tv2->size());
+        CHECK_EQUAL(tv.size(), tv2->size());
         for (std::size_t k=0; k<tv.size(); ++k)
-            CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
+            CHECK_EQUAL(tv.get_int(0,k), tv2->get_int(0,k));
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
         sg.end_read();
@@ -8622,6 +8654,58 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
             handover2 = sg_w.export_for_handover(tv1, ConstSourcePayload::Copy);
             CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
+        }
+    }
+}
+
+TEST(LangBindHelper_HandoverTableViewFromBacklink)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
+        {
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+            TableRef source = group_w.add_table("source");
+            source->add_column(type_Int, "int");
+
+            TableRef links = group_w.add_table("links");
+            links->add_column_link(type_Link, "link", *source);
+
+
+            for (int i = 0; i < 100; ++i) {
+                source->add_empty_row();
+                source->set_int(0, i, i);
+
+                links->add_empty_row();
+                links->set_link(0, i, i);
+            }
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+
+            for (int i = 0; i < 100; ++i) {
+                TableView tv = source->get_backlink_view(i, links.get(), 0);
+                CHECK(tv.is_attached());
+                CHECK_EQUAL(1, tv.size());
+                CHECK_EQUAL(i, tv.get_link(0, 0));
+                handover1 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+                CHECK(tv.is_attached());
+                sg.begin_read(vid);
+                auto tv2 = sg.import_from_handover(std::move(handover1));
+                CHECK(tv2->is_attached());
+                CHECK_EQUAL(1, tv2->size());
+                CHECK_EQUAL(i, tv2->get_link(0, 0));
+                sg.end_read();
+            }
         }
     }
 }

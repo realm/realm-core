@@ -36,16 +36,16 @@ class wildcard_pattern {
 public:
     explicit wildcard_pattern(const std::string& text);
 
-    bool match(const char* begin, const char* end) const REALM_NOEXCEPT;
+    bool match(const char* begin, const char* end) const noexcept;
 
-    bool match(const char* c_str) const REALM_NOEXCEPT;
+    bool match(const char* c_str) const noexcept;
 
 private:
     std::string m_text;
 
     struct card {
         std::size_t m_offset, m_size;
-        card(std::size_t begin, std::size_t end) REALM_NOEXCEPT;
+        card(std::size_t begin, std::size_t end) noexcept;
     };
 
     // Must contain at least one card. The first, and the last card
@@ -61,14 +61,14 @@ private:
 
 // Implementation
 
-inline bool wildcard_pattern::match(const char* c_str) const REALM_NOEXCEPT
+inline bool wildcard_pattern::match(const char* c_str) const noexcept
 {
     const char* begin = c_str;
     const char* end   = begin + std::strlen(c_str);
     return match(begin, end);
 }
 
-inline wildcard_pattern::card::card(std::size_t begin, std::size_t end) REALM_NOEXCEPT
+inline wildcard_pattern::card::card(std::size_t begin, std::size_t end) noexcept
 {
     m_offset = begin;
     m_size   = end - begin;

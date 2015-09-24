@@ -56,8 +56,8 @@ in set(), etc). This way no file format upgrade is needed to support nulls for B
 
 class ArrayBinary: public Array {
 public:
-    explicit ArrayBinary(Allocator&) REALM_NOEXCEPT;
-    ~ArrayBinary() REALM_NOEXCEPT override {}
+    explicit ArrayBinary(Allocator&) noexcept;
+    ~ArrayBinary() noexcept override {}
 
     /// Create a new empty binary array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -69,19 +69,19 @@ public:
 
     // Old database files will not have the m_nulls array, so we need code paths for
     // backwards compatibility for these cases.
-    bool legacy_array_type() const REALM_NOEXCEPT;
+    bool legacy_array_type() const noexcept;
 
     //@{
     /// Overriding functions of Array
-    void init_from_ref(ref_type) REALM_NOEXCEPT;
-    void init_from_mem(MemRef) REALM_NOEXCEPT;
-    void init_from_parent() REALM_NOEXCEPT;
+    void init_from_ref(ref_type) noexcept;
+    void init_from_mem(MemRef) noexcept;
+    void init_from_parent() noexcept;
     //@}
 
-    bool is_empty() const REALM_NOEXCEPT;
-    std::size_t size() const REALM_NOEXCEPT;
+    bool is_empty() const noexcept;
+    std::size_t size() const noexcept;
 
-    BinaryData get(std::size_t ndx) const REALM_NOEXCEPT;
+    BinaryData get(std::size_t ndx) const noexcept;
 
     void add(BinaryData value, bool add_zero_term = false);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -95,12 +95,12 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static BinaryData get(const char* header, std::size_t ndx, Allocator&) REALM_NOEXCEPT;
+    static BinaryData get(const char* header, std::size_t ndx, Allocator&) noexcept;
 
     ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
 
-    static std::size_t get_size_from_header(const char*, Allocator&) REALM_NOEXCEPT;
+    static std::size_t get_size_from_header(const char*, Allocator&) noexcept;
 
     /// Construct a binary array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
@@ -114,7 +114,7 @@ public:
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
-    bool update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT;
+    bool update_from_parent(std::size_t old_baseline) noexcept;
 
 private:
     ArrayInteger m_offsets;
@@ -128,7 +128,7 @@ private:
 
 // Implementation:
 
-inline ArrayBinary::ArrayBinary(Allocator& alloc) REALM_NOEXCEPT:
+inline ArrayBinary::ArrayBinary(Allocator& alloc) noexcept:
     Array(alloc), m_offsets(alloc), m_blob(alloc), 
     m_nulls(alloc)
 {
@@ -144,20 +144,20 @@ inline void ArrayBinary::create()
     init_from_mem(mem);
 }
 
-inline void ArrayBinary::init_from_ref(ref_type ref) REALM_NOEXCEPT
+inline void ArrayBinary::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
     init_from_mem(MemRef(header, ref));
 }
 
-inline void ArrayBinary::init_from_parent() REALM_NOEXCEPT
+inline void ArrayBinary::init_from_parent() noexcept
 {
     ref_type ref = get_ref_from_parent();
     init_from_ref(ref);
 }
 
-inline bool ArrayBinary::is_empty() const REALM_NOEXCEPT
+inline bool ArrayBinary::is_empty() const noexcept
 {
     return m_offsets.is_empty();
 }
@@ -165,7 +165,7 @@ inline bool ArrayBinary::is_empty() const REALM_NOEXCEPT
 // Old database files will not have the m_nulls array, so we need code paths for
 // backwards compatibility for these cases. We can test if m_nulls exists by looking
 // at number of references in this ArrayBinary.
-inline bool ArrayBinary::legacy_array_type() const REALM_NOEXCEPT
+inline bool ArrayBinary::legacy_array_type() const noexcept
 {
     if (Array::size() == 3)
         return false;               // New database file
@@ -176,12 +176,12 @@ inline bool ArrayBinary::legacy_array_type() const REALM_NOEXCEPT
     return false;
 }
 
-inline std::size_t ArrayBinary::size() const REALM_NOEXCEPT
+inline std::size_t ArrayBinary::size() const noexcept
 {
     return m_offsets.size();
 }
 
-inline BinaryData ArrayBinary::get(std::size_t ndx) const REALM_NOEXCEPT
+inline BinaryData ArrayBinary::get(std::size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
@@ -229,14 +229,14 @@ inline void ArrayBinary::destroy()
 }
 
 inline std::size_t ArrayBinary::get_size_from_header(const char* header,
-                                                     Allocator& alloc) REALM_NOEXCEPT
+                                                     Allocator& alloc) noexcept
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
     return Array::get_size_from_header(offsets_header);
 }
 
-inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
+inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) noexcept
 {
     bool res = Array::update_from_parent(old_baseline);
     if (res) {

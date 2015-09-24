@@ -62,8 +62,8 @@ namespace {
 
 class TreeWriter {
 public:
-    TreeWriter(_impl::OutputStream&) REALM_NOEXCEPT;
-    ~TreeWriter() REALM_NOEXCEPT;
+    TreeWriter(_impl::OutputStream&) noexcept;
+    ~TreeWriter() noexcept;
 
     void add_leaf_ref(ref_type child_ref, size_t elems_in_child, ref_type* is_last);
 
@@ -77,7 +77,7 @@ private:
 class TreeWriter::ParentLevel {
 public:
     ParentLevel(Allocator&, _impl::OutputStream&, size_t max_elems_per_child);
-    ~ParentLevel() REALM_NOEXCEPT;
+    ~ParentLevel() noexcept;
 
     void add_child_ref(ref_type child_ref, size_t elems_in_child,
                        bool leaf_or_compact, ref_type* is_last);
@@ -93,13 +93,13 @@ private:
 };
 
 
-inline TreeWriter::TreeWriter(_impl::OutputStream& out) REALM_NOEXCEPT:
+inline TreeWriter::TreeWriter(_impl::OutputStream& out) noexcept:
     m_alloc(Allocator::get_default()),
     m_out(out)
 {
 }
 
-inline TreeWriter::~TreeWriter() REALM_NOEXCEPT
+inline TreeWriter::~TreeWriter() noexcept
 {
 }
 
@@ -130,7 +130,7 @@ inline TreeWriter::ParentLevel::ParentLevel(Allocator& alloc, _impl::OutputStrea
     m_main.create(Array::type_InnerBptreeNode); // Throws
 }
 
-inline TreeWriter::ParentLevel::~ParentLevel() REALM_NOEXCEPT
+inline TreeWriter::ParentLevel::~ParentLevel() noexcept
 {
     m_offsets.destroy(); // Shallow
     m_main.destroy(); // Shallow
@@ -237,7 +237,7 @@ struct BpTreeBase::WriteSliceHandler: public Array::VisitHandler {
 public:
     WriteSliceHandler(size_t offset, size_t size, Allocator& alloc,
                       BpTreeBase::SliceHandler &slice_handler,
-                      _impl::OutputStream& out) REALM_NOEXCEPT:
+                      _impl::OutputStream& out) noexcept:
         m_begin(offset), m_end(offset + size),
         m_leaf_cache(alloc),
         m_slice_handler(slice_handler),
@@ -246,7 +246,7 @@ public:
         m_top_ref(0)
     {
     }
-    ~WriteSliceHandler() REALM_NOEXCEPT
+    ~WriteSliceHandler() noexcept
     {
     }
     bool visit(const Array::NodeInfo& leaf_info) override
@@ -284,7 +284,7 @@ public:
         m_tree_writer.add_leaf_ref(ref, size, is_last); // Throws
         return !is_last;
     }
-    ref_type get_top_ref() const REALM_NOEXCEPT
+    ref_type get_top_ref() const noexcept
     {
         return m_top_ref;
     }

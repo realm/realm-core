@@ -58,7 +58,7 @@ void nslog(const char *message) {
 }
 #endif
 
-REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
+REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
 {
 
 #if defined(__APPLE__)
@@ -66,7 +66,7 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
     int frames = backtrace(callstack, 128);
     char** strs = backtrace_symbols(callstack, frames);
     for (int i = 0; i < frames; ++i) {
-        ss << strs[i] << "\n";
+        ss << strs[i] << '\n';
     }
     free(strs);
 #endif
@@ -85,6 +85,12 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
     please_report_this_error_to_help_at_realm_dot_io();
 }
 
+REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept
+{
+    std::stringstream ss;
+    ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << '\n';
+    terminate_internal(ss);
+}
 
 } // namespace util
 } // namespace realm

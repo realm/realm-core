@@ -35,7 +35,6 @@ Initialization initialization;
 
 void Group::upgrade_file_format()
 {
-#if REALM_NULL_STRINGS == 1
     REALM_ASSERT(is_attached());
 
     // SlabAlloc::validate_buffer() ensures this
@@ -47,23 +46,22 @@ void Group::upgrade_file_format()
         TableRef table = get_table(t);
         table->upgrade_file_format();
     }
-#endif
 }
 
 
-int Group::get_file_format() const REALM_NOEXCEPT
+int Group::get_file_format() const noexcept
 {
     return m_alloc.m_file_format;
 }
 
 
-void Group::set_file_format(int file_format) REALM_NOEXCEPT
+void Group::set_file_format(int file_format) noexcept
 {
     m_alloc.m_file_format = file_format;
 }
 
 
-int Group::get_committed_file_format() const REALM_NOEXCEPT
+int Group::get_committed_file_format() const noexcept
 {
     return m_alloc.get_committed_file_format();
 }
@@ -122,7 +120,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
 }
 
 
-Group::~Group() REALM_NOEXCEPT
+Group::~Group() noexcept
 {
     // If this group accessor is detached at this point in time, it is either
     // because it is SharedGroup::m_group (m_is_shared), or it is a free-stading
@@ -185,7 +183,8 @@ void Group::attach(ref_type top_ref)
     else {
         m_top.init_from_ref(top_ref);
         size_t top_size = m_top.size();
-        REALM_ASSERT(top_size == 3 || top_size == 5 || top_size == 7);
+        static_cast<void>(top_size);
+        REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
 
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
@@ -197,7 +196,7 @@ void Group::attach(ref_type top_ref)
 }
 
 
-void Group::detach() REALM_NOEXCEPT
+void Group::detach() noexcept
 {
     detach_table_accessors();
     m_table_accessors.clear();
@@ -225,7 +224,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
 }
 
 
-void Group::detach_table_accessors() REALM_NOEXCEPT
+void Group::detach_table_accessors() noexcept
 {
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
@@ -717,7 +716,7 @@ void Group::commit()
 }
 
 
-void Group::update_refs(ref_type top_ref, size_t old_baseline) REALM_NOEXCEPT
+void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 {
     // After Group::commit() we will always have free space tracking
     // info.
@@ -808,7 +807,7 @@ void Group::to_string(std::ostream& out) const
 }
 
 
-void Group::mark_all_table_accessors() REALM_NOEXCEPT
+void Group::mark_all_table_accessors() noexcept
 {
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
@@ -905,7 +904,7 @@ public:
     {
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) REALM_NOEXCEPT
+    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) noexcept
     {
         REALM_ASSERT_3(table_ndx, <=, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() ||
@@ -927,7 +926,7 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(size_t table_ndx, size_t num_tables) REALM_NOEXCEPT
+    bool erase_group_level_table(size_t table_ndx, size_t num_tables) noexcept
     {
         REALM_ASSERT_3(table_ndx, <, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() ||
@@ -957,14 +956,14 @@ public:
         return true;
     }
 
-    bool rename_group_level_table(size_t, StringData) REALM_NOEXCEPT
+    bool rename_group_level_table(size_t, StringData) noexcept
     {
         // No-op since table names are properties of the group, and the group
         // accessor is always refreshed
         return true;
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t* path) REALM_NOEXCEPT
+    bool select_table(size_t group_level_ndx, int levels, const size_t* path) noexcept
     {
         m_table.reset();
         if (group_level_ndx < m_group.m_table_accessors.size()) {
@@ -991,7 +990,7 @@ public:
     }
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
-                           bool unordered) REALM_NOEXCEPT
+                           bool unordered) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table) {
@@ -1018,7 +1017,7 @@ public:
     }
 
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                    bool unordered) REALM_NOEXCEPT
+                    bool unordered) noexcept
     {
         if (unordered) {
             // Unordered removal of multiple rows is not yet supported (and not
@@ -1040,7 +1039,7 @@ public:
         return true;
     }
 
-    bool clear_table() REALM_NOEXCEPT
+    bool clear_table() noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table)
@@ -1048,42 +1047,42 @@ public:
         return true;
     }
 
-    bool set_int(size_t, size_t, int_fast64_t) REALM_NOEXCEPT
+    bool set_int(size_t, size_t, int_fast64_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_bool(size_t, size_t, bool) REALM_NOEXCEPT
+    bool set_bool(size_t, size_t, bool) noexcept
     {
         return true; // No-op
     }
 
-    bool set_float(size_t, size_t, float) REALM_NOEXCEPT
+    bool set_float(size_t, size_t, float) noexcept
     {
         return true; // No-op
     }
 
-    bool set_double(size_t, size_t, double) REALM_NOEXCEPT
+    bool set_double(size_t, size_t, double) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string(size_t, size_t, StringData) REALM_NOEXCEPT
+    bool set_string(size_t, size_t, StringData) noexcept
     {
         return true; // No-op
     }
 
-    bool set_binary(size_t, size_t, BinaryData) REALM_NOEXCEPT
+    bool set_binary(size_t, size_t, BinaryData) noexcept
     {
         return true; // No-op
     }
 
-    bool set_date_time(size_t, size_t, DateTime) REALM_NOEXCEPT
+    bool set_date_time(size_t, size_t, DateTime) noexcept
     {
         return true; // No-op
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx) REALM_NOEXCEPT
+    bool set_table(size_t col_ndx, size_t row_ndx) noexcept
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1095,7 +1094,7 @@ public:
         return true;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) REALM_NOEXCEPT
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table)
@@ -1103,12 +1102,12 @@ public:
         return true;
     }
 
-    bool set_null(size_t, size_t) REALM_NOEXCEPT
+    bool set_null(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_link(size_t col_ndx, size_t, size_t) REALM_NOEXCEPT
+    bool set_link(size_t col_ndx, size_t, size_t) noexcept
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1135,7 +1134,7 @@ public:
         return true;
     }
 
-    bool optimize_table() REALM_NOEXCEPT
+    bool optimize_table() noexcept
     {
         return true; // No-op
     }
@@ -1233,37 +1232,37 @@ public:
         return true;
     }
 
-    bool rename_column(size_t, StringData) REALM_NOEXCEPT
+    bool rename_column(size_t, StringData) noexcept
     {
         return true; // No-op
     }
 
-    bool add_search_index(size_t) REALM_NOEXCEPT
+    bool add_search_index(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool remove_search_index(size_t) REALM_NOEXCEPT
+    bool remove_search_index(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool add_primary_key(size_t) REALM_NOEXCEPT
+    bool add_primary_key(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool remove_primary_key() REALM_NOEXCEPT
+    bool remove_primary_key() noexcept
     {
         return true; // No-op
     }
 
-    bool set_link_type(size_t, LinkType) REALM_NOEXCEPT
+    bool set_link_type(size_t, LinkType) noexcept
     {
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, size_t) REALM_NOEXCEPT
+    bool select_link_list(size_t col_ndx, size_t) noexcept
     {
         // See comments on link handling in TransactAdvancer::set_link().
         typedef _impl::TableFriend tf;
@@ -1274,32 +1273,32 @@ public:
         return true; // No-op
     }
 
-    bool link_list_set(size_t, size_t) REALM_NOEXCEPT
+    bool link_list_set(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_insert(size_t, size_t) REALM_NOEXCEPT
+    bool link_list_insert(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_move(size_t, size_t) REALM_NOEXCEPT
+    bool link_list_move(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_swap(size_t, size_t) REALM_NOEXCEPT
+    bool link_list_swap(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_erase(size_t) REALM_NOEXCEPT
+    bool link_list_erase(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_clear(size_t) REALM_NOEXCEPT
+    bool link_list_clear(size_t) noexcept
     {
         return true; // No-op
     }

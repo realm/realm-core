@@ -72,14 +72,14 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size
     return r;
 }
 
-void ArrayIntNull::init_from_ref(ref_type ref) REALM_NOEXCEPT
+void ArrayIntNull::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
     init_from_mem(MemRef{header, ref});
 }
 
-void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
+void ArrayIntNull::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
 
@@ -95,7 +95,7 @@ void ArrayIntNull::init_from_mem(MemRef mem) REALM_NOEXCEPT
     }
 }
 
-void ArrayIntNull::init_from_parent() REALM_NOEXCEPT
+void ArrayIntNull::init_from_parent() noexcept
 {
     init_from_ref(get_ref_from_parent());
 }
@@ -205,7 +205,7 @@ void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t co
 }
 
 
-void ArrayIntNull::get_chunk(size_t ndx, int64_t res[8]) const REALM_NOEXCEPT
+void ArrayIntNull::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     Array::get_chunk(ndx + 1, res);
 }

@@ -88,9 +88,6 @@ TEST(Upgrade_Database_2_3)
     // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
     // even read using Get()) without upgrading the database first.
 
-    // If REALM_NULL_STRINGS is NOT defined to 1, then this Realm core still operates in format 2 (null not supported)
-    // and this unit test will not upgrade the file. The REALM_NULL_STRINGS flag was introduced to be able to merge
-    // null branch into master but without activating version 3 yet.
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
@@ -131,7 +128,6 @@ TEST(Upgrade_Database_2_3)
     }
 #endif
 
-#if REALM_NULL_STRINGS == 1
     // Prohibit automatic upgrade by SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
@@ -146,7 +142,6 @@ TEST(Upgrade_Database_2_3)
             SharedGroup(temp_copy, no_create, durability, encryption_key, allow_upgrade),
             FileFormatUpgradeRequired);
     }
-#endif
 
     // Automatic upgrade from SharedGroup
     {
@@ -308,11 +303,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-#if REALM_NULL_STRINGS == 1
     CHECK_EQUAL(3, sgf::get_file_format(g));
-#else
-    CHECK_EQUAL(2, sgf::get_file_format(g));
-#endif
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -451,11 +442,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-#if REALM_NULL_STRINGS == 1
     CHECK_EQUAL(3, sgf::get_file_format(g));
-#else
-    CHECK_EQUAL(2, sgf::get_file_format(g));
-#endif
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -663,7 +650,7 @@ TEST(Upgrade_Database_Binary)
 
 
 // Test upgrading a database with single column containing strings with embedded NULs
-TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_NULL_STRINGS)
+TEST(Upgrade_Database_Strings_With_NUL)
 {
     const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
 

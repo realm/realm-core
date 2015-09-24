@@ -11,13 +11,13 @@ using namespace realm::util;
 namespace {
 
 class system_category: public std::error_category {
-    const char* name() const REALM_NOEXCEPT override;
+    const char* name() const noexcept override;
     std::string message(int) const override;
 };
 
 system_category g_system_category;
 
-const char* system_category::name() const REALM_NOEXCEPT
+const char* system_category::name() const noexcept
 {
     return "realm.basic_system";
 }

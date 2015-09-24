@@ -35,16 +35,6 @@
 #  endif
 #endif
 
-
-// Enables null support for strings, and also fixes an old bug in Index where it didn't support 0-bytes in
-// strings. If enabled, then existing database files made by older versions of Core will be upgraded
-// automatically the first time you open it. Hence, it must be opened with write access (through SharedGroup).
-// If you open it for read access (through Group) it will throw an exception (with a descriptive user friendly
-// error message).
-#ifndef REALM_NULL_STRINGS
-#  define REALM_NULL_STRINGS 1
-#endif
-
 /* The maximum number of elements in a B+-tree node. Applies to inner nodes and
  * to leaves. The minimum allowable value is 2.
  */
@@ -148,46 +138,6 @@
     REALM_HAVE_CLANG_FEATURE(cxx_explicit_conversions) || \
     REALM_HAVE_AT_LEAST_MSVC_12_2013
 #  define REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
-#endif
-
-
-/* Support for the C++11 'constexpr' keyword.
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 6) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_constexpr)
-#  define REALM_HAVE_CXX11_CONSTEXPR 1
-#endif
-#if REALM_HAVE_CXX11_CONSTEXPR
-#  define REALM_CONSTEXPR constexpr
-#else
-#  define REALM_CONSTEXPR
-#endif
-
-
-/* Support for the C++11 'noexcept' specifier.
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 6) || defined(_MSC_VER) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_noexcept)
-#  define REALM_HAVE_CXX11_NOEXCEPT 1
-#endif
-#if REALM_HAVE_CXX11_NOEXCEPT
-#  define REALM_NOEXCEPT noexcept
-#elif defined REALM_DEBUG
-#  define REALM_NOEXCEPT throw()
-#else
-#  define REALM_NOEXCEPT
-#endif
-#if REALM_HAVE_CXX11_NOEXCEPT
-#  define REALM_NOEXCEPT_IF(cond) noexcept (cond)
-#else
-#  define REALM_NOEXCEPT_IF(cond)
-#endif
-#if REALM_HAVE_CXX11_NOEXCEPT
-#  define REALM_NOEXCEPT_OR_NOTHROW noexcept
-#else
-#  define REALM_NOEXCEPT_OR_NOTHROW throw ()
 #endif
 
 

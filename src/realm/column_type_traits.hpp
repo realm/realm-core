@@ -32,12 +32,15 @@ template <bool Nullable> struct ColumnTypeTraits<int64_t, Nullable> {
     using leaf_type = typename column_type::LeafType;
     using sum_type = int64_t;
     static const DataType id = type_Int;
+    static const ColumnType column_id = col_type_Int;
+    static const ColumnType real_column_type = col_type_Int;
 };
 
 template <bool Nullable> struct ColumnTypeTraits<bool, Nullable> :
     ColumnTypeTraits<int64_t, Nullable>
 {
     static const DataType id = type_Bool;
+    static const ColumnType column_id = col_type_Bool;
 };
 
 template <bool N> struct ColumnTypeTraits<float, N> {
@@ -45,6 +48,8 @@ template <bool N> struct ColumnTypeTraits<float, N> {
     using leaf_type = ArrayFloat;
     using sum_type = double;
     static const DataType id = type_Float;
+    static const ColumnType column_id = col_type_Float;
+    static const ColumnType real_column_type = col_type_Float;
 };
 
 template <bool N> struct ColumnTypeTraits<double, N> {
@@ -52,12 +57,15 @@ template <bool N> struct ColumnTypeTraits<double, N> {
     using leaf_type = ArrayDouble;
     using sum_type = double;
     static const DataType id = type_Double;
+    static const ColumnType column_id = col_type_Double;
+    static const ColumnType real_column_type = col_type_Double;
 };
 
 template <bool N> struct ColumnTypeTraits<DateTime, N> :
     ColumnTypeTraits<int64_t, N>
 {
     static const DataType id = type_DateTime;
+    static const ColumnType column_id = col_type_DateTime;
 };
 
 template <bool N> struct ColumnTypeTraits<StringData, N> {
@@ -65,6 +73,16 @@ template <bool N> struct ColumnTypeTraits<StringData, N> {
     using leaf_type = StringEnumColumn::LeafType;
     using sum_type = int64_t;
     static const DataType id = type_String;
+    static const ColumnType column_id = col_type_String;
+    static const ColumnType real_column_type = col_type_String;
+};
+
+template <bool N> struct ColumnTypeTraits<BinaryData, N> {
+    using column_type = BinaryColumn;
+    using leaf_type = ArrayBinary;
+    static const DataType id = type_Binary;
+    static const ColumnType column_id = col_type_Binary;
+    static const ColumnType real_column_type = col_type_Binary;
 };
 
 template <DataType, bool Nullable> struct GetColumnType;

@@ -106,24 +106,24 @@ StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable):
 }
 
 
-StringColumn::~StringColumn() REALM_NOEXCEPT
+StringColumn::~StringColumn() noexcept
 {
 }
 
 
-void StringColumn::destroy() REALM_NOEXCEPT
+void StringColumn::destroy() noexcept
 {
     ColumnBaseSimple::destroy();
     if (m_search_index)
         m_search_index->destroy();
 }
 
-bool StringColumn::is_nullable() const REALM_NOEXCEPT
+bool StringColumn::is_nullable() const noexcept
 {
     return m_nullable;
 }
 
-StringData StringColumn::get(size_t ndx) const REALM_NOEXCEPT
+StringData StringColumn::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < size());
 
@@ -164,14 +164,14 @@ StringData StringColumn::get(size_t ndx) const REALM_NOEXCEPT
     return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc, m_nullable);
 }
 
-bool StringColumn::is_null(std::size_t ndx) const REALM_NOEXCEPT
+bool StringColumn::is_null(std::size_t ndx) const noexcept
 {
     StringData sd = get(ndx);
     REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd.is_null();
 }
 
-StringData StringColumn::get_index_data(std::size_t ndx, char*) const REALM_NOEXCEPT
+StringData StringColumn::get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
 {
     return get(ndx);
 }
@@ -213,13 +213,13 @@ StringIndex* StringColumn::create_search_index()
 }
 
 
-void StringColumn::destroy_search_index() REALM_NOEXCEPT
+void StringColumn::destroy_search_index() noexcept
 {
     m_search_index.reset();
 }
 
 
-std::unique_ptr<StringIndex> StringColumn::release_search_index() REALM_NOEXCEPT
+std::unique_ptr<StringIndex> StringColumn::release_search_index() noexcept
 {
     return std::move(m_search_index);
 }
@@ -234,13 +234,13 @@ void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
 }
 
 
-void StringColumn::set_search_index_allow_duplicate_values(bool allow) REALM_NOEXCEPT
+void StringColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
 {
     m_search_index->set_allow_duplicate_values(allow);
 }
 
 
-void StringColumn::update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT
+void StringColumn::update_from_parent(std::size_t old_baseline) noexcept
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -280,7 +280,7 @@ public:
     const StringData m_value;
     bool m_nullable;
 
-    SetLeafElem(Allocator& alloc, StringData value, bool nullable) REALM_NOEXCEPT:
+    SetLeafElem(Allocator& alloc, StringData value, bool nullable) noexcept:
         m_alloc(alloc), m_value(value), m_nullable(nullable) {}
 
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
@@ -391,7 +391,7 @@ void StringColumn::set(size_t ndx, StringData value)
 class StringColumn::EraseLeafElem: public Array::EraseHandler {
 public:
     StringColumn& m_column;
-    EraseLeafElem(StringColumn& column, bool nullable) REALM_NOEXCEPT:
+    EraseLeafElem(StringColumn& column, bool nullable) noexcept:
         m_column(column), m_nullable(nullable) {}
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
@@ -443,7 +443,7 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) REALM_NOEXCEPT override
+    void destroy_leaf(MemRef leaf_mem) noexcept override
     {
         Array::destroy_deep(leaf_mem, m_column.get_alloc());
     }
@@ -873,13 +873,13 @@ namespace {
 struct BinToStrAdaptor {
     typedef StringData value_type;
     const ArrayBigBlobs& m_big_blobs;
-    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) REALM_NOEXCEPT: m_big_blobs(big_blobs) {}
-    ~BinToStrAdaptor() REALM_NOEXCEPT {}
-    size_t size() const REALM_NOEXCEPT
+    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) noexcept: m_big_blobs(big_blobs) {}
+    ~BinToStrAdaptor() noexcept {}
+    size_t size() const noexcept
     {
         return m_big_blobs.size();
     }
-    StringData get(size_t ndx) const REALM_NOEXCEPT
+    StringData get(size_t ndx) const noexcept
     {
         return m_big_blobs.get_string(ndx);
     }
@@ -887,7 +887,7 @@ struct BinToStrAdaptor {
 
 } // anonymous namespace
 
-size_t StringColumn::lower_bound_string(StringData value) const REALM_NOEXCEPT
+size_t StringColumn::lower_bound_string(StringData value) const noexcept
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -911,7 +911,7 @@ size_t StringColumn::lower_bound_string(StringData value) const REALM_NOEXCEPT
     return ColumnBase::lower_bound(*this, value);
 }
 
-size_t StringColumn::upper_bound_string(StringData value) const REALM_NOEXCEPT
+size_t StringColumn::upper_bound_string(StringData value) const noexcept
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();

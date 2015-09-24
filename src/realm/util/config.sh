@@ -73,13 +73,6 @@ else
     enable_assertions="0"
 fi
 
-enable_null_strings="$(get_config_param "ENABLE_NULL_STRINGS")" || exit 1
-if [ "$enable_null_strings" = "yes" ]; then
-    enable_null_strings="1"
-else
-    enable_null_strings="0"
-fi
-
 cat >"$target" <<EOF
 /*************************************************************************
  *
@@ -115,6 +108,4 @@ cat >"$target" <<EOF
 #if $enable_assertions
 #  define REALM_ENABLE_ASSERTIONS 1
 #endif
-
-#define REALM_NULL_STRINGS $enable_null_strings
 EOF

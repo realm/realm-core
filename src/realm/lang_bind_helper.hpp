@@ -49,12 +49,12 @@ public:
     /// table accessor pointers, but if the binding/application makes a copy of
     /// such a pointer, and the copy needs to have an "independent life", then
     /// the binding/application must bind that copy using this function.
-    static void bind_table_ptr(const Table*) REALM_NOEXCEPT;
+    static void bind_table_ptr(const Table*) noexcept;
 
     /// Decrement the reference counter of the specified table accessor. The
     /// binding/application must call this function for every bound table
     /// accessor pointer object, when that pointer object ends its life.
-    static void unbind_table_ptr(const Table*) REALM_NOEXCEPT;
+    static void unbind_table_ptr(const Table*) noexcept;
 
     /// Construct a new freestanding table. The table accessor pointer is bound
     /// by the callee before it is returned (bind_table_ptr()).
@@ -202,7 +202,7 @@ public:
     ///   type_Mixed     ->  "mixed"
     ///
     /// </pre>
-    static const char* get_data_type_name(DataType) REALM_NOEXCEPT;
+    static const char* get_data_type_name(DataType) noexcept;
 };
 
 
@@ -318,12 +318,12 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
     return table;
 }
 
-inline void LangBindHelper::unbind_table_ptr(const Table* t) REALM_NOEXCEPT
+inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 {
    t->unbind_ref();
 }
 
-inline void LangBindHelper::bind_table_ptr(const Table* t) REALM_NOEXCEPT
+inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
    t->bind_ref();
 }

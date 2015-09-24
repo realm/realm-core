@@ -58,32 +58,32 @@ public:
     /// table. Otherwise you should pass zero.
     MixedColumn(Allocator&, ref_type, Table* table, std::size_t column_ndx);
 
-    ~MixedColumn() REALM_NOEXCEPT override;
+    ~MixedColumn() noexcept override;
 
-    DataType get_type(std::size_t ndx) const REALM_NOEXCEPT;
-    std::size_t size() const REALM_NOEXCEPT final { return m_types->size(); }
-    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+    DataType get_type(std::size_t ndx) const noexcept;
+    std::size_t size() const noexcept final { return m_types->size(); }
+    bool is_empty() const noexcept { return size() == 0; }
 
-    int64_t get_int(std::size_t ndx) const REALM_NOEXCEPT;
-    bool get_bool(std::size_t ndx) const REALM_NOEXCEPT;
-    DateTime get_datetime(std::size_t ndx) const REALM_NOEXCEPT;
-    float get_float(std::size_t ndx) const REALM_NOEXCEPT;
-    double get_double(std::size_t ndx) const REALM_NOEXCEPT;
-    StringData get_string(std::size_t ndx) const REALM_NOEXCEPT;
-    BinaryData get_binary(std::size_t ndx) const REALM_NOEXCEPT;
-    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT override;
+    int64_t get_int(std::size_t ndx) const noexcept;
+    bool get_bool(std::size_t ndx) const noexcept;
+    DateTime get_datetime(std::size_t ndx) const noexcept;
+    float get_float(std::size_t ndx) const noexcept;
+    double get_double(std::size_t ndx) const noexcept;
+    StringData get_string(std::size_t ndx) const noexcept;
+    BinaryData get_binary(std::size_t ndx) const noexcept;
+    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept override;
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.
-    ref_type get_subtable_ref(std::size_t row_ndx) const REALM_NOEXCEPT;
+    ref_type get_subtable_ref(std::size_t row_ndx) const noexcept;
 
     /// The returned size is zero if the specified row does not
     /// contain a subtable.
-    std::size_t get_subtable_size(std::size_t row_ndx) const REALM_NOEXCEPT;
+    std::size_t get_subtable_size(std::size_t row_ndx) const noexcept;
 
-    Table* get_subtable_accessor(std::size_t row_ndx) const REALM_NOEXCEPT override;
+    Table* get_subtable_accessor(std::size_t row_ndx) const noexcept override;
 
-    void discard_subtable_accessor(std::size_t row_ndx) REALM_NOEXCEPT override;
+    void discard_subtable_accessor(std::size_t row_ndx) noexcept override;
 
     /// If the value at the specified index is a subtable, return a
     /// pointer to that accessor for that subtable. Otherwise return
@@ -121,11 +121,11 @@ public:
     /// Compare two mixed columns for equality.
     bool compare_mixed(const MixedColumn&) const;
 
-    void discard_child_accessors() REALM_NOEXCEPT;
+    void discard_child_accessors() noexcept;
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) REALM_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) noexcept;
 
     // Overriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
@@ -135,12 +135,12 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
-    void update_from_parent(std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_insert_rows(std::size_t, std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_erase_row(std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_move_over(std::size_t, std::size_t) REALM_NOEXCEPT override;
-    void adj_acc_clear_root_table() REALM_NOEXCEPT override;
-    void mark(int) REALM_NOEXCEPT override;
+    void update_from_parent(std::size_t) noexcept override;
+    void adj_acc_insert_rows(std::size_t, std::size_t) noexcept override;
+    void adj_acc_erase_row(std::size_t) noexcept override;
+    void adj_acc_move_over(std::size_t, std::size_t) noexcept override;
+    void adj_acc_clear_root_table() noexcept override;
+    void mark(int) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -198,7 +198,7 @@ private:
     void clear_value_and_discard_subtab_acc(std::size_t ndx, MixedColType new_type);
 
     // Get/set/insert 64-bit values in m_data/m_types
-    int64_t get_value(std::size_t ndx) const REALM_NOEXCEPT;
+    int64_t get_value(std::size_t ndx) const noexcept;
     void set_value(std::size_t ndx, int64_t value, MixedColType);
     void set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 
@@ -207,7 +207,7 @@ private:
     void insert_pos_neg(std::size_t ndx, int_fast64_t value, MixedColType pos_type,
                         MixedColType neg_type);
 
-    void do_discard_child_accessors() REALM_NOEXCEPT override;
+    void do_discard_child_accessors() noexcept override;
 
 #ifdef REALM_DEBUG
     void do_verify(const Table*, std::size_t col_ndx) const;
@@ -216,7 +216,7 @@ private:
 #endif
 };
 
-inline StringData MixedColumn::get_index_data(std::size_t, char*) const REALM_NOEXCEPT
+inline StringData MixedColumn::get_index_data(std::size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not supported for MixedColumn yet.");
     REALM_UNREACHABLE();
@@ -230,7 +230,7 @@ public:
     {
     }
 
-    ~RefsColumn() REALM_NOEXCEPT override {}
+    ~RefsColumn() noexcept override {}
 
     using SubtableColumnBase::get_subtable_ptr;
 

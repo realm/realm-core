@@ -51,16 +51,16 @@ public:
     typedef StringData value_type;
 
     StringColumn(Allocator&, ref_type, bool nullable = false);
-    ~StringColumn() REALM_NOEXCEPT override;
+    ~StringColumn() noexcept override;
 
-    void destroy() REALM_NOEXCEPT override;
+    void destroy() noexcept override;
 
-    std::size_t size() const REALM_NOEXCEPT final;
-    bool is_empty() const REALM_NOEXCEPT { return size() == 0; }
+    std::size_t size() const noexcept final;
+    bool is_empty() const noexcept { return size() == 0; }
 
-    bool is_null(std::size_t ndx) const REALM_NOEXCEPT final;
+    bool is_null(std::size_t ndx) const noexcept final;
     void set_null(std::size_t ndx) final;
-    StringData get(std::size_t ndx) const REALM_NOEXCEPT;
+    StringData get(std::size_t ndx) const noexcept;
     void set(std::size_t ndx, StringData);
     void add();
     void add(StringData value);
@@ -82,29 +82,29 @@ public:
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to StringData::operator<().
-    std::size_t lower_bound_string(StringData value) const REALM_NOEXCEPT;
-    std::size_t upper_bound_string(StringData value) const REALM_NOEXCEPT;
+    std::size_t lower_bound_string(StringData value) const noexcept;
+    std::size_t upper_bound_string(StringData value) const noexcept;
     //@}
 
     void set_string(std::size_t, StringData) override;
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
-    bool is_nullable() const REALM_NOEXCEPT final;
+    bool is_nullable() const noexcept final;
 
     // Search index
-    StringData get_index_data(std::size_t ndx, char* buffer) const REALM_NOEXCEPT final;
-    bool has_search_index() const REALM_NOEXCEPT override;
+    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
+    bool has_search_index() const noexcept override;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) override;
-    void set_search_index_allow_duplicate_values(bool) REALM_NOEXCEPT override;
-    StringIndex* get_search_index() REALM_NOEXCEPT override;
-    const StringIndex* get_search_index() const REALM_NOEXCEPT override;
-    std::unique_ptr<StringIndex> release_search_index() REALM_NOEXCEPT;
+    void set_search_index_allow_duplicate_values(bool) noexcept override;
+    StringIndex* get_search_index() noexcept override;
+    const StringIndex* get_search_index() const noexcept override;
+    std::unique_ptr<StringIndex> release_search_index() noexcept;
     StringIndex* create_search_index() override;
 
     // Simply inserts all column values in the index in a loop
     void populate_search_index();
-    void destroy_search_index() REALM_NOEXCEPT override;
+    void destroy_search_index() noexcept override;
 
     // Optimizing data layout
     // Optimizing data layout. enforce == true will enforce enumeration;
@@ -125,7 +125,7 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) REALM_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) noexcept;
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
@@ -135,7 +135,7 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(std::size_t, bool) override;
-    void update_from_parent(std::size_t old_baseline) REALM_NOEXCEPT override;
+    void update_from_parent(std::size_t old_baseline) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -208,7 +208,7 @@ private:
 
 // Implementation:
 
-inline std::size_t StringColumn::size() const REALM_NOEXCEPT
+inline std::size_t StringColumn::size() const noexcept
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -300,23 +300,23 @@ inline void StringColumn::set_string(std::size_t row_ndx, StringData value)
     set(row_ndx, value); // Throws
 }
 
-inline bool StringColumn::has_search_index() const REALM_NOEXCEPT
+inline bool StringColumn::has_search_index() const noexcept
 {
     return m_search_index != 0;
 }
 
-inline StringIndex* StringColumn::get_search_index() REALM_NOEXCEPT
+inline StringIndex* StringColumn::get_search_index() noexcept
 {
     return m_search_index.get();
 }
 
-inline const StringIndex* StringColumn::get_search_index() const REALM_NOEXCEPT
+inline const StringIndex* StringColumn::get_search_index() const noexcept
 {
     return m_search_index.get();
 }
 
 inline std::size_t StringColumn::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) REALM_NOEXCEPT
+                                                   Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);

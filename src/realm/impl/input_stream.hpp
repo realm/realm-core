@@ -45,13 +45,13 @@ public:
     /// availble.
     virtual size_t read(char* buffer, size_t size) = 0;
 
-    virtual ~InputStream() REALM_NOEXCEPT {}
+    virtual ~InputStream() noexcept {}
 };
 
 
 class SimpleInputStream: public InputStream {
 public:
-    SimpleInputStream(const char* data, std::size_t size) REALM_NOEXCEPT:
+    SimpleInputStream(const char* data, std::size_t size) noexcept:
         m_ptr(data),
         m_end(data + size)
     {
@@ -80,13 +80,13 @@ public:
     /// contiguous memory chunk.
     virtual size_t next_block(const char*& begin, const char*& end) = 0;
 
-    virtual ~NoCopyInputStream() REALM_NOEXCEPT {}
+    virtual ~NoCopyInputStream() noexcept {}
 };
 
 
 class NoCopyInputStreamAdaptor: public NoCopyInputStream {
 public:
-    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) REALM_NOEXCEPT:
+    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept:
         m_in(in),
         m_buffer(buffer),
         m_buffer_size(buffer_size)
