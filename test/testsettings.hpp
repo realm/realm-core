@@ -47,7 +47,7 @@
 #define TEST_TRANSACTIONS
 #define TEST_TRANSACTIONS_LASSE
 #define TEST_REPLICATION
-#define TEST_UTF8
+#define TEST_UNICODE
 #define TEST_COLUMN_LARGE
 #define TEST_JSON
 #define TEST_LINKS
@@ -55,6 +55,7 @@
 #define TEST_UTIL_ERROR
 #ifndef _WIN32
 #  define TEST_UTIL_NETWORK
+#  define TEST_UTIL_UTF8
 #endif
 
 // Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this

@@ -11,16 +11,19 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Several functions renamed in `<realm/util/utf8.hpp>` for clarity. For
+  instance, `Utf8x16<>::to_utf16()` was renamed to `Utf8x16<>::utf8_to_utf16()`.
 
 ### Enhancements:
 
 * Comparisons involving unary links on each side of the operator are now
   supported by query_expression.hpp.
-* Added version chunk information and failure reason for
-  `pthread_mutex_lock()`.
-* Termination routines now always display the library's version before the
-  error message.
+* Added version chunk information and failure reason for `pthread_mutex_lock()`.
+* Termination routines now always display the library's version before the error
+  message.
+* Added `Utf8x16<>::utf8_skip_utf16()` in `<realm/util/utf8.hpp>`. This is
+  expected to be needed by some bindings in connection with new substring
+  operations.
 
 -----------
 
@@ -35,7 +38,8 @@
 # 0.93.0 Release notes
 
 ### Bugfixes:
-* Fixed severe bug in Array allocator that could give asserts like 
+
+* Fixed severe bug in Array allocator that could give asserts like
   `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`, especially
   for BinaryData columns. This bug could be triggered by using binary data
   blobs with a size in the range between 8M and 16M.
@@ -69,7 +73,7 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
-* Fixed a bug in the way the new memory mapping machinery interacted with 
+* Fixed a bug in the way the new memory mapping machinery interacted with
   encryption.
 * Query expression comparisons now give correct results when comparing a linked
   column with a column in the base table.
@@ -98,6 +102,7 @@
   Android) are likely to want to use unordered mode everywhere.
 
 ### Enhancements:
+
 * Added argument to Table::average() and TableView::average() that returns number
   of values that were used for computing the average
 * Full null support everywhere and on all column types. See

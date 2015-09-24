@@ -49,14 +49,14 @@ template<class Char16, class Traits16 = std::char_traits<Char16>> struct Utf8x16
     /// advanced to the position where transcoding stopped.
     ///
     /// Throws only if Traits16::to_char_type() throws.
-    static bool to_utf16(const char*& in_begin, const char* in_end,
-                         Char16*& out_begin, Char16* out_end);
+    static bool utf8_to_utf16(const char*& in_begin, const char* in_end,
+                              Char16*& out_begin, Char16* out_end);
 
-    /// Same as to_utf16(), but in reverse.
+    /// Same as utf8_to_utf16(), but in reverse.
     ///
     /// Throws only if Traits16::to_int_type() throws.
-    static bool to_utf8(const Char16*& in_begin, const Char16* in_end,
-                        char*& out_begin, char* out_end);
+    static bool utf16_to_utf8(const Char16*& in_begin, const Char16* in_end,
+                              char*& out_begin, char* out_end);
 
     /// Summarize the number of UTF-16 elements needed to hold the result of
     /// transcoding the specified UTF-8 string. Upon return, if \a in_begin !=
@@ -65,7 +65,7 @@ template<class Char16, class Traits16 = std::char_traits<Char16>> struct Utf8x16
     /// the result of transcoding the part of the input that was examined. This
     /// function will only detect a few UTF-8 validity issues, and can therefore
     /// not be used for general UTF-8 validation.
-    static std::size_t find_utf16_buf_size(const char*& in_begin, const char* in_end);
+    static size_t utf8_find_utf16_buf_size(const char*& in_begin, const char* in_end);
 
     /// Summarize the number of UTF-8 bytes needed to hold the result of
     /// transcoding the specified UTF-16 string. Upon return, if \a in_begin !=
@@ -75,7 +75,28 @@ template<class Char16, class Traits16 = std::char_traits<Char16>> struct Utf8x16
     /// transcoding the part of the input that was examined. This function will
     /// only detect a few UTF-16 validity issues, and can therefore not be used
     /// for general UTF-16 validation.
-    static std::size_t find_utf8_buf_size(const Char16*& in_begin, const Char16* in_end);
+    static size_t utf16_find_utf8_buf_size(const Char16*& in_begin, const Char16* in_end);
+
+    /// \brief Skip UTF-8 encoded characters bounded by the number of
+    /// corresponding UTF-16 elements.
+    ///
+    /// In the specified UTF-8 buffer, skip over the longest prefix of complete,
+    /// validly encoded Unicode characters whose corresponding UTF-16 encoding
+    /// would fit in an output buffer with space for \a utf16_skip UTF-16
+    /// elements.
+    ///
+    /// This function is more efficient than, but semantically identical
+    /// to,
+    ///
+    ///    Char16* utf16_begin = buffer;
+    ///    Char16* utf16_end   = buffer + utf16_skip;
+    ///    bool complete = utf8_to_utf16(utf8_begin, utf8_end, utf16_begin, utf16_end);
+    ///    utf16_skip -= utf16_begin - buffer;
+    ///    return complete;
+    ///
+    /// as long as `buffer` is a sufficiently large buffer.
+    static bool utf8_skip_utf16(const char*& utf8_begin, const char* utf8_end,
+                                size_t& utf16_skip);
 };
 
 
@@ -88,10 +109,10 @@ template<class Char16, class Traits16 = std::char_traits<Char16>> struct Utf8x16
 // http://www.unicode.org/resources/utf8.html
 // http://www.bsdua.org/files/unicode.tar.gz
 template<class Char16, class Traits16>
-inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const char* const in_end,
-                                                Char16*& out_begin, Char16* const out_end)
+inline bool Utf8x16<Char16, Traits16>::utf8_to_utf16(const char*& in_begin, const char* in_end,
+                                                     Char16*& out_begin, Char16* out_end)
 {
-        typedef std::char_traits<char> traits8;
+    typedef std::char_traits<char> traits8;
     bool invalid = false;
     const char* in = in_begin;
     Char16* out = out_begin;
@@ -99,7 +120,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
         if (REALM_UNLIKELY(out == out_end)) {
             break; // Need space in output buffer
         }
-        REALM_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
         if (REALM_LIKELY(v1 < 0x80)) { // One byte
             // UTF-8 layout: 0xxxxxxx
@@ -116,7 +136,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 invalid = true;
                 break; // Incomplete UTF-8 sequence
             }
-            REALM_ASSERT(&in[1] >= in_begin && &in[1] < in_end);
             uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
             // UTF-8 layout: 110xxxxx 10xxxxxx
             if (REALM_UNLIKELY((v2 & 0xC0) != 0x80)) {
@@ -138,7 +157,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 invalid = true;
                 break; // Incomplete UTF-8 sequence
             }
-            REALM_ASSERT(&in[1] >= in_begin && &in[2] < in_end);
             uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
             uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2]));
             // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
@@ -170,7 +188,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 break; // Incomplete UTF-8 sequence
             }
             uint_fast32_t w1 = uint_fast32_t(v1); // 16 bit -> 32 bit
-            REALM_ASSERT(&in[1] >= in_begin && &in[3] < in_end);
             uint_fast32_t v2 = uint_fast32_t(traits8::to_int_type(in[1])); // 32 bit intended
             uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2])); // 16 bit intended
             uint_fast16_t v4 = uint_fast16_t(traits8::to_int_type(in[3])); // 16 bit intended
@@ -204,8 +221,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
         break;
     }
 
-    REALM_ASSERT(in >= in_begin && in <= in_end);
-    REALM_ASSERT(out >= out_begin && out <= out_end);
     in_begin = in;
     out_begin = out;
     return !invalid;
@@ -213,14 +228,13 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
 
 
 template<class Char16, class Traits16>
-inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& in_begin,
+inline size_t Utf8x16<Char16, Traits16>::utf8_find_utf16_buf_size(const char*& in_begin,
                                                                   const char* const in_end)
 {
-        typedef std::char_traits<char> traits8;
+    typedef std::char_traits<char> traits8;
     size_t num_out = 0;
     const char* in = in_begin;
     while (in != in_end) {
-        REALM_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
         if (REALM_LIKELY(v1 < 0x80)) { // One byte
             num_out += 1;
@@ -258,7 +272,6 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& i
         break;
     }
 
-    REALM_ASSERT(in >= in_begin && in <= in_end);
     in_begin  = in;
     return num_out;
 }
@@ -269,23 +282,22 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& i
 // http://www.unicode.org/resources/utf8.html
 // http://www.bsdua.org/files/unicode.tar.gz
 template<class Char16, class Traits16>
-inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Char16* const in_end,
-                                               char*& out_begin, char* const out_end)
+inline bool Utf8x16<Char16, Traits16>::utf16_to_utf8(const Char16*& in_begin,
+                                                     const Char16* in_end,
+                                                     char*& out_begin, char* out_end)
 {
-        typedef std::char_traits<char> traits8;
+    typedef std::char_traits<char> traits8;
     typedef typename traits8::int_type traits8_int_type;
     bool invalid = false;
     const Char16* in = in_begin;
     char* out = out_begin;
     while (in != in_end) {
-        REALM_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v1 = uint_fast16_t(Traits16::to_int_type(in[0]));
         if (REALM_LIKELY(v1 < 0x80)) {
             if (REALM_UNLIKELY(out == out_end)) {
                 break; // Not enough output buffer space
             }
             // UTF-8 layout: 0xxxxxxx
-            REALM_ASSERT(out >= out_begin && out < out_end);
             *out++ = traits8::to_char_type(traits8_int_type(v1));
             in += 1;
             continue;
@@ -296,7 +308,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
             }
             // UTF-8 layout: 110xxxxx 10xxxxxx
             *out++ = traits8::to_char_type(traits8_int_type(0xC0 + v1 / 0x40));
-            REALM_ASSERT(out >= out_begin && out < out_end);
             *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 % 0x40));
             in += 1;
             continue;
@@ -306,7 +317,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
                 break; // Not enough output buffer space
             }
             // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
-            REALM_ASSERT(out >= out_begin && out + 2 < out_end);
             *out++ = traits8::to_char_type(traits8_int_type(0xE0 + v1 / 0x1000));
             *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 / 0x40 % 0x40));
             *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 % 0x40));
@@ -326,7 +336,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
             invalid = true;
             break; // Incomplete surrogate pair
         }
-        REALM_ASSERT(&in[1] >= in_begin && &in[1] < in_end);
         uint_fast16_t v2 = uint_fast16_t(Traits16::to_int_type(in[1]));
         if (REALM_UNLIKELY(v2 < 0xDC00 || 0xE000 <= v2)) {
             invalid = true;
@@ -334,7 +343,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
         }
         uint_fast32_t v = 0x10000l + (uint_fast32_t(v1 - 0xD800) * 0x400 + (v2 - 0xDC00));
         // UTF-8 layout: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-        REALM_ASSERT(out >= out_begin && out + 3 < out_end);
         *out++ = traits8::to_char_type(traits8_int_type(0xF0 + v / 0x40000));
         *out++ = traits8::to_char_type(traits8_int_type(0x80 + v / 0x1000 % 0x40));
         *out++ = traits8::to_char_type(traits8_int_type(0x80 + v / 0x40 % 0x40));
@@ -342,8 +350,6 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
         in += 2;
     }
 
-    REALM_ASSERT(in >= in_begin && in <= in_end);
-    REALM_ASSERT(out >= out_begin && out <= out_end);
     in_begin = in;
     out_begin = out;
     return !invalid;
@@ -351,13 +357,12 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
 
 
 template<class Char16, class Traits16>
-inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& in_begin,
-                                                                 const Char16* const in_end)
+inline size_t Utf8x16<Char16, Traits16>::utf16_find_utf8_buf_size(const Char16*& in_begin,
+                                                                  const Char16* const in_end)
 {
-        size_t num_out = 0;
+    size_t num_out = 0;
     const Char16* in = in_begin;
     while (in != in_end) {
-        REALM_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v = uint_fast16_t(Traits16::to_int_type(in[0]));
         if (REALM_LIKELY(v < 0x80)) {
             if (REALM_UNLIKELY(int_add_with_overflow_detect(num_out, 1)))
@@ -383,10 +388,131 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& 
             in += 2;
         }
     }
-    REALM_ASSERT(in >= in_begin && in <= in_end);
     in_begin  = in;
     return num_out;
 }
+
+
+template<class Char16, class Traits16>
+inline bool Utf8x16<Char16, Traits16>::utf8_skip_utf16(const char*& utf8_begin,
+                                                       const char* utf8_end,
+                                                       size_t& utf16_skip)
+{
+    typedef std::char_traits<char> traits8;
+    bool invalid = false;
+    const char* in = utf8_begin;
+    const char* in_end = utf8_end;
+    size_t skip = utf16_skip;
+    while (in != in_end) {
+        if (REALM_UNLIKELY(skip == 0)) {
+            break; // All UTF-16 elements skipped
+        }
+        uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
+        if (REALM_LIKELY(v1 < 0x80)) { // One byte
+            // UTF-8 layout: 0xxxxxxx
+            skip -= 1;
+            in += 1;
+            continue;
+        }
+        if (REALM_UNLIKELY(v1 < 0xC0)) {
+            invalid = true;
+            break; // Invalid first byte of UTF-8 sequence
+        }
+        if (REALM_LIKELY(v1 < 0xE0)) { // Two bytes
+            if (REALM_UNLIKELY(in_end - in < 2)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
+            // UTF-8 layout: 110xxxxx 10xxxxxx
+            if (REALM_UNLIKELY((v2 & 0xC0) != 0x80)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast16_t v = uint_fast16_t(((v1 & 0x1F) << 6) |
+                                            ((v2 & 0x3F) << 0));
+            if (REALM_UNLIKELY(v < 0x80)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            skip -= 1;
+            in += 2;
+            continue;
+        }
+        if (REALM_LIKELY(v1 < 0xF0)) { // Three bytes
+            if (REALM_UNLIKELY(in_end - in < 3)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
+            uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2]));
+            // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
+            if (REALM_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast16_t v = uint_fast16_t(((v1 & 0x0F) << 12) |
+                                            ((v2 & 0x3F) <<  6) |
+                                            ((v3 & 0x3F) <<  0));
+            if (REALM_UNLIKELY(v < 0x800)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            if (REALM_UNLIKELY(0xD800 <= v && v < 0xE000)) {
+                invalid = true;
+                break; // Illegal code point range (reserved for UTF-16 surrogate pairs)
+            }
+            skip -= 1;
+            in += 3;
+            continue;
+        }
+        if (REALM_UNLIKELY(skip == 1)) {
+            // Surrogate pair requires skipping two UTF-16 elements, but only
+            // one more may be skipped, so stop.
+            break;
+        }
+        if (REALM_LIKELY(v1 < 0xF8)) { // Four bytes
+            if (REALM_UNLIKELY(in_end - in < 4)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast32_t w1 = uint_fast32_t(v1); // 16 bit -> 32 bit
+            uint_fast32_t v2 = uint_fast32_t(traits8::to_int_type(in[1])); // 32 bit intended
+            uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2])); // 16 bit intended
+            uint_fast16_t v4 = uint_fast16_t(traits8::to_int_type(in[3])); // 16 bit intended
+            // UTF-8 layout: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+            if (REALM_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80 ||
+                               (v4 & 0xC0) != 0x80)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast32_t v =
+                uint_fast32_t(((w1 & 0x07) << 18) | // Parenthesis is 32 bit partial result
+                              ((v2 & 0x3F) << 12) | // Parenthesis is 32 bit partial result
+                              ((v3 & 0x3F) <<  6) | // Parenthesis is 16 bit partial result
+                              ((v4 & 0x3F) <<  0)); // Parenthesis is 16 bit partial result
+            if (REALM_UNLIKELY(v < 0x10000)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            if (REALM_UNLIKELY(0x110000 <= v)) {
+                invalid = true;
+                break; // Code point too big for UTF-16
+            }
+            skip -= 2;
+            in += 4;
+            continue;
+        }
+        // Invalid first byte of UTF-8 sequence, or code point too big for UTF-16
+        invalid = true;
+        break;
+    }
+
+    utf8_begin = in;
+    utf16_skip = skip;
+    return !invalid;
+}
+
 } // namespace util
 } // namespace realm
 
