@@ -478,7 +478,7 @@ private:
 
     void do_async_connect(std::unique_ptr<connect_oper_base>);
     bool initiate_connect(const endpoint&, std::error_code&) noexcept;
-    std::error_code finalize_connect(const endpoint&, std::error_code&) noexcept;
+    std::error_code finalize_connect(std::error_code&) noexcept;
 
     friend class buffered_input_stream;
 };
@@ -1022,16 +1022,9 @@ class socket::connect_oper_base:
         public io_service::async_oper {
 public:
     connect_oper_base(socket& sock, const endpoint& ep):
-        m_socket(sock),
-        m_endpoint(ep)
+        m_socket(sock)
     {
-    }
-    void initiate() noexcept
-    {
-        REALM_ASSERT(!complete);
-        REALM_ASSERT(!canceled);
-        REALM_ASSERT(!m_error_code);
-        if (m_socket.initiate_connect(m_endpoint, m_error_code))
+        if (m_socket.initiate_connect(ep, m_error_code))
             complete = true; // Failure, or immediate completion
     }
     void proceed() noexcept override
@@ -1039,12 +1032,11 @@ public:
         REALM_ASSERT(!complete);
         REALM_ASSERT(!canceled);
         REALM_ASSERT(!m_error_code);
-        m_socket.finalize_connect(m_endpoint, m_error_code);
+        m_socket.finalize_connect(m_error_code);
         complete = true;
     }
 protected:
     socket& m_socket;
-    endpoint m_endpoint;
     std::error_code m_error_code;
 };
 
@@ -1181,7 +1173,6 @@ inline std::size_t socket::write_some(const char* data, std::size_t size)
 
 inline void socket::do_async_connect(std::unique_ptr<connect_oper_base> op)
 {
-    op->initiate();
     if (op->complete) {
         m_service.add_completed_oper(move(op));
     }

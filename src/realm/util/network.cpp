@@ -772,8 +772,7 @@ std::error_code socket::connect(const endpoint& ep, std::error_code& ec)
         }
     }
 
-    // Retry connect. This time, if it succeeds, it must succeed immediately.
-    if (finalize_connect(ep, ec))
+    if (finalize_connect(ec))
         return ec; // Failure
 
     ec = std::error_code(); // Success
@@ -887,14 +886,19 @@ bool socket::initiate_connect(const endpoint& ep, std::error_code& ec) noexcept
 }
 
 
-std::error_code socket::finalize_connect(const endpoint& ep, std::error_code& ec) noexcept
+std::error_code socket::finalize_connect(std::error_code& ec) noexcept
 {
-    socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
-        sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
-    int ret = ::connect(get_sock_fd(), &ep.m_sockaddr_union.m_base, addr_len);
+    int connect_errno = 0;
+    socklen_t connect_errno_size = sizeof connect_errno;
+    int ret = ::getsockopt(get_sock_fd(), SOL_SOCKET, SO_ERROR, &connect_errno,
+                           &connect_errno_size);
     if (REALM_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
-        return ec;
+        return ec; // getsockopt() failed
+    }
+    if (REALM_UNLIKELY(connect_errno)) {
+        ec = make_basic_system_error_code(connect_errno);
+        return ec; // connect failed
     }
 
     // Disable nonblocking mode
