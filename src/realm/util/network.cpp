@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <limits>
 #include <algorithm>
 #include <vector>
 #include <stdexcept>
