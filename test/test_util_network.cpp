@@ -453,6 +453,75 @@ TEST(Network_CancelEmptyRead)
 }
 
 
+TEST(Network_DeadlineTimer)
+{
+    network::io_service service;
+    network::deadline_timer timer(service);
+
+    // Check that the completion handler is executed
+    bool completed = false;
+    bool canceled = false;
+    auto wait_handler = [&](std::error_code ec) {
+        if (!ec)
+            completed = true;
+        if (ec == error::operation_aborted)
+            canceled = true;
+    };
+    timer.async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    service.run();
+    CHECK(completed);
+    CHECK(!canceled);
+    completed = false;
+
+    // Check that an immediately completed wait operation can be canceled
+    timer.async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer.cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    service.run();
+    CHECK(!completed);
+    CHECK(canceled);
+    canceled = false;
+
+    // Check that a long running wait operation can be canceled
+    timer.async_wait(std::chrono::hours(10000), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer.cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    service.run();
+    CHECK(!completed);
+    CHECK(canceled);
+}
+
+
+/*
+TEST(Network_DeadlineTimer_Special)
+{
+    network::io_service service;
+    network::deadline_timer timer_1(service);
+    network::deadline_timer timer_2(service);
+    network::deadline_timer timer_3(service);
+    network::deadline_timer timer_4(service);
+    network::deadline_timer timer_5(service);
+    network::deadline_timer timer_6(service);
+    using namespace std;
+    timer_1.async_wait(chrono::seconds(3), [](error_code) { cerr << "*3*\n";   });
+    timer_2.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2*\n";   });
+    timer_3.async_wait(chrono::seconds(3), [](error_code) { cerr << "*3-2*\n"; });
+    timer_4.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2-2*\n"; });
+    timer_5.async_wait(chrono::seconds(1), [](error_code) { cerr << "*1*\n";   });
+    timer_6.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2-3*\n"; });
+    service.run();
+}
+*/
+
+
 TEST(Network_HandlerDealloc)
 {
     // Check that dynamically allocated handlers are properly freed when the
