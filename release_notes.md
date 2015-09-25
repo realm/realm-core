@@ -23,6 +23,8 @@
   `pthread_mutex_lock()`.
 * Termination routines now always display the library's version before the
   error message.
+* New `util::network::socket_base::cancel()`.
+* Added `util::network::deadline_timer` class.
 
 -----------
 
@@ -36,7 +38,6 @@
 * Improved documentation in `util::network`.
 * Improved exception safety in `util::network`.
 * `util::network::socket_base::close()` is now `noexcept`.
-* New `util::network::socket_base::cancel()`.
 
 ----------------------------------------------
 

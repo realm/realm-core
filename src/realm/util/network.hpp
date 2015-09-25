@@ -22,6 +22,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <chrono>
 #include <string>
 #include <ostream>
 
@@ -47,7 +48,8 @@ namespace util {
 ///
 /// A *service context* is a set of objects consisting of an instance of
 /// io_service, and all the objects that are associated with that instance (\ref
-/// socket`, \ref acceptor`, \ref resolver, and \ref buffered_input_stream).
+/// resolver, \ref acceptor`, \ref socket`, \ref buffered_input_stream, and \ref
+/// deadline_timer).
 ///
 /// In general, it is unsafe for two threads to call functions on the same
 /// object, or on different objects in the same service context. This also
@@ -81,6 +83,7 @@ class socket_base;
 class socket;
 class acceptor;
 class buffered_input_stream;
+class deadline_timer;
 
 
 /// \brief An IP protocol descriptor.
@@ -249,11 +252,15 @@ public:
 
 private:
     class async_oper;
+    class wait_oper_base;
     template<class H> class post_oper;
     class oper_queue;
 
+    using clock = std::chrono::steady_clock;
+
     enum io_op { io_op_Read, io_op_Write };
     void add_io_oper(int fd, std::unique_ptr<async_oper>, io_op type);
+    void add_wait_oper(std::unique_ptr<wait_oper_base>);
     void add_completed_oper(std::unique_ptr<async_oper>) noexcept;
     void add_post_oper(std::unique_ptr<async_oper>) noexcept;
 
@@ -264,6 +271,7 @@ private:
     friend class socket;
     friend class acceptor;
     friend class buffered_input_stream;
+    friend class deadline_timer;
 };
 
 
@@ -274,7 +282,7 @@ public:
     resolver(io_service&);
     ~resolver() noexcept {}
 
-    io_service& service();
+    io_service& service() noexcept;
 
     void resolve(const query&, endpoint::list&);
     std::error_code resolve(const query&, endpoint::list&, std::error_code&);
@@ -320,7 +328,7 @@ class socket_base {
 public:
     ~socket_base() noexcept;
 
-    io_service& service();
+    io_service& service() noexcept;
 
     bool is_open() const noexcept;
 
@@ -619,6 +627,64 @@ private:
 };
 
 
+/// \brief A timer object supporting asynchronous wait operations.
+class deadline_timer {
+public:
+    deadline_timer(io_service&);
+    ~deadline_timer() noexcept;
+
+    io_service& service() noexcept;
+
+    /// \brief Perform an asynchronous wait operation.
+    ///
+    /// Initiate an asynchronous wait operation. The completion handler becomes
+    /// ready to execute when the expiration time is reached, or an error occurs
+    /// (cancellation counts as an error here). The completion handler will
+    /// **always** be executed, as long as a thread is executing the event
+    /// loop. The error code passed to the complition handler will **never**
+    /// indicate success, unless the expiration time was reached. The completion
+    /// handler will never be called directly as part of the execution of
+    /// async_wait().
+    ///
+    /// An asynchronous wait operation in progress can be canceled by calling
+    /// cancel(), and will be automatically canceled if the deadline timer is
+    /// destroyed. If the operation is canceled, its completion handler will be
+    /// called with `error::operation_aborted`.
+    ///
+    /// The specified handler object will be copied as necessary, and will be
+    /// executed by an expression on the form `handler(ec)` where `ec` is the
+    /// error code.
+    ///
+    /// It is an error to start a new asynchronous wait operation while an
+    /// another one is in progress. An asynchronous wait operation is in
+    /// progress until its completion handler starts executing.
+    ///
+    /// \param ep The remote endpoint of the connection to be established.
+    template<class R, class P, class H>
+    void async_wait(std::chrono::duration<R,P> delay, const H& handler) noexcept;
+
+    /// \brief Cancel an asynchronous wait operation.
+    ///
+    /// If an asynchronous wait operation, that is associated with this deadline
+    /// timer, is in progress, cause it to fail with
+    /// `error::operation_aborted`. An asynchronous wait operation is in
+    /// progress until its completion handler starts executing.
+    ///
+    /// Completion handlers of canceled operations will become immediately ready
+    /// to execute, but will never be executed directly as part of the execution
+    /// of cancel().
+    void cancel() noexcept;
+
+private:
+    template<class H> class wait_oper;
+
+    using clock = io_service::clock;
+
+    io_service& m_service;
+    io_service::wait_oper_base* m_wait_oper = 0;
+};
+
+
 enum errors {
     /// End of input.
     end_of_input = 1,
@@ -797,6 +863,22 @@ private:
     friend class io_service;
 };
 
+class io_service::wait_oper_base:
+        public async_oper {
+public:
+    wait_oper_base(clock::time_point expiration_time):
+        m_expiration_time(expiration_time)
+    {
+    }
+    void proceed() noexcept override
+    {
+        REALM_ASSERT(false); // Never called
+    }
+private:
+    clock::time_point m_expiration_time;
+    friend class io_service;
+};
+
 template<class H> class io_service::post_oper:
         public async_oper {
 public:
@@ -828,7 +910,7 @@ inline resolver::resolver(io_service& serv):
 {
 }
 
-inline io_service& resolver::service()
+inline io_service& resolver::service() noexcept
 {
     return m_service;
 }
@@ -904,7 +986,7 @@ inline socket_base::~socket_base() noexcept
     close();
 }
 
-inline io_service& socket_base::service()
+inline io_service& socket_base::service() noexcept
 {
     return m_service;
 }
@@ -1423,6 +1505,65 @@ inline void buffered_input_stream::do_async_read(std::unique_ptr<read_oper_base>
         m_socket.m_service.add_io_oper(m_socket.get_sock_fd(), move(op),
                                        io_service::io_op_Read); // Throws
     }
+}
+
+// ---------------- deadline_timer ----------------
+
+template<class H> class deadline_timer::wait_oper:
+        public io_service::wait_oper_base {
+public:
+    wait_oper(deadline_timer& timer, clock::time_point expiration_time, const H& handler):
+        io_service::wait_oper_base(expiration_time),
+        m_timer(timer),
+        m_handler(handler)
+    {
+    }
+    void exec_handler() const override
+    {
+        std::error_code ec;
+        if (canceled) {
+            ec = error::operation_aborted;
+        }
+        else {
+            REALM_ASSERT(m_timer.m_wait_oper);
+            m_timer.m_wait_oper = 0;
+        }
+        m_handler(ec);
+    }
+private:
+    deadline_timer& m_timer;
+    const H m_handler;
+};
+
+inline deadline_timer::deadline_timer(io_service& serv):
+    m_service(serv)
+{
+}
+
+inline deadline_timer::~deadline_timer() noexcept
+{
+    cancel();
+}
+
+inline io_service& deadline_timer::service() noexcept
+{
+    return m_service;
+}
+
+template<class R, class P, class H>
+inline void deadline_timer::async_wait(std::chrono::duration<R,P> delay, const H& handler) noexcept
+{
+    REALM_ASSERT(!m_wait_oper);
+    clock::time_point now = clock::now();
+    auto max_add = clock::time_point::max() - now;
+    if (delay > max_add)
+        throw std::runtime_error("Expiration time overflow");
+    clock::time_point expiration_time = now + delay;
+    std::unique_ptr<wait_oper<H>> op;
+    op.reset(new wait_oper<H>(*this, expiration_time, handler)); // Throws
+    wait_oper<H>* op_2 = op.get();
+    m_service.add_wait_oper(move(op)); // Throws
+    m_wait_oper = op_2;
 }
 
 } // namespace network

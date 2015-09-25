@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <limits>
 #include <algorithm>
 #include <vector>
 #include <stdexcept>
@@ -233,27 +234,58 @@ public:
 
     void run()
     {
-        for (;;) {
-            {
-                LockGuard l(m_mutex);
-                if (m_stopped)
-                    break;
-                m_completed_operations.push_back(m_post_operations);
+      on_handlers_executed_or_checked_stopped:
+        {
+            LockGuard l(m_mutex);
+            if (m_stopped)
+                return;
+            m_completed_operations.push_back(m_post_operations);
+
+            if (m_completed_operations.empty())
+                goto on_time_progressed;
+        }
+
+      on_operations_completed:
+        {
+            while (std::unique_ptr<async_oper> op = m_completed_operations.pop_front())
+                op->exec_handler(); // Throws
+            goto on_handlers_executed_or_checked_stopped;
+        }
+
+      on_time_progressed:
+        {
+            clock::time_point now = clock::now();
+            if (process_timers(now))
+                goto on_operations_completed;
+
+            if (m_num_active_io_operations == 0 && m_wait_operations.empty()) {
+                // We can only get to this point when there are no completion
+                // handlers ready to execute. It happens either because of a
+                // fall-through from on_operations_completed, or because of a
+                // jump to on_time_progressed, but that only happens if no
+                // completions handlers became ready during
+                // wait_and_process_io().
+                //
+                // We can also only get to this point when there are no
+                // asynchronous operations in progress (due to the preceeding
+                // if-condition.
+                //
+                // It is possible that a different thread has added new post
+                // operations since we checked, but there is really no point in
+                // rechecking that, as it is always possible that, even after a
+                // recheck, that new post handlers get added after we decide to
+                // return, but before we actually do return. Also, if would
+                // offer no additional guarantees to the application.
+                return; // Out of work
             }
 
-            if (!m_completed_operations.empty()) {
-                while (std::unique_ptr<async_oper> op = m_completed_operations.pop_front())
-                    op->exec_handler(); // Throws
-                continue;
-            }
-
-            if (m_num_active_io_operations > 0) {
-                // Blocking wait for I/O
-                wait_for_io(); // Throws
-                continue;
-            }
-
-            break; // Out of work
+            // Blocking wait for I/O
+            bool check_stopped = false;
+            if (wait_and_process_io(now, check_stopped)) // Throws
+                goto on_operations_completed;
+            if (check_stopped)
+                goto on_handlers_executed_or_checked_stopped;
+            goto on_time_progressed;
         }
     }
 
@@ -318,6 +350,24 @@ public:
         ++m_num_active_io_operations;
     }
 
+    struct wait_oper_compare {
+        bool operator()(const std::unique_ptr<wait_oper_base>& a, clock::time_point b)
+        {
+            return a->m_expiration_time > b;
+        }
+        bool operator()(clock::time_point a, const std::unique_ptr<wait_oper_base>& b)
+        {
+            return a > b->m_expiration_time;
+        }
+    };
+
+    void add_wait_oper(std::unique_ptr<wait_oper_base> op)
+    {
+        auto i = std::lower_bound(m_wait_operations.begin(), m_wait_operations.end(),
+                                  op->m_expiration_time, wait_oper_compare());
+        m_wait_operations.insert(i, move(op)); // Throws
+    }
+
     void add_completed_oper(std::unique_ptr<async_oper> op) noexcept
     {
         m_completed_operations.push_back(move(op));
@@ -353,6 +403,17 @@ public:
         }
     }
 
+    void cancel_incomplete_wait_oper(wait_oper_base* op) noexcept
+    {
+        auto p = std::equal_range(m_wait_operations.begin(), m_wait_operations.end(),
+                                  op->m_expiration_time, wait_oper_compare());
+        auto pred = [=](const std::unique_ptr<wait_oper_base>& op_2) { return op_2.get() == op; };
+        auto i = std::find_if(p.first, p.second, pred);
+        REALM_ASSERT(i != p.second);
+        m_completed_operations.push_back(move(*i));
+        m_wait_operations.erase(i); // Does not throw
+    }
+
 private:
     typedef struct pollfd pollfd;
 
@@ -367,22 +428,88 @@ private:
     std::vector<io_oper_slot> m_io_operations;
     size_t m_num_active_io_operations = 0;
 
+    std::vector<std::unique_ptr<wait_oper_base>> m_wait_operations;
+
     Mutex m_mutex;
     oper_queue m_post_operations; // Protected by `m_mutex` (including the enqueued operations).
     bool m_stopped = false; // Protected by `m_mutex`
 
-    void wait_for_io()
+    bool process_timers(clock::time_point now)
+    {
+        bool any_operations_completed = false;
+        for (;;) {
+            if (m_wait_operations.empty())
+                break;
+            std::unique_ptr<wait_oper_base>& op = m_wait_operations.back();
+            if (now < op->m_expiration_time)
+                break;
+            m_completed_operations.push_back(move(op));
+            m_wait_operations.pop_back();
+            any_operations_completed = true;
+        }
+        return any_operations_completed;
+    }
+
+    bool wait_and_process_io(clock::time_point now, bool& check_stopped)
     {
         size_t num_ready_descriptors = 0;
         {
+            wait_oper_base* next_wait_op = 0;
+            if (!m_wait_operations.empty())
+                next_wait_op = m_wait_operations.back().get();
+
             // std::vector guarantees contiguous storage
             pollfd* fds = &m_pollfd_slots.front();
             nfds_t nfds = m_pollfd_slots.size();
             for (;;) {
-                int timeout = -1; // Wait indefinitely
-                int ret = ::poll(fds, nfds, timeout);
+                int max_wait_millis = -1; // Wait indefinitely
+                if (next_wait_op) {
+                    clock::time_point expiration_time = next_wait_op->m_expiration_time;
+                    if (now >= expiration_time)
+                        return false; // No operations completed
+                    auto diff = expiration_time - now;
+                    int max_int_millis = std::numeric_limits<int>::max();
+                    // 17592186044415LL is the largest value (45-bit signed
+                    // integer) garanteed to be supported by
+                    // std::chrono::milliseconds. In the worst case, `int` is a
+                    // 16-bit integer, meaning that we can only wait about 30
+                    // seconds at a time. In the best case (17592186044415LL) we
+                    // can wait more than 500 years at a time. In the typical
+                    // case (`int` has 32 bits), we can wait 24 days at a time.
+                    long long max_chrono_millis = 17592186044415LL;
+                    if (max_int_millis > max_chrono_millis)
+                        max_int_millis = int(max_chrono_millis);
+                    if (diff > std::chrono::milliseconds(max_int_millis)) {
+                        max_wait_millis = max_int_millis;
+                    }
+                    else {
+                        // Overflow is impossible here, due to the preceeding
+                        // check
+                        auto diff_millis =
+                            std::chrono::duration_cast<std::chrono::milliseconds>(diff);
+                        // The convertion to milliseconds will round down if the
+                        // tick period of `diff` is less than a millisecond,
+                        // which it usually is. This is a problem, because it
+                        // can lead to premature wakeups, which in turn could
+                        // cause extranous iterations in the event loop. This is
+                        // especially problematic when a small `diff` is rounded
+                        // down to zero milliseconds, becuase that can easily
+                        // produce a "busy wait" condition for up to a
+                        // millisecond every time this happens. Obviously, the
+                        // solution is to round up, instead of down.
+                        if (diff_millis < diff) {
+                            // Note that the following increment cannot
+                            // overflow, because diff_millis < diff <=
+                            // max_int_millis <=
+                            // std::numeric_limits<int>::max().
+                            ++diff_millis;
+                        }
+                        max_wait_millis = int(diff_millis.count());
+                    }
+                }
+                int ret = ::poll(fds, nfds, max_wait_millis);
                 if (ret != -1) {
-                    REALM_ASSERT(ret >= 1);
+                    REALM_ASSERT(ret >= 0);
                     num_ready_descriptors = ret;
                     break;
                 }
@@ -391,15 +518,22 @@ private:
                     throw std::system_error(ec);
                 }
                 // Retry on interruption by system signal
+                if (next_wait_op)
+                    now = clock::now();
             }
         }
+
+        if (num_ready_descriptors == 0)
+            return false; // No operations completed
 
         // Check wake-up descriptor
         if ((m_pollfd_slots[0].revents & (POLLRDNORM|POLLERR|POLLHUP)) != 0) {
             clear_wake_up_pipe();
-            return;
+            check_stopped = true;
+            return false;
         }
 
+        size_t orig_num_active_io_operations = m_num_active_io_operations;
         REALM_ASSERT(m_pollfd_slots[0].revents == 0);
         size_t n = m_io_operations.size();
         REALM_ASSERT(n == m_pollfd_slots.size() - 1);
@@ -450,6 +584,10 @@ private:
         }
 
         REALM_ASSERT(num_ready_descriptors == 0);
+
+        bool any_operations_completed =
+            (m_num_active_io_operations < orig_num_active_io_operations);
+        return any_operations_completed;
     }
 
     void wake_up_poll_thread() noexcept
@@ -506,6 +644,11 @@ void io_service::reset() noexcept
 void io_service::add_io_oper(int fd, std::unique_ptr<async_oper> op, io_op type)
 {
     m_impl->add_io_oper(fd, move(op), type); // Throws
+}
+
+void io_service::add_wait_oper(std::unique_ptr<wait_oper_base> op)
+{
+    m_impl->add_wait_oper(move(op)); // Throws
 }
 
 void io_service::add_completed_oper(std::unique_ptr<async_oper> op) noexcept
@@ -1054,6 +1197,17 @@ void buffered_input_stream::read_oper_base::proceed() noexcept
     m_stream.m_begin = m_stream.m_buffer.get();
     m_stream.m_end = m_stream.m_begin + n;
     process_buffered_input();
+}
+
+
+void deadline_timer::cancel() noexcept
+{
+    if (m_wait_oper) {
+        if (!m_wait_oper->complete)
+            m_service.m_impl->cancel_incomplete_wait_oper(m_wait_oper);
+        m_wait_oper->canceled = true;
+        m_wait_oper = 0;
+    }
 }
 
 
