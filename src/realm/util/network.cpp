@@ -240,31 +240,53 @@ public:
             if (m_stopped)
                 return;
             m_completed_operations.push_back(m_post_operations);
+
+            if (m_completed_operations.empty())
+                goto on_time_progressed;
         }
 
-        if (m_completed_operations.empty())
-            goto on_time_progressed;
-
       on_operations_completed:
-        while (std::unique_ptr<async_oper> op = m_completed_operations.pop_front())
-            op->exec_handler(); // Throws
-        goto on_handlers_executed_or_checked_stopped;
+        {
+            while (std::unique_ptr<async_oper> op = m_completed_operations.pop_front())
+                op->exec_handler(); // Throws
+            goto on_handlers_executed_or_checked_stopped;
+        }
 
       on_time_progressed:
-        clock::time_point now = clock::now();
-        if (process_timers(now))
-            goto on_operations_completed;
+        {
+            clock::time_point now = clock::now();
+            if (process_timers(now))
+                goto on_operations_completed;
 
-        if (m_num_active_io_operations == 0 && m_wait_operations.empty())
-            return; // Out of work
+            if (m_num_active_io_operations == 0 && m_wait_operations.empty()) {
+                // We can only get to this point when there are no completion
+                // handlers ready to execute. It happens either because of a
+                // fall-through from on_operations_completed, or because of a
+                // jump to on_time_progressed, but that only happens if no
+                // completions handlers became ready during
+                // wait_and_process_io().
+                //
+                // We can also only get to this point when there are no
+                // asynchronous operations in progress (due to the preceeding
+                // if-condition.
+                //
+                // It is possible that a different thread has added new post
+                // operations since we checked, but there is really no point in
+                // rechecking that, as it is always possible that, even after a
+                // recheck, that new post handlers get added after we decide to
+                // return, but before we actually do return. Also, if would
+                // offer no additional guarantees to the application.
+                return; // Out of work
+            }
 
-        // Blocking wait for I/O
-        bool check_stopped = false;
-        if (wait_and_process_io(now, check_stopped)) // Throws
-            goto on_operations_completed;
-        if (check_stopped)
-            goto on_handlers_executed_or_checked_stopped;
-        goto on_time_progressed;
+            // Blocking wait for I/O
+            bool check_stopped = false;
+            if (wait_and_process_io(now, check_stopped)) // Throws
+                goto on_operations_completed;
+            if (check_stopped)
+                goto on_handlers_executed_or_checked_stopped;
+            goto on_time_progressed;
+        }
     }
 
     void stop() noexcept
