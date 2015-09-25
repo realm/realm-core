@@ -8,6 +8,8 @@
   crash (if assert was disabled).
 * The error handling for `pthread_cond_wait()/pthread_cond_timedwait()`
   incorrectly attributed the failure to `pthread_mutex_lock()`.
+* The error handling for several File functions incorrectly attributed the
+  failure to `open()`.
 
 ### API breaking changes:
 
