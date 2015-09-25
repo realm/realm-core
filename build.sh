@@ -972,7 +972,6 @@ EOF
         sh build.sh build-osx || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-watchos || exit 1
-        sh build.sh build-tvos || exit 1
 
         echo "Copying files"
         tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
@@ -981,10 +980,10 @@ EOF
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
-        for original in "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" "$TVOS_DIR/librealm-tvos.a" "$TVOS_DIR/librealm-tvos-dbg.a" "src/realm/librealm.a" "src/realm/librealm-dbg.a"; do
+        for original in "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" "src/realm/librealm.a" "src/realm/librealm-dbg.a"; do
             cp "$original" "$tmpdir/$BASENAME" || exit 1
         done
-        for sdk in $iphone_sdks $watchos_sdks $tvos_sdks; do
+        for sdk in $iphone_sdks $watchos_sdks; do
             platform="$(printf "%s\n" "$sdk" | cut -d: -f1)" || exit 1
             cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
