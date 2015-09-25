@@ -49,8 +49,8 @@ public:
     using size_type       = typename Container::size_type;
     using reference       = typename Container::reference;
     using const_reference = typename Container::const_reference;
-    using const_iterator         = typename Container::const_reverse_iterator;
-    using const_reverse_iterator = typename Container::const_iterator;
+    using const_reverse_iterator = typename Container::const_reverse_iterator;
+    using const_iterator         = typename Container::const_iterator;
 
     //{@
     /// Construct a PriorityQueue, optionally providing a comparator object.
@@ -106,16 +106,16 @@ public:
 
     // Not in std::priority_queue:
 
-    /// Return an iterator to the beginning of the queue (largest element first).
+    /// Return an iterator to the beginning of the queue (smallest element first).
     const_iterator begin() const;
 
-    /// Return an iterator to the end of the queue (smallest element last);
+    /// Return an iterator to the end of the queue (largest element last);
     const_iterator end() const;
 
-    /// Return a reverse iterator into the priority queue (smallest element first).
+    /// Return a reverse iterator into the priority queue (largest element first).
     const_reverse_iterator rbegin() const;
 
-    /// Return a reverse iterator representing the end of the priority queue (largest element last).
+    /// Return a reverse iterator representing the end of the priority queue (smallest element last).
     const_reverse_iterator rend() const;
 
     /// Erase element pointed to by \a it.
@@ -217,28 +217,28 @@ template<class T, class Container, class Compare>
 typename PriorityQueue<T, Container, Compare>::const_iterator
 PriorityQueue<T, Container, Compare>::begin() const
 {
-    return m_queue.rbegin();
+    return m_queue.begin();
 }
 
 template<class T, class Container, class Compare>
 typename PriorityQueue<T, Container, Compare>::const_iterator
 PriorityQueue<T, Container, Compare>::end() const
 {
-    return m_queue.rend();
+    return m_queue.end();
 }
 
 template<class T, class Container, class Compare>
 typename PriorityQueue<T, Container, Compare>::const_reverse_iterator
 PriorityQueue<T, Container, Compare>::rbegin() const
 {
-    return m_queue.begin();
+    return m_queue.rbegin();
 }
 
 template<class T, class Container, class Compare>
 typename PriorityQueue<T, Container, Compare>::const_reverse_iterator
 PriorityQueue<T, Container, Compare>::rend() const
 {
-    return m_queue.end();
+    return m_queue.rend();
 }
 
 template<class T, class Container, class Compare>
