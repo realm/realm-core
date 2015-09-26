@@ -64,11 +64,10 @@ public:
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
+    Query(Expression*);
     virtual ~Query() noexcept;
 
     Query& operator = (const Query& source);
-
-    Query& expression(Expression* compare);
 
     // Find links that point to a specific target row
     Query& links_to(size_t column_ndx, size_t target_row);
@@ -294,6 +293,8 @@ public:
 private:
     void copy_nodes(const Query& source);
     void fetch_descriptor();
+
+    void add_expression_node(Expression*);
 
     template <class ColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class ColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);

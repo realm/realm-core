@@ -108,8 +108,6 @@ Caveats, notes and todos
     * The name Columns (with s) an be confusing because we also have Column (without s)
     * Memory allocation: Maybe clone Compare and Operator to get rid of m_auto_delete. However, this might become
       bloated, with non-trivial copy constructors instead of defaults
-    * Hack: In compare operator overloads (==, !=, >, etc), Compare class is returned as Query class, resulting in object
-      slicing. Just be aware.
     * clone() some times new's, sometimes it just returns *this. Can be confusing. Rename method or copy always.
     * We have Columns::m_table, Query::m_table and ColumnAccessorBase::m_table that point at the same thing, even with
       ColumnAccessor<> extending Columns. So m_table is redundant, but this is in order to keep class dependencies and
@@ -286,7 +284,7 @@ struct ValueBase
     size_t m_values;
 };
 
-class Expression : public Query
+class Expression
 {
 public:
     Expression() { }
@@ -384,7 +382,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
             q.contains(column->m_column, only_string(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
-            // fallback to using use 'return *new Compare<>' instead.
+            // fallback to using use 'return new Compare<>' instead.
             REALM_ASSERT(false);
         }
         // Return query_engine.hpp node
@@ -398,7 +396,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
         char* compare_string = in_place_deep_clone(&left);
 
         // Return query_expression.hpp node
-        return *new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left),
+        return new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left),
             const_cast<Subexpr2<R>&>(right).clone(), true, compare_string);
     }
 }
@@ -557,7 +555,7 @@ public:
 #endif
         {
             // Return query_expression.hpp node
-            return *new Compare<Cond, typename Common<R, float>::type>
+            return new Compare<Cond, typename Common<R, float>::type>
                         (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
         }
     }
@@ -1547,9 +1545,9 @@ template <class S, class I> Query string_compare(const Columns<StringData>& left
     Subexpr& left_copy = const_cast<Columns<StringData>&>(left).clone();
     Subexpr& right_copy = const_cast<Columns<StringData>&>(right).clone();
     if (case_sensitive)
-        return *new Compare<S, StringData>(right_copy, left_copy, /* auto_delete */ true);
+        return new Compare<S, StringData>(right_copy, left_copy, /* auto_delete */ true);
     else
-        return *new Compare<I, StringData>(right_copy, left_copy, /* auto_delete */ true);
+        return new Compare<I, StringData>(right_copy, left_copy, /* auto_delete */ true);
 }
 
 // Columns<String> == Columns<String>
@@ -1676,9 +1674,6 @@ class UnaryLinkCompare : public Expression
 public:
     UnaryLinkCompare(LinkMap lm) : m_link_map(lm)
     {
-        Query::expression(this);
-        Table* t = const_cast<Table*>(get_table());
-        Query::set_table(t->get_table_ref());
     }
 
     void set_table() override
@@ -1749,7 +1744,7 @@ public:
         if (m_link_map.m_link_columns.size() > 1)
             throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return *new UnaryLinkCompare(m_link_map);
+        return new UnaryLinkCompare(m_link_map);
     }
 
     LinkCount count() const
@@ -2260,18 +2255,10 @@ private:
 template <class TCond, class T, class TLeft, class TRight> class Compare : public Expression
 {
 public:
-
-    // Compare extends Expression which extends Query. This constructor for Compare initializes the Query part by
-    // adding an ExpressionNode (see query_engine.hpp) and initializes Query::table so that it's ready to call
-    // Query methods on, like find_first(), etc.
     Compare(TLeft& left, const TRight& right, bool auto_delete = false, const char* compare_string = nullptr) :
-            m_left(left), m_right(const_cast<TRight&>(right)), m_compare_string(compare_string)
+        m_auto_delete(auto_delete), m_left(left), m_right(const_cast<TRight&>(right)),
+        m_compare_string(compare_string)
     {
-        m_auto_delete = auto_delete;
-        Query::expression(this);
-        Table* t = const_cast<Table*>(get_table()); // todo, const
-        if (t)
-            Query::set_table(t->get_table_ref());
     }
 
     ~Compare()
