@@ -416,37 +416,37 @@ public:
     // Arithmetic, right side constant
     Operator<Plus<CommonType>> operator + (R right) const
     {
-        return Operator<Plus<CommonType>>(clone_subexpr(), make_subexpr<Value<R>>(right));
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
     Operator<Minus<CommonType>> operator - (R right) const
     {
-        return Operator<Minus<CommonType>>(clone_subexpr(), make_subexpr<Value<R>>(right));
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
     Operator<Mul<CommonType>> operator * (R right) const
     {
-        return Operator<Mul<CommonType>>(clone_subexpr(), make_subexpr<Value<R>>(right));
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
     Operator<Div<CommonType>> operator / (R right) const
     {
-        return Operator<Div<CommonType>>(clone_subexpr(), make_subexpr<Value<R>>(right));
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
 
     // Arithmetic, right side subexpression
     Operator<Plus<CommonType>> operator + (const Subexpr2<R>& right) const
     {
-        return Operator<Plus<CommonType>>(clone_subexpr(), right.clone());
+        return { clone_subexpr(), right.clone() };
     }
     Operator<Minus<CommonType>> operator - (const Subexpr2<R>& right) const
     {
-        return Operator<Minus<CommonType>>(clone_subexpr(), right.clone());
+        return { clone_subexpr(), right.clone() };
     }
     Operator<Mul<CommonType>> operator * (const Subexpr2<R>& right) const
     {
-        return Operator<Mul<CommonType>>(clone_subexpr(), right.clone());
+        return { clone_subexpr(), right.clone() };
     }
     Operator<Div<CommonType>> operator / (const Subexpr2<R>& right) const
     {
-        return Operator<Div<CommonType>>(clone_subexpr(), right.clone());
+        return { clone_subexpr(), right.clone() };
     }
 
     // Compare, right side constant
@@ -1175,57 +1175,57 @@ template <class R> Query operator != (int64_t left, const Subexpr2<R>& right) {
 
 // Arithmetic
 template <class R> Operator<Plus<typename Common<R, double>::type>> operator + (double left, const Subexpr2<R>& right) {
-    return Operator<Plus<typename Common<R, double>::type>>(make_subexpr<Value<double>>(left), right.clone());
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
 template <class R> Operator<Plus<typename Common<R, float>::type>> operator + (float left, const Subexpr2<R>& right) {
-    return Operator<Plus<typename Common<R, float>::type>>(make_subexpr<Value<float>>(left), right.clone());
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
 template <class R> Operator<Plus<typename Common<R, int>::type>> operator + (int left, const Subexpr2<R>& right) {
-    return Operator<Plus<typename Common<R, int>::type>>(make_subexpr<Value<int>>(left), right.clone());
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
 template <class R> Operator<Plus<typename Common<R, int64_t>::type>> operator + (int64_t left, const Subexpr2<R>& right) {
-    return Operator<Plus<typename Common<R, int64_t>::type>>(make_subexpr<Value<int64_t>>(left), right.clone());
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
 template <class R> Operator<Minus<typename Common<R, double>::type>> operator - (double left, const Subexpr2<R>& right) {
-    return Operator<Minus<typename Common<R, double>::type>>(make_subexpr<Value<double>>(left), right.clone());
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
 template <class R> Operator<Minus<typename Common<R, float>::type>> operator - (float left, const Subexpr2<R>& right) {
-    return Operator<Minus<typename Common<R, float>::type>>(make_subexpr<Value<float>>(left), right.clone());
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
 template <class R> Operator<Minus<typename Common<R, int>::type>> operator - (int left, const Subexpr2<R>& right) {
-    return Operator<Minus<typename Common<R, int>::type>>(make_subexpr<Value<int>>(left), right.clone());
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
 template <class R> Operator<Minus<typename Common<R, int64_t>::type>> operator - (int64_t left, const Subexpr2<R>& right) {
-    return Operator<Minus<typename Common<R, int64_t>::type>>(make_subexpr<Value<int64_t>>(left), right.clone());
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
 template <class R> Operator<Mul<typename Common<R, double>::type>> operator * (double left, const Subexpr2<R>& right) {
-    return Operator<Mul<typename Common<R, double>::type>>(make_subexpr<Value<double>>(left), right.clone());
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
 template <class R> Operator<Mul<typename Common<R, float>::type>> operator * (float left, const Subexpr2<R>& right) {
-    return Operator<Mul<typename Common<R, float>::type>>(make_subexpr<Value<float>>(left), right.clone());
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
 template <class R> Operator<Mul<typename Common<R, int>::type>> operator * (int left, const Subexpr2<R>& right) {
-    return Operator<Mul<typename Common<R, int>::type>>(make_subexpr<Value<int>>(left), right.clone());
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
 template <class R> Operator<Mul<typename Common<R, int64_t>::type>> operator * (int64_t left, const Subexpr2<R>& right) {
-    return Operator<Mul<typename Common<R, int64_t>::type>>(make_subexpr<Value<int64_t>>(left), right.clone());
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
 template <class R> Operator<Div<typename Common<R, double>::type>> operator / (double left, const Subexpr2<R>& right) {
-    return Operator<Div<typename Common<R, double>::type>>(make_subexpr<Value<double>>(left), right.clone());
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
 template <class R> Operator<Div<typename Common<R, float>::type>> operator / (float left, const Subexpr2<R>& right) {
-    return Operator<Div<typename Common<R, float>::type>>(make_subexpr<Value<float>>(left), right.clone());
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
 template <class R> Operator<Div<typename Common<R, int>::type>> operator / (int left, const Subexpr2<R>& right) {
-    return Operator<Div<typename Common<R, int>::type>>(make_subexpr<Value<int>>(left), right.clone());
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
 template <class R> Operator<Div<typename Common<R, int64_t>::type>> operator / (int64_t left, const Subexpr2<R>& right) {
-    return Operator<Div<typename Common<R, int64_t>::type>>(make_subexpr<Value<int64_t>>(left), right.clone());
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
 
 // Unary operators
 template <class T> UnaryOperator<Pow<T>> power (const Subexpr2<T>& left) {
-    return UnaryOperator<Pow<T>>(left.clone());
+    return { left.clone() };
 }
 
 
@@ -2009,22 +2009,22 @@ public:
 
     SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Minimum<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
     SubColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Maximum<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
     SubColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Sum<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
     SubColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Average<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
 private:
