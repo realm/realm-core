@@ -828,8 +828,9 @@ public:
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
-    virtual Subexpr& clone() {
-        return *new Columns<int64_t>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
+    virtual std::unique_ptr<Subexpr> clone() const
+    {
+        return make_subexpr<Columns<int64_t>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     std::size_t find_first(int64_t value) const
@@ -899,8 +900,9 @@ public:
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
-    virtual Subexpr& clone() {
-        return *new Columns<float>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
+    virtual std::unique_ptr<Subexpr> clone() const
+    {
+        return make_subexpr<Columns<float>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     std::size_t find_first(float value) const
@@ -976,8 +978,9 @@ public:
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
-    virtual Subexpr& clone() {
-        return *new Columns<double>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
+    virtual std::unique_ptr<Subexpr> clone() const
+    {
+        return make_subexpr<Columns<double>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     std::size_t find_first(double value) const
