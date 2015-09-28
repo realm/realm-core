@@ -182,6 +182,19 @@ PriorityQueue<T, Container, Compare>::PriorityQueue(InputIt first, InputIt last,
 }
 
 template<class T, class Container, class Compare>
+typename PriorityQueue<T, Container, Compare>::size_type
+PriorityQueue<T, Container, Compare>::size() const
+{
+    return m_queue.size();
+}
+
+template<class T, class Container, class Compare>
+bool PriorityQueue<T, Container, Compare>::empty() const
+{
+    return m_queue.empty();
+}
+
+template<class T, class Container, class Compare>
 void PriorityQueue<T, Container, Compare>::push(const T& element)
 {
     auto it = std::lower_bound(m_queue.begin(), m_queue.end(), element, compare());
