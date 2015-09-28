@@ -1,18 +1,9 @@
 #include "testsettings.hpp"
 #ifdef TEST_GROUP
 
-
-#define __STDC_LIMIT_MACROS
 #include <stdint.h>
 #include <algorithm>
 #include <fstream>
-#include <thread>
-
-#include <mutex>
-// These 3 lines are needed in Visual Studio 2015 to make std::thread work
-#define __STDC_LIMIT_MACROS
-#include <stdint.h>
-#include <thread>
 
 #include <sys/stat.h>
 #ifndef _WIN32
@@ -747,15 +738,15 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) {
     SHARED_GROUP_TEST_PATH(temp_copy);
     CHECK_OR_RETURN(File::copy(path, temp_copy));
 
-    std::thread t[10];
+    util::Thread t[10];
 
-    for (std::thread& tt : t) {
-        tt = std::thread([&]() {
+    for (auto& tt : t) {
+        tt.start([&]() {
             SharedGroup sg(temp_copy);
         });
     }
 
-    for (std::thread& tt : t)
+    for (auto& tt : t)
         tt.join();
 }
 
