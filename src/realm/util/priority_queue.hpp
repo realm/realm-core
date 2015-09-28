@@ -127,9 +127,12 @@ public:
 
     /// Erase element pointed to by \a it.
     ///
+    /// Note: This function differs from `std::priority_queue` by returning the erased
+    /// element using move semantics.
+    ///
     /// Calling `erase()` with a beyond-end iterator (such as what is returned by `end()`)
     /// is undefined.
-    void erase(const_iterator it);
+    value_type erase(const_iterator it);
 
     /// Remove all elements from the priority queue.
     void clear();
@@ -179,6 +182,19 @@ PriorityQueue<T, Container, Compare>::PriorityQueue(InputIt first, InputIt last,
     for (auto it = first; it != last; ++it) {
         push(*it);
     }
+}
+
+template<class T, class Container, class Compare>
+typename PriorityQueue<T, Container, Compare>::size_type
+PriorityQueue<T, Container, Compare>::size() const
+{
+    return m_queue.size();
+}
+
+template<class T, class Container, class Compare>
+bool PriorityQueue<T, Container, Compare>::empty() const
+{
+    return m_queue.empty();
 }
 
 template<class T, class Container, class Compare>
@@ -258,9 +274,14 @@ PriorityQueue<T, Container, Compare>::rend() const
 }
 
 template<class T, class Container, class Compare>
-void PriorityQueue<T, Container, Compare>::erase(const_iterator it)
+typename PriorityQueue<T, Container, Compare>::value_type
+PriorityQueue<T, Container, Compare>::erase(const_iterator it)
 {
-    m_queue.erase(it);
+    // Convert to non-const iterator:
+    auto non_const_iterator = m_queue.begin() + (it - m_queue.begin());
+    value_type value = std::move(*non_const_iterator);
+    m_queue.erase(non_const_iterator);
+    return value;
 }
 
 template<class T, class Container, class Compare>
