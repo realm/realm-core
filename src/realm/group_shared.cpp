@@ -635,6 +635,13 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             File::UnlockGuard ulg(m_file);
 
+            // The DB file shouldn't already exist if no one has it open, but if
+            // the process crashed on a previous run it may not have been
+            // deleted on close, so clean up any existing file at that path
+            if (durability == durability_MemOnly) {
+                util::File::try_remove(m_db_path);
+            }
+
             // We're alone in the world, and it is Ok to initialize the file:
             char empty_buf[sizeof (SharedInfo)];
             std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
