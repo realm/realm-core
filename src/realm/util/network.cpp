@@ -10,7 +10,9 @@
 
 #include <realm/util/misc_errors.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/priority_queue.hpp>
 #include <realm/util/network.hpp>
+
 
 using namespace realm::util;
 using namespace realm::util::network;
@@ -359,13 +361,15 @@ public:
         {
             return a > b->m_expiration_time;
         }
+        bool operator()(const std::unique_ptr<wait_oper_base>& a, const std::unique_ptr<wait_oper_base>& b)
+        {
+            return a->m_expiration_time > b->m_expiration_time;
+        }
     };
 
     void add_wait_oper(std::unique_ptr<wait_oper_base> op)
     {
-        auto i = std::lower_bound(m_wait_operations.begin(), m_wait_operations.end(),
-                                  op->m_expiration_time, wait_oper_compare());
-        m_wait_operations.insert(i, move(op)); // Throws
+        m_wait_operations.push(std::move(op)); // Throws
     }
 
     void add_completed_oper(std::unique_ptr<async_oper> op) noexcept
@@ -410,8 +414,7 @@ public:
         auto pred = [=](const std::unique_ptr<wait_oper_base>& op_2) { return op_2.get() == op; };
         auto i = std::find_if(p.first, p.second, pred);
         REALM_ASSERT(i != p.second);
-        m_completed_operations.push_back(move(*i));
-        m_wait_operations.erase(i); // Does not throw
+        m_completed_operations.push_back(m_wait_operations.erase(i));
     }
 
 private:
@@ -428,7 +431,10 @@ private:
     std::vector<io_oper_slot> m_io_operations;
     size_t m_num_active_io_operations = 0;
 
-    std::vector<std::unique_ptr<wait_oper_base>> m_wait_operations;
+    using WaitQueue = util::PriorityQueue<std::unique_ptr<wait_oper_base>,
+                                          std::vector<std::unique_ptr<wait_oper_base>>,
+                                          wait_oper_compare>;
+    WaitQueue m_wait_operations;
 
     Mutex m_mutex;
     oper_queue m_post_operations; // Protected by `m_mutex` (including the enqueued operations).
@@ -440,11 +446,10 @@ private:
         for (;;) {
             if (m_wait_operations.empty())
                 break;
-            std::unique_ptr<wait_oper_base>& op = m_wait_operations.back();
+            auto& op = m_wait_operations.top();
             if (now < op->m_expiration_time)
                 break;
-            m_completed_operations.push_back(move(op));
-            m_wait_operations.pop_back();
+            m_completed_operations.push_back(m_wait_operations.pop_top());
             any_operations_completed = true;
         }
         return any_operations_completed;
@@ -456,7 +461,7 @@ private:
         {
             wait_oper_base* next_wait_op = 0;
             if (!m_wait_operations.empty())
-                next_wait_op = m_wait_operations.back().get();
+                next_wait_op = m_wait_operations.top().get();
 
             // std::vector guarantees contiguous storage
             pollfd* fds = &m_pollfd_slots.front();
