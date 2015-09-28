@@ -87,7 +87,7 @@ void make_dir(const std::string& path)
         return;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("open() failed: ", err);
+    std::string msg = get_errno_msg("make_dir() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -116,7 +116,7 @@ void remove_dir(const std::string& path)
         return;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("open() failed: ", err);
+    std::string msg = get_errno_msg("remove_dir() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -885,7 +885,7 @@ void File::remove(const std::string& path)
     if (try_remove(path))
         return;
     int err = ENOENT;
-    std::string msg = get_errno_msg("open() failed: ", err);
+    std::string msg = get_errno_msg("remove() failed: ", err);
     throw NotFound(msg, path);
 }
 
