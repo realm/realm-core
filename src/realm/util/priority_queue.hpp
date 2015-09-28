@@ -99,6 +99,13 @@ public:
     /// Calling `top()` on an empty priority queue is undefined.
     const_reference top() const;
 
+    /// Pop the top of the queue and return it by moving it out of the queue.
+    ///
+    /// Note: This method does not exist in `std::priority_queue`.
+    ///
+    /// Calling `pop_top()` on an empty priorty queue is undefined.
+    value_type pop_top();
+
     // FIXME: emplace() deliberately omitted for simplicity.
 
     /// Swap the contents of this priority queue with the contents of \a other.
@@ -199,6 +206,15 @@ typename PriorityQueue<T, Container, Compare>::const_reference
 PriorityQueue<T, Container, Compare>::top() const
 {
     return m_queue.back();
+}
+
+template<class T, class Container, class Compare>
+typename PriorityQueue<T, Container, Compare>::value_type
+PriorityQueue<T, Container, Compare>::pop_top()
+{
+    value_type value = std::move(m_queue.back());
+    m_queue.pop_back();
+    return value;
 }
 
 template<class T, class Container, class Compare>

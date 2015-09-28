@@ -60,3 +60,11 @@ TEST(PriorityQueue_PopsLargestElement)
     q.pop();
     CHECK_EQUAL(1, q.top());
 }
+
+TEST(PriorityQueue_PopByMove)
+{
+    PriorityQueue<std::unique_ptr<int>> q;
+    q.push(std::unique_ptr<int>(new int{123}));
+    auto p = q.pop_top();
+    CHECK_EQUAL(123, *p);
+}
