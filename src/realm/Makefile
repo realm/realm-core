@@ -21,6 +21,7 @@ util/file.hpp \
 util/optional.hpp \
 util/network.hpp \
 util/utf8.hpp \
+util/priority_queue.hpp \
 util/platform_specific_condvar.hpp \
 exceptions.hpp \
 utilities.hpp \
