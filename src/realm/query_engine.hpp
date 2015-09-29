@@ -576,13 +576,13 @@ public:
         using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
         bool cont;
         size_t start_in_leaf = s - this->m_leaf_start;
-        if (this->m_null) {
+        if (!m_value) {
             cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
                 (null{}, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
                  std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
         } else {
             cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
-                (m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
+                (*m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
                  std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
         }
         return cont;
@@ -617,11 +617,11 @@ protected:
             if (fastmode) {
                 bool cont;
                 size_t start_in_leaf = s - m_leaf_start;
-                if (m_null) {
+                if (!m_value) {
                     cont = m_leaf_ptr->find(c, m_action, null{}, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 }
                 else {
-                    cont = m_leaf_ptr->find(c, m_action, m_value, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                    cont = m_leaf_ptr->find(c, m_action, *m_value, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 }
                 if (!cont)
                     return not_found;
@@ -651,20 +651,15 @@ protected:
         }
     }
 
-    IntegerNodeBase(TConditionValue v, size_t column_idx)
-        : IntegerNodeBase(column_idx)
+    IntegerNodeBase(util::Optional<TConditionValue> value, size_t column_idx) : ColumnNodeBase(column_idx),
+        m_value(std::move(value))
     {
-        m_value = v;
-    }
-
-    IntegerNodeBase(null, size_t column_idx)
-        : IntegerNodeBase(column_idx)
-    {
-        m_null = true;
+        m_dT = _impl::CostHeuristic<ColType>::dT;
+        m_dD = _impl::CostHeuristic<ColType>::dD;
     }
 
     IntegerNodeBase(const ThisType& from) : ColumnNodeBase(from),
-        m_value(from.m_value), m_null(from.m_null)
+        m_value(from.m_value)
     {
         // state is transient/only valid during search, no need to copy
         m_dT = _impl::CostHeuristic<ColType>::dT;
@@ -721,9 +716,7 @@ protected:
     }
 
     // Search value:
-    // FIXME: Consider using Optional.
-    TConditionValue m_value;
-    bool m_null = false;
+    util::Optional<TConditionValue> m_value;
 
     // Column on which search criteria are applied
     const ColType* m_condition_column = nullptr;
@@ -740,13 +733,6 @@ protected:
     // Aggregate optimization
     using TFind_callback_specialized = bool(ThisType::*)(size_t, size_t);
     TFind_callback_specialized m_find_callback_specialized = nullptr;
-
-private:
-    explicit IntegerNodeBase(size_t column_idx) : ColumnNodeBase(column_idx)
-    {
-        m_dT = _impl::CostHeuristic<ColType>::dT;
-        m_dD = _impl::CostHeuristic<ColType>::dD;
-    }
 };
 
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
@@ -758,13 +744,11 @@ public:
     static const bool special_null_node = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
-    IntegerNode(TConditionValue value, size_t column_ndx)
-    : IntegerNodeBase<ColType>(value, column_ndx)
+    IntegerNode(TConditionValue value, size_t column_ndx) : IntegerNodeBase<ColType>(value, column_ndx)
     {
     }
 
-    IntegerNode(null n, size_t column_ndx)
-    : IntegerNodeBase<ColType>(n, column_ndx)
+    IntegerNode(null, size_t column_ndx) : IntegerNodeBase<ColType>(none, column_ndx)
     {
     }
 
@@ -807,10 +791,10 @@ public:
                 end2 = end - this->m_leaf_start;
 
             size_t s;
-            if (IntegerNodeBase<ColType>::m_null)
+            if (!this->m_value)
                 s = this->m_leaf_ptr->template find_first<TConditionFunction>(null(), start - this->m_leaf_start, end2);
             else
-                s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start - this->m_leaf_start, end2);
+                s = this->m_leaf_ptr->template find_first<TConditionFunction>(*this->m_value, start - this->m_leaf_start, end2);
 
             if (s == not_found) {
                 start = this->m_leaf_end;
