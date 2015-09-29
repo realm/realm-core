@@ -442,33 +442,33 @@ public:
         m_dD = 10.0;
         m_table = &table;
 
-        // m_child is first node in condition of subtable query.
-        if (m_child) {
+        // m_condition is first node in condition of subtable query.
+        if (m_condition) {
             // Can't call init() here as usual since the subtable can be degenerate
-            // m_child->init(table);
+            // m_condition->init(table);
             std::vector<ParentNode*> v;
-            m_child->gather_children(v);
+            m_condition->gather_children(v);
         }
 
-        // m_child2 is next node of parent query
-        if (m_child2)
-            m_child2->init(table);
+        // m_child is next node of parent query
+        if (m_child)
+            m_child->init(table);
     }
 
     std::string validate() override
     {
         if (error_code != "")
             return error_code;
-        if (m_child == nullptr)
+        if (m_condition == nullptr)
             return "Unbalanced subtable/end_subtable block";
         else
-            return m_child->validate();
+            return m_condition->validate();
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(m_table);
-        REALM_ASSERT(m_child);
+        REALM_ASSERT(m_condition);
 
         for (size_t s = start; s < end; ++s) {
             ConstTableRef subtable = m_table->get_subtable(m_column, s);
@@ -476,9 +476,9 @@ public:
             if (subtable->is_degenerate())
                 return not_found;
 
-            m_child->init(*subtable);
+            m_condition->init(*subtable);
             const size_t subsize = subtable->size();
-            const size_t sub = m_child->find_first(0, subsize);
+            const size_t sub = m_condition->find_first(0, subsize);
 
             if (sub != not_found)
                 return s;
@@ -488,7 +488,7 @@ public:
 
     ParentNode* child_criteria() override
     {
-        return m_child2;
+        return m_child;
     }
 
     ParentNode* clone() override
@@ -499,18 +499,14 @@ public:
     void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
-        m_child2 = mapping.find(m_child2)->second;
+        m_condition = mapping.find(m_condition)->second;
     }
 
-    SubtableNode(const SubtableNode& from)
-        : ParentNode(from)
+    SubtableNode(const SubtableNode& from) : ParentNode(from), m_condition(from.m_condition), m_column(from.m_column)
     {
-        m_child2 = from.m_child2;
-        m_column = from.m_column;
-        m_child = from.m_child;
     }
 
-    ParentNode* m_child2 = nullptr;
+    ParentNode* m_condition = nullptr;
     size_t m_column = npos;
 };
 

@@ -1117,9 +1117,9 @@ Query& Query::Or()
 Query& Query::subtable(size_t column)
 {
     SubtableNode* const p = new SubtableNode(column);
-    update_pointers(p, &p->m_child);
-    // once subtable conditions have been evaluated, resume evaluation from m_child2
-    subtables.push_back(&p->m_child2);
+    update_pointers(p, &p->m_condition);
+    // once subtable conditions have been evaluated, resume evaluation from m_child
+    subtables.push_back(&p->m_child);
     m_subtable_path.push_back(column);
     fetch_descriptor();
     group();
