@@ -129,6 +129,7 @@ namespace realm {
     // file (http://www.opensource.apple.com/source/Heimdal/Heimdal-247.9/lib/wind/UnicodeData.txt) that contains case
     // conversion information. The conversion does not take your current locale in count; it can be slightly wrong in some
     // countries! If the input is already lower case, or outside range 0...0x6ff, then input value is returned untouched. 
+    uint32_t to_lower(uint32_t character); // Not used. Prototype here to silence warning. Consider moving this to an unnamed namespace or move prototype to header, if actually needed.
     uint32_t to_lower(uint32_t character)
     {
         static const int16_t lowers[] = {
@@ -148,6 +149,7 @@ namespace realm {
         return ret;
     }
 
+    std::wstring utf8_to_wstring(StringData str); // Prototype to silence warning. Consider moving this to an unnamed namespace.
     std::wstring utf8_to_wstring(StringData str)
     {
 #if REALM_HAVE_CXX11 && defined(_MSC_VER)
