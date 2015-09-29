@@ -249,8 +249,6 @@ public:
         m_children = v;
         m_children.erase(m_children.begin() + i);
         m_children.insert(m_children.begin(), this);
-
-        m_conds = m_children.size();
     }
 
     struct score_compare {
@@ -330,7 +328,6 @@ public:
         m_child = from.m_child;
         m_children = from.m_children;
         m_condition_column_idx = from.m_condition_column_idx;
-        m_conds = from.m_conds;
         m_dD = from.m_dD;
         m_dT = from.m_dT;
         m_probes = from.m_probes;
@@ -351,7 +348,6 @@ public:
     std::vector<ParentNode*> m_children;
     size_t m_condition_column_idx = npos; // Column of search criteria
 
-    size_t m_conds = 0;
     double m_dD; // Average row distance between each local match at current position
     double m_dT; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0 for index/tableview
 
@@ -562,7 +558,7 @@ protected:
         auto source_column = static_cast<SequentialGetter<ColType>*>(m_source_column);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
-        for (size_t c = 1; c < m_conds; c++) {
+        for (size_t c = 1; c < m_children.size(); c++) {
             m_children[c]->m_probes++;
             size_t m = m_children[c]->find_first_local(i, i + 1);
             if (m != i)
@@ -624,13 +620,13 @@ protected:
     size_t aggregate_local_impl(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column, int c)
     {
-        REALM_ASSERT(m_conds > 0);
+        REALM_ASSERT(m_children.size() > 0);
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
         m_state = st;
 
-        // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
+        // If there are no other nodes than us (m_children.size() == 1) AND the column used for our condition is
         // the same as the column used for the aggregate action, then the entire query can run within scope of that
         // column only, with no references to other columns:
         bool fastmode = should_run_in_fastmode(source_column);
@@ -744,7 +740,7 @@ protected:
 
     bool should_run_in_fastmode(SequentialGetterBase* source_column) const
     {
-        return (m_conds == 1 &&
+        return (m_children.size() == 1 &&
                 (source_column == nullptr ||
                  (!m_fastmode_disabled
                   && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));

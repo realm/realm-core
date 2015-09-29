@@ -15,15 +15,14 @@ using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {
-    size_t m = start;
     size_t next_cond = 0;
     size_t first_cond = 0;
 
     while (start < end) {
-        m = m_children[next_cond]->find_first_local(start, end);
+        size_t m = m_children[next_cond]->find_first_local(start, end);
 
         next_cond++;
-        if (next_cond == m_conds)
+        if (next_cond == m_children.size())
             next_cond = 0;
 
         if (m == start) {
@@ -112,7 +111,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
         // Find first match in remaining condition nodes
         size_t m = r;
 
-        for (size_t c = 1; c < m_conds; c++) {
+        for (size_t c = 1; c < m_children.size(); c++) {
             m = m_children[c]->find_first_local(r, r + 1);
             if (m != r) {
                 break;
