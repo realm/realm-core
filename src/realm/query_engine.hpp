@@ -363,7 +363,6 @@ protected:
 class ListviewNode: public ParentNode {
 public:
     ListviewNode(TableView& tv) : m_size(tv.size()), m_tv(tv) { m_dT = 0.0; }
-    ~ListviewNode() noexcept override {  }
 
     // Return the n'th table row index contained in the TableView.
     size_t tableindex(size_t n)
@@ -423,8 +422,6 @@ protected:
 class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) { m_dT = 100.0; }
-    SubtableNode() {};
-    ~SubtableNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -520,9 +517,7 @@ protected:
         m_condition_column_idx = column_idx;
     }
 
-    ColumnNodeBase(const ColumnNodeBase& other) : ParentNode(other)
-    {
-    }
+    ColumnNodeBase(const ColumnNodeBase&) = default;
 
     template <Action TAction, class ColType>
     bool match_callback(int64_t v)
@@ -674,7 +669,6 @@ protected:
         // state is transient/only valid during search, no need to copy
         m_dT = _impl::CostHeuristic<ColType>::dT;
         m_dD = _impl::CostHeuristic<ColType>::dD;
-        m_child = from.m_child;
         m_condition_column = from.m_condition_column;
         m_find_callback_specialized = from.m_find_callback_specialized;
     }
@@ -774,10 +768,7 @@ public:
     {
     }
 
-    IntegerNode(const ThisType& other)
-    : IntegerNodeBase<ColType>(other)
-    {
-    }
+    IntegerNode(const IntegerNode&) = default;
 
     void aggregate_local_prepare(Action action, DataType col_id, bool nullable) override
     {
@@ -906,7 +897,6 @@ public:
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    ~FloatDoubleNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -946,10 +936,8 @@ public:
     }
 
     FloatDoubleNode(const FloatDoubleNode& from)
-        : ParentNode(from)
+        : ParentNode(from), m_value(from.m_value)
     {
-        m_value = from.m_value;
-        m_child = from.m_child;
         // m_condition_column is not copied
     }
 
@@ -1023,7 +1011,6 @@ public:
         m_value = BinaryData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
         m_column_type = from.m_column_type;
-        m_child = from.m_child;
     }
 
 
@@ -1095,7 +1082,6 @@ public:
         m_leaf_type = from.m_leaf_type;
         m_end_s = 0;
         m_leaf_start = 0;
-        m_child = from.m_child;
     }
 
 protected:
@@ -1134,8 +1120,6 @@ public:
     {
         delete[] m_ucase;
         delete[] m_lcase;
-
-        clear_leaf_state();
     }
 
 
@@ -1209,7 +1193,6 @@ public:
         memcpy(ucase, from.m_ucase, sz);
         m_lcase = lcase;
         m_ucase = ucase;
-        m_child = from.m_child;
     }
 protected:
     const char* m_lcase;
@@ -1400,15 +1383,13 @@ public:
         return not_found;
     }
 
-public:
     ParentNode* clone() override
     {
         return new StringNode<Equal>(*this);
     }
 
-    StringNode(const StringNode& from) : StringNodeBase(from)
+    StringNode(const StringNode& from) : StringNodeBase(from), m_index_matches_destroy(false)
     {
-        m_index_matches_destroy = false;
     }
 
 private:
@@ -1447,11 +1428,8 @@ public:
     }
 
     OrNode(ParentNode* p1) : m_cond(1, p1) {
-        m_child = nullptr;
         m_dT = 50.0;
     }
-
-    ~OrNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -1568,8 +1546,10 @@ public:
         return 0;
     }
 
-    NotNode() {m_child = nullptr; m_cond = nullptr; m_dT = 50.0;}
-    ~NotNode() noexcept override {}
+    NotNode()
+    {
+        m_dT = 50.0;
+    }
 
     void init(const Table& table) override
     {
@@ -1630,10 +1610,9 @@ public:
         m_known_range_start = from.m_known_range_start;
         m_known_range_end = from.m_known_range_end;
         m_first_in_known_range = from.m_first_in_known_range;
-        m_child = from.m_child;
     }
 
-    ParentNode* m_cond;
+    ParentNode* m_cond = nullptr;
 private:
     // FIXME This heuristic might as well be reused for all condition nodes.
     size_t m_known_range_start;
@@ -1663,7 +1642,6 @@ public:
         m_dT = 100.0;
         m_condition_column_idx1 = column1;
         m_condition_column_idx2 = column2;
-        m_child = nullptr;
     }
 
     ~TwoColumnsNode() noexcept override
@@ -1739,15 +1717,10 @@ public:
         return new TwoColumnsNode<ColType, TConditionFunction>(*this);
     }
 
-    TwoColumnsNode(const TwoColumnsNode& from)
-        : ParentNode(from)
+    TwoColumnsNode(const TwoColumnsNode& from) : ParentNode(from), m_value(from.m_value),
+        m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
+        m_condition_column_idx1(from.m_condition_column_idx1), m_condition_column_idx2(from.m_condition_column_idx2)
     {
-        m_value = from.m_value;
-        m_condition_column = from.m_condition_column;
-        m_column_type = from.m_column_type;
-        m_condition_column_idx1 = from.m_condition_column_idx1;
-        m_condition_column_idx2 = from.m_condition_column_idx2;
-        m_child = from.m_child;
         // NOT copied:
         // m_getter1 = from.m_getter1;
         // m_getter2 = from.m_getter2;
@@ -1770,11 +1743,8 @@ protected:
 class ExpressionNode: public ParentNode {
 
 public:
-    ~ExpressionNode() noexcept { }
-
-    ExpressionNode(Expression* compare)
+    ExpressionNode(Expression* compare) : m_compare(util::SharedPtr<Expression>(compare))
     {
-        m_compare = util::SharedPtr<Expression>(compare);
         m_dD = 10.0;
         m_dT = 50.0;
     }
@@ -1797,12 +1767,7 @@ public:
         return new ExpressionNode(*this);
     }
 
-    ExpressionNode(ExpressionNode& from)
-        : ParentNode(from)
-    {
-        m_compare = from.m_compare;
-        m_child = from.m_child;
-    }
+    ExpressionNode(const ExpressionNode&) = default;
 
     util::SharedPtr<Expression> m_compare;
 };
