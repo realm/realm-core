@@ -230,21 +230,17 @@ private:
 class ParentNode {
     typedef ParentNode ThisType;
 public:
-
-    ParentNode()
-    {
-    }
+    ParentNode() = default;
+    virtual ~ParentNode() = default;
 
     void gather_children(std::vector<ParentNode*>& v)
     {
         m_children.clear();
-        ParentNode* p = this;
         size_t i = v.size();
         v.push_back(this);
-        p = p->child_criteria();
 
-        if (p)
-            p->gather_children(v);
+        if (m_child)
+            m_child->gather_children(v);
 
         m_children = v;
         m_children.erase(m_children.begin() + i);
@@ -262,8 +258,6 @@ public:
 
     size_t find_first(size_t start, size_t end);
 
-    virtual ~ParentNode() noexcept {}
-
     virtual void init(const Table& table)
     {
         m_table = &table;
@@ -278,11 +272,6 @@ public:
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
-
-    virtual ParentNode* child_criteria()
-    {
-        return m_child;
-    }
 
     virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
 
@@ -484,11 +473,6 @@ public:
                 return s;
         }
         return not_found;
-    }
-
-    ParentNode* child_criteria() override
-    {
-        return m_child;
     }
 
     ParentNode* clone() override
