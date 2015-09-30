@@ -64,10 +64,10 @@ struct QueryGroup {
 
     QueryGroup() = default;
 
-    ParentNode* first = nullptr;
+    ParentNode* m_root_node = nullptr;
 
-    bool pending_not = false;
-    size_t subtable_column = not_found;
+    bool m_pending_not = false;
+    size_t m_subtable_column = not_found;
     State m_state = State::Default;
 };
 
@@ -337,11 +337,11 @@ private:
 
     bool supports_export_for_handover() { return m_view == 0; };
 
-    bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].first; }
+    bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].m_root_node; }
     ParentNode* root_node() const
     {
         REALM_ASSERT(m_groups.size());
-        return m_groups[0].first;
+        return m_groups[0].m_root_node;
     }
 
     void add_node(ParentNode*);

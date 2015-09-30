@@ -114,7 +114,7 @@ void Query::copy_nodes(const Query& source)
     m_groups.clear();
     m_groups.resize(source.m_groups.size());
     for (size_t i = 0; i < source.m_groups.size(); ++i) {
-        m_groups[i].first = node_mapping[source.m_groups[i].first];
+        m_groups[i].m_root_node = node_mapping[source.m_groups[i].m_root_node];
     }
 }
 
@@ -1006,9 +1006,9 @@ Query& Query::end_group()
     QueryGroup group = m_groups.back();
     m_groups.pop_back();
 
-    if (group.first) {
-        add_node(group.first);
-        all_nodes.erase(std::find(begin(all_nodes), end(all_nodes), group.first));
+    if (group.m_root_node) {
+        add_node(group.m_root_node);
+        all_nodes.erase(std::find(begin(all_nodes), end(all_nodes), group.m_root_node));
     }
 
     handle_pending_not();
@@ -1019,7 +1019,7 @@ Query& Query::end_group()
 Query& Query::Not()
 {
     group();
-    m_groups.back().pending_not = true;
+    m_groups.back().m_pending_not = true;
 
     return *this;
 }
@@ -1031,13 +1031,13 @@ Query& Query::Not()
 void Query::handle_pending_not()
 {
     auto& current_group = m_groups.back();
-    if (m_groups.size() > 1 && current_group.pending_not) {
+    if (m_groups.size() > 1 && current_group.m_pending_not) {
         // we are inside group(s) implicitly created to handle a not, so reparent its
         // nodes into a NotNode.
-        auto condition = current_group.first;
-        current_group.first = nullptr;
+        auto condition = current_group.m_root_node;
+        current_group.m_root_node = nullptr;
         NotNode* not_node = new NotNode(condition);
-        current_group.pending_not = false;
+        current_group.m_pending_not = false;
 
         add_node(not_node);
         end_group();
@@ -1047,11 +1047,11 @@ void Query::handle_pending_not()
 Query& Query::Or()
 {
     auto& current_group = m_groups.back();
-    OrNode* or_node = dynamic_cast<OrNode*>(current_group.first);
+    OrNode* or_node = dynamic_cast<OrNode*>(current_group.m_root_node);
     if (!or_node) {
         // Reparent the current group's nodes within an OrNode.
-        or_node = new OrNode(current_group.first);
-        current_group.first = nullptr;
+        or_node = new OrNode(current_group.m_root_node);
+        current_group.m_root_node = nullptr;
         add_node(or_node);
     }
     current_group.m_state = QueryGroup::State::OrCondition;
@@ -1064,21 +1064,21 @@ Query& Query::subtable(size_t column)
     m_subtable_path.push_back(column);
     fetch_descriptor();
     group();
-    m_groups.back().subtable_column = column;
+    m_groups.back().m_subtable_column = column;
     return *this;
 }
 
 Query& Query::end_subtable()
 {
     auto& current_group = m_groups.back();
-    if (current_group.subtable_column == not_found) {
+    if (current_group.m_subtable_column == not_found) {
         error_code = "Unbalanced subtable";
         return *this;
     }
 
-    auto condition = current_group.first;
-    current_group.first = nullptr;
-    auto subtable_node = new SubtableNode(current_group.subtable_column, condition);
+    auto condition = current_group.m_root_node;
+    current_group.m_root_node = nullptr;
+    auto subtable_node = new SubtableNode(current_group.m_subtable_column, condition);
     end_group();
     add_node(subtable_node);
 
@@ -1282,8 +1282,8 @@ TableView Query::find_all_multi(size_t start, size_t end)
     // Sort search results because user expects ascending order
     sort(ts.chunks.begin(), ts.chunks.end(), &Query::comp);
     for (size_t i = 0; i < ts.chunks.size(); ++i) {
-        const size_t from = ts.chunks[i].first;
-        const size_t upto = (i == ts.chunks.size() - 1) ? size_t(-1) : ts.chunks[i + 1].first;
+        const size_t from = ts.chunks[i].m_root_node;
+        const size_t upto = (i == ts.chunks.size() - 1) ? size_t(-1) : ts.chunks[i + 1].m_root_node;
         size_t first = ts.chunks[i].second;
 
         while (first < ts.results.size() && ts.results[first] < upto && ts.results[first] >= from) {
@@ -1446,23 +1446,23 @@ void Query::add_node(ParentNode* node)
     auto& current_group = m_groups.back();
     switch (current_group.m_state) {
     case QueryGroup::State::OrCondition: {
-        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.first));
-        OrNode* or_node = static_cast<OrNode*>(current_group.first);
+        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node));
+        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node);
         or_node->m_conditions.emplace_back(node);
         current_group.m_state = State::OrConditionChildren;
         break;
     }
     case QueryGroup::State::OrConditionChildren: {
-        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.first));
-        OrNode* or_node = static_cast<OrNode*>(current_group.first);
+        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node));
+        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node);
         or_node->m_conditions.back()->add_child(node);
         break;
     }
     default: {
-        if (!current_group.first) {
-            current_group.first = node;
+        if (!current_group.m_root_node) {
+            current_group.m_root_node = node;
         } else {
-            current_group.first->add_child(node);
+            current_group.m_root_node->add_child(node);
         }
     }
     }
