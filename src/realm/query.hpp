@@ -64,7 +64,13 @@ struct QueryGroup {
 
     QueryGroup() = default;
 
-    ParentNode* m_root_node = nullptr;
+    QueryGroup(const QueryGroup&);
+    QueryGroup& operator=(const QueryGroup&);
+
+    QueryGroup(QueryGroup&&) = default;
+    QueryGroup& operator=(QueryGroup&&) = default;
+
+    std::unique_ptr<ParentNode> m_root_node;
 
     bool m_pending_not = false;
     size_t m_subtable_column = not_found;
@@ -306,7 +312,6 @@ public:
     Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode);
     Query(Query& source, Handover_patch& patch, MutableSourcePayload mode);
 private:
-    void copy_nodes(const Query& source);
     void fetch_descriptor();
 
     void add_expression_node(Expression*);
@@ -341,10 +346,10 @@ private:
     ParentNode* root_node() const
     {
         REALM_ASSERT(m_groups.size());
-        return m_groups[0].m_root_node;
+        return m_groups[0].m_root_node.get();
     }
 
-    void add_node(ParentNode*);
+    void add_node(std::unique_ptr<ParentNode>);
 
     friend class Table;
     friend class TableViewBase;
@@ -352,7 +357,6 @@ private:
     std::string error_code;
 
     std::vector<QueryGroup> m_groups;
-    std::vector<ParentNode*> all_nodes;
 
     // Used to access schema while building query:
     std::vector<size_t> m_subtable_path;
@@ -369,8 +373,6 @@ private:
     LinkViewRef m_source_link_view; // link views are refcounted and shared.
     TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
     bool m_owns_source_table_view; // <--- except when indicated here
-
-    mutable bool do_delete;
 };
 
 // Implementation:

@@ -314,8 +314,7 @@ public:
 
     ParentNode(const ParentNode& from)
     {
-        m_child = from.m_child;
-        m_children = from.m_children;
+        m_child = from.m_child ? from.m_child->clone() : nullptr;
         m_condition_column_idx = from.m_condition_column_idx;
         m_dD = from.m_dD;
         m_dT = from.m_dT;
@@ -323,24 +322,17 @@ public:
         m_matches = from.m_matches;
     }
 
-    virtual ParentNode* clone() = 0;
+    virtual std::unique_ptr<ParentNode> clone() = 0;
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping)
-    {
-        m_child = mapping.find(m_child)->second;
-        for (size_t i = 0; i < m_children.size(); ++i)
-            m_children[i] = mapping.find(m_children[i])->second;
-    }
-
-    void add_child(ParentNode* child)
+    void add_child(std::unique_ptr<ParentNode> child)
     {
         if (m_child)
-            m_child->add_child(child);
+            m_child->add_child(std::move(child));
         else
-            m_child = child;
+            m_child = std::move(child);
     }
 
-    ParentNode* m_child = nullptr;
+    std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
     size_t m_condition_column_idx = npos; // Column of search criteria
 
@@ -402,9 +394,9 @@ public:
         return tableindex(r);
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new ListviewNode(*this);
+        return std::unique_ptr<ParentNode>(new ListviewNode(*this));
     }
 
     ListviewNode(const ListviewNode& from)
@@ -413,7 +405,6 @@ public:
         m_max = from.m_max;
         m_next = from.m_next;
         m_size = from.m_size;
-        m_child = from.m_child;
     }
 
 protected:
@@ -428,7 +419,8 @@ protected:
 // only if one or more subtable rows match the condition.
 class SubtableNode: public ParentNode {
 public:
-    SubtableNode(size_t column, ParentNode* condition) : m_condition(condition), m_column(column)
+    SubtableNode(size_t column, std::unique_ptr<ParentNode> condition) :
+        m_condition(std::move(condition)), m_column(column)
     {
         m_dT = 100.0;
     }
@@ -482,22 +474,17 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new SubtableNode(*this);
+        return std::unique_ptr<ParentNode>(new SubtableNode(*this));
     }
 
-    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
-    {
-        ParentNode::translate_pointers(mapping);
-        m_condition = mapping.find(m_condition)->second;
-    }
-
-    SubtableNode(const SubtableNode& from) : ParentNode(from), m_condition(from.m_condition), m_column(from.m_column)
+    SubtableNode(const SubtableNode& from) : ParentNode(from),
+        m_condition(from.m_condition ? from.m_condition->clone() : nullptr), m_column(from.m_column)
     {
     }
 
-    ParentNode* m_condition = nullptr;
+    std::unique_ptr<ParentNode> m_condition;
     size_t m_column = npos;
 };
 
@@ -817,9 +804,9 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new IntegerNode<ColType, TConditionFunction>(*this);
+        return std::unique_ptr<ParentNode>(new IntegerNode<ColType, TConditionFunction>(*this));
     }
 
 protected:
@@ -924,9 +911,9 @@ public:
             return find(false);
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new FloatDoubleNode(*this);
+        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this));
     }
 
     FloatDoubleNode(const FloatDoubleNode& from)
@@ -982,9 +969,9 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new BinaryNode(*this);
+        return std::unique_ptr<ParentNode>(new BinaryNode(*this));
     }
 
 private:
@@ -1125,9 +1112,9 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new StringNode<TConditionFunction>(*this);
+        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this));
     }
 
     StringNode(const StringNode&) = default;
@@ -1321,9 +1308,9 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new StringNode<Equal>(*this);
+        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this));
     }
 
     StringNode(const StringNode& from) : StringNodeBase(from), m_index_matches_destroy(false)
@@ -1365,11 +1352,17 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* condition)
+    OrNode(std::unique_ptr<ParentNode> condition)
     {
         m_dT = 50.0;
         if (condition)
-            m_conditions.emplace_back(condition);
+            m_conditions.emplace_back(std::move(condition));
+    }
+
+    OrNode(const OrNode& other) : ParentNode(other)
+    {
+        for (const auto& condition : other.m_conditions)
+            m_conditions.emplace_back(condition->clone());
     }
 
     void init(const Table& table) override
@@ -1386,7 +1379,7 @@ public:
         m_was_match.resize(m_conditions.size(), false);
 
         std::vector<ParentNode*> v;
-        for (auto* condition : m_conditions) {
+        for (auto& condition : m_conditions) {
             condition->init(table);
             v.clear();
             condition->gather_children(v);
@@ -1454,19 +1447,12 @@ public:
         return "";
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new OrNode(*this);
+        return std::unique_ptr<ParentNode>(new OrNode(*this));
     }
 
-    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
-    {
-        ParentNode::translate_pointers(mapping);
-        for (size_t i = 0; i < m_conditions.size(); ++i)
-            m_conditions[i] = mapping.find(m_conditions[i])->second;
-    }
-
-    std::vector<ParentNode*> m_conditions;
+    std::vector<std::unique_ptr<ParentNode>> m_conditions;
 private:
     // start index of the last find for each cond
     std::vector<size_t> m_start;
@@ -1486,7 +1472,7 @@ public:
         return 0;
     }
 
-    NotNode(ParentNode* condition) : m_condition(condition)
+    NotNode(std::unique_ptr<ParentNode> condition) : m_condition(std::move(condition))
     {
         m_dT = 50.0;
     }
@@ -1531,28 +1517,21 @@ public:
         return "";
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new NotNode(*this);
-    }
-
-    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
-    {
-        ParentNode::translate_pointers(mapping);
-        m_condition = mapping.find(m_condition)->second;
+        return std::unique_ptr<ParentNode>(new NotNode(*this));
     }
 
     NotNode(const NotNode& from)
         : ParentNode(from)
     {
-        // here we are just copying the pointers - they'll be remapped by "translate_pointers"
-        m_condition = from.m_condition;
+        m_condition = from.m_condition ? from.m_condition->clone() : nullptr;
         m_known_range_start = from.m_known_range_start;
         m_known_range_end = from.m_known_range_end;
         m_first_in_known_range = from.m_first_in_known_range;
     }
 
-    ParentNode* m_condition = nullptr;
+    std::unique_ptr<ParentNode> m_condition;
 private:
     // FIXME This heuristic might as well be reused for all condition nodes.
     size_t m_known_range_start;
@@ -1652,9 +1631,9 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new TwoColumnsNode<ColType, TConditionFunction>(*this);
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<ColType, TConditionFunction>(*this));
     }
 
     TwoColumnsNode(const TwoColumnsNode& from) : ParentNode(from), m_value(from.m_value),
@@ -1702,9 +1681,9 @@ public:
         return res;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new ExpressionNode(*this);
+        return std::unique_ptr<ParentNode>(new ExpressionNode(*this));
     }
 
     ExpressionNode(const ExpressionNode&) = default;
@@ -1756,9 +1735,9 @@ public:
         return ret;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() override
     {
-        return new LinksToNode(*this);
+        return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
 
     size_t m_origin_column;

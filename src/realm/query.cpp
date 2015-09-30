@@ -51,7 +51,6 @@ Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
 void Query::create()
 {
     m_groups.emplace_back();
-    do_delete = true;
     if (m_table)
         fetch_descriptor();
 }
@@ -60,15 +59,12 @@ void Query::create()
 Query::Query(const Query& copy)
 {
     m_table = copy.m_table;
-    all_nodes = copy.all_nodes;
     m_groups = copy.m_groups;
     error_code = copy.error_code;
     m_view = copy.m_view;
     m_source_link_view = copy.m_source_link_view;
     m_source_table_view = copy.m_source_table_view;
     m_owns_source_table_view = false;
-    copy.do_delete = false;
-    do_delete = true;
     m_current_descriptor = copy.m_current_descriptor;
 }
 
@@ -77,9 +73,7 @@ Query::Query(const Query& copy)
 // copy-assignment anylonger (which is now just "=").
 Query::Query(const Query& copy, const TCopyExpressionTag&) 
 {
-    // We can call the copyassignment operator even if this destination is uninitialized - the do_delete flag 
-    // just needs to be false.
-    do_delete = false;
+    // We can call the copy-assignment operator even if this destination is uninitialized.
     m_owns_source_table_view = false;
     *this = copy;
 }
@@ -91,49 +85,17 @@ Query::Query(Expression* expr) : Query()
         set_table(table->get_table_ref());
 }
 
-void Query::copy_nodes(const Query& source)
-{
-    create();
-
-    std::map<ParentNode*, ParentNode*> node_mapping;
-    node_mapping[nullptr] = nullptr;
-
-    // Clone all nodes, and build a mapping from original to clone.
-    for (auto* node : source.all_nodes) {
-        ParentNode* new_node = node->clone();
-        all_nodes.push_back(new_node);
-        node_mapping[node] = new_node;
-    }
-
-    // Update the references within the node hierarchy to point to the clones.
-    for (auto* node : all_nodes) {
-        node->translate_pointers(node_mapping);
-    }
-
-    // Update the root nodes of the groups to point at their clones.
-    m_groups.clear();
-    m_groups.resize(source.m_groups.size());
-    for (size_t i = 0; i < source.m_groups.size(); ++i) {
-        m_groups[i].m_root_node = node_mapping[source.m_groups[i].m_root_node];
-    }
-}
-
 Query& Query::operator = (const Query& source)
 {
-    REALM_ASSERT(source.do_delete);
-
     if (this != &source) {
-        // free destination object
-        delete_nodes();
-        m_groups.clear();
-        all_nodes.clear();
-
+        m_groups = source.m_groups;
         m_table = source.m_table;
         m_view = source.m_view;
         m_source_link_view = source.m_source_link_view;
         m_source_table_view = source.m_source_table_view;
 
-        copy_nodes(source);
+        if (m_table)
+            fetch_descriptor();
     }
     return *this;
 }
@@ -142,18 +104,7 @@ Query::~Query() noexcept
 {
     if (m_owns_source_table_view)
         delete m_source_table_view;
-    delete_nodes();
 }
-
-void Query::delete_nodes() noexcept
-{
-    if (do_delete) {
-        for (size_t t = 0; t < all_nodes.size(); t++) {
-            delete all_nodes[t];
-        }
-    }
-}
-
 
 Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
@@ -174,8 +125,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
     m_view = m_source_link_view.get();
 
-    // copy actual query payload
-    copy_nodes(source);
+    m_groups = source.m_groups;
 }
 
 Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode)
@@ -197,8 +147,7 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
     m_view = m_source_link_view.get();
 
-    // copy actual query payload
-    copy_nodes(source);
+    m_groups = source.m_groups;
 }
 
 void Query::set_table(TableRef tr)
@@ -231,8 +180,7 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
 
 void Query::add_expression_node(Expression* compare)
 {
-    ParentNode* const p = new ExpressionNode(compare);
-    add_node(p);
+    add_node(std::unique_ptr<ParentNode>(new ExpressionNode(compare)));
 }
 
 // Binary
@@ -276,10 +224,10 @@ struct MakeConditionNode {
     // a column of a different type.
 
     template <class Node>
-    static typename std::enable_if<Node::special_null_node, ParentNode*>::type
+    static typename std::enable_if<Node::special_null_node, std::unique_ptr<ParentNode>>::type
     make(size_t col_ndx, typename Node::TConditionValue value)
     {
-        return new Node(std::move(value), col_ndx);
+        return std::unique_ptr<ParentNode>(new Node(std::move(value), col_ndx));
     }
 
     template <class Node, class T>
@@ -287,7 +235,7 @@ struct MakeConditionNode {
         Node::special_null_node
         && !std::is_same<T, typename Node::TConditionValue>::value
         && !std::is_same<T, null>::value
-        , ParentNode*>::type
+        , std::unique_ptr<ParentNode>>::type
     make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
@@ -297,21 +245,21 @@ struct MakeConditionNode {
     static typename std::enable_if<
         !Node::special_null_node
         && std::is_same<T, null>::value
-        , ParentNode*>::type
+        , std::unique_ptr<ParentNode>>::type
     make(size_t col_ndx, T value)
     {
         // value is null
-        return new Node(value, col_ndx);
+        return std::unique_ptr<ParentNode>(new Node(value, col_ndx));
     }
 
     template <class Node, class T>
     static typename std::enable_if<
         !Node::special_null_node
         && std::is_same<T, typename Node::TConditionValue>::value
-        , ParentNode*>::type
+        , std::unique_ptr<ParentNode>>::type
     make(size_t col_ndx, T value)
     {
-        return new Node(value, col_ndx);
+        return std::unique_ptr<ParentNode>(new Node(value, col_ndx));
     }
 
     template <class Node, class T>
@@ -319,7 +267,7 @@ struct MakeConditionNode {
         !Node::special_null_node
         && !std::is_same<T, null>::value
         && !std::is_same<T, typename Node::TConditionValue>::value
-        , ParentNode*>::type
+        , std::unique_ptr<ParentNode>>::type
     make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
@@ -327,7 +275,7 @@ struct MakeConditionNode {
 };
 
 template <class Cond, class T>
-ParentNode* make_condition_node(const Descriptor& descriptor, size_t column_ndx, T value)
+std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, size_t column_ndx, T value)
 {
     DataType type = descriptor.get_column_type(column_ndx);
     bool is_nullable = descriptor.is_nullable(column_ndx);
@@ -376,48 +324,48 @@ template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
     REALM_ASSERT_DEBUG(m_current_descriptor);
-    ParentNode* const parent = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
-    add_node(parent);
+    auto node = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
+    add_node(std::move(node));
     return *this;
 }
 
 
 template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2);
-    add_node(p);
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2));
+    add_node(std::move(node));
     return *this;
 }
 
 // Two column methods, any type
 template <class ColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2);
-    add_node(p);
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2));
+    add_node(std::move(node));
     return *this;
 }
 template <class ColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2);
-    add_node(p);
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2));
+    add_node(std::move(node));
     return *this;
 }
 template <class ColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2);
-    add_node(p);
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2));
+    add_node(std::move(node));
     return *this;
 }
 template <class ColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2);
-    add_node(p);
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2));
+    add_node(std::move(node));
     return *this;
 }
 template <class ColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
-    ParentNode* const p = new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2);
-    add_node(p);
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2));
+    add_node(std::move(node));
     return *this;
 }
 
@@ -558,8 +506,7 @@ Query& Query::between(size_t column_ndx, int from, int to)
 
 Query& Query::links_to(size_t origin_column, size_t target_row)
 {
-    ParentNode* const p = new LinksToNode(origin_column, target_row);
-    add_node(p);
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_row)));
     return *this;
 }
 
@@ -1003,12 +950,11 @@ Query& Query::end_group()
         return *this;
     }
 
-    QueryGroup group = m_groups.back();
+    auto root_node = std::move(m_groups.back().m_root_node);
     m_groups.pop_back();
 
-    if (group.m_root_node) {
-        add_node(group.m_root_node);
-        all_nodes.erase(std::find(begin(all_nodes), end(all_nodes), group.m_root_node));
+    if (root_node) {
+        add_node(std::move(root_node));
     }
 
     handle_pending_not();
@@ -1034,12 +980,10 @@ void Query::handle_pending_not()
     if (m_groups.size() > 1 && current_group.m_pending_not) {
         // we are inside group(s) implicitly created to handle a not, so reparent its
         // nodes into a NotNode.
-        auto condition = current_group.m_root_node;
-        current_group.m_root_node = nullptr;
-        NotNode* not_node = new NotNode(condition);
+        auto not_node = std::unique_ptr<ParentNode>(new NotNode(std::move(current_group.m_root_node)));
         current_group.m_pending_not = false;
 
-        add_node(not_node);
+        add_node(std::move(not_node));
         end_group();
     }
 }
@@ -1047,12 +991,10 @@ void Query::handle_pending_not()
 Query& Query::Or()
 {
     auto& current_group = m_groups.back();
-    OrNode* or_node = dynamic_cast<OrNode*>(current_group.m_root_node);
+    OrNode* or_node = dynamic_cast<OrNode*>(current_group.m_root_node.get());
     if (!or_node) {
         // Reparent the current group's nodes within an OrNode.
-        or_node = new OrNode(current_group.m_root_node);
-        current_group.m_root_node = nullptr;
-        add_node(or_node);
+        add_node(std::unique_ptr<ParentNode>(new OrNode(std::move(current_group.m_root_node))));
     }
     current_group.m_state = QueryGroup::State::OrCondition;
 
@@ -1076,11 +1018,10 @@ Query& Query::end_subtable()
         return *this;
     }
 
-    auto condition = current_group.m_root_node;
-    current_group.m_root_node = nullptr;
-    auto subtable_node = new SubtableNode(current_group.m_subtable_column, condition);
+    auto subtable_node = std::unique_ptr<ParentNode>(new SubtableNode(current_group.m_subtable_column,
+                                                                      std::move(current_group.m_root_node)));
     end_group();
-    add_node(subtable_node);
+    add_node(std::move(subtable_node));
 
     m_subtable_path.pop_back();
     fetch_descriptor();
@@ -1436,33 +1377,31 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
     return a.first < b.first;
 }
 
-void Query::add_node(ParentNode* node)
+void Query::add_node(std::unique_ptr<ParentNode> node)
 {
     REALM_ASSERT(node);
     using State = QueryGroup::State;
 
-    all_nodes.push_back(node);
-
     auto& current_group = m_groups.back();
     switch (current_group.m_state) {
     case QueryGroup::State::OrCondition: {
-        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node));
-        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node);
-        or_node->m_conditions.emplace_back(node);
+        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
+        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
+        or_node->m_conditions.emplace_back(std::move(node));
         current_group.m_state = State::OrConditionChildren;
         break;
     }
     case QueryGroup::State::OrConditionChildren: {
-        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node));
-        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node);
-        or_node->m_conditions.back()->add_child(node);
+        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
+        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
+        or_node->m_conditions.back()->add_child(std::move(node));
         break;
     }
     default: {
         if (!current_group.m_root_node) {
-            current_group.m_root_node = node;
+            current_group.m_root_node = std::move(node);
         } else {
-            current_group.m_root_node->add_child(node);
+            current_group.m_root_node->add_child(std::move(node));
         }
     }
     }
@@ -1478,22 +1417,7 @@ void Query::add_node(ParentNode* node)
 
 Query& Query::and_query(Query q)
 {
-    // This transfers ownership of the nodes from q to this, so both q and this
-    // must currently own their nodes
-    REALM_ASSERT(do_delete && q.do_delete);
-
-    ParentNode* const p = q.root_node();
-    add_node(p);
-
-    // q.root_node() was added by update_pointers, but it'll be added again below
-    // so remove it
-    all_nodes.erase(std::find(begin(all_nodes), end(all_nodes), p));
-
-    // The query on which AddQuery() was called is now responsible for destruction of query given as argument. do_delete
-    // indicates not to do cleanup in deconstructor, and all_nodes contains a list of all objects to be deleted. So
-    // take all objects of argument and copy to this node's all_nodes list.
-    q.do_delete = false;
-    all_nodes.insert( all_nodes.end(), q.all_nodes.begin(), q.all_nodes.end() );
+    add_node(q.root_node()->clone());
 
     if (q.m_source_link_view) {
         REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
@@ -1539,4 +1463,21 @@ Query Query::operator!()
     q.Not();
     q.and_query(*this);
     return q;
+}
+
+QueryGroup::QueryGroup(const QueryGroup& other) :
+    m_root_node(other.m_root_node ? other.m_root_node->clone() : nullptr),
+    m_pending_not(other.m_pending_not), m_subtable_column(other.m_subtable_column), m_state(other.m_state)
+{
+}
+
+QueryGroup& QueryGroup::operator=(const QueryGroup& other)
+{
+    if (this != &other) {
+        m_root_node = other.m_root_node ? other.m_root_node->clone() : nullptr;
+        m_pending_not = other.m_pending_not;
+        m_subtable_column = other.m_subtable_column;
+        m_state = other.m_state;
+    }
+    return *this;
 }
