@@ -33,6 +33,7 @@
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
 #include <realm/exceptions.hpp> // only used by null() class
+#include <realm/owned_data.hpp>
 
 namespace realm {
 
@@ -151,6 +152,19 @@ private:
     std::size_t m_size;
 };
 
+/// A chunk of character data.
+class OwnedStringData : public OwnedData {
+public:
+    using OwnedData::OwnedData;
+
+    OwnedStringData() = default;
+    OwnedStringData(const StringData& data) : OwnedData(data.data(), data.size()) { }
+
+    StringData get() const
+    {
+        return { data(), size() };
+    }
+};
 
 
 // Implementation:

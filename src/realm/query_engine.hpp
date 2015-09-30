@@ -938,26 +938,17 @@ public:
 
     template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
-    BinaryNode(BinaryData v, size_t column)
+    BinaryNode(BinaryData v, size_t column) : m_value(v)
     {
         m_dT = 100.0;
         m_condition_column_idx = column;
-
-        // FIXME: Store this in std::string instead.
-        char* data = v.is_null() ? nullptr : new char[v.size()];
-        memcpy(data, v.data(), v.size());
-        m_value = BinaryData(data, v.size());
     }
 
-    BinaryNode(null, size_t column)
-    : BinaryNode(BinaryData{nullptr, 0}, column)
+    BinaryNode(null, size_t column) : BinaryNode(BinaryData{}, column)
     {
     }
 
-    ~BinaryNode() noexcept override
-    {
-        delete[] m_value.data();
-    }
+    BinaryNode(const BinaryNode& from) = default;
 
     void init(const Table& table) override
     {
@@ -975,7 +966,7 @@ public:
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
             BinaryData value = m_condition_column->get(s);
-            if (condition(m_value, value))
+            if (condition(m_value.get(), value))
                 return s;
         }
         return not_found;
@@ -986,21 +977,8 @@ public:
         return new BinaryNode(*this);
     }
 
-    BinaryNode(const BinaryNode& from)
-        : ParentNode(from)
-    {
-        // FIXME: Store this in std::string instead.
-        char* data = new char[from.m_value.size()];
-        memcpy(data, from.m_value.data(), from.m_value.size());
-        m_value = BinaryData(data, from.m_value.size());
-        m_condition_column = from.m_condition_column;
-        m_column_type = from.m_column_type;
-    }
-
-
-protected:
 private:
-    BinaryData m_value;
+    OwnedBinaryData m_value;
 protected:
     const BinaryColumn* m_condition_column;
     ColumnType m_column_type;
@@ -1018,24 +996,11 @@ public:
         REALM_ASSERT(false);
         return 0;
     }
-    StringNodeBase(StringData v, size_t column)
+
+    StringNodeBase(StringData v, size_t column) : m_value(v)
     {
         m_condition_column_idx = column;
-        m_child = nullptr;
         m_dT = 10.0;
-        m_leaf = nullptr;
-
-        // FIXME: Store these in std::string instead.
-        // '*6' because case converted strings can take up more space. Todo, investigate
-        char* data;
-        data = v.data() ? new char[6 * v.size()] : nullptr; // FIXME: Arithmetic is prone to overflow
-        memcpy(data, v.data(), v.size());
-        m_value = StringData(data, v.size());
-    }
-
-    ~StringNodeBase() noexcept override
-    {
-        delete[] m_value.data();
     }
 
     void init(const Table& table) override
@@ -1055,21 +1020,14 @@ public:
         m_leaf.reset(nullptr);
     }
 
-    StringNodeBase(const StringNodeBase& from)
-        : ParentNode(from)
+    StringNodeBase(const StringNodeBase& from) : ParentNode(from), m_value(from.m_value),
+        m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
+        m_leaf_type(from.m_leaf_type), m_end_s(0), m_leaf_start(0), m_leaf_end(0)
     {
-        char* data = from.m_value.data() ? new char[from.m_value.size()] : nullptr;
-        memcpy(data, from.m_value.data(), from.m_value.size());
-        m_value = StringData(data, from.m_value.size());
-        m_condition_column = from.m_condition_column;
-        m_column_type = from.m_column_type;
-        m_leaf_type = from.m_leaf_type;
-        m_end_s = 0;
-        m_leaf_start = 0;
     }
 
 protected:
-    StringData m_value;
+    OwnedStringData m_value;
 
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
@@ -1088,24 +1046,18 @@ template <class TConditionFunction> class StringNode: public StringNodeBase {
 public:
     StringNode(StringData v, size_t column) : StringNodeBase(v,column)
     {
-        char* upper = new char[6 * v.size()];
-        char* lower = new char[6 * v.size()];
+        const size_t case_mapped_string_size = 6 * v.size();
+        auto upper = std::unique_ptr<char[]>(new char[case_mapped_string_size]);
+        auto lower = std::unique_ptr<char[]>(new char[case_mapped_string_size]);
 
-        bool b1 = case_map(v, lower, false);
-        bool b2 = case_map(v, upper, true);
+        bool b1 = case_map(v, lower.get(), false);
+        bool b2 = case_map(v, upper.get(), true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(v);
 
-        m_ucase = upper;
-        m_lcase = lower;
+        m_ucase = OwnedStringData(std::move(upper), case_mapped_string_size);
+        m_lcase = OwnedStringData(std::move(lower), case_mapped_string_size);
     }
-
-    ~StringNode() noexcept override
-    {
-        delete[] m_ucase;
-        delete[] m_lcase;
-    }
-
 
     void init(const Table& table) override
     {
@@ -1157,7 +1109,7 @@ public:
                 else
                     t = static_cast<const ArrayBigBlobs&>(*m_leaf).get_string(s - m_leaf_start);
             }
-            if (cond(m_value, m_ucase, m_lcase, t))
+            if (cond(m_value.get(), m_ucase.data(), m_lcase.data(), t))
                 return s;
         }
         return not_found;
@@ -1168,19 +1120,11 @@ public:
         return new StringNode<TConditionFunction>(*this);
     }
 
-    StringNode(const StringNode& from) : StringNodeBase(from)
-    {
-        size_t sz = 6 * m_value.size();
-        char* lcase = new char[sz];
-        char* ucase = new char[sz];
-        memcpy(lcase, from.m_lcase, sz);
-        memcpy(ucase, from.m_ucase, sz);
-        m_lcase = lcase;
-        m_ucase = ucase;
-    }
+    StringNode(const StringNode&) = default;
+
 protected:
-    const char* m_lcase;
-    const char* m_ucase;
+    OwnedStringData m_lcase;
+    OwnedStringData m_ucase;
 };
 
 
@@ -1219,7 +1163,7 @@ public:
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
-            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
+            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value.get());
         }
         else if (m_condition_column->has_search_index()) {
             m_dT = 0.0;
@@ -1234,10 +1178,10 @@ public:
             size_t index_ref;
 
             if (m_column_type == col_type_StringEnum) {
-                fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
+                fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_indexref(m_value.get(), index_ref);
             }
             else {
-                fr = static_cast<const StringColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
+                fr = static_cast<const StringColumn*>(m_condition_column)->find_all_indexref(m_value.get(), index_ref);
             }
 
             m_index_matches_destroy = false;
@@ -1352,11 +1296,11 @@ public:
             size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
             if (m_leaf_type == StringColumn::leaf_type_Small)
-                s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
+                s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value.get(), s - m_leaf_start, end2);
             else if (m_leaf_type ==  StringColumn::leaf_type_Medium)
-                s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
+                s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value.get(), s - m_leaf_start, end2);
             else
-                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
+                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value.get()), true, s - m_leaf_start, end2);
 
             if (s == not_found)
                 s = m_leaf_end - 1;

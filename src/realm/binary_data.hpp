@@ -27,6 +27,7 @@
 
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
+#include <realm/owned_data.hpp>
 
 namespace realm {
 
@@ -104,6 +105,20 @@ public:
 private:
     const char* m_data;
     std::size_t m_size;
+};
+
+/// A read-only chunk of binary data.
+class OwnedBinaryData : public OwnedData {
+public:
+    using OwnedData::OwnedData;
+
+    OwnedBinaryData() = default;
+    OwnedBinaryData(const BinaryData& data) : OwnedData(data.data(), data.size()) { }
+
+    BinaryData get() const
+    {
+        return { data(), size() };
+    }
 };
 
 
