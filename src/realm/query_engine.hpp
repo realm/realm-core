@@ -1341,11 +1341,11 @@ private:
 };
 
 // OR node contains at least two node pointers: Two or more conditions to OR
-// together in m_cond, and the next AND condition (if any) in m_child.
+// together in m_conditions, and the next AND condition (if any) in m_child.
 //
 // For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
-// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
-// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
+// will first set m_conditions[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
+// invocation will set m_conditions[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
 // also set to next AND condition (if any exists) following the OR.
 class OrNode: public ParentNode {
 public:
@@ -1355,7 +1355,7 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* p1) : m_cond(1, p1) {
+    OrNode(ParentNode* p1) : m_conditions(1, p1) {
         m_dT = 50.0;
     }
 
@@ -1363,21 +1363,20 @@ public:
     {
         m_dD = 10.0;
 
-        std::vector<ParentNode*> v;
-
         m_start.clear();
-        m_start.resize(m_cond.size(), 0);
+        m_start.resize(m_conditions.size(), 0);
 
         m_last.clear();
-        m_last.resize(m_cond.size(), 0);
+        m_last.resize(m_conditions.size(), 0);
 
         m_was_match.clear();
-        m_was_match.resize(m_cond.size(), false);
+        m_was_match.resize(m_conditions.size(), false);
 
-        for (size_t c = 0; c < m_cond.size(); ++c) {
-            m_cond[c]->init(table);
+        std::vector<ParentNode*> v;
+        for (auto* condition : m_conditions) {
+            condition->init(table);
             v.clear();
-            m_cond[c]->gather_children(v);
+            condition->gather_children(v);
         }
 
         if (m_child)
@@ -1393,7 +1392,7 @@ public:
 
         size_t index = not_found;
 
-        for (size_t c = 0; c < m_cond.size(); ++c) {
+        for (size_t c = 0; c < m_conditions.size(); ++c) {
             // out of order search; have to discard cached results
             if (start < m_start[c]) {
                 m_last[c] = 0;
@@ -1411,7 +1410,7 @@ public:
 
             m_start[c] = start;
             size_t fmax = std::max(m_last[c], start);
-            size_t f = m_cond[c]->find_first(fmax, end);
+            size_t f = m_conditions[c]->find_first(fmax, end);
             m_was_match[c] = f != not_found;
             m_last[c] = f == not_found ? end : f;
             if (f != not_found && index > m_last[c])
@@ -1425,17 +1424,17 @@ public:
     {
         if (error_code != "")
             return error_code;
-        if (m_cond[0] == 0)
+        if (m_conditions[0] == 0)
             return "Missing left-hand side of OR";
-        if (m_cond.back() == 0)
+        if (m_conditions.back() == 0)
             return "Missing final right-hand side of OR";
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
         if (s != "")
             return s;
-        for (size_t i = 0; i < m_cond.size(); ++i) {
-            s = m_cond[i]->validate();
+        for (size_t i = 0; i < m_conditions.size(); ++i) {
+            s = m_conditions[i]->validate();
             if (s != "")
                 return s;
         }
@@ -1450,11 +1449,11 @@ public:
     void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
-        for (size_t i = 0; i < m_cond.size(); ++i)
-            m_cond[i] = mapping.find(m_cond[i])->second;
+        for (size_t i = 0; i < m_conditions.size(); ++i)
+            m_conditions[i] = mapping.find(m_conditions[i])->second;
     }
 
-    std::vector<ParentNode*> m_cond;
+    std::vector<ParentNode*> m_conditions;
 private:
     // start index of the last find for each cond
     std::vector<size_t> m_start;
@@ -1485,9 +1484,9 @@ public:
 
         std::vector<ParentNode*> v;
 
-        m_cond->init(table);
+        m_condition->init(table);
         v.clear();
-        m_cond->gather_children(v);
+        m_condition->gather_children(v);
 
         // Heuristics bookkeeping:
         m_known_range_start = 0;
@@ -1506,14 +1505,14 @@ public:
     {
         if (error_code != "")
             return error_code;
-        if (m_cond == 0)
+        if (m_condition == 0)
             return "Missing argument to Not";
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
         if (s != "")
             return s;
-        s = m_cond->validate();
+        s = m_condition->validate();
         if (s != "")
             return s;
         return "";
@@ -1527,20 +1526,20 @@ public:
     void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
     {
         ParentNode::translate_pointers(mapping);
-        m_cond = mapping.find(m_cond)->second;
+        m_condition = mapping.find(m_condition)->second;
     }
 
     NotNode(const NotNode& from)
         : ParentNode(from)
     {
         // here we are just copying the pointers - they'll be remapped by "translate_pointers"
-        m_cond = from.m_cond;
+        m_condition = from.m_condition;
         m_known_range_start = from.m_known_range_start;
         m_known_range_end = from.m_known_range_end;
         m_first_in_known_range = from.m_first_in_known_range;
     }
 
-    ParentNode* m_cond = nullptr;
+    ParentNode* m_condition = nullptr;
 private:
     // FIXME This heuristic might as well be reused for all condition nodes.
     size_t m_known_range_start;

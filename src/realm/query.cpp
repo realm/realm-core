@@ -1073,7 +1073,7 @@ Query& Query::Not()
     pending_not[pending_not.size()-1] = true;
     // value for update for sub-condition
     update[update.size()-2] = nullptr;
-    update[update.size()-1] = &p->m_cond;
+    update[update.size()-1] = &p->m_condition;
     // pending value for update, once the sub-condition ends:
     update_override[update_override.size()-1] = &p->m_child;
     return *this;
@@ -1099,17 +1099,17 @@ Query& Query::Or()
 {
     OrNode* o = dynamic_cast<OrNode*>(first.back());
     if (o) {
-        if (o->m_cond.back())
-            o->m_cond.push_back(0);
+        if (o->m_conditions.back())
+            o->m_conditions.push_back(0);
     }
     else {
         o = new OrNode(first.back());
-        o->m_cond.push_back(0);
+        o->m_conditions.push_back(0);
         all_nodes.push_back(o);
     }
 
     first.back() = o;
-    update.back() = &o->m_cond.back();
+    update.back() = &o->m_conditions.back();
     update_override.back() = &o->m_child;
     return *this;
 }

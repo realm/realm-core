@@ -149,7 +149,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
 
 bool NotNode::evaluate_at(size_t rowndx)
 {
-    return m_cond->find_first(rowndx, rowndx+1) == not_found;
+    return m_condition->find_first(rowndx, rowndx+1) == not_found;
 }
 
 void NotNode::update_known(size_t start, size_t end, size_t first)
