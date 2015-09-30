@@ -1756,7 +1756,7 @@ public:
 
     Query is_not_null() {
         if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+            throw std::runtime_error("Cannot find non-null-links in a linked-to table (link()...is_null() not supported).");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return *new UnaryLinkCompare<true>(m_link_map);
     }
