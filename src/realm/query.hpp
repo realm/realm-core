@@ -55,6 +55,16 @@ class Expression;
 class SequentialGetterBase;
 class Group;
 
+struct QueryGroup {
+    QueryGroup() = default;
+
+    ParentNode* first = nullptr;
+    ParentNode** update = nullptr;
+    ParentNode** update_override = nullptr;
+
+    bool pending_not = false;
+};
+
 class Query {
 public:
     Query(const Table& table, TableViewBase* tv = nullptr);
@@ -256,7 +266,6 @@ protected:
     bool   is_initialized() const;
     size_t find_internal(size_t start = 0, size_t end=size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;
-    void   update_pointers(ParentNode* p, ParentNode** newnode);
     void handle_pending_not();
     void set_table(TableRef tr);
 
@@ -322,18 +331,24 @@ private:
 
     bool supports_export_for_handover() { return m_view == 0; };
 
+    bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].first; }
+    ParentNode* root_node() const
+    {
+        REALM_ASSERT(m_groups.size());
+        return m_groups[0].first;
+    }
+
+    void add_node(ParentNode*);
+    void add_node(ParentNode*, ParentNode**);
+
     friend class Table;
     friend class TableViewBase;
 
     std::string error_code;
 
-    std::vector<ParentNode*> first;
-    std::vector<ParentNode**> update;
-    std::vector<ParentNode**> update_override;
-    std::vector<ParentNode**> subtables;
+    std::vector<QueryGroup> m_groups;
     std::vector<ParentNode*> all_nodes;
-
-    std::vector<bool> pending_not;
+    std::vector<ParentNode**> subtables;
 
     // Used to access schema while building query:
     std::vector<size_t> m_subtable_path;
