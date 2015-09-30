@@ -32,8 +32,6 @@
 
 #include <realm/util/terminate.hpp>
 
-namespace {
-
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
 // prototype here to silence warning
@@ -44,6 +42,8 @@ extern "C" REALM_NORETURN REALM_NOINLINE
 void please_report_this_error_to_help_at_realm_dot_io() {
     std::abort();
 }
+
+namespace {
 
 #ifdef __APPLE__
 void nslog(const char *message) {
