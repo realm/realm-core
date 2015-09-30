@@ -332,6 +332,13 @@ public:
             m_children[i] = mapping.find(m_children[i])->second;
     }
 
+    void add_child(ParentNode* child)
+    {
+        if (m_child)
+            m_child->add_child(child);
+        else
+            m_child = child;
+    }
 
     ParentNode* m_child = nullptr;
     std::vector<ParentNode*> m_children;
@@ -421,7 +428,10 @@ protected:
 // only if one or more subtable rows match the condition.
 class SubtableNode: public ParentNode {
 public:
-    SubtableNode(size_t column): m_column(column) { m_dT = 100.0; }
+    SubtableNode(size_t column, ParentNode* condition) : m_condition(condition), m_column(column)
+    {
+        m_dT = 100.0;
+    }
 
     void init(const Table& table) override
     {
@@ -1355,8 +1365,11 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* p1) : m_conditions(1, p1) {
+    OrNode(ParentNode* condition)
+    {
         m_dT = 50.0;
+        if (condition)
+            m_conditions.emplace_back(condition);
     }
 
     void init(const Table& table) override
@@ -1424,10 +1437,10 @@ public:
     {
         if (error_code != "")
             return error_code;
-        if (m_conditions[0] == 0)
+        if (m_conditions.size() == 0)
             return "Missing left-hand side of OR";
-        if (m_conditions.back() == 0)
-            return "Missing final right-hand side of OR";
+        if (m_conditions.size() == 1)
+            return "Missing right-hand side of OR";
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
@@ -1473,7 +1486,7 @@ public:
         return 0;
     }
 
-    NotNode()
+    NotNode(ParentNode* condition) : m_condition(condition)
     {
         m_dT = 50.0;
     }

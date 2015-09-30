@@ -3393,7 +3393,7 @@ TEST(Query_Subtable)
     subtable->set_int(0, 1, 33);
     subtable->set_string(1, 1, "c");
 
-    //  Intentioally have empty (degenerate) subtable at 2,2
+    // Intentionally have empty (degenerate) subtable at 2,2
 
     subtable = table->get_subtable(2, 3);
     subtable->insert_empty_row(0);

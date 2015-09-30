@@ -116,14 +116,6 @@ void Query::copy_nodes(const Query& source)
     for (size_t i = 0; i < source.m_groups.size(); ++i) {
         m_groups[i].first = node_mapping[source.m_groups[i].first];
     }
-
-    if (ParentNode* top = m_groups[0].first) {
-        ParentNode* node_to_update = top;
-        while (node_to_update->m_child) {
-            node_to_update = node_to_update->m_child;
-        }
-        m_groups[0].update = &node_to_update->m_child;
-    }
 }
 
 Query& Query::operator = (const Query& source)
@@ -135,7 +127,6 @@ Query& Query::operator = (const Query& source)
         delete_nodes();
         m_groups.clear();
         all_nodes.clear();
-        subtables.clear();
 
         m_table = source.m_table;
         m_view = source.m_view;
@@ -241,7 +232,7 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
 void Query::add_expression_node(Expression* compare)
 {
     ParentNode* const p = new ExpressionNode(compare);
-    add_node(p, &p->m_child);
+    add_node(p);
 }
 
 // Binary
@@ -386,7 +377,7 @@ Query& Query::add_condition(size_t column_ndx, T value)
 {
     REALM_ASSERT_DEBUG(m_current_descriptor);
     ParentNode* const parent = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
-    add_node(parent, &parent->m_child);
+    add_node(parent);
     return *this;
 }
 
@@ -394,7 +385,7 @@ Query& Query::add_condition(size_t column_ndx, T value)
 template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2);
-    add_node(p, &p->m_child);
+    add_node(p);
     return *this;
 }
 
@@ -402,31 +393,31 @@ template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t colum
 template <class ColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2);
-    add_node(p, &p->m_child);
+    add_node(p);
     return *this;
 }
 template <class ColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2);
-    add_node(p, &p->m_child);
+    add_node(p);
     return *this;
 }
 template <class ColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2);
-    add_node(p, &p->m_child);
+    add_node(p);
     return *this;
 }
 template <class ColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2);
-    add_node(p, &p->m_child);
+    add_node(p);
     return *this;
 }
 template <class ColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
     ParentNode* const p = new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2);
-    add_node(p, &p->m_child);
+    add_node(p);
     return *this;
 }
 
@@ -568,7 +559,7 @@ Query& Query::between(size_t column_ndx, int from, int to)
 Query& Query::links_to(size_t origin_column, size_t target_row)
 {
     ParentNode* const p = new LinksToNode(origin_column, target_row);
-    add_node(p, &p->m_child);
+    add_node(p);
     return *this;
 }
 
@@ -1015,27 +1006,10 @@ Query& Query::end_group()
     QueryGroup group = m_groups.back();
     m_groups.pop_back();
 
-    auto& current_group = m_groups.back();
     if (group.first) {
-        if (!current_group.first) {
-            current_group.first = group.first;
-        } else if (current_group.update) {
-            *current_group.update = group.first;
-        }
-        current_group.update = &group.first->m_child;
+        add_node(group.first);
+        all_nodes.erase(std::find(begin(all_nodes), end(all_nodes), group.first));
     }
-
-    // the update back link for the surrounding group must be updated to support
-    // the linking in of nodes that follows. If the node we are adding to the surrounding
-    // context has taken control of the nodes in the inner group, then we set up an
-    // update to a field inside it - if not, then we just copy the last update in the
-    // current group into the surrounding group. So: the update override is used to override
-    // the normal sequential linking in of nodes, producing e.g. the structure used for
-    // OrNodes and NotNodes.
-    if (group.update_override)
-        current_group.update = group.update_override;
-    else if (group.update)
-        current_group.update = group.update;
 
     handle_pending_not();
     return *this;
@@ -1045,15 +1019,7 @@ Query& Query::end_group()
 Query& Query::Not()
 {
     group();
-
-    NotNode* const p = new NotNode;
-    add_node(p);
-
-    auto& current_group = m_groups.back();
-    current_group.pending_not = true;
-    // value for update for sub-condition
-    current_group.update = &p->m_condition;
-    current_group.update_override = &p->m_child;
+    m_groups.back().pending_not = true;
 
     return *this;
 }
@@ -1064,12 +1030,16 @@ Query& Query::Not()
 // within each other.
 void Query::handle_pending_not()
 {
-    if (m_groups.size() > 1 && m_groups.back().pending_not) {
-        // we are inside group(s) implicitly created to handle a not, so pop it/them:
-        // but first, prevent the pop from linking the current node into the surrounding
-        // context - the current node is instead hanging of from the previously added NotNode's
-        // m_cond field.
-        // update[update.size()-1] = 0;
+    auto& current_group = m_groups.back();
+    if (m_groups.size() > 1 && current_group.pending_not) {
+        // we are inside group(s) implicitly created to handle a not, so reparent its
+        // nodes into a NotNode.
+        auto condition = current_group.first;
+        current_group.first = nullptr;
+        NotNode* not_node = new NotNode(condition);
+        current_group.pending_not = false;
+
+        add_node(not_node);
         end_group();
     }
 }
@@ -1077,49 +1047,41 @@ void Query::handle_pending_not()
 Query& Query::Or()
 {
     auto& current_group = m_groups.back();
-    OrNode* o = dynamic_cast<OrNode*>(current_group.first);
-    if (o) {
-        if (o->m_conditions.back())
-            o->m_conditions.push_back(0);
+    OrNode* or_node = dynamic_cast<OrNode*>(current_group.first);
+    if (!or_node) {
+        // Reparent the current group's nodes within an OrNode.
+        or_node = new OrNode(current_group.first);
+        current_group.first = nullptr;
+        add_node(or_node);
     }
-    else {
-        o = new OrNode(current_group.first);
-        o->m_conditions.push_back(0);
-        all_nodes.push_back(o);
-        current_group.first = o;
-    }
+    current_group.m_state = QueryGroup::State::OrCondition;
 
-    current_group.update = &o->m_conditions.back();
-    current_group.update_override = &o->m_child;
     return *this;
 }
 
 Query& Query::subtable(size_t column)
 {
-    SubtableNode* const p = new SubtableNode(column);
-    add_node(p, &p->m_condition);
-    // once subtable conditions have been evaluated, resume evaluation from m_child
-    subtables.push_back(&p->m_child);
     m_subtable_path.push_back(column);
     fetch_descriptor();
     group();
+    m_groups.back().subtable_column = column;
     return *this;
 }
 
 Query& Query::end_subtable()
 {
-    if (subtables.size() == 0) {
+    auto& current_group = m_groups.back();
+    if (current_group.subtable_column == not_found) {
         error_code = "Unbalanced subtable";
         return *this;
     }
 
+    auto condition = current_group.first;
+    current_group.first = nullptr;
+    auto subtable_node = new SubtableNode(current_group.subtable_column, condition);
     end_group();
+    add_node(subtable_node);
 
-    auto& current_group = m_groups.back();
-    if (current_group.update)
-        current_group.update = subtables[subtables.size()-1];
-
-    subtables.pop_back();
     m_subtable_path.pop_back();
     fetch_descriptor();
     return *this;
@@ -1476,20 +1438,34 @@ bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, siz
 
 void Query::add_node(ParentNode* node)
 {
-    add_node(node, &node->m_child);
-}
+    REALM_ASSERT(node);
+    using State = QueryGroup::State;
 
-void Query::add_node(ParentNode* p, ParentNode** newnode)
-{
-    all_nodes.push_back(p);
+    all_nodes.push_back(node);
 
     auto& current_group = m_groups.back();
-    if (!current_group.first) {
-        current_group.first = p;
-    } else if (current_group.update) {
-        *current_group.update = p;
+    switch (current_group.m_state) {
+    case QueryGroup::State::OrCondition: {
+        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.first));
+        OrNode* or_node = static_cast<OrNode*>(current_group.first);
+        or_node->m_conditions.emplace_back(node);
+        current_group.m_state = State::OrConditionChildren;
+        break;
     }
-    current_group.update = newnode;
+    case QueryGroup::State::OrConditionChildren: {
+        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.first));
+        OrNode* or_node = static_cast<OrNode*>(current_group.first);
+        or_node->m_conditions.back()->add_child(node);
+        break;
+    }
+    default: {
+        if (!current_group.first) {
+            current_group.first = node;
+        } else {
+            current_group.first->add_child(node);
+        }
+    }
+    }
 
     handle_pending_not();
 }
@@ -1507,11 +1483,11 @@ Query& Query::and_query(Query q)
     REALM_ASSERT(do_delete && q.do_delete);
 
     ParentNode* const p = q.root_node();
-    add_node(p, &p->m_child);
+    add_node(p);
 
-    // q.first[0] was added by update_pointers, but it'll be added again below
+    // q.root_node() was added by update_pointers, but it'll be added again below
     // so remove it
-    all_nodes.pop_back();
+    all_nodes.erase(std::find(begin(all_nodes), end(all_nodes), p));
 
     // The query on which AddQuery() was called is now responsible for destruction of query given as argument. do_delete
     // indicates not to do cleanup in deconstructor, and all_nodes contains a list of all objects to be deleted. So

@@ -56,13 +56,19 @@ class SequentialGetterBase;
 class Group;
 
 struct QueryGroup {
+    enum class State {
+        Default,
+        OrCondition,
+        OrConditionChildren,
+    };
+
     QueryGroup() = default;
 
     ParentNode* first = nullptr;
-    ParentNode** update = nullptr;
-    ParentNode** update_override = nullptr;
 
     bool pending_not = false;
+    size_t subtable_column = not_found;
+    State m_state = State::Default;
 };
 
 class Query {
@@ -339,7 +345,6 @@ private:
     }
 
     void add_node(ParentNode*);
-    void add_node(ParentNode*, ParentNode**);
 
     friend class Table;
     friend class TableViewBase;
@@ -348,7 +353,6 @@ private:
 
     std::vector<QueryGroup> m_groups;
     std::vector<ParentNode*> all_nodes;
-    std::vector<ParentNode**> subtables;
 
     // Used to access schema while building query:
     std::vector<size_t> m_subtable_path;
