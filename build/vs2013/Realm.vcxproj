@@ -698,6 +698,7 @@
     <ClCompile Include="..\..\test\test_optional.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\test\test_priority_queue.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -1140,6 +1141,7 @@
     <ClInclude Include="..\..\src\realm\util\memory_stream.hpp" />
     <ClInclude Include="..\..\src\realm\util\misc_errors.hpp" />
     <ClInclude Include="..\..\src\realm\util\optional.hpp" />
+    <ClInclude Include="..\..\src\realm\util\priority_queue.hpp" />
     <ClInclude Include="..\..\src\realm\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\realm\util\terminate.hpp" />
     <ClInclude Include="..\..\src\realm\util\unique_ptr.hpp" />
