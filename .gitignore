@@ -47,6 +47,9 @@ Static library*/
 /realm.xcodeproj/xcuserdata
 *.dSYM
 
+# Ignore KDevelop4 user files
+.kdev4/*
+
 # ref doc
 /doc/ref_cpp/html/*
 
