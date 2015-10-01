@@ -113,6 +113,10 @@ public:
     /// form, and if needed the file size is adjusted to match mmap boundaries.
     /// Must be set to false if is_shared is false.
     ///
+    /// \param clear_file Always initialize the file as if it was a newly
+    /// created file and ignore any pre-existing contents. Requires that
+    /// session_initiator be true as well.
+    ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
@@ -123,6 +127,7 @@ public:
         bool skip_validate = false;
         bool server_sync_mode = false;
         bool session_initiator = false;
+        bool clear_file = false;
         const char* encryption_key = 0;
     };
 

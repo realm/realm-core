@@ -635,13 +635,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             File::UnlockGuard ulg(m_file);
 
-            // The DB file shouldn't already exist if no one has it open, but if
-            // the process crashed on a previous run it may not have been
-            // deleted on close, so clean up any existing file at that path
-            if (durability == durability_MemOnly) {
-                util::File::try_remove(m_db_path);
-            }
-
             // We're alone in the world, and it is Ok to initialize the file:
             char empty_buf[sizeof (SharedInfo)];
             std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
@@ -739,6 +732,11 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
             cfg.no_create = begin_new_session ? no_create_file : true;
+
+            // if we're opening a MemOnly file that isn't already opened by
+            // someone else then it's a file which should have been deleted on
+            // close previously, but wasn't (perhaps due to the process crashing)
+            cfg.clear_file = durability == durability_MemOnly && begin_new_session;
 
             // If replication is enabled, we need to ask it whether we're in server-sync mode
             // and check that the database is operated in the same mode.
