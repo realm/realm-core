@@ -10,6 +10,8 @@
   incorrectly attributed the failure to `pthread_mutex_lock()`.
 * The error handling for several File functions incorrectly attributed the
   failure to `open()`.
+* Added the bitcode marker to ios simulator builds so that bitcode for device
+  builds can actually be used.
 
 ### API breaking changes:
 
