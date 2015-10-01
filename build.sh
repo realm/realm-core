@@ -285,6 +285,7 @@ build_apple()
             word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
         else
             word_list_append "cflags_arch" "-m$simulator_name-simulator-version-min=$min_version" || exit 1
+            word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
         fi
         sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
         $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
