@@ -201,9 +201,9 @@ public:
     Query& end_subtable();
     Query& Or();
 
-    Query& and_query(Query q);
-    Query operator||(Query q);
-    Query operator&&(Query q);
+    Query& and_query(const Query& q);
+    Query operator||(const Query& q);
+    Query operator&&(const Query& q);
     Query operator!();
 
 

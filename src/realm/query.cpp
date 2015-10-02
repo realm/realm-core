@@ -1408,7 +1408,7 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 *
 ******************************************************************************************************************** */
 
-Query& Query::and_query(Query q)
+Query& Query::and_query(const Query& q)
 {
     add_node(q.root_node()->clone());
 
@@ -1421,9 +1421,9 @@ Query& Query::and_query(Query q)
 }
 
 
-Query Query::operator||(Query q)
+Query Query::operator||(const Query& q)
 {
-    Query q2(*this->m_table);
+    Query q2(*m_table);
     q2.and_query(*this);
     q2.Or();
     q2.and_query(q);
@@ -1432,15 +1432,15 @@ Query Query::operator||(Query q)
 }
 
 
-Query Query::operator&&(Query q)
+Query Query::operator&&(const Query& q)
 {
     if (!root_node())
         return q;
 
     if (!q.root_node())
-        return (*this);
+        return *this;
 
-    Query q2(*this->m_table);
+    Query q2(*m_table);
     q2.and_query(*this);
     q2.and_query(q);
 
