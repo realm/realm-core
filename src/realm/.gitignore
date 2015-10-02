@@ -62,6 +62,14 @@
 /realm-config-watchos
 /realm-config-watchos-dbg
 
+# TV
+/librealm-AppleTVOS-dbg.a
+/librealm-AppleTVOS.a
+/librealm-AppleTVSimulator-dbg.a
+/librealm-AppleTVSimulator.a
+/realm-config-tvos
+/realm-config-tvos-dbg
+
 # Android
 /librealm-android-*.a
 

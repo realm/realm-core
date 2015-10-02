@@ -1113,6 +1113,20 @@ TEST(Link_FindNullLink)
         3     null     {}
     */
 
+    // Find all non-null links on Link
+    Query q5 = table1->column<Link>(col_link1).is_not_null();
+    TableView tv5 = q5.find_all();
+    CHECK_EQUAL(2, tv5.size());
+    CHECK_EQUAL(0, tv5.get_source_ndx(0));
+    CHECK_EQUAL(2, tv5.get_source_ndx(1));
+
+    // Find all non-null links on LinkList
+    Query q6 = table2->column<LinkList>(col_link2).is_not_null();
+    TableView tv6 = q6.find_all();
+    CHECK_EQUAL(2, tv6.size());
+    CHECK_EQUAL(0, tv6.get_source_ndx(0));
+    CHECK_EQUAL(2, tv6.get_source_ndx(1));
+
     // Test find_all on Link
     Query q3 = table2->column<Link>(col_link2).is_null();
     TableView tv = q3.find_all();

@@ -49,45 +49,14 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(Network_Hostname)
-{
-    // Just check that we call call network::host_name()
-    network::host_name();
-}
-
-
-TEST(Network_Post)
-{
-    network::io_service service;
-    int var = 381;
-    service.post([&] { var = 824; });
-    CHECK_EQUAL(var, 381);
-    service.run();
-    CHECK_EQUAL(var, 824);
-}
-
-
-TEST(Network_GetSetSocketOption)
-{
-    network::io_service service;
-    network::socket socket(service);
-    socket.open(network::protocol::ip_v4());
-    network::socket::reuse_address opt_reuse_addr;
-    socket.get_option(opt_reuse_addr);
-    CHECK_NOT(opt_reuse_addr.value());
-    socket.set_option(network::socket::reuse_address(true));
-    socket.get_option(opt_reuse_addr);
-    CHECK(opt_reuse_addr.value());
-}
-
-
 namespace {
 
 network::endpoint bind_acceptor(network::acceptor& acceptor)
 {
     network::io_service& service = acceptor.service();
     network::resolver resolver(service);
-    network::resolver::query query("localhost", "",
+    network::resolver::query query("localhost",
+                                   "", // Assign the port dynamically
                                    network::resolver::query::passive |
                                    network::resolver::query::address_configured);
     network::endpoint::list endpoints;
@@ -129,7 +98,176 @@ void connect_socket(network::socket& socket, std::string port)
     }
 }
 
+class bowl_of_stones_semaphore {
+public:
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
+        m_num_stones(initial_number_of_stones)
+    {
+    }
+    void get_stone()
+    {
+        LockGuard lock(m_mutex);
+        while (m_num_stones == 0)
+            m_cond_var.wait(lock);
+        --m_num_stones;
+    }
+    void add_stone()
+    {
+        LockGuard lock(m_mutex);
+        ++m_num_stones;
+        m_cond_var.notify();
+    }
+private:
+    Mutex m_mutex;
+    int m_num_stones;
+    CondVar m_cond_var;
+};
+
 } // anonymous namespace
+
+
+TEST(Network_Hostname)
+{
+    // Just check that we call call network::host_name()
+    network::host_name();
+}
+
+
+TEST(Network_PostOperation)
+{
+    network::io_service service;
+    int var_1 = 381, var_2 = 743;
+    service.post([&] { var_1 = 824; });
+    service.post([&] { var_2 = 216; });
+    CHECK_EQUAL(var_1, 381);
+    CHECK_EQUAL(var_2, 743);
+    service.run();
+    CHECK_EQUAL(var_1, 824);
+    CHECK_EQUAL(var_2, 216);
+    service.post([&] { var_2 = 191; });
+    service.post([&] { var_1 = 476; });
+    CHECK_EQUAL(var_1, 824);
+    CHECK_EQUAL(var_2, 216);
+    service.run();
+    CHECK_EQUAL(var_1, 476);
+    CHECK_EQUAL(var_2, 191);
+}
+
+
+TEST(Network_EventLoopStopAndReset_1)
+{
+    network::io_service service;
+
+    // Prestop
+    int var = 381;
+    service.stop();
+    service.post([&]{ var = 824; });
+    service.run(); // Must return immediately
+    CHECK_EQUAL(var, 381);
+    service.run(); // Must still return immediately
+    CHECK_EQUAL(var, 381);
+
+    // Reset
+    service.reset();
+    service.post([&]{ var = 824; });
+    CHECK_EQUAL(var, 381);
+    service.run();
+    CHECK_EQUAL(var, 824);
+    service.post([&]{ var = 476; });
+    CHECK_EQUAL(var, 824);
+    service.run();
+    CHECK_EQUAL(var, 476);
+}
+
+
+TEST(Network_EventLoopStopAndReset_2)
+{
+    // Introduce a blocking operation that will keep the event loop running
+    network::io_service service;
+    network::acceptor acceptor(service);
+    bind_acceptor(acceptor);
+    acceptor.listen();
+    network::socket socket(service);
+    acceptor.async_accept(socket, [](std::error_code) {});
+
+    // Start event loop execution in the background
+    ThreadWrapper thread_1;
+    thread_1.start([&]() { service.run(); });
+
+    // Check that the event loop is actually running
+    bowl_of_stones_semaphore bowl_1; // Empty
+    service.post([&]() { bowl_1.add_stone(); });
+    bowl_1.get_stone(); // Block until the stone is added
+
+    // Stop the event loop
+    service.stop();
+    CHECK_NOT(thread_1.join());
+
+    // Check that the event loop remains in the stopped state
+    int var = 381;
+    service.post([&]() { var = 824; });
+    CHECK_EQUAL(var, 381);
+    service.run(); // Still stopped, so run() must return immediately
+    CHECK_EQUAL(var, 381);
+
+    // Put the event loop back into the unstopped state, and restart it in the
+    // background
+    service.reset();
+    ThreadWrapper thread_2;
+    thread_2.start([&]() { service.run(); });
+
+    // Check that the event loop is actually running
+    bowl_of_stones_semaphore bowl_2; // Empty
+    service.post([&]() { bowl_2.add_stone(); });
+    bowl_2.get_stone(); // Block until the stone is added
+
+    // Stop the event loop by canceling the blocking operation
+    service.post([&]() { acceptor.cancel(); });
+    CHECK_NOT(thread_2.join());
+
+    CHECK_EQUAL(var, 824);
+}
+
+
+TEST(Network_GetSetSocketOption)
+{
+    network::io_service service;
+    network::socket socket(service);
+    socket.open(network::protocol::ip_v4());
+    network::socket::reuse_address opt_reuse_addr;
+    socket.get_option(opt_reuse_addr);
+    CHECK_NOT(opt_reuse_addr.value());
+    socket.set_option(network::socket::reuse_address(true));
+    socket.get_option(opt_reuse_addr);
+    CHECK(opt_reuse_addr.value());
+}
+
+
+TEST(Network_AsyncConnectAndAsyncAccept)
+{
+    network::io_service service;
+    network::acceptor acceptor(service);
+    network::endpoint listening_endpoint = bind_acceptor(acceptor);
+    acceptor.listen();
+    network::socket socket_1(service), socket_2(service);
+    bool connected = false;
+    auto connect_handler = [&](std::error_code ec) {
+        if (ec)
+            throw std::system_error(ec);
+        connected = true;
+    };
+    bool accepted = false;
+    auto accept_handler = [&](std::error_code ec) {
+        if (ec)
+            throw std::system_error(ec);
+        accepted = true;
+    };
+    socket_1.async_connect(listening_endpoint, connect_handler);
+    acceptor.async_accept(socket_2, accept_handler);
+    service.run();
+    CHECK(connected);
+}
+
 
 TEST(Network_ReadWrite)
 {
@@ -159,10 +297,10 @@ TEST(Network_ReadWrite)
     network::io_service service_2;
     network::socket socket_2(service_2);
     socket_2.connect(listening_endpoint);
-    write(socket_2, data, sizeof data);
+    socket_2.write(data, sizeof data);
     socket_2.close();
 
-    thread.join();
+    CHECK_NOT(thread.join());
 }
 
 
@@ -207,32 +345,24 @@ TEST(Network_SocketAndAcceptorOpen)
 }
 
 
-TEST(Network_PrestopAndResetService)
-{
-    network::io_service service;
-    int var = 381;
-    service.post([&]{ var = 824; });
-    service.stop();
-    service.run();
-    CHECK_EQUAL(var, 381);
-    service.post([&]{ var = 824; });
-    service.reset();
-    service.run();
-    CHECK_EQUAL(var, 824);
-}
-
-
 TEST(Network_CancelAsyncAccept)
 {
     network::io_service service;
     network::acceptor acceptor(service);
     acceptor.open(network::protocol::ip_v4());
     network::socket socket(service);
+
     bool accept_was_canceled = false;
     auto handler = [&](std::error_code ec) {
         if (ec == error::operation_aborted)
             accept_was_canceled = true;
     };
+    acceptor.async_accept(socket, handler);
+    acceptor.cancel();
+    service.run();
+    CHECK(accept_was_canceled);
+
+    accept_was_canceled = false;
     acceptor.async_accept(socket, handler);
     acceptor.close();
     service.run();
@@ -264,7 +394,7 @@ TEST(Network_CancelAsyncReadWrite)
         if (ec == error::operation_aborted)
             write_was_canceled = true;
     };
-    async_write(socket_2, data, size, write_handler);
+    socket_2.async_write(data, size, write_handler);
     network::buffered_input_stream input(socket_2);
     char buffer[size];
     bool read_was_canceled = false;
@@ -278,6 +408,118 @@ TEST(Network_CancelAsyncReadWrite)
     CHECK(read_was_canceled);
     CHECK(write_was_canceled);
 }
+
+
+TEST(Network_CancelEmptyRead)
+{
+    // Make sure that an immediately completable read operation is still
+    // cancelable
+
+    network::io_service service;
+    network::acceptor acceptor(service);
+    acceptor.open(network::protocol::ip_v4());
+    acceptor.listen();
+    network::socket socket_1(service);
+    bool was_accepted = false;
+    auto accept_handler = [&](std::error_code ec) {
+        if (!ec)
+            was_accepted = true;
+    };
+    acceptor.async_accept(socket_1, accept_handler);
+    network::socket socket_2(service);
+    socket_2.connect(acceptor.local_endpoint());
+    service.run();
+    CHECK(was_accepted);
+    const size_t size = 1;
+    char data[size] = { 'a' };
+    bool write_was_canceled = false;
+    auto write_handler = [&](std::error_code ec, size_t) {
+        if (ec == error::operation_aborted)
+            write_was_canceled = true;
+    };
+    socket_2.async_write(data, size, write_handler);
+    network::buffered_input_stream input(socket_2);
+    char buffer[size];
+    bool read_was_canceled = false;
+    auto read_handler = [&](std::error_code ec, size_t) {
+        if (ec == error::operation_aborted)
+            read_was_canceled = true;
+    };
+    input.async_read(buffer, 0, read_handler);
+    socket_2.close();
+    service.run();
+    CHECK(read_was_canceled);
+    CHECK(write_was_canceled);
+}
+
+
+TEST(Network_DeadlineTimer)
+{
+    network::io_service service;
+    network::deadline_timer timer(service);
+
+    // Check that the completion handler is executed
+    bool completed = false;
+    bool canceled = false;
+    auto wait_handler = [&](std::error_code ec) {
+        if (!ec)
+            completed = true;
+        if (ec == error::operation_aborted)
+            canceled = true;
+    };
+    timer.async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    service.run();
+    CHECK(completed);
+    CHECK(!canceled);
+    completed = false;
+
+    // Check that an immediately completed wait operation can be canceled
+    timer.async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer.cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    service.run();
+    CHECK(!completed);
+    CHECK(canceled);
+    canceled = false;
+
+    // Check that a long running wait operation can be canceled
+    timer.async_wait(std::chrono::hours(10000), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer.cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    service.run();
+    CHECK(!completed);
+    CHECK(canceled);
+}
+
+
+/*
+TEST(Network_DeadlineTimer_Special)
+{
+    network::io_service service;
+    network::deadline_timer timer_1(service);
+    network::deadline_timer timer_2(service);
+    network::deadline_timer timer_3(service);
+    network::deadline_timer timer_4(service);
+    network::deadline_timer timer_5(service);
+    network::deadline_timer timer_6(service);
+    using namespace std;
+    timer_1.async_wait(chrono::seconds(3), [](error_code) { cerr << "*3*\n";   });
+    timer_2.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2*\n";   });
+    timer_3.async_wait(chrono::seconds(3), [](error_code) { cerr << "*3-2*\n"; });
+    timer_4.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2-2*\n"; });
+    timer_5.async_wait(chrono::seconds(1), [](error_code) { cerr << "*1*\n";   });
+    timer_6.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2-3*\n"; });
+    service.run();
+}
+*/
 
 
 TEST(Network_HandlerDealloc)
@@ -335,7 +577,7 @@ TEST(Network_HandlerDealloc)
         char data[] = { 'X', 'F', 'M' };
         // This leaves behind both a read and a write handler in m_poll_handlers
         input.async_read(buffer, sizeof buffer, [](std::error_code, size_t) {});
-        async_write(socket_1, data, sizeof data, [](std::error_code, size_t) {});
+        socket_1.async_write(data, sizeof data, [](std::error_code, size_t) {});
     }
 }
 
@@ -391,8 +633,8 @@ void sync_server(network::acceptor* acceptor, unit_test::TestResults* test_resul
     MemoryOutputStream out;
     out.set_buffer(header_buffer, header_buffer+max_header_size);
     out << "was " << body_size << '\n';
-    write(socket, header_buffer, out.size());
-    write(socket, body_buffer.get(), body_size);
+    socket.write(header_buffer, out.size());
+    socket.write(body_buffer.get(), body_size);
 }
 
 
@@ -414,8 +656,8 @@ void sync_client(unsigned short listen_port, unit_test::TestResults* test_result
     MemoryOutputStream out;
     out.set_buffer(header_buffer, header_buffer+max_header_size);
     out << "echo " << sizeof echo_body << '\n';
-    write(socket, header_buffer, out.size());
-    write(socket, echo_body, sizeof echo_body);
+    socket.write(header_buffer, out.size());
+    socket.write(echo_body, sizeof echo_body);
 
     network::buffered_input_stream input_stream(socket);
     size_t n = input_stream.read_until(header_buffer, max_header_size, '\n');
@@ -558,7 +800,7 @@ private:
         auto handler = [=](std::error_code ec, size_t) {
             handle_write_header(ec);
         };
-        async_write(m_socket, m_header_buffer, out.size(), handler);
+        m_socket.async_write(m_header_buffer, out.size(), handler);
     }
 
     void handle_write_header(std::error_code ec)
@@ -568,7 +810,7 @@ private:
         auto handler = [=](std::error_code ec, size_t) {
             handle_write_body(ec);
         };
-        async_write(m_socket, m_body_buffer.get(), m_body_size, handler);
+        m_socket.async_write(m_body_buffer.get(), m_body_size, handler);
     }
 
     void handle_write_body(std::error_code ec)
@@ -617,7 +859,7 @@ public:
         auto handler = [=](std::error_code ec, size_t) {
             handle_write_header(ec);
         };
-        async_write(m_socket, m_header_buffer, out.size(), handler);
+        m_socket.async_write(m_header_buffer, out.size(), handler);
 
         m_service.run();
 
@@ -642,7 +884,7 @@ private:
         auto handler = [=](std::error_code ec, size_t) {
             handle_write_body(ec);
         };
-        async_write(m_socket, echo_body, sizeof echo_body, handler);
+        m_socket.async_write(echo_body, sizeof echo_body, handler);
     }
 
     void handle_write_body(std::error_code ec)

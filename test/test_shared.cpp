@@ -430,6 +430,44 @@ TEST(Shared_InitialMem)
 }
 
 
+TEST(Shared_InitialMem_StaleFile)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // On platforms which do not support automatically deleting a file when it's
+    // closed, MemOnly files won't be deleted if the process crashes, and so any
+    // existing file at the given path should be overwritten if no one has the
+    // file open
+
+    // Create a MemOnly realm at the path so that a lock file gets initialized
+    {
+        bool no_create = false;
+        SharedGroup(path, no_create, SharedGroup::durability_MemOnly);
+    }
+    CHECK(!File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    // Create a file at the DB path to fake a process crashing and failing to
+    // delete it
+    {
+        File f(path, File::mode_Write);
+        f.write("text");
+    }
+    CHECK(File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    // Verify that we can still open the path as a MemOnly SharedGroup and that
+    // it's cleaned up afterwards
+    {
+        bool no_create = false;
+        SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
+        CHECK(File::exists(path));
+    }
+    CHECK(!File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+}
+
+
 TEST(Shared_Initial2)
 {
     SHARED_GROUP_TEST_PATH(path);

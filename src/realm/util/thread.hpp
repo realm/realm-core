@@ -333,7 +333,7 @@ template<class F> inline void Thread::start(F func)
 inline Thread::~Thread() noexcept
 {
     if (m_joinable)
-        std::terminate();
+        REALM_TERMINATE("Destruction of joinable thread");
 }
 
 inline bool Thread::joinable() noexcept
