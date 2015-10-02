@@ -10,6 +10,8 @@
   incorrectly attributed the failure to `pthread_mutex_lock()`.
 * The error handling for several File functions incorrectly attributed the
   failure to `open()`.
+* Added the bitcode marker to iOS Simulator builds so that bitcode for device
+  builds can actually be used.
 
 ### API breaking changes:
 
@@ -147,6 +149,37 @@
 * `NOEXCEPT*` macros have been replaced by the C++11 `noexcept` specifier.
 * The `REALM_CONSTEXPR` macro has been replaced by the C++11 `constexpr` keyword.
 * Removed conditional compilation of null string support.
+
+----------------------------------------------
+
+# 0.92.3 Release notes
+
+### Bugfixes:
+
+* Added the bitcode marker to iOS Simulator builds so that bitcode for device
+  builds can actually be used.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.93.0].**
+
+----------------------------------------------
+
+# 0.92.2 Release notes
+
+### Bugfixes:
+
+* Fixed assertion failure when TableViewBase::is_row_attached() would return
+  false in a debug build.
+* Fixes a crash due to an assert when rolling back a transaction in which a link
+  or linklist column was removed.
+
+**NOTE: This is a hotfix release.**
+
+-----------
+
+### Internals:
+
+* Now built for Apple platforms with the non-beta version of Xcode 7.
 
 ----------------------------------------------
 
