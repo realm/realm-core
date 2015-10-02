@@ -237,7 +237,7 @@
 #  define REALM_COOKIE_CHECK
 #endif
 
-#if !REALM_IOS && !REALM_WATCHOS && !defined(REALM_TVOS) && !defined(_WIN32)
+#if !REALM_IOS && !REALM_WATCHOS && !REALM_TVOS && !defined(_WIN32)
 #  define REALM_ASYNC_DAEMON
 #endif
 
