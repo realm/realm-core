@@ -55,7 +55,6 @@ void Query::create()
         fetch_descriptor();
 }
 
-// FIXME: Try to remove this
 Query::Query(const Query& copy)
 {
     m_table = copy.m_table;
@@ -66,16 +65,6 @@ Query::Query(const Query& copy)
     m_source_table_view = copy.m_source_table_view;
     m_owns_source_table_view = false;
     m_current_descriptor = copy.m_current_descriptor;
-}
-
-
-// todo, try and remove this constructor. It's currently required for copy-initialization only, and not
-// copy-assignment anylonger (which is now just "=").
-Query::Query(const Query& copy, const TCopyExpressionTag&) 
-{
-    // We can call the copy-assignment operator even if this destination is uninitialized.
-    m_owns_source_table_view = false;
-    *this = copy;
 }
 
 Query::Query(Expression* expr) : Query()
