@@ -49,6 +49,9 @@ IPHONE_DIR="iphone-lib"
 WATCHOS_PLATFORMS="WatchOS WatchSimulator"
 WATCHOS_DIR="watchos-lib"
 
+TVOS_PLATFORMS="AppleTVOS AppleTVSimulator"
+TVOS_DIR="tvos-lib"
+
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
@@ -64,7 +67,8 @@ Available modes are:
     build-config-progs:                 
     build-osx:                          
     build-iphone:                       
-    build-watchos:
+    build-watchos:                      
+    build-tvos:                         
     build-android:                      
     build-cocoa:                        
     build-osx-framework:                
@@ -231,8 +235,103 @@ if [ "$IS_REDHAT_DERIVATIVE" ]; then
     PLATFORM_HAS_LIBRARY_PATH_ISSUE="1"
 fi
 
+build_apple()
+{
+    auto_configure || exit 1
+    export REALM_HAVE_CONFIG="1"
+    sdks_avail="$(get_config_param "$available_sdks_config_key")" || exit 1
+    if [ "$sdks_avail" != "yes" ]; then
+        echo "ERROR: Required $name SDKs are not available" 1>&2
+        exit 1
+    fi
+    temp_dir="$(mktemp -d /tmp/realm.build-$short_name.XXXX)" || exit 1
+    mkdir "$temp_dir/platforms" || exit 1
+    xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
+    sdks="$(get_config_param "$sdks_config_key")" || exit 1
+    for x in $sdks; do
+        platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+        sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
+        archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
+        cflags_arch="-stdlib=libc++"
+        for y in $archs; do
+            word_list_append "cflags_arch" "-arch $y" || exit 1
+        done
+        if [ "$platform" = "$bitcode_platform" ]; then
+            word_list_append "cflags_arch" "-mstrict-align" || exit 1
+            word_list_append "cflags_arch" "-m$os_name-version-min=$min_version" || exit 1
+            word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+        else
+            word_list_append "cflags_arch" "-m$simulator_name-simulator-version-min=$min_version" || exit 1
+            word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
+        fi
+        sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
+        $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
+        mkdir "$temp_dir/platforms/$platform" || exit 1
+        cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
+        cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
+    done
+    REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-$simulator_name" "realm-config-$simulator_name-dbg" BASE_DENOM="$simulator_name" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_$all_caps_name" AR="libtool" ARFLAGS="-o" || exit 1
+    mkdir -p "$dir" || exit 1
+    echo "Creating '$dir/librealm-$simulator_name.a'"
+    libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$simulator_name.a"     || exit 1
+    echo "Creating '$dir/librealm-$simulator_name-dbg.a'"
+    libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$dir/librealm-$simulator_name-dbg.a" || exit 1
+    echo "Copying headers to '$dir/include'"
+    mkdir -p "$dir/include" || exit 1
+    cp "src/realm.hpp" "$dir/include/" || exit 1
+    mkdir -p "$dir/include/realm" || exit 1
+    inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+    (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+    (cd "$REALM_HOME/$dir/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+    for x in "realm-config" "realm-config-dbg"; do
+        echo "Creating '$dir/$x'"
+        y="$(printf "%s\n" "$x" | sed "s/realm-config/realm-config-$simulator_name/")" || exit 1
+        cp "src/realm/$y" "$REALM_HOME/$dir/$x" || exit 1
+    done
+    echo "Done building"
+    return 0
+}
 
-find_iphone_sdk()
+find_apple_sdks()
+{
+    sdks=""
+    if [ "$xcode_home" != "none" ]; then
+        for x in $PLATFORMS; do
+            platform_home="$xcode_home/Platforms/$x.platform"
+            if ! [ -e "$platform_home/Info.plist" ]; then
+                echo "Failed to find '$platform_home/Info.plist'"
+                exit 1
+            else
+                sdk="$(find_apple_sdk "$platform_home")" || exit 1
+                if ! [ "$sdk" ]; then
+                    echo "Found no SDKs in '$platform_home'"
+                    exit 1
+                else
+                    if [ "$x" = "iPhoneSimulator" ]; then
+                        archs="i386,x86_64"
+                    elif [ "$x" = "iPhoneOS" ]; then
+                        archs="armv7,armv7s,arm64"
+                    elif [ "$x" = "WatchSimulator" ]; then
+                        archs="i386"
+                    elif [ "$x" = "WatchOS" ]; then
+                        archs="armv7k"
+                    elif [ "$x" = "AppleTVSimulator" ]; then
+                        archs="x86_64"
+                    elif [ "$x" = "AppleTVOS" ]; then
+                        archs="arm64"
+                    else
+                        continue
+                    fi
+                    word_list_append "sdks" "$x:$sdk:$archs" || exit 1
+                fi
+            fi
+        done
+    fi
+    echo "$sdks"
+    return 0
+}
+
+find_apple_sdk()
 {
     local platform_home sdks highest_version highest_version_dir ambiguous dir settings version higher version_in_dir_1 version_in_dir_2 sorted new_highest_version
     platform_home="$1"
@@ -513,73 +612,27 @@ case "$MODE" in
                 echo "Failed to determine Xcode version using \`$xcodebuild -version\`" 1>&2
                 exit 1
             fi
-            major="$(printf "%s" "$version" | cut -d. -f1)" || exit 1
-            if [ "$major" -ge "5" ]; then
-                arm64_supported="1"
-            fi
         fi
 
         # Find iPhone SDKs
-        iphone_sdks=""
         iphone_sdks_avail="no"
-        if [ "$xcode_home" != "none" ]; then
-            # Xcode provides the iPhoneOS SDK
+        iphone_sdks="$(PLATFORMS="$IPHONE_PLATFORMS" find_apple_sdks)"
+        if [ "$iphone_sdks" != "" ]; then
             iphone_sdks_avail="yes"
-            for x in $IPHONE_PLATFORMS; do
-                platform_home="$xcode_home/Platforms/$x.platform"
-                if ! [ -e "$platform_home/Info.plist" ]; then
-                    echo "Failed to find '$platform_home/Info.plist'"
-                    iphone_sdks_avail="no"
-                else
-                    sdk="$(find_iphone_sdk "$platform_home")" || exit 1
-                    if ! [ "$sdk" ]; then
-                        echo "Found no SDKs in '$platform_home'"
-                        iphone_sdks_avail="no"
-                    else
-                        if [ "$x" = "iPhoneSimulator" ]; then
-                            archs="i386,x86_64"
-                        elif [  "$x" = "iPhoneOS" ]; then
-                            archs="armv7,armv7s"
-                            if [ "$arm64_supported" ]; then
-                                archs="$archs,arm64"
-                            fi
-                        else
-                            continue
-                        fi
-                        word_list_append "iphone_sdks" "$x:$sdk:$archs" || exit 1
-                    fi
-                fi
-            done
         fi
 
         # Find watchOS SDKs
-        watchos_sdks=""
         watchos_sdks_avail="no"
-        if [ "$xcode_home" != "none" ]; then
-            # Xcode provides the watchOS SDK
+        watchos_sdks="$(PLATFORMS="$WATCHOS_PLATFORMS" find_apple_sdks)"
+        if [ "$watchos_sdks" != "" ]; then
             watchos_sdks_avail="yes"
-            for x in $WATCHOS_PLATFORMS; do
-                platform_home="$xcode_home/Platforms/$x.platform"
-                if ! [ -e "$platform_home/Info.plist" ]; then
-                    echo "Failed to find '$platform_home/Info.plist'"
-                    watchos_sdks_avail="no"
-                else
-                    sdk="$(find_iphone_sdk "$platform_home")" || exit 1
-                    if ! [ "$sdk" ]; then
-                        echo "Found no SDKs in '$platform_home'"
-                        watchos_sdks_avail="no"
-                    else
-                        if [ "$x" = "WatchSimulator" ]; then
-                            archs="i386"
-                        elif [ "$x" = "WatchOS" ]; then
-                            archs="armv7k"
-                        else
-                            continue
-                        fi
-                        word_list_append "watchos_sdks" "$x:$sdk:$archs" || exit 1
-                    fi
-                fi
-            done
+        fi
+
+        # Find tvOS SDKs
+        tvos_sdks_avail="no"
+        tvos_sdks="$(PLATFORMS="$TVOS_PLATFORMS" find_apple_sdks)"
+        if [ "$tvos_sdks" != "" ]; then
+            tvos_sdks_avail="yes"
         fi
 
         # Find Android NDK
@@ -608,6 +661,8 @@ IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
 WATCHOS_SDKS          = ${watchos_sdks:-none}
 WATCHOS_SDKS_AVAIL    = $watchos_sdks_avail
+TVOS_SDKS             = ${tvos_sdks:-none}
+TVOS_SDKS_AVAIL       = $tvos_sdks_avail
 ANDROID_NDK_HOME      = $android_ndk_home
 EOF
         if ! [ "$INTERACTIVE" ]; then
@@ -623,28 +678,21 @@ EOF
         export REALM_HAVE_CONFIG="1"
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
-            for x in $IPHONE_PLATFORMS; do
+            for x in $IPHONE_PLATFORMS $WATCHOS_PLATFORMS $TVOS_PLATFORMS; do
                 $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
             done
             $MAKE -C "src/realm" clean BASE_DENOM="ios" || exit 1
-            if [ -e "$IPHONE_DIR" ]; then
-                echo "Removing '$IPHONE_DIR'"
-                rm -fr "$IPHONE_DIR/include" || exit 1
-                rm -f "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" || exit 1
-                rm -f "$IPHONE_DIR/realm-config" "$IPHONE_DIR/realm-config-dbg" || exit 1
-                rmdir "$IPHONE_DIR" || exit 1
-            fi
-            for x in $WATCHOS_PLATFORMS; do
-                $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
-            done
             $MAKE -C "src/realm" clean BASE_DENOM="watch" || exit 1
-            if [ -e "$WATCHOS_DIR" ]; then
-                echo "Removing '$WATCHOS_DIR'"
-                rm -fr "$WATCHOS_DIR/include" || exit 1
-                rm -f "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" || exit 1
-                rm -f "$WATCHOS_DIR/realm-config" "$WATCHOS_DIR/realm-config-dbg" || exit 1
-                rmdir "$WATCHOS_DIR" || exit 1
-            fi
+            $MAKE -C "src/realm" clean BASE_DENOM="tv" || exit 1
+            for dir in "$IPHONE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
+                if [ -e "$dir" ]; then
+                    echo "Removing '$dir'"
+                    rm -rf "$dir/include" || exit 1
+                    rm -f "$dir/librealm-*.a" || exit 1
+                    rm -f "$dir/realm-config*" || exit 1
+                    rmdir "$dir" || exit 1
+                fi
+            done
         fi
         for x in $ANDROID_PLATFORMS; do
             denom="android-$x"
@@ -691,115 +739,45 @@ EOF
         ;;
 
     "build-iphone")
-        auto_configure || exit 1
-        export REALM_HAVE_CONFIG="1"
-        iphone_sdks_avail="$(get_config_param "IPHONE_SDKS_AVAIL")" || exit 1
-        if [ "$iphone_sdks_avail" != "yes" ]; then
-            echo "ERROR: Required iPhone SDKs are not available" 1>&2
-            exit 1
-        fi
-        temp_dir="$(mktemp -d /tmp/realm.build-iphone.XXXX)" || exit 1
-        mkdir "$temp_dir/platforms" || exit 1
-        xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
-        iphone_sdks="$(get_config_param "IPHONE_SDKS")" || exit 1
-        for x in $iphone_sdks; do
-            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
-            sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
-            archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch="-stdlib=libc++"
-            for y in $archs; do
-                word_list_append "cflags_arch" "-arch $y" || exit 1
-            done
-            if [ "$platform" = 'iPhoneOS' ]; then
-                word_list_append "cflags_arch" "-mstrict-align" || exit 1
-                word_list_append "cflags_arch" "-miphoneos-version-min=7.0" || exit 1
-                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
-            else
-                word_list_append "cflags_arch" "-mios-simulator-version-min=7.0" || exit 1
-                word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
-            fi
-            sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
-            mkdir "$temp_dir/platforms/$platform" || exit 1
-            cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
-            cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
-        done
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-ios" "realm-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_IOS" AR="libtool" ARFLAGS="-o" || exit 1
-        mkdir -p "$IPHONE_DIR" || exit 1
-        echo "Creating '$IPHONE_DIR/librealm-ios.a'"
-        libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$IPHONE_DIR/librealm-ios.a"     || exit 1
-        echo "Creating '$IPHONE_DIR/librealm-ios-dbg.a'"
-        libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$IPHONE_DIR/librealm-ios-dbg.a" || exit 1
-        echo "Copying headers to '$IPHONE_DIR/include'"
-        mkdir -p "$IPHONE_DIR/include" || exit 1
-        cp "src/realm.hpp" "$IPHONE_DIR/include/" || exit 1
-        mkdir -p "$IPHONE_DIR/include/realm" || exit 1
-        inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
-        (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
-        (cd "$REALM_HOME/$IPHONE_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
-        for x in "realm-config" "realm-config-dbg"; do
-            echo "Creating '$IPHONE_DIR/$x'"
-            y="$(printf "%s\n" "$x" | sed 's/realm-config/realm-config-ios/')" || exit 1
-            cp "src/realm/$y" "$REALM_HOME/$IPHONE_DIR/$x" || exit 1
-        done
-        echo "Done building"
-        exit 0
+        export name='iPhone'
+        export short_name='iphone'
+        export available_sdks_config_key='IPHONE_SDKS_AVAIL'
+        export min_version='7.0'
+        export simulator_name='ios'
+        export os_name='iphoneos'
+        export bitcode_platform='iPhoneOS'
+        export sdks_config_key='IPHONE_SDKS'
+        export dir="$IPHONE_DIR"
+        export all_caps_name='IOS'
+        build_apple
         ;;
 
     "build-watchos")
-        auto_configure || exit 1
-        export REALM_HAVE_CONFIG="1"
-        watchos_sdks_avail="$(get_config_param "WATCHOS_SDKS_AVAIL")" || exit 1
-        if [ "$watchos_sdks_avail" != "yes" ]; then
-            echo "ERROR: Required watchOS SDKs are not available" 1>&2
-            exit 1
-        fi
-        temp_dir="$(mktemp -d /tmp/realm.build-watchos.XXXX)" || exit 1
-        mkdir "$temp_dir/platforms" || exit 1
-        xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
-        watchos_sdks="$(get_config_param "WATCHOS_SDKS")" || exit 1
-        for x in $watchos_sdks; do
-            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
-            sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
-            archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch="-stdlib=libc++"
-            for y in $archs; do
-                word_list_append "cflags_arch" "-arch $y" || exit 1
-            done
-            if [ "$platform" = 'WatchOS' ]; then
-                word_list_append "cflags_arch" "-mstrict-align" || exit 1
-                word_list_append "cflags_arch" "-mwatchos-version-min=2.0" || exit 1
-                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
-            else
-                word_list_append "cflags_arch" "-mwatchos-simulator-version-min=2.0" || exit 1
-                word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
-            fi
-            sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
-            mkdir "$temp_dir/platforms/$platform" || exit 1
-            cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
-            cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
-        done
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-watchos" "realm-config-watchos-dbg" BASE_DENOM="watchos" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_WATCHOS" AR="libtool" ARFLAGS="-o" || exit 1
-        mkdir -p "$WATCHOS_DIR" || exit 1
-        echo "Creating '$WATCHOS_DIR/librealm-watchos.a'"
-        libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$WATCHOS_DIR/librealm-watchos.a"     || exit 1
-        echo "Creating '$WATCHOS_DIR/librealm-watchos-dbg.a'"
-        libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$WATCHOS_DIR/librealm-watchos-dbg.a" || exit 1
-        echo "Copying headers to '$WATCHOS_DIR/include'"
-        mkdir -p "$WATCHOS_DIR/include" || exit 1
-        cp "src/realm.hpp" "$WATCHOS_DIR/include/" || exit 1
-        mkdir -p "$WATCHOS_DIR/include/realm" || exit 1
-        inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
-        (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
-        (cd "$REALM_HOME/$WATCHOS_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
-        for x in "realm-config" "realm-config-dbg"; do
-            echo "Creating '$WATCHOS_DIR/$x'"
-            y="$(printf "%s\n" "$x" | sed 's/realm-config/realm-config-watchos/')" || exit 1
-            cp "src/realm/$y" "$REALM_HOME/$WATCHOS_DIR/$x" || exit 1
-        done
-        echo "Done building"
-        exit 0
+        export name='watchOS'
+        export short_name='watchos'
+        export available_sdks_config_key='WATCHOS_SDKS_AVAIL'
+        export min_version='2.0'
+        export simulator_name='watchos'
+        export os_name='watchos'
+        export bitcode_platform='WatchOS'
+        export sdks_config_key='WATCHOS_SDKS'
+        export dir="$WATCHOS_DIR"
+        export all_caps_name='WATCHOS'
+        build_apple
+        ;;
+
+    "build-tvos")
+        export name='tvOS'
+        export short_name='tvos'
+        export available_sdks_config_key='TVOS_SDKS_AVAIL'
+        export min_version='9.0'
+        export simulator_name='tvos'
+        export os_name='tvos'
+        export bitcode_platform='AppleTVOS'
+        export sdks_config_key='TVOS_SDKS'
+        export dir="$TVOS_DIR"
+        export all_caps_name='TVOS'
+        build_apple
         ;;
 
     "build-android")
@@ -903,7 +881,7 @@ EOF
 
     "build-cocoa")
         if [ "$OS" != "Darwin" ]; then
-            echo "zip for iOS/OSX can only be generated under OS X."
+            echo "zip for iOS/OSX/watchOS/tvOS can only be generated under OS X."
             exit 0
         fi
 
@@ -923,23 +901,15 @@ EOF
         BASENAME="core"
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR/librealm-ios.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$IPHONE_DIR/librealm-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$WATCHOS_DIR/librealm-watchos.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$WATCHOS_DIR/librealm-watchos-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
-        for x in $iphone_sdks; do
-            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+        for original in "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" "src/realm/librealm.a" "src/realm/librealm-dbg.a"; do
+            cp "$original" "$tmpdir/$BASENAME" || exit 1
+        done
+        for sdk in $iphone_sdks $watchos_sdks; do
+            platform="$(printf "%s\n" "$sdk" | cut -d: -f1)" || exit 1
             cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
             cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
         done
-        for x in $watchos_sdks; do
-            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
-            cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
-            cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
-        done
-        cp src/realm/librealm.a "$tmpdir/$BASENAME" || exit 1
-        cp src/realm/librealm-dbg.a "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
