@@ -15,7 +15,6 @@ using namespace realm;
 Query::Query() : m_view(nullptr), m_source_table_view(0), m_owns_source_table_view(false)
 {
     create();
-//    expression(static_cast<Expression*>(this));
 }
 
 Query::Query(Table& table, TableViewBase* tv) 
@@ -93,6 +92,13 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
     do_delete = false;
     m_owns_source_table_view = false;
     *this = copy;
+}
+
+Query::Query(Expression* expr) : Query()
+{
+    add_expression_node(expr);
+    if (auto table = const_cast<Table*>(expr->get_table()))
+        set_table(table->get_table_ref());
 }
 
 void Query::copy_nodes(const Query& source)
@@ -239,11 +245,10 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
     }
 }
 
-Query& Query::expression(Expression* compare)
+void Query::add_expression_node(Expression* compare)
 {
     ParentNode* const p = new ExpressionNode(compare);
     update_pointers(p, &p->m_child);
-    return *this;
 }
 
 // Binary

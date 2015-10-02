@@ -52,15 +52,13 @@ Subexpr2
 Compare: public Subexpr2
     size_t find_first(size_t start, size_t end)     // main method that executes query
 
-    bool m_auto_delete
-    Subexpr2& m_left;                               // left expression subtree
-    Subexpr2& m_right;                              // right expression subtree
+    unique_ptr<Subexpr2> m_left;                               // left expression subtree
+    unique_ptr<Subexpr2> m_right;                              // right expression subtree
 
 Operator: public Subexpr2
     void evaluate(size_t i, ValueBase* destination)
-    bool m_auto_delete
-    Subexpr2& m_left;                               // left expression subtree
-    Subexpr2& m_right;                              // right expression subtree
+    unique_ptr<Subexpr2> m_left;                               // left expression subtree
+    unique_ptr<Subexpr2> m_right;                              // right expression subtree
 
 Value<T>: public Subexpr2
     void evaluate(size_t i, ValueBase* destination)
@@ -95,22 +93,14 @@ to save overhead by virtual calls needed for evaluating a query that has been dy
 
 Memory allocation:
 -----------------------------------------------------------------------------------------------------------------------
-Operator and Compare contain a 'bool m_auto_delete' which tell if their subtrees were created by the query system or by the
-end-user. If created by query system, they are deleted upon destructed of Operator and Compare.
-
-Value and Columns given to Operator or Compare constructors are cloned with 'new' and hence deleted unconditionally
-by query system.
+Subexpressions created by the end-user are stack allocated. They are cloned to the heap when passed to UnaryOperator,
+Operator, and Compare. Those types own the clones and deallocate them when destroyed.
 
 
 Caveats, notes and todos
 -----------------------------------------------------------------------------------------------------------------------
     * Perhaps disallow columns from two different tables in same expression
     * The name Columns (with s) an be confusing because we also have Column (without s)
-    * Memory allocation: Maybe clone Compare and Operator to get rid of m_auto_delete. However, this might become
-      bloated, with non-trivial copy constructors instead of defaults
-    * Hack: In compare operator overloads (==, !=, >, etc), Compare class is returned as Query class, resulting in object
-      slicing. Just be aware.
-    * clone() some times new's, sometimes it just returns *this. Can be confusing. Rename method or copy always.
     * We have Columns::m_table, Query::m_table and ColumnAccessorBase::m_table that point at the same thing, even with
       ColumnAccessor<> extending Columns. So m_table is redundant, but this is in order to keep class dependencies and
       entanglement low so that the design is flexible (if you perhaps later want a Columns class that is not dependent
@@ -286,7 +276,7 @@ struct ValueBase
     size_t m_values;
 };
 
-class Expression : public Query
+class Expression
 {
 public:
     Expression() { }
@@ -302,11 +292,7 @@ class Subexpr
 public:
     virtual ~Subexpr() {}
 
-    // todo, think about renaming, or actualy doing deep copy
-    virtual Subexpr& clone()
-    {
-        return *this;
-    }
+    virtual std::unique_ptr<Subexpr> clone() const = 0;
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     virtual void set_table() {}
@@ -320,6 +306,12 @@ public:
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
+
+template <typename T, typename... Args>
+std::unique_ptr<Subexpr> make_subexpr(Args&&... args)
+{
+    return std::unique_ptr<Subexpr>(new T(std::forward<Args>(args)...));
+}
 
 template <class T> class Columns;
 template <class T> class Value;
@@ -384,7 +376,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
             q.contains(column->m_column, only_string(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
-            // fallback to using use 'return *new Compare<>' instead.
+            // fallback to using use 'return new Compare<>' instead.
             REALM_ASSERT(false);
         }
         // Return query_engine.hpp node
@@ -398,8 +390,8 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
         char* compare_string = in_place_deep_clone(&left);
 
         // Return query_expression.hpp node
-        return *new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left),
-            const_cast<Subexpr2<R>&>(right).clone(), true, compare_string);
+        using CommonType = typename Common<L, R>::type;
+        return new Compare<Cond, CommonType>(make_subexpr<Value<L>>(left), right.clone(), compare_string);
     }
 }
 
@@ -413,42 +405,48 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
 template <class L, class R> class Overloads
 {
     typedef typename Common<L, R>::type CommonType;
+
+    std::unique_ptr<Subexpr> clone_subexpr() const
+    {
+        return static_cast<const Subexpr2<L>&>(*this).clone();
+    }
+
 public:
 
     // Arithmetic, right side constant
-    Operator<Plus<CommonType>>& operator + (R right)
+    Operator<Plus<CommonType>> operator + (R right) const
     {
-       return *new Operator<Plus<CommonType>>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
-    Operator<Minus<CommonType>>& operator - (R right)
+    Operator<Minus<CommonType>> operator - (R right) const
     {
-       return *new Operator<Minus<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
-    Operator<Mul<CommonType>>& operator * (R right)
+    Operator<Mul<CommonType>> operator * (R right) const
     {
-       return *new Operator<Mul<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
-    Operator<Div<CommonType>>& operator / (R right)
+    Operator<Div<CommonType>> operator / (R right) const
     {
-        return *new Operator<Div<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return { clone_subexpr(), make_subexpr<Value<R>>(right) };
     }
 
     // Arithmetic, right side subexpression
-    Operator<Plus<CommonType>>& operator + (const Subexpr2<R>& right)
+    Operator<Plus<CommonType>> operator + (const Subexpr2<R>& right) const
     {
-        return *new Operator<Plus<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return { clone_subexpr(), right.clone() };
     }
-    Operator<Minus<CommonType>>& operator - (const Subexpr2<R>& right)
+    Operator<Minus<CommonType>> operator - (const Subexpr2<R>& right) const
     {
-        return *new Operator<Minus<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return { clone_subexpr(), right.clone() };
     }
-    Operator<Mul<CommonType>>& operator * (const Subexpr2<R>& right)
+    Operator<Mul<CommonType>> operator * (const Subexpr2<R>& right) const
     {
-        return *new Operator<Mul<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return { clone_subexpr(), right.clone() };
     }
-    Operator<Div<CommonType>>& operator / (const Subexpr2<R>& right)
+    Operator<Div<CommonType>> operator / (const Subexpr2<R>& right) const
     {
-        return *new Operator<Div<CommonType>> (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return { clone_subexpr(), right.clone() };
     }
 
     // Compare, right side constant
@@ -557,8 +555,7 @@ public:
 #endif
         {
             // Return query_expression.hpp node
-            return *new Compare<Cond, typename Common<R, float>::type>
-                        (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+            return new Compare<Cond, typename Common<R, float>::type>(clone_subexpr(), right.clone());
         }
     }
 
@@ -1087,9 +1084,9 @@ public:
         return not_found; // no match
     }
 
-    Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *new Value<T>(*this);
+        return make_subexpr<Value<T>>(*this);
     }
 
     NullableVector<T> m_storage;
@@ -1177,58 +1174,58 @@ template <class R> Query operator != (int64_t left, const Subexpr2<R>& right) {
 }
 
 // Arithmetic
-template <class R> Operator<Plus<typename Common<R, double>::type>>& operator + (double left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, double>::type>> operator + (double left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Plus<typename Common<R, float>::type>>& operator + (float left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, float>::type>>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, float>::type>> operator + (float left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Plus<typename Common<R, int>::type>>& operator + (int left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, int>::type>> operator + (int left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Plus<typename Common<R, int64_t>::type>>& operator + (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Plus<typename Common<R, int64_t>::type>> operator + (int64_t left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, double>::type>>& operator - (double left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, double>::type>> operator - (double left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, float>::type>>& operator - (float left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, float>::type>>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, float>::type>> operator - (float left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, int>::type>>& operator - (int left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, int>::type>> operator - (int left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, int64_t>::type>>& operator - (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Minus<typename Common<R, int64_t>::type>> operator - (int64_t left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, double>::type>>& operator * (double left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, double>::type>> operator * (double left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, float>::type>>& operator * (float left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, float>::type>>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, float>::type>> operator * (float left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, int>::type>>& operator * (int left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, int>::type>> operator * (int left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, int64_t>::type>>& operator * (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Mul<typename Common<R, int64_t>::type>> operator * (int64_t left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, double>::type>>& operator / (double left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, double>::type>>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, double>::type>> operator / (double left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, float>::type>>& operator / (float left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, float>::type>>*(new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, float>::type>> operator / (float left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, int>::type>>& operator / (int left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, int>::type>>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, int>::type>> operator / (int left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, int64_t>::type>>& operator / (int64_t left, const Subexpr2<R>& right) {
-    return *new Operator<Div<typename Common<R, int64_t>::type>>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+template <class R> Operator<Div<typename Common<R, int64_t>::type>> operator / (int64_t left, const Subexpr2<R>& right) {
+    return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
 
 // Unary operators
-template <class T> UnaryOperator<Pow<T>>& power (const Subexpr2<T>& left) {
-    return *new UnaryOperator<Pow<T>>(const_cast<Subexpr2<T>&>(left).clone(), true);
+template <class T> UnaryOperator<Pow<T>> power (const Subexpr2<T>& left) {
+    return { left.clone() };
 }
 
 
@@ -1436,9 +1433,9 @@ public:
     {
     }
 
-    Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *new Columns<StringData>(*this);
+        return make_subexpr<Columns<StringData>>(*this);
     }
 
     const Table* get_table() const override
@@ -1544,12 +1541,10 @@ template <class T, class S, class I> Query string_compare(const Columns<StringDa
 
 template <class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_sensitive)
 {
-    Subexpr& left_copy = const_cast<Columns<StringData>&>(left).clone();
-    Subexpr& right_copy = const_cast<Columns<StringData>&>(right).clone();
     if (case_sensitive)
-        return *new Compare<S, StringData>(right_copy, left_copy, /* auto_delete */ true);
+        return new Compare<S, StringData>(right.clone(), left.clone());
     else
-        return *new Compare<I, StringData>(right_copy, left_copy, /* auto_delete */ true);
+        return new Compare<I, StringData>(right.clone(), left.clone());
 }
 
 // Columns<String> == Columns<String>
@@ -1605,9 +1600,9 @@ public:
     {
     }
 
-    virtual Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *new Columns<BinaryData>(*this);
+        return make_subexpr<Columns<BinaryData>>(*this);
     }
 
     const Table* get_table() const override
@@ -1678,9 +1673,6 @@ template <bool has_links> class UnaryLinkCompare : public Expression
 public:
     UnaryLinkCompare(LinkMap lm) : m_link_map(lm)
     {
-        Query::expression(this);
-        Table* t = const_cast<Table*>(get_table());
-        Query::set_table(t->get_table_ref());
     }
 
     void set_table() override
@@ -1719,9 +1711,9 @@ class LinkCount : public Subexpr2<Int> {
 public:
     LinkCount(LinkMap link_map): m_link_map(link_map) { }
 
-    Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *new LinkCount(*this);
+        return make_subexpr<LinkCount>(*this);
     }
 
     const Table* get_table() const override
@@ -1751,14 +1743,14 @@ public:
         if (m_link_map.m_link_columns.size() > 1)
             throw std::runtime_error("Combining link() and is_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return *new UnaryLinkCompare<false>(m_link_map);
+        return new UnaryLinkCompare<false>(m_link_map);
     }
 
     Query is_not_null() {
         if (m_link_map.m_link_columns.size() > 1)
             throw std::runtime_error("Combining link() and is_not_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return *new UnaryLinkCompare<true>(m_link_map);
+        return new UnaryLinkCompare<true>(m_link_map);
     }
 
     LinkCount count() const
@@ -1788,9 +1780,9 @@ private:
         static_cast<void>(column);
     }
 
-    Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *this;
+        return make_subexpr<Columns<Link>>(*this);
     }
 
     const Table* get_table() const override
@@ -1852,9 +1844,9 @@ public:
         return *this;
     }
 
-    Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *new Columns<T>(*this);
+        return make_subexpr<Columns<T>>(*this);
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
@@ -2003,9 +1995,9 @@ public:
     {
     }
 
-    Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *new SubColumns<T>(*this);
+        return make_subexpr<SubColumns<T>>(*this);
     }
 
     const Table* get_table() const override
@@ -2026,22 +2018,22 @@ public:
 
     SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Minimum<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
     SubColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Maximum<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
     SubColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Sum<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
     SubColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
-        return SubColumnAggregate<T, aggregate_operations::Average<T>>(m_column, m_link_map);
+        return { m_column, m_link_map };
     }
 
 private:
@@ -2049,7 +2041,7 @@ private:
     LinkMap m_link_map;
 };
 
-template <typename  T, typename Operation>
+template <typename T, typename Operation>
 class SubColumnAggregate : public Subexpr2<typename Operation::ResultType>
 {
 public:
@@ -2059,9 +2051,9 @@ public:
     {
     }
 
-    Subexpr& clone() override
+    std::unique_ptr<Subexpr> clone() const override
     {
-        return *new SubColumnAggregate<T, Operation>(*this);
+        return make_subexpr<SubColumnAggregate>(*this);
     }
 
     const Table* get_table() const override
@@ -2170,25 +2162,31 @@ namespace aggregate_operations {
 template <class oper, class TLeft> class UnaryOperator : public Subexpr2<typename oper::type>
 {
 public:
-    UnaryOperator(TLeft& left, bool auto_delete = false) : m_auto_delete(auto_delete), m_left(left) {}
+    UnaryOperator(std::unique_ptr<TLeft> left) : m_left(std::move(left)) {}
 
-    ~UnaryOperator()
+    UnaryOperator(const UnaryOperator& other) : m_left(other.m_left->clone()) {}
+    UnaryOperator& operator=(const UnaryOperator& other)
     {
-        if (m_auto_delete)
-            delete &m_left;
+        if (this != &other) {
+            m_left = other.m_left->clone();
+        }
+        return *this;
     }
+
+    UnaryOperator(UnaryOperator&&) = default;
+    UnaryOperator& operator=(UnaryOperator&&) = default;
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     void set_table() override
     {
-        m_left.set_table();
+        m_left->set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
     const Table* get_table() const override
     {
-        return m_left.get_table();
+        return m_left->get_table();
     }
 
     // destination = operator(left)
@@ -2196,48 +2194,56 @@ public:
     {
         Value<T> result;
         Value<T> left;
-        m_left.evaluate(index, left);
+        m_left->evaluate(index, left);
         result.template fun<oper>(&left);
         destination.import(result);
     }
 
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<UnaryOperator>(*this);
+    }
+
 private:
     typedef typename oper::type T;
-    bool m_auto_delete;
-    TLeft& m_left;
+    std::unique_ptr<TLeft> m_left;
 };
 
 
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
 {
 public:
-
-    Operator(TLeft& left, const TRight& right, bool auto_delete = false) : m_left(left), m_right(const_cast<TRight&>(right))
+    Operator(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right) :
+        m_left(std::move(left)), m_right(std::move(right))
     {
-        m_auto_delete = auto_delete;
     }
 
-    ~Operator()
+    Operator(const Operator& other) : m_left(other.m_left->clone()), m_right(other.m_right->clone()) {}
+    Operator& operator=(const Operator& other)
     {
-        if (m_auto_delete) {
-            delete &m_left;
-            delete &m_right;
+        if (this != &other) {
+            m_left = other.m_left->clone();
+            m_right = other.m_right->clone();
         }
+        return *this;
     }
+
+    Operator(Operator&&) = default;
+    Operator& operator=(Operator&&) = default;
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     void set_table() override
     {
-        m_left.set_table();
-        m_right.set_table();
+        m_left->set_table();
+        m_right->set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
     const Table* get_table() const override
     {
-        const Table* l = m_left.get_table();
-        const Table* r = m_right.get_table();
+        const Table* l = m_left->get_table();
+        const Table* r = m_right->get_table();
 
         // Queries do not support multiple different tables; all tables must be the same.
         REALM_ASSERT(l == nullptr || r == nullptr || l == r);
@@ -2252,59 +2258,50 @@ public:
         Value<T> result;
         Value<T> left;
         Value<T> right;
-        m_left.evaluate(index, left);
-        m_right.evaluate(index, right);
+        m_left->evaluate(index, left);
+        m_right->evaluate(index, right);
         result.template fun<oper>(&left, &right);
         destination.import(result);
     }
 
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Operator>(*this);
+    }
+
 private:
     typedef typename oper::type T;
-    bool m_auto_delete;
-    TLeft& m_left;
-    TRight& m_right;
+    std::unique_ptr<TLeft> m_left;
+    std::unique_ptr<TRight> m_right;
 };
 
 
 template <class TCond, class T, class TLeft, class TRight> class Compare : public Expression
 {
 public:
-
-    // Compare extends Expression which extends Query. This constructor for Compare initializes the Query part by
-    // adding an ExpressionNode (see query_engine.hpp) and initializes Query::table so that it's ready to call
-    // Query methods on, like find_first(), etc.
-    Compare(TLeft& left, const TRight& right, bool auto_delete = false, const char* compare_string = nullptr) :
-            m_left(left), m_right(const_cast<TRight&>(right)), m_compare_string(compare_string)
+    Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right, const char* compare_string = nullptr) :
+        m_left(std::move(left)), m_right(std::move(right)), m_compare_string(compare_string)
     {
-        m_auto_delete = auto_delete;
-        Query::expression(this);
-        Table* t = const_cast<Table*>(get_table()); // todo, const
-        if (t)
-            Query::set_table(t->get_table_ref());
     }
 
     ~Compare()
     {
-        if (m_auto_delete) {
-            delete[] m_compare_string;
-            delete &m_left;
-            delete &m_right;
-        }
+        delete[] m_compare_string;
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     void set_table() override
     {
-        m_left.set_table();
-        m_right.set_table();
+        m_left->set_table();
+        m_right->set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
     const Table* get_table() const override
     {
-        const Table* l = m_left.get_table();
-        const Table* r = m_right.get_table();
+        const Table* l = m_left->get_table();
+        const Table* r = m_right->get_table();
 
         // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
         REALM_ASSERT(l == nullptr || r == nullptr || l == r);
@@ -2320,8 +2317,8 @@ public:
         Value<T> left;
 
         for (; start < end;) {
-            m_left.evaluate(start, left);
-            m_right.evaluate(start, right);
+            m_left->evaluate(start, left);
+            m_right->evaluate(start, right);
             match = Value<T>::template compare<TCond>(&left, &right);
 
             if (match != not_found && match + start < end)
@@ -2335,9 +2332,8 @@ public:
     }
 
 private:
-    bool m_auto_delete;
-    TLeft& m_left;
-    TRight& m_right;
+    std::unique_ptr<TLeft> m_left;
+    std::unique_ptr<TRight> m_right;
 
     // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in
     // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this
