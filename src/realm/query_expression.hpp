@@ -1702,7 +1702,7 @@ public:
 
             FindNullLinks fnl;
             m_link_map.map_links(start, fnl);
-            if (has_links ? fnl.m_has_link : !fnl.m_has_link)
+            if (fnl.m_has_link == has_links)
                 return start;
 
             start++;
@@ -1749,14 +1749,14 @@ template <> class Columns<Link> : public Subexpr2<Link>
 public:
     Query is_null() {
         if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+            throw std::runtime_error("Combining link() and is_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return *new UnaryLinkCompare<false>(m_link_map);
     }
 
     Query is_not_null() {
         if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+            throw std::runtime_error("Combining link() and is_not_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return *new UnaryLinkCompare<true>(m_link_map);
     }
