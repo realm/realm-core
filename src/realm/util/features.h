@@ -219,6 +219,12 @@
 /* The necessary signal handling / mach exception APIs are all unavailable */
 #    undef REALM_ENABLE_ENCRYPTION
 #  endif
+#  if TARGET_OS_TV
+/* Device (Apple TV) or simulator. */
+#    define REALM_TVOS 1
+/* The necessary signal handling / mach exception APIs are all unavailable */
+#    undef REALM_ENABLE_ENCRYPTION
+#  endif
 #endif
 
 
@@ -231,7 +237,7 @@
 #  define REALM_COOKIE_CHECK
 #endif
 
-#if !REALM_IOS && !REALM_WATCHOS && !defined(_WIN32)
+#if !REALM_IOS && !REALM_WATCHOS && !REALM_TVOS && !defined(_WIN32)
 #  define REALM_ASYNC_DAEMON
 #endif
 
