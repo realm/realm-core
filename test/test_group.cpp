@@ -560,7 +560,7 @@ TEST(Group_RemoveTableWithColumns)
     CHECK(delta->is_attached());
     CHECK(epsilon->is_attached());
 
-    // Remove table with a circular referenced through another table
+    // Remove table with a circular reference through another table
     group.remove_table("zeta");
     CHECK_EQUAL(3, group.size());
     CHECK_NOT(zeta->is_attached());
@@ -569,7 +569,7 @@ TEST(Group_RemoveTableWithColumns)
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
     CHECK_THROW(group.remove_table("delta"), CrossTableLinkTarget);
-    CHECK_EQUAL(4, group.size());
+    CHECK_EQUAL(3, group.size());
     CHECK(delta->is_attached());
     CHECK(epsilon->is_attached());
 }
