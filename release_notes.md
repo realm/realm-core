@@ -12,6 +12,8 @@
   failure to `open()`.
 * Added the bitcode marker to iOS Simulator builds so that bitcode for device
   builds can actually be used.
+* Build with bitcode both enabled and disabled for iOS for compatibility with
+  Xcode 6.
 
 ### API breaking changes:
 
