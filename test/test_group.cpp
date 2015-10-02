@@ -61,18 +61,18 @@ using namespace realm::util;
 
 namespace {
 
-enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
+    enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-REALM_TABLE_4(TestTableGroup,
-                first,  String,
-                second, Int,
-                third,  Bool,
-                fourth, Enum<Days>)
+    REALM_TABLE_4(TestTableGroup,
+            first,  String,
+            second, Int,
+            third,  Bool,
+            fourth, Enum<Days>)
 
-REALM_TABLE_3(TestTableGroup2,
-                first,  Mixed,
-                second, Subtable<TestTableGroup>,
-                third,  Subtable<TestTableGroup>)
+    REALM_TABLE_3(TestTableGroup2,
+            first,  Mixed,
+            second, Subtable<TestTableGroup>,
+            third,  Subtable<TestTableGroup>)
 
 } // Anonymous namespace
 
@@ -522,18 +522,22 @@ TEST(Group_RemoveTableWithColumns)
     TableRef gamma   = group.add_table("gamma");
     TableRef delta   = group.add_table("delta");
     TableRef epsilon = group.add_table("epsilon");
-    CHECK_EQUAL(5, group.size());
+    TableRef zeta = group.add_table("zeta");
+    TableRef eta = group.add_table("eta");
+    CHECK_EQUAL(7, group.size());
 
     alpha->add_column(type_Int, "alpha-1");
     beta->add_column_link(type_Link, "beta-1", *delta);
     gamma->add_column_link(type_Link, "gamma-1", *gamma);
     delta->add_column(type_Int, "delta-1");
     epsilon->add_column_link(type_Link, "epsilon-1", *delta);
+    zeta->add_column_link(type_Link, "eta-1", *eta);
+    eta->add_column_link(type_Link, "zeta-1", *zeta);
 
     // Remove table with columns, but no link columns, and table is not a link
     // target.
     group.remove_table("alpha");
-    CHECK_EQUAL(4, group.size());
+    CHECK_EQUAL(6, group.size());
     CHECK_NOT(alpha->is_attached());
     CHECK(beta->is_attached());
     CHECK(gamma->is_attached());
@@ -542,7 +546,7 @@ TEST(Group_RemoveTableWithColumns)
 
     // Remove table with link column, and table is not a link target.
     group.remove_table("beta");
-    CHECK_EQUAL(3, group.size());
+    CHECK_EQUAL(5, group.size());
     CHECK_NOT(beta->is_attached());
     CHECK(gamma->is_attached());
     CHECK(delta->is_attached());
@@ -551,15 +555,21 @@ TEST(Group_RemoveTableWithColumns)
     // Remove table with self-link column, and table is not a target of link
     // columns of other tables.
     group.remove_table("gamma");
-    CHECK_EQUAL(2, group.size());
+    CHECK_EQUAL(4, group.size());
     CHECK_NOT(gamma->is_attached());
     CHECK(delta->is_attached());
     CHECK(epsilon->is_attached());
 
+    // Remove table with a circular referenced through another table
+    group.remove_table("zeta");
+    CHECK_EQUAL(3, group.size());
+    CHECK_NOT(zeta->is_attached());
+    CHECK(eta->is_attached());
+
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
     CHECK_THROW(group.remove_table("delta"), CrossTableLinkTarget);
-    CHECK_EQUAL(2, group.size());
+    CHECK_EQUAL(4, group.size());
     CHECK(delta->is_attached());
     CHECK(epsilon->is_attached());
 }
@@ -704,13 +714,13 @@ TEST(Group_RenameTable)
 
 namespace {
 
-void setup_table(TestTableGroup::Ref t)
-{
-    t->add("a",  1, true, Wed);
-    t->add("b", 15, true, Wed);
-    t->add("ccc", 10, true, Wed);
-    t->add("dddd", 20, true, Wed);
-}
+    void setup_table(TestTableGroup::Ref t)
+    {
+        t->add("a",  1, true, Wed);
+        t->add("b", 15, true, Wed);
+        t->add("ccc", 10, true, Wed);
+        t->add("dddd", 20, true, Wed);
+    }
 
 } // anonymous namespace
 
@@ -1688,7 +1698,7 @@ TEST(Group_IndexString)
     size_t r2 = table->column().first.find_first("jeff");
     size_t r3 = table->column().first.find_first("jim");
     size_t r4 = table->column().first.find_first("jimbo");
-     size_t r5 = table->column().first.find_first("johnny");
+    size_t r5 = table->column().first.find_first("johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
