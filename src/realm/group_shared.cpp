@@ -733,6 +733,11 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             // must assume that it already exists.
             cfg.no_create = begin_new_session ? no_create_file : true;
 
+            // if we're opening a MemOnly file that isn't already opened by
+            // someone else then it's a file which should have been deleted on
+            // close previously, but wasn't (perhaps due to the process crashing)
+            cfg.clear_file = durability == durability_MemOnly && begin_new_session;
+
             // If replication is enabled, we need to ask it whether we're in server-sync mode
             // and check that the database is operated in the same mode.
             cfg.server_sync_mode = false;

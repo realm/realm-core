@@ -28,6 +28,8 @@
   error message.
 * New `util::network::socket_base::cancel()`.
 * Added `util::network::deadline_timer` class.
+* Automatically clean up stale MemOnly files which were not deleted on close
+  due to the process crashing.
 
 -----------
 
