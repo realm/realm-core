@@ -48,6 +48,7 @@ Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
     REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
     create();
 }
+
 void Query::create()
 {
     m_groups.emplace_back();
@@ -67,13 +68,6 @@ Query::Query(const Query& copy)
     m_current_descriptor = copy.m_current_descriptor;
 }
 
-Query::Query(Expression* expr) : Query()
-{
-    add_expression_node(expr);
-    if (auto table = const_cast<Table*>(expr->get_table()))
-        set_table(table->get_table_ref());
-}
-
 Query& Query::operator = (const Query& source)
 {
     if (this != &source) {
@@ -88,6 +82,9 @@ Query& Query::operator = (const Query& source)
     }
     return *this;
 }
+
+Query::Query(Query&&) = default;
+Query& Query::operator=(Query&&) = default;
 
 Query::~Query() noexcept
 {
@@ -137,6 +134,13 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
     m_view = m_source_link_view.get();
 
     m_groups = source.m_groups;
+}
+
+Query::Query(Expression* expr) : Query()
+{
+    add_expression_node(expr);
+    if (auto table = const_cast<Table*>(expr->get_table()))
+        set_table(table->get_table_ref());
 }
 
 void Query::set_table(TableRef tr)

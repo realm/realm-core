@@ -89,6 +89,9 @@ public:
     Query(const Query& copy);
     Query& operator = (const Query& source);
 
+    Query(Query&&);
+    Query& operator=(Query&&);
+
     // Find links that point to a specific target row
     Query& links_to(size_t column_ndx, size_t target_row);
 
