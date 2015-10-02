@@ -1,3 +1,13 @@
+# 0.92.4 Release notes
+
+### Bugfixes:
+
+* Build with bitcode both enabled and disabled for iOS for compatibility with
+  Xcode 6.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.93.0].**
+
 # 0.92.3 Release notes
 
 ### Bugfixes:
