@@ -6827,7 +6827,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
         CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
         LangBindHelper::commit_and_continue_as_read(sg);
     }
-    group->verify();
+    group->Verify();
     {
         // ... but then regret it
         LangBindHelper::promote_to_write(sg, *hist);
