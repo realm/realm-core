@@ -446,6 +446,7 @@
 		F43098B31B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
 		F43098B41B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
 		F43098B51B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
+		F44F0AD71BB9502C000C4ABA /* priority_queue.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F44F0AD61BB9502C000C4ABA /* priority_queue.hpp */; settings = {ASSET_TAGS = (); }; };
 		F45013B41B01022800CD4A7E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = F45013B31B01022800CD4A7E /* main.m */; };
 		F45013BA1B01022800CD4A7E /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F45013B91B01022800CD4A7E /* ViewController.mm */; };
 		F45013BD1B01022800CD4A7E /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F45013BB1B01022800CD4A7E /* Main.storyboard */; };
@@ -942,6 +943,7 @@
 		C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = simulated_failure.hpp; sourceTree = "<group>"; };
 		F43098B01B021C04000A2333 /* bptree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bptree.cpp; path = realm/bptree.cpp; sourceTree = "<group>"; };
 		F43098B11B021C04000A2333 /* bptree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = bptree.hpp; path = realm/bptree.hpp; sourceTree = "<group>"; };
+		F44F0AD61BB9502C000C4ABA /* priority_queue.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = priority_queue.hpp; sourceTree = "<group>"; };
 		F45013AF1B01022800CD4A7E /* unit-tests-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "unit-tests-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F45013B21B01022800CD4A7E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F45013B31B01022800CD4A7E /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -1360,6 +1362,7 @@
 			isa = PBXGroup;
 			children = (
 				52D7C4671852A01700633748 /* assert.hpp */,
+				F44F0AD61BB9502C000C4ABA /* priority_queue.hpp */,
 				485231171B2E918F003C72AF /* basic_system_errors.cpp */,
 				485231191B2E91A4003C72AF /* basic_system_errors.hpp */,
 				52D7C4691852A01700633748 /* bind_ptr.hpp */,
@@ -1592,6 +1595,7 @@
 				52D7C48E1852A01700633748 /* type_list.hpp in Headers */,
 				B159814518CF55D400E3C5DF /* type_traits.hpp in Headers */,
 				522EA51B192C4D4B002AD3B6 /* unicode.hpp in Headers */,
+				F44F0AD71BB9502C000C4ABA /* priority_queue.hpp in Headers */,
 				52D7C4911852A01700633748 /* utf8.hpp in Headers */,
 				365CCE76157CC37D00172BF8 /* utilities.hpp in Headers */,
 				80ADCCEB18A23DD00049D472 /* version.hpp in Headers */,

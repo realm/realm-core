@@ -8,19 +8,30 @@
   crash (if assert was disabled).
 * The error handling for `pthread_cond_wait()/pthread_cond_timedwait()`
   incorrectly attributed the failure to `pthread_mutex_lock()`.
+* The error handling for several File functions incorrectly attributed the
+  failure to `open()`.
+* Added the bitcode marker to iOS Simulator builds so that bitcode for device
+  builds can actually be used.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Free-standing functions `util::network::write()` and
+  `util::network::async_write()` converted to members of
+  `util::network::socket`.
 
 ### Enhancements:
-
+* Supports finding non-null links (Link + LinkList) in queries, using
+  syntax like `Query q = table->column<Link>(col).is_not_null();`
 * Comparisons involving unary links on each side of the operator are now
   supported by query_expression.hpp.
 * Added version chunk information and failure reason for
   `pthread_mutex_lock()`.
 * Termination routines now always display the library's version before the
   error message.
+* New `util::network::socket_base::cancel()`.
+* Added `util::network::deadline_timer` class.
+* Automatically clean up stale MemOnly files which were not deleted on close
+  due to the process crashing.
 
 -----------
 
@@ -29,6 +40,11 @@
 * All calls to `REALM_TERMINATE` or `util::terminate()` now display the
   library's version. It is no longer necessary to include `REALM_VER_CHUNK` in
   calls to those functions.
+* Various bug fixes in `util::network`, most notably, asynchronous operations
+  that complete immediately can now be canceled.
+* Improved documentation in `util::network`.
+* Improved exception safety in `util::network`.
+* `util::network::socket_base::close()` is now `noexcept`.
 
 ----------------------------------------------
 
@@ -133,6 +149,37 @@
 * `NOEXCEPT*` macros have been replaced by the C++11 `noexcept` specifier.
 * The `REALM_CONSTEXPR` macro has been replaced by the C++11 `constexpr` keyword.
 * Removed conditional compilation of null string support.
+
+----------------------------------------------
+
+# 0.92.3 Release notes
+
+### Bugfixes:
+
+* Added the bitcode marker to iOS Simulator builds so that bitcode for device
+  builds can actually be used.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.93.0].**
+
+----------------------------------------------
+
+# 0.92.2 Release notes
+
+### Bugfixes:
+
+* Fixed assertion failure when TableViewBase::is_row_attached() would return
+  false in a debug build.
+* Fixes a crash due to an assert when rolling back a transaction in which a link
+  or linklist column was removed.
+
+**NOTE: This is a hotfix release.**
+
+-----------
+
+### Internals:
+
+* Now built for Apple platforms with the non-beta version of Xcode 7.
 
 ----------------------------------------------
 
