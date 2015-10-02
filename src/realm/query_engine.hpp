@@ -945,7 +945,7 @@ public:
     {
     }
 
-    BinaryNode(const BinaryNode& from) = default;
+    BinaryNode(const BinaryNode&) = default;
 
     void init(const Table& table) override
     {
