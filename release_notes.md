@@ -1,3 +1,15 @@
+# 0.92.3 Release notes
+
+### Bugfixes:
+
+* Added the bitcode marker to iOS Simulator builds so that bitcode for device
+  builds can actually be used.
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.93.0].**
+
+----------------------------------------------
+
 # 0.92.2 Release notes
 
 ### Bugfixes:
@@ -12,6 +24,10 @@
 ### Internals:
 
 * Now built for Apple platforms with the non-beta version of Xcode 7.
+
+**NOTE: This is a hotfix release.**
+
+----------------------------------------------
 
 # 0.92.1 Release notes
 
