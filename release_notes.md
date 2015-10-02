@@ -18,7 +18,8 @@
   `util::network::socket`.
 
 ### Enhancements:
-
+* Supports finding non-null links (Link + LinkList) in queries, using
+  syntax like `Query q = table->column<Link>(col).is_not_null();`
 * Comparisons involving unary links on each side of the operator are now
   supported by query_expression.hpp.
 * Added version chunk information and failure reason for

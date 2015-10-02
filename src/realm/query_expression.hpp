@@ -319,7 +319,7 @@ template <class T> class Subexpr2;
 template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator;
 template <class oper, class TLeft = Subexpr> class UnaryOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
-class UnaryLinkCompare;
+template <bool has_links> class UnaryLinkCompare;
 class ColumnAccessorBase;
 
 
@@ -1665,8 +1665,10 @@ inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
 
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload*
 // in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
-// only "find first null-link" is supported. More will be added later.
-class UnaryLinkCompare : public Expression
+// only "find first null link" and "find first non-null link" is supported. More will be added later. When we add
+// more, I propose to remove the <bool has_links> template argument from this class and instead template it by 
+// a criteria-class (like the FindNullLinks class below in find_first()) in some generalized fashion.
+template <bool has_links> class UnaryLinkCompare : public Expression
 {
 public:
     UnaryLinkCompare(LinkMap lm) : m_link_map(lm)
@@ -1692,7 +1694,7 @@ public:
 
             FindNullLinks fnl;
             m_link_map.map_links(start, fnl);
-            if (!fnl.m_has_link)
+            if (fnl.m_has_link == has_links)
                 return start;
 
             start++;
@@ -1739,9 +1741,16 @@ template <> class Columns<Link> : public Subexpr2<Link>
 public:
     Query is_null() {
         if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+            throw std::runtime_error("Combining link() and is_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return new UnaryLinkCompare(m_link_map);
+        return new UnaryLinkCompare<false>(m_link_map);
+    }
+
+    Query is_not_null() {
+        if (m_link_map.m_link_columns.size() > 1)
+            throw std::runtime_error("Combining link() and is_not_null() is currently not supported");
+        // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
+        return new UnaryLinkCompare<true>(m_link_map);
     }
 
     LinkCount count() const
