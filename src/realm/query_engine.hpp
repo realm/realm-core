@@ -322,7 +322,7 @@ public:
         m_matches = from.m_matches;
     }
 
-    virtual std::unique_ptr<ParentNode> clone() = 0;
+    virtual std::unique_ptr<ParentNode> clone() const = 0;
 
     void add_child(std::unique_ptr<ParentNode> child)
     {
@@ -394,7 +394,7 @@ public:
         return tableindex(r);
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new ListviewNode(*this));
     }
@@ -474,7 +474,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new SubtableNode(*this));
     }
@@ -804,7 +804,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new IntegerNode<ColType, TConditionFunction>(*this));
     }
@@ -911,7 +911,7 @@ public:
             return find(false);
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this));
     }
@@ -969,7 +969,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new BinaryNode(*this));
     }
@@ -1112,7 +1112,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this));
     }
@@ -1308,7 +1308,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this));
     }
@@ -1447,7 +1447,7 @@ public:
         return "";
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new OrNode(*this));
     }
@@ -1517,7 +1517,7 @@ public:
         return "";
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new NotNode(*this));
     }
@@ -1631,7 +1631,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new TwoColumnsNode<ColType, TConditionFunction>(*this));
     }
@@ -1681,7 +1681,7 @@ public:
         return res;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new ExpressionNode(*this));
     }
@@ -1735,7 +1735,7 @@ public:
         return ret;
     }
 
-    std::unique_ptr<ParentNode> clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
