@@ -1377,26 +1377,26 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 
     auto& current_group = m_groups.back();
     switch (current_group.m_state) {
-    case QueryGroup::State::OrCondition: {
-        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
-        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
-        or_node->m_conditions.emplace_back(std::move(node));
-        current_group.m_state = State::OrConditionChildren;
-        break;
-    }
-    case QueryGroup::State::OrConditionChildren: {
-        REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
-        OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
-        or_node->m_conditions.back()->add_child(std::move(node));
-        break;
-    }
-    default: {
-        if (!current_group.m_root_node) {
-            current_group.m_root_node = std::move(node);
-        } else {
-            current_group.m_root_node->add_child(std::move(node));
+        case QueryGroup::State::OrCondition: {
+            REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
+            OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
+            or_node->m_conditions.emplace_back(std::move(node));
+            current_group.m_state = State::OrConditionChildren;
+            break;
         }
-    }
+        case QueryGroup::State::OrConditionChildren: {
+            REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
+            OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
+            or_node->m_conditions.back()->add_child(std::move(node));
+            break;
+        }
+        default: {
+            if (!current_group.m_root_node) {
+                current_group.m_root_node = std::move(node);
+            } else {
+                current_group.m_root_node->add_child(std::move(node));
+            }
+        }
     }
 
     handle_pending_not();
