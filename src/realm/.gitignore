@@ -37,30 +37,15 @@
 /realm-config-dbg
 
 # iPhone
-/librealm-iPhoneOS.a
-/librealm-iPhoneOS-dbg.a
-/librealm-iPhoneSimulator.a
-/librealm-iPhoneSimulator-dbg.a
 /realm-config-ios
 /realm-config-ios-dbg
 
 # Watch
-/librealm-WatchOS.a
-/librealm-WatchOS-dbg.a
-/librealm-WatchSimulator.a
-/librealm-WatchSimulator-dbg.a
 /realm-config-watchos
 /realm-config-watchos-dbg
 
 # TV
-/librealm-AppleTVOS-dbg.a
-/librealm-AppleTVOS.a
-/librealm-AppleTVSimulator-dbg.a
-/librealm-AppleTVSimulator.a
 /realm-config-tvos
 /realm-config-tvos-dbg
-
-# Android
-/librealm-android-*.a
 
 /util/config.h
