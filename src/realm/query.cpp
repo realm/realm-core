@@ -752,7 +752,8 @@ size_t Query::peek_tableview(size_t tv_index) const
     REALM_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
     REALM_ASSERT_3(tv_index, <, m_view->size());
 
-    size_t tablerow = m_view->m_row_indexes.get(tv_index);
+    // Cannot use to_size_t() because the get() may return -1
+    size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(tv_index));
 
     size_t r;
     if (first.size() > 0 && first[0])

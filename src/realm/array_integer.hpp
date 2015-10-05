@@ -642,7 +642,9 @@ bool ArrayIntNull::find(int64_t value, std::size_t start, std::size_t end, std::
 template<class cond, Action action, class Callback>
 bool ArrayIntNull::find(null, std::size_t start, std::size_t end, std::size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return find<cond, action>(null{}, start, end, baseindex, state, std::forward<Callback>(callback));
+    return Array::find<cond, action>(0 /*ignored*/, start, end, baseindex, state, std::forward<Callback>(callback), 
+                                     true /*treat as nullable array*/,
+                                     true /*search for null, ignore value argument*/);
 }
 
 
@@ -672,7 +674,7 @@ template<class cond> std::size_t ArrayIntNull::find_first(null, std::size_t star
                                        true /*treat as nullable array*/,
                                        true /*search for null, ignore value argument*/);
     if (state.m_match_count > 0)
-        return state.m_state;
+        return to_size_t(state.m_state);
     else
         return not_found;
 }
@@ -685,7 +687,7 @@ template<class cond> std::size_t ArrayIntNull::find_first(int64_t value, std::si
                                        true /*treat as nullable array*/,
                                        false /*search parameter given in 'value' argument*/);
     if (state.m_match_count > 0)
-        return state.m_state;
+        return to_size_t(state.m_state);
     else
         return not_found;
 }

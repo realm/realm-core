@@ -20,6 +20,9 @@
 #ifndef REALM_UTIL_FEATURES_H
 #define REALM_UTIL_FEATURES_H
 
+#ifdef _MSC_VER
+#pragma warning(disable:4800) // Visual Studio int->bool performance warnings
+#endif
 
 #ifdef REALM_HAVE_CONFIG
 #  include <realm/util/config.h>

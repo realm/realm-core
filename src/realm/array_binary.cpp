@@ -40,7 +40,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         ++stored_size;
     size_t offset = stored_size;
     if (!m_offsets.is_empty())
-        offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
+        offset += to_size_t(m_offsets.back());
     m_offsets.add(offset);
 
     if (!legacy_array_type())

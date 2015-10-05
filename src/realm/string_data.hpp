@@ -355,7 +355,8 @@ struct null {
     /// Returns the quiet NaNs that represent null for floats/doubles in Realm in stored payload.
     template <class T> static T get_null_float() {
         typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
-        i = std::is_same<T, float>::value ? 0x7fc000aa : static_cast<decltype(i)>(0x7ff80000000000aa);
+        int64_t double_nan = 0x7ff80000000000aa;
+        i = std::is_same<T, float>::value ? 0x7fc000aa : static_cast<decltype(i)>(double_nan);
         T d = type_punning<T, decltype(i)>(i);
         REALM_ASSERT_DEBUG(isnan(static_cast<double>(d)));
         REALM_ASSERT_DEBUG(!is_signaling(d));
