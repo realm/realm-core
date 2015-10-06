@@ -27,6 +27,7 @@
   error message.
 * New `util::network::socket_base::cancel()`.
 * Added `util::network::deadline_timer` class.
+* Queries are no longer limited to 16 levels of grouping.
 
 -----------
 
