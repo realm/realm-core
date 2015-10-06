@@ -58,6 +58,19 @@ public:
         return false;
     }
 
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    {
+        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+#ifdef REALM_DEBUG
+            if (m_log)
+                *m_log << "table->set_int_unique("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+#endif
+            m_table->set_int_unique(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
     bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
@@ -105,6 +118,19 @@ public:
                 *m_log << "table->set_string("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
 #endif
             m_table->set_string(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, StringData value)
+    {
+        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+#ifdef REALM_DEBUG
+            if (m_log)
+                *m_log << "table->set_string_unique("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
+#endif
+            m_table->set_string_unique(col_ndx, row_ndx, value); // Throws
             return true;
         }
         return false;

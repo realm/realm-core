@@ -1387,6 +1387,38 @@ TEST(Table_IndexInteger)
 }
 
 
+TEST(Table_SetIntUnique)
+{
+    Table table;
+    table.add_column(type_Int, "ints");
+    table.add_column(type_String, "strings");
+    table.add_empty_row(10);
+
+    CHECK_LOGIC_ERROR(table.set_int_unique(0, 0, 123), LogicError::no_search_index);
+    table.add_search_index(0);
+
+    table.set_int_unique(0, 0, 123);
+
+    CHECK_LOGIC_ERROR(table.set_int_unique(0, 1, 123), LogicError::unique_constraint_violation);
+}
+
+
+TEST(Table_SetStringUnique)
+{
+    Table table;
+    table.add_column(type_Int, "ints");
+    table.add_column(type_String, "strings");
+    table.add_empty_row(10);
+
+    CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, "foo"), LogicError::no_search_index);
+    table.add_search_index(1);
+
+    table.set_string_unique(1, 0, "bar");
+
+    CHECK_LOGIC_ERROR(table.set_string_unique(1, 1, "bar"), LogicError::unique_constraint_violation);
+}
+
+
 TEST(Table_Distinct)
 {
     TestTableEnum table;

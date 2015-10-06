@@ -48,10 +48,12 @@ enum Instruction {
     instr_RenameGroupLevelTable =  3,
     instr_SelectTable           =  4,
     instr_SetInt                =  5,
+    instr_SetIntUnique          = 30,
     instr_SetBool               =  6,
     instr_SetFloat              =  7,
     instr_SetDouble             =  8,
     instr_SetString             =  9,
+    instr_SetStringUnique       = 31,
     instr_SetBinary             = 10,
     instr_SetDateTime           = 11,
     instr_SetTable              = 12,
@@ -137,10 +139,12 @@ public:
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
     bool clear_table() { return true; }
     bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool set_int_unique(std::size_t, std::size_t, int_fast64_t) { return true; }
     bool set_bool(std::size_t, std::size_t, bool) { return true; }
     bool set_float(std::size_t, std::size_t, float) { return true; }
     bool set_double(std::size_t, std::size_t, double) { return true; }
     bool set_string(std::size_t, std::size_t, StringData) { return true; }
+    bool set_string_unique(std::size_t, std::size_t, StringData) { return true; }
     bool set_binary(std::size_t, std::size_t, BinaryData) { return true; }
     bool set_date_time(std::size_t, std::size_t, DateTime) { return true; }
     bool set_table(std::size_t, std::size_t) { return true; }
@@ -195,10 +199,12 @@ public:
                     bool unordered);
     bool clear_table();
     bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t);
+    bool set_int_unique(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t);
     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool);
     bool set_float(std::size_t col_ndx, std::size_t row_ndx, float);
     bool set_double(std::size_t col_ndx, std::size_t row_ndx, double);
     bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData);
+    bool set_string_unique(std::size_t col_ndx, std::size_t row_ndx, StringData);
     bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData);
     bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime);
     bool set_table(std::size_t col_ndx, std::size_t row_ndx);
@@ -294,10 +300,12 @@ public:
     void rename_column(const Descriptor&, std::size_t col_ndx, StringData name);
 
     void set_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
+    void set_int_unique(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
     void set_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
     void set_float(const Table*, std::size_t col_ndx, std::size_t ndx, float value);
     void set_double(const Table*, std::size_t col_ndx, std::size_t ndx, double value);
     void set_string(const Table*, std::size_t col_ndx, std::size_t ndx, StringData value);
+    void set_string_unique(const Table*, std::size_t col_ndx, std::size_t ndx, StringData value);
     void set_binary(const Table*, std::size_t col_ndx, std::size_t ndx, BinaryData value);
     void set_date_time(const Table*, std::size_t col_ndx, std::size_t ndx, DateTime value);
     void set_table(const Table*, std::size_t col_ndx, std::size_t ndx);
@@ -886,6 +894,19 @@ inline void TransactLogConvenientEncoder::set_int(const Table* t, std::size_t co
     m_encoder.set_int(col_ndx, ndx, value); // Throws
 }
 
+inline bool TransactLogEncoder::set_int_unique(std::size_t col_ndx, std::size_t ndx, int_fast64_t value)
+{
+    simple_cmd(instr_SetIntUnique, util::tuple(col_ndx, ndx, value));
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_int_unique(const Table* t, std::size_t col_ndx,
+                                                         std::size_t ndx, int_fast64_t value)
+{
+    select_table(t); // Throws
+    m_encoder.set_int_unique(col_ndx, ndx, value); // Throws
+}
+
 inline bool TransactLogEncoder::set_bool(std::size_t col_ndx, std::size_t ndx, bool value)
 {
     simple_cmd(instr_SetBool, util::tuple(col_ndx, ndx, value));
@@ -941,6 +962,24 @@ inline void TransactLogConvenientEncoder::set_string(const Table* t, std::size_t
 {
     select_table(t); // Throws
     m_encoder.set_string(col_ndx, ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::set_string_unique(std::size_t col_ndx, std::size_t ndx, StringData value)
+{
+    if (value.is_null()) {
+        set_null(col_ndx, ndx); // Throws
+    }
+    else {
+        string_cmd(instr_SetStringUnique, col_ndx, ndx, value.data(), value.size()); // Throws
+    }
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_string_unique(const Table* t, std::size_t col_ndx,
+                                                            std::size_t ndx, StringData value)
+{
+    select_table(t); // Throws
+    m_encoder.set_string_unique(col_ndx, ndx, value); // Throws
 }
 
 inline bool TransactLogEncoder::set_binary(std::size_t col_ndx, std::size_t ndx, BinaryData value)
@@ -1324,6 +1363,17 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_SetIntUnique: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            // FIXME: Don't depend on the existence of int64_t,
+            // but don't allow values to use more than 64 bits
+            // either.
+            int_fast64_t value = read_int<int64_t>(); // Throws
+            if (!handler.set_int_unique(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
         case instr_SetBool: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
@@ -1353,6 +1403,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             StringData value = read_string(m_string_buffer); // Throws
             if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetStringUnique: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            StringData value = read_string(m_string_buffer); // Throws
+            if (!handler.set_string_unique(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
@@ -1914,6 +1972,13 @@ public:
         return true;
     }
 
+    bool set_int_unique(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
+    {
+        m_encoder.set_int_unique(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool value)
     {
         m_encoder.set_bool(col_ndx, row_ndx, value);
@@ -1938,6 +2003,13 @@ public:
     bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData value)
     {
         m_encoder.set_string(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_string_unique(std::size_t col_ndx, std::size_t row_ndx, StringData value)
+    {
+        m_encoder.set_string_unique(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }

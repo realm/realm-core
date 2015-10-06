@@ -2275,6 +2275,36 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 }
 
 
+void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (!has_search_index(col_ndx)) {
+        throw LogicError{LogicError::no_search_index};
+    }
+
+    if (is_nullable(col_ndx)) {
+        auto& col = get_column_int_null(col_ndx);
+        if (col.find_first(value) != not_found) {
+            throw LogicError{LogicError::unique_constraint_violation};
+        }
+        col.set(ndx, value);
+    }
+    else {
+        auto& col = get_column(col_ndx);
+        if (col.find_first(value) != not_found) {
+            throw LogicError{LogicError::unique_constraint_violation};
+        }
+        col.set(ndx, value);
+    }
+
+    if (Replication* repl = get_repl())
+        repl->set_int_unique(this, col_ndx, ndx, value); // Throws
+}
+
+
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2452,6 +2482,40 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 
     if (Replication* repl = get_repl())
         repl->set_string(this, col_ndx, ndx, value); // Throws
+}
+
+
+void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
+{
+    if (REALM_UNLIKELY(value.size() > max_string_size))
+        throw LogicError(LogicError::string_too_big);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
+    // column, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
+
+    if (!has_search_index(col_ndx))
+        throw LogicError(LogicError::no_search_index);
+
+    bump_version();
+
+    StringColumn& col = get_column_string(col_ndx);
+    if (col.find_first(value) != not_found)
+        throw LogicError(LogicError::unique_constraint_violation);
+
+    col.set_string(ndx, value); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->set_string_unique(this, col_ndx, ndx, value); // Throws
 }
 
 

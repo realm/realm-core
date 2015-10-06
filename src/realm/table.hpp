@@ -413,20 +413,26 @@ public:
     /// requirements also apply when calling set_mixed(). Passing an oversized
     /// string or binary data value will cause an exception to be thrown.
     ///
-    /// It is an error to assign a value to a column that is part of a primary
-    /// key, if that would result in a violation the implied *unique constraint*
-    /// of that primary key. The consequenses of doing so are unspecified.
+    /// The 'unique' variants of these methods treats the given column as a
+    /// logical "primary key" column. It is an error to use these methods with
+    /// a column that does not have a search index. It is an error to assign a
+    /// value to a column that is part of a primary key, if that would result
+    /// in a violation the implied *unique constraint* of that primary key.
+    /// The consequenses of doing so are unspecified.
+    // FIXME: Specify the consequences of a primary key constraint violation.
 
     static const std::size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const std::size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
+    void set_int_unique(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
     void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
     template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
     void set_float(std::size_t column_ndx, std::size_t row_ndx, float value);
     void set_double(std::size_t column_ndx, std::size_t row_ndx, double value);
     void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
+    void set_string_unique(std::size_t column_ndx, std::size_t row_ndx, StringData value);
     void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
