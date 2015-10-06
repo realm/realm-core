@@ -16,10 +16,7 @@
   Xcode 6.
 
 ### API breaking changes:
-
-* Free-standing functions `util::network::write()` and
-  `util::network::async_write()` converted to members of
-  `util::network::socket`.
+* None.
 
 ### Enhancements:
 * Supports finding non-null links (Link + LinkList) in queries, using
@@ -30,8 +27,6 @@
   `pthread_mutex_lock()`.
 * Termination routines now always display the library's version before the
   error message.
-* New `util::network::socket_base::cancel()`.
-* Added `util::network::deadline_timer` class.
 * Automatically clean up stale MemOnly files which were not deleted on close
   due to the process crashing.
 
@@ -47,6 +42,12 @@
 * Improved documentation in `util::network`.
 * Improved exception safety in `util::network`.
 * `util::network::socket_base::close()` is now `noexcept`.
+* New `util::network::socket_base::cancel()`.
+* Added `util::network::deadline_timer` class.
+* Breaking: Free-standing functions `util::network::write()` and
+  `util::network::async_write()` converted to members of
+  `util::network::socket`.
+
 
 ----------------------------------------------
 
