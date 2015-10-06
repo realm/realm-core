@@ -736,7 +736,7 @@ std::size_t Column<T, N>::count(T target) const
     if (has_search_index()) {
         return m_search_index->count(target);
     }
-    return aggregate<T, T, act_Count, Equal>(*this, target, 0, size(), npos, nullptr);
+    return to_size_t(aggregate<T, T, act_Count, Equal>(*this, target, 0, size(), npos, nullptr));
 }
 
 template <class T, bool N>
@@ -755,7 +755,7 @@ double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t lim
         end = size();
 
     auto s = sum(start, end, limit);
-    size_t cnt = aggregate<T, int64_t, act_Count, NotNull>(*this, 0, start, end, limit, nullptr);
+    size_t cnt = to_size_t(aggregate<T, int64_t, act_Count, NotNull>(*this, 0, start, end, limit, nullptr));
     if (return_ndx)
         *return_ndx = cnt;
     double avg = double(s) / (cnt == 0 ? 1 : cnt);

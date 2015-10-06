@@ -344,8 +344,6 @@ public:
 
     Query& end_subtable() { m_impl.end_subtable(); return *this; }
 
-    Query& expression(Expression* exp) { m_impl.expression(exp); return *this; }
-
     Query& Or() { m_impl.Or(); return *this; }
 
     Query& Not() { m_impl.Not(); return *this; }

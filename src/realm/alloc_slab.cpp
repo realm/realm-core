@@ -422,6 +422,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     REALM_ASSERT(!(cfg.is_shared && cfg.read_only));
     // session_initiator can be set *only* if we're shared.
     REALM_ASSERT(cfg.is_shared || !cfg.session_initiator);
+    // clear_file can be set *only* if we're the first session.
+    REALM_ASSERT(cfg.session_initiator || !cfg.clear_file);
 
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;
@@ -455,7 +457,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // never properly initialized. In this case we should simply reinitialize
     // it. B) It looks corrupt. In this case we throw an exception. C) It looks
     // good. In this case we proceede as normal.
-    if (size == 0) {
+    if (size == 0 || cfg.clear_file) {
         did_create = true;
         if (REALM_UNLIKELY(cfg.read_only))
             throw InvalidDatabase("Read-only access to empty Realm file", path);

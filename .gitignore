@@ -47,6 +47,9 @@ Static library*/
 /realm.xcodeproj/xcuserdata
 *.dSYM
 
+# Ignore KDevelop4 user files
+.kdev4/*
+
 # ref doc
 /doc/ref_cpp/html/*
 
@@ -55,20 +58,9 @@ Static library*/
 
 # sh build.sh build-cocoa
 /core-*.zip
-
-# sh build.sh build-iphone
-/iphone-lib/include
-/iphone-lib/librealm-ios.a
-/iphone-lib/librealm-ios-dbg.a
-/iphone-lib/realm-config
-/iphone-lib/realm-config-dbg
-
-# sh build.sh build-watchos
-/watchos-lib/include
-/watchos-lib/librealm-watchos.a
-/watchos-lib/librealm-watchos-dbg.a
-/watchos-lib/realm-config
-/watchos-lib/realm-config-dbg
+/iphone-lib/
+/watchos-lib/
+/tvos-lib/
 
 # sh build.sh build-android
 /android-lib/

@@ -15,7 +15,6 @@ using namespace realm;
 Query::Query() : m_view(nullptr), m_source_table_view(0), m_owns_source_table_view(false)
 {
     create();
-//    expression(static_cast<Expression*>(this));
 }
 
 Query::Query(Table& table, TableViewBase* tv) 
@@ -93,6 +92,13 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
     do_delete = false;
     m_owns_source_table_view = false;
     *this = copy;
+}
+
+Query::Query(Expression* expr) : Query()
+{
+    add_expression_node(expr);
+    if (auto table = const_cast<Table*>(expr->get_table()))
+        set_table(table->get_table_ref());
 }
 
 void Query::copy_nodes(const Query& source)
@@ -239,11 +245,10 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
     }
 }
 
-Query& Query::expression(Expression* compare)
+void Query::add_expression_node(Expression* compare)
 {
     ParentNode* const p = new ExpressionNode(compare);
     update_pointers(p, &p->m_child);
-    return *this;
 }
 
 // Binary
@@ -747,7 +752,8 @@ size_t Query::peek_tableview(size_t tv_index) const
     REALM_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
     REALM_ASSERT_3(tv_index, <, m_view->size());
 
-    size_t tablerow = m_view->m_row_indexes.get(tv_index);
+    // Cannot use to_size_t() because the get() may return -1
+    size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(tv_index));
 
     size_t r;
     if (first.size() > 0 && first[0])

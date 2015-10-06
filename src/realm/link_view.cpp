@@ -113,7 +113,7 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
 // Replication instruction 'link-list-set' calls this function directly.
 size_t LinkView::do_set(size_t link_ndx, size_t target_row_ndx)
 {
-    size_t old_target_row_ndx = m_row_indexes.get(link_ndx);
+    size_t old_target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
     size_t origin_row_ndx = get_origin_row_index();
     m_origin_column.remove_backlink(old_target_row_ndx, origin_row_ndx); // Throws
     m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
@@ -136,7 +136,8 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
-    size_t target_row_ndx = m_row_indexes.get(old_link_ndx);
+    // Fixme, can get() return -1 now that we have detached entries? Does this move() work with it?
+    size_t target_row_ndx = static_cast<size_t>(m_row_indexes.get(old_link_ndx));
     m_row_indexes.erase(old_link_ndx);
     m_row_indexes.insert(new_link_ndx, target_row_ndx);
 
@@ -163,7 +164,7 @@ void LinkView::swap(size_t link_ndx_1, size_t link_ndx_2)
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
-    size_t target_row_ndx = m_row_indexes.get(link_ndx_1);
+    size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx_1));
     m_row_indexes.set(link_ndx_1, m_row_indexes.get(link_ndx_2));
     m_row_indexes.set(link_ndx_2, target_row_ndx);
 
@@ -204,7 +205,7 @@ void LinkView::remove(size_t link_ndx)
 // Replication instruction 'link-list-erase' calls this function directly.
 size_t LinkView::do_remove(size_t link_ndx)
 {
-    size_t target_row_ndx = m_row_indexes.get(link_ndx);
+    size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
     size_t origin_row_ndx = get_origin_row_index();
     m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
     m_row_indexes.erase(link_ndx); // Throws
@@ -238,7 +239,7 @@ void LinkView::clear()
     typedef _impl::TableFriend tf;
     size_t num_links = m_row_indexes.size();
     for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
-        size_t target_row_ndx = m_row_indexes.get(link_ndx);
+        size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
         m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
         Table& target_table = m_origin_column.get_target_table();
         size_t num_remaining = target_table.get_num_strong_backlinks(target_row_ndx);
@@ -268,7 +269,7 @@ void LinkView::do_clear(bool broken_reciprocal_backlinks)
     if (!broken_reciprocal_backlinks) {
         size_t num_links = m_row_indexes.size();
         for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
-            size_t target_row_ndx = m_row_indexes.get(link_ndx);
+            size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
             m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
         }
     }
@@ -331,7 +332,7 @@ void LinkView::remove_target_row(size_t link_ndx)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
-    size_t target_row_ndx = m_row_indexes.get(link_ndx);
+    size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
     Table& target_table = get_target_table();
 
     // Deleting the target row will automatically remove all links

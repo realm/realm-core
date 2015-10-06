@@ -196,7 +196,7 @@ std::size_t BacklinkColumn::for_each_link(std::size_t row_ndx, bool do_destroy, 
                 backlink_list.destroy();
         }
     }
-    return value;
+    return to_size_t(value);
 }
 
 

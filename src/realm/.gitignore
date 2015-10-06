@@ -14,20 +14,10 @@
 /impl/*.gcno
 /impl/*.gcda
 
-/librealm.a
-/librealm.so
-/librealm.so.*
-/librealm.dylib
-/librealm.*.dylib
-/librealm-dbg.a
-/librealm-dbg.so
-/librealm-dbg.so.*
-/librealm-dbg.dylib
-/librealm-dbg.*.dylib
-/librealm-cov.so
-/librealm-cov.so.*
-/librealm-cov.dylib
-/librealm-cov.*.dylib
+/librealm*.a
+/librealm*.so
+/librealm*.so.*
+/librealm*.dylib
 
 /realm-import
 /realm-import-noinst
@@ -47,22 +37,15 @@
 /realm-config-dbg
 
 # iPhone
-/librealm-iPhoneOS.a
-/librealm-iPhoneOS-dbg.a
-/librealm-iPhoneSimulator.a
-/librealm-iPhoneSimulator-dbg.a
 /realm-config-ios
 /realm-config-ios-dbg
 
 # Watch
-/librealm-WatchOS.a
-/librealm-WatchOS-dbg.a
-/librealm-WatchSimulator.a
-/librealm-WatchSimulator-dbg.a
 /realm-config-watchos
 /realm-config-watchos-dbg
 
-# Android
-/librealm-android-*.a
+# TV
+/realm-config-tvos
+/realm-config-tvos-dbg
 
 /util/config.h
