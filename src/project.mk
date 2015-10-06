@@ -19,7 +19,7 @@ endif
 
 CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
-CFLAGS_GENERAL += -Wextra -pedantic -Wmissing-prototypes
+CFLAGS_GENERAL += -Wextra -pedantic
 CFLAGS_CXX = -std=c++11
 
 # Avoid a warning from Clang when linking on OS X. By default,
