@@ -1420,6 +1420,17 @@ Query& Query::and_query(const Query& q)
     return *this;
 }
 
+Query& Query::and_query(Query&& q)
+{
+    add_node(std::move(q.m_groups[0].m_root_node));
+
+    if (q.m_source_link_view) {
+        REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
+        m_source_link_view = q.m_source_link_view;
+    }
+
+    return *this;
+}
 
 Query Query::operator||(const Query& q)
 {

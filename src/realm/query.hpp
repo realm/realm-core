@@ -202,6 +202,7 @@ public:
     Query& Or();
 
     Query& and_query(const Query& q);
+    Query& and_query(Query&& q);
     Query operator||(const Query& q);
     Query operator&&(const Query& q);
     Query operator!();
