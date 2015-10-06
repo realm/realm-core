@@ -329,40 +329,6 @@ public:
         return false;
     }
 
-    bool add_primary_key(size_t col_ndx)
-    {
-        if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(!m_table->has_shared_type())) {
-                if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
-#ifdef REALM_DEBUG
-                    if (m_log)
-                        *m_log << "table->add_primary_key("<<col_ndx<<")\n";
-#endif
-                    // Fails if there are duplicate values, but given valid
-                    // transaction logs, there never will be.
-                    bool success = m_table->try_add_primary_key(col_ndx); // Throws
-                    return success;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool remove_primary_key()
-    {
-        if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(!m_table->has_shared_type())) {
-#ifdef REALM_DEBUG
-                if (m_log)
-                    *m_log << "table->remove_primary_key()\n";
-#endif
-                m_table->remove_primary_key(); // Throws
-                return true;
-            }
-        }
-        return false;
-    }
-
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
         if (REALM_LIKELY(m_table)) {

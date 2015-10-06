@@ -72,8 +72,6 @@ enum Instruction {
     instr_RenameColumn          = 27, // Rename column in selected descriptor
     instr_AddSearchIndex        = 28, // Add a search index to a column
     instr_RemoveSearchIndex     = 29, // Remove a search index from a column
-    instr_AddPrimaryKey         = 30, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 31, // Remove primary key from a table
     instr_SetLinkType           = 32, // Strong/weak
     instr_SelectLinkList        = 33,
     instr_LinkListSet           = 34, // Assign to link list entry
@@ -160,8 +158,6 @@ public:
     bool rename_column(std::size_t, StringData) { return true; }
     bool add_search_index(std::size_t) { return true; }
     bool remove_search_index(std::size_t) { return true; }
-    bool add_primary_key(std::size_t) { return true; }
-    bool remove_primary_key() { return true; }
     bool set_link_type(std::size_t, LinkType) { return true; }
 
     // Must have linklist selected:
@@ -220,8 +216,6 @@ public:
     bool rename_column(std::size_t col_ndx, StringData new_name);
     bool add_search_index(std::size_t col_ndx);
     bool remove_search_index(std::size_t col_ndx);
-    bool add_primary_key(std::size_t col_ndx);
-    bool remove_primary_key();
     bool set_link_type(std::size_t col_ndx, LinkType);
 
     // Must have linklist selected:
@@ -324,8 +318,6 @@ public:
 
     void add_search_index(const Table*, std::size_t col_ndx);
     void remove_search_index(const Table*, std::size_t col_ndx);
-    void add_primary_key(const Table*, std::size_t col_ndx);
-    void remove_primary_key(const Table*);
     void set_link_type(const Table*, std::size_t col_ndx, LinkType);
     void clear_table(const Table*);
     void optimize_table(const Table*);
@@ -1112,32 +1104,6 @@ inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, st
 }
 
 
-inline bool TransactLogEncoder::add_primary_key(std::size_t col_ndx)
-{
-    simple_cmd(instr_AddPrimaryKey, util::tuple(col_ndx)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::add_primary_key(const Table* t, std::size_t col_ndx)
-{
-    select_table(t); // Throws
-    m_encoder.add_primary_key(col_ndx); // Throws
-}
-
-
-inline bool TransactLogEncoder::remove_primary_key()
-{
-    simple_cmd(instr_RemovePrimaryKey, util::tuple()); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::remove_primary_key(const Table* t)
-{
-    select_table(t); // Throws
-    m_encoder.remove_primary_key(); // Throws
-}
-
-
 inline bool TransactLogEncoder::set_link_type(std::size_t col_ndx, LinkType link_type)
 {
     simple_cmd(instr_SetLinkType, util::tuple(col_ndx, int(link_type))); // Throws
@@ -1560,17 +1526,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_RemoveSearchIndex: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             if (!handler.remove_search_index(col_ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_AddPrimaryKey: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            if (!handler.add_primary_key(col_ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_RemovePrimaryKey: {
-            if (!handler.remove_primary_key()) // Throws
                 parser_error();
             return;
         }
@@ -2042,16 +1997,6 @@ public:
     }
 
     bool remove_search_index(size_t)
-    {
-        return true; // No-op
-    }
-
-    bool add_primary_key(size_t)
-    {
-        return true; // No-op
-    }
-
-    bool remove_primary_key()
     {
         return true; // No-op
     }

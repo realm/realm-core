@@ -854,7 +854,6 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
 
     // Searching:
 
-    CHECK_LOGIC_ERROR(degen_child->find_pkey_string(""), LogicError::no_primary_key);
 //    CHECK_EQUAL(0, degen_child->distinct(0).size()); // needs index but you cannot set index on ConstTableRef
     CHECK_EQUAL(0, degen_child->get_sorted_view(0).size());
 
@@ -1325,7 +1324,7 @@ TEST(Table_IndexStringTwice)
 }
 
 
-// Tests Table part of index on Int, DateTime and Bool columns. For a more exhaustive 
+// Tests Table part of index on Int, DateTime and Bool columns. For a more exhaustive
 // test of the integer index (bypassing Table), see test_index_string.cpp)
 TEST(Table_IndexInteger)
 {
@@ -1385,170 +1384,6 @@ TEST(Table_IndexInteger)
     CHECK_EQUAL(7, tv[3].get_index());
     CHECK_EQUAL(9, tv[4].get_index());
     CHECK_EQUAL(11, tv[5].get_index());
-}
-
-
-TEST(Table_PrimaryKeyBasics)
-{
-    // Note: Formally, member functions of Table are not required to leave the
-    // table in a valid state when they throw LogicError. In the cases below,
-    // however, informed by the actual implementation of these functions, we
-    // assume that they do allow us to continue, but please remember that this
-    // is not generally the case.
-
-    Table table;
-    table.add_column(type_String, "");
-
-    // Empty table
-    CHECK_NOT(table.has_primary_key());
-    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
-    table.add_search_index(0);
-    CHECK_NOT(table.has_primary_key());
-    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK(table.try_add_primary_key(0));
-    CHECK(table.has_primary_key());
-    CHECK_NOT(table.find_pkey_string("foo"));
-
-    // One row
-    table.remove_primary_key();
-    table.add_empty_row();
-    table.set_string(0, 0, "foo");
-    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK(table.try_add_primary_key(0));
-    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
-    CHECK_NOT(table.find_pkey_string("bar"));
-
-    // Two rows
-    table.remove_primary_key();
-    table.add_empty_row();
-    table.set_string(0, 1, "bar");
-    CHECK(table.try_add_primary_key(0));
-    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
-    CHECK_EQUAL(1, table.find_pkey_string("bar").get_index());
-
-    // Modify primary key
-    CHECK_LOGIC_ERROR(table.set_string(0, 1, "foo"), LogicError::unique_constraint_violation);
-    table.set_string(0, 1, "bar");
-    table.set_string(0, 1, "baz");
-    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
-    CHECK_NOT(table.find_pkey_string("bar"));
-    CHECK_EQUAL(1, table.find_pkey_string("baz").get_index());
-
-    // Insert row
-    // Unfortunately, we could not have recovered and continued if we had let
-    // Table::insert_string() throw.
-//    CHECK_LOGIC_ERROR(table.insert_string(0, 2, "foo"), LogicError::unique_constraint_violation);
-    table.verify();
-    table.insert_empty_row(2);
-    table.set_string(0, 2, "bar");
-    table.verify();
-    table.add_empty_row();
-    table.verify();
-    // Unfortunately, we could not have recovered and continued if we had let
-    // Table::add_empty_row() throw.
-//    CHECK_LOGIC_ERROR(table.add_empty_row(), LogicError::unique_constraint_violation);
-
-    // Duplicate key value
-    table.remove_primary_key();
-    table.set_string(0, 1, "foo");
-    CHECK_NOT(table.try_add_primary_key(0));
-}
-
-
-TEST(Table_PrimaryKeyLargeCommonPrefix)
-{
-    Table table;
-    table.add_column(type_String, "");
-    table.add_empty_row(2);
-    table.set_string(0, 0, "metasyntactic variable 1");
-    table.set_string(0, 1, "metasyntactic variable 2");
-    table.add_search_index(0);
-    CHECK(table.try_add_primary_key(0));
-    CHECK_LOGIC_ERROR(table.set_string(0, 1, "metasyntactic variable 1"),
-                      LogicError::unique_constraint_violation);
-    table.set_string(0, 1, "metasyntactic variable 2");
-    table.set_string(0, 1, "metasyntactic variable 3");
-}
-
-
-TEST(Table_PrimaryKeyExtra)
-{
-    Table table;
-    table.add_column(type_String, "");
-    table.add_column(type_Int, "");
-    table.add_empty_row(8);
-
-    table.set_string(0, 0, "jeff");
-    table.set_string(0, 1, "jim");
-    table.set_string(0, 2, "jennifer");
-    table.set_string(0, 3, "john");
-    table.set_string(0, 4, "jimmy");
-    table.set_string(0, 5, "jimbo");
-    table.set_string(0, 6, "johnny");
-    table.set_string(0, 7, "jennifer"); // Duplicate primary key
-
-    table.set_int(1, 0, 0);
-    table.set_int(1, 1, 1);
-    table.set_int(1, 2, 2);
-    table.set_int(1, 3, 3);
-    table.set_int(1, 4, 4);
-    table.set_int(1, 5, 5);
-    table.set_int(1, 6, 6);
-    table.set_int(1, 7, 7);
-
-    CHECK_LOGIC_ERROR(table.find_pkey_string("jeff"), LogicError::no_primary_key);
-
-    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
-    CHECK_NOT(table.has_primary_key());
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    CHECK_NOT(table.try_add_primary_key(0));
-    CHECK_NOT(table.has_primary_key());
-
-    table.set_string(0, 7, "jennifer 8");
-    CHECK(table.try_add_primary_key(0));
-    CHECK(table.has_primary_key());
-
-    table.verify();
-
-    Row a0 = table.find_pkey_string("jeff");
-    Row a1 = table.find_pkey_string("jim");
-    Row a2 = table.find_pkey_string("jennifer");
-    Row a3 = table.find_pkey_string("john");
-    Row a4 = table.find_pkey_string("jimmy");
-    Row a5 = table.find_pkey_string("jimbo");
-    Row a6 = table.find_pkey_string("johnny");
-    Row a7 = table.find_pkey_string("jerry");
-    CHECK(a0);
-    CHECK(a1);
-    CHECK(a2);
-    CHECK(a3);
-    CHECK(a4);
-    CHECK(a5);
-    CHECK(a6);
-    CHECK_NOT(a7);
-    CHECK_EQUAL(0, a0.get_index());
-    CHECK_EQUAL(1, a1.get_index());
-    CHECK_EQUAL(2, a2.get_index());
-    CHECK_EQUAL(3, a3.get_index());
-    CHECK_EQUAL(4, a4.get_index());
-    CHECK_EQUAL(5, a5.get_index());
-    CHECK_EQUAL(6, a6.get_index());
-}
-
-
-TEST(Table_SubtablePrimaryKey)
-{
-    Table parent;
-    parent.add_column(type_Table, "");
-    parent.get_subdescriptor(0)->add_column(type_String, "");
-    parent.add_empty_row();
-    TableRef child = parent[0].get_subtable(0);
-    CHECK_LOGIC_ERROR(child->find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK_LOGIC_ERROR(child->add_search_index(0), LogicError::wrong_kind_of_table);
 }
 
 
@@ -3398,7 +3233,7 @@ TEST(Table_Aggregates2)
 TEST(Table_Aggregates3)
 {
     bool nullable = false;
-    
+
     for (int i = 0; i < 2; i++) {
         // First we test everything with columns being nullable and with each column having at least 1 null
         // Then we test everything with non-nullable columns where the null entries will instead be just
@@ -6211,7 +6046,7 @@ TEST(Table_RowAccessor_Null)
     size_t col_int    = table.add_column(type_Int,      "int",    true);
     size_t col_string = table.add_column(type_String,   "string", true);
     size_t col_float  = table.add_column(type_Float,    "float",  true);
-    size_t col_double = table.add_column(type_Double,   "double", true);    
+    size_t col_double = table.add_column(type_Double,   "double", true);
     size_t col_date   = table.add_column(type_DateTime, "date",   true);
     size_t col_binary = table.add_column(type_Binary,   "binary", true);
 
@@ -6291,7 +6126,7 @@ TEST(Table_AllocatorCapacityBug)
                 t.add_empty_row();
             }
             else if (t.size() > 0 && t.size() < 5) {
-                // Set only if there are no more than 4 rows, else it takes up too much space on devices (4 * 16 MB 
+                // Set only if there are no more than 4 rows, else it takes up too much space on devices (4 * 16 MB
                 // worst case now)
                 size_t row = (j * 123456789 + 123456789) % t.size();
                 size_t len = (j * 123456789 + 123456789) % 16000000;
