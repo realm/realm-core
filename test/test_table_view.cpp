@@ -314,8 +314,8 @@ TEST(TableView_Average)
     TestTableInt::View v = table.column().first.find_all(2);
     CHECK_EQUAL(5, v.size());
 
-    int64_t sum = v.column().first.average();
-    CHECK_EQUAL(2, sum);
+    double sum = v.column().first.average();
+    CHECK_APPROXIMATELY_EQUAL(2., sum, 0.00001);
 }
 
 TEST(TableView_SumNegative)

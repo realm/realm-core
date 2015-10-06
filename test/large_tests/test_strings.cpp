@@ -51,7 +51,7 @@ std::string randstring(Random& random)
     size_t len = random.draw_int_mod(10) * 100 + 1;
     std::string s;
     while (s.length() < len)
-        s += number_name(t);
+        s += number_name(static_cast<size_t>(t));
 
     s = s.substr(0, len);
     return s;

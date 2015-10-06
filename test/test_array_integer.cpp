@@ -362,8 +362,8 @@ TEST(ArrayIntNull_Find)
         a.find_all(&col, 0x44);
 
         CHECK_EQUAL(2, col.size());
-        CHECK_EQUAL(a[col.get(0)], 0x44);
-        CHECK_EQUAL(a[col.get(1)], 0x44);
+        CHECK_EQUAL(a[static_cast<size_t>(col.get(0))], 0x44);
+        CHECK_EQUAL(a[static_cast<size_t>(col.get(1))], 0x44);
 
         col.destroy();
 

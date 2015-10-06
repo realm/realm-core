@@ -728,7 +728,7 @@ std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const
     size_t idx;
 
     for (idx = start; idx < m_size; ++idx) {
-        if (get(indirection ? indirection->get(idx) : idx) >= target) {
+        if (get(indirection ? to_size_t(indirection->get(idx)) : idx) >= target) {
             ref = idx;
             break;
         }

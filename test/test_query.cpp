@@ -5926,7 +5926,7 @@ TEST(Query_Nulls_Fuzzy)
                     }
                     else {
                         // non-null string
-                        size_t len = fastrand(3);
+                        size_t len = static_cast<size_t>(fastrand(3));
                         if (len == 0)
                             len = 0;
                         else if (len == 1)
@@ -6162,11 +6162,11 @@ TEST(Query_64BitValues)
     const int64_t min = std::numeric_limits<int64_t>::min();
     const int64_t max = std::numeric_limits<int64_t>::max();
     table->add_empty_row(count);
-    for (int64_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i) {
         table->set_int(0, i, start + i);
     }
 
-    for (int64_t i = 0; i < 5; i++) {
+    for (size_t i = 0; i < 5; i++) {
         // Insert values 5, 4, 3, 2, 1
         table->set_int(1, i, 5 - i);
     }

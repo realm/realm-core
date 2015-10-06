@@ -2983,7 +2983,7 @@ double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
 DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
-        return 0.;
+        return 0;
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
@@ -3417,14 +3417,14 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
     // Since we know the exact number of distinct keys,
     // we can use that to avoid index lookups
     int64_t key = state.block->get(i - state.offset);
-    size_t ndx = state.keys[key];
+    size_t ndx = state.keys[to_size_t(key)];
 
     // Stored position is offset by one, so zero can indicate
     // that no entry have been added yet.
     if (ndx == 0) {
         ndx = result.add_empty_row();
         result.set_string(0, ndx, state.enums->get(i));
-        state.keys[key] = ndx+1;
+        state.keys[to_size_t(key)] = ndx+1;
         state.added_row = true;
     }
     else
@@ -3496,7 +3496,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         switch (op) {
             case aggr_count:
                 for (size_t r = 0; r < count; ++r) {
-                    size_t i = viewrefs->get(r);
+                    size_t i = static_cast<size_t>(viewrefs->get(r));
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
 
                     // Count
@@ -3505,7 +3505,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 break;
             case aggr_sum:
                 for (size_t r = 0; r < count; ++r) {
-                    size_t i = viewrefs->get(r);
+                    size_t i = static_cast<size_t>(viewrefs->get(r));
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
 
                     // Sum
@@ -3520,7 +3520,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 IntegerColumn& cnt_column = result.get_column(2);
 
                 for (size_t r = 0; r < count; ++r) {
-                    size_t i = viewrefs->get(r);
+                    size_t i = static_cast<size_t>(viewrefs->get(r));
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
 
                     // SUM
@@ -3549,7 +3549,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
             }
             case aggr_min:
                 for (size_t r = 0; r < count; ++r) {
-                    size_t i = viewrefs->get(r);
+                    size_t i = static_cast<size_t>(viewrefs->get(r));
 
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
@@ -3567,7 +3567,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 break;
             case aggr_max:
                 for (size_t r = 0; r < count; ++r) {
-                    size_t i = viewrefs->get(r);
+                    size_t i = static_cast<size_t>(static_cast<size_t>(viewrefs->get(r)));
 
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
