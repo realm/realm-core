@@ -3774,7 +3774,7 @@ public:
             for (size_t i = 0; i != n; ++i) {
                 int attr = spec.get_column_attr(i);
                 // Remove any index specifying attributes
-                attr &= ~(col_attr_Indexed | col_attr_Unique | col_attr_PrimaryKey);
+                attr &= ~(col_attr_Indexed | col_attr_Unique);
                 spec.set_column_attr(i, ColumnAttr(attr)); // Throws
             }
             size_t pos = spec.m_top.write(out); // Throws
