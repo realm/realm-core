@@ -412,10 +412,7 @@ namespace realm {
 
     std::string case_map(StringData source, bool upper, IgnoreErrorsTag)
     {
-        if (auto result = case_map(source, upper))
-            return std::move(*result);
-
-        return {};
+        return case_map(source, upper).value_or("");
     }
 
     // If needle == haystack, return true. NOTE: This function first
