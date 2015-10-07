@@ -31,8 +31,10 @@
 #include <math.h>
 
 #include <realm/util/features.h>
+#include <realm/util/optional.hpp>
 #include <realm/utilities.hpp>
 #include <realm/exceptions.hpp> // only used by null() class
+#include <realm/owned_data.hpp>
 
 namespace realm {
 
@@ -84,6 +86,8 @@ public:
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
+
+    template<class T, class A> StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
     /// Initialize from a zero terminated C style string. Pass null to construct
     /// a null reference.
@@ -152,7 +156,6 @@ private:
 };
 
 
-
 // Implementation:
 
 inline StringData::StringData() noexcept:
@@ -177,6 +180,12 @@ template<class T, class A> inline StringData::StringData(const std::basic_string
 template<class T, class A> inline StringData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
+}
+
+template<class T, class A> inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s):
+    m_data(s ? s->data() : nullptr),
+    m_size(s ? s->size() : 0)
+{
 }
 
 inline StringData::StringData(const char* c_str) noexcept:

@@ -230,27 +230,21 @@ private:
 class ParentNode {
     typedef ParentNode ThisType;
 public:
-
-    ParentNode()
-    {
-    }
+    ParentNode() = default;
+    virtual ~ParentNode() = default;
 
     void gather_children(std::vector<ParentNode*>& v)
     {
         m_children.clear();
-        ParentNode* p = this;
         size_t i = v.size();
         v.push_back(this);
-        p = p->child_criteria();
 
-        if (p)
-            p->gather_children(v);
+        if (m_child)
+            m_child->gather_children(v);
 
         m_children = v;
         m_children.erase(m_children.begin() + i);
         m_children.insert(m_children.begin(), this);
-
-        m_conds = m_children.size();
     }
 
     struct score_compare {
@@ -263,8 +257,6 @@ public:
     }
 
     size_t find_first(size_t start, size_t end);
-
-    virtual ~ParentNode() noexcept {}
 
     virtual void init(const Table& table)
     {
@@ -280,11 +272,6 @@ public:
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
-
-    virtual ParentNode* child_criteria()
-    {
-        return m_child;
-    }
 
     virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
 
@@ -327,31 +314,28 @@ public:
 
     ParentNode(const ParentNode& from)
     {
-        m_child = from.m_child;
-        m_children = from.m_children;
+        m_child = from.m_child ? from.m_child->clone() : nullptr;
         m_condition_column_idx = from.m_condition_column_idx;
-        m_conds = from.m_conds;
         m_dD = from.m_dD;
         m_dT = from.m_dT;
         m_probes = from.m_probes;
         m_matches = from.m_matches;
     }
 
-    virtual ParentNode* clone() = 0;
+    virtual std::unique_ptr<ParentNode> clone() const = 0;
 
-    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping)
+    void add_child(std::unique_ptr<ParentNode> child)
     {
-        m_child = mapping.find(m_child)->second;
-        for (size_t i = 0; i < m_children.size(); ++i)
-            m_children[i] = mapping.find(m_children[i])->second;
+        if (m_child)
+            m_child->add_child(std::move(child));
+        else
+            m_child = std::move(child);
     }
 
-
-    ParentNode* m_child = nullptr;
+    std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
     size_t m_condition_column_idx = npos; // Column of search criteria
 
-    size_t m_conds = 0;
     double m_dD; // Average row distance between each local match at current position
     double m_dT; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0 for index/tableview
 
@@ -378,7 +362,6 @@ protected:
 class ListviewNode: public ParentNode {
 public:
     ListviewNode(TableView& tv) : m_size(tv.size()), m_tv(tv) { m_dT = 0.0; }
-    ~ListviewNode() noexcept override {  }
 
     // Return the n'th table row index contained in the TableView.
     size_t tableindex(size_t n)
@@ -411,9 +394,9 @@ public:
         return tableindex(r);
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new ListviewNode(*this);
+        return std::unique_ptr<ParentNode>(new ListviewNode(*this));
     }
 
     ListviewNode(const ListviewNode& from)
@@ -422,7 +405,6 @@ public:
         m_max = from.m_max;
         m_next = from.m_next;
         m_size = from.m_size;
-        m_child = from.m_child;
     }
 
 protected:
@@ -437,42 +419,44 @@ protected:
 // only if one or more subtable rows match the condition.
 class SubtableNode: public ParentNode {
 public:
-    SubtableNode(size_t column): m_column(column) { m_dT = 100.0; }
-    SubtableNode() {};
-    ~SubtableNode() noexcept override {}
+    SubtableNode(size_t column, std::unique_ptr<ParentNode> condition) :
+        m_condition(std::move(condition)), m_column(column)
+    {
+        m_dT = 100.0;
+    }
 
     void init(const Table& table) override
     {
         m_dD = 10.0;
         m_table = &table;
 
-        // m_child is first node in condition of subtable query.
-        if (m_child) {
+        // m_condition is first node in condition of subtable query.
+        if (m_condition) {
             // Can't call init() here as usual since the subtable can be degenerate
-            // m_child->init(table);
+            // m_condition->init(table);
             std::vector<ParentNode*> v;
-            m_child->gather_children(v);
+            m_condition->gather_children(v);
         }
 
-        // m_child2 is next node of parent query
-        if (m_child2)
-            m_child2->init(table);
+        // m_child is next node of parent query
+        if (m_child)
+            m_child->init(table);
     }
 
     std::string validate() override
     {
         if (error_code != "")
             return error_code;
-        if (m_child == nullptr)
+        if (m_condition == nullptr)
             return "Unbalanced subtable/end_subtable block";
         else
-            return m_child->validate();
+            return m_condition->validate();
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(m_table);
-        REALM_ASSERT(m_child);
+        REALM_ASSERT(m_condition);
 
         for (size_t s = start; s < end; ++s) {
             ConstTableRef subtable = m_table->get_subtable(m_column, s);
@@ -480,9 +464,9 @@ public:
             if (subtable->is_degenerate())
                 return not_found;
 
-            m_child->init(*subtable);
+            m_condition->init(*subtable);
             const size_t subsize = subtable->size();
-            const size_t sub = m_child->find_first(0, subsize);
+            const size_t sub = m_condition->find_first(0, subsize);
 
             if (sub != not_found)
                 return s;
@@ -490,31 +474,17 @@ public:
         return not_found;
     }
 
-    ParentNode* child_criteria() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return m_child2;
+        return std::unique_ptr<ParentNode>(new SubtableNode(*this));
     }
 
-    ParentNode* clone() override
+    SubtableNode(const SubtableNode& from) : ParentNode(from),
+        m_condition(from.m_condition ? from.m_condition->clone() : nullptr), m_column(from.m_column)
     {
-        return new SubtableNode(*this);
     }
 
-    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
-    {
-        ParentNode::translate_pointers(mapping);
-        m_child2 = mapping.find(m_child2)->second;
-    }
-
-    SubtableNode(const SubtableNode& from)
-        : ParentNode(from)
-    {
-        m_child2 = from.m_child2;
-        m_column = from.m_column;
-        m_child = from.m_child;
-    }
-
-    ParentNode* m_child2 = nullptr;
+    std::unique_ptr<ParentNode> m_condition;
     size_t m_column = npos;
 };
 
@@ -544,9 +514,7 @@ protected:
         m_condition_column_idx = column_idx;
     }
 
-    ColumnNodeBase(const ColumnNodeBase& other) : ParentNode(other)
-    {
-    }
+    ColumnNodeBase(const ColumnNodeBase&) = default;
 
     template <Action TAction, class ColType>
     bool match_callback(int64_t v)
@@ -562,7 +530,7 @@ protected:
         auto source_column = static_cast<SequentialGetter<ColType>*>(m_source_column);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip it
-        for (size_t c = 1; c < m_conds; c++) {
+        for (size_t c = 1; c < m_children.size(); c++) {
             m_children[c]->m_probes++;
             size_t m = m_children[c]->find_first_local(i, i + 1);
             if (m != i)
@@ -605,13 +573,13 @@ public:
         using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
         bool cont;
         size_t start_in_leaf = s - this->m_leaf_start;
-        if (this->m_null) {
+        if (!m_value) {
             cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
                 (null{}, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
                  std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
         } else {
             cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
-                (m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
+                (*m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
                  std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
         }
         return cont;
@@ -624,13 +592,13 @@ protected:
     size_t aggregate_local_impl(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column, int c)
     {
-        REALM_ASSERT(m_conds > 0);
+        REALM_ASSERT(m_children.size() > 0);
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
         m_state = st;
 
-        // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
+        // If there are no other nodes than us (m_children.size() == 1) AND the column used for our condition is
         // the same as the column used for the aggregate action, then the entire query can run within scope of that
         // column only, with no references to other columns:
         bool fastmode = should_run_in_fastmode(source_column);
@@ -646,11 +614,11 @@ protected:
             if (fastmode) {
                 bool cont;
                 size_t start_in_leaf = s - m_leaf_start;
-                if (m_null) {
+                if (!m_value) {
                     cont = m_leaf_ptr->find(c, m_action, null{}, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 }
                 else {
-                    cont = m_leaf_ptr->find(c, m_action, m_value, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
+                    cont = m_leaf_ptr->find(c, m_action, *m_value, start_in_leaf, end_in_leaf, m_leaf_start, static_cast<QueryState<int64_t>*>(st));
                 }
                 if (!cont)
                     return not_found;
@@ -680,25 +648,19 @@ protected:
         }
     }
 
-    IntegerNodeBase(TConditionValue v, size_t column_idx)
-        : IntegerNodeBase(column_idx)
+    IntegerNodeBase(util::Optional<TConditionValue> value, size_t column_idx) : ColumnNodeBase(column_idx),
+        m_value(std::move(value))
     {
-        m_value = v;
-    }
-
-    IntegerNodeBase(null, size_t column_idx)
-        : IntegerNodeBase(column_idx)
-    {
-        m_null = true;
+        m_dT = _impl::CostHeuristic<ColType>::dT;
+        m_dD = _impl::CostHeuristic<ColType>::dD;
     }
 
     IntegerNodeBase(const ThisType& from) : ColumnNodeBase(from),
-        m_value(from.m_value), m_null(from.m_null)
+        m_value(from.m_value)
     {
         // state is transient/only valid during search, no need to copy
         m_dT = _impl::CostHeuristic<ColType>::dT;
         m_dD = _impl::CostHeuristic<ColType>::dD;
-        m_child = from.m_child;
         m_condition_column = from.m_condition_column;
         m_find_callback_specialized = from.m_find_callback_specialized;
     }
@@ -744,16 +706,14 @@ protected:
 
     bool should_run_in_fastmode(SequentialGetterBase* source_column) const
     {
-        return (m_conds == 1 &&
+        return (m_children.size() == 1 &&
                 (source_column == nullptr ||
                  (!m_fastmode_disabled
                   && static_cast<SequentialGetter<ColType>*>(source_column)->m_column == m_condition_column)));
     }
 
     // Search value:
-    // FIXME: Consider using Optional.
-    TConditionValue m_value;
-    bool m_null = false;
+    util::Optional<TConditionValue> m_value;
 
     // Column on which search criteria are applied
     const ColType* m_condition_column = nullptr;
@@ -770,13 +730,6 @@ protected:
     // Aggregate optimization
     using TFind_callback_specialized = bool(ThisType::*)(size_t, size_t);
     TFind_callback_specialized m_find_callback_specialized = nullptr;
-
-private:
-    explicit IntegerNodeBase(size_t column_idx) : ColumnNodeBase(column_idx)
-    {
-        m_dT = _impl::CostHeuristic<ColType>::dT;
-        m_dD = _impl::CostHeuristic<ColType>::dD;
-    }
 };
 
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
@@ -788,20 +741,15 @@ public:
     static const bool special_null_node = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
-    IntegerNode(TConditionValue value, size_t column_ndx)
-    : IntegerNodeBase<ColType>(value, column_ndx)
+    IntegerNode(TConditionValue value, size_t column_ndx) : IntegerNodeBase<ColType>(value, column_ndx)
     {
     }
 
-    IntegerNode(null n, size_t column_ndx)
-    : IntegerNodeBase<ColType>(n, column_ndx)
+    IntegerNode(null, size_t column_ndx) : IntegerNodeBase<ColType>(none, column_ndx)
     {
     }
 
-    IntegerNode(const ThisType& other)
-    : IntegerNodeBase<ColType>(other)
-    {
-    }
+    IntegerNode(const IntegerNode&) = default;
 
     void aggregate_local_prepare(Action action, DataType col_id, bool nullable) override
     {
@@ -840,10 +788,10 @@ public:
                 end2 = end - this->m_leaf_start;
 
             size_t s;
-            if (IntegerNodeBase<ColType>::m_null)
+            if (!this->m_value)
                 s = this->m_leaf_ptr->template find_first<TConditionFunction>(null(), start - this->m_leaf_start, end2);
             else
-                s = this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start - this->m_leaf_start, end2);
+                s = this->m_leaf_ptr->template find_first<TConditionFunction>(*this->m_value, start - this->m_leaf_start, end2);
 
             if (s == not_found) {
                 start = this->m_leaf_end;
@@ -856,9 +804,9 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new IntegerNode<ColType, TConditionFunction>(*this);
+        return std::unique_ptr<ParentNode>(new IntegerNode<ColType, TConditionFunction>(*this));
     }
 
 protected:
@@ -930,7 +878,6 @@ public:
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    ~FloatDoubleNode() noexcept override {}
 
     void init(const Table& table) override
     {
@@ -964,16 +911,14 @@ public:
             return find(false);
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new FloatDoubleNode(*this);
+        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this));
     }
 
     FloatDoubleNode(const FloatDoubleNode& from)
-        : ParentNode(from)
+        : ParentNode(from), m_value(from.m_value)
     {
-        m_value = from.m_value;
-        m_child = from.m_child;
         // m_condition_column is not copied
     }
 
@@ -990,26 +935,17 @@ public:
 
     template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
-    BinaryNode(BinaryData v, size_t column)
+    BinaryNode(BinaryData v, size_t column) : m_value(v)
     {
         m_dT = 100.0;
         m_condition_column_idx = column;
-
-        // FIXME: Store this in std::string instead.
-        char* data = v.is_null() ? nullptr : new char[v.size()];
-        memcpy(data, v.data(), v.size());
-        m_value = BinaryData(data, v.size());
     }
 
-    BinaryNode(null, size_t column)
-    : BinaryNode(BinaryData{nullptr, 0}, column)
+    BinaryNode(null, size_t column) : BinaryNode(BinaryData{}, column)
     {
     }
 
-    ~BinaryNode() noexcept override
-    {
-        delete[] m_value.data();
-    }
+    BinaryNode(const BinaryNode&) = default;
 
     void init(const Table& table) override
     {
@@ -1027,33 +963,19 @@ public:
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
             BinaryData value = m_condition_column->get(s);
-            if (condition(m_value, value))
+            if (condition(m_value.get(), value))
                 return s;
         }
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new BinaryNode(*this);
+        return std::unique_ptr<ParentNode>(new BinaryNode(*this));
     }
 
-    BinaryNode(const BinaryNode& from)
-        : ParentNode(from)
-    {
-        // FIXME: Store this in std::string instead.
-        char* data = new char[from.m_value.size()];
-        memcpy(data, from.m_value.data(), from.m_value.size());
-        m_value = BinaryData(data, from.m_value.size());
-        m_condition_column = from.m_condition_column;
-        m_column_type = from.m_column_type;
-        m_child = from.m_child;
-    }
-
-
-protected:
 private:
-    BinaryData m_value;
+    OwnedBinaryData m_value;
 protected:
     const BinaryColumn* m_condition_column;
     ColumnType m_column_type;
@@ -1071,24 +993,12 @@ public:
         REALM_ASSERT(false);
         return 0;
     }
-    StringNodeBase(StringData v, size_t column)
+
+    StringNodeBase(StringData v, size_t column) :
+        m_value(v.is_null() ? util::none : util::make_optional(std::string(v)))
     {
         m_condition_column_idx = column;
-        m_child = nullptr;
         m_dT = 10.0;
-        m_leaf = nullptr;
-
-        // FIXME: Store these in std::string instead.
-        // '*6' because case converted strings can take up more space. Todo, investigate
-        char* data;
-        data = v.data() ? new char[6 * v.size()] : nullptr; // FIXME: Arithmetic is prone to overflow
-        memcpy(data, v.data(), v.size());
-        m_value = StringData(data, v.size());
-    }
-
-    ~StringNodeBase() noexcept override
-    {
-        delete[] m_value.data();
     }
 
     void init(const Table& table) override
@@ -1108,22 +1018,14 @@ public:
         m_leaf.reset(nullptr);
     }
 
-    StringNodeBase(const StringNodeBase& from)
-        : ParentNode(from)
+    StringNodeBase(const StringNodeBase& from) : ParentNode(from), m_value(from.m_value),
+        m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
+        m_leaf_type(from.m_leaf_type), m_end_s(0), m_leaf_start(0), m_leaf_end(0)
     {
-        char* data = from.m_value.data() ? new char[from.m_value.size()] : nullptr;
-        memcpy(data, from.m_value.data(), from.m_value.size());
-        m_value = StringData(data, from.m_value.size());
-        m_condition_column = from.m_condition_column;
-        m_column_type = from.m_column_type;
-        m_leaf_type = from.m_leaf_type;
-        m_end_s = 0;
-        m_leaf_start = 0;
-        m_child = from.m_child;
     }
 
 protected:
-    StringData m_value;
+    util::Optional<std::string> m_value;
 
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
@@ -1140,28 +1042,18 @@ protected:
 // Conditions for strings. Note that Equal is specialized later in this file!
 template <class TConditionFunction> class StringNode: public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column) : StringNodeBase(v,column)
+    StringNode(StringData v, size_t column) : StringNodeBase(v, column)
     {
-        char* upper = new char[6 * v.size()];
-        char* lower = new char[6 * v.size()];
-
-        bool b1 = case_map(v, lower, false);
-        bool b2 = case_map(v, upper, true);
-        if (!b1 || !b2)
+        auto upper = case_map(v, true);
+        auto lower = case_map(v, false);
+        if (!upper || !lower) {
             error_code = "Malformed UTF-8: " + std::string(v);
-
-        m_ucase = upper;
-        m_lcase = lower;
+        }
+        else {
+            m_ucase = std::move(*upper);
+            m_lcase = std::move(*lower);
+        }
     }
-
-    ~StringNode() noexcept override
-    {
-        delete[] m_ucase;
-        delete[] m_lcase;
-
-        clear_leaf_state();
-    }
-
 
     void init(const Table& table) override
     {
@@ -1213,31 +1105,22 @@ public:
                 else
                     t = static_cast<const ArrayBigBlobs&>(*m_leaf).get_string(s - m_leaf_start);
             }
-            if (cond(m_value, m_ucase, m_lcase, t))
+            if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), t))
                 return s;
         }
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new StringNode<TConditionFunction>(*this);
+        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this));
     }
 
-    StringNode(const StringNode& from) : StringNodeBase(from)
-    {
-        size_t sz = 6 * m_value.size();
-        char* lcase = new char[sz];
-        char* ucase = new char[sz];
-        memcpy(lcase, from.m_lcase, sz);
-        memcpy(ucase, from.m_ucase, sz);
-        m_lcase = lcase;
-        m_ucase = ucase;
-        m_child = from.m_child;
-    }
+    StringNode(const StringNode&) = default;
+
 protected:
-    const char* m_lcase;
-    const char* m_ucase;
+    std::string m_ucase;
+    std::string m_lcase;
 };
 
 
@@ -1424,15 +1307,13 @@ public:
         return not_found;
     }
 
-public:
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new StringNode<Equal>(*this);
+        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this));
     }
 
-    StringNode(const StringNode& from) : StringNodeBase(from)
+    StringNode(const StringNode& from) : StringNodeBase(from), m_index_matches_destroy(false)
     {
-        m_index_matches_destroy = false;
     }
 
 private:
@@ -1456,11 +1337,11 @@ private:
 };
 
 // OR node contains at least two node pointers: Two or more conditions to OR
-// together in m_cond, and the next AND condition (if any) in m_child.
+// together in m_conditions, and the next AND condition (if any) in m_child.
 //
 // For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
-// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
-// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
+// will first set m_conditions[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
+// invocation will set m_conditions[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
 // also set to next AND condition (if any exists) following the OR.
 class OrNode: public ParentNode {
 public:
@@ -1470,32 +1351,37 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* p1) : m_cond(1, p1) {
-        m_child = nullptr;
+    OrNode(std::unique_ptr<ParentNode> condition)
+    {
         m_dT = 50.0;
+        if (condition)
+            m_conditions.emplace_back(std::move(condition));
     }
 
-    ~OrNode() noexcept override {}
+    OrNode(const OrNode& other) : ParentNode(other)
+    {
+        for (const auto& condition : other.m_conditions)
+            m_conditions.emplace_back(condition->clone());
+    }
 
     void init(const Table& table) override
     {
         m_dD = 10.0;
 
-        std::vector<ParentNode*> v;
-
         m_start.clear();
-        m_start.resize(m_cond.size(), 0);
+        m_start.resize(m_conditions.size(), 0);
 
         m_last.clear();
-        m_last.resize(m_cond.size(), 0);
+        m_last.resize(m_conditions.size(), 0);
 
         m_was_match.clear();
-        m_was_match.resize(m_cond.size(), false);
+        m_was_match.resize(m_conditions.size(), false);
 
-        for (size_t c = 0; c < m_cond.size(); ++c) {
-            m_cond[c]->init(table);
+        std::vector<ParentNode*> v;
+        for (auto& condition : m_conditions) {
+            condition->init(table);
             v.clear();
-            m_cond[c]->gather_children(v);
+            condition->gather_children(v);
         }
 
         if (m_child)
@@ -1511,7 +1397,7 @@ public:
 
         size_t index = not_found;
 
-        for (size_t c = 0; c < m_cond.size(); ++c) {
+        for (size_t c = 0; c < m_conditions.size(); ++c) {
             // out of order search; have to discard cached results
             if (start < m_start[c]) {
                 m_last[c] = 0;
@@ -1529,7 +1415,7 @@ public:
 
             m_start[c] = start;
             size_t fmax = std::max(m_last[c], start);
-            size_t f = m_cond[c]->find_first(fmax, end);
+            size_t f = m_conditions[c]->find_first(fmax, end);
             m_was_match[c] = f != not_found;
             m_last[c] = f == not_found ? end : f;
             if (f != not_found && index > m_last[c])
@@ -1543,36 +1429,29 @@ public:
     {
         if (error_code != "")
             return error_code;
-        if (m_cond[0] == 0)
+        if (m_conditions.size() == 0)
             return "Missing left-hand side of OR";
-        if (m_cond.back() == 0)
-            return "Missing final right-hand side of OR";
+        if (m_conditions.size() == 1)
+            return "Missing right-hand side of OR";
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
         if (s != "")
             return s;
-        for (size_t i = 0; i < m_cond.size(); ++i) {
-            s = m_cond[i]->validate();
+        for (size_t i = 0; i < m_conditions.size(); ++i) {
+            s = m_conditions[i]->validate();
             if (s != "")
                 return s;
         }
         return "";
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new OrNode(*this);
+        return std::unique_ptr<ParentNode>(new OrNode(*this));
     }
 
-    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
-    {
-        ParentNode::translate_pointers(mapping);
-        for (size_t i = 0; i < m_cond.size(); ++i)
-            m_cond[i] = mapping.find(m_cond[i])->second;
-    }
-
-    std::vector<ParentNode*> m_cond;
+    std::vector<std::unique_ptr<ParentNode>> m_conditions;
 private:
     // start index of the last find for each cond
     std::vector<size_t> m_start;
@@ -1592,8 +1471,10 @@ public:
         return 0;
     }
 
-    NotNode() {m_child = nullptr; m_cond = nullptr; m_dT = 50.0;}
-    ~NotNode() noexcept override {}
+    NotNode(std::unique_ptr<ParentNode> condition) : m_condition(std::move(condition))
+    {
+        m_dT = 50.0;
+    }
 
     void init(const Table& table) override
     {
@@ -1601,9 +1482,9 @@ public:
 
         std::vector<ParentNode*> v;
 
-        m_cond->init(table);
+        m_condition->init(table);
         v.clear();
-        m_cond->gather_children(v);
+        m_condition->gather_children(v);
 
         // Heuristics bookkeeping:
         m_known_range_start = 0;
@@ -1622,42 +1503,34 @@ public:
     {
         if (error_code != "")
             return error_code;
-        if (m_cond == 0)
+        if (m_condition == 0)
             return "Missing argument to Not";
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
         if (s != "")
             return s;
-        s = m_cond->validate();
+        s = m_condition->validate();
         if (s != "")
             return s;
         return "";
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new NotNode(*this);
-    }
-
-    void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) override
-    {
-        ParentNode::translate_pointers(mapping);
-        m_cond = mapping.find(m_cond)->second;
+        return std::unique_ptr<ParentNode>(new NotNode(*this));
     }
 
     NotNode(const NotNode& from)
         : ParentNode(from)
     {
-        // here we are just copying the pointers - they'll be remapped by "translate_pointers"
-        m_cond = from.m_cond;
+        m_condition = from.m_condition ? from.m_condition->clone() : nullptr;
         m_known_range_start = from.m_known_range_start;
         m_known_range_end = from.m_known_range_end;
         m_first_in_known_range = from.m_first_in_known_range;
-        m_child = from.m_child;
     }
 
-    ParentNode* m_cond;
+    std::unique_ptr<ParentNode> m_condition;
 private:
     // FIXME This heuristic might as well be reused for all condition nodes.
     size_t m_known_range_start;
@@ -1687,7 +1560,6 @@ public:
         m_dT = 100.0;
         m_condition_column_idx1 = column1;
         m_condition_column_idx2 = column2;
-        m_child = nullptr;
     }
 
     ~TwoColumnsNode() noexcept override
@@ -1758,20 +1630,15 @@ public:
         return not_found;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new TwoColumnsNode<ColType, TConditionFunction>(*this);
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<ColType, TConditionFunction>(*this));
     }
 
-    TwoColumnsNode(const TwoColumnsNode& from)
-        : ParentNode(from)
+    TwoColumnsNode(const TwoColumnsNode& from) : ParentNode(from), m_value(from.m_value),
+        m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
+        m_condition_column_idx1(from.m_condition_column_idx1), m_condition_column_idx2(from.m_condition_column_idx2)
     {
-        m_value = from.m_value;
-        m_condition_column = from.m_condition_column;
-        m_column_type = from.m_column_type;
-        m_condition_column_idx1 = from.m_condition_column_idx1;
-        m_condition_column_idx2 = from.m_condition_column_idx2;
-        m_child = from.m_child;
         // NOT copied:
         // m_getter1 = from.m_getter1;
         // m_getter2 = from.m_getter2;
@@ -1794,11 +1661,8 @@ protected:
 class ExpressionNode: public ParentNode {
 
 public:
-    ~ExpressionNode() noexcept { }
-
-    ExpressionNode(Expression* compare)
+    ExpressionNode(Expression* compare) : m_compare(util::SharedPtr<Expression>(compare))
     {
-        m_compare = util::SharedPtr<Expression>(compare);
         m_dD = 10.0;
         m_dT = 50.0;
     }
@@ -1816,17 +1680,12 @@ public:
         return res;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new ExpressionNode(*this);
+        return std::unique_ptr<ParentNode>(new ExpressionNode(*this));
     }
 
-    ExpressionNode(ExpressionNode& from)
-        : ParentNode(from)
-    {
-        m_compare = from.m_compare;
-        m_child = from.m_child;
-    }
+    ExpressionNode(const ExpressionNode&) = default;
 
     util::SharedPtr<Expression> m_compare;
 };
@@ -1875,9 +1734,9 @@ public:
         return ret;
     }
 
-    ParentNode* clone() override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return new LinksToNode(*this);
+        return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
 
     size_t m_origin_column;

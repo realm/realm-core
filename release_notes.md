@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Queries are no longer limited to 16 levels of grouping.
 
 -----------
 

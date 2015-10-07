@@ -3393,7 +3393,7 @@ TEST(Query_Subtable)
     subtable->set_int(0, 1, 33);
     subtable->set_string(1, 1, "c");
 
-    //  Intentioally have empty (degenerate) subtable at 2,2
+    // Intentionally have empty (degenerate) subtable at 2,2
 
     subtable = table->get_subtable(2, 3);
     subtable->insert_empty_row(0);
@@ -5619,14 +5619,14 @@ TEST(Query_DeepCopy)
 
 
     // Test if we can execute a copy
-    Query q2 = Query(q, Query::TCopyExpressionTag());
+    Query q2(q);
 
     CHECK_EQUAL(2, q2.find());
 
 
-    // See if we can execute a copy of a delted query (copy should not contain references to original)
-    Query* q3 = new Query(q, Query::TCopyExpressionTag());
-    Query* q4 = new Query(*q3, Query::TCopyExpressionTag());
+    // See if we can execute a copy of a deleted query. The copy should not contain references to the original.
+    Query* q3 = new Query(q);
+    Query* q4 = new Query(*q3);
     delete q3;
 
 
@@ -5652,7 +5652,7 @@ TEST(Query_DeepCopy)
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_expression integer node.
     Query q6 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
-    Query q7 = Query(q6, Query::TCopyExpressionTag());
+    Query q7(q6);
 
     q7.greater(2, 4.0);
     CHECK_EQUAL(3, q7.find());
@@ -5662,7 +5662,7 @@ TEST(Query_DeepCopy)
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine integer node.
     Query q8 = t.column().ints > 2;
-    Query q9 = Query(q8, Query::TCopyExpressionTag());
+    Query q9(q8);
 
     q9.greater(2, 4.0);
     CHECK_EQUAL(3, q9.find());
@@ -5672,7 +5672,7 @@ TEST(Query_DeepCopy)
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine string node.
     Query q10 = t.column().strings != "2";
-    Query q11 = Query(q10, Query::TCopyExpressionTag());
+    Query q11(q10);
 
     q11.greater(2, 4.0);
     CHECK_EQUAL(3, q11.find());
@@ -5680,7 +5680,7 @@ TEST(Query_DeepCopy)
 
     // Test and_query() on a copy
     Query q12 = t.column().ints > 2;
-    Query q13 = Query(q12, Query::TCopyExpressionTag());
+    Query q13(q12);
 
     q13.and_query(t.column().strings != "3");
     CHECK_EQUAL(3, q13.find());
@@ -5777,8 +5777,8 @@ TEST(Query_DeepCopyLeak1)
 
     // See if copying of a mix of query_expression and query_engine nodes will leak
     Query q = !(t.column().ints > Value<Int>(2) && t.column().ints > 2 && t.column().doubles > 2.2) || t.column().ints == 4 || t.column().ints == Value<Int>(4);
-    Query q2 = Query(q, Query::TCopyExpressionTag());
-    Query q3 = Query(q2, Query::TCopyExpressionTag());
+    Query q2(q);
+    Query q3(q2);
 }
 
 TEST(Query_DeepCopyTest)
@@ -5790,7 +5790,7 @@ TEST(Query_DeepCopyTest)
 
     Query q1 = table.where();
 
-    Query q2(q1, Query::TCopyExpressionTag());
+    Query q2(q1);
 
     q2.group();
     q2.end_group();
@@ -5806,7 +5806,7 @@ TEST(Query_StringIndexCrash)
 
     Query q = table.where().equal(0, StringData(""));
     q.count();
-    Query(q, Query::TCopyExpressionTag());
+    Query q2(q);
 }
 
 TEST(Query_NullStrings)
