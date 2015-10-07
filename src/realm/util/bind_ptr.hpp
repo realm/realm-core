@@ -29,9 +29,7 @@
 #  include <utility>
 #endif
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
-#  include <atomic>
-#endif
+#include <atomic>
 
 
 namespace realm {
@@ -191,7 +189,6 @@ private:
 };
 
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
 /// Same as RefCountBase, but this one makes the copying of, and the
 /// destruction of counted references thread-safe.
 ///
@@ -215,7 +212,6 @@ private:
 
     template<class> friend class bind_ptr;
 };
-#endif // REALM_HAVE_CXX11_ATOMIC
 
 
 

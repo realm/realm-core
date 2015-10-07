@@ -85,16 +85,6 @@
 #endif
 
 
-/* Support for C++11 <atomic>.
- *
- * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
-#  if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 4) || \
-    REALM_HAVE_CXX11 && _LIBCPP_VERSION >= 1001 || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#    define REALM_HAVE_CXX11_ATOMIC 1
-#  endif
-
-
 /* Support for C++11 variadic templates. */
 #if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
     REALM_HAVE_CLANG_FEATURE(cxx_variadic_templates) || \
