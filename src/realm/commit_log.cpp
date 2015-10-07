@@ -264,13 +264,14 @@ inline uint_fast64_t aligned_to(uint_fast64_t alignment, uint_fast64_t value)
     return (value + alignment - 1) & ~(alignment - 1);
 }
 
+namespace {
 
 void recover_from_dead_owner()
 {
     // nothing!
 }
 
-
+} // unnamed namespace
 
 // Header access and manipulation methods:
 

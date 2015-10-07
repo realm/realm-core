@@ -6202,6 +6202,8 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
+namespace {
+
 void create_columns(TableRef table, bool nullable = true)
 {
     table->insert_column(0, type_Int, "Price", nullable);
@@ -6252,6 +6254,8 @@ void fill_data(TableRef table) {
     table->set_null(5, 1);
     table->set_datetime(5, 2, DateTime(2016, 6, 6));
 }
+
+} // unnamed namespace
 
 TEST(Query_NullShowcase)
 {

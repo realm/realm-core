@@ -604,6 +604,7 @@ TEST(TableView_FindAllString)
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
+namespace {
 
 // primitive C locale comparer. But that's OK since all we want to test is if the callback is invoked
 bool got_called = false;
@@ -612,6 +613,8 @@ bool comparer(const char* s1, const char* s2)
     got_called = true;
     return *s1 < *s2;
 }
+
+} // unnamed namespace
 
 TEST(TableView_StringSort)
 {

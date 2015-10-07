@@ -17,8 +17,8 @@
 * from Realm Incorporated.
 *
 **************************************************************************/
-#ifndef REALM_UTIL_UNICODE_HPP
-#define REALM_UTIL_UNICODE_HPP
+#ifndef REALM_UNICODE_HPP
+#define REALM_UNICODE_HPP
 
 #include <stdint.h>
 #include <string>
@@ -29,7 +29,7 @@
 #include <realm/utilities.hpp>
 
 #if REALM_HAVE_CXX11
-    #include <locale>
+#  include <locale>
 #endif
 
 namespace realm {
@@ -151,4 +151,4 @@ namespace realm {
 
 } // namespace realm
 
-#endif // REALM_UTIL_UTF8_HPP
+#endif // REALM_UNICODE_HPP
