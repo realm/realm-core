@@ -208,7 +208,7 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
         const Result& br = baseline_iter->second;
         double avg = r.avg();
         double baseline_avg = br.avg();
-        if ((avg - baseline_avg) > r.stddev) {
+        if ((avg - baseline_avg) > r.stddev*2) {
             out << "* ";
         }
         else {
