@@ -1092,9 +1092,8 @@ private:
     const VTable* m_vtable = nullptr;
 
 public:
-    // FIXME: Should not be mutable
     // FIXME: Should not be public
-    mutable char* m_data = nullptr; // Points to first byte after header
+    char* m_data = nullptr; // Points to first byte after header
 
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
