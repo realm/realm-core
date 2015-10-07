@@ -30,14 +30,17 @@ namespace {
 */
 
 const size_t min_repetitions = 10;
-const size_t max_repetitions = 100;
+const size_t max_repetitions = 1000;
 const double min_duration_s = 0.05;
+const double min_warmup_time_s = 0.01;
 
 struct Benchmark
 {
     virtual const char* name() const = 0;
-    virtual void setup(SharedGroup&) {}
-    virtual void teardown(SharedGroup&) {}
+    virtual void before_all(SharedGroup&) {}
+    virtual void after_all(SharedGroup&) {}
+    virtual void before_each(SharedGroup&) {}
+    virtual void after_each(SharedGroup&) {}
     virtual void operator()(SharedGroup&) = 0;
 };
 
@@ -54,7 +57,7 @@ struct AddTable : Benchmark {
         tr.commit();
     }
 
-    void teardown(SharedGroup& group)
+    void after_each(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table(name());
@@ -63,7 +66,7 @@ struct AddTable : Benchmark {
 };
 
 struct BenchmarkWithStringsTable : Benchmark {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("StringOnly");
@@ -71,7 +74,7 @@ struct BenchmarkWithStringsTable : Benchmark {
         tr.commit();
     }
 
-    void teardown(SharedGroup& group)
+    void after_all(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table("StringOnly");
@@ -80,9 +83,9 @@ struct BenchmarkWithStringsTable : Benchmark {
 };
 
 struct BenchmarkWithStrings : BenchmarkWithStringsTable {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
-        BenchmarkWithStringsTable::setup(group);
+        BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
         t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
@@ -96,9 +99,9 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
 };
 
 struct BenchmarkWithLongStrings : BenchmarkWithStrings {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
-        BenchmarkWithStrings::setup(group);
+        BenchmarkWithStrings::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
         t->insert_empty_row(0);
@@ -112,7 +115,7 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
 };
 
 struct BenchmarkWithIntsTable : Benchmark {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("IntOnly");
@@ -120,7 +123,7 @@ struct BenchmarkWithIntsTable : Benchmark {
         tr.commit();
     }
 
-    void teardown(SharedGroup& group)
+    void after_all(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table("IntOnly");
@@ -129,9 +132,9 @@ struct BenchmarkWithIntsTable : Benchmark {
 };
 
 struct BenchmarkWithInts : BenchmarkWithIntsTable {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
-        BenchmarkWithIntsTable::setup(group);
+        BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
         t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
@@ -279,7 +282,7 @@ struct BenchmarkSetLongString : BenchmarkWithLongStrings {
 struct BenchmarkQueryNot : Benchmark {
     const char* name() const { return "QueryNot"; }
 
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.add_table(name());
@@ -301,7 +304,7 @@ struct BenchmarkQueryNot : Benchmark {
         results.size();
     }
 
-    void teardown(SharedGroup& group)
+    void after_all(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table(name());
@@ -325,15 +328,11 @@ const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 
 void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 {
-    timer.pause();
-    benchmark.setup(sg);
-    timer.unpause();
+    benchmark.before_each(sg);
 
     benchmark(sg);
 
-    timer.pause();
-    benchmark.teardown(sg);
-    timer.unpause();
+    benchmark.after_each(sg);
 }
 
 
@@ -374,23 +373,38 @@ void run_benchmark(BenchmarkResults& results)
         std::unique_ptr<SharedGroup> group;
         group.reset(new SharedGroup(realm_path, false, level));
 
+        benchmark.before_all(*group);
+
         // Warm-up and initial measuring:
-        Timer t_unused(Timer::type_UserTime);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
+        Timer t_baseline(Timer::type_UserTime);
+        size_t num_warmup_reps = 1;
+        double time_to_execute_warmup_reps = 0;
+        while (time_to_execute_warmup_reps < min_warmup_time_s && num_warmup_reps < max_repetitions) {
+            num_warmup_reps *= 10;
+            Timer t_baseline(Timer::type_UserTime);
+            for (size_t i = 0; i < num_warmup_reps; ++i) {
+                run_benchmark_once(benchmark, *group, t_baseline);
+            }
+            time_to_execute_warmup_reps = t_baseline.get_elapsed_time();
+        }
+
+        size_t required_reps = size_t(min_duration_s / (time_to_execute_warmup_reps / num_warmup_reps));
+        if (required_reps < min_repetitions) {
+            required_reps = min_repetitions;
+        }
+        if (required_reps > max_repetitions) {
+            required_reps = max_repetitions;
+        }
 
         size_t rep;
-        double total = 0;
-        for (rep = 0; rep < max_repetitions && (rep < min_repetitions || total < min_duration_s); ++rep) {
+        for (rep = 0; rep < required_reps; ++rep) {
             Timer t;
             run_benchmark_once(benchmark, *group, t);
             double s = t.get_elapsed_time();
-            total += s;
             results.submit(ident.c_str(), s);
         }
+
+        benchmark.after_all(*group);
 
         results.finish(ident, lead_text_ss.str());
     }
