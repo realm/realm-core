@@ -16,7 +16,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* De-templatified (!) some methods in SharedGroup in preparation for a refactoring
+  which will utilise virtual methods (you can't have virtual template methods)
 
 ----------------------------------------------
 
