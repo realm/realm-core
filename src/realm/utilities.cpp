@@ -52,21 +52,11 @@ string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 void cpuid_init()
 {
 #ifdef REALM_COMPILER_SSE
-    int cret;
 #  ifdef _MSC_VER
+    int cret;
     int CPUInfo[4];
     __cpuid(CPUInfo, 1);
     cret = CPUInfo[2];
-#  else
-    int a = 1;
-    __asm ( "mov %1, %%eax; "            // a into eax
-          "cpuid;"
-          "mov %%ecx, %0;"             // ecx into b
-          :"=r"(cret)                     // output
-          :"r"(a)                      // input
-          :"%eax","%ebx","%ecx","%edx" // clobbered register
-         );
-#  endif
 
 // Byte is atomic. Race can/will occur but that's fine
     if (cret & 0x100000) { // test for 4.2
@@ -81,8 +71,6 @@ void cpuid_init()
 
     bool avxSupported = false;
 
-// seems like in jenkins builds, __GNUC__ is defined for clang?! todo fixme
-#  if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
     bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
     bool cpuAVXSuport = cret & (1 << 28) || false;
 
@@ -91,7 +79,6 @@ void cpuid_init()
         unsigned long long xcrFeatureMask = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
         avxSupported = (xcrFeatureMask & 0x6) || false;
     }
-#  endif
 
     if (avxSupported) {
         avx_support = 0; // AVX1 supported
@@ -101,8 +88,30 @@ void cpuid_init()
     }
 
     // 1 is reserved for AVX2
+#  elif defined __llvm__ || defined __clang__ || defined __GNUC__
 
-#endif
+    if (__builtin_cpu_supports("sse4.2")) {
+        sse_support = 1;
+    }
+    else if (__builtin_cpu_supports("sse3")) {
+        sse_support = 0;
+    }
+    else {
+        sse_support = -2;
+    }
+
+    if (__builtin_cpu_supports("avx2")) {
+        avx_support = 1;
+    }
+    else if (__builtin_cpu_supports("avx")) {
+        avx_support = 0;
+    }
+    else {
+        avx_support = -1;
+    }
+
+#  endif // LLVM/Clang/GCC
+#endif // REALM_COMPILER_SSE
 }
 
 
