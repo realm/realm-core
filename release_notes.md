@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a bug in SharedGroup::Compact() which could leave the database in an
+  inconsistent state.
 
 ### API breaking changes:
 
