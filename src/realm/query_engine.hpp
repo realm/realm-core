@@ -994,7 +994,8 @@ public:
         return 0;
     }
 
-    StringNodeBase(StringData v, size_t column) : m_value(v)
+    StringNodeBase(StringData v, size_t column) :
+        m_value(v.is_null() ? util::none : util::make_optional(std::string(v)))
     {
         m_condition_column_idx = column;
         m_dT = 10.0;
@@ -1024,7 +1025,7 @@ public:
     }
 
 protected:
-    OwnedStringData m_value;
+    util::Optional<std::string> m_value;
 
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
@@ -1041,19 +1042,17 @@ protected:
 // Conditions for strings. Note that Equal is specialized later in this file!
 template <class TConditionFunction> class StringNode: public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column) : StringNodeBase(v,column)
+    StringNode(StringData v, size_t column) : StringNodeBase(v, column)
     {
-        const size_t case_mapped_string_size = 6 * v.size();
-        auto upper = std::unique_ptr<char[]>(new char[case_mapped_string_size]);
-        auto lower = std::unique_ptr<char[]>(new char[case_mapped_string_size]);
-
-        bool b1 = case_map(v, lower.get(), false);
-        bool b2 = case_map(v, upper.get(), true);
-        if (!b1 || !b2)
+        auto upper = case_map(v, true);
+        auto lower = case_map(v, false);
+        if (!upper || !lower) {
             error_code = "Malformed UTF-8: " + std::string(v);
-
-        m_ucase = OwnedStringData(std::move(upper), case_mapped_string_size);
-        m_lcase = OwnedStringData(std::move(lower), case_mapped_string_size);
+        }
+        else {
+            m_ucase = std::move(*upper);
+            m_lcase = std::move(*lower);
+        }
     }
 
     void init(const Table& table) override
@@ -1106,7 +1105,7 @@ public:
                 else
                     t = static_cast<const ArrayBigBlobs&>(*m_leaf).get_string(s - m_leaf_start);
             }
-            if (cond(m_value.get(), m_ucase.data(), m_lcase.data(), t))
+            if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), t))
                 return s;
         }
         return not_found;
@@ -1120,8 +1119,8 @@ public:
     StringNode(const StringNode&) = default;
 
 protected:
-    OwnedStringData m_lcase;
-    OwnedStringData m_ucase;
+    std::string m_ucase;
+    std::string m_lcase;
 };
 
 
@@ -1160,7 +1159,7 @@ public:
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
-            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value.get());
+            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
         }
         else if (m_condition_column->has_search_index()) {
             m_dT = 0.0;
@@ -1175,10 +1174,10 @@ public:
             size_t index_ref;
 
             if (m_column_type == col_type_StringEnum) {
-                fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_indexref(m_value.get(), index_ref);
+                fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
             }
             else {
-                fr = static_cast<const StringColumn*>(m_condition_column)->find_all_indexref(m_value.get(), index_ref);
+                fr = static_cast<const StringColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
             }
 
             m_index_matches_destroy = false;
@@ -1293,11 +1292,11 @@ public:
             size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
             if (m_leaf_type == StringColumn::leaf_type_Small)
-                s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value.get(), s - m_leaf_start, end2);
+                s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
             else if (m_leaf_type ==  StringColumn::leaf_type_Medium)
-                s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value.get(), s - m_leaf_start, end2);
+                s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
             else
-                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value.get()), true, s - m_leaf_start, end2);
+                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
 
             if (s == not_found)
                 s = m_leaf_end - 1;

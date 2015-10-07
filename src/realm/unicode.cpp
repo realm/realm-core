@@ -328,33 +328,28 @@ namespace realm {
     // If an output character differs in size, it is simply substituded by
     // the original character. This may of course give wrong search
     // results in very special cases. Todo.
-    std::string case_map(StringData source, bool upper)
+    util::Optional<std::string> case_map(StringData source, bool upper)
     {
-        char* dst = new char[source.size()];
-        case_map(source, dst, upper);
-        std::string str(dst, source.size());
-        delete[] dst;
-        return str;
-    }
+        std::string result;
+        result.resize(source.size());
 
-    bool case_map(StringData source, char* target, bool upper)
-    {
 #ifdef _WIN32
         const char* begin = source.data();
         const char* end = begin + source.size();
+        auto output = result.begin();
         while (begin != end) {
             int n = static_cast<int>(sequence_length(*begin));
-            if (n == 0 || end - begin < n) 
-                return false;
+            if (n == 0 || end - begin < n)
+                return util::none;
 
             wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
 
 
             int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
-            if (n2 == 0) 
-                return false;
+            if (n2 == 0)
+                return util::none;
 
-            REALM_ASSERT(0 < n2 && n2 <= 1);
+            REALM_ASSERT(n2 == 1);
             tmp[n2] = 0;
 
             // Note: If tmp[0] == 0, it is because the string contains a
@@ -371,18 +366,19 @@ namespace realm {
             // the flag is specified, the function fails with error
             // ERROR_INVALID_FLAGS.
             DWORD flags = 0;
-            int n3 = WideCharToMultiByte(CP_UTF8, flags, tmp, 1, target, static_cast<int>(end - begin), 0, 0);
-            if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) 
-                return false;
+            int n3 = WideCharToMultiByte(CP_UTF8, flags, tmp, 1, &*output, static_cast<int>(end - begin), 0, 0);
+            if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+                return util::none;
+
             if (n3 != n) {
-                std::copy(begin, begin + n, target); // Cannot handle different size, copy source
+                std::copy(begin, begin + n, output); // Cannot handle different size, copy source
             }
 
             begin += n;
-            target += n;
+            output += n;
         }
 
-        return true;
+        return result;
 #else
         // FIXME: Implement this! Note that this is trivial in C++11 due
         // to its built-in support for UTF-8. In C++03 it is trivial when
@@ -397,7 +393,7 @@ namespace realm {
                 char c = source[i];
                 if (traits::lt(0x60, c) &&
                     traits::lt(c, 0x7B)) c = traits::to_char_type(traits::to_int_type(c) - 0x20);
-                target[i] = c;
+                result[i] = c;
             }
         }
         else { // lower
@@ -406,14 +402,21 @@ namespace realm {
                 char c = source[i];
                 if (traits::lt(0x40, c) &&
                     traits::lt(c, 0x5B)) c = traits::to_char_type(traits::to_int_type(c) + 0x20);
-                target[i] = c;
+                result[i] = c;
             }
         }
 
-        return true;
+        return result;
 #endif
     }
 
+    std::string case_map(StringData source, bool upper, IgnoreErrorsTag)
+    {
+        if (auto result = case_map(source, upper))
+            return std::move(*result);
+
+        return {};
+    }
 
     // If needle == haystack, return true. NOTE: This function first
     // performs a case insensitive *byte* compare instead of one whole
