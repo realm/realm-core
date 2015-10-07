@@ -8974,8 +8974,8 @@ TEST(LangBindHelper_Compact)
     size_t N = 100;
 
     {
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key(true)));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key(true));
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction w(sg_w);
         TableRef table = w.get_or_add_table("test");
         table->add_column(type_Int, "int");
@@ -8986,17 +8986,25 @@ TEST(LangBindHelper_Compact)
         w.commit();
         sg_w.close();
     }
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        ReadTransaction r(sg);
+        ConstTableRef table = r.get_table("test");
+        CHECK_EQUAL(N, table->size());
+        sg.close();
+    }
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         CHECK_EQUAL(true, sg.compact());
         sg.close();
     }
     
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
