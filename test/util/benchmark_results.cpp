@@ -125,7 +125,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
         if (r.max < s) r.max = s;
         r.total += s;
     }
-    
+
     // Calculate standard deviation
     if (r.rep > 1) {
         double mean = r.avg();
@@ -146,7 +146,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
     else {
         r.stddev = 0;
     }
-    
+
     return r;
 }
 

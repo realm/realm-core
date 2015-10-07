@@ -347,28 +347,28 @@ void run_benchmark(BenchmarkResults& results)
 #else
     const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
 #endif
-    
+
     static long test_counter = 0;
 
     Timer timer(Timer::type_UserTime);
     for (size_t i = 0; i < num_durabilities; ++i) {
         SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
         B benchmark;
-        
+
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
         lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ")";
         ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level);
         std::string ident = ident_ss.str();
-        
+
         realm::test_util::unit_test::TestDetails test_details;
         test_details.test_index = test_counter++;
         test_details.suite_name = "BenchmarkCommonTasks";
         test_details.test_name = ident.c_str();
         test_details.file_name = __FILE__;
         test_details.line_number = __LINE__;
-        
+
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
         std::unique_ptr<SharedGroup> group;

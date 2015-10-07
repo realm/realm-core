@@ -61,10 +61,10 @@ private:
 
         double avg() const;
     };
-    
+
     struct Measurement {
         std::vector<double> samples;
-        
+
         Result finish() const;
     };
 
