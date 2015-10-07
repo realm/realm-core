@@ -57,6 +57,7 @@ private:
         double max;
         double total;
         double stddev;
+        double median;
         size_t rep;
 
         double avg() const;

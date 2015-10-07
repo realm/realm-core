@@ -119,11 +119,32 @@ void BenchmarkResults::submit(const char* ident, double seconds)
 BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
 {
     Result r;
-    r.rep = samples.size();
+
+    std::vector<double> samples = this->samples;
+    // Sort to simplify calculating min/max/median.
+    std::sort(samples.begin(), samples.end());
+
+    // Compute total:
+    r.total = 0;
     for (auto s: samples) {
-        if (r.min > s) r.min = s;
-        if (r.max < s) r.max = s;
         r.total += s;
+    }
+
+    // Compute min/max/median
+    r.rep = samples.size();
+    if (r.rep > 0) {
+        r.min = samples.front();
+        r.max = samples.back();
+
+        if (r.rep % 2 == 0) {
+            // Equal number of elements: median is the average of the
+            // two middle elements.
+            r.median = (samples[r.rep / 2] + samples[r.rep / 2 + 1]) / 2;
+        }
+        else {
+            // Odd number of elements: median is the middle element.
+            r.median = samples[r.rep / 2];
+        }
     }
 
     // Calculate standard deviation
