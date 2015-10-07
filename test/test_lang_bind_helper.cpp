@@ -8968,4 +8968,40 @@ TEST(LangBindHelper_RollbackToInitialState2)
     sg_w.rollback();
 }
 
+TEST(LangBindHelper_Compact)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    size_t N = 100;
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key(true)));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key(true));
+        WriteTransaction w(sg_w);
+        TableRef table = w.get_or_add_table("test");
+        table->add_column(type_Int, "int");
+        for (size_t i = 0; i < N; ++i) {
+            table->add_empty_row();
+            table->set_int(0, i, i);
+        }
+        w.commit();
+        sg_w.close();
+    }
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        CHECK_EQUAL(true, sg.compact());
+        sg.close();
+    }
+    
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        ReadTransaction r(sg);
+        ConstTableRef table = r.get_table("test");
+        CHECK_EQUAL(N, table->size());
+        sg.close();
+    }
+}
+
 #endif
