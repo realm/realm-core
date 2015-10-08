@@ -923,9 +923,7 @@ bool SharedGroup::compact()
     // close and reopen the database file.
     alloc.detach();
     SlabAlloc::Config cfg;
-    // FIXME: Need to do validation in order for the slab allocator to properly
-    // recognize the file header/footer format. This should not be needed!
-    cfg.skip_validate = false;
+    cfg.skip_validate = true;
     cfg.no_create = true;
     cfg.is_shared = true;
     cfg.session_initiator = true;

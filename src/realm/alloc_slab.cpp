@@ -503,7 +503,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
-        m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!cfg.skip_validate) {
             // Verify the data structures
             validate_buffer(map.get_addr(), initial_size_of_file, path, top_ref, cfg.is_shared); // Throws
@@ -526,9 +525,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         }
 
         {
-            const Header* header = reinterpret_cast<const Header*>(map.get_addr());
-            int select_field = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_format = header->m_file_format[select_field];
+            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
+            int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+            m_file_format = header.m_file_format[select_field];
+            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
+            m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
         }
 
         m_data        = map.release();
@@ -553,7 +554,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         Header* header = reinterpret_cast<Header*>(m_data);
         static_cast<void>(header);
 
-        // Don't compare file format version fields as they are allowed to differ. 
+        // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
         REALM_ASSERT_3(header->m_flags, == , streaming_header.m_flags);
         REALM_ASSERT_3(header->m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
@@ -588,16 +589,17 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     REALM_ASSERT(!is_attached());
 
     // Verify the data structures
-    m_file_on_streaming_form = false; // May be updated by validate_buffer()
     std::string path; // No path
     ref_type top_ref;
     bool is_shared = false;
     validate_buffer(data, size, path, top_ref, is_shared); // Throws
 
     {
-        const Header* header = reinterpret_cast<const Header*>(data);
-        int select_field = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-        m_file_format = header->m_file_format[select_field];
+        const Header& header = reinterpret_cast<const Header&>(*data);
+        int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+        m_file_format = header.m_file_format[select_field];
+        uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
+        m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
     }
 
     m_data        = data;
@@ -670,7 +672,6 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
         ref = footer.m_top_ref;
         if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie))
             throw InvalidDatabase("Bad Realm file header (#1)", path);
-        m_file_on_streaming_form = true;
     }
     if (REALM_UNLIKELY(ref % 8 != 0))
         throw InvalidDatabase("Bad Realm file header (#2)", path);
