@@ -629,6 +629,7 @@ void SlabAlloc::attach_empty()
     m_initial_mapping_size = m_baseline;
 }
 
+
 void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path,
                                 ref_type& top_ref, bool is_shared)
 {
@@ -636,23 +637,20 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
     if (REALM_UNLIKELY(size < sizeof (Header) || size % 8 != 0))
         throw InvalidDatabase("Realm file has bad size", path);
 
-    // File header is 24 bytes, composed of three 64-bit
-    // blocks. The two first being top_refs (only one valid
-    // at a time) and the last being the info block.
-    const char* file_header = data;
+    const Header& header = *reinterpret_cast<const Header*>(data);
 
     // First four bytes of info block is file format id
-    if (REALM_UNLIKELY(!(file_header[16] == 'T' &&
-                         file_header[17] == '-' &&
-                         file_header[18] == 'D' &&
-                         file_header[19] == 'B')))
+    if (REALM_UNLIKELY(!(char(header.m_mnemonic[0]) == 'T' &&
+                         char(header.m_mnemonic[1]) == '-' &&
+                         char(header.m_mnemonic[2]) == 'D' &&
+                         char(header.m_mnemonic[3]) == 'B')))
         throw InvalidDatabase("Not a Realm file", path);
 
     // Last bit in info block indicates which top_ref block is valid
-    int valid_part = file_header[16 + 7] & 0x1;
+    int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
-    int file_format = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
+    int file_format = int(header.m_file_format[select_field]);
     bool bad_file_format = (file_format != library_file_format);
 
     // As a special case, allow upgrading from version 2 to 3, but only when
@@ -664,14 +662,13 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
         throw InvalidDatabase("Unsupported Realm file format version", path);
 
     // Top_ref should always point within buffer
-    const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(data);
-    uint_fast64_t ref = top_refs[valid_part];
-    if (valid_part == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
+    uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
+    if (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
             throw InvalidDatabase("Realm file in streaming form has bad size", path);
-        const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data+size) - 1;
-        ref = footer->m_top_ref;
-        if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie))
+        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data+size) - 1);
+        ref = footer.m_top_ref;
+        if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie))
             throw InvalidDatabase("Bad Realm file header (#1)", path);
         m_file_on_streaming_form = true;
     }
