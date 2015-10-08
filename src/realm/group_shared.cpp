@@ -476,7 +476,7 @@ void recover_from_dead_write_transact()
     // Nothing needs to be done
 }
 
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
 
 void spawn_daemon(const std::string& file)
 {
@@ -807,7 +807,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
             m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
             m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
@@ -866,7 +866,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
     m_transact_stage = transact_Ready;
     // std::cerr << "open completed" << std::endl;
 
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
     if (durability == durability_Async) {
         if (is_backend) {
             do_async_commits();
@@ -1352,7 +1352,7 @@ void SharedGroup::do_begin_write()
     // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
     if (info->durability == durability_Async) {
 
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
