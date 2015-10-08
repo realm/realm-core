@@ -22,9 +22,9 @@
 #include <vector>
 #include <iostream>
 
-#ifdef _WIN32
-    #define NOMINMAX
-    #include <windows.h>
+#if REALM_PLATFORM_WINDOWS
+#  define NOMINMAX
+#  include <windows.h>
 #else
     #include <ctype.h>
 #endif
@@ -97,7 +97,7 @@ namespace realm {
     bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
     {
         if (method == STRING_COMPARE_CPP11) {
-#if defined(REALM_HAVE_CXX11) && !defined(REALM_ANDROID)
+#if defined(REALM_HAVE_CXX11) && !REALM_PLATFORM_ANDROID
             std::string l = std::locale("").name();
             // We cannot use C locale because it puts 'Z' before 'a'
             if (l == "C")
@@ -341,7 +341,7 @@ namespace realm {
         std::string result;
         result.resize(source.size());
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
         const char* begin = source.data();
         const char* end = begin + source.size();
         auto output = result.begin();

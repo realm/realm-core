@@ -12,7 +12,7 @@ bool keep_files = false;
 std::string path_prefix;
 std::string resource_path;
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 std::string sanitize_for_file_name(std::string str)
 {
     static const std::string invalid("<>:\"|?*\\/");

@@ -53,7 +53,7 @@
 #define TEST_LINKS
 #define TEST_ENCRYPTED_FILE_MAPPING
 #define TEST_UTIL_ERROR
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  define TEST_UTIL_NETWORK
 #endif
 

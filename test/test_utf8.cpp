@@ -449,7 +449,7 @@ template<class String16> size_t find_buf_size_utf16_to_utf8(const String16& s)
 
 // FIXME: For some reason, these tests do not compile under VisualStudio
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 
 TEST(UTF8_TranscodeUtf16)
 {
@@ -498,6 +498,6 @@ TEST(UTF8_TranscodeUtf16)
     CHECK_EQUAL("41", encode_8bit_hex("A")); // Avoid 'unused function' warning
 }
 
-#endif // _WIN32
+#endif // !REALM_PLATFORM_WINDOWS
 
 #endif // TEST_UTF8

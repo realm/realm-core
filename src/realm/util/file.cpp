@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 #  define NOMINMAX
 #  include <windows.h>
 #  include <io.h>
@@ -31,7 +31,7 @@ using namespace realm;
 using namespace realm::util;
 
 namespace {
-#ifdef _WIN32 // Windows - GetLastError()
+#if REALM_PLATFORM_WINDOWS // Windows - GetLastError()
 
 std::string get_last_error_msg(const char* prefix, DWORD err)
 {
@@ -56,7 +56,7 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
 
 size_t get_page_size()
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     SYSTEM_INFO sysinfo;
     GetNativeSystemInfo(&sysinfo);
     //DWORD size = sysinfo.dwPageSize;
@@ -79,7 +79,7 @@ namespace util {
 
 void make_dir(const std::string& path)
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     if (_mkdir(path.c_str()) == 0)
         return;
 #else // POSIX
@@ -108,7 +108,7 @@ void make_dir(const std::string& path)
 
 void remove_dir(const std::string& path)
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     if (_rmdir(path.c_str()) == 0)
         return;
 #else // POSIX
@@ -140,7 +140,7 @@ void remove_dir(const std::string& path)
 
 std::string make_temp_dir()
 {
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     StringBuffer buffer1;
     buffer1.resize(MAX_PATH+1);
@@ -186,7 +186,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
 {
     REALM_ASSERT_RELEASE(!is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     DWORD desired_access = GENERIC_READ;
     switch (a) {
@@ -318,7 +318,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
 
 void File::close() noexcept
 {
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     if (!m_handle)
         return;
@@ -345,7 +345,7 @@ size_t File::read(char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     char* const data_0 = data;
     while (0 < size) {
@@ -406,7 +406,7 @@ void File::write(const char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     while (0 < size) {
         DWORD n = std::numeric_limits<DWORD>::max();
@@ -462,7 +462,7 @@ File::SizeType File::get_size() const
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     LARGE_INTEGER large_int;
     if (GetFileSizeEx(m_handle, &large_int)) {
@@ -494,7 +494,7 @@ void File::resize(SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     // Save file position
     SizeType p = get_file_position();
@@ -599,7 +599,7 @@ void File::seek(SizeType position)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
@@ -628,7 +628,7 @@ File::SizeType File::get_file_position()
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
     LARGE_INTEGER liOfs = { 0 };
     LARGE_INTEGER liNew = { 0 };
     if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
@@ -650,13 +650,13 @@ void File::sync()
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if defined _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     if (FlushFileBuffers(m_handle))
         return;
     throw std::runtime_error("FlushFileBuffers() failed");
 
-#elif defined __APPLE__
+#elif REALM_PLATFORM_APPLE
 
     if (::fcntl(m_fd, F_FULLFSYNC) == 0)
         return;
@@ -677,7 +677,7 @@ bool File::lock(bool exclusive, bool non_blocking)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     REALM_ASSERT_RELEASE(!m_have_lock);
 
@@ -741,7 +741,7 @@ bool File::lock(bool exclusive, bool non_blocking)
 
 void File::unlock() noexcept
 {
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     if (!m_have_lock)
         return;
@@ -764,7 +764,7 @@ void File::unlock() noexcept
 
 void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) const
 {
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
     static_cast<void>(map_flags);
@@ -815,7 +815,7 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
 
 void File::unmap(void* addr, size_t size) noexcept
 {
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     static_cast<void>(size);
     BOOL r = UnmapViewOfFile(addr);
@@ -832,7 +832,7 @@ void File::unmap(void* addr, size_t size) noexcept
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
                   int map_flags, size_t file_offset) const
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     void* new_addr = map(a, new_size, map_flags);
     unmap(old_addr, old_size);
     return new_addr;
@@ -845,7 +845,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
 
 void File::sync_map(void* addr, size_t size)
 {
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     if (FlushViewOfFile(addr, size))
         return;
@@ -861,7 +861,7 @@ void File::sync_map(void* addr, size_t size)
 
 bool File::exists(const std::string& path)
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     if (_access(path.c_str(), 0) == 0)
         return true;
 #else // POSIX
@@ -892,7 +892,7 @@ void File::remove(const std::string& path)
 
 bool File::try_remove(const std::string& path)
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     if (_unlink(path.c_str()) == 0)
         return true;
 #else // POSIX
@@ -982,7 +982,7 @@ bool File::is_same_file(const File& f) const
     REALM_ASSERT_RELEASE(is_attached());
     REALM_ASSERT_RELEASE(f.is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     // FIXME: This version does not work on ReFS.
     BY_HANDLE_FILE_INFORMATION file_info;
@@ -1037,7 +1037,7 @@ bool File::is_removed() const
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     return false; // An open file cannot be deleted on Windows
 

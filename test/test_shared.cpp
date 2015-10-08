@@ -5,7 +5,7 @@
 #include <fstream>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  include <unistd.h>
 #  include <sys/wait.h>
 #  include <signal.h>
@@ -75,6 +75,7 @@ TEST(Shared_Unattached)
 namespace {
 
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
+#if REALM_ASYNC_DAEMON && !REALM_PLATFORM_APPLE_MACOS
 // Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !defined(__APPLE__)
 #  if REALM_ANDROID || defined DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
@@ -118,7 +119,7 @@ void writer(std::string path, int id)
 }
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined REALM_ENABLE_ENCRYPTION
+#if !REALM_PLATFORM_WINDOWS && !REALM_PLATFORM_APPLE && !defined REALM_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, std::string path, int id)
 {
@@ -167,7 +168,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if REALM_PLATFORM_LINUX && !defined REALM_ENABLE_ENCRYPTION
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -384,7 +385,7 @@ TEST(Shared_StaleLockFileRenamed)
     {
         // create lock file
         SharedGroup sg(path, no_create, SharedGroup::durability_Full, crypt_key());
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
         // Requires ntfs to work
         if (!CreateHardLinkA(lock_path_2.c_str(), lock_path.c_str(), 0)) {
             std::cerr << "Creating a hard link failed, test abandoned" << std::endl;
@@ -1012,7 +1013,7 @@ TEST(Shared_ManyReaders)
         for (int i = N-1; i >= 0; --i) {
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0  // These .verify() calls are horribly slow on Windows
+#if !REALM_PLATFORM_WINDOWS || TEST_DURATION > 0  // These .verify() calls are horribly slow on Windows
                 wt.get_group().verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
@@ -1038,7 +1039,7 @@ TEST(Shared_ManyReaders)
         // Initiate 6*N extra read transactionss with further progressive changes
         for (int i = 2*N; i < 8*N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
-#if !defined(_WIN32) || TEST_DURATION > 0
+#if !REALM_PLATFORM_WINDOWS || TEST_DURATION > 0
             read_transactions[i]->get_group().verify();
 #endif
             {
@@ -1057,7 +1058,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0
+#if !REALM_PLATFORM_WINDOWS || TEST_DURATION > 0
                 wt.get_group().verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
@@ -1069,7 +1070,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0
+#if !REALM_PLATFORM_WINDOWS || TEST_DURATION > 0
                 wt.get_group().verify();
 #endif
                 TableRef test_2 = wt.get_table("test_2");
@@ -1085,7 +1086,7 @@ TEST(Shared_ManyReaders)
         for (int i = 1*N; i < 8*N; ++i) {
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0
+#if !REALM_PLATFORM_WINDOWS || TEST_DURATION > 0
                 wt.get_group().verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
@@ -1113,7 +1114,7 @@ TEST(Shared_ManyReaders)
         for (int i=0; i<8*N; ++i) {
             {
                 ReadTransaction rt(*shared_groups[i]);
-#if !defined(_WIN32) || TEST_DURATION > 0
+#if !REALM_PLATFORM_WINDOWS || TEST_DURATION > 0
                 rt.get_group().verify();
 #endif
                 ConstTableRef test_1 = rt.get_table("test_1");
@@ -1135,7 +1136,7 @@ TEST(Shared_ManyReaders)
         {
             SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
             ReadTransaction rt(sg);
-#if !defined(_WIN32) || TEST_DURATION > 0
+#if !REALM_PLATFORM_WINDOWS || TEST_DURATION > 0
             rt.get_group().verify();
 #endif
             ConstTableRef test_1 = rt.get_table("test_1");
@@ -1830,7 +1831,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 
 // disable shared async on windows and any Apple operating system
 // TODO: enable async daemon for OS X - think how to do it in XCode (no issue for build.sh)
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !REALM_PLATFORM_WINDOWS && !REALM_PLATFORM_APPLE
 // Todo. Keywords: winbug
 TEST_IF(Shared_Async, allow_async)
 {
@@ -2093,11 +2094,6 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
-#endif // !defined(_WIN32) && !defined(__APPLE__)
-
-#if !defined(_WIN32) && !defined(__APPLE__)
-
-
 // Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
 /*
 
@@ -2227,7 +2223,7 @@ TEST(Shared_WaitForChange)
 
 */
 
-#endif // endif not on windows (or apple)
+#endif // !REALM_PLATFORM_WINDOWS && !REALM_PLATFORM_APPLE
 
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
@@ -2398,7 +2394,7 @@ TEST(Shared_MixedWithNonShared)
 }
 
 // @Finn, fixme, find out why it fails on Windows
-#if !defined(_WIN32)
+#if !REALM_PLATFORM_WINDOWS
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);

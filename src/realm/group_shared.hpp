@@ -253,7 +253,7 @@ public:
     /// Has db been changed ?
     bool has_changed();
 
-#ifndef __APPLE__
+#if !REALM_PLATFORM_APPLE
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to wait_for_change_release()
     /// further calls to wait_for_change() will return immediately. To restore
@@ -529,7 +529,7 @@ private:
     };
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
     util::PlatformSpecificCondVar m_room_to_write;
     util::PlatformSpecificCondVar m_work_to_do;
     util::PlatformSpecificCondVar m_daemon_becomes_ready;
@@ -1017,7 +1017,7 @@ inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
 #ifdef REALM_DEBUG
         // Sleep 0.2 seconds to create a simple thread-barrier for the two threads in the
         // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test. See the unit test for details.
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
         _sleep(200);
 #else
         // sleep() takes seconds and usleep() is deprecated, so use nanosleep()

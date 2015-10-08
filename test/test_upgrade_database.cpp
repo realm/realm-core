@@ -6,7 +6,7 @@
 #include <fstream>
 
 #include <sys/stat.h>
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  include <unistd.h>
 #  include <sys/types.h>
 #endif

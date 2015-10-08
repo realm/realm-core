@@ -254,7 +254,7 @@ TEST(File_SetEncryptionKey)
 }
 
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 
 TEST(File_ReadWrite)
 {

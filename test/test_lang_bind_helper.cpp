@@ -13,7 +13,7 @@
 #include <realm/commit_log.hpp>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  include <unistd.h>
 #  include <sys/wait.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
@@ -7293,7 +7293,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     }
 }
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
@@ -7577,9 +7577,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 */
 
-#endif // !defined(REALM_ANDROID) && !defined(REALM_IOS)
+#endif // !REALM_MOBILE
 #endif // not defined REALM_ENABLE_ENCRYPTION
-#endif // not defined _WIN32
+#endif // !REALM_PLATFORM_WINDOWS
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
 {
@@ -8712,7 +8712,7 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
 
 REALM_TABLE_1(MyTable, first,  Int)
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 
 TEST(LangBindHelper_VersionControl)
 {
@@ -8850,7 +8850,7 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
-#endif // not defined _WIN32
+#endif // !REALM_PLATFORM_WINDOWS
 
 
 TEST(LangBindHelper_LinkListCrash)

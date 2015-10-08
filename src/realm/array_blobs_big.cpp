@@ -1,7 +1,7 @@
 #include <algorithm>
 
-#ifdef _WIN32
-#include <win32/types.h>
+#if REALM_PLATFORM_WINDOWS
+#  include <win32/types.h>
 #endif
 
 #include <realm/array_blobs_big.hpp>

@@ -12,11 +12,11 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 #ifndef REALM_PTHREAD_TEST_HPP
 #define REALM_PTHREAD_TEST_HPP
 
-#ifdef _WIN32
-#define NOMINMAX
-#include <Windows.h>
+#if REALM_PLATFORM_WINDOWS
+#  define NOMINMAX
+#  include <Windows.h>
 #else
-#include <unistd.h>
+#  include <unistd.h>
 #endif
 
 inline unsigned int ptf_fastrand()
@@ -55,7 +55,7 @@ inline void ptf_randsleep(void)
     }
     else if (r < 999) {
         // Wake up in time slice according to normal OS scheduling
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     Sleep(0);
 #else
     usleep(0);
@@ -63,7 +63,7 @@ inline void ptf_randsleep(void)
     }
     else {
         size_t w = ptf_fastrand() % 100;
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
         Sleep(w);
 #else
         usleep(w * 1000);

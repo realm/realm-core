@@ -111,8 +111,8 @@ inline int log2(std::size_t x) {
     return 63 - __builtin_clzll(x); // returns int
 #   else
     return 31 - __builtin_clz(x); // returns int
-#   endif
-#elif defined(_WIN32)
+#  endif
+#elif REALM_PLATFORM_WINDOWS
     unsigned long index = 0;
 #   ifdef REALM_PTR_64
     unsigned char c = _BitScanReverse64(&index, x); // outputs unsigned long
@@ -120,7 +120,7 @@ inline int log2(std::size_t x) {
     unsigned char c = _BitScanReverse(&index, x); // outputs unsigned long
 #   endif
     return static_cast<int>(index);
-#else // not __GNUC__ and not _WIN32
+#else // not REALM_COMPILER_GCC_COMPATIBLE and not REALM_PLATFORM_WINDOWS
     int r = 0;
     while (x >>= 1) {
         r++;

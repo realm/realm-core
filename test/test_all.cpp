@@ -107,8 +107,8 @@ void fix_max_open_files()
 
 void fix_async_daemon_path()
 {
-    // `setenv()` is POSIX. _WIN32 has `_putenv_s()` instead.
-#ifndef _WIN32
+    // `setenv()` is POSIX. REALM_PLATFORM_WINDOWS has `_putenv_s()` instead.
+#if !REALM_PLATFORM_WINDOWS
     const char* async_daemon;
     // When running the unit-tests in Xcode, it runs them
     // in its own temporary directory. So we have to make sure we
@@ -133,7 +133,7 @@ void fix_async_daemon_path()
 #  endif
     }
     setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
-#endif // _WIN32
+#endif // REALM_PLATFORM_WINDOWS
 }
 
 

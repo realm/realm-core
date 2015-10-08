@@ -3,10 +3,10 @@
 #include <cmath>
 #include <sstream>
 
-#if defined _WIN32
+#if REALM_PLATFORM_WINDOWS
 #  define NOMINMAX
 #  include <windows.h>
-#elif defined __APPLE__
+#elif REALM_PLATFORM_APPLE
 #  include <sys/resource.h>
 #  include <mach/mach_time.h>
 #  include <sys/time.h>
@@ -19,7 +19,7 @@
 using namespace realm::test_util;
 
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 
 
 uint_fast64_t Timer::get_timer_ticks() const
@@ -33,7 +33,7 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 }
 
 
-#elif defined __APPLE__
+#elif REALM_PLATFORM_APPLE
 
 
 uint_fast64_t Timer::get_timer_ticks() const

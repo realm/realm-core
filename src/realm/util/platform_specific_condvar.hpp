@@ -23,9 +23,7 @@
 
 // Enable this only on platforms where it might be needed
 // currently none!
-//#ifdef __APPLE__
 //#define REALM_CONDVAR_EMULATION
-//#endif
 
 #include <realm/util/thread.hpp>
 #include <stdint.h>
@@ -170,7 +168,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
     for (;;) {
         // FIXME: handle premature return due to signal
         int r;
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
         // no timeout support on apple
         REALM_ASSERT(tp == nullptr);
         static_cast<void>(tp);

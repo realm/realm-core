@@ -24,7 +24,7 @@
 #include <vector>
 #include <string>
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 #  include <win32\stdint.h>
 #endif
 

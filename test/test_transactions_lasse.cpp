@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 #  define NOMINMAX
 #  include <windows.h> // Sleep(), sched_yield()
 #  include <pthread.h> // pthread_win32_process_attach_np()
@@ -176,7 +176,7 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
         wt.commit();
     }
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#if REALM_PLATFORM_WINDOWS
     pthread_win32_process_attach_np ();
 #endif
 
@@ -345,7 +345,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
         wt.commit();
     }
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#if REALM_PLATFORM_WINDOWS
     pthread_win32_process_attach_np ();
 #endif
 
@@ -441,7 +441,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
         wt.commit();
     }
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#if REALM_PLATFORM_WINDOWS
     pthread_win32_process_attach_np ();
 #endif
 

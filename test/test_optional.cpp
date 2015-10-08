@@ -196,7 +196,7 @@ TEST(Optional_ConstExpr) {
 }
 
 // FIXME: Visual Studio 2015's constexpr support isn't sufficient to allow Optional<T&> to compile.
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 TEST(Optional_ReferenceConstExpr) {
     // Should compile:
     constexpr Optional<const int&> a;

@@ -18,7 +18,7 @@
  *
  **************************************************************************/
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 
 #include "file_mapper.hpp"
 
@@ -45,14 +45,14 @@
 #include <realm/util/thread.hpp>
 #include <string.h> // for memset
 
-#ifdef __APPLE__
-#   include <mach/mach.h>
-#   include <mach/exc.h>
+#if REALM_PLATFORM_APPLE
+#  include <mach/mach.h>
+#  include <mach/exc.h>
 #endif
 
-#ifdef REALM_ANDROID
-#include <linux/unistd.h>
-#include <sys/syscall.h>
+#if REALM_PLATFORM_ANDROID
+#  include <linux/unistd.h>
+#  include <sys/syscall.h>
 #endif
 
 using namespace realm;
@@ -61,7 +61,7 @@ using namespace realm::util;
 namespace {
 bool handle_access(void *addr);
 
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
 
 #if defined(__x86_64__) || defined(__arm64__)
 typedef int64_t NativeCodeType;
@@ -370,9 +370,9 @@ void install_handler()
     new Thread(exception_handler_loop);
 }
 
-#else // __APPLE__
+#else // REALM_PLATFORM_APPLE
 
-#if defined(REALM_ANDROID) && defined(__LP64__)
+#if REALM_PLATFORM_ANDROID && REALM_ARCHITECTURE_ARM64
 // bionic's sigaction() is broken on arm64, so use the syscall directly
 int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sigaction* old_action) {
     __kernel_sigaction kernel_new_action;
@@ -482,7 +482,7 @@ void install_handler()
         throw EncryptionNotSupportedOnThisDevice();
 }
 
-#endif // __APPLE__
+#endif // REALM_PLATFORM_APPLE
 
 class SpinLockGuard {
 public:
@@ -789,4 +789,4 @@ void msync(void* addr, size_t size)
 }
 }
 
-#endif // _WIN32
+#endif // !REALM_PLATFORM_WINDOWS

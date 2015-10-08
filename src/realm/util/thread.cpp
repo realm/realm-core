@@ -22,15 +22,13 @@
 
 #include <realm/util/thread.hpp>
 
-#if !defined _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  include <unistd.h>
 #endif
 
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
-#if _POSIX_THREAD_PROCESS_SHARED > 0 || REALM_ANDROID
-#  define REALM_HAVE_PTHREAD_PROCESS_SHARED
-#endif
+#define REALM_HAVE_PTHREAD_PROCESS_SHARED (_POSIX_THREAD_PROCESS_SHARED > 0 || REALM_PLATFORM_ANDROID)
 
 // Unfortunately Older Ubuntu releases such as 10.04 reports support
 // for robust mutexes by setting _POSIX_THREADS = 200809L and
@@ -65,7 +63,7 @@ namespace {
 // http://www.network-theory.co.uk/docs/valgrind/valgrind_20.html under --run-libc-freeres=<yes|no>.
 // This can give false positives because of missing suppression, etc (not real leaks!). It's also a problem
 // on Windows, so we have written our own clean-up method for the Windows port.
-#if defined _WIN32 && defined REALM_DEBUG
+#if REALM_PLATFORM_WINDOWS && defined REALM_DEBUG
 void free_threadpool();
 
 class Initialization

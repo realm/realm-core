@@ -27,13 +27,13 @@ std::string system_category::message(int value) const
     const size_t max_msg_size = 256;
     char buffer[max_msg_size+1];
 
-#ifdef _WIN32 // Windows version
+#if REALM_PLATFORM_WINDOWS // Windows version
 
     if (REALM_LIKELY(strerror_s(buffer, max_msg_size, value) == 0)) {
         return buffer; // Guaranteed to be NULL-terminated
     }
 
-#elif defined __APPLE__ && defined __MACH__ // OSX, iOS and WatchOS version
+#elif REALM_PLATFORM_APPLE // OSX, iOS and WatchOS version
 
     {
         const int result = strerror_r(value, buffer, max_msg_size);
@@ -47,7 +47,7 @@ std::string system_category::message(int value) const
         }
     }
 
-#elif ! REALM_ANDROID && _GNU_SOURCE // GNU specific version
+#elif REALM_PLATFORM_LINUX && _GNU_SOURCE // GNU specific version
 
     {
         char* msg = nullptr;
