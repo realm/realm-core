@@ -192,7 +192,7 @@ public:
     //@}
 
     // Dereference
-#ifdef __clang__
+#if REALM_COMPILER_CLANG
     // Clang has a bug that causes it to effectively ignore the 'using' declaration.
     T& operator*() const noexcept { return util::bind_ptr<T>::operator*(); }
 #else
@@ -203,7 +203,7 @@ public:
 #if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     using util::bind_ptr<T>::operator bool;
 #else
-#  ifdef __clang__
+#  if REALM_COMPILER_CLANG
     // Clang 3.0 and 3.1 has a bug that causes it to effectively
     // ignore the 'using' declaration.
     typedef typename util::bind_ptr<T>::unspecified_bool_type unspecified_bool_type;
