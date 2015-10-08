@@ -152,12 +152,7 @@ public:
     /// detached accessor, the returned value is unspecified.
     std::size_t get_index() const noexcept;
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept;
-#else
-    typedef bool (RowFuncs::*unspecified_bool_type)() const;
-    operator unspecified_bool_type() const noexcept;
-#endif
 
 private:
     const T* table() const noexcept;
@@ -589,22 +584,10 @@ template<class T, class R> inline std::size_t RowFuncs<T,R>::get_index() const n
     return row_ndx();
 }
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-
 template<class T, class R> inline RowFuncs<T,R>::operator bool() const noexcept
 {
     return is_attached();
 }
-
-#else // REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-
-template<class T, class R>
-inline RowFuncs<T,R>::operator unspecified_bool_type() const noexcept
-{
-    return is_attached() ? &RowFuncs::is_attached : 0;
-}
-
-#endif // REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
 template<class T, class R> inline const T* RowFuncs<T,R>::table() const noexcept
 {

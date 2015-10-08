@@ -143,12 +143,7 @@ public:
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept;
-#else
-    typedef const char* StringData::*unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept;
-#endif
 
 private:
     const char* m_data;
@@ -303,17 +298,10 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const S
     return out;
 }
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 inline StringData::operator bool() const noexcept
 {
     return !is_null();
 }
-#else
-inline StringData::operator unspecified_bool_type() const noexcept
-{
-    return is_null() ? 0 : &StringData::m_data;
-}
-#endif
 
 /*
 Represents null in Query, find(), get(), set(), etc. Todo, maybe move this outside string_data.hpp.
