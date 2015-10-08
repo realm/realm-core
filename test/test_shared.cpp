@@ -277,6 +277,12 @@ TEST(Shared_CompactingOnTheFly)
         CHECK_EQUAL(true, sg2.compact());
         ReadTransaction rt2(sg2);
         rt2.get_group().verify();
+        sg2.close();
+    }
+    {
+        SharedGroup sg2(path, true, SharedGroup::durability_Full, crypt_key());
+        ReadTransaction rt2(sg2);
+        rt2.get_group().verify();
     }
 }
 

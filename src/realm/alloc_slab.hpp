@@ -397,8 +397,6 @@ private:
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This
     /// function will not detect all forms of corruption, though.
-    ///
-    /// Initializes `m_file_on_streaming_form`.
     void validate_buffer(const char* data, std::size_t len, const std::string& path,
                          ref_type& top_ref, bool is_shared);
 
@@ -438,7 +436,7 @@ private:
     /// Find a possible allocation of 'request_size' that will fit into a section
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
-    std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size, 
+    std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size,
                                       std::size_t request_size) const noexcept;
 
     friend class Group;
