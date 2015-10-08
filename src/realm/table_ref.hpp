@@ -136,7 +136,7 @@ public:
     constexpr BasicTableRef() noexcept {}
     ~BasicTableRef() noexcept {}
 
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
+#if REALM_HAVE_CXX11_RVALUE_REFERENCE
 
     // Copy construct
     BasicTableRef(const BasicTableRef& r) noexcept: util::bind_ptr<T>(r) {}
@@ -200,7 +200,7 @@ public:
 #endif
     using util::bind_ptr<T>::operator->;
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     using util::bind_ptr<T>::operator bool;
 #else
 #  ifdef __clang__
@@ -299,7 +299,7 @@ template<class T, class U> bool operator>=(T*, const BasicTableRef<U>&) noexcept
 
 // Implementation:
 
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
+#if REALM_HAVE_CXX11_RVALUE_REFERENCE
 
 template<class T>
 inline BasicTableRef<T>& BasicTableRef<T>::operator=(const BasicTableRef& r) noexcept

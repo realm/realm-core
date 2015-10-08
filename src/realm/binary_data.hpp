@@ -95,7 +95,7 @@ public:
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept;
 #else
     typedef const char* BinaryData::*unspecified_bool_type;
@@ -211,7 +211,7 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
     return out;
 }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 inline BinaryData::operator bool() const noexcept
 {
     return !is_null();

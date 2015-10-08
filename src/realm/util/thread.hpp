@@ -37,7 +37,7 @@
 #include <memory>
 #include <realm/util/meta.hpp>
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
+#if REALM_HAVE_CXX11_ATOMIC
 #  include <atomic>
 #endif
 

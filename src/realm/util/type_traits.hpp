@@ -84,7 +84,7 @@ template<int bits> struct FastestUnsigned;
 // Implementation
 
 
-#ifdef REALM_HAVE_CXX11_DECLTYPE
+#if REALM_HAVE_CXX11_DECLTYPE
 template<class T> struct Promote {
     typedef decltype(+T()) type; // FIXME: This is not performing floating-point promotion.
 };
@@ -155,7 +155,7 @@ template<> struct Promote<long double> { typedef long double type; };
 #endif // !REALM_HAVE_CXX11_DECLTYPE
 
 
-#ifdef REALM_HAVE_CXX11_DECLTYPE
+#if REALM_HAVE_CXX11_DECLTYPE
 template<class A, class B> struct ArithBinOpType {
     typedef decltype(A()+B()) type;
 };

@@ -25,11 +25,11 @@
 
 #include <realm/util/features.h>
 
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
+#if REALM_HAVE_CXX11_RVALUE_REFERENCE
 #  include <utility>
 #endif
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
+#if REALM_HAVE_CXX11_ATOMIC
 #  include <atomic>
 #endif
 
@@ -61,7 +61,7 @@ public:
     template<class U> explicit bind_ptr(U* p) noexcept { bind(p); }
     ~bind_ptr() noexcept { unbind(); }
 
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
+#if REALM_HAVE_CXX11_RVALUE_REFERENCE
 
     // Copy construct
     bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
@@ -114,7 +114,7 @@ public:
     T& operator*() const noexcept { return *m_ptr; }
     T* operator->() const noexcept { return m_ptr; }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept { return m_ptr != 0; }
 #else
     typedef T* bind_ptr::*unspecified_bool_type;
@@ -191,7 +191,7 @@ private:
 };
 
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
+#if REALM_HAVE_CXX11_ATOMIC
 /// Same as RefCountBase, but this one makes the copying of, and the
 /// destruction of counted references thread-safe.
 ///

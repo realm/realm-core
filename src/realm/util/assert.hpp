@@ -70,7 +70,7 @@
     realm::util::terminate("Unreachable code", __FILE__, __LINE__)
 
 
-#ifdef REALM_HAVE_CXX11_STATIC_ASSERT
+#if REALM_HAVE_CXX11_STATIC_ASSERT
 #  define REALM_STATIC_ASSERT(condition, message) static_assert(condition, message)
 #else
 #  define REALM_STATIC_ASSERT(condition, message) typedef \
