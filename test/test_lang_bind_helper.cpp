@@ -7477,12 +7477,12 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     sg.end_read();
 }
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 
 #ifndef REALM_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
-#if !defined(REALM_ANDROID) && !defined(REALM_IOS)
+#if !REALM_MOBILE
 // fork should not be used on android or ios.
 
 /*
