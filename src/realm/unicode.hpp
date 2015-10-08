@@ -28,9 +28,7 @@
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
 
-#if REALM_HAVE_CXX11
-#  include <locale>
-#endif
+#include <locale>
 
 namespace realm {
 

@@ -267,49 +267,39 @@
 #  define REALM_MAX_BPNODE_SIZE 1000
 #endif
 
-#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__ || REALM_HAVE_AT_LEAST_MSVC(11, 0)
-#  define REALM_HAVE_CXX11 1
-#else
-#  define REALM_HAVE_CXX11 0
-#endif
-
 /* Support for C++11 <atomic>.
  *
  * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
-#if REALM_HAVE_CXX11 \
-     && (REALM_HAVE_AT_LEAST_GCC(4, 4) || \
-         REALM_HAVE_AT_LEAST_LIBCPP(1001) || \
-         REALM_HAVE_AT_LEAST_MSVC(12, 0))
+#if REALM_HAVE_AT_LEAST_GCC(4, 4) || \
+    REALM_HAVE_AT_LEAST_LIBCPP(1001) || \
+    REALM_HAVE_AT_LEAST_MSVC(12, 0)
 #  define REALM_HAVE_CXX11_ATOMIC 1
 #else
 #  define REALM_HAVE_CXX11_ATOMIC 0
 #endif
 
 /* Support for C++11 static_assert(). */
-#if REALM_HAVE_CXX11 \
-     && (REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-         REALM_HAVE_CLANG_FEATURE(cxx_static_assert) || \
-         REALM_HAVE_AT_LEAST_MSVC(10, 0))
+#if REALM_HAVE_AT_LEAST_GCC(4, 3) || \
+    REALM_HAVE_CLANG_FEATURE(cxx_static_assert) || \
+    REALM_HAVE_AT_LEAST_MSVC(10, 0)
 #  define REALM_HAVE_CXX11_STATIC_ASSERT 1
 #else
 #  define REALM_HAVE_CXX11_STATIC_ASSERT 0
 #endif
 
 /* Support for the C++11 'decltype' keyword. */
-#if REALM_HAVE_CXX11 \
-     && (REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-         REALM_HAVE_CLANG_FEATURE(cxx_decltype) || \
-         REALM_HAVE_AT_LEAST_MSVC(12, 0))
+#if REALM_HAVE_AT_LEAST_GCC(4, 3) || \
+    REALM_HAVE_CLANG_FEATURE(cxx_decltype) || \
+    REALM_HAVE_AT_LEAST_MSVC(12, 0)
 #  define REALM_HAVE_CXX11_DECLTYPE 1
 #else
 #  define REALM_HAVE_CXX11_DECLTYPE 0
 #endif
 
 /* Support for C++11 explicit conversion operators. */
-#if REALM_HAVE_CXX11 \
-     && (REALM_HAVE_AT_LEAST_GCC(4, 5) || \
-         REALM_HAVE_CLANG_FEATURE(cxx_explicit_conversions) || \
-         REALM_HAVE_AT_LEAST_MSVC(12, 0))
+#if REALM_HAVE_AT_LEAST_GCC(4, 5) || \
+    REALM_HAVE_CLANG_FEATURE(cxx_explicit_conversions) || \
+    REALM_HAVE_AT_LEAST_MSVC(12, 0)
 #  define REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
 #else
 #  define REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
@@ -319,7 +309,7 @@
  *
  * NOTE: C++11 generalized attributes are not yet fully supported in
  * MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && (REALM_HAVE_AT_LEAST_GCC(4, 8) || REALM_HAVE_CLANG_FEATURE(cxx_attributes))
+#if REALM_HAVE_AT_LEAST_GCC(4, 8) || REALM_HAVE_CLANG_FEATURE(cxx_attributes)
 #  define REALM_NORETURN [[noreturn]]
 #elif REALM_COMPILER_GCC_COMPATIBLE
 #  define REALM_NORETURN __attribute__((noreturn))

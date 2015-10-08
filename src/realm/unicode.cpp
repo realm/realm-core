@@ -34,14 +34,12 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/unicode.hpp>
 
-#if REALM_HAVE_CXX11
-#  include <clocale>
+#include <clocale>
 
-#  if REALM_COMPILER_MSVC
-#    include <codecvt>
-#  else
-#    include <locale>
-#  endif
+#if REALM_COMPILER_MSVC
+#  include <codecvt>
+#else
+#  include <locale>
 #endif
 
 
@@ -99,7 +97,7 @@ namespace realm {
     bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
     {
         if (method == STRING_COMPARE_CPP11) {
-#if defined(REALM_HAVE_CXX11) && !REALM_PLATFORM_ANDROID
+#if !REALM_PLATFORM_ANDROID
             std::string l = std::locale("").name();
             // We cannot use C locale because it puts 'Z' before 'a'
             if (l == "C")
@@ -238,16 +236,11 @@ namespace realm {
         }
         else if (string_compare_method == STRING_COMPARE_CPP11) {
             // C++11. Precise sorting in user's current locale. Arbitrary return value (silent error) for invalid utf8
-#if REALM_HAVE_CXX11
             std::wstring wstring1 = utf8_to_wstring(string1);
             std::wstring wstring2 = utf8_to_wstring(string2);
             std::locale l = std::locale("");
             bool ret = l(wstring1, wstring2);
             return ret;
-#else
-            REALM_ASSERT(false);
-            return false;
-#endif
         }
         else if (string_compare_method == STRING_COMPARE_CALLBACK) {
             // Callback method
