@@ -103,6 +103,9 @@
 #  define REALM_HAVE_CLANG_FEATURE(feature) 0
 #endif
 
+#define REALM_HAVE_AT_LEAST_LIBCPP(version) \
+    (defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= version)
+
 // Platform is Windows
 #if defined(_WIN32) || defined(_WIN64)
 #  define REALM_PLATFORM_WINDOWS 1
@@ -275,7 +278,7 @@
  * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
 #if REALM_HAVE_CXX11 \
      && (REALM_HAVE_AT_LEAST_GCC(4, 4) || \
-         _LIBCPP_VERSION >= 1001 || \
+         REALM_HAVE_AT_LEAST_LIBCPP(1001) || \
          REALM_HAVE_AT_LEAST_MSVC(12, 0))
 #  define REALM_HAVE_CXX11_ATOMIC 1
 #else
@@ -297,7 +300,7 @@
  * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
 #if REALM_HAVE_CXX11 \
      && (REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-         REALM_HAVE_CLANG_FEATURE(cxx_rvalue_references) && _LIBCPP_VERSION >= 1001)
+         REALM_HAVE_CLANG_FEATURE(cxx_rvalue_references) && REALM_HAVE_AT_LEAST_LIBCPP(1001))
 #  define REALM_HAVE_CXX11_RVALUE_REFERENCE 1
 #else
 #  define REALM_HAVE_CXX11_RVALUE_REFERENCE 0

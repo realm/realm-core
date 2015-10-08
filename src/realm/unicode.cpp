@@ -22,6 +22,8 @@
 #include <vector>
 #include <iostream>
 
+#include <realm/util/features.h>
+
 #if REALM_PLATFORM_WINDOWS
 #  define NOMINMAX
 #  include <windows.h>

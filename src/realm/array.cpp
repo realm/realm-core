@@ -3,6 +3,8 @@
 #include <iostream>
 #include <iomanip>
 
+#include <realm/util/features.h>
+
 #if REALM_COMPILER_MSVC
 #  include <intrin.h>
 #  include <win32/types.h>
@@ -722,7 +724,7 @@ std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const
 {
     REALM_ASSERT(start < (indirection ? indirection->size() : size()));
 
-#if REALM_DEBUG
+#ifdef REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;

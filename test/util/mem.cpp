@@ -1,5 +1,7 @@
 #include <stdexcept>
 
+#include <realm/util/features.h>
+
 #if REALM_PLATFORM_WINDOWS
 #  include <windows.h>
 #  include <psapi.h>

@@ -18,6 +18,8 @@
  *
  **************************************************************************/
 
+#include <realm/util/features.h>
+
 #if !REALM_PLATFORM_WINDOWS
 
 #include "file_mapper.hpp"

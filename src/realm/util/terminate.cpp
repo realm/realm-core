@@ -20,6 +20,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <realm/util/features.h>
+
 #if REALM_PLATFORM_APPLE
 #  include <dlfcn.h>
 #  include <execinfo.h>

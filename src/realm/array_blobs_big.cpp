@@ -1,5 +1,7 @@
 #include <algorithm>
 
+#include <realm/util/features.h>
+
 #if REALM_PLATFORM_WINDOWS
 #  include <win32/types.h>
 #endif

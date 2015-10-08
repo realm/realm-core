@@ -1,5 +1,7 @@
 #include <ctime>
 
+#include <realm/util/features.h>
+
 #if REALM_PLATFORM_WINDOWS
 #  define NOMINMAX
 #  include <windows.h>

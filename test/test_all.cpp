@@ -1,4 +1,6 @@
 // #define USE_VLD
+#include <realm/util/features.h>
+
 #if REALM_COMPILER_MSVC && defined(_DEBUG) && defined(USE_VLD)
 #  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
@@ -14,9 +16,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/util/features.h>
 #include <memory>
-#include <realm/util/features.h>
 #include <realm.hpp>
 #include <realm/utilities.hpp>
 #include <realm/version.hpp>

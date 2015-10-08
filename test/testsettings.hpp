@@ -1,6 +1,8 @@
 #ifndef TESTSETTINGS_H
 #define TESTSETTINGS_H
 
+#include <realm/util/features.h>
+
 #ifndef TEST_DURATION
 #  define TEST_DURATION 0    // Only brief unit tests. < 1 sec
 //#  define TEST_DURATION 1  // All unit tests, plus monkey tests. ~1 minute
