@@ -258,6 +258,9 @@ public:
     }
 
     void run();
+    void run_test(Test* test);
+private:
+    Timer* m_timer;
 };
 
 
@@ -287,46 +290,52 @@ void TestList::reassign_indexes()
 
 void TestList::ExecContext::run()
 {
-    Timer timer;
-    double time = 0;
+    m_timer = new Timer;
     Test* test = nullptr;
     for (;;) {
-        double prev_time = time;
-        time = timer.get_elapsed_time();
-
         // Next test
         {
             SharedContext& shared = *m_shared;
-            Reporter& reporter = shared.m_reporter;
             LockGuard lock(shared.m_mutex);
-            if (test)
-                reporter.end(test->test_details, time - prev_time);
             if (shared.m_next_test == shared.m_tests.size())
                 break;
             test = shared.m_tests[shared.m_next_test++];
-            reporter.begin(test->test_details);
         }
 
-        m_errors_seen = false;
-        test->test_results.m_context = this;
-
-        try {
-            test->test_run();
-        }
-        catch (std::exception& ex) {
-            std::string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
-            test->test_results.test_failed(message);
-        }
-        catch (...) {
-            m_errors_seen = true;
-            std::string message = "Unhandled exception of unknown type";
-            test->test_results.test_failed(message);
-        }
-
-        test->test_results.m_context = 0;
-        if (m_errors_seen)
-            ++m_num_failed_tests;
+        test->visit(this);
     }
+    delete m_timer;
+}
+
+void TestList::ExecContext::run_test(Test* test)
+{
+    double start_time = m_timer->get_elapsed_time();
+    
+    Reporter& reporter = (*m_shared).m_reporter;
+    reporter.begin(test->test_details);
+
+    m_errors_seen = false;
+    test->test_results.m_context = this;
+    
+    try {
+        test->test_run();
+    }
+    catch (std::exception& ex) {
+        std::string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
+        test->test_results.test_failed(message);
+    }
+    catch (...) {
+        m_errors_seen = true;
+        std::string message = "Unhandled exception of unknown type";
+        test->test_results.test_failed(message);
+    }
+    
+    test->test_results.m_context = 0;
+    if (m_errors_seen)
+        ++m_num_failed_tests;
+    
+    double end_time = m_timer->get_elapsed_time();
+    reporter.end(test->test_details, end_time - start_time);
 }
 
 bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shuffle)
@@ -399,6 +408,65 @@ TestList& get_default_test_list()
 {
     static TestList list;
     return list;
+}
+
+
+void Test::visit(TestList::ExecContext* context)
+{
+    context->run_test(this);
+}
+
+
+void TestSetBase::visit(TestList::ExecContext *context)
+{
+    test_before();
+
+    context->run_test(this);
+
+    test_after();
+}
+
+void TestSetBase::test_before_all() {}
+void TestSetBase::test_after_all() {}
+void TestSetBase::test_before() {}
+void TestSetBase::test_after() {}
+
+
+void TestSet::test_before_all() {}
+void TestSet::test_after_all() {}
+
+void TestSet::visit(TestList::ExecContext* context)
+{
+    m_context = context;
+    test_before_all();
+
+    context->run_test(this);
+
+    test_after_all();
+    m_context = 0;
+}
+
+void TestSet::test_run()
+{
+    long n = long(m_tests.size());
+    for (long i = 0; i != n; ++i) {
+        Test* test = m_tests[i];
+        test->visit(m_context);
+    }
+}
+
+void TestSet::add(Test& test, const std::string& name, const char* file, long line)
+{
+    test.test_results.m_test = &test;
+    test.test_results.m_list = this->test_results.m_list;
+    long index = long(m_tests.size());
+    TestDetails& details = test.test_details;
+    details.test_index  = index;
+    details.suite_name  = this->test_details.suite_name;
+    details.test_name   = this->test_details.test_name + "::" + name;
+    details.file_name   = file;
+    details.line_number = line;
+    m_tests.push_back(&test);
 }
 
 
