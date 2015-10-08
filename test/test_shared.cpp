@@ -77,8 +77,7 @@ namespace {
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 #if REALM_ASYNC_DAEMON && !REALM_PLATFORM_APPLE_MACOS
 // Also: async requires interprocess communication, which does not work with our current encryption support.
-#if !defined(_WIN32) && !defined(__APPLE__)
-#  if REALM_ANDROID || defined DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
+#  if defined REALM_DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
 bool allow_async = true;
