@@ -267,15 +267,6 @@
 #  define REALM_MAX_BPNODE_SIZE 1000
 #endif
 
-/* Support for the C++11 'decltype' keyword. */
-#if REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_decltype) || \
-    REALM_HAVE_AT_LEAST_MSVC(12, 0)
-#  define REALM_HAVE_CXX11_DECLTYPE 1
-#else
-#  define REALM_HAVE_CXX11_DECLTYPE 0
-#endif
-
 /* The way to specify that a function never returns.
  *
  * NOTE: C++11 generalized attributes are not yet fully supported in
