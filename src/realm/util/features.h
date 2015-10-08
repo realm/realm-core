@@ -295,17 +295,6 @@
 #  define REALM_HAVE_CXX11_STATIC_ASSERT 0
 #endif
 
-/* Support for C++11 r-value references and std::move().
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 \
-     && (REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-         REALM_HAVE_CLANG_FEATURE(cxx_rvalue_references) && REALM_HAVE_AT_LEAST_LIBCPP(1001))
-#  define REALM_HAVE_CXX11_RVALUE_REFERENCE 1
-#else
-#  define REALM_HAVE_CXX11_RVALUE_REFERENCE 0
-#endif
-
 /* Support for the C++11 'decltype' keyword. */
 #if REALM_HAVE_CXX11 \
      && (REALM_HAVE_AT_LEAST_GCC(4, 3) || \
