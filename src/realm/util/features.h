@@ -229,6 +229,15 @@
 #  define REALM_COMPILER_AVX 0
 #endif
 
+// Only specific versions of clang and gcc support retrieving ISA extensions
+// through `__builtin_cpu_supports()`. Apple's clang and MSVC do not currently
+// support it.
+#if REALM_HAVE_AT_LEAST_LLVM_CLANG(3, 7) || REALM_HAVE_AT_LEAST_GCC(4, 8)
+#  define REALM_COMPILER_HAS_ISA_INTRINSICS 1
+#else
+#  define REALM_COMPILER_HAS_ISA_INTRINSICS 0
+#endif
+
 // Disable some warnings on MSVC
 #if REALM_COMPILER_MSVC
 #  pragma warning(disable:4800) // Visual Studio int->bool performance warnings

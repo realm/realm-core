@@ -8,34 +8,22 @@
 #include <realm/unicode.hpp>
 #include <realm/util/thread.hpp>
 
-#ifdef REALM_COMPILER_SSE
-#  ifdef _MSC_VER
-#    include <intrin.h>
-#  endif
-#endif
-
-
 namespace {
 
-#ifdef REALM_COMPILER_SSE
-#  if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
-#    if defined REALM_COMPILER_AVX && defined __GNUC__
-#      define _XCR_XFEATURE_ENABLED_MASK 0
+#if REALM_COMPILER_SSE && !REALM_COMPILER_HAS_ISA_INTRINSICS && !REALM_COMPILER_MSVC
+#  define _XCR_XFEATURE_ENABLED_MASK 0
 
 inline unsigned long long _xgetbv(unsigned index)
 {
-#if REALM_HAVE_AT_LEAST_GCC(4, 4)
+#  if REALM_HAVE_AT_LEAST_GCC(4, 4)
     unsigned int eax, edx;
     __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
     return (static_cast<unsigned long long>(edx) << 32) | eax;
-#else
+#  else
     static_cast<void>(index);
     return 0;
-#endif
-}
-
-#    endif
 #  endif
+}
 #endif
 
 } // anonymous namespace
@@ -51,8 +39,30 @@ string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 
 void cpuid_init()
 {
-#ifdef REALM_COMPILER_SSE
-#  ifdef _MSC_VER
+#if REALM_COMPILER_SSE
+#  if REALM_COMPILER_HAS_ISA_INTRINSICS
+    if (__builtin_cpu_supports("sse4.2")) {
+        sse_support = 1;
+    }
+    else if (__builtin_cpu_supports("sse3")) {
+        sse_support = 0;
+    }
+    else {
+        sse_support = -2;
+    }
+
+    if (__builtin_cpu_supports("avx2")) {
+        avx_support = 1;
+    }
+    else if (__builtin_cpu_supports("avx")) {
+        avx_support = 0;
+    }
+    else {
+        avx_support = -1;
+    }
+#  else // REALM_COMPILER_HAS_ISA_INTRINSICS
+        // == Apple's clang or MSVC
+
     int cret;
 
 #    if REALM_COMPILER_MSVC
@@ -83,6 +93,7 @@ void cpuid_init()
 
     bool avxSupported = false;
 
+#    if REALM_COMPILER_GCC_COMPATIBLE || REALM_HAVE_AT_LEAST_MSVC_10_SP1
     bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
     bool cpuAVXSuport = cret & (1 << 28) || false;
 
@@ -91,6 +102,7 @@ void cpuid_init()
         unsigned long long xcrFeatureMask = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
         avxSupported = (xcrFeatureMask & 0x6) || false;
     }
+#    endif
 
     if (avxSupported) {
         avx_support = 0; // AVX1 supported
@@ -100,29 +112,7 @@ void cpuid_init()
     }
 
     // 1 is reserved for AVX2
-#  elif defined __llvm__ || defined __clang__ || defined __GNUC__
-
-    if (__builtin_cpu_supports("sse4.2")) {
-        sse_support = 1;
-    }
-    else if (__builtin_cpu_supports("sse3")) {
-        sse_support = 0;
-    }
-    else {
-        sse_support = -2;
-    }
-
-    if (__builtin_cpu_supports("avx2")) {
-        avx_support = 1;
-    }
-    else if (__builtin_cpu_supports("avx")) {
-        avx_support = 0;
-    }
-    else {
-        avx_support = -1;
-    }
-
-#  endif // LLVM/Clang/GCC
+#  endif // Apple's clang or msvc
 #endif // REALM_COMPILER_SSE
 }
 
