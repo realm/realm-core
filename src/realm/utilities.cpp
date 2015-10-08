@@ -198,7 +198,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     t->remainder = 0;
 
     while (len >= 8) {
-#ifdef REALM_X86_OR_X64
+#if REALM_ARCHITECTURE_X86 || REALM_ARCHITECTURE_AMD64
         t->a_val += (*reinterpret_cast<unsigned long long*>(data)) * t->b_val;
 #else
         unsigned long long l = 0;

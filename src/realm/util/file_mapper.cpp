@@ -63,7 +63,7 @@ bool handle_access(void *addr);
 
 #if REALM_PLATFORM_APPLE
 
-#if defined(__x86_64__) || defined(__arm64__)
+#if REALM_ARCHITECTURE_AMD64 || REALM_ARCHITECTURE_ARM64
 typedef int64_t NativeCodeType;
 #define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
 #else

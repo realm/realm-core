@@ -1834,7 +1834,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const noexc
     // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
     // memset(res, 0, 8*8);
 
-    if (REALM_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
+    if (REALM_ARCHITECTURE_X86_OR_AMD64 && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
