@@ -26,37 +26,15 @@
 #include <algorithm>
 #include <cstdio>
 
-#ifdef _MSC_VER
-#  include <win32/types.h>
-#  include <intrin.h>
+#include <realm/util/features.h>
+
+#if REALM_COMPILER_MSVC
+  #include <win32/types.h>
+  #include <intrin.h>
 #endif
 
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
-
-// GCC defines __i386__ and __x86_64__
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-#  define REALM_X86_OR_X64
-#  define REALM_X86_OR_X64_TRUE true
-#else
-#  define REALM_X86_OR_X64_TRUE false
-#endif
-
-// GCC defines __arm__
-#ifdef __arm__
-#  define REALM_ARCH_ARM
-#endif
-
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-#  define REALM_PTR_64
-#endif
-
-
-#if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64)
-#  define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-#  define REALM_COMPILER_AVX
-#endif
 
 namespace realm {
 
