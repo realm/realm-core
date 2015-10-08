@@ -267,15 +267,6 @@
 #  define REALM_MAX_BPNODE_SIZE 1000
 #endif
 
-/* Support for C++11 static_assert(). */
-#if REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_static_assert) || \
-    REALM_HAVE_AT_LEAST_MSVC(10, 0)
-#  define REALM_HAVE_CXX11_STATIC_ASSERT 1
-#else
-#  define REALM_HAVE_CXX11_STATIC_ASSERT 0
-#endif
-
 /* Support for the C++11 'decltype' keyword. */
 #if REALM_HAVE_AT_LEAST_GCC(4, 3) || \
     REALM_HAVE_CLANG_FEATURE(cxx_decltype) || \

@@ -70,23 +70,7 @@
     realm::util::terminate("Unreachable code", __FILE__, __LINE__)
 
 
-#if REALM_HAVE_CXX11_STATIC_ASSERT
-#  define REALM_STATIC_ASSERT(condition, message) static_assert(condition, message)
-#else
-#  define REALM_STATIC_ASSERT(condition, message) typedef \
-    realm::util::static_assert_dummy<sizeof(realm::util:: \
-        REALM_STATIC_ASSERTION_FAILURE<bool(condition)>)> \
-    REALM_JOIN(_realm_static_assert_, __LINE__) REALM_UNUSED
-#  define REALM_JOIN(x,y) REALM_JOIN2(x,y)
-#  define REALM_JOIN2(x,y) x ## y
-namespace realm {
-namespace util {
-    template<bool> struct REALM_STATIC_ASSERTION_FAILURE;
-    template<> struct REALM_STATIC_ASSERTION_FAILURE<true> {};
-    template<int> struct static_assert_dummy {};
-}
-}
-#endif
+#define REALM_STATIC_ASSERT(condition, message) static_assert(condition, message)
 
 
 #endif // REALM_UTIL_ASSERT_HPP
