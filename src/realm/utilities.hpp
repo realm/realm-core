@@ -106,19 +106,19 @@ uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 inline int log2(std::size_t x) {
     if (x == 0)
         return -1;
-#if defined(__GNUC__)
-#   ifdef REALM_PTR_64
+#if REALM_COMPILER_GCC_COMPATIBLE
+#  if REALM_PTR_64
     return 63 - __builtin_clzll(x); // returns int
-#   else
+#  else
     return 31 - __builtin_clz(x); // returns int
 #  endif
 #elif REALM_PLATFORM_WINDOWS
     unsigned long index = 0;
-#   ifdef REALM_PTR_64
+#  if REALM_PTR_64
     unsigned char c = _BitScanReverse64(&index, x); // outputs unsigned long
-#   else
+#  else
     unsigned char c = _BitScanReverse(&index, x); // outputs unsigned long
-#   endif
+#  endif
     return static_cast<int>(index);
 #else // not REALM_COMPILER_GCC_COMPATIBLE and not REALM_PLATFORM_WINDOWS
     int r = 0;
