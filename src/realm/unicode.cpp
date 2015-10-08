@@ -74,7 +74,7 @@ uint32_t to_lower(uint32_t character)
 
 std::wstring utf8_to_wstring(StringData str)
 {
-#if REALM_HAVE_CXX11 && defined(_MSC_VER)
+#if REALM_COMPILER_MSVC
     // __STDC_UTF_16__ seems not to work
     REALM_STATIC_ASSERT(sizeof(wchar_t) == 2, "Expected Windows to use utf16");
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utf8conv;

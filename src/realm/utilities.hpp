@@ -170,7 +170,7 @@ enum IndexMethod {
 template <class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
-#if defined(_MSC_VER) && defined(_DEBUG)
+#if REALM_COMPILER_MSVC && defined(_DEBUG)
 
     // Windows has a special check in debug mode against passing realm::null()
     // pointer to std::equal(). It's uncertain if this is allowed by the C++ standard. For details, see
