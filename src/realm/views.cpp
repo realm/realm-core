@@ -38,7 +38,7 @@ void RowIndexes::sort(Sorter& sorting_predicate)
 RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
     : m_row_indexes()
 {
-#ifdef REALM_COOKIE_CHECK
+#if REALM_COOKIE_CHECK
     cookie = source.cookie;
 #endif
     if (mode == ConstSourcePayload::Copy) {
@@ -66,7 +66,7 @@ RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
         source.m_row_indexes.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
     }
 
-#ifdef REALM_COOKIE_CHECK
+#if REALM_COOKIE_CHECK
     cookie = source.cookie;
 #endif
 }

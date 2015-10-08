@@ -382,7 +382,7 @@
 #  define REALM_ASYNC_DAEMON 0
 #endif
 
-#if !defined(REALM_COOKIE_CHECK) && defined(REALM_DEBUG)
+#if defined(REALM_DEBUG)
 #  define REALM_COOKIE_CHECK 1
 #else
 #  define REALM_COOKIE_CHECK 0

@@ -16,14 +16,14 @@ class RowIndexes
 {
 public:
     RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
-#ifdef REALM_COOKIE_CHECK
+#if REALM_COOKIE_CHECK
         cookie(cookie_expected),
 #endif
         m_row_indexes(urt, alloc)
     {}
 
     RowIndexes(IntegerColumn&& col) :
-#ifdef REALM_COOKIE_CHECK
+#if REALM_COOKIE_CHECK
         cookie(cookie_expected),
 #endif
         m_row_indexes(std::move(col))
@@ -34,7 +34,7 @@ public:
 
     virtual ~RowIndexes()
     {
-#ifdef REALM_COOKIE_CHECK
+#if REALM_COOKIE_CHECK
         cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
 #endif
     }
@@ -51,7 +51,7 @@ public:
 
     void check_cookie() const
     {
-#ifdef REALM_COOKIE_CHECK
+#if REALM_COOKIE_CHECK
         REALM_ASSERT_RELEASE(cookie == cookie_expected);
 #endif
     }
@@ -106,7 +106,7 @@ public:
 
     void sort(Sorter& sorting_predicate);
 
-#ifdef REALM_COOKIE_CHECK
+#if REALM_COOKIE_CHECK
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
     uint64_t cookie;
 #endif
