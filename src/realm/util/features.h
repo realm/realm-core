@@ -267,17 +267,6 @@
 #  define REALM_MAX_BPNODE_SIZE 1000
 #endif
 
-/* Support for C++11 <atomic>.
- *
- * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
-#if REALM_HAVE_AT_LEAST_GCC(4, 4) || \
-    REALM_HAVE_AT_LEAST_LIBCPP(1001) || \
-    REALM_HAVE_AT_LEAST_MSVC(12, 0)
-#  define REALM_HAVE_CXX11_ATOMIC 1
-#else
-#  define REALM_HAVE_CXX11_ATOMIC 0
-#endif
-
 /* Support for C++11 static_assert(). */
 #if REALM_HAVE_AT_LEAST_GCC(4, 3) || \
     REALM_HAVE_CLANG_FEATURE(cxx_static_assert) || \

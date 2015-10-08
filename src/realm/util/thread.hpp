@@ -37,9 +37,7 @@
 #include <memory>
 #include <realm/util/meta.hpp>
 
-#if REALM_HAVE_CXX11_ATOMIC
-#  include <atomic>
-#endif
+#include <atomic>
 
 namespace realm {
 namespace util {

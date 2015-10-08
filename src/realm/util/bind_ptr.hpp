@@ -21,15 +21,11 @@
 #define REALM_UTIL_BIND_PTR_HPP
 
 #include <algorithm>
+#include <atomic>
 #include <ostream>
-
-#include <realm/util/features.h>
-
 #include <utility>
 
-#if REALM_HAVE_CXX11_ATOMIC
-#  include <atomic>
-#endif
+#include <realm/util/features.h>
 
 
 namespace realm {
@@ -175,7 +171,6 @@ private:
 };
 
 
-#if REALM_HAVE_CXX11_ATOMIC
 /// Same as RefCountBase, but this one makes the copying of, and the
 /// destruction of counted references thread-safe.
 ///
@@ -199,10 +194,6 @@ private:
 
     template<class> friend class bind_ptr;
 };
-#endif // REALM_HAVE_CXX11_ATOMIC
-
-
-
 
 
 // Implementation:
