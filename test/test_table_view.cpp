@@ -661,7 +661,7 @@ TEST(TableView_StringSort)
     CHECK_EQUAL("zebra", v[3].first);
     CHECK_EQUAL(true, got_called);
 
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
     // Try C++11 method which uses current locale of the operating system to give precise sorting. This C++11 feature
     // is currently (mid 2014) only supported by Visual Studio
     got_called = false;

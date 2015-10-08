@@ -54,11 +54,23 @@ void cpuid_init()
 #ifdef REALM_COMPILER_SSE
 #  ifdef _MSC_VER
     int cret;
+
+#    if REALM_COMPILER_MSVC
     int CPUInfo[4];
     __cpuid(CPUInfo, 1);
     cret = CPUInfo[2];
+#    else
+    int a = 1;
+    __asm ( "mov %1, %%eax; "            // a into eax
+          "cpuid;"
+          "mov %%ecx, %0;"             // ecx into b
+          :"=r"(cret)                     // output
+          :"r"(a)                      // input
+          :"%eax","%ebx","%ecx","%edx" // clobbered register
+         );
+#    endif
 
-// Byte is atomic. Race can/will occur but that's fine
+    // Byte is atomic. Race can/will occur but that's fine
     if (cret & 0x100000) { // test for 4.2
         sse_support = 1;
     }

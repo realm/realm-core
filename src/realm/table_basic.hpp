@@ -327,9 +327,9 @@ private:
 };
 
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4355)
+#if REALM_COMPILER_MSVC
+#  pragma warning(push)
+#  pragma warning(disable: 4355)
 #endif
 
 template<class Spec> class BasicTable<Spec>::Query:
@@ -436,11 +436,9 @@ private:
     template<class, int, class> friend class _impl::QueryColumn;
 };
 
-#ifdef _MSC_VER
-#pragma warning(pop)
+#if REALM_COMPILER_MSVC
+#  pragma warning(pop)
 #endif
-
-
 
 
 // Implementation:

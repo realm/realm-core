@@ -33,14 +33,13 @@
 #include <realm/unicode.hpp>
 
 #if REALM_HAVE_CXX11
-#include <clocale>
+#  include <clocale>
 
-#ifdef _MSC_VER
-    #include <codecvt>
-#else
-    #include <locale>
-#endif
-
+#  if REALM_COMPILER_MSVC
+#    include <codecvt>
+#  else
+#    include <locale>
+#  endif
 #endif
 
 

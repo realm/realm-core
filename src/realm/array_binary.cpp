@@ -1,4 +1,4 @@
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
 #  include <win32/types.h>
 #endif
 

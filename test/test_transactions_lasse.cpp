@@ -87,7 +87,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
     }
     else if (r <= 254) {
         // Release current time slice and get time slice according to normal scheduling
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
         Sleep(0);
 #else
         usleep(0);
@@ -95,7 +95,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
     }
     else {
         // Release time slices for at least 200 ms
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
         Sleep(200);
 #else
         usleep(200);

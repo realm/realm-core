@@ -3,7 +3,7 @@
 #include <iostream>
 #include <iomanip>
 
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
 #  include <intrin.h>
 #  include <win32/types.h>
 #  pragma warning (disable : 4127) // Condition is constant warning
@@ -813,12 +813,12 @@ exit:
 
 size_t Array::first_set_bit(unsigned int v) const
 {
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
+#if 0 && defined(USE_SSE42) && REALM_COMPILER_MSVC && REALM_PTR_64
     unsigned long ul;
     // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
     _BitScanForward(&ul, v);
     return ul;
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
+#elif 0 && !REALM_COMPILER_MSVC && defined(USE_SSE42) && REALM_PTR_64
     return __builtin_clz(v);
 #else
     int r;
@@ -835,12 +835,12 @@ return r;
 
 size_t Array::first_set_bit64(int64_t v) const
 {
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
+#if 0 && defined(USE_SSE42) && REALM_COMPILER_MSVC && REALM_PTR_64
     unsigned long ul;
     _BitScanForward64(&ul, v);
     return ul;
 
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
+#elif 0 && !REALM_COMPILER_MSVC && defined(USE_SSE42) && REALM_PTR_64
     return __builtin_clzll(v);
 #else
     unsigned int v0 = unsigned(v);
@@ -1066,9 +1066,9 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
             if (w == 1) {
 
 /*
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
+#if defined(USE_SSE42) && REALM_COMPILER_MSVC && REALM_PTR_64
                     s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
+#elif !REALM_COMPILER_MSVC && defined(USE_SSE42) && REALM_PTR_64
                     s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];

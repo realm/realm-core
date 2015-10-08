@@ -1,5 +1,5 @@
-#ifdef _MSC_VER
-#include <win32/types.h> //ssize_t
+#if REALM_COMPILER_MSVC
+#  include <win32/types.h> //ssize_t
 #endif
 
 #include <iostream>

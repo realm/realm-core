@@ -12,7 +12,7 @@
     own intrinsics to be assembled by the back end assembler and omit passing -msse to gcc.
 */
 
-#ifndef _MSC_VER
+#if !REALM_COMPILER_MSVC
 
 #ifdef REALM_COMPILER_SSE
     #include <emmintrin.h> // SSE2 (using __m128i)

@@ -8,10 +8,10 @@
 #include "../util/mem.hpp"
 #include "../util/number_names.hpp"
 
-#ifdef _MSC_VER
-#include "../../src/win32/stdint.h"
+#if REALM_COMPILER_MSVC
+#  include "../../src/win32/stdint.h"
 #else
-#include <stdint.h>
+#  include <stdint.h>
 #endif
 
 using namespace realm;
@@ -182,7 +182,7 @@ int main()
     }
     std::cout << "\nDone.\n";
 
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
     std::cin.get();
 #endif
     return 0;

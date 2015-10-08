@@ -134,7 +134,7 @@ int main()
         std::cout << "Search index: "<<timer<<"\n";
     }
 
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
     std::cin.get();
 #endif
 }

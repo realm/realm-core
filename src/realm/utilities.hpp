@@ -29,8 +29,8 @@
 #include <realm/util/features.h>
 
 #if REALM_COMPILER_MSVC
-  #include <win32/types.h>
-  #include <intrin.h>
+#  include <win32/types.h>
+#  include <intrin.h>
 #endif
 
 #include <realm/util/assert.hpp>
