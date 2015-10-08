@@ -26,7 +26,7 @@
 #  define NOMINMAX
 #  include <windows.h>
 #else
-    #include <ctype.h>
+#  include <ctype.h>
 #endif
 
 #include <realm/util/safe_int_ops.hpp>

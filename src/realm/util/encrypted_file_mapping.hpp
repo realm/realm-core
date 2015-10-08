@@ -33,7 +33,7 @@
 #  include <openssl/aes.h>
 #  include <openssl/sha.h>
 #else
-#error Encryption is not yet implemented for this platform.
+#  error Encryption is not yet implemented for this platform.
 #endif
 
 namespace realm {

@@ -65,10 +65,10 @@ bool handle_access(void *addr);
 
 #if REALM_ARCHITECTURE_AMD64 || REALM_ARCHITECTURE_ARM64
 typedef int64_t NativeCodeType;
-#define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
+#  define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
 #else
 typedef int32_t NativeCodeType;
-#define REALM_EXCEPTION_BEHAVIOR EXCEPTION_STATE_IDENTITY
+#  define REALM_EXCEPTION_BEHAVIOR EXCEPTION_STATE_IDENTITY
 #endif
 
 // These structures and the message IDs mostly defined by the .def files included
@@ -78,7 +78,7 @@ typedef int32_t NativeCodeType;
 // 32-bit handler
 
 #ifdef  __MigPackStructs
-#   pragma pack(4)
+#  pragma pack(4)
 #endif
 
 template<typename CodeType>
@@ -131,7 +131,7 @@ struct RaiseStateIdentityRequest {
 };
 
 #ifdef  __MigPackStructs
-#   pragma pack()
+#  pragma pack()
 #endif
 
 enum MachExceptionMessageID {
@@ -390,7 +390,7 @@ int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sig
     return result;
 }
 #else
-#define sigaction_wrapper sigaction
+#  define sigaction_wrapper sigaction
 #endif
 
 // The signal handlers which our handlers replaced, if any, for forwarding
