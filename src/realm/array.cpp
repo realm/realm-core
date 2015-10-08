@@ -958,7 +958,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     ++start;
 
 #if 0 // We must now return both value AND index of result. SSE does not support finding index, so we've disabled it
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
@@ -1103,7 +1103,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
         start += sizeof (int64_t) * 8 / no0(w) * chunks;
     }
 
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     if (sseavx<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:

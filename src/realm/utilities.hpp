@@ -65,7 +65,7 @@ template<int version> REALM_FORCEINLINE bool sseavx()
     prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
 */
     REALM_STATIC_ASSERT(version == 1 || version == 2 || version == 30 || version == 42, "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     if (version == 30)
         return (sse_support >= 0);
     else if (version == 42)

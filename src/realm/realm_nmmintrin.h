@@ -14,14 +14,14 @@
 
 #if !REALM_COMPILER_MSVC
 
-#ifdef REALM_COMPILER_SSE
-    #include <emmintrin.h> // SSE2 (using __m128i)
+#if REALM_COMPILER_SSE
+#  include <emmintrin.h> // SSE2 (using __m128i)
 #endif
 
 namespace realm {
 
 #if 0
-#ifdef REALM_COMPILER_AVX
+#if REALM_COMPILER_AVX
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__));
 typedef double __m256d __attribute__((__vector_size__(32), __may_alias__));
 

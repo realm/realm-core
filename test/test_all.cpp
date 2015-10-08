@@ -144,13 +144,13 @@ void display_build_config()
     const char* with_replication =
         Version::has_feature(feature_Replication) ? "Enabled" : "Disabled";
 
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
 #else
     const char* compiler_sse = "No";
 #endif
 
-#ifdef REALM_COMPILER_AVX
+#if REALM_COMPILER_AVX
     const char* compiler_avx = "Yes";
 #else
     const char* compiler_avx = "No";
