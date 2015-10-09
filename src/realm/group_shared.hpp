@@ -290,7 +290,7 @@ public:
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
-    using version_type = uint_fast64_t;
+    using version_type = History::version_type;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.

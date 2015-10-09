@@ -175,7 +175,7 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef REALM_DEBUG
@@ -193,6 +193,38 @@ public:
             return true;
         }
         return false;
+    }
+
+    bool insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
+    {
+#ifdef REALM_DEBUG
+        if (m_log)
+            *m_log << "table->insert_substring("<<col_ndx<<", "<<row_ndx<<", "<<pos<<", "
+                ""<<value<<")\n";
+#endif
+        try {
+            m_table->insert_substring(col_ndx, row_ndx, pos, value); // Throws
+            return true;
+        }
+        catch (LogicError&) {
+            return false;
+        }
+    }
+
+    bool erase_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size)
+    {
+#ifdef REALM_DEBUG
+        if (m_log)
+            *m_log << "table->remove_substring("<<col_ndx<<", "<<row_ndx<<", "<<pos<<", "
+                ""<<size<<")\n";
+#endif
+        try {
+            m_table->remove_substring(col_ndx, row_ndx, pos, size); // Throws
+            return true;
+        }
+        catch (LogicError&) {
+            return false;
+        }
     }
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
@@ -240,6 +272,17 @@ public:
 #endif
             tf::do_remove(*m_table, row_ndx); // Throws
         }
+        return true;
+    }
+
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(row_ndx_1 >= m_table->size() || row_ndx_2 >= m_table->size()))
+            return false;
+        using tf = _impl::TableFriend;
+        tf::do_swap_rows(*m_table, row_ndx_1, row_ndx_2);
         return true;
     }
 
@@ -392,7 +435,7 @@ public:
                 }
 #endif
                 Table* link_target_table = nullptr;
-                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
+                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
                 return true;
             }
         }
@@ -469,6 +512,23 @@ public:
         return false;
     }
 
+    bool move_column(size_t col_ndx_1, size_t col_ndx_2)
+    {
+        if (REALM_LIKELY(m_desc)) {
+            size_t column_count = m_desc->get_column_count();
+            if (REALM_LIKELY(col_ndx_1 < column_count && col_ndx_2 < column_count)) {
+#ifdef REALM_DEBUG
+                if (m_log)
+                    *m_log << "desc->move_column("<<col_ndx_1<<", "<<col_ndx_2<<")\n";
+#endif
+                typedef _impl::TableFriend tf;
+                tf::move_column(*m_desc, col_ndx_1, col_ndx_2); // Throws
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool select_descriptor(int levels, const size_t* path)
     {
         if (REALM_UNLIKELY(!m_table))
@@ -493,19 +553,17 @@ public:
         return true;
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name)
+    bool insert_group_level_table(size_t table_ndx, size_t prior_num_tables, StringData name)
     {
-        if (REALM_UNLIKELY(table_ndx != num_tables))
-            return false;
-        if (REALM_UNLIKELY(num_tables != m_group.size()))
+        if (REALM_UNLIKELY(prior_num_tables != m_group.size()))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "group->add_table(\""<<name<<"\", false)\n";
 #endif
         typedef _impl::GroupFriend gf;
-        bool require_unique_name = false;
-        gf::add_table(m_group, name, require_unique_name); // Throws
+        bool was_inserted;
+        gf::get_or_insert_table(m_group, table_ndx, name, &was_inserted); // Throws
         return true;
     }
 
@@ -531,6 +589,16 @@ public:
         return true;
     }
 
+    bool move_group_level_table(std::size_t table_ndx_1, std::size_t table_ndx_2) noexcept
+    {
+#ifdef REALM_DEBUG
+        if (m_log)
+            *m_log << "group->move_table("<<table_ndx_1<<", "<<table_ndx_2<<")\n";
+#endif
+        m_group.move_table(table_ndx_1, table_ndx_2);
+        return true;
+    }
+
     bool optimize_table()
     {
         if (REALM_LIKELY(m_table)) {
@@ -546,7 +614,7 @@ public:
         return false;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
@@ -654,14 +722,14 @@ public:
         return true;
     }
 
-    bool nullify_link(size_t, size_t)
+    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx)
     {
-        return true; // No-op
+        return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx);
     }
 
-    bool link_list_nullify(size_t)
+    bool link_list_nullify(size_t link_ndx)
     {
-        return true; // No-op
+        return link_list_erase(link_ndx);
     }
 
 private:
@@ -676,17 +744,6 @@ private:
         if (REALM_LIKELY(m_table)) {
             if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
                 if (REALM_LIKELY(row_ndx < m_table->size()))
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    bool check_insert_cell(size_t col_ndx, size_t row_ndx) noexcept
-    {
-        if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
-                if (REALM_LIKELY(row_ndx <= m_table->size()))
                     return true;
             }
         }

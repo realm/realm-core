@@ -32,6 +32,9 @@
 #define TEST_PATH(var_name) \
     TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
 
+#define TEST_DIR(var_name) \
+    TEST_PATH_HELPER(realm::test_util::TestDirGuard, var_name, "test-dir");
+
 #define GROUP_TEST_PATH(var_name) \
     TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "realm");
 
@@ -76,6 +79,26 @@ protected:
     std::string m_path;
 };
 
+/// The constructor creates the directory if it does not already exist, then
+/// removes any files already in it. The destructor removes files in the
+/// directory, then removes the directory.
+class TestDirGuard {
+public:
+    TestDirGuard(const std::string& path);
+    ~TestDirGuard() noexcept;
+    operator std::string() const
+    {
+        return m_path;
+    }
+    const char* c_str() const
+    {
+        return m_path.c_str();
+    }
+private:
+    std::string m_path;
+    void clean_dir(const std::string& path);
+};
+
 class SharedGroupTestPathGuard: public TestPathGuard {
 public:
     SharedGroupTestPathGuard(const std::string& path);
@@ -83,7 +106,7 @@ public:
     {
         return m_path + ".lock";
     }
-    ~SharedGroupTestPathGuard();
+    ~SharedGroupTestPathGuard() noexcept;
 };
 
 } // namespace test_util

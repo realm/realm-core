@@ -45,6 +45,7 @@ public:
     void insert_column(std::size_t column_ndx, ColumnType type, StringData name,
                        ColumnAttr attr = col_attr_None);
     void rename_column(std::size_t column_ndx, StringData new_name);
+    void move_column(std::size_t from, std::size_t to);
 
     /// Erase the column at the specified index, and move columns at
     /// succeeding indexes to the next lower index.
@@ -174,13 +175,15 @@ private:
 
     ColumnInfo get_column_info(std::size_t column_ndx) const noexcept;
 
+    std::size_t get_subspec_ndx_after(std::size_t column_ndx) const noexcept;
+
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.
     static bool get_first_column_type_from_ref(ref_type, Allocator&,
                                                ColumnType& type) noexcept;
 
     friend class Replication;
-
+    friend class Group;
     friend class Table;
 };
 

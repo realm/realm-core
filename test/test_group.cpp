@@ -344,6 +344,41 @@ TEST(Group_AddTable)
 }
 
 
+TEST(Group_InsertTable)
+{
+    Group group;
+    TableRef a = group.add_table("a");
+    TableRef b = group.insert_table(0, "b");
+    CHECK_EQUAL(2, group.size());
+    CHECK_THROW(group.insert_table(2, "b"), TableNameInUse);
+    CHECK_EQUAL(2, group.size());
+    CHECK_EQUAL(a->get_index_in_group(), 1);
+    CHECK_EQUAL(b->get_index_in_group(), 0);
+}
+
+
+TEST(Group_InsertTableWithLinks)
+{
+    using df = _impl::DescriptorFriend;
+
+    Group group;
+    TableRef a = group.add_table("a");
+    TableRef b = group.add_table("b");
+    a->add_column(type_Int, "foo");
+    b->add_column_link(type_Link, "bar", *a);
+
+    auto& a_spec = df::get_spec(*a->get_descriptor());
+    auto& b_spec = df::get_spec(*b->get_descriptor());
+    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(0), 0);
+    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), 1);
+
+    group.insert_table(0, "c");
+
+    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(0), 1);
+    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), 2);
+}
+
+
 TEST(Group_TableNameTooLong)
 {
     Group group;
@@ -426,6 +461,22 @@ TEST(Group_GetOrAddTable)
     group.get_or_add_table("baz", &was_created);
     CHECK_NOT(was_created);
     CHECK_EQUAL(4, group.size());
+}
+
+
+TEST(Group_GetOrInsertTable)
+{
+    Group group;
+    bool was_inserted;
+    group.get_or_insert_table(0, "foo", &was_inserted);
+    CHECK_EQUAL(1, group.size());
+    CHECK(was_inserted);
+    group.get_or_insert_table(0, "foo", &was_inserted);
+    CHECK_EQUAL(1, group.size());
+    CHECK_NOT(was_inserted);
+    group.get_or_insert_table(1, "foo", &was_inserted);
+    CHECK_EQUAL(1, group.size());
+    CHECK_NOT(was_inserted);
 }
 
 
@@ -699,6 +750,97 @@ TEST(Group_RenameTable)
     CHECK_EQUAL("alpha", beta->get_name());
     CHECK_EQUAL("gamma", gamma->get_name());
     group.verify();
+}
+
+
+TEST(Group_BasicMoveTable)
+{
+    Group group;
+    TableRef alpha = group.add_table("alpha");
+    TableRef beta  = group.add_table("beta");
+    TableRef gamma = group.add_table("gamma");
+    TableRef delta = group.add_table("delta");
+    CHECK_EQUAL(4, group.size());
+
+    // Move up:
+    group.move_table(1, 3);
+    CHECK_EQUAL(4, group.size());
+    CHECK(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK_EQUAL(0, alpha->get_index_in_group());
+    CHECK_EQUAL(3, beta->get_index_in_group());
+    CHECK_EQUAL(1, gamma->get_index_in_group());
+    CHECK_EQUAL(2, delta->get_index_in_group());
+
+    group.verify();
+
+    // Move down:
+    group.move_table(2, 0);
+    CHECK_EQUAL(4, group.size());
+    CHECK(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK_EQUAL(1, alpha->get_index_in_group());
+    CHECK_EQUAL(3, beta->get_index_in_group());
+    CHECK_EQUAL(2, gamma->get_index_in_group());
+    CHECK_EQUAL(0, delta->get_index_in_group());
+
+    group.verify();
+}
+
+TEST(Group_MoveTableWithLinks)
+{
+    using df = _impl::DescriptorFriend;
+    Group group;
+    TableRef a = group.add_table("a");
+    TableRef b = group.add_table("b");
+    TableRef c = group.add_table("c");
+    TableRef d = group.add_table("d");
+    CHECK_EQUAL(4, group.size());
+    a->add_column_link(type_Link, "link_to_b", *b);
+    b->add_column_link(type_LinkList, "link_to_c", *c);
+    c->add_column_link(type_Link, "link_to_d", *d);
+    d->add_column_link(type_LinkList, "link_to_a", *a);
+
+    auto& a_spec = df::get_spec(*a->get_descriptor());
+    auto& b_spec = df::get_spec(*b->get_descriptor());
+    auto& c_spec = df::get_spec(*c->get_descriptor());
+    auto& d_spec = df::get_spec(*d->get_descriptor());
+
+    // Move up:
+    group.move_table(1, 3);
+    CHECK(a->is_attached());
+    CHECK(b->is_attached());
+    CHECK(c->is_attached());
+    CHECK(d->is_attached());
+    CHECK_EQUAL(a->get_link_target(0), b);
+    CHECK_EQUAL(b->get_link_target(0), c);
+    CHECK_EQUAL(c->get_link_target(0), d);
+    CHECK_EQUAL(d->get_link_target(0), a);
+    // Check backlink columns
+    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), d->get_index_in_group());
+    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
+    CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
+    CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
+
+    // Move down:
+    group.move_table(2, 0);
+    CHECK(a->is_attached());
+    CHECK(b->is_attached());
+    CHECK(c->is_attached());
+    CHECK(d->is_attached());
+    CHECK_EQUAL(a->get_link_target(0), b);
+    CHECK_EQUAL(b->get_link_target(0), c);
+    CHECK_EQUAL(c->get_link_target(0), d);
+    CHECK_EQUAL(d->get_link_target(0), a);
+    // Check backlink columns
+    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), d->get_index_in_group());
+    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
+    CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
+    CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
 }
 
 

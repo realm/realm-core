@@ -423,15 +423,36 @@ public:
 
     /// Set cell values.
     ///
+    /// It is an error to specify a column index, row index, or string position
+    /// that is out of range.
+    ///
     /// The number of bytes in a string value must not exceed `max_string_size`,
     /// and the number of bytes in a binary data value must not exceed
-    /// `max_binary_size`. String must also be valid UTF-8 encodings. These
-    /// requirements also apply when calling set_mixed(). Passing an oversized
-    /// string or binary data value will cause an exception to be thrown.
+    /// `max_binary_size`. String must also contain valid UTF-8 encodings. These
+    /// requirements also apply when modifying a string with insert_substring()
+    /// and remove_substring(), and for strings in a mixed columnt. Passing, or
+    /// producing an oversized string or binary data value will cause an
+    /// exception to be thrown.
     ///
-    /// It is an error to assign a value to a column that is part of a primary
-    /// key, if that would result in a violation the implied *unique constraint*
-    /// of that primary key. The consequenses of doing so are unspecified.
+    /// It is an error to modify a value in a column that participates in a
+    /// primary key, if that would result in a violation the implied *unique
+    /// constraint* of that primary key. The consequenses of doing so are
+    /// unspecified.
+    ///
+    /// insert_substring() inserts the specified string into the currently
+    /// stored string at the specified position. The position must be less than
+    /// or equal to the size of the currently stored string.
+    ///
+    /// remove_substring() removes the specified byte range from the currently
+    /// stored string. The beginning of the range (\a pos) must be less than or
+    /// equal to the size of the currently stored string. If the specified range
+    /// cextends beyond the end of the currently stored string, it will be
+    /// silently clamped.
+    ///
+    /// String level modifications performed via insert_substring() and
+    /// remove_substring() are mergable and subject to operational
+    /// trsnaformation. That is, the effect of two causally unrelated
+    /// modifications will in general both be retained during synchronization.
 
     static const std::size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const std::size_t max_binary_size = 0xFFFFF8 - Array::header_size;
@@ -448,6 +469,9 @@ public:
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
     void set_null(std::size_t column_ndx, std::size_t row_ndx);
+
+    void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
+    void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size = realm::npos);
 
     //@}
 
@@ -862,6 +886,7 @@ private:
     void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
+    void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_clear(bool broken_reciprocal_backlinks);
     std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
 
@@ -918,22 +943,30 @@ private:
 
     static void do_insert_column(Descriptor&, std::size_t col_ndx, DataType type,
                                  StringData name, Table* link_target_table, bool nullable = false);
+    static void do_insert_column_unless_exists(Descriptor&, std::size_t col_ndx, DataType type,
+                                               StringData name, Table* link_target_table, bool nullable = false,
+                                               bool* was_inserted = nullptr);
     static void do_erase_column(Descriptor&, std::size_t col_ndx);
     static void do_rename_column(Descriptor&, std::size_t col_ndx, StringData name);
+    static void do_move_column(Descriptor&, std::size_t col_ndx_1, std::size_t col_ndx_2);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
+    struct MoveSubtableColumns;
 
     void insert_root_column(std::size_t col_ndx, DataType type, StringData name,
                             Table* link_target_table, bool nullable = false);
     void erase_root_column(std::size_t col_ndx);
+    void move_root_column(std::size_t from, std::size_t to);
     void do_insert_root_column(std::size_t col_ndx, ColumnType, StringData name, bool nullable = false);
     void do_erase_root_column(std::size_t col_ndx);
+    void do_move_root_column(std::size_t from, std::size_t to);
     void do_set_link_type(std::size_t col_ndx, LinkType);
     void insert_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
     void erase_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
     void update_link_target_tables(std::size_t old_col_ndx_begin, std::size_t new_col_ndx_begin);
+    void update_link_target_tables_after_column_move(std::size_t moved_from, std::size_t moved_to);
 
     struct SubtableUpdater {
         virtual void update(const SubtableColumn&, Array& subcolumns) = 0;
@@ -1211,6 +1244,7 @@ private:
 
     void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) noexcept;
     void adj_acc_erase_row(std::size_t row_ndx) noexcept;
+    void adj_acc_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1249,12 +1283,14 @@ private:
     void adj_acc_clear_nonroot_table() noexcept;
     void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) noexcept;
     void adj_row_acc_erase_row(std::size_t row_ndx) noexcept;
+    void adj_row_acc_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
     void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) noexcept;
 
     void adj_insert_column(std::size_t col_ndx);
     void adj_erase_column(std::size_t col_ndx) noexcept;
+    void adj_move_column(std::size_t col_ndx_1, std::size_t col_ndx_2) noexcept;
 
     bool is_marked() const noexcept;
     void mark() noexcept;
@@ -2028,6 +2064,11 @@ public:
         table.do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
     }
 
+    static void do_swap_rows(Table& table, std::size_t row_ndx_1, std::size_t row_ndx_2)
+    {
+        table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
+    }
+
     static void do_clear(Table& table)
     {
         bool broken_reciprocal_backlinks = false;
@@ -2069,6 +2110,13 @@ public:
         Table::do_insert_column(desc, column_ndx, type, name, link_target_table, nullable); // Throws
     }
 
+    static void insert_column_unless_exists(Descriptor& desc, std::size_t column_ndx, DataType type,
+                                            StringData name, Table* link_target_table, bool nullable = false,
+                                            bool* was_inserted = nullptr)
+    {
+        Table::do_insert_column_unless_exists(desc, column_ndx, type, name, link_target_table, nullable, was_inserted); // Throws
+    }
+
     static void erase_column(Descriptor& desc, std::size_t column_ndx)
     {
         Table::do_erase_column(desc, column_ndx); // Throws
@@ -2077,6 +2125,11 @@ public:
     static void rename_column(Descriptor& desc, std::size_t column_ndx, StringData name)
     {
         Table::do_rename_column(desc, column_ndx, name); // Throws
+    }
+
+    static void move_column(Descriptor& desc, std::size_t col_ndx_1, std::size_t col_ndx_2)
+    {
+        Table::do_move_column(desc, col_ndx_1, col_ndx_2); // Throws
     }
 
     static void set_link_type(Table& table, std::size_t column_ndx, LinkType link_type)
@@ -2129,6 +2182,11 @@ public:
         table.adj_acc_erase_row(row_ndx);
     }
 
+    static void adj_acc_swap_rows(Table& table, std::size_t row_ndx_1, std::size_t row_ndx_2) noexcept
+    {
+        table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+
     static void adj_acc_move_over(Table& table, std::size_t from_row_ndx,
                                   std::size_t to_row_ndx) noexcept
     {
@@ -2159,6 +2217,12 @@ public:
     static void adj_erase_column(Table& table, std::size_t col_ndx) noexcept
     {
         table.adj_erase_column(col_ndx);
+    }
+
+    static void adj_move_column(Table& table, std::size_t col_ndx_1, std::size_t col_ndx_2)
+        noexcept
+    {
+        table.adj_move_column(col_ndx_1, col_ndx_2);
     }
 
     static bool is_marked(const Table& table) noexcept

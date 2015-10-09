@@ -34,7 +34,7 @@ class Allocator;
 
 class Replication;
 
-typedef std::size_t ref_type;
+using ref_type = size_t;
 
 ref_type to_ref(int64_t) noexcept;
 

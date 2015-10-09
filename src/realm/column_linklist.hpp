@@ -70,6 +70,7 @@ public:
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
+    void swap_rows(size_t, size_t) override;
     void clear(std::size_t, bool) override;
     void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
@@ -78,6 +79,7 @@ public:
     void adj_acc_insert_rows(size_t, size_t) noexcept override;
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
+    void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -100,6 +102,8 @@ private:
     void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                         std::size_t new_target_row_ndx) override;
+    void do_swap_link(std::size_t row_ndx, std::size_t target_row_ndx_1,
+                      std::size_t target_row_ndx_2) override;
 
     void unregister_linkview(const LinkView& view);
     ref_type get_row_ref(std::size_t row_ndx) const noexcept;
@@ -126,6 +130,7 @@ private:
     void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept;
     template<bool fix_ndx_in_parent>
     void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
+    template<bool fix_ndx_in_parent> void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;

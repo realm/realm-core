@@ -184,7 +184,7 @@ void Group::attach(ref_type top_ref)
         m_top.init_from_ref(top_ref);
         size_t top_size = m_top.size();
         static_cast<void>(top_size);
-        REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
+        REALM_ASSERT(top_size == 3 || top_size == 5 || top_size == 7 || top_size == 8);
 
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
@@ -274,20 +274,41 @@ Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
 }
 
 
-Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
+Table* Group::do_insert_table(size_t table_ndx, StringData name, DescSetter desc_setter,
+                              bool require_unique_name)
 {
     if (require_unique_name && has_table(name))
         throw TableNameInUse();
-    return do_add_table(name, desc_setter); // Throws
+    return do_insert_table(table_ndx, name, desc_setter); // Throws
 }
 
 
-Table* Group::do_add_table(StringData name, DescSetter desc_setter)
+Table* Group::do_insert_table(size_t table_ndx, StringData name, DescSetter desc_setter)
 {
-    size_t table_ndx = create_table(name); // Throws
-    Table* table = create_table_accessor(table_ndx); // Throws
+    if (table_ndx > m_tables.size())
+        throw LogicError(LogicError::table_index_out_of_range);
+    create_and_insert_table(table_ndx, name); // Throws
+    Table* table = do_get_table(table_ndx, nullptr); // Throws
     if (desc_setter)
         (*desc_setter)(*table); // Throws
+    return table;
+}
+
+Table* Group::do_get_or_insert_table(size_t table_ndx, StringData name, DescMatcher desc_matcher,
+                                     DescSetter desc_setter, bool* was_added)
+{
+    Table* table;
+    size_t existing_table_ndx = m_table_names.find_first(name);
+    if (existing_table_ndx == not_found) {
+        table = do_insert_table(table_ndx, name, desc_setter); // Throws
+        if (was_added)
+            *was_added = true;
+    }
+    else {
+        table = do_get_table(existing_table_ndx, desc_matcher); // Throws
+        if (was_added)
+            *was_added = false;
+    }
     return table;
 }
 
@@ -298,7 +319,7 @@ Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
     Table* table;
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found) {
-        table = do_add_table(name, desc_setter); // Throws
+        table = do_insert_table(m_tables.size(), name, desc_setter); // Throws
     }
     else {
         table = do_get_table(table_ndx, desc_matcher); // Throws
@@ -309,7 +330,7 @@ Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
 }
 
 
-size_t Group::create_table(StringData name)
+void Group::create_and_insert_table(size_t table_ndx, StringData name)
 {
     if (REALM_UNLIKELY(name.size() > max_table_name_length))
         throw LogicError(LogicError::table_name_too_long);
@@ -317,19 +338,25 @@ size_t Group::create_table(StringData name)
     using namespace _impl;
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
-    size_t ndx = m_tables.size();
-    REALM_ASSERT_3(ndx, ==, m_table_names.size());
-    m_tables.add(ref); // Throws
-    m_table_names.add(name); // Throws
+    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
+    size_t prior_size = m_tables.size();
+    m_tables.insert(table_ndx, ref); // Throws
+    m_table_names.insert(table_ndx, name); // Throws
 
     // Need slot for table accessor
-    if (!m_table_accessors.empty())
-        m_table_accessors.push_back(0); // Throws
+    if (!m_table_accessors.empty()) {
+        m_table_accessors.insert(m_table_accessors.begin() + table_ndx, nullptr); // Throws
+    }
+
+    update_table_indices([&](size_t old_table_ndx) {
+        if (old_table_ndx >= table_ndx) {
+            return old_table_ndx + 1;
+        }
+        return old_table_ndx;
+    });
 
     if (Replication* repl = m_alloc.get_replication())
-        repl->insert_group_level_table(ndx, ndx, name); // Throws
-
-    return ndx;
+        repl->insert_group_level_table(table_ndx, prior_size, name); // Throws
 }
 
 
@@ -426,49 +453,8 @@ void Group::remove_table(size_t table_ndx)
     // table requires link column adjustments.
     size_t last_ndx = m_tables.size() - 1;
     if (last_ndx != table_ndx) {
-        TableRef last_table = get_table(last_ndx);
-        const Spec& last_spec = tf::get_spec(*last_table);
-        size_t last_num_cols = last_spec.get_column_count();
-        std::set<Table*> opposite_tables;
-        for (size_t i = 0; i < last_num_cols; ++i) {
-            Table* opposite_table;
-            ColumnType type = last_spec.get_column_type(i);
-            if (tf::is_link_type(type)) {
-                ColumnBase& col = tf::get_column(*last_table, i);
-                REALM_ASSERT(dynamic_cast<LinkColumnBase*>(&col));
-                LinkColumnBase& link_col = static_cast<LinkColumnBase&>(col);
-                opposite_table = &link_col.get_target_table();
-            }
-            else if (type == col_type_BackLink) {
-                ColumnBase& col = tf::get_column(*last_table, i);
-                REALM_ASSERT(dynamic_cast<BacklinkColumn*>(&col));
-                BacklinkColumn& backlink_col = static_cast<BacklinkColumn&>(col);
-                opposite_table = &backlink_col.get_origin_table();
-            }
-            else {
-                continue;
-            }
-            opposite_tables.insert(opposite_table); // Throws
-        }
-        typedef std::set<Table*>::const_iterator iter;
-        iter end = opposite_tables.end();
-        for (iter i = opposite_tables.begin(); i != end; ++i) {
-            Table* table_2 = *i;
-            Spec& spec_2 = tf::get_spec(*table_2);
-            size_t num_cols_2 = spec_2.get_column_count();
-            for (size_t col_ndx_2 = 0; col_ndx_2 < num_cols_2; ++col_ndx_2) {
-                ColumnType type_2 = spec_2.get_column_type(col_ndx_2);
-                if (type_2 == col_type_Link || type_2 == col_type_LinkList ||
-                    type_2 == col_type_BackLink) {
-                    size_t table_ndx_2 = spec_2.get_opposite_link_table_ndx(col_ndx_2);
-                    if (table_ndx_2 == last_ndx)
-                        spec_2.set_opposite_link_table_ndx(col_ndx_2, table_ndx); // Throws
-                }
-            }
-        }
         m_tables.set(table_ndx, m_tables.get(last_ndx)); // Throws
         m_table_names.set(table_ndx, m_table_names.get(last_ndx)); // Throws
-        tf::set_ndx_in_parent(*last_table, table_ndx);
     }
 
     m_tables.erase(last_ndx); // Throws
@@ -476,6 +462,16 @@ void Group::remove_table(size_t table_ndx)
 
     m_table_accessors[table_ndx] = m_table_accessors[last_ndx];
     m_table_accessors.pop_back();
+
+    if (last_ndx != table_ndx) {
+        update_table_indices([&](size_t old_table_ndx) {
+            if (old_table_ndx == last_ndx) {
+                return table_ndx;
+            }
+            return old_table_ndx;
+        });
+    }
+
     tf::detach(*table);
     tf::unbind_ref(*table);
 
@@ -511,19 +507,86 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
 }
 
 
+void Group::move_table(size_t from_ndx, size_t to_ndx)
+{
+    REALM_ASSERT_3(from_ndx, !=, to_ndx);
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
+    if (from_ndx >= m_tables.size())
+        throw LogicError(LogicError::table_index_out_of_range);
+    if (to_ndx >= m_tables.size())
+        throw LogicError(LogicError::table_index_out_of_range);
+
+    // Tables between from_ndx and to_ndx change their indices,
+    // so link columns have to be adjusted (similar to remove_table).
+
+    // Build a map of all table indices that are going to change:
+    std::map<size_t, size_t> moves; // from -> to
+    moves[from_ndx] = to_ndx;
+    if (from_ndx < to_ndx) {
+        // Move up:
+        for (size_t i = from_ndx + 1; i <= to_ndx; ++i) {
+            moves[i] = i - 1;
+        }
+    }
+    else if (from_ndx > to_ndx) {
+        // Move down:
+        for (size_t i = to_ndx; i < from_ndx; ++i) {
+            moves[i] = i + 1;
+        }
+    }
+
+    // Move entries in internal data structures.
+    m_tables.move_rotate(from_ndx, to_ndx);
+    m_table_names.move_rotate(from_ndx, to_ndx);
+
+    // Move accessors.
+    using iter = decltype(m_table_accessors.begin());
+    iter first, new_first, last;
+    if (from_ndx < to_ndx) {
+        // Rotate left.
+        first     = m_table_accessors.begin() + from_ndx;
+        new_first = first + 1;
+        last      = m_table_accessors.begin() + to_ndx + 1;
+    }
+    else { // from_ndx > to_ndx
+        // Rotate right.
+        first     = m_table_accessors.begin() + to_ndx;
+        new_first = m_table_accessors.begin() + from_ndx;
+        last      = new_first + 1;
+    }
+    std::rotate(first, new_first, last);
+
+    update_table_indices([&](size_t old_table_ndx) {
+        auto it = moves.find(old_table_ndx);
+        if (it != moves.end()) {
+            return it->second;
+        }
+        return old_table_ndx;
+    });
+
+    if (Replication* repl = m_alloc.get_replication())
+        repl->move_group_level_table(from_ndx, to_ndx); // Throws
+}
+
+
 class Group::DefaultTableWriter: public Group::TableWriter {
 public:
     DefaultTableWriter(const Group& group):
         m_group(group)
     {
     }
-    size_t write_names(_impl::OutputStream& out) override
+    ref_type write_names(_impl::OutputStream& out) override
     {
-        return m_group.m_table_names.write(out); // Throws
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        return m_group.m_table_names.write(out, deep, only_if_modified); // Throws
     }
-    size_t write_tables(_impl::OutputStream& out) override
+    ref_type write_tables(_impl::OutputStream& out) override
     {
-        return m_group.m_tables.write(out); // Throws
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        return m_group.m_tables.write(out, deep, only_if_modified); // Throws
     }
 private:
     const Group& m_group;
@@ -602,62 +665,69 @@ void Group::write(std::ostream& out, TableWriter& table_writer,
     // indicating that versioning info is to be saved. This is used from
     // SharedGroup to compact the database by writing only the live data
     // into a separate file.
-    size_t names_pos  = table_writer.write_names(out_2); // Throws
-    size_t tables_pos = table_writer.write_tables(out_2); // Throws
-    int top_size;
-    Array top(Allocator::get_default());
+    ref_type names_ref  = table_writer.write_names(out_2); // Throws
+    ref_type tables_ref = table_writer.write_tables(out_2); // Throws
+    Allocator& alloc = Allocator::get_default();
+    Array top(alloc);
     top.create(Array::type_HasRefs); // Throws
+    _impl::ShallowArrayDestroyGuard dg_top(&top);
     // FIXME: We really need an alternative to Array::truncate() that is able to expand.
-    // FIXME: Dangerous cast: unsigned -> signed
-    top.add(names_pos); // Throws
-    top.add(tables_pos); // Throws
+    int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_2 = int_fast64_t(tables_ref); // FIXME: Problematic unsigned -> signed conversion
+    top.add(value_1); // Throws
+    top.add(value_2); // Throws
     top.add(0); // Throws
 
+    int top_size = 3;
     if (version_number) {
-        Array free_list(Allocator::get_default());
-        Array size_list(Allocator::get_default());
-        Array version_list(Allocator::get_default());
-        free_list.create(Array::type_Normal);
-        size_list.create(Array::type_Normal);
-        version_list.create(Array::type_Normal);
-        size_t free_list_pos = free_list.write(out_2, /* recurse: */ false, /* persist: */ false);
-        size_t size_list_pos = size_list.write(out_2, /* recurse: */ false, /* persist: */ false);
-        size_t version_list_pos = version_list.write(out_2, /* recurse: */ false, /* persist: */ false);
-        top.add(free_list_pos);
-        top.add(size_list_pos);
-        top.add(version_list_pos);
-        top.add(1 + 2 * version_number);
+        Array free_list(alloc);
+        Array size_list(alloc);
+        Array version_list(alloc);
+        free_list.create(Array::type_Normal); // Throws
+        _impl::DeepArrayDestroyGuard dg_1(&free_list);
+        size_list.create(Array::type_Normal); // Throws
+        _impl::DeepArrayDestroyGuard dg_2(&size_list);
+        version_list.create(Array::type_Normal); // Throws
+        _impl::DeepArrayDestroyGuard dg_3(&version_list);
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
+        ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
+        ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
+        int_fast64_t value_3 = int_fast64_t(free_list_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_4 = int_fast64_t(size_list_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_5 = int_fast64_t(version_list_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_6 = 1 + 2 * int_fast64_t(version_number); // FIXME: Problematic unsigned -> signed conversion
+        top.add(value_3); // Throws
+        top.add(value_4); // Throws
+        top.add(value_5); // Throws
+        top.add(value_6); // Throws
         top_size = 7;
-        free_list.destroy();
-        size_list.destroy();
-        version_list.destroy();
     }
-    else {
-        top_size = 3;
-    }
-    size_t top_pos = out_2.get_pos();
+    ref_type top_ref = out_2.get_ref_of_next_array();
 
     // Produce a preliminary version of the top array whose
     // representation is guaranteed to be able to hold the final file
     // size
     size_t max_top_byte_size = Array::get_max_byte_size(top_size);
-    uint64_t max_final_file_size = top_pos + max_top_byte_size;
-    // FIXME: Dangerous cast: unsigned -> signed
-    top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
+    size_t max_final_file_size = size_t(top_ref) + max_top_byte_size;
+    int_fast64_t value_7 = 1 + 2*int_fast64_t(max_final_file_size); // FIXME: Problematic unsigned -> signed conversion
+    top.ensure_minimum_width(value_7); // Throws
 
     // Finalize the top array by adding the projected final file size
     // to it
     size_t top_byte_size = top.get_byte_size();
-    size_t final_file_size = top_pos + top_byte_size;
-    // FIXME: Dangerous cast: unsigned -> signed
-    top.set(2, 1 + 2*final_file_size);
+    size_t final_file_size = size_t(top_ref) + top_byte_size;
+    int_fast64_t value_8 = 1 + 2*int_fast64_t(final_file_size); // FIXME: Problematic unsigned -> signed conversion
+    top.set(2, value_8); // Throws
 
     // Write the top array
-    bool recurse = false;
-    top.write(out_2, recurse); // Throws
-    REALM_ASSERT_3(out_2.get_pos(), ==, final_file_size);
+    bool deep = false; // Shallow
+    bool only_if_modified = false; // Always
+    top.write(out_2, deep, only_if_modified); // Throws
+    REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
 
-    top.destroy(); // Shallow
+    dg_top.reset(nullptr); // Destroy now
 
     // encryption will pad the file to a multiple of the page, so ensure the
     // footer is aligned to the end of a page
@@ -674,7 +744,7 @@ void Group::write(std::ostream& out, TableWriter& table_writer,
 
     // Write streaming footer
     SlabAlloc::StreamingFooter footer;
-    footer.m_top_ref = top_pos;
+    footer.m_top_ref = top_ref;
     footer.m_magic_cookie = SlabAlloc::footer_magic_cookie;
     out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 }
@@ -885,6 +955,29 @@ private:
     size_t m_col_ndx;
 };
 
+
+class MoveColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+public:
+    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2):
+        m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2)
+    {
+    }
+
+    void update(Table& table) override
+    {
+        using tf = _impl::TableFriend;
+        tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
+    }
+
+    void update_parent(Table&) override
+    {
+    }
+
+private:
+    size_t m_col_ndx_1;
+    size_t m_col_ndx_2;
+};
+
 } // anonymous namespace
 
 
@@ -899,8 +992,8 @@ private:
 // transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
-    TransactAdvancer(Group& group):
-        m_group(group)
+    TransactAdvancer(Group& group, bool& schema_changed):
+        m_group(group), m_schema_changed(schema_changed)
     {
     }
 
@@ -922,6 +1015,8 @@ public:
                 tf::mark_opposite_link_tables(*moved_table);
             }
         }
+
+        m_schema_changed = true;
 
         return true;
     }
@@ -953,6 +1048,8 @@ public:
             m_group.m_table_accessors.pop_back();
         }
 
+        m_schema_changed = true;
+
         return true;
     }
 
@@ -960,6 +1057,15 @@ public:
     {
         // No-op since table names are properties of the group, and the group
         // accessor is always refreshed
+        m_schema_changed = true;
+        return true;
+    }
+
+    bool move_group_level_table(size_t, size_t) noexcept
+    {
+        // No-op since table names / table refs are properties of the group, and the group
+        // accessor is always refreshed
+        m_schema_changed = true;
         return true;
     }
 
@@ -1039,6 +1145,17 @@ public:
         return true;
     }
 
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(row_ndx_1 >= m_table->size() || row_ndx_2 >= m_table->size()))
+            return false;
+        using tf = _impl::TableFriend;
+        tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);
+        return true;
+    }
+
     bool clear_table() noexcept
     {
         typedef _impl::TableFriend tf;
@@ -1107,7 +1224,7 @@ public:
         return true; // No-op
     }
 
-    bool set_link(size_t col_ndx, size_t, size_t) noexcept
+    bool set_link(size_t col_ndx, size_t, size_t, size_t) noexcept
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1132,6 +1249,16 @@ public:
                 tf::mark(*target);
         }
         return true;
+    }
+
+    bool insert_substring(size_t, size_t, size_t, StringData)
+    {
+        return true; // No-op
+    }
+
+    bool erase_substring(size_t, size_t, size_t, size_t)
+    {
+        return true; // No-op
     }
 
     bool optimize_table() noexcept
@@ -1176,6 +1303,9 @@ public:
         typedef _impl::DescriptorFriend df;
         if (m_desc)
             df::adj_insert_column(*m_desc, col_ndx);
+
+        m_schema_changed = true;
+
         return true;
     }
 
@@ -1194,6 +1324,9 @@ public:
         typedef _impl::DescriptorFriend df;
         if (m_desc)
             df::adj_insert_column(*m_desc, col_ndx);
+
+        m_schema_changed = true;
+
         return true;
     }
 
@@ -1207,6 +1340,9 @@ public:
         typedef _impl::DescriptorFriend df;
         if (m_desc)
             df::adj_erase_column(*m_desc, col_ndx);
+
+        m_schema_changed = true;
+
         return true;
     }
 
@@ -1229,12 +1365,32 @@ public:
         typedef _impl::DescriptorFriend df;
         if (m_desc)
             df::adj_erase_column(*m_desc, col_ndx);
+
+        m_schema_changed = true;
+
         return true;
     }
 
     bool rename_column(size_t, StringData) noexcept
     {
+        m_schema_changed = true;
         return true; // No-op
+    }
+
+    bool move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_move_column(*m_desc, col_ndx_1, col_ndx_2);
+
+        m_schema_changed = true;
+
+        return true;
     }
 
     bool add_search_index(size_t) noexcept
@@ -1262,7 +1418,7 @@ public:
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, size_t) noexcept
+    bool select_link_list(size_t col_ndx, size_t, size_t) noexcept
     {
         // See comments on link handling in TransactAdvancer::set_link().
         typedef _impl::TableFriend tf;
@@ -1303,7 +1459,7 @@ public:
         return true; // No-op
     }
 
-    bool nullify_link(size_t, size_t)
+    bool nullify_link(size_t, size_t, size_t)
     {
         return true; // No-op
     }
@@ -1319,6 +1475,7 @@ private:
     DescriptorRef m_desc;
     const size_t* m_desc_path_begin;
     const size_t* m_desc_path_end;
+    bool& m_schema_changed;
 };
 
 void Group::refresh_dirty_accessors()
@@ -1336,6 +1493,46 @@ void Group::refresh_dirty_accessors()
                 bool bump_global = false;
                 tf::bump_version(*table, bump_global);
             }
+        }
+    }
+}
+
+
+template<class F>
+void Group::update_table_indices(F&& map_function)
+{
+    using tf = _impl::TableFriend;
+
+    // Update any link columns.
+    for (size_t i = 0; i < m_tables.size(); ++i) {
+        Array table_top{m_alloc};
+        table_top.set_parent(&m_tables, i);
+        table_top.init_from_parent();
+        Spec spec{m_alloc};
+        size_t spec_ndx_in_parent = 0;
+        spec.set_parent(&table_top, spec_ndx_in_parent);
+        spec.init_from_parent();
+
+        size_t num_cols = spec.get_column_count();
+        for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
+            ColumnType type = spec.get_column_type(col_ndx);
+            if (tf::is_link_type(type) || type == col_type_BackLink) {
+                size_t table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
+                size_t new_table_ndx = map_function(table_ndx);
+                if (new_table_ndx != table_ndx) {
+                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx);
+                }
+            }
+        }
+    }
+
+    // Update accessors.
+    refresh_dirty_accessors();
+
+    // Table's specs might have changed, so they need to be reinitialized.
+    for (size_t i = 0; i < m_table_accessors.size(); ++i) {
+        if (Table* t = m_table_accessors[i]) {
+            tf::get_spec(*t).init_from_parent();
         }
     }
 }
@@ -1398,8 +1595,9 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     // traversal to the set of accessors that were touched by the changes in the
     // transaction logs.
 
+    bool schema_changed = false;
     _impl::TransactLogParser parser; // Throws
-    TransactAdvancer advancer(*this);
+    TransactAdvancer advancer(*this, schema_changed);
     parser.parse(in, advancer); // Throws
 
     // Make all dynamically allocated memory (space beyond the attached file) as
@@ -1414,6 +1612,9 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     m_top.detach(); // Soft detach
     attach(new_top_ref); // Throws
     refresh_dirty_accessors(); // Throws
+
+    if (schema_changed)
+        send_schema_change_notification();
 }
 
 

@@ -457,7 +457,7 @@ public:
 
     /// If neccessary, expand the representation so that it can store the
     /// specified value.
-    void ensure_minimum_width(int64_t value);
+    void ensure_minimum_width(int_fast64_t value);
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
@@ -489,6 +489,16 @@ public:
     void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
     void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
     //@}
+
+    /// move_rotate moves one element from \a from to be located at index \a to,
+    /// shifting all elements inbetween by one.
+    ///
+    /// If \a from is larger than \a to, the elements inbetween are shifted down.
+    /// If \a to is larger than \a from, the elements inbetween are shifted up.
+    ///
+    /// This function is guaranteed to not throw if
+    /// `get_alloc().is_read_only(get_ref())` returns false.
+    void move_rotate(std::size_t from, std::size_t to, std::size_t num_elems = 1);
 
     //@{
     /// Find the lower/upper bound of the specified value in a sequence of
@@ -610,12 +620,20 @@ public:
 
     // Serialization
 
-    /// Returns the position in the target where the first byte of this array
-    /// was written.
+    /// Returns the ref (position in the target stream) of the written copy of
+    /// this array, or the ref of the original array if \a only_if_modified is
+    /// true, and this array is unmodified (Alloc::is_read_only()).
     ///
     /// The number of bytes that will be written by a non-recursive invocation
     /// of this function is exactly the number returned by get_byte_size().
-    size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
+    ///
+    /// \param deep If true, recursively write out subarrays, but still subject
+    /// to \a only_if_modified.
+    ref_type write(_impl::ArrayWriterBase&, bool deep, bool only_if_modified) const;
+
+    /// Same as non-static write() with `deep` set to true. This is for the
+    /// cases where you do not already have an array accessor available.
+    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -1113,6 +1131,10 @@ protected:
     bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;    // Meaning depends on context.
 
+private:
+    ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
+    ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class StringColumn;
@@ -1490,6 +1512,33 @@ inline void Array::destroy_deep() noexcept
     m_data = nullptr;
 }
 
+inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
+{
+    REALM_ASSERT(is_attached());
+
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs)
+        return do_write_shallow(out); // Throws
+
+    return do_write_deep(out, only_if_modified); // Throws
+}
+
+inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out,
+                             bool only_if_modified)
+{
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc);
+    array.init_from_ref(ref);
+
+    if (!array.m_has_refs)
+        return array.do_write_shallow(out); // Throws
+
+    return array.do_write_deep(out, only_if_modified); // Throws
+}
 
 inline void Array::add(int_fast64_t value)
 {

@@ -291,8 +291,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         m_main.set(0, 1 + 2*v); // Throws
     }
     else {
-        size_t pos = m_offsets.write(m_out); // Throws
-        ref_type ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref_type ref = m_offsets.write(m_out, deep, only_if_modified); // Throws
         int_fast64_t v(ref); // FIXME: Dangerous cast (unsigned -> signed)
         m_main.set(0, v); // Throws
     }
@@ -300,9 +301,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
         m_main.add(1 + 2*v); // Throws
     }
-    bool recurse = false; // Shallow
-    size_t pos = m_main.write(m_out, recurse); // Throws
-    ref_type parent_ref = pos;
+    bool deep = false; // Shallow
+    bool only_if_modified = false; // Always
+    ref_type parent_ref = m_main.write(m_out, deep, only_if_modified); // Throws
 
     // Whether the resulting ref must be added to the previous parent
     // level, or reported as the final ref (through `is_last`) depends
@@ -366,7 +367,8 @@ public:
     }
     bool visit(const Array::NodeInfo& leaf_info) override
     {
-        size_t size = leaf_info.m_size, pos;
+        ref_type ref;
+        size_t size = leaf_info.m_size;
         size_t leaf_begin = leaf_info.m_offset;
         size_t leaf_end   = leaf_begin + size;
         REALM_ASSERT_3(leaf_begin, <=, m_end);
@@ -374,7 +376,9 @@ public:
         bool no_slicing = leaf_begin >= m_begin && leaf_end <= m_end;
         if (no_slicing) {
             m_leaf_cache.init_from_mem(leaf_info.m_mem);
-            pos = m_leaf_cache.write(m_out); // Throws
+            bool deep = true; // Deep
+            bool only_if_modified = false; // Always
+            ref = m_leaf_cache.write(m_out, deep, only_if_modified); // Throws
         }
         else {
             // Slice the leaf
@@ -388,9 +392,10 @@ public:
             Array slice(slice_alloc);
             _impl::DeepArrayDestroyGuard dg(&slice);
             slice.init_from_mem(mem);
-            pos = slice.write(m_out); // Throws
+            bool deep = true; // Deep
+            bool only_if_modified = false; // Always
+            ref = slice.write(m_out, deep, only_if_modified); // Throws
         }
-        ref_type ref = pos;
         ref_type* is_last = nullptr;
         if (leaf_end >= m_end)
             is_last = &m_top_ref;

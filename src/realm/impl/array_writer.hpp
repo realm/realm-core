@@ -21,6 +21,8 @@
 #ifndef REALM_ARRAY_WRITER_HPP
 #define REALM_ARRAY_WRITER_HPP
 
+#include <realm/alloc.hpp>
+
 namespace realm {
 namespace _impl {
 
@@ -31,9 +33,9 @@ public:
     /// Write the specified array data and its checksum into free
     /// space.
     ///
-    /// Returns the position in the file where the first byte was
-    /// written.
-    virtual size_t write_array(const char* data, size_t size, uint_fast32_t checksum) = 0;
+    /// Returns the ref (position in the target stream) of the written copy of
+    /// the specified array data.
+    virtual ref_type write_array(const char* data, size_t size, uint_fast32_t checksum) = 0;
 };
 
 } // namespace impl_

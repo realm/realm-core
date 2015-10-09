@@ -22,13 +22,17 @@
 
 #include <cstddef>
 #include <stdint.h>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <streambuf>
 
+#ifndef _WIN32
+#  include <dirent.h> // POSIX.1-2001
+#endif
+
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
-#include <memory>
 #include <realm/util/safe_int_ops.hpp>
 
 namespace realm {
@@ -353,6 +357,11 @@ public:
     /// as not existing.
     static bool exists(const std::string& path);
 
+    /// Check whether the specified path exists and refers to a directory. If
+    /// the referenced file system object resides in an inaccessible directory,
+    /// this function returns false.
+    static bool is_dir(const std::string& path);
+
     /// Remove the specified file path from the file system. If the
     /// specified path is not a directory, this function is equivalent
     /// to std::remove(const char*).
@@ -400,6 +409,36 @@ public:
 
     // FIXME: Can we get rid of this one please!!!
     bool is_removed() const;
+
+    /// Resolve the specified path against the specified base directory.
+    ///
+    /// If \a path is absolute, or if \a base_dir is empty, \p path is returned
+    /// unmodified, otherwise \a path is resolved against \a base_dir.
+    ///
+    /// Examples (assuming POSIX):
+    ///
+    ///    resolve("/foo/bar", "../baz") -> "/foo/baz"
+    ///    resolve(".", "foo")           -> "./foo"
+    ///    resolve("/foo/", ".")         -> "/foo"
+    ///    resolve("foo", "..")          -> "."
+    ///    resolve("foo", "../..")       -> ".."
+    ///    resolve("..", "..")           -> "../.."
+    ///    resolve("", "")               -> "."
+    ///    resolve("/", "")              -> "/."
+    ///    resolve("/", "..")            -> "/."
+    ///    resolve("foo//bar", "..")     -> "foo"
+    ///
+    /// This function does not access the file system.
+    ///
+    /// \param path The path to be resolved. An empty string produces the same
+    /// result as as if "." was passed. The result has a trailing directory
+    /// separator (`/`) if, and only if this path has a trailing directory
+    /// separator.
+    ///
+    /// \param base_dir The base directory path, which may be relative or
+    /// absolute. A final directory separator (`/`) is optional. The empty
+    /// string is interpreted as a relative path.
+    static std::string resolve(const std::string& path, const std::string& base_dir);
 
     class ExclusiveLock;
     class SharedLock;
@@ -653,6 +692,17 @@ public:
     Exists(const std::string& msg, const std::string& path);
 };
 
+
+class DirScanner {
+public:
+    DirScanner(const std::string& path);
+    ~DirScanner() noexcept;
+    bool next(std::string& name);
+private:
+#ifndef _WIN32
+    DIR* m_dirp;
+#endif
+};
 
 
 

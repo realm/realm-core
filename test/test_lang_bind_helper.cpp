@@ -6382,7 +6382,7 @@ public:
         return true;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
     {
         m_current_linkview_col = col_ndx;
         m_current_linkview_row = row_ndx;
@@ -6396,11 +6396,13 @@ public:
     bool insert_group_level_table(size_t, size_t, StringData) { return false; }
     bool erase_group_level_table(size_t, size_t) { return false; }
     bool rename_group_level_table(size_t, StringData) { return false; }
+    bool move_group_level_table(size_t, size_t) { return false; }
     bool insert_column(size_t, DataType, StringData, bool) { return false; }
     bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return false; }
     bool erase_column(size_t) { return false; }
     bool erase_link_column(size_t, size_t, size_t) { return false; }
     bool rename_column(size_t, StringData) { return false; }
+    bool move_column(size_t, size_t) { return false; }
     bool add_search_index(size_t) { return false; }
     bool remove_search_index(size_t) { return false; }
     bool add_primary_key(size_t) { return false; }
@@ -6408,6 +6410,7 @@ public:
     bool set_link_type(size_t, LinkType) { return false; }
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
     bool erase_rows(size_t, size_t, size_t, bool) { return false; }
+    bool swap_rows(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }
@@ -6425,9 +6428,11 @@ public:
     bool set_date_time(size_t, size_t, DateTime) { return false; }
     bool set_table(size_t, size_t) { return false; }
     bool set_mixed(size_t, size_t, const Mixed&) { return false; }
-    bool set_link(size_t, size_t, size_t) { return false; }
+    bool set_link(size_t, size_t, size_t, size_t) { return false; }
     bool set_null(size_t, size_t) { return false; }
-    bool nullify_link(size_t, size_t) { return false; }
+    bool nullify_link(size_t, size_t, size_t) { return false; }
+    bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
+    bool erase_substring(size_t, size_t, size_t, size_t) { return false; }
     bool optimize_table() { return false; }
 };
 
@@ -6567,7 +6572,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
 
-            bool nullify_link(std::size_t col_ndx, std::size_t row_ndx)
+            bool nullify_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
@@ -7238,7 +7243,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t value)
+            bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t value, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);

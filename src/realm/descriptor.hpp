@@ -88,6 +88,16 @@ public:
     /// returns `not_found`.
     std::size_t get_column_index(StringData name) const noexcept;
 
+    /// Get the index of the column to which links in the column at the specified
+    /// index refer.
+    ///
+    /// The consequences of specifying a column index that is out of
+    /// range, are undefined.
+    ///
+    /// The consequences of specifying a column index that does not refer
+    /// to a link column, are undefined.
+    std::size_t get_column_link_target(std::size_t column_ndx) const noexcept;
+
     /// Get whether or not the specified column is nullable.
     ///
     /// The consequences of specifying a column index that is out of
@@ -491,8 +501,11 @@ private:
     // return null.
     Descriptor* get_subdesc_accessor(std::size_t column_ndx) noexcept;
 
+    void move_column(std::size_t from_ndx, std::size_t to_ndx);
+
     void adj_insert_column(std::size_t col_ndx) noexcept;
     void adj_erase_column(std::size_t col_ndx) noexcept;
+    void adj_move_column(std::size_t col_ndx_1, std::size_t col_ndx_2) noexcept;
 
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
@@ -532,6 +545,12 @@ inline std::size_t Descriptor::get_column_index(StringData name) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_column_index(name);
+}
+
+inline size_t Descriptor::get_column_link_target(std::size_t column_ndx) const noexcept
+{
+    REALM_ASSERT(is_attached());
+    return m_spec->get_opposite_link_table_ndx(column_ndx);
 }
 
 inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc,
@@ -619,6 +638,14 @@ inline void Descriptor::rename_column(size_t col_ndx, StringData name)
         throw LogicError(LogicError::column_index_out_of_range);
 
     tf::rename_column(*this, col_ndx, name); // Throws
+}
+
+inline void Descriptor::move_column(size_t from_ndx, size_t to_ndx)
+{
+    REALM_ASSERT(is_attached());
+    typedef _impl::TableFriend tf;
+    tf::move_column(*this, from_ndx, to_ndx); // Throws
+    adj_move_column(from_ndx, to_ndx);
 }
 
 inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
@@ -778,6 +805,11 @@ public:
         return desc.get_subdesc_accessor(column_ndx);
     }
 
+    static void move_column(Descriptor& desc, std::size_t from_ndx, std::size_t to_ndx)
+    {
+        return desc.move_column(from_ndx, to_ndx);
+    }
+
     static void adj_insert_column(Descriptor& desc, std::size_t col_ndx) noexcept
     {
         desc.adj_insert_column(col_ndx);
@@ -786,6 +818,12 @@ public:
     static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) noexcept
     {
         desc.adj_erase_column(col_ndx);
+    }
+
+    static void adj_move_column(Descriptor& desc, std::size_t col_ndx_1, std::size_t col_ndx_2)
+        noexcept
+    {
+        desc.adj_move_column(col_ndx_1, col_ndx_2);
     }
 };
 

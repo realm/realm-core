@@ -777,9 +777,9 @@ ref_type BpTree<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        bool recurse = true;
-        size_t pos = slice.write(out, recurse); // Throws
-        ref = pos;
+        bool deep = true;
+        bool only_when_modified = false;
+        ref = slice.write(out, deep, only_when_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc());

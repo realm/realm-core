@@ -377,6 +377,11 @@ inline void MixedColumn::move_last_over(std::size_t row_ndx)
     do_move_last_over(row_ndx, prior_num_rows); // Throws
 }
 
+inline void MixedColumn::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    do_swap_rows(row_ndx_1, row_ndx_2);
+}
+
 inline void MixedColumn::clear()
 {
     std::size_t num_rows = size(); // Note that size() is slow

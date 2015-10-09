@@ -48,13 +48,18 @@ public:
     BacklinkColumn& get_backlink_column() const noexcept;
     void set_backlink_column(BacklinkColumn&) noexcept;
 
+    void swap_rows(std::size_t, std::size_t) override = 0;
+
     virtual void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) = 0;
     virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                                 std::size_t new_target_row_ndx) = 0;
+    virtual void do_swap_link(std::size_t row_ndx, std::size_t target_row_ndx_1,
+                              std::size_t target_row_ndx_2) = 0;
 
     void adj_acc_insert_rows(std::size_t, std::size_t) noexcept override;
     void adj_acc_erase_row(std::size_t) noexcept override;
     void adj_acc_move_over(std::size_t, std::size_t) noexcept override;
+    void adj_acc_swap_rows(std::size_t, std::size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(std::size_t, const Spec&) override;
@@ -155,6 +160,15 @@ inline void LinkColumnBase::adj_acc_move_over(std::size_t from_row_ndx,
                                               std::size_t to_row_ndx) noexcept
 {
     IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
+
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_target_table);
+}
+
+inline void LinkColumnBase::adj_acc_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+    noexcept
+{
+    IntegerColumn::adj_acc_swap_rows(row_ndx_1, row_ndx_2);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);

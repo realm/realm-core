@@ -156,6 +156,15 @@ void MixedColumn::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
     m_data->move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
+void MixedColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+
+    m_types->swap_rows(row_ndx_1, row_ndx_2);
+    m_data->swap_rows(row_ndx_1, row_ndx_2);
+}
+
 
 void MixedColumn::do_clear(size_t num_rows)
 {
@@ -359,8 +368,10 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     // FIXME: This is far from good enough. See comments above.
     ref_type binary_data_ref = 0;
     if (m_binary_data) {
-        size_t pos = m_binary_data->get_root_array()->write(out); // Throws
-        binary_data_ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        binary_data_ref =
+            m_binary_data->get_root_array()->write(out, deep, only_if_modified); // Throws
     }
 
     // build new top array
@@ -381,8 +392,9 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     }
 
     // Write new top array
-    bool recurse = false;
-    return top.write(out, recurse);
+    bool deep = false; // Shallow
+    bool only_if_modified = false; // Always
+    return top.write(out, deep, only_if_modified); // Throws
 }
 
 

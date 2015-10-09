@@ -134,6 +134,11 @@ template<class T> inline void BasicColumn<T>::move_last_over(std::size_t row_ndx
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
+template<class T> inline void BasicColumn<T>::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    do_swap_rows(row_ndx_1, row_ndx_2);
+}
+
 template<class T> inline void BasicColumn<T>::clear()
 {
     do_clear(); // Throws
@@ -227,6 +232,18 @@ void BasicColumn<T>::do_move_last_over(std::size_t row_ndx, std::size_t last_row
     erase(last_row_ndx, is_last); // Throws
 }
 
+template<class T>
+void BasicColumn<T>::do_swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+
+    T value_1 = get(row_ndx_1);
+    T value_2 = get(row_ndx_2);
+    set(row_ndx_1, value_2);
+    set(row_ndx_2, value_1);
+}
+
 template<class T> void BasicColumn<T>::do_clear()
 {
     if (!m_array->is_inner_bptree_node()) {
@@ -293,13 +310,14 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        size_t pos = slice.write(out); // Throws
-        ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref = slice.write(out, deep, only_if_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc());
         ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                                      table_size, handler, out); // Throws
     }
     return ref;
 }
