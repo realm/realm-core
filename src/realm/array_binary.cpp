@@ -1,4 +1,6 @@
-#ifdef _MSC_VER
+#include <realm/util/features.h>
+
+#if REALM_COMPILER_MSVC
 #  include <win32/types.h>
 #endif
 

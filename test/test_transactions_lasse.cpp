@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 #  define NOMINMAX
 #  include <windows.h> // Sleep(), sched_yield()
 #  include <pthread.h> // pthread_win32_process_attach_np()
@@ -87,7 +87,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
     }
     else if (r <= 254) {
         // Release current time slice and get time slice according to normal scheduling
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
         Sleep(0);
 #else
         usleep(0);
@@ -95,7 +95,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
     }
     else {
         // Release time slices for at least 200 ms
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
         Sleep(200);
 #else
         usleep(200);
@@ -176,7 +176,7 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
         wt.commit();
     }
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#if REALM_PLATFORM_WINDOWS
     pthread_win32_process_attach_np ();
 #endif
 
@@ -345,7 +345,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
         wt.commit();
     }
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#if REALM_PLATFORM_WINDOWS
     pthread_win32_process_attach_np ();
 #endif
 
@@ -441,7 +441,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
         wt.commit();
     }
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#if REALM_PLATFORM_WINDOWS
     pthread_win32_process_attach_np ();
 #endif
 

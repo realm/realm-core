@@ -22,25 +22,24 @@
 #include <vector>
 #include <iostream>
 
-#ifdef _WIN32
-    #define NOMINMAX
-    #include <windows.h>
+#include <realm/util/features.h>
+
+#if REALM_PLATFORM_WINDOWS
+#  define NOMINMAX
+#  include <windows.h>
 #else
-    #include <ctype.h>
+#  include <ctype.h>
 #endif
 
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/unicode.hpp>
 
-#if REALM_HAVE_CXX11
 #include <clocale>
 
-#ifdef _MSC_VER
-    #include <codecvt>
+#if REALM_COMPILER_MSVC
+#  include <codecvt>
 #else
-    #include <locale>
-#endif
-
+#  include <locale>
 #endif
 
 
@@ -75,7 +74,7 @@ uint32_t to_lower(uint32_t character)
 
 std::wstring utf8_to_wstring(StringData str)
 {
-#if REALM_HAVE_CXX11 && defined(_MSC_VER)
+#if REALM_COMPILER_MSVC
     // __STDC_UTF_16__ seems not to work
     REALM_STATIC_ASSERT(sizeof(wchar_t) == 2, "Expected Windows to use utf16");
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utf8conv;
@@ -98,7 +97,7 @@ namespace realm {
     bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
     {
         if (method == STRING_COMPARE_CPP11) {
-#if defined(REALM_HAVE_CXX11) && !defined(REALM_ANDROID)
+#if !REALM_PLATFORM_ANDROID
             std::string l = std::locale("").name();
             // We cannot use C locale because it puts 'Z' before 'a'
             if (l == "C")
@@ -237,16 +236,11 @@ namespace realm {
         }
         else if (string_compare_method == STRING_COMPARE_CPP11) {
             // C++11. Precise sorting in user's current locale. Arbitrary return value (silent error) for invalid utf8
-#if REALM_HAVE_CXX11
             std::wstring wstring1 = utf8_to_wstring(string1);
             std::wstring wstring2 = utf8_to_wstring(string2);
             std::locale l = std::locale("");
             bool ret = l(wstring1, wstring2);
             return ret;
-#else
-            REALM_ASSERT(false);
-            return false;
-#endif
         }
         else if (string_compare_method == STRING_COMPARE_CALLBACK) {
             // Callback method
@@ -342,7 +336,7 @@ namespace realm {
         std::string result;
         result.resize(source.size());
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
         const char* begin = source.data();
         const char* end = begin + source.size();
         auto output = result.begin();

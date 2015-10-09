@@ -19,7 +19,6 @@
  **************************************************************************/
 
 
-#pragma once
 #ifndef REALM_UTIL_PRIORITY_QUEUE_HPP
 #define REALM_UTIL_PRIORITY_QUEUE_HPP
 

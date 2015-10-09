@@ -84,108 +84,13 @@ template<int bits> struct FastestUnsigned;
 // Implementation
 
 
-#ifdef REALM_HAVE_CXX11_DECLTYPE
 template<class T> struct Promote {
     typedef decltype(+T()) type; // FIXME: This is not performing floating-point promotion.
 };
-#else
-template<> struct Promote<bool> {
-    typedef int type;
-};
-template<> struct Promote<char> {
-private:
-    static const bool cond =
-        int(INT_MIN) <= int(CHAR_MIN) && unsigned(CHAR_MAX) <= unsigned(INT_MAX);
-public:
-    typedef std::conditional<cond, int, unsigned>::type type;
-};
-template<> struct Promote<signed char> {
-    typedef int type;
-};
-template<> struct Promote<unsigned char> {
-private:
-    static const bool cond = unsigned(UCHAR_MAX) <= unsigned(INT_MAX);
-public:
-    typedef std::conditional<cond, int, unsigned>::type type;
-};
-template<> struct Promote<wchar_t> {
-private:
-    typedef intmax_t  max_int;
-    typedef uintmax_t max_uint;
-    static const bool cond_0 =
-        (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(ULLONG_MAX));
-    static const bool cond_1 =
-        (max_int(LLONG_MIN) <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(LLONG_MAX));
-    static const bool cond_2 =
-        (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(ULONG_MAX));
-    static const bool cond_3 =
-        (max_int(LONG_MIN) <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(LONG_MAX));
-    static const bool cond_4 =
-        (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= unsigned(UINT_MAX));
-    static const bool cond_5 =
-        (int(INT_MIN) <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= unsigned(INT_MAX));
-    typedef std::conditional<cond_0, unsigned long long, void>::type type_0;
-    typedef std::conditional<cond_1, long long,        type_0>::type type_1;
-    typedef std::conditional<cond_2, unsigned long,    type_1>::type type_2;
-    typedef std::conditional<cond_3, long,             type_2>::type type_3;
-    typedef std::conditional<cond_4, unsigned,         type_3>::type type_4;
-    typedef std::conditional<cond_5, int,              type_4>::type type_5;
-    REALM_STATIC_ASSERT(!(std::is_same<type_5, void>::value), "Failed to promote `wchar_t`");
-public:
-    typedef type_5 type;
-};
-template<> struct Promote<short> {
-    typedef int type;
-};
-template<> struct Promote<unsigned short> {
-private:
-    static const bool cond = unsigned(USHRT_MAX) <= unsigned(INT_MAX);
-public:
-    typedef std::conditional<cond, int, unsigned>::type type;
-};
-template<> struct Promote<int> { typedef int type; };
-template<> struct Promote<unsigned> { typedef unsigned type; };
-template<> struct Promote<long> { typedef long type; };
-template<> struct Promote<unsigned long> { typedef unsigned long type; };
-template<> struct Promote<long long> { typedef long long type; };
-template<> struct Promote<unsigned long long> { typedef unsigned long long type; };
-template<> struct Promote<float> { typedef double type; };
-template<> struct Promote<double> { typedef double type; };
-template<> struct Promote<long double> { typedef long double type; };
-#endif // !REALM_HAVE_CXX11_DECLTYPE
 
-
-#ifdef REALM_HAVE_CXX11_DECLTYPE
 template<class A, class B> struct ArithBinOpType {
     typedef decltype(A()+B()) type;
 };
-#else
-template<class A, class B> struct ArithBinOpType {
-private:
-    typedef typename Promote<A>::type A2;
-    typedef typename Promote<B>::type B2;
-
-    typedef unsigned long long ullong;
-    typedef typename std::conditional<ullong(UINT_MAX) <= ullong(LONG_MAX), long, unsigned long>::type type_l_u;
-    typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, type_l_u, long>::type type_l;
-
-    typedef typename std::conditional<ullong(UINT_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_u;
-    typedef typename std::conditional<ullong(ULONG_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_ul;
-    typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, type_ll_u, long long>::type type_ll_1;
-    typedef typename std::conditional<EitherTypeIs<unsigned long, A2, B2>::value, type_ll_ul, type_ll_1>::type type_ll;
-
-    typedef typename std::conditional<EitherTypeIs<unsigned, A2, B2>::value, unsigned, int>::type type_1;
-    typedef typename std::conditional<EitherTypeIs<long, A2, B2>::value, type_l, type_1>::type type_2;
-    typedef typename std::conditional<EitherTypeIs<unsigned long, A2, B2>::value, unsigned long, type_2>::type type_3;
-    typedef typename std::conditional<EitherTypeIs<long long, A2, B2>::value, type_ll, type_3>::type type_4;
-    typedef typename std::conditional<EitherTypeIs<unsigned long long, A2, B2>::value, unsigned long long, type_4>::type type_5;
-    typedef typename std::conditional<EitherTypeIs<float, A, B>::value, float, type_5>::type type_6;
-    typedef typename std::conditional<EitherTypeIs<double, A, B>::value, double, type_6>::type type_7;
-
-public:
-    typedef typename std::conditional<EitherTypeIs<long double, A, B>::value, long double, type_7>::type type;
-};
-#endif // !REALM_HAVE_CXX11_DECLTYPE
 
 
 template<class A, class B> struct ChooseWidestInt {

@@ -65,7 +65,7 @@ Searching: The main finding function is:
     SSE4.1: smmintrin.h
     SSE4.2: nmmintrin.h
 */
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
 #  include <emmintrin.h> // SSE2
 #  include <realm/realm_nmmintrin.h> // SSE42
 #endif
@@ -703,7 +703,7 @@ public:
                       QueryState<int64_t>* state, Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     template<class cond2, Action action, size_t width, class Callback>
     bool find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
                  size_t baseindex, Callback callback) const;
@@ -2475,7 +2475,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     // finder cannot handle this bitwidth
     REALM_ASSERT_3(m_width, !=, 0);
 
-#if defined(REALM_COMPILER_SSE)
+#if REALM_COMPILER_SSE
     // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support 
     // Less-than comparison for 64-bit values. 
     if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start2 >= sizeof(__m128i) && m_width >= 8 &&
@@ -2875,7 +2875,7 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
     return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback, nullable_array, find_null);
 }
 
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
 template<class cond2, Action action, size_t width, class Callback>
 bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
@@ -3058,7 +3058,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
     }
 
 
-#if defined(REALM_COMPILER_SSE)
+#if REALM_COMPILER_SSE
     if (sseavx<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed
         while (start < end && (((reinterpret_cast<size_t>(m_data) & 0xf) * 8 + start * width) % (128) != 0)) {

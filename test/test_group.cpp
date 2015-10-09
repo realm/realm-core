@@ -5,14 +5,14 @@
 #include <fstream>
 
 #include <sys/stat.h>
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  include <unistd.h>
 #  include <sys/types.h>
 #endif
 
 // File permissions for Windows
 // http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 #  include <io.h>
 typedef int mode_t2;
 static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
@@ -184,7 +184,7 @@ TEST(Group_DoubleOpening)
     }
 }
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 TEST(Group_Permissions)
 {
     if(getuid() == 0) {
@@ -206,11 +206,7 @@ TEST(Group_Permissions)
         group1.write(path, crypt_key());
     }
 
-#ifdef _WIN32
-    _chmod(path.c_str(), S_IWUSR & MS_MODE_MASK);
-#else
     chmod(path.c_str(), S_IWUSR);
-#endif
 
     {
         Group group2((Group::unattached_tag()));
@@ -220,7 +216,7 @@ TEST(Group_Permissions)
         CHECK(!group2.is_attached());
     }
 }
-#endif
+#endif // !REALM_PLATFORM_WINDOWS
 
 TEST(Group_BadFile)
 {

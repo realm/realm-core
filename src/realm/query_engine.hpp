@@ -114,7 +114,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <iostream>
 #include <map>
 
-#if _MSC_FULL_VER >= 160040219
+#if REALM_HAVE_AT_LEAST_MSVC_10_SP1
 #  include <immintrin.h>
 #endif
 
@@ -190,18 +190,9 @@ public:
 
     REALM_FORCEINLINE T get_next(size_t index)
     {
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable:4800)   // Disable the Microsoft warning about bool performance issue.
-#endif
-
         cache_next(index);
         T av = m_leaf_ptr->get(index - m_leaf_start);
         return av;
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
     }
 
     size_t local_end(size_t global_end)

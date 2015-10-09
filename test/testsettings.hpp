@@ -1,6 +1,8 @@
 #ifndef TESTSETTINGS_H
 #define TESTSETTINGS_H
 
+#include <realm/util/features.h>
+
 #ifndef TEST_DURATION
 #  define TEST_DURATION 0    // Only brief unit tests. < 1 sec
 //#  define TEST_DURATION 1  // All unit tests, plus monkey tests. ~1 minute
@@ -53,7 +55,7 @@
 #define TEST_LINKS
 #define TEST_ENCRYPTED_FILE_MAPPING
 #define TEST_UTIL_ERROR
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  define TEST_UTIL_NETWORK
 #endif
 
@@ -63,6 +65,6 @@
 
 // Temporarily disable async testing until use of sleep() in the async tests have
 // been replaced with a better solution.
-#define DISABLE_ASYNC
+#define REALM_DISABLE_ASYNC
 
 #endif

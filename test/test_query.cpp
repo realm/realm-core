@@ -4804,7 +4804,7 @@ TEST(Query_CaseSensitivity)
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
-#if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
+#if REALM_PLATFORM_WINDOWS
 
 TEST(Query_Unicode2)
 {
@@ -4867,7 +4867,7 @@ TEST(Query_Unicode3)
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
 
-#endif
+#endif // REALM_PLATFORM_WINDOWS
 
 TEST(Query_FindAllBeginsUnicode)
 {
@@ -6533,11 +6533,11 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+#if !REALM_PLATFORM_WINDOWS // signaling_NaN() broken in VS2015
     CHECK(null::is_signaling(table->get_float(1, 0)));
 #endif
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+#if !REALM_PLATFORM_WINDOWS // signaling_NaN() broken in VS2015
     CHECK(!null::is_signaling(table->get_float(1, 1)));
 #endif
 
@@ -6549,7 +6549,7 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_double(3, 0)));
     CHECK(std::isnan(table->get_double(3, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+#if !REALM_PLATFORM_WINDOWS // signaling_NaN() broken in VS2015
     CHECK(null::is_signaling(table->get_double(3, 0)));
     CHECK(!null::is_signaling(table->get_double(3, 1)));
 #endif

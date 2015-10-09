@@ -1,6 +1,8 @@
 #include <ctime>
 
-#ifdef _WIN32
+#include <realm/util/features.h>
+
+#if REALM_PLATFORM_WINDOWS
 #  define NOMINMAX
 #  include <windows.h>
 #else
@@ -19,7 +21,7 @@ unsigned long produce_nondeterministic_random_seed()
     typedef unsigned long ulong;
     ulong value = ulong(time(0));
 
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     value ^= ulong(GetCurrentProcessId());
 #else
     value ^= ulong(getpid());

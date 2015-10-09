@@ -419,7 +419,7 @@ public:
     class Exists;
 
 private:
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     void* m_handle;
     bool m_have_lock; // Only valid when m_handle is not null
 #else
@@ -662,7 +662,7 @@ public:
 
 inline File::File(const std::string& path, Mode m)
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     m_handle = 0;
 #else
     m_fd = -1;
@@ -673,7 +673,7 @@ inline File::File(const std::string& path, Mode m)
 
 inline File::File() noexcept
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     m_handle = 0;
 #else
     m_fd = -1;
@@ -724,7 +724,7 @@ inline void File::open(const std::string& path, bool& was_created)
 
 inline bool File::is_attached() const noexcept
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     return (m_handle != nullptr);
 #else
     return 0 <= m_fd;

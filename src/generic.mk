@@ -926,7 +926,7 @@ ifneq ($(COMPILER_IS_GCC_LIKE),)
   CFLAGS_DEBUG   = -ggdb
   CFLAGS_COVER   = --coverage
   CFLAGS_SHARED  = -fPIC -DPIC
-  CFLAGS_GENERAL = -Wall
+  CFLAGS_GENERAL = -Wall -Wundef
   CFLAGS_AUTODEP = -MMD -MP
 endif
 

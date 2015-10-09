@@ -18,7 +18,9 @@
  *
  **************************************************************************/
 
-#ifndef _WIN32
+#include <realm/util/features.h>
+
+#if !REALM_PLATFORM_WINDOWS
 
 #include "file_mapper.hpp"
 
@@ -45,14 +47,14 @@
 #include <realm/util/thread.hpp>
 #include <string.h> // for memset
 
-#ifdef __APPLE__
-#   include <mach/mach.h>
-#   include <mach/exc.h>
+#if REALM_PLATFORM_APPLE
+#  include <mach/mach.h>
+#  include <mach/exc.h>
 #endif
 
-#ifdef REALM_ANDROID
-#include <linux/unistd.h>
-#include <sys/syscall.h>
+#if REALM_PLATFORM_ANDROID
+#  include <linux/unistd.h>
+#  include <sys/syscall.h>
 #endif
 
 using namespace realm;
@@ -61,14 +63,14 @@ using namespace realm::util;
 namespace {
 bool handle_access(void *addr);
 
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
 
-#if defined(__x86_64__) || defined(__arm64__)
+#if REALM_ARCHITECTURE_AMD64 || REALM_ARCHITECTURE_ARM64
 typedef int64_t NativeCodeType;
-#define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
+#  define REALM_EXCEPTION_BEHAVIOR MACH_EXCEPTION_CODES|EXCEPTION_STATE_IDENTITY
 #else
 typedef int32_t NativeCodeType;
-#define REALM_EXCEPTION_BEHAVIOR EXCEPTION_STATE_IDENTITY
+#  define REALM_EXCEPTION_BEHAVIOR EXCEPTION_STATE_IDENTITY
 #endif
 
 // These structures and the message IDs mostly defined by the .def files included
@@ -78,7 +80,7 @@ typedef int32_t NativeCodeType;
 // 32-bit handler
 
 #ifdef  __MigPackStructs
-#   pragma pack(4)
+#  pragma pack(4)
 #endif
 
 template<typename CodeType>
@@ -131,7 +133,7 @@ struct RaiseStateIdentityRequest {
 };
 
 #ifdef  __MigPackStructs
-#   pragma pack()
+#  pragma pack()
 #endif
 
 enum MachExceptionMessageID {
@@ -370,9 +372,9 @@ void install_handler()
     new Thread(exception_handler_loop);
 }
 
-#else // __APPLE__
+#else // REALM_PLATFORM_APPLE
 
-#if defined(REALM_ANDROID) && defined(__LP64__)
+#if REALM_PLATFORM_ANDROID && REALM_ARCHITECTURE_ARM64
 // bionic's sigaction() is broken on arm64, so use the syscall directly
 int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sigaction* old_action) {
     __kernel_sigaction kernel_new_action;
@@ -390,7 +392,7 @@ int sigaction_wrapper(int signal, const struct sigaction* new_action, struct sig
     return result;
 }
 #else
-#define sigaction_wrapper sigaction
+#  define sigaction_wrapper sigaction
 #endif
 
 // The signal handlers which our handlers replaced, if any, for forwarding
@@ -482,7 +484,7 @@ void install_handler()
         throw EncryptionNotSupportedOnThisDevice();
 }
 
-#endif // __APPLE__
+#endif // REALM_PLATFORM_APPLE
 
 class SpinLockGuard {
 public:
@@ -789,4 +791,4 @@ void msync(void* addr, size_t size)
 }
 }
 
-#endif // _WIN32
+#endif // !REALM_PLATFORM_WINDOWS

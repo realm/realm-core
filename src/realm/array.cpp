@@ -3,7 +3,9 @@
 #include <iostream>
 #include <iomanip>
 
-#ifdef _MSC_VER
+#include <realm/util/features.h>
+
+#if REALM_COMPILER_MSVC
 #  include <intrin.h>
 #  include <win32/types.h>
 #  pragma warning (disable : 4127) // Condition is constant warning
@@ -722,7 +724,7 @@ std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const
 {
     REALM_ASSERT(start < (indirection ? indirection->size() : size()));
 
-#if REALM_DEBUG
+#ifdef REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
@@ -813,12 +815,12 @@ exit:
 
 size_t Array::first_set_bit(unsigned int v) const
 {
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
+#if 0 && defined(USE_SSE42) && REALM_COMPILER_MSVC && REALM_PTR_64
     unsigned long ul;
     // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
     _BitScanForward(&ul, v);
     return ul;
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
+#elif 0 && !REALM_COMPILER_MSVC && defined(USE_SSE42) && REALM_PTR_64
     return __builtin_clz(v);
 #else
     int r;
@@ -835,12 +837,12 @@ return r;
 
 size_t Array::first_set_bit64(int64_t v) const
 {
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
+#if 0 && defined(USE_SSE42) && REALM_COMPILER_MSVC && REALM_PTR_64
     unsigned long ul;
     _BitScanForward64(&ul, v);
     return ul;
 
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
+#elif 0 && !REALM_COMPILER_MSVC && defined(USE_SSE42) && REALM_PTR_64
     return __builtin_clzll(v);
 #else
     unsigned int v0 = unsigned(v);
@@ -958,7 +960,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     ++start;
 
 #if 0 // We must now return both value AND index of result. SSE does not support finding index, so we've disabled it
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
@@ -1066,9 +1068,9 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
             if (w == 1) {
 
 /*
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
+#if defined(USE_SSE42) && REALM_COMPILER_MSVC && REALM_PTR_64
                     s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
+#elif !REALM_COMPILER_MSVC && defined(USE_SSE42) && REALM_PTR_64
                     s += __builtin_popcountll(data[t]);
 #else
                     uint64_t a = data[t];
@@ -1103,7 +1105,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
         start += sizeof (int64_t) * 8 / no0(w) * chunks;
     }
 
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     if (sseavx<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
@@ -1834,7 +1836,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const noexc
     // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
     // memset(res, 0, 8*8);
 
-    if (REALM_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
+    if (REALM_ARCHITECTURE_X86_OR_AMD64 && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;

@@ -1232,7 +1232,7 @@ TableView Query::find_all_multi(size_t start, size_t end)
 
 int Query::set_threads(unsigned int threadcount)
 {
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+#if REALM_PLATFORM_WINDOWS
     pthread_win32_process_attach_np ();
 #endif
     pthread_mutex_init(&ts.result_mutex, nullptr);

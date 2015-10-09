@@ -20,14 +20,16 @@
 #include <iostream>
 #include <sstream>
 
-#ifdef __APPLE__
-#include <dlfcn.h>
-#include <execinfo.h>
-#include <CoreFoundation/CoreFoundation.h>
+#include <realm/util/features.h>
+
+#if REALM_PLATFORM_APPLE
+#  include <dlfcn.h>
+#  include <execinfo.h>
+#  include <CoreFoundation/CoreFoundation.h>
 #endif
 
-#ifdef __ANDROID__
-#include <android/log.h>
+#if REALM_PLATFORM_ANDROID
+#  include <android/log.h>
 #endif
 
 #include <realm/util/terminate.hpp>
@@ -45,7 +47,7 @@ void please_report_this_error_to_help_at_realm_dot_io() {
 
 namespace {
 
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
 void nslog(const char *message) {
     CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
     CFShow(str);
@@ -69,7 +71,7 @@ namespace util {
 REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
 {
 
-#if defined(__APPLE__)
+#if REALM_PLATFORM_APPLE
     void* callstack[128];
     int frames = backtrace(callstack, 128);
     char** strs = backtrace_symbols(callstack, frames);
@@ -84,9 +86,9 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
     std::cerr << ss.rdbuf() << '\n';
 #endif
 
-#if defined(__APPLE__)
+#if REALM_PLATFORM_APPLE
     nslog(ss.str().c_str());
-#elif defined(__ANDROID__)
+#elif REALM_PLATFORM_ANDROID
     __android_log_print(ANDROID_LOG_ERROR, "REALM", ss.str().c_str());
 #endif
 

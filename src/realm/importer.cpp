@@ -100,7 +100,7 @@ void print_row(Table& table, size_t r)
         if(table.get_column_type(c) == type_Int)
             sprintf(buf, "%lld", static_cast<long long>(table.get_int(c, r)));
         if(table.get_column_type(c) == type_String) {
-#if _MSC_VER
+#if REALM_COMPILER_MSVC
             _snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
 #else
             snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());

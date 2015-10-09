@@ -21,17 +21,11 @@
 #define REALM_UTIL_BIND_PTR_HPP
 
 #include <algorithm>
+#include <atomic>
 #include <ostream>
+#include <utility>
 
 #include <realm/util/features.h>
-
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
-#  include <utility>
-#endif
-
-#ifdef REALM_HAVE_CXX11_ATOMIC
-#  include <atomic>
-#endif
 
 
 namespace realm {
@@ -61,8 +55,6 @@ public:
     template<class U> explicit bind_ptr(U* p) noexcept { bind(p); }
     ~bind_ptr() noexcept { unbind(); }
 
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
-
     // Copy construct
     bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
     template<class U> bind_ptr(const bind_ptr<U>& p) noexcept { bind(p.m_ptr); }
@@ -78,18 +70,6 @@ public:
     // Move assign
     bind_ptr& operator=(bind_ptr&& p) noexcept { bind_ptr(std::move(p)).swap(*this); return *this; }
     template<class U> bind_ptr& operator=(bind_ptr<U>&& p) noexcept { bind_ptr(std::move(p)).swap(*this); return *this; }
-
-#else // !REALM_HAVE_CXX11_RVALUE_REFERENCE
-
-    // Copy construct
-    bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
-    template<class U> bind_ptr(bind_ptr<U> p) noexcept: m_ptr(p.release()) {}
-
-    // Copy assign
-    bind_ptr& operator=(bind_ptr p) noexcept { p.swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(bind_ptr<U> p) noexcept { bind_ptr(move(p)).swap(*this); return *this; }
-
-#endif // !REALM_HAVE_CXX11_RVALUE_REFERENCE
 
     // Replacement for std::move() in C++11
     friend bind_ptr move(bind_ptr& p) noexcept { return bind_ptr(&p, move_tag()); }
@@ -114,12 +94,7 @@ public:
     T& operator*() const noexcept { return *m_ptr; }
     T* operator->() const noexcept { return m_ptr; }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept { return m_ptr != 0; }
-#else
-    typedef T* bind_ptr::*unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept { return m_ptr ? &bind_ptr::m_ptr : 0; }
-#endif
 
     T* get() const noexcept { return m_ptr; }
     void reset() noexcept { bind_ptr().swap(*this); }
@@ -191,7 +166,6 @@ private:
 };
 
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
 /// Same as RefCountBase, but this one makes the copying of, and the
 /// destruction of counted references thread-safe.
 ///
@@ -215,10 +189,6 @@ private:
 
     template<class> friend class bind_ptr;
 };
-#endif // REALM_HAVE_CXX11_ATOMIC
-
-
-
 
 
 // Implementation:

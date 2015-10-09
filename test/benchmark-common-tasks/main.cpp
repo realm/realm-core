@@ -317,7 +317,7 @@ const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
     switch (level) {
         case SharedGroup::durability_Full: return "Full";
         case SharedGroup::durability_MemOnly: return "MemOnly";
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
         case SharedGroup::durability_Async: return "Async";
 #endif
     }
@@ -342,7 +342,7 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 template <typename B>
 void run_benchmark(BenchmarkResults& results)
 {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
     const size_t num_durabilities = 2;
 #else
     const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.

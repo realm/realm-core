@@ -51,7 +51,7 @@ TEST(BasicSystemErrors_Messages)
     {
         std::error_code err = make_error_code(error::address_family_not_supported);
         CHECK_GREATER(err.message().length(), 0);
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
         CHECK_EQUAL(err.message(), error_message);
 #else
         CHECK_NOT_EQUAL(err.message(), error_message);
@@ -70,7 +70,7 @@ TEST(BasicSystemErrors_Messages)
     {
         std::error_code err = make_error_code(error::operation_aborted);
         CHECK_GREATER(err.message().length(), 0);
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
         CHECK_EQUAL(err.message(), error_message);
 #else
         CHECK_NOT_EQUAL(err.message(), error_message);

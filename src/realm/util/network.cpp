@@ -814,7 +814,7 @@ void socket_base::do_open(const protocol& prot, std::error_code& ec)
         return;
     }
 
-#if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
+#if REALM_PLATFORM_APPLE
     {
         int optval = 1;
         int ret = setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
@@ -972,7 +972,7 @@ size_t socket::read_some(char* buffer, size_t size, std::error_code& ec) noexcep
 size_t socket::write_some(const char* data, size_t size, std::error_code& ec) noexcept
 {
     int flags = 0;
-#ifdef __linux__
+#if REALM_PLATFORM_LINUX
     // Prevent SIGPIPE when remote peer has closed the connection.
     flags |= MSG_NOSIGNAL;
 #endif
@@ -1098,7 +1098,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     if (REALM_UNLIKELY(addr_len != expected_addr_len))
         REALM_TERMINATE("Unexpected peer address length");
 
-#if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
+#if REALM_PLATFORM_APPLE
     int optval = 1;
     int ret = ::setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
     if (REALM_UNLIKELY(ret == -1)) {

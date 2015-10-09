@@ -5,7 +5,7 @@
 using namespace realm::_impl;
 
 #ifdef REALM_DEBUG
-#  if !REALM_IOS
+#  if !REALM_PLATFORM_APPLE_IOS
 
 namespace {
 
@@ -33,7 +33,7 @@ void SimulatedFailure::do_check(type failure_type)
     }
 }
 
-#  else // !REALM_IOS
+#  else // !REALM_PLATFORM_APPLE_IOS
 
 #include <pthread.h>
 #include <stdlib.h>

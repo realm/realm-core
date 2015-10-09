@@ -1,5 +1,7 @@
 // #define USE_VLD
-#if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
+#include <realm/util/features.h>
+
+#if REALM_COMPILER_MSVC && defined(_DEBUG) && defined(USE_VLD)
 #  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
@@ -14,9 +16,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/util/features.h>
 #include <memory>
-#include <realm/util/features.h>
 #include <realm.hpp>
 #include <realm/utilities.hpp>
 #include <realm/version.hpp>
@@ -107,8 +107,8 @@ void fix_max_open_files()
 
 void fix_async_daemon_path()
 {
-    // `setenv()` is POSIX. _WIN32 has `_putenv_s()` instead.
-#ifndef _WIN32
+    // `setenv()` is POSIX. REALM_PLATFORM_WINDOWS has `_putenv_s()` instead.
+#if !REALM_PLATFORM_WINDOWS
     const char* async_daemon;
     // When running the unit-tests in Xcode, it runs them
     // in its own temporary directory. So we have to make sure we
@@ -133,7 +133,7 @@ void fix_async_daemon_path()
 #  endif
     }
     setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
-#endif // _WIN32
+#endif // REALM_PLATFORM_WINDOWS
 }
 
 
@@ -144,13 +144,13 @@ void display_build_config()
     const char* with_replication =
         Version::has_feature(feature_Replication) ? "Enabled" : "Disabled";
 
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
 #else
     const char* compiler_sse = "No";
 #endif
 
-#ifdef REALM_COMPILER_AVX
+#if REALM_COMPILER_AVX
     const char* compiler_avx = "Yes";
 #else
     const char* compiler_avx = "No";
@@ -284,7 +284,7 @@ bool run_tests()
     // Set up reporter
     std::ofstream xml_file;
     bool xml;
-#ifdef REALM_MOBILE
+#if REALM_MOBILE
     xml = true;
 #else
     const char* xml_str = getenv("UNITTEST_XML");
@@ -364,7 +364,7 @@ int test_all(int argc, char* argv[])
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
     // we're in /build/ on Windows if we're in the Visual Studio IDE
     set_test_resource_path("../../test/");
     set_test_path_prefix("../../test/");
@@ -376,7 +376,7 @@ int test_all(int argc, char* argv[])
 
     bool success = run_tests();
 
-#ifdef _MSC_VER
+#if REALM_COMPILER_MSVC
     getchar(); // wait for key
 #endif
 

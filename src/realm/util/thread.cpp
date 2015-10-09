@@ -22,14 +22,17 @@
 
 #include <realm/util/thread.hpp>
 
-#if !defined _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  include <unistd.h>
 #endif
 
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
-#if _POSIX_THREAD_PROCESS_SHARED > 0 || REALM_ANDROID
-#  define REALM_HAVE_PTHREAD_PROCESS_SHARED
+#if REALM_PLATFORM_ANDROID \
+    || (defined(_POSIX_THREAD_PROCESS_SHARED) && _POSIX_THREAD_PROCESS_SHARED > 0)
+#  define REALM_HAVE_PTHREAD_PROCESS_SHARED 1
+#else
+#  define REALM_HAVE_PTHREAD_PROCESS_SHARED 0
 #endif
 
 // Unfortunately Older Ubuntu releases such as 10.04 reports support
@@ -39,20 +42,16 @@
 // http://www.gnu.org/software/gnulib/manual/gnulib.html#pthread_005fmutex_005fconsistent.
 // Support was added to glibc 2.12, so we disable for earlier versions
 // of glibs
-#ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
-#  if !defined _WIN32 // 'robust' not supported by our windows pthreads port
-#    if _POSIX_THREADS >= 200809L
-#      ifdef __GNU_LIBRARY__
-#        if __GLIBC__ >= 2  && __GLIBC_MINOR__ >= 12
-#          define REALM_HAVE_ROBUST_PTHREAD_MUTEX
-#        endif
-#      else
-#        define REALM_HAVE_ROBUST_PTHREAD_MUTEX
-#      endif
-#    endif
-#  endif
+//
+// 'robust' not supported by our windows pthreads port
+#if REALM_HAVE_PTHREAD_PROCESS_SHARED && !REALM_PLATFORM_WINDOWS \
+     && _POSIX_THREADS >= 200809L && ( \
+         !defined __GNU_LIBRARY__ \
+         || __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 12)
+#  define REALM_HAVE_ROBUST_PTHREAD_MUTEX 1
+#else
+#  define REALM_HAVE_ROBUST_PTHREAD_MUTEX 0
 #endif
-
 
 using namespace realm;
 using namespace realm::util;
@@ -65,7 +64,7 @@ namespace {
 // http://www.network-theory.co.uk/docs/valgrind/valgrind_20.html under --run-libc-freeres=<yes|no>.
 // This can give false positives because of missing suppression, etc (not real leaks!). It's also a problem
 // on Windows, so we have written our own clean-up method for the Windows port.
-#if defined _WIN32 && defined REALM_DEBUG
+#if REALM_PLATFORM_WINDOWS && defined REALM_DEBUG
 void free_threadpool();
 
 class Initialization
@@ -112,14 +111,14 @@ REALM_NORETURN void Thread::join_failed(int)
 
 void Mutex::init_as_process_shared(bool robust_if_available)
 {
-#ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
+#if REALM_HAVE_PTHREAD_PROCESS_SHARED
     pthread_mutexattr_t attr;
     int r = pthread_mutexattr_init(&attr);
     if (REALM_UNLIKELY(r != 0))
         attr_init_failed(r);
     r = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
     REALM_ASSERT(r == 0);
-#  ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
+#  if REALM_HAVE_ROBUST_PTHREAD_MUTEX
     if (robust_if_available) {
         r = pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
         REALM_ASSERT(r == 0);
@@ -184,7 +183,7 @@ REALM_NORETURN void Mutex::lock_failed(int err) noexcept
 
 bool RobustMutex::is_robust_on_this_platform() noexcept
 {
-#ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
+#if REALM_HAVE_ROBUST_PTHREAD_MUTEX
     return true;
 #else
     return false;
@@ -196,7 +195,7 @@ bool RobustMutex::low_level_lock()
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return true;
-#ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
+#if REALM_HAVE_ROBUST_PTHREAD_MUTEX
     if (r == EOWNERDEAD)
         return false;
     if (r == ENOTRECOVERABLE)
@@ -220,7 +219,7 @@ bool RobustMutex::is_valid() noexcept
 
 void RobustMutex::mark_as_consistent() noexcept
 {
-#ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
+#if REALM_HAVE_ROBUST_PTHREAD_MUTEX
     int r = pthread_mutex_consistent(&m_impl);
     REALM_ASSERT(r == 0);
     static_cast<void>(r);
@@ -231,7 +230,7 @@ void RobustMutex::mark_as_consistent() noexcept
 
 CondVar::CondVar(process_shared_tag)
 {
-#ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
+#if REALM_HAVE_PTHREAD_PROCESS_SHARED
     pthread_condattr_t attr;
     int r = pthread_condattr_init(&attr);
     if (REALM_UNLIKELY(r != 0))
@@ -262,7 +261,7 @@ REALM_NORETURN void CondVar::init_failed(int err)
 void CondVar::handle_wait_error(int err)
 {
     switch (err) {
-#ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
+#if REALM_HAVE_ROBUST_PTHREAD_MUTEX
         case ENOTRECOVERABLE:
             throw RobustMutex::NotRecoverable();
         case EOWNERDEAD:

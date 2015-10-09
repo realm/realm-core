@@ -36,7 +36,7 @@
 #include <realm/replication.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
 #  include <sys/wait.h>
 #  include <sys/time.h>
 #  include <unistd.h>
@@ -412,7 +412,7 @@ struct SharedGroup::SharedInfo
     RobustMutex writemutex;
     RobustMutex balancemutex;
     RobustMutex controlmutex;
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
     // FIXME: windows pthread support for condvar not ready
     PlatformSpecificCondVar::SharedPart room_to_write;
     PlatformSpecificCondVar::SharedPart work_to_do;
@@ -439,7 +439,7 @@ struct SharedGroup::SharedInfo
 
 
 SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura):
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
     size_of_mutex(sizeof(writemutex)),
     size_of_condvar(sizeof(room_to_write)),
     writemutex(), // Throws
@@ -454,7 +454,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura):
 {
     version = SHAREDINFO_VERSION;
     durability = dura; // durability level is fixed from creation
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
     PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
     PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
     PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
@@ -476,7 +476,7 @@ void recover_from_dead_write_transact()
     // Nothing needs to be done
 }
 
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
 
 void spawn_daemon(const std::string& file)
 {
@@ -527,7 +527,7 @@ void spawn_daemon(const std::string& file)
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
-#if REALM_ANDROID
+#if REALM_PLATFORM_ANDROID
         _exit(1);
 #else
         _Exit(1);
@@ -690,7 +690,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             if (info->size_of_mutex != sizeof(info->controlmutex))
                 throw IncompatibleLockFile();
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
             if (info->size_of_condvar != sizeof(info->room_to_write))
                 throw IncompatibleLockFile();
 #endif
@@ -784,7 +784,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                 if (repl)
                     repl->reset_log_management(version);
 
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
                 if (encryption_key) {
                     REALM_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint64_t(getpid());
@@ -796,18 +796,18 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             }
             else { // not the session initiator!
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
                 if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
                     throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
 #endif
 
             }
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
             m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
             m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
             m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
             m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
@@ -866,7 +866,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
     m_transact_stage = transact_Ready;
     // std::cerr << "open completed" << std::endl;
 
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
     if (durability == durability_Async) {
         if (is_backend) {
             do_async_commits();
@@ -992,7 +992,7 @@ void SharedGroup::close() noexcept
             // If replication is enabled, we need to stop log management:
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
             if (repl) {
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
                 try {
                     repl->stop_logging();
                 }
@@ -1004,7 +1004,7 @@ void SharedGroup::close() noexcept
             }
         }
     }
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
     m_room_to_write.close();
     m_work_to_do.close();
     m_daemon_becomes_ready.close();
@@ -1023,8 +1023,8 @@ bool SharedGroup::has_changed()
     return changed;
 }
 
-#ifndef _WIN32
-#ifndef __APPLE__
+#if !REALM_PLATFORM_WINDOWS
+#if !REALM_PLATFORM_APPLE
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -1151,7 +1151,7 @@ void SharedGroup::do_async_commits()
 
     }
 }
-#endif // _WIN32
+#endif // REALM_PLATFORM_WINDOWS
 
 
 SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
@@ -1352,7 +1352,7 @@ void SharedGroup::do_begin_write()
     // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
-#ifdef REALM_ASYNC_DAEMON
+#if REALM_ASYNC_DAEMON
     if (info->durability == durability_Async) {
 
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
@@ -1368,7 +1368,7 @@ void SharedGroup::do_begin_write()
         info->free_write_slots--;
         info->balancemutex.unlock();
     }
-#endif // _WIN32
+#endif // REALM_PLATFORM_WINDOWS
 }
 
 
@@ -1593,7 +1593,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         info->number_of_versions = new_version - readlock_version + 1;
         info->latest_version_number = new_version;
-#ifndef _WIN32
+#if !REALM_PLATFORM_WINDOWS
         m_new_commit_available.notify_all();
 #endif
     }

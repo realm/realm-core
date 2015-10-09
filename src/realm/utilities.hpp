@@ -26,37 +26,15 @@
 #include <algorithm>
 #include <cstdio>
 
-#ifdef _MSC_VER
+#include <realm/util/features.h>
+
+#if REALM_COMPILER_MSVC
 #  include <win32/types.h>
 #  include <intrin.h>
 #endif
 
-#include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
-
-// GCC defines __i386__ and __x86_64__
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-#  define REALM_X86_OR_X64
-#  define REALM_X86_OR_X64_TRUE true
-#else
-#  define REALM_X86_OR_X64_TRUE false
-#endif
-
-// GCC defines __arm__
-#ifdef __arm__
-#  define REALM_ARCH_ARM
-#endif
-
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-#  define REALM_PTR_64
-#endif
-
-
-#if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64)
-#  define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-#  define REALM_COMPILER_AVX
-#endif
 
 namespace realm {
 
@@ -87,7 +65,7 @@ template<int version> REALM_FORCEINLINE bool sseavx()
     prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
 */
     REALM_STATIC_ASSERT(version == 1 || version == 2 || version == 30 || version == 42, "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
-#ifdef REALM_COMPILER_SSE
+#if REALM_COMPILER_SSE
     if (version == 30)
         return (sse_support >= 0);
     else if (version == 42)
@@ -128,21 +106,21 @@ uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 inline int log2(std::size_t x) {
     if (x == 0)
         return -1;
-#if defined(__GNUC__)
-#   ifdef REALM_PTR_64
+#if REALM_COMPILER_GCC_COMPATIBLE
+#  if REALM_PTR_64
     return 63 - __builtin_clzll(x); // returns int
-#   else
+#  else
     return 31 - __builtin_clz(x); // returns int
-#   endif
-#elif defined(_WIN32)
+#  endif
+#elif REALM_PLATFORM_WINDOWS
     unsigned long index = 0;
-#   ifdef REALM_PTR_64
+#  if REALM_PTR_64
     unsigned char c = _BitScanReverse64(&index, x); // outputs unsigned long
-#   else
+#  else
     unsigned char c = _BitScanReverse(&index, x); // outputs unsigned long
-#   endif
+#  endif
     return static_cast<int>(index);
-#else // not __GNUC__ and not _WIN32
+#else // not REALM_COMPILER_GCC_COMPATIBLE and not REALM_PLATFORM_WINDOWS
     int r = 0;
     while (x >>= 1) {
         r++;
@@ -192,7 +170,7 @@ enum IndexMethod {
 template <class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
-#if defined(_MSC_VER) && defined(_DEBUG)
+#if REALM_COMPILER_MSVC && defined(_DEBUG)
 
     // Windows has a special check in debug mode against passing realm::null()
     // pointer to std::equal(). It's uncertain if this is allowed by the C++ standard. For details, see

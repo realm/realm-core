@@ -60,7 +60,7 @@ void emit_flags()
 
 
     if (emit_ldflags) {
-#ifdef REALM_CONFIG_IOS
+#if REALM_PLATFORM_APPLE_IOS
 #  ifdef REALM_DEBUG
         emit_flags("-lrealm-ios-dbg");
 #  else

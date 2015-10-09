@@ -1,9 +1,11 @@
 #include <stdexcept>
 
-#if defined _WIN32
+#include <realm/util/features.h>
+
+#if REALM_PLATFORM_WINDOWS
 #  include <windows.h>
 #  include <psapi.h>
-#elif defined __APPLE__
+#elif REALM_PLATFORM_APPLE
 #  include <mach/mach.h>
 #elif defined REALM_HAVE_LIBPROCPS
 // Requires libprocps (formerly known as libproc)
@@ -13,8 +15,7 @@
 #include "mem.hpp"
 
 
-
-#ifdef _WIN32
+#if REALM_PLATFORM_WINDOWS
 
 namespace {
 
@@ -99,7 +100,7 @@ DWORD calculate_ws_private(DWORD process_id)
 
 } // anonymous namespace
 
-#endif // _WIN32
+#endif // REALM_PLATFORM_WINDOWS
 
 
 namespace realm {
@@ -108,14 +109,14 @@ namespace test_util {
 
 size_t get_mem_usage()
 {
-#if defined _WIN32
+#if REALM_PLATFORM_WINDOWS
 
     // FIXME: Does this return virtual size or resident set size? What
     // we need is the virtual size, i.e., we want to include that
     // which is temporarily swapped out.
     return calculate_ws_private(GetCurrentProcessId());
 
-#elif defined __APPLE__
+#elif REALM_PLATFORM_APPLE
 
     struct task_basic_info t_info;
     mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
