@@ -190,18 +190,9 @@ public:
 
     REALM_FORCEINLINE T get_next(size_t index)
     {
-#if REALM_COMPILER_MSVC
-#  pragma warning(push)
-#  pragma warning(disable:4800)   // Disable the Microsoft warning about bool performance issue.
-#endif
-
         cache_next(index);
         T av = m_leaf_ptr->get(index - m_leaf_start);
         return av;
-
-#if REALM_COMPILER_MSVC
-#  pragma warning(pop)
-#endif
     }
 
     size_t local_end(size_t global_end)
