@@ -98,7 +98,7 @@ void writer(std::string path, int id)
     // std::cerr << "Started writer " << std::endl;
     try {
         bool done = false;
-        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        SharedGroup sg(path, true, SharedGroup::durability_Full, crypt_key());
         // std::cerr << "Opened sg " << std::endl;
         for (int i=0; !done; ++i) {
             // std::cerr << "       - " << getpid() << std::endl;
@@ -114,6 +114,7 @@ void writer(std::string path, int id)
         // std::cerr << "Ended pid " << getpid() << std::endl;
     } catch (...) {
         // std::cerr << "Exception from " << getpid() << std::endl;
+        REALM_ASSERT(false);
     }
 }
 
@@ -123,7 +124,7 @@ void writer(std::string path, int id)
 void killer(TestResults& test_results, int pid, std::string path, int id)
 {
     {
-        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        SharedGroup sg(path, true, SharedGroup::durability_Full, crypt_key());
         bool done = false;
         do {
             sched_yield();
@@ -185,7 +186,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         // Create table entries
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
@@ -228,8 +229,6 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::string old_path = path;
-    std::string tmp_path = std::string(path)+".tmp";
     Thread writer_thread;
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
@@ -243,7 +242,7 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            writer_thread.start(std::bind(&writer, old_path, 41));
+            writer_thread.start(std::bind(&writer, std::string(path), 41));
 
             // make sure writer has started:
             bool waiting = true;
@@ -2468,7 +2467,14 @@ TEST(Shared_ReserveDiskSpace)
         size_t reserve_size_2 = orig_file_size;
         sg.reserve(reserve_size_2);
         size_t new_file_size_2 = size_t(File(path).get_size());
-        CHECK_EQUAL(orig_file_size, new_file_size_2);
+        if (crypt_key()) {
+            // For encrypted files, reserve() may actually grow the file
+            // with a page sized header.
+            CHECK(orig_file_size <= new_file_size_2 && (orig_file_size+page_size()) >= new_file_size_2 );
+        }
+        else {
+            CHECK_EQUAL(orig_file_size, new_file_size_2);
+        }
 
         // Check that reserve() does change the file size if the
         // specified size is greater than the actual file size, and
