@@ -2090,7 +2090,7 @@ EOF
         if ! which "make" >/dev/null 2>&1; then
             echo "ERROR: GNU make must be installed."
             if [ "$OS" = "Darwin" ]; then
-                echo "Please install xcode and command-line tools and try again."
+                echo "Please install Xcode and command-line tools and try again."
                 echo "You can download them at https://developer.apple.com/downloads/index.action"
                 echo "or consider to use https://github.com/kennethreitz/osx-gcc-installer"
             fi

@@ -37,7 +37,7 @@
 #  define REALM_COMPILER_GCC 0
 #endif
 
-// Compiler is Apple's clang (xcode)
+// Compiler is Apple's clang (Xcode)
 #if defined(__clang__) && defined(__apple_build_version__)
 #  define REALM_COMPILER_APPLE_CLANG 1
 #else
@@ -77,7 +77,7 @@
     (REALM_COMPILER_GCC && \
         (__GNUC__ > (maj) || __GNUC__ == (maj) && __GNUC_MINOR__ >= (min)))
 
-// Compiler is Apple's clang (xcode) and version is greater than or equal to the specified version
+// Compiler is Apple's clang (Xcode) and version is greater than or equal to the specified version
 #define REALM_HAVE_AT_LEAST_APPLE_CLANG(maj, min) \
     (REALM_COMPILER_APPLE_CLANG && \
         (__clang_major__ > (maj) || __clang_major__ == (maj) && __clang_minor__ >= (min)))
