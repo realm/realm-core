@@ -106,6 +106,9 @@
 #define REALM_HAVE_AT_LEAST_LIBCPP(version) \
     (defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= version)
 
+#define REALM_HAVE_AT_LEAST_POSIX(version) \
+    (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= version)
+
 // Platform is Windows
 #if defined(_WIN32) || defined(_WIN64)
 #  define REALM_PLATFORM_WINDOWS 1

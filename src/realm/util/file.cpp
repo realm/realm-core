@@ -532,7 +532,7 @@ void File::prealloc(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_AT_LEAST_POSIX(200112L) // POSIX.1-2001 version
 
     prealloc_if_supported(offset, size);
 
@@ -551,7 +551,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_AT_LEAST_POSIX(200112L) // POSIX.1-2001 version
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
@@ -589,7 +589,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
 bool File::is_prealloc_supported()
 {
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if REALM_HAVE_AT_LEAST_POSIX(200112L) // POSIX.1-2001 version
     return true;
 #else
     return false;

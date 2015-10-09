@@ -28,7 +28,8 @@
 
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
-#if _POSIX_THREAD_PROCESS_SHARED > 0 || REALM_PLATFORM_ANDROID
+#if REALM_PLATFORM_ANDROID \
+    || (defined(_POSIX_THREAD_PROCESS_SHARED) && _POSIX_THREAD_PROCESS_SHARED > 0)
 #  define REALM_HAVE_PTHREAD_PROCESS_SHARED 1
 #else
 #  define REALM_HAVE_PTHREAD_PROCESS_SHARED 0
