@@ -136,19 +136,19 @@
 
 #  include <TargetConditionals.h>
 
-#  if TARGET_OS_IPHONE == 1
+#  if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1
 #    define REALM_PLATFORM_APPLE_IOS 1
 #  else
 #    define REALM_PLATFORM_APPLE_IOS 0
 #  endif
 
-#  if TARGET_OS_TV == 1
+#  if defined(TARGET_OS_TV) && TARGET_OS_TV == 1
 #    define REALM_PLATFORM_APPLE_TVOS 1
 #  else
 #    define REALM_PLATFORM_APPLE_TVOS 0
 #  endif
 
-#  if TARGET_OS_WATCH == 1
+#  if defined(TARGET_OS_WATCH) && TARGET_OS_WATCH == 1
 #    define REALM_PLATFORM_APPLE_WATCHOS 1
 #  else
 #    define REALM_PLATFORM_APPLE_WATCHOS 0
@@ -220,7 +220,8 @@
 
 // The current platform supports 64-bit pointers
 #if REALM_ARCHITECTURE_AMD64 || REALM_ARCHITECTURE_ARM64 || defined(_LP64) || defined(__LP64__) \
-    || defined(__64BIT__) || _ADDR64 || defined(_WIN64) || defined(__arch64__) || __WORDSIZE == 64
+    || defined(__64BIT__) || defined(_ADDR64) || defined(_WIN64) || defined(__arch64__) \
+    || (defined(__WORDSIZE) && __WORDSIZE == 64)
 #  define REALM_PTR_64 1
 #else
 #  define REALM_PTR_64 0
