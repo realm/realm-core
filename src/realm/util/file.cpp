@@ -1159,7 +1159,6 @@ DirScanner::DirScanner(const std::string& path)
             default:
                 throw std::runtime_error(msg);
         }
-        throw std::runtime_error(msg);
     }
 }
 
