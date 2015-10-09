@@ -396,8 +396,7 @@ void run_benchmark(BenchmarkResults& results)
             required_reps = max_repetitions;
         }
 
-        size_t rep;
-        for (rep = 0; rep < required_reps; ++rep) {
+        for (size_t rep = 0; rep < required_reps; ++rep) {
             Timer t;
             run_benchmark_once(benchmark, *group, t);
             double s = t.get_elapsed_time();
