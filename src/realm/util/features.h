@@ -175,14 +175,14 @@
 #endif
 
 // We are on an ARMv6
-#if REALM_ARCHITECTURE_ARM && (defined(__ARM_ARCH_6__) || _M_ARM == 6)
+#if REALM_ARCHITECTURE_ARM && (defined(__ARM_ARCH_6__) || (defined(_M_ARM) && _M_ARM == 6))
 #  define REALM_ARCHITECTURE_ARMV6 1
 #else
 #  define REALM_ARCHITECTURE_ARMV6 0
 #endif
 
 // We are on an ARMv7
-#if REALM_ARCHITECTURE_ARM && (defined(__ARM_ARCH_7__) || _M_ARM == 7)
+#if REALM_ARCHITECTURE_ARM && (defined(__ARM_ARCH_7__) || (defined(_M_ARM) && _M_ARM == 7))
 #  define REALM_ARCHITECTURE_ARMV7 1
 #else
 #  define REALM_ARCHITECTURE_ARMV7 0
