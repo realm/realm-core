@@ -18,7 +18,6 @@
  *
  **************************************************************************/
 
-#pragma once
 #ifndef REALM_UTIL_OPTIONAL_HPP
 #define REALM_UTIL_OPTIONAL_HPP
 
