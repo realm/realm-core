@@ -12,8 +12,6 @@
 #include "test.hpp"
 #include "../test/util/thread_wrapper.hpp"
 
-using std::string;
-using std::ostringstream;
 using namespace realm::util;
 using namespace realm::test_util;
 
@@ -616,7 +614,7 @@ void sync_server(network::acceptor* acceptor, unit_test::TestResults* test_resul
     MemoryInputStream in;
     in.set_buffer(header_buffer, header_buffer+(n-1));
     in.unsetf(std::ios_base::skipws);
-    string message_type;
+    std::string message_type;
     in >> message_type;
     if (!CHECK_EQUAL(message_type, "echo"))
         return;
@@ -644,9 +642,9 @@ void sync_client(unsigned short listen_port, unit_test::TestResults* test_result
     network::io_service service;
     network::socket socket(service);
     {
-        ostringstream out;
+        std::ostringstream out;
         out << listen_port;
-        string listen_port_2 = out.str();
+        std::string listen_port_2 = out.str();
         connect_socket(socket, listen_port_2);
     }
 
@@ -669,7 +667,7 @@ void sync_client(unsigned short listen_port, unit_test::TestResults* test_result
     MemoryInputStream in;
     in.set_buffer(header_buffer, header_buffer+(n-1));
     in.unsetf(std::ios_base::skipws);
-    string message_type;
+    std::string message_type;
     in >> message_type;
     if (!CHECK_EQUAL(message_type, "was"))
         return;
@@ -771,7 +769,7 @@ private:
         MemoryInputStream in;
         in.set_buffer(m_header_buffer, m_header_buffer+(n-1));
         in.unsetf(std::ios_base::skipws);
-        string message_type;
+        std::string message_type;
         in >> message_type;
         if (!CHECK_EQUAL(message_type, "echo"))
             return;
@@ -844,9 +842,9 @@ public:
 
     void run()
     {
-        string service;
+        std::string service;
         {
-            ostringstream out;
+            std::ostringstream out;
             out << m_listen_port;
             service = out.str();
         }
@@ -910,7 +908,7 @@ private:
         MemoryInputStream in;
         in.set_buffer(m_header_buffer, m_header_buffer+(n-1));
         in.unsetf(std::ios_base::skipws);
-        string message_type;
+        std::string message_type;
         in >> message_type;
         if (!CHECK_EQUAL(message_type, "was"))
             return;
