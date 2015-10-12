@@ -441,7 +441,7 @@ CATEGORIES:
                  behavior.
       PARAMS:
       - NAME   : size_in_bytes
-        TYPES  : std::size_t
+        TYPES  : size_t
         DESCR  : &g_shared_group_reserve_parm1
                  The total number of bytes to reserve on disk for this database.
       EXAMPLES:

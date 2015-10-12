@@ -129,24 +129,24 @@ private:
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<BasicTable, col_idx, value_type, false> type;
     };
-    typedef std::pair<BasicTable*, std::size_t> FieldInit;
+    typedef std::pair<BasicTable*, size_t> FieldInit;
 
     template<int col_idx> struct ConstField {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const BasicTable, col_idx, value_type, true> type;
     };
-    typedef std::pair<const BasicTable*, std::size_t> ConstFieldInit;
+    typedef std::pair<const BasicTable*, size_t> ConstFieldInit;
 
 public:
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
-    RowAccessor operator[](std::size_t row_idx) noexcept
+    RowAccessor operator[](size_t row_idx) noexcept
     {
         return RowAccessor(std::make_pair(this, row_idx));
     }
 
-    ConstRowAccessor operator[](std::size_t row_idx) const noexcept
+    ConstRowAccessor operator[](size_t row_idx) const noexcept
     {
         return ConstRowAccessor(std::make_pair(this, row_idx));
     }
@@ -181,19 +181,19 @@ public:
 
     template<class L> void add(const util::Tuple<L>& tuple)
     {
-        std::size_t i = size();
+        size_t i = size();
         insert(i, tuple);
     }
 
-    void insert(std::size_t i) { insert_empty_row(i); }
+    void insert(size_t i) { insert_empty_row(i); }
 
-    template<class L> void insert(std::size_t i, const util::Tuple<L>& tuple)
+    template<class L> void insert(size_t i, const util::Tuple<L>& tuple)
     {
         insert(i);
         set(i, tuple);
     }
 
-    template<class L> void set(std::size_t i, const util::Tuple<L>& tuple)
+    template<class L> void set(size_t i, const util::Tuple<L>& tuple)
     {
         using namespace realm::util;
         REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
@@ -270,12 +270,12 @@ private:
     Table* get_impl() noexcept { return this; }
     const Table* get_impl() const noexcept { return this; }
 
-    template<class Subtab> Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx)
+    template<class Subtab> Subtab* get_subtable_ptr(size_t col_idx, size_t row_idx)
     {
         return static_cast<Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
 
-    template<class Subtab> const Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx) const
+    template<class Subtab> const Subtab* get_subtable_ptr(size_t col_idx, size_t row_idx) const
     {
         return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
@@ -348,35 +348,35 @@ public:
 
     Query& Not() { m_impl.Not(); return *this; }
 
-    std::size_t find(std::size_t begin_at_table_row = 0)
+    size_t find(size_t begin_at_table_row = 0)
     {
         return m_impl.find(begin_at_table_row);
     }
 
-    typename BasicTable<Spec>::View find_all(std::size_t start = 0,
-                                             std::size_t end   = std::size_t(-1),
-                                             std::size_t limit = std::size_t(-1))
+    typename BasicTable<Spec>::View find_all(size_t start = 0,
+                                             size_t end   = size_t(-1),
+                                             size_t limit = size_t(-1))
     {
         return m_impl.find_all(start, end, limit);
     }
 
-    typename BasicTable<Spec>::ConstView find_all(std::size_t start = 0,
-                                                  std::size_t end   = std::size_t(-1),
-                                                  std::size_t limit = std::size_t(-1)) const
+    typename BasicTable<Spec>::ConstView find_all(size_t start = 0,
+                                                  size_t end   = size_t(-1),
+                                                  size_t limit = size_t(-1)) const
     {
         return m_impl.find_all(start, end, limit);
     }
 
-    std::size_t count(std::size_t start = 0,
-                      std::size_t end   = std::size_t(-1),
-                      std::size_t limit = std::size_t(-1)) const
+    size_t count(size_t start = 0,
+                      size_t end   = size_t(-1),
+                      size_t limit = size_t(-1)) const
     {
         return m_impl.count(start, end, limit);
     }
 
-    std::size_t remove(std::size_t start = 0,
-                       std::size_t end   = std::size_t(-1),
-                       std::size_t limit = std::size_t(-1))
+    size_t remove(size_t start = 0,
+                       size_t end   = size_t(-1),
+                       size_t limit = size_t(-1))
     {
         return m_impl.remove(start, end, limit);
     }
@@ -526,7 +526,7 @@ template<class Subtab, int col_idx> struct CmpColType<SpecBase::Subtable<Subtab>
 
 // AssignIntoCol specialization for integers
 template<int col_idx> struct AssignIntoCol<int64_t, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_int(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -534,7 +534,7 @@ template<int col_idx> struct AssignIntoCol<int64_t, col_idx> {
 
 // AssignIntoCol specialization for floats
 template<int col_idx> struct AssignIntoCol<float, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_float(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -542,7 +542,7 @@ template<int col_idx> struct AssignIntoCol<float, col_idx> {
 
 // AssignIntoCol specialization for doubles
 template<int col_idx> struct AssignIntoCol<double, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_double(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -550,7 +550,7 @@ template<int col_idx> struct AssignIntoCol<double, col_idx> {
 
 // AssignIntoCol specialization for booleans
 template<int col_idx> struct AssignIntoCol<bool, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_bool(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -558,7 +558,7 @@ template<int col_idx> struct AssignIntoCol<bool, col_idx> {
 
 // AssignIntoCol specialization for strings
 template<int col_idx> struct AssignIntoCol<StringData, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_string(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -566,7 +566,7 @@ template<int col_idx> struct AssignIntoCol<StringData, col_idx> {
 
 // AssignIntoCol specialization for enumerations
 template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_enum(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -574,7 +574,7 @@ template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> 
 
 // AssignIntoCol specialization for dates
 template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -582,7 +582,7 @@ template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
 
 // AssignIntoCol specialization for binary data
 template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_binary(col_idx, row_idx, util::at<col_idx>(tuple));
     }
@@ -590,7 +590,7 @@ template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
 
 // AssignIntoCol specialization for subtables
 template<class T, int col_idx> struct AssignIntoCol<SpecBase::Subtable<T>, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         // FIXME: unsafe reinterpret_cast to private base class
         auto subtable = reinterpret_cast<const Table*>(static_cast<const T*>(util::at<col_idx>(tuple)));
@@ -600,7 +600,7 @@ template<class T, int col_idx> struct AssignIntoCol<SpecBase::Subtable<T>, col_i
 
 // AssignIntoCol specialization for mixed type
 template<int col_idx> struct AssignIntoCol<Mixed, col_idx> {
-    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    template<class L> static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_mixed(col_idx, row_idx, util::at<col_idx>(tuple));
     }

@@ -81,7 +81,7 @@ public:
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory. 
     /// The SharedPart is assumed to have been initialized (possibly by another process) 
     /// earlier through a call to init_shared_part.
-    void set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar);
+    void set_shared_part(SharedPart& shared_part, std::string path, size_t offset_of_condvar);
 
     /// Initialize the shared part of a process shared condition variable.
     /// A process shared condition variables may be represented by any number of
@@ -107,7 +107,7 @@ public:
     /// a prefix can be set. This must be done before setting any SharedParts.
     static void set_resource_naming_prefix(std::string prefix);
 private:
-    sem_t* get_semaphore(std::string path, std::size_t offset_of_condvar);
+    sem_t* get_semaphore(std::string path, size_t offset_of_condvar);
 
     // non-zero if a shared part has been registered (always 0 on process local instances)
     SharedPart* m_shared_part; 

@@ -21,7 +21,7 @@
 #define REALM_COLUMN_HPP
 
 #include <stdint.h> // unint8_t etc
-#include <cstdlib> // std::size_t
+#include <cstdlib> // size_t
 #include <vector>
 #include <memory>
 
@@ -56,8 +56,8 @@ struct ColumnTemplateBase
 };
 
 template <class T, class R, Action action, class Condition, class ColType>
-R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
-                std::size_t limit, std::size_t* return_ndx);
+R aggregate(const ColType& column, T target, size_t start, size_t end,
+                size_t limit, size_t* return_ndx);
 
 template <class T> struct ColumnTemplate : public ColumnTemplateBase
 {
@@ -88,21 +88,21 @@ class ColumnBase {
 public:
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
-    virtual std::size_t size() const noexcept = 0;
+    virtual size_t size() const noexcept = 0;
 
     /// \throw LogicError Thrown if this column is not string valued.
-    virtual void set_string(std::size_t row_ndx, StringData value);
+    virtual void set_string(size_t row_ndx, StringData value);
 
     /// Whether or not this column is nullable.
     virtual bool is_nullable() const noexcept;
 
     /// Whether or not the value at \a row_ndx is NULL. If the column is not
     /// nullable, always returns false.
-    virtual bool is_null(std::size_t row_ndx) const noexcept;
+    virtual bool is_null(size_t row_ndx) const noexcept;
 
     /// Sets the value at \a row_ndx to be NULL.
     /// \throw LogicError Thrown if this column is not nullable.
-    virtual void set_null(std::size_t row_ndx);
+    virtual void set_null(size_t row_ndx);
 
     //@{
 
@@ -139,7 +139,7 @@ public:
     /// \param broken_reciprocal_backlinks If true, link columns must assume
     /// that reciprocal backlinks have already been removed. Non-link columns
     /// should ignore this argument.
-    virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
+    virtual void clear(size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
     virtual void destroy() noexcept = 0;
     void move_assign(ColumnBase& col) noexcept;
@@ -149,7 +149,7 @@ public:
     // Getter function for index. For integer index, the caller must supply a buffer that we can store the
     // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
     // String index).
-    virtual StringData get_index_data(std::size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
+    virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
     virtual bool has_search_index() const noexcept;
@@ -157,7 +157,7 @@ public:
     virtual void destroy_search_index() noexcept;
     virtual const StringIndex* get_search_index() const noexcept;
     virtual StringIndex* get_search_index() noexcept;
-    virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+    virtual void set_search_index_ref(ref_type, ArrayParent*, size_t ndx_in_parent,
                                       bool allow_duplicate_values);
     virtual void set_search_index_allow_duplicate_values(bool) noexcept;
 
@@ -172,25 +172,25 @@ public:
     virtual void detach(void) = 0;
     virtual bool is_attached(void) const noexcept = 0;
 
-    static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) noexcept;
+    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) noexcept;
 
     // These assume that the right column compile-time type has been
     // figured out.
-    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&);
-    static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&);
+    static size_t get_size_from_ref(ref_type root_ref, Allocator&);
+    static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&);
 
     /// Write a slice of this column to the specified output stream.
-    virtual ref_type write(std::size_t slice_offset, std::size_t slice_size,
-                           std::size_t table_size, _impl::OutputStream&) const = 0;
+    virtual ref_type write(size_t slice_offset, size_t slice_size,
+                           size_t table_size, _impl::OutputStream&) const = 0;
 
-    virtual void set_parent(ArrayParent*, std::size_t ndx_in_parent) noexcept = 0;
-    virtual std::size_t get_ndx_in_parent() const noexcept = 0;
-    virtual void set_ndx_in_parent(std::size_t ndx_in_parent) noexcept = 0;
+    virtual void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept = 0;
+    virtual size_t get_ndx_in_parent() const noexcept = 0;
+    virtual void set_ndx_in_parent(size_t ndx_in_parent) noexcept = 0;
 
     /// Called in the context of Group::commit() and
     /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
     /// table and link list accessors stay valid across a commit.
-    virtual void update_from_parent(std::size_t old_baseline) noexcept = 0;
+    virtual void update_from_parent(size_t old_baseline) noexcept = 0;
 
     //@{
 
@@ -203,8 +203,8 @@ public:
     /// Table::cascade_break_backlinks_to_all_rows() to pass the number of rows
     /// in the table as \a num_rows.
 
-    virtual void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState&);
-    virtual void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&);
+    virtual void cascade_break_backlinks_to(size_t row_ndx, CascadeState&);
+    virtual void cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState&);
 
     //@}
 
@@ -214,18 +214,18 @@ public:
     /// the pointer to the subtable accessor at the specified row index if it
     /// exists, otherwise it returns null. For other column types, this function
     /// returns null.
-    virtual Table* get_subtable_accessor(std::size_t row_ndx) const noexcept;
+    virtual Table* get_subtable_accessor(size_t row_ndx) const noexcept;
 
     /// Detach and remove the subtable accessor at the specified row if it
     /// exists. For column types that are unable to contain subtable, this
     /// function does nothing.
-    virtual void discard_subtable_accessor(std::size_t row_ndx) noexcept;
+    virtual void discard_subtable_accessor(size_t row_ndx) noexcept;
 
-    virtual void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) noexcept;
-    virtual void adj_acc_erase_row(std::size_t row_ndx) noexcept;
+    virtual void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
+    virtual void adj_acc_erase_row(size_t row_ndx) noexcept;
     /// See Table::adj_acc_move_over()
-    virtual void adj_acc_move_over(std::size_t from_row_ndx,
-                                   std::size_t to_row_ndx) noexcept;
+    virtual void adj_acc_move_over(size_t from_row_ndx,
+                                   size_t to_row_ndx) noexcept;
     virtual void adj_acc_clear_root_table() noexcept;
 
     enum {
@@ -258,12 +258,12 @@ public:
     ///
     ///  - The 'index in parent' property of the cached root array
     ///    (`root->m_ndx_in_parent`) is valid.
-    virtual void refresh_accessor_tree(std::size_t new_col_ndx, const Spec&) = 0;
+    virtual void refresh_accessor_tree(size_t new_col_ndx, const Spec&) = 0;
 
 #ifdef REALM_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void verify() const = 0;
-    virtual void verify(const Table&, std::size_t col_ndx) const;
+    virtual void verify(const Table&, size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
@@ -284,31 +284,31 @@ protected:
     /// \tparam L Any type with an appropriate `value_type`, %size(),
     /// and %get() members.
     template<class L, class T>
-    std::size_t lower_bound(const L& list, T value) const noexcept;
+    size_t lower_bound(const L& list, T value) const noexcept;
     template<class L, class T>
-    std::size_t upper_bound(const L& list, T value) const noexcept;
+    size_t upper_bound(const L& list, T value) const noexcept;
     //@}
 
     // Node functions
 
     class CreateHandler {
     public:
-        virtual ref_type create_leaf(std::size_t size) = 0;
+        virtual ref_type create_leaf(size_t size) = 0;
         ~CreateHandler() noexcept {}
     };
 
-    static ref_type create(Allocator&, std::size_t size, CreateHandler&);
+    static ref_type create(Allocator&, size_t size, CreateHandler&);
 
 #ifdef REALM_DEBUG
     class LeafToDot;
-    virtual void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+    virtual void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                              std::ostream&) const = 0;
 #endif
 
 private:
     class WriteSliceHandler;
 
-    static ref_type build(std::size_t* rest_size_ptr, std::size_t fixed_height,
+    static ref_type build(size_t* rest_size_ptr, size_t fixed_height,
                           Allocator&, CreateHandler&);
 };
 
@@ -331,10 +331,10 @@ public:
     MemRef get_mem() const noexcept final { return m_array->get_mem(); }
     void detach() noexcept final { m_array->detach(); }
     bool is_attached() const noexcept final { return m_array->is_attached(); }
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept final { m_array->set_parent(parent, ndx_in_parent); }
-    std::size_t get_ndx_in_parent() const noexcept final { return m_array->get_ndx_in_parent(); }
-    void set_ndx_in_parent(std::size_t ndx_in_parent) noexcept final { m_array->set_ndx_in_parent(ndx_in_parent); }
-    void update_from_parent(std::size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept final { m_array->set_parent(parent, ndx_in_parent); }
+    size_t get_ndx_in_parent() const noexcept final { return m_array->get_ndx_in_parent(); }
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept final { m_array->set_ndx_in_parent(ndx_in_parent); }
+    void update_from_parent(size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 protected:
     ColumnBaseSimple() {}
@@ -349,8 +349,8 @@ protected:
     void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
                             bool is_append);
 
-    static ref_type write(const Array* root, std::size_t slice_offset, std::size_t slice_size,
-                          std::size_t table_size, SliceHandler&, _impl::OutputStream&);
+    static ref_type write(const Array* root, size_t slice_offset, size_t slice_size,
+                          size_t table_size, SliceHandler&, _impl::OutputStream&);
 
 #if defined(REALM_DEBUG)
     void tree_to_dot(std::ostream&) const;
@@ -360,9 +360,9 @@ protected:
 class ColumnBaseWithIndex : public ColumnBase {
 public:
     ~ColumnBaseWithIndex() noexcept override {}
-    void set_ndx_in_parent(std::size_t ndx) noexcept override;
-    void update_from_parent(std::size_t old_baseline) noexcept override;
-    void refresh_accessor_tree(std::size_t, const Spec&) override;
+    void set_ndx_in_parent(size_t ndx) noexcept override;
+    void update_from_parent(size_t old_baseline) noexcept override;
+    void refresh_accessor_tree(size_t, const Spec&) override;
     void move_assign(ColumnBaseWithIndex& col) noexcept;
     void destroy() noexcept override;
 
@@ -407,18 +407,18 @@ public:
     Allocator& get_alloc() const noexcept final;
     ref_type get_ref() const noexcept final;
     MemRef get_mem() const noexcept final;
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept override;
-    std::size_t get_ndx_in_parent() const noexcept final;
-    void set_ndx_in_parent(std::size_t ndx) noexcept final;
-    void update_from_parent(std::size_t old_baseline) noexcept override;
-    void refresh_accessor_tree(std::size_t, const Spec&) override;
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override;
+    size_t get_ndx_in_parent() const noexcept final;
+    void set_ndx_in_parent(size_t ndx) noexcept final;
+    void update_from_parent(size_t old_baseline) noexcept override;
+    void refresh_accessor_tree(size_t, const Spec&) override;
     void detach() noexcept final;
     bool is_attached() const noexcept final;
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column<T, Nullable>&);
 
-    std::size_t size() const noexcept override;
+    size_t size() const noexcept override;
     bool is_empty() const noexcept { return size() == 0; }
     bool is_nullable() const noexcept override;
 
@@ -436,59 +436,59 @@ public:
     /// accessors. For this reason, the identified leaf should always
     /// be accessed through the returned const-qualified reference,
     /// and never directly through the specfied fallback accessor.
-    void get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+    void get_leaf(size_t ndx, size_t& ndx_in_leaf,
         LeafInfo& inout_leaf) const noexcept;
 
     // Getting and setting values
-    T get_val(std::size_t ndx) const noexcept final { return get(ndx); }
-    T get(std::size_t ndx) const noexcept;
-    bool is_null(std::size_t ndx) const noexcept override;
+    T get_val(size_t ndx) const noexcept final { return get(ndx); }
+    T get(size_t ndx) const noexcept;
+    bool is_null(size_t ndx) const noexcept override;
     T back() const noexcept;
-    void set(std::size_t, T value);
-    void set(std::size_t, null);
-    void set_null(std::size_t) override;
+    void set(size_t, T value);
+    void set(size_t, null);
+    void set_null(size_t) override;
     void add(T value = T{});
     void add(null);
-    void insert(std::size_t ndx, T value = T{}, std::size_t num_rows = 1);
-    void insert(std::size_t ndx, null, std::size_t num_rows = 1);
+    void insert(size_t ndx, T value = T{}, size_t num_rows = 1);
+    void insert(size_t ndx, null, size_t num_rows = 1);
     void erase(size_t row_ndx);
     void erase(size_t row_ndx, bool is_last);
     void move_last_over(size_t row_ndx, size_t last_row_ndx);
     void clear();
 
     // Index support
-    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept override;
+    StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept override;
 
     // FIXME: Remove these
-    uint64_t get_uint(std::size_t ndx) const noexcept;
-    ref_type get_as_ref(std::size_t ndx) const noexcept;
-    void set_uint(std::size_t ndx, uint64_t value);
-    void set_as_ref(std::size_t ndx, ref_type value);
+    uint64_t get_uint(size_t ndx) const noexcept;
+    ref_type get_as_ref(size_t ndx) const noexcept;
+    void set_uint(size_t ndx, uint64_t value);
+    void set_as_ref(size_t ndx, ref_type value);
 
     template <class U>
-    void adjust(std::size_t ndx, U diff);
+    void adjust(size_t ndx, U diff);
     template <class U>
     void adjust(U diff);
     template <class U>
     void adjust_ge(T limit, U diff);
 
-    std::size_t count(T target) const;
+    size_t count(T target) const;
 
-    T sum(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                std::size_t* return_ndx = nullptr) const;
+    T sum(size_t start = 0, size_t end = npos, size_t limit = npos,
+                size_t* return_ndx = nullptr) const;
 
-    T maximum(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                    std::size_t* return_ndx = nullptr) const;
+    T maximum(size_t start = 0, size_t end = npos, size_t limit = npos,
+                    size_t* return_ndx = nullptr) const;
 
-    T minimum(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                    std::size_t* return_ndx = nullptr) const;
+    T minimum(size_t start = 0, size_t end = npos, size_t limit = npos,
+                    size_t* return_ndx = nullptr) const;
 
-    double average(std::size_t start = 0, std::size_t end = npos, std::size_t limit = npos,
-                    std::size_t* return_ndx = nullptr) const;
+    double average(size_t start = 0, size_t end = npos, size_t limit = npos,
+                    size_t* return_ndx = nullptr) const;
 
-    std::size_t find_first(T value, std::size_t begin = 0, std::size_t end = npos) const;
+    size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
     void find_all(Column<int64_t, false>& out_indices, T value,
-                  std::size_t begin = 0, std::size_t end = npos) const;
+                  size_t begin = 0, size_t end = npos) const;
 
     void populate_search_index();
     StringIndex* create_search_index() override;
@@ -498,30 +498,30 @@ public:
     /// that the elements are already sorted in ascending order
     /// according to ordinary integer comparison.
     // FIXME: Rename
-    std::size_t lower_bound_int(T value) const noexcept;
+    size_t lower_bound_int(T value) const noexcept;
     // FIXME: Rename
-    std::size_t upper_bound_int(T value) const noexcept;
+    size_t upper_bound_int(T value) const noexcept;
     //@}
 
-    std::size_t find_gte(T target, std::size_t start) const;
+    size_t find_gte(T target, size_t start) const;
 
     // FIXME: Rename
     bool compare_int(const Column<T, Nullable>&) const noexcept;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
-                           std::size_t size = 0, T value = 0);
+                           size_t size = 0, T value = 0);
 
     // Overriding method in ColumnBase
-    ref_type write(std::size_t, std::size_t, std::size_t,
+    ref_type write(size_t, size_t, size_t,
                    _impl::OutputStream&) const override;
 
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
-    void clear(std::size_t, bool) override;
+    void clear(size_t, bool) override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
-    void insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows);
+    void insert_without_updating_index(size_t row_ndx, T value, size_t num_rows);
 
 #ifdef REALM_DEBUG
     void verify() const override;
@@ -545,9 +545,9 @@ protected:
     bool root_is_leaf() const noexcept { return m_tree.root_is_leaf(); }
     void replace_root_array(std::unique_ptr<Array> leaf) final { m_tree.replace_root(std::move(leaf)); }
 
-    void set_without_updating_index(std::size_t row_ndx, T value);
-    void erase_without_updating_index(std::size_t row_ndx, bool is_last);
-    void move_last_over_without_updating_index(std::size_t row_ndx, std::size_t last_row_ndx);
+    void set_without_updating_index(size_t row_ndx, T value);
+    void erase_without_updating_index(size_t row_ndx, bool is_last);
+    void move_last_over_without_updating_index(size_t row_ndx, size_t last_row_ndx);
 
     /// If any element points to an array node, this function recursively
     /// destroys that array node. Note that the same is **not** true for
@@ -558,7 +558,7 @@ protected:
     void clear_without_updating_index();
 
 #ifdef REALM_DEBUG
-    void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
@@ -604,7 +604,7 @@ inline StringIndex* ColumnBase::get_search_index() noexcept
     return nullptr;
 }
 
-inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool)
+inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, size_t, bool)
 {
 }
 
@@ -617,27 +617,27 @@ inline void ColumnBase::discard_child_accessors() noexcept
     do_discard_child_accessors();
 }
 
-inline Table* ColumnBase::get_subtable_accessor(std::size_t) const noexcept
+inline Table* ColumnBase::get_subtable_accessor(size_t) const noexcept
 {
     return 0;
 }
 
-inline void ColumnBase::discard_subtable_accessor(std::size_t) noexcept
+inline void ColumnBase::discard_subtable_accessor(size_t) noexcept
 {
     // Noop
 }
 
-inline void ColumnBase::adj_acc_insert_rows(std::size_t, std::size_t) noexcept
+inline void ColumnBase::adj_acc_insert_rows(size_t, size_t) noexcept
 {
     // Noop
 }
 
-inline void ColumnBase::adj_acc_erase_row(std::size_t) noexcept
+inline void ColumnBase::adj_acc_erase_row(size_t) noexcept
 {
     // Noop
 }
 
-inline void ColumnBase::adj_acc_move_over(std::size_t, std::size_t) noexcept
+inline void ColumnBase::adj_acc_move_over(size_t, size_t) noexcept
 {
     // Noop
 }
@@ -658,13 +658,13 @@ inline void ColumnBase::bump_link_origin_table_version() noexcept
 }
 
 template <class T, bool N>
-void Column<T, N>::set_without_updating_index(std::size_t ndx, T value)
+void Column<T, N>::set_without_updating_index(size_t ndx, T value)
 {
     m_tree.set(ndx, std::move(value));
 }
 
 template <class T, bool N>
-void Column<T, N>::set(std::size_t ndx, T value)
+void Column<T, N>::set(size_t ndx, T value)
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (has_search_index()) {
@@ -674,7 +674,7 @@ void Column<T, N>::set(std::size_t ndx, T value)
 }
 
 template <class T, bool N>
-void Column<T, N>::set_null(std::size_t ndx)
+void Column<T, N>::set_null(size_t ndx)
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (!is_nullable()) {
@@ -687,7 +687,7 @@ void Column<T, N>::set_null(std::size_t ndx)
 }
 
 template <class T, bool N>
-void Column<T, N>::set(std::size_t ndx, null)
+void Column<T, N>::set(size_t ndx, null)
 {
     set_null(ndx);
 }
@@ -697,20 +697,20 @@ void Column<T, N>::set(std::size_t ndx, null)
 // realm::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
 // which reduces to a no-op when 2's complement is the native representation of negative values.
 template <class T, bool N>
-void Column<T, N>::set_uint(std::size_t ndx, uint64_t value)
+void Column<T, N>::set_uint(size_t ndx, uint64_t value)
 {
     set(ndx, util::from_twos_compl<int_fast64_t>(value));
 }
 
 template <class T, bool N>
-void Column<T, N>::set_as_ref(std::size_t ndx, ref_type ref)
+void Column<T, N>::set_as_ref(size_t ndx, ref_type ref)
 {
     set(ndx, from_ref(ref));
 }
 
 template <class T, bool N>
 template <class U>
-void Column<T, N>::adjust(std::size_t ndx, U diff)
+void Column<T, N>::adjust(size_t ndx, U diff)
 {
     REALM_ASSERT_3(ndx, <, size());
     m_tree.adjust(ndx, diff);
@@ -731,7 +731,7 @@ void Column<T, N>::adjust_ge(T limit, U diff)
 }
 
 template <class T, bool N>
-std::size_t Column<T, N>::count(T target) const
+size_t Column<T, N>::count(T target) const
 {
     if (has_search_index()) {
         return m_search_index->count(target);
@@ -740,7 +740,7 @@ std::size_t Column<T, N>::count(T target) const
 }
 
 template <class T, bool N>
-T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
+T Column<T, N>::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
     if (N)
         return aggregate<T, T, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
@@ -749,7 +749,7 @@ T Column<T, N>::sum(std::size_t start, std::size_t end, std::size_t limit, std::
 }
 
 template <class T, bool N>
-double Column<T, N>::average(std::size_t start, std::size_t end, std::size_t limit, std::size_t* return_ndx) const
+double Column<T, N>::average(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
     if (end == size_t(-1))
         end = size();
@@ -775,14 +775,14 @@ T Column<T,N>::maximum(size_t start, size_t end, size_t limit, size_t* return_nd
 }
 
 template <class T, bool N>
-void Column<T, N>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+void Column<T, N>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
                              typename BpTree<T,N>::LeafInfo& inout_leaf_info) const noexcept
 {
     m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
 }
 
 template <class T, bool N>
-StringData Column<T, N>::get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
+StringData Column<T, N>::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
 {
     static_assert(sizeof(T) == StringIndex::string_conversion_buffer_size, "not filling buffer");
     if (N && is_null(ndx)) {
@@ -798,8 +798,8 @@ void Column<T,N>::populate_search_index()
 {
     REALM_ASSERT(has_search_index());
     // Populate the index
-    std::size_t num_rows = size();
-    for (std::size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         bool is_append = true;
         if (N && is_null(row_ndx)) {
             m_search_index->insert(row_ndx, null{}, 1, is_append); // Throws
@@ -821,7 +821,7 @@ StringIndex* Column<T, N>::create_search_index()
 }
 
 template <class T, bool N>
-std::size_t Column<T,N>::find_first(T value, std::size_t begin, std::size_t end) const
+size_t Column<T,N>::find_first(T value, size_t begin, size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -842,7 +842,7 @@ void Column<T,N>::find_all(IntegerColumn& result, T value, size_t begin, size_t 
     return m_tree.find_all(result, value, begin, end);
 }
 
-inline std::size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& alloc)
+inline size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& alloc)
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
@@ -852,13 +852,13 @@ inline std::size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& a
 }
 
 template<class L, class T>
-std::size_t ColumnBase::lower_bound(const L& list, T value) const noexcept
+size_t ColumnBase::lower_bound(const L& list, T value) const noexcept
 {
-    std::size_t i = 0;
-    std::size_t size = list.size();
+    size_t i = 0;
+    size_t size = list.size();
     while (0 < size) {
-        std::size_t half = size / 2;
-        std::size_t mid = i + half;
+        size_t half = size / 2;
+        size_t mid = i + half;
         typename L::value_type probe = list.get(mid);
         if (probe < value) {
             i = mid + 1;
@@ -872,7 +872,7 @@ std::size_t ColumnBase::lower_bound(const L& list, T value) const noexcept
 }
 
 template<class L, class T>
-std::size_t ColumnBase::upper_bound(const L& list, T value) const noexcept
+size_t ColumnBase::upper_bound(const L& list, T value) const noexcept
 {
     size_t i = 0;
     size_t size = list.size();
@@ -892,10 +892,10 @@ std::size_t ColumnBase::upper_bound(const L& list, T value) const noexcept
 }
 
 
-inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHandler& handler)
+inline ref_type ColumnBase::create(Allocator& alloc, size_t size, CreateHandler& handler)
 {
-    std::size_t rest_size = size;
-    std::size_t fixed_height = 0; // Not fixed
+    size_t rest_size = size;
+    size_t fixed_height = 0; // Not fixed
     return build(&rest_size, fixed_height, alloc, handler);
 }
 
@@ -960,19 +960,19 @@ Allocator& Column<T,N>::get_alloc() const noexcept
 }
 
 template <class T, bool N>
-void Column<T,N>::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept
+void Column<T,N>::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
 {
     m_tree.set_parent(parent, ndx_in_parent);
 }
 
 template <class T, bool N>
-std::size_t Column<T,N>::get_ndx_in_parent() const noexcept
+size_t Column<T,N>::get_ndx_in_parent() const noexcept
 {
     return m_tree.get_ndx_in_parent();
 }
 
 template <class T, bool N>
-void Column<T,N>::set_ndx_in_parent(std::size_t ndx_in_parent) noexcept
+void Column<T,N>::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
     ColumnBaseWithIndex::set_ndx_in_parent(ndx_in_parent);
     m_tree.set_ndx_in_parent(ndx_in_parent);
@@ -1003,7 +1003,7 @@ MemRef Column<T,N>::get_mem() const noexcept
 }
 
 template <class T, bool N>
-void Column<T,N>::update_from_parent(std::size_t old_baseline) noexcept
+void Column<T,N>::update_from_parent(size_t old_baseline) noexcept
 {
     ColumnBaseWithIndex::update_from_parent(old_baseline);
     m_tree.update_from_parent(old_baseline);
@@ -1016,7 +1016,7 @@ MemRef Column<T,N>::clone_deep(Allocator& alloc) const
 }
 
 template <class T, bool N>
-std::size_t Column<T,N>::size() const noexcept
+size_t Column<T,N>::size() const noexcept
 {
     return m_tree.size();
 }
@@ -1028,7 +1028,7 @@ bool Column<T,N>::is_nullable() const noexcept
 }
 
 template <class T, bool N>
-T Column<T,N>::get(std::size_t ndx) const noexcept
+T Column<T,N>::get(size_t ndx) const noexcept
 {
     // TODO: This can be speed optimized by letting .get() do the null check
     if (N)
@@ -1045,7 +1045,7 @@ T Column<T,N>::get(std::size_t ndx) const noexcept
 }
 
 template <class T, bool N>
-bool Column<T,N>::is_null(std::size_t ndx) const noexcept
+bool Column<T,N>::is_null(size_t ndx) const noexcept
 {
     if (N)
         return m_tree.is_null(ndx);
@@ -1060,13 +1060,13 @@ T Column<T,N>::back() const noexcept
 }
 
 template <class T, bool N>
-ref_type Column<T,N>::get_as_ref(std::size_t ndx) const noexcept
+ref_type Column<T,N>::get_as_ref(size_t ndx) const noexcept
 {
     return to_ref(get(ndx));
 }
 
 template <class T, bool N>
-uint64_t Column<T,N>::get_uint(std::size_t ndx) const noexcept
+uint64_t Column<T,N>::get_uint(size_t ndx) const noexcept
 {
     static_assert(std::is_convertible<T, uint64_t>::value, "T is not convertible to uint.");
     return static_cast<uint64_t>(get(ndx));
@@ -1085,21 +1085,21 @@ void Column<T,N>::add(null)
 }
 
 template <class T, bool N>
-void Column<T,N>::insert_without_updating_index(std::size_t row_ndx, T value, std::size_t num_rows)
+void Column<T,N>::insert_without_updating_index(size_t row_ndx, T value, size_t num_rows)
 {
-    std::size_t size = this->size(); // Slow
+    size_t size = this->size(); // Slow
     bool is_append = row_ndx == size || row_ndx == npos;
-    std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
+    size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
 
     m_tree.insert(ndx_or_npos_if_append, std::move(value), num_rows); // Throws
 }
 
 template <class T, bool N>
-void Column<T,N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
+void Column<T,N>::insert(size_t row_ndx, T value, size_t num_rows)
 {
-    std::size_t size = this->size(); // Slow
+    size_t size = this->size(); // Slow
     bool is_append = row_ndx == size || row_ndx == npos;
-    std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
+    size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
 
     m_tree.insert(ndx_or_npos_if_append, value, num_rows); // Throws
 
@@ -1110,11 +1110,11 @@ void Column<T,N>::insert(std::size_t row_ndx, T value, std::size_t num_rows)
 }
 
 template <class T, bool N>
-void Column<T,N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
+void Column<T,N>::insert(size_t row_ndx, null, size_t num_rows)
 {
-    std::size_t size = this->size(); // Slow
+    size_t size = this->size(); // Slow
     bool is_append = row_ndx == size || row_ndx == npos;
-    std::size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
+    size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
 
     m_tree.insert(ndx_or_npos_if_append, null{}, num_rows); // Throws
 
@@ -1125,7 +1125,7 @@ void Column<T,N>::insert(std::size_t row_ndx, null, std::size_t num_rows)
 }
 
 template <class T, bool N>
-void Column<T,N>::erase_without_updating_index(std::size_t row_ndx, bool is_last)
+void Column<T,N>::erase_without_updating_index(size_t row_ndx, bool is_last)
 {
     m_tree.erase(row_ndx, is_last);
 }
@@ -1147,13 +1147,13 @@ void Column<T,N>::erase(size_t row_ndx, bool is_last)
 }
 
 template <class T, bool N>
-void Column<T, N>::move_last_over_without_updating_index(std::size_t row_ndx, std::size_t last_row_ndx)
+void Column<T, N>::move_last_over_without_updating_index(size_t row_ndx, size_t last_row_ndx)
 {
     m_tree.move_last_over(row_ndx, last_row_ndx);
 }
 
 template <class T, bool N>
-void Column<T,N>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
+void Column<T,N>::move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
     REALM_ASSERT_DEBUG(last_row_ndx + 1 == size());
@@ -1239,14 +1239,14 @@ void Column<T,N>::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool
 
 // Implementing pure virtual method of ColumnBase.
 template <class T, bool N>
-void Column<T,N>::clear(std::size_t, bool)
+void Column<T,N>::clear(size_t, bool)
 {
     clear(); // Throws
 }
 
 
 template <class T, bool N>
-std::size_t Column<T,N>::lower_bound_int(T value) const noexcept
+size_t Column<T,N>::lower_bound_int(T value) const noexcept
 {
     static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
@@ -1256,7 +1256,7 @@ std::size_t Column<T,N>::lower_bound_int(T value) const noexcept
 }
 
 template <class T, bool N>
-std::size_t Column<T,N>::upper_bound_int(T value) const noexcept
+size_t Column<T,N>::upper_bound_int(T value) const noexcept
 {
     static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
@@ -1267,7 +1267,7 @@ std::size_t Column<T,N>::upper_bound_int(T value) const noexcept
 
 // For a *sorted* Column, return first element E for which E >= target or return -1 if none
 template <class T, bool N>
-std::size_t Column<T,N>::find_gte(T target, size_t start) const
+size_t Column<T,N>::find_gte(T target, size_t start) const
 {
     // fixme: slow reference implementation. See Array::find_gte for faster version
     size_t ref = 0;
@@ -1329,8 +1329,8 @@ ref_type Column<T,N>::create(Allocator& alloc, Array::Type leaf_type, size_t siz
 }
 
 template <class T, bool N>
-ref_type Column<T,N>::write(std::size_t slice_offset, std::size_t slice_size,
-                       std::size_t table_size, _impl::OutputStream& out) const
+ref_type Column<T,N>::write(size_t slice_offset, size_t slice_size,
+                       size_t table_size, _impl::OutputStream& out) const
 {
     return m_tree.write(slice_offset, slice_size, table_size, out);
 }

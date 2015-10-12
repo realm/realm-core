@@ -146,8 +146,8 @@ namespace realm {
     /// Assumes that the sizes of \a needle_upper and \a needle_lower are
     /// both equal to \a needle_size. Returns haystack.size() if the
     /// needle was not found.
-    std::size_t search_case_fold(StringData haystack, const char* needle_upper,
-        const char* needle_lower, std::size_t needle_size);
+    size_t search_case_fold(StringData haystack, const char* needle_upper,
+        const char* needle_lower, size_t needle_size);
 
 
 } // namespace realm

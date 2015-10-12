@@ -82,7 +82,7 @@ public:
     StringData() noexcept;
 
     /// If \a data is 'null', \a size must be zero.
-    StringData(const char* data, std::size_t size) noexcept;
+    StringData(const char* data, size_t size) noexcept;
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
@@ -93,10 +93,10 @@ public:
     /// a null reference.
     StringData(const char* c_str) noexcept;
 
-    char operator[](std::size_t i) const noexcept;
+    char operator[](size_t i) const noexcept;
 
     const char* data() const noexcept;
-    std::size_t size() const noexcept;
+    size_t size() const noexcept;
 
     /// Is this a null reference?
     ///
@@ -134,10 +134,10 @@ public:
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
     /// size().
-    StringData prefix(std::size_t n) const noexcept;
-    StringData suffix(std::size_t n) const noexcept;
-    StringData substr(std::size_t i, std::size_t n) const noexcept;
-    StringData substr(std::size_t i) const noexcept;
+    StringData prefix(size_t n) const noexcept;
+    StringData suffix(size_t n) const noexcept;
+    StringData substr(size_t i, size_t n) const noexcept;
+    StringData substr(size_t i) const noexcept;
     //@}
 
     template<class C, class T>
@@ -152,7 +152,7 @@ public:
 
 private:
     const char* m_data;
-    std::size_t m_size;
+    size_t m_size;
 };
 
 
@@ -164,7 +164,7 @@ inline StringData::StringData() noexcept:
 {
 }
 
-inline StringData::StringData(const char* data, std::size_t size) noexcept:
+inline StringData::StringData(const char* data, size_t size) noexcept:
     m_data(data),
     m_size(size)
 {
@@ -196,7 +196,7 @@ inline StringData::StringData(const char* c_str) noexcept:
         m_size = std::char_traits<char>::length(c_str);
 }
 
-inline char StringData::operator[](std::size_t i) const noexcept
+inline char StringData::operator[](size_t i) const noexcept
 {
     return m_data[i];
 }
@@ -206,7 +206,7 @@ inline const char* StringData::data() const noexcept
     return m_data;
 }
 
-inline std::size_t StringData::size() const noexcept
+inline size_t StringData::size() const noexcept
 {
     return m_size;
 }
@@ -275,22 +275,22 @@ inline bool StringData::contains(StringData d) const noexcept
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
-inline StringData StringData::prefix(std::size_t n) const noexcept
+inline StringData StringData::prefix(size_t n) const noexcept
 {
     return substr(0,n);
 }
 
-inline StringData StringData::suffix(std::size_t n) const noexcept
+inline StringData StringData::suffix(size_t n) const noexcept
 {
     return substr(m_size - n);
 }
 
-inline StringData StringData::substr(std::size_t i, std::size_t n) const noexcept
+inline StringData StringData::substr(size_t i, size_t n) const noexcept
 {
     return StringData(m_data + i, n);
 }
 
-inline StringData StringData::substr(std::size_t i) const noexcept
+inline StringData StringData::substr(size_t i) const noexcept
 {
     return substr(i, m_size - i);
 }

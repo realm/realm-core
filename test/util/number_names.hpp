@@ -26,9 +26,9 @@
 namespace realm {
 namespace test_util {
 
-std::string number_name(std::size_t n);
+std::string number_name(size_t n);
 
-std::string number_name(std::size_t n)
+std::string number_name(size_t n)
 {
     static const char* ones[] = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
                                  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",

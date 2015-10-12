@@ -240,7 +240,7 @@ private:
 
 public:
     /// Same as 'table[i]' where 'table' is the referenced table.
-    RowAccessor operator[](std::size_t i) const noexcept { return (*this->get())[i]; }
+    RowAccessor operator[](size_t i) const noexcept { return (*this->get())[i]; }
 
 private:
     friend class SubtableColumnBase;

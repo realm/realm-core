@@ -29,12 +29,12 @@ namespace test_util {
 /// Returns the amount (in number of bytes) of virtaul memory
 /// allocated to the calling process.
 ///
-/// FIXME: 'std::size_t' is inappropriate for holding the total memory
+/// FIXME: 'size_t' is inappropriate for holding the total memory
 /// usage. C++11 guarantees only that it can hold the size of a single
 /// object or array. 'std::uintptr_t' would have been the ideal type
 /// to use here, but C++11 does not required it to be available (see
 /// 18.4.1 "Header <cstdint> synopsis".)
-std::size_t get_mem_usage();
+size_t get_mem_usage();
 
 
 } // namespace test_util

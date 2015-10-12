@@ -67,32 +67,32 @@ namespace _impl { class DescriptorFriend; }
 class Descriptor {
 public:
     /// Get the number of columns in the associated tables.
-    std::size_t get_column_count() const noexcept;
+    size_t get_column_count() const noexcept;
 
     /// Get the type of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    DataType get_column_type(std::size_t column_ndx) const noexcept;
+    DataType get_column_type(size_t column_ndx) const noexcept;
 
     /// Get the name of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    StringData get_column_name(std::size_t column_ndx) const noexcept;
+    StringData get_column_name(size_t column_ndx) const noexcept;
 
     /// Search for a column with the specified name.
     ///
     /// This function finds the first column with the specified name,
     /// and returns its index. If there are no such columns, it
     /// returns `not_found`.
-    std::size_t get_column_index(StringData name) const noexcept;
+    size_t get_column_index(StringData name) const noexcept;
 
     /// Get whether or not the specified column is nullable.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
-    bool is_nullable(std::size_t column_ndx) const noexcept;
+    bool is_nullable(size_t column_ndx) const noexcept;
 
     //@{
 
@@ -147,16 +147,16 @@ public:
     /// \sa Table::insert_column_link()
     /// \sa is_root()
 
-    static const std::size_t max_column_name_length = 63;
+    static const size_t max_column_name_length = 63;
 
-    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
+    size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
 
-    void insert_column(std::size_t col_ndx, DataType type, StringData name,
+    void insert_column(size_t col_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0, bool nullable = false);
 
-    std::size_t add_column_link(DataType type, StringData name, Table& target,
+    size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
-    void insert_column_link(std::size_t col_ndx, DataType type, StringData name, Table& target,
+    void insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
                             LinkType = link_Weak);
     //@}
 
@@ -184,7 +184,7 @@ public:
     ///
     /// \sa is_root()
     /// \sa Table::remove_column()
-    void remove_column(std::size_t col_ndx);
+    void remove_column(size_t col_ndx);
 
     /// Rename the specified column.
     ///
@@ -203,7 +203,7 @@ public:
     ///
     /// \sa is_root()
     /// \sa Table::rename_column()
-    void rename_column(std::size_t col_ndx, StringData new_name);
+    void rename_column(size_t col_ndx, StringData new_name);
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
     /// that implies ownership, i.e., that the origin row (parent) owns the
@@ -277,7 +277,7 @@ public:
     /// `type_LinkList`) to be modified. It is an error to specify an index that
     /// is greater than, or equal to the number of columns, or to specify the
     /// index of a non-link column.
-    void set_link_type(std::size_t col_ndx, LinkType);
+    void set_link_type(size_t col_ndx, LinkType);
 
     //@{
     /// Get the descriptor for the specified subtable column.
@@ -295,8 +295,8 @@ public:
     /// first getting access to the subtable itself.
     ///
     /// \sa is_root()
-    DescriptorRef get_subdescriptor(std::size_t column_ndx);
-    ConstDescriptorRef get_subdescriptor(std::size_t column_ndx) const;
+    DescriptorRef get_subdescriptor(size_t column_ndx);
+    ConstDescriptorRef get_subdescriptor(size_t column_ndx) const;
     //@}
 
     //@{
@@ -397,7 +397,7 @@ public:
     /// this function returns the number of unique values currently
     /// stored. Otherwise it returns zero. This function is mainly intended for
     /// debugging purposes.
-    std::size_t get_num_unique_values(std::size_t column_ndx) const;
+    size_t get_num_unique_values(size_t column_ndx) const;
 
     ~Descriptor() noexcept;
 
@@ -418,9 +418,9 @@ private:
     // It also enables the necessary recursive detaching of descriptor
     // objects.
     struct subdesc_entry {
-        std::size_t m_column_ndx;
+        size_t m_column_ndx;
         Descriptor* m_subdesc;
-        subdesc_entry(std::size_t column_ndx, Descriptor*);
+        subdesc_entry(size_t column_ndx, Descriptor*);
     };
     typedef std::vector<subdesc_entry> subdesc_map;
     mutable subdesc_map m_subdesc_map;
@@ -484,15 +484,15 @@ private:
     // too long to fit in the specified buffer. Otherwise the path
     // indexes will be stored between `begin_2`and `end`, where
     // `begin_2` is the returned pointer.
-    std::size_t* record_subdesc_path(std::size_t* begin, std::size_t* end) const noexcept;
+    size_t* record_subdesc_path(size_t* begin, size_t* end) const noexcept;
 
     // Returns a pointer to the accessor of the specified
     // subdescriptor if that accessor exists, otherwise this function
     // return null.
-    Descriptor* get_subdesc_accessor(std::size_t column_ndx) noexcept;
+    Descriptor* get_subdesc_accessor(size_t column_ndx) noexcept;
 
-    void adj_insert_column(std::size_t col_ndx) noexcept;
-    void adj_erase_column(std::size_t col_ndx) noexcept;
+    void adj_insert_column(size_t col_ndx) noexcept;
+    void adj_erase_column(size_t col_ndx) noexcept;
 
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
@@ -504,31 +504,31 @@ private:
 
 // Implementation:
 
-inline std::size_t Descriptor::get_column_count() const noexcept
+inline size_t Descriptor::get_column_count() const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_public_column_count();
 }
 
-inline StringData Descriptor::get_column_name(std::size_t ndx) const noexcept
+inline StringData Descriptor::get_column_name(size_t ndx) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_column_name(ndx);
 }
 
-inline DataType Descriptor::get_column_type(std::size_t ndx) const noexcept
+inline DataType Descriptor::get_column_type(size_t ndx) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_public_column_type(ndx);
 }
 
-inline bool Descriptor::is_nullable(std::size_t ndx) const noexcept
+inline bool Descriptor::is_nullable(size_t ndx) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_column_attr(ndx) & col_attr_Nullable;
 }
 
-inline std::size_t Descriptor::get_column_index(StringData name) const noexcept
+inline size_t Descriptor::get_column_index(StringData name) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_column_index(name);
@@ -635,7 +635,7 @@ inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
     tf::set_link_type(*get_root_table(), col_ndx, link_type); // Throws
 }
 
-inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) const
+inline ConstDescriptorRef Descriptor::get_subdescriptor(size_t column_ndx) const
 {
     return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
 }
@@ -708,7 +708,7 @@ inline bool Descriptor::is_attached() const noexcept
     return bool(m_root_table);
 }
 
-inline Descriptor::subdesc_entry::subdesc_entry(std::size_t n, Descriptor* d):
+inline Descriptor::subdesc_entry::subdesc_entry(size_t n, Descriptor* d):
     m_column_ndx(n),
     m_subdesc(d)
 {
@@ -766,24 +766,24 @@ public:
         return *desc.m_spec;
     }
 
-    static std::size_t* record_subdesc_path(const Descriptor& desc, std::size_t* begin,
-                                            std::size_t* end) noexcept
+    static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin,
+                                            size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
     }
 
-    static Descriptor* get_subdesc_accessor(Descriptor& desc, std::size_t column_ndx)
+    static Descriptor* get_subdesc_accessor(Descriptor& desc, size_t column_ndx)
         noexcept
     {
         return desc.get_subdesc_accessor(column_ndx);
     }
 
-    static void adj_insert_column(Descriptor& desc, std::size_t col_ndx) noexcept
+    static void adj_insert_column(Descriptor& desc, size_t col_ndx) noexcept
     {
         desc.adj_insert_column(col_ndx);
     }
 
-    static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) noexcept
+    static void adj_erase_column(Descriptor& desc, size_t col_ndx) noexcept
     {
         desc.adj_erase_column(col_ndx);
     }

@@ -267,7 +267,7 @@ CATEGORIES :
         DESCR  : *g_typed_view_value_parameter_descr
       RETURN:
         TYPES  : size_t
-        DESCR  : "The row index or <code>realm::not_found</code> (equal to <code>std::size_t(-1)</code>) if there is no match."
+        DESCR  : "The row index or <code>realm::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_first_xxx
         DESCR  :
@@ -464,7 +464,7 @@ CATEGORIES :
       CONST    : true
       PARAMS:
       - NAME   : row_ndx
-        TYPES  : std::size_t
+        TYPES  : size_t
         DESCR  : &g_typed_view_row_to_string_parm1_descr
                  The index of the row to convert.
       - NAME   : out

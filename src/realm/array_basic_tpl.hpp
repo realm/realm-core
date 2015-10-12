@@ -43,12 +43,12 @@ inline BasicArray<T>::BasicArray(no_prealloc_tag) noexcept:
 
 
 template<class T>
-inline MemRef BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
+inline MemRef BasicArray<T>::create_array(size_t size, Allocator& alloc)
 {
-    std::size_t byte_size_0 = calc_aligned_byte_size(size); // Throws
+    size_t byte_size_0 = calc_aligned_byte_size(size); // Throws
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
-    std::size_t byte_size = std::max(byte_size_0, Array::initial_capacity+0); // Throws
+    size_t byte_size = std::max(byte_size_0, Array::initial_capacity+0); // Throws
 
     MemRef mem = alloc.alloc(byte_size); // Throws
 
@@ -66,14 +66,14 @@ inline MemRef BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
 template<class T>
 inline void BasicArray<T>::create()
 {
-    std::size_t size = 0;
+    size_t size = 0;
     MemRef mem = create_array(size, get_alloc()); // Throws
     init_from_mem(mem);
 }
 
 
 template<class T>
-MemRef BasicArray<T>::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const
+MemRef BasicArray<T>::slice(size_t offset, size_t size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
@@ -100,14 +100,14 @@ inline void BasicArray<T>::add(T value)
 }
 
 
-template<class T> inline T BasicArray<T>::get(std::size_t ndx) const noexcept
+template<class T> inline T BasicArray<T>::get(size_t ndx) const noexcept
 {
     return *(reinterpret_cast<const T*>(m_data) + ndx);
 }
 
 
 template<class T>
-inline T BasicArray<T>::get(const char* header, std::size_t ndx) noexcept
+inline T BasicArray<T>::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
     // FIXME: This casting assumes that T can be aliged on an 8-bype
@@ -119,7 +119,7 @@ inline T BasicArray<T>::get(const char* header, std::size_t ndx) noexcept
 
 
 template<class T>
-inline void BasicArray<T>::set(std::size_t ndx, T value)
+inline void BasicArray<T>::set(size_t ndx, T value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
@@ -132,7 +132,7 @@ inline void BasicArray<T>::set(std::size_t ndx, T value)
 }
 
 template<class T>
-void BasicArray<T>::insert(std::size_t ndx, T value)
+void BasicArray<T>::insert(size_t ndx, T value)
 {
     REALM_ASSERT_3(ndx, <=, m_size);
 
@@ -159,7 +159,7 @@ void BasicArray<T>::insert(std::size_t ndx, T value)
 }
 
 template<class T>
-void BasicArray<T>::erase(std::size_t ndx)
+void BasicArray<T>::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
@@ -180,7 +180,7 @@ void BasicArray<T>::erase(std::size_t ndx)
     set_header_size(m_size);
 }
 
-template<class T> void BasicArray<T>::truncate(std::size_t size)
+template<class T> void BasicArray<T>::truncate(size_t size)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(size, <=, m_size);
@@ -211,7 +211,7 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 
 
 template<class T>
-std::size_t BasicArray<T>::calc_byte_len(std::size_t size, std::size_t) const
+size_t BasicArray<T>::calc_byte_len(size_t size, size_t) const
 {
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
     // instead. Note however, that calc_byte_len() is supposed to return
@@ -223,36 +223,36 @@ std::size_t BasicArray<T>::calc_byte_len(std::size_t size, std::size_t) const
 }
 
 template<class T>
-std::size_t BasicArray<T>::calc_item_count(std::size_t bytes, std::size_t) const noexcept
+size_t BasicArray<T>::calc_item_count(size_t bytes, size_t) const noexcept
 {
     // FIXME: ??? what about width = 0? return -1?
 
-    std::size_t bytes_without_header = bytes - header_size;
+    size_t bytes_without_header = bytes - header_size;
     return bytes_without_header / sizeof (T);
 }
 
 template<class T>
-std::size_t BasicArray<T>::find(T value, std::size_t begin, std::size_t end) const
+size_t BasicArray<T>::find(T value, size_t begin, size_t end) const
 {
     if (end == npos)
         end = m_size;
     REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
     const T* data = reinterpret_cast<const T*>(m_data);
     const T* i = std::find(data + begin, data + end, value);
-    return i == data + end ? not_found : std::size_t(i - data);
+    return i == data + end ? not_found : size_t(i - data);
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::find_first(T value, std::size_t begin, std::size_t end) const
+inline size_t BasicArray<T>::find_first(T value, size_t begin, size_t end) const
 {
     return this->find(value, begin, end);
 }
 
 template<class T>
-void BasicArray<T>::find_all(IntegerColumn* result, T value, std::size_t add_offset,
-                             std::size_t begin, std::size_t end) const
+void BasicArray<T>::find_all(IntegerColumn* result, T value, size_t add_offset,
+                             size_t begin, size_t end) const
 {
-    std::size_t first = begin - 1;
+    size_t first = begin - 1;
     for (;;) {
         first = this->find(value, first + 1, end);
         if (first == not_found)
@@ -263,7 +263,7 @@ void BasicArray<T>::find_all(IntegerColumn* result, T value, std::size_t add_off
 }
 
 template<class T>
-std::size_t BasicArray<T>::count(T value, std::size_t begin, std::size_t end) const
+size_t BasicArray<T>::count(T value, size_t begin, size_t end) const
 {
     if (end == npos)
         end = m_size;
@@ -275,7 +275,7 @@ std::size_t BasicArray<T>::count(T value, std::size_t begin, std::size_t end) co
 #if 0
 // currently unused
 template<class T>
-double BasicArray<T>::sum(std::size_t begin, std::size_t end) const
+double BasicArray<T>::sum(size_t begin, size_t end) const
 {
     if (end == npos)
         end = m_size;
@@ -286,7 +286,7 @@ double BasicArray<T>::sum(std::size_t begin, std::size_t end) const
 #endif
 
 template<class T> template<bool find_max>
-bool BasicArray<T>::minmax(T& result, std::size_t begin, std::size_t end) const
+bool BasicArray<T>::minmax(T& result, size_t begin, size_t end) const
 {
     if (end == npos)
         end = m_size;
@@ -306,13 +306,13 @@ bool BasicArray<T>::minmax(T& result, std::size_t begin, std::size_t end) const
 }
 
 template<class T>
-bool BasicArray<T>::maximum(T& result, std::size_t begin, std::size_t end) const
+bool BasicArray<T>::maximum(T& result, size_t begin, size_t end) const
 {
     return minmax<true>(result, begin, end);
 }
 
 template<class T>
-bool BasicArray<T>::minimum(T& result, std::size_t begin, std::size_t end) const
+bool BasicArray<T>::minimum(T& result, size_t begin, size_t end) const
 {
     return minmax<false>(result, begin, end);
 }
@@ -351,7 +351,7 @@ ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& 
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::lower_bound(T value) const noexcept
+inline size_t BasicArray<T>::lower_bound(T value) const noexcept
 {
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();
@@ -359,7 +359,7 @@ inline std::size_t BasicArray<T>::lower_bound(T value) const noexcept
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::upper_bound(T value) const noexcept
+inline size_t BasicArray<T>::upper_bound(T value) const noexcept
 {
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();
@@ -367,10 +367,10 @@ inline std::size_t BasicArray<T>::upper_bound(T value) const noexcept
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::calc_aligned_byte_size(std::size_t size)
+inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
 {
-    std::size_t max = std::numeric_limits<std::size_t>::max();
-    std::size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
+    size_t max = std::numeric_limits<size_t>::max();
+    size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
     if (size > (max_2 - header_size) / sizeof (T))
         throw std::runtime_error("Byte size overflow");
     size_t byte_size = header_size + size * sizeof (T);
@@ -401,8 +401,8 @@ void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
     out << "</FONT></TD>\n";
 
     // Values
-    std::size_t n = m_size;
-    for (std::size_t i = 0; i != n; ++i)
+    size_t n = m_size;
+    for (size_t i = 0; i != n; ++i)
         out << "<TD>" << get(i) << "</TD>\n";
 
     out << "</TR></TABLE>>];\n";

@@ -1,7 +1,7 @@
 #ifndef REALM_SHARED_PTR_HPP
 #define REALM_SHARED_PTR_HPP
 
-#include <cstdlib> // std::size_t
+#include <cstdlib> // size_t
 
 namespace realm {
 namespace util {
@@ -69,7 +69,7 @@ public:
         return m_ptr < o.m_ptr;
     }
                         
-    std::size_t ref_count() const
+    size_t ref_count() const
     {
         return *m_count;
     }
@@ -79,7 +79,7 @@ private:
     {
         m_ptr = p;
         try {
-            m_count = new std::size_t(1);
+            m_count = new size_t(1);
         }
         catch (...) {
             delete p;
@@ -101,7 +101,7 @@ private:
     }
 
     T* m_ptr;
-    std::size_t* m_count;
+    size_t* m_count;
 };
 
 }

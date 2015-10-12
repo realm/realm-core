@@ -173,7 +173,7 @@ void BacklinkColumn::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
 
 
 template<typename Func>
-std::size_t BacklinkColumn::for_each_link(std::size_t row_ndx, bool do_destroy, Func&& func)
+size_t BacklinkColumn::for_each_link(size_t row_ndx, bool do_destroy, Func&& func)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
     if (value != 0) {
@@ -282,7 +282,7 @@ void BacklinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 }
 
 
-void BacklinkColumn::clear(std::size_t num_rows, bool)
+void BacklinkColumn::clear(size_t num_rows, bool)
 {
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
         // IntegerColumn::clear() handles the destruction of subtrees

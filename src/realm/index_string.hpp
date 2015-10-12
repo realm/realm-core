@@ -60,7 +60,7 @@ inline StringData to_str(const char* value)
 class StringIndex {
 public:
     StringIndex(ColumnBase* target_column, Allocator&);
-    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, ColumnBase* target_column,
+    StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column,
                 bool allow_duplicate_values, Allocator&);
     ~StringIndex() noexcept {}
     void set_target(ColumnBase* target_column) noexcept;
@@ -70,11 +70,11 @@ public:
     void destroy() noexcept;
     void detach();
     bool is_attached() const noexcept;
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept;
-    std::size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(std::size_t ndx_in_parent) noexcept;
-    void update_from_parent(std::size_t old_baseline) noexcept;
-    void refresh_accessor_tree(std::size_t, const Spec&);
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
+    size_t get_ndx_in_parent() const noexcept;
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
+    void update_from_parent(size_t old_baseline) noexcept;
+    void refresh_accessor_tree(size_t, const Spec&);
     ref_type get_ref() const noexcept;
 
     // StringIndex interface:
@@ -201,7 +201,7 @@ inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
 {
 }
 
-inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                                 ColumnBase* target_column,
                                 bool deny_duplicate_values, Allocator& alloc):
     m_array(new Array(alloc)),
@@ -355,7 +355,7 @@ bool StringIndex::is_attached() const noexcept
 }
 
 inline
-void StringIndex::refresh_accessor_tree(std::size_t, const Spec&)
+void StringIndex::refresh_accessor_tree(size_t, const Spec&)
 {
     m_array->init_from_parent();
 }
@@ -367,25 +367,25 @@ ref_type StringIndex::get_ref() const noexcept
 }
 
 inline
-void StringIndex::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept
+void StringIndex::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
 {
     m_array->set_parent(parent, ndx_in_parent);
 }
 
 inline
-std::size_t StringIndex::get_ndx_in_parent() const noexcept
+size_t StringIndex::get_ndx_in_parent() const noexcept
 {
     return m_array->get_ndx_in_parent();
 }
 
 inline
-void StringIndex::set_ndx_in_parent(std::size_t ndx_in_parent) noexcept
+void StringIndex::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
     m_array->set_ndx_in_parent(ndx_in_parent);
 }
 
 inline
-void StringIndex::update_from_parent(std::size_t old_baseline) noexcept
+void StringIndex::update_from_parent(size_t old_baseline) noexcept
 {
     m_array->update_from_parent(old_baseline);
 }

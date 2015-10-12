@@ -229,7 +229,7 @@ public:
     bool is_empty() const noexcept;
 
     /// Returns the number of tables in this group.
-    std::size_t size() const;
+    size_t size() const;
 
     //@{
 
@@ -310,14 +310,14 @@ public:
     /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
     /// table is the target of a link column of a different table.
 
-    static const std::size_t max_table_name_length = 63;
+    static const size_t max_table_name_length = 63;
 
     bool has_table(StringData name) const noexcept;
-    std::size_t find_table(StringData name) const noexcept;
-    StringData get_table_name(std::size_t table_ndx) const;
+    size_t find_table(StringData name) const noexcept;
+    StringData get_table_name(size_t table_ndx) const;
 
-    TableRef get_table(std::size_t index);
-    ConstTableRef get_table(std::size_t index) const;
+    TableRef get_table(size_t index);
+    ConstTableRef get_table(size_t index) const;
 
     TableRef get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
@@ -325,8 +325,8 @@ public:
     TableRef add_table(StringData name, bool require_unique_name = true);
     TableRef get_or_add_table(StringData name, bool* was_added = 0);
 
-    template<class T> BasicTableRef<T> get_table(std::size_t index);
-    template<class T> BasicTableRef<const T> get_table(std::size_t index) const;
+    template<class T> BasicTableRef<T> get_table(size_t index);
+    template<class T> BasicTableRef<const T> get_table(size_t index) const;
 
     template<class T> BasicTableRef<T> get_table(StringData name);
     template<class T> BasicTableRef<const T> get_table(StringData name) const;
@@ -334,10 +334,10 @@ public:
     template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
     template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
 
-    void remove_table(std::size_t index);
+    void remove_table(size_t index);
     void remove_table(StringData name);
 
-    void rename_table(std::size_t index, StringData new_name, bool require_unique_name = true);
+    void rename_table(size_t index, StringData new_name, bool require_unique_name = true);
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
     //@}
@@ -434,12 +434,12 @@ public:
 
         struct link {
             const Table* origin_table; ///< A group-level table.
-            std::size_t origin_col_ndx; ///< Link column being nullified.
-            std::size_t origin_row_ndx; ///< Row in column being nullified.
+            size_t origin_col_ndx; ///< Link column being nullified.
+            size_t origin_row_ndx; ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
             /// valid for Link.
-            std::size_t old_target_row_ndx;
+            size_t old_target_row_ndx;
         };
 
         /// A sorted list of rows which will be removed by the current operation.
@@ -547,16 +547,16 @@ private:
     /// that exists across Group::commit() will remain valid. This
     /// function is not appropriate for use in conjunction with
     /// commits via shared group.
-    void update_refs(ref_type top_ref, std::size_t old_baseline) noexcept;
+    void update_refs(ref_type top_ref, size_t old_baseline) noexcept;
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) override;
+    void update_child_ref(size_t, ref_type) override;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const noexcept override;
+    ref_type get_child_ref(size_t) const noexcept override;
 
     // Overriding method in Table::Parent
-    StringData get_child_name(std::size_t) const noexcept override;
+    StringData get_child_name(size_t) const noexcept override;
 
     // Overriding method in Table::Parent
     void child_accessor_destroyed(Table*) noexcept override;
@@ -581,8 +581,8 @@ private:
     Table* do_get_or_add_table(StringData name, DescMatcher desc_matcher,
                                DescSetter desc_setter, bool* was_added);
 
-    std::size_t create_table(StringData name); // Returns index of new table
-    Table* create_table_accessor(std::size_t table_ndx);
+    size_t create_table(StringData name); // Returns index of new table
+    Table* create_table_accessor(size_t table_ndx);
 
     void detach_table_accessors() noexcept; // Idempotent
 
@@ -595,7 +595,7 @@ private:
     Replication* get_replication() const noexcept;
     void set_replication(Replication*) noexcept;
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
+    void advance_transact(ref_type new_top_ref, size_t new_file_size,
                           _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
 
@@ -607,8 +607,8 @@ private:
     void upgrade_file_format();
 
 #ifdef REALM_DEBUG
-    std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const override;
+    std::pair<ref_type, size_t>
+    get_to_dot_parent(size_t ndx_in_parent) const override;
 #endif
 
     void send_cascade_notification(const CascadeNotification& notification) const;
@@ -703,7 +703,7 @@ inline bool Group::is_empty() const noexcept
     return m_table_names.is_empty();
 }
 
-inline std::size_t Group::size() const
+inline size_t Group::size() const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -711,7 +711,7 @@ inline std::size_t Group::size() const
     return m_table_names.size();
 }
 
-inline StringData Group::get_table_name(std::size_t table_ndx) const
+inline StringData Group::get_table_name(size_t table_ndx) const
 {
     if (table_ndx >= size())
         throw LogicError(LogicError::table_index_out_of_range);
@@ -724,7 +724,7 @@ inline bool Group::has_table(StringData name) const noexcept
     return ndx != not_found;
 }
 
-inline std::size_t Group::find_table(StringData name) const noexcept
+inline size_t Group::find_table(StringData name) const noexcept
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -733,7 +733,7 @@ inline std::size_t Group::find_table(StringData name) const noexcept
     return ndx;
 }
 
-inline TableRef Group::get_table(std::size_t table_ndx)
+inline TableRef Group::get_table(size_t table_ndx)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -742,7 +742,7 @@ inline TableRef Group::get_table(std::size_t table_ndx)
     return TableRef(table);
 }
 
-inline ConstTableRef Group::get_table(std::size_t table_ndx) const
+inline ConstTableRef Group::get_table(size_t table_ndx) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -788,7 +788,7 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     return TableRef(table);
 }
 
-template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx)
+template<class T> inline BasicTableRef<T> Group::get_table(size_t table_ndx)
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
@@ -798,7 +798,7 @@ template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t table_ndx) const
+template<class T> inline BasicTableRef<const T> Group::get_table(size_t table_ndx) const
 {
     REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
@@ -851,7 +851,7 @@ template<class T> inline BasicTableRef<T> Group::get_or_add_table(StringData nam
 }
 
 template<class S>
-void Group::to_json(S& out, std::size_t link_depth,
+void Group::to_json(S& out, size_t link_depth,
                     std::map<std::string, std::string>* renames) const
 {
     if (!is_attached())
@@ -862,7 +862,7 @@ void Group::to_json(S& out, std::size_t link_depth,
 
     out << "{";
 
-    for (std::size_t i = 0; i < m_tables.size(); ++i) {
+    for (size_t i = 0; i < m_tables.size(); ++i) {
         StringData name = m_table_names.get(i);
         std::map<std::string, std::string>& m = *renames;
         if (m[name] != "")
@@ -886,17 +886,17 @@ inline void Group::init_array_parents() noexcept
     m_tables.set_parent(&m_top, 1);
 }
 
-inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
+inline void Group::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
     m_tables.set(child_ndx, new_ref);
 }
 
-inline ref_type Group::get_child_ref(std::size_t child_ndx) const noexcept
+inline ref_type Group::get_child_ref(size_t child_ndx) const noexcept
 {
     return m_tables.get_as_ref(child_ndx);
 }
 
-inline StringData Group::get_child_name(std::size_t child_ndx) const noexcept
+inline StringData Group::get_child_name(size_t child_ndx) const noexcept
 {
     return m_table_names.get(child_ndx);
 }
@@ -924,8 +924,8 @@ inline void Group::send_cascade_notification(const CascadeNotification& notifica
 
 class Group::TableWriter {
 public:
-    virtual std::size_t write_names(_impl::OutputStream&) = 0;
-    virtual std::size_t write_tables(_impl::OutputStream&) = 0;
+    virtual size_t write_names(_impl::OutputStream&) = 0;
+    virtual size_t write_tables(_impl::OutputStream&) = 0;
     virtual ~TableWriter() noexcept {}
 };
 
@@ -958,14 +958,14 @@ inline void Group::set_replication(Replication* repl) noexcept
 // not all of the non-public parts of the Group class.
 class _impl::GroupFriend {
 public:
-    static Table& get_table(Group& group, std::size_t ndx_in_group)
+    static Table& get_table(Group& group, size_t ndx_in_group)
     {
         Group::DescMatcher desc_matcher = 0; // Do not check descriptor
         Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
         return *table;
     }
 
-    static const Table& get_table(const Group& group, std::size_t ndx_in_group)
+    static const Table& get_table(const Group& group, size_t ndx_in_group)
     {
         Group::DescMatcher desc_matcher = 0; // Do not check descriptor
         const Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
@@ -1065,7 +1065,7 @@ struct CascadeState: Group::CascadeNotification {
     LinkListColumn* stop_on_link_list_column = nullptr;
 
     /// Is ignored if stop_on_link_list_column is null.
-    std::size_t stop_on_link_list_row_ndx = 0;
+    size_t stop_on_link_list_row_ndx = 0;
 
     /// If false, the links field is not needed, so any work done just for that
     /// can be skipped.

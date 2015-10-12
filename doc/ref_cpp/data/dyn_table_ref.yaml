@@ -347,7 +347,7 @@ CATEGORIES :
         - TEXT : &g_dyn_table_column_index_descr_1
                  The column index or
         - TEXT : &g_dyn_table_column_index_descr_2
-                 <code>std::size_t(-1)</code>
+                 <code>size_t(-1)</code>
         - TEXT : &g_dyn_table_column_descr_3
                  if there is no column with the specified name.
       EXAMPLES:
@@ -911,21 +911,21 @@ CATEGORIES :
                  lexicographical comparison. No Unicode or locale
                  dependent collation is taken into account.
       SIGNATURE: |
-                 std::size_t lower_bound_int(std::size_t column_ndx, std::int64_t value) const noexcept;
-                 std::size_t upper_bound_int(std::size_t column_ndx, std::int64_t value) const noexcept;
-                 std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const noexcept;
-                 std::size_t upper_bound_bool(std::size_t column_ndx, bool value) const noexcept;
-                 std::size_t lower_bound_float(std::size_t column_ndx, float value) const noexcept;
-                 std::size_t upper_bound_float(std::size_t column_ndx, float value) const noexcept;
-                 std::size_t lower_bound_double(std::size_t column_ndx, double value) const noexcept;
-                 std::size_t upper_bound_double(std::size_t column_ndx, double value) const noexcept;
-                 std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const noexcept;
-                 std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const noexcept;
+                 size_t lower_bound_int(size_t column_ndx, std::int64_t value) const noexcept;
+                 size_t upper_bound_int(size_t column_ndx, std::int64_t value) const noexcept;
+                 size_t lower_bound_bool(size_t column_ndx, bool value) const noexcept;
+                 size_t upper_bound_bool(size_t column_ndx, bool value) const noexcept;
+                 size_t lower_bound_float(size_t column_ndx, float value) const noexcept;
+                 size_t upper_bound_float(size_t column_ndx, float value) const noexcept;
+                 size_t lower_bound_double(size_t column_ndx, double value) const noexcept;
+                 size_t upper_bound_double(size_t column_ndx, double value) const noexcept;
+                 size_t lower_bound_string(size_t column_ndx, StringData value) const noexcept;
+                 size_t upper_bound_string(size_t column_ndx, StringData value) const noexcept;
       CONST    : True
       # NOEXCEPT : True
       PARAMS:
       - NAME   : column_ndx
-        TYPES  : std::size_t
+        TYPES  : size_t
         DESCR  : The index of a sorted column whose type matches the
                  suffix of the function name. These functions have
                  undefined behaviour if the specified column index is
@@ -938,7 +938,7 @@ CATEGORIES :
         TYPES  : [ int64_t, bool, float, double, StringData ]
         DESCR  : The value whose bound is queried for.
       RETURN:
-        TYPES  : std::size_t
+        TYPES  : size_t
         DESCR  : The row index corresponding to the lower/upper
                  bound. Note that this index is always in the range
                  `[0,N]` where `N` is the number of rows in this
@@ -956,8 +956,8 @@ CATEGORIES :
                  This method will return a range of rows of the table. The
                  rows are returned as a {@link class_dyn_tableview} object.
       SIGNATURE: |
-                 TableView      get_range_view(std::size_t start, std::size_t end);
-                 ConstTableView get_range_view(std::size_t start, std::size_t end) const;
+                 TableView      get_range_view(size_t start, size_t end);
+                 ConstTableView get_range_view(size_t start, size_t end) const;
       PARAMS:
       - NAME   : start
         TYPES  : size_t
@@ -1249,7 +1249,7 @@ CATEGORIES :
       DESCR    : &g_dyn_table_to_string_descr
                  This method will convert a table and its columns and rows to a
                  human readable format.
-      SIGNATURE: void to_string(std::ostream& out, std::size_t limit = 500) const
+      SIGNATURE: void to_string(std::ostream& out, size_t limit = 500) const
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1257,7 +1257,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_to_string_parm1_descr
                  Output stream.
       - NAME   : limit
-        TYPES  : std::size_t
+        TYPES  : size_t
         DESCR  : &g_dyn_table_to_string_parm2_descr
                  "The number of rows to convert. Default: 500."
       EXAMPLES:
@@ -1275,7 +1275,7 @@ CATEGORIES :
       CONST    : true
       PARAMS:
       - NAME   : row_ndx
-        TYPES  : std::size_t
+        TYPES  : size_t
         DESCR  : &g_dyn_table_row_to_string_parm1_descr
                  The index of the row to convert.
       - NAME   : out
