@@ -177,7 +177,7 @@ public:
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
             typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
-            std::size_t ndx_in_leaf;
+            size_t ndx_in_leaf;
             m_column->get_leaf(index, ndx_in_leaf, leaf);
             m_leaf_start = index - ndx_in_leaf;
             const size_t leaf_size = m_leaf_ptr->size();
@@ -347,12 +347,12 @@ protected:
     const Table* m_table;
     std::string error_code;
 
-    const ColumnBase& get_column_base(const Table& table, std::size_t ndx)
+    const ColumnBase& get_column_base(const Table& table, size_t ndx)
     {
         return table.get_column_base(ndx);
     }
 
-    ColumnType get_real_column_type(const Table& table, std::size_t ndx)
+    ColumnType get_real_column_type(const Table& table, size_t ndx)
     {
         return table.get_real_column_type(ndx);
     }
@@ -1086,7 +1086,7 @@ public:
                 if (s >= m_end_s || s < m_leaf_start) {
                     // we exceeded current leaf's range
                     clear_leaf_state();
-                    std::size_t ndx_in_leaf;
+                    size_t ndx_in_leaf;
                     m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
                     m_leaf_start = s - ndx_in_leaf;
 
@@ -1278,7 +1278,7 @@ public:
             const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
             if (s >= m_leaf_end || s < m_leaf_start) {
                 clear_leaf_state();
-                std::size_t ndx_in_leaf;
+                size_t ndx_in_leaf;
                 m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
                 m_leaf_start = s - ndx_in_leaf;
                 if (m_leaf_type == StringColumn::leaf_type_Small)

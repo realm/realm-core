@@ -288,12 +288,12 @@ protected:
 
     TrivialReplication(const std::string& database_file);
 
-    virtual void prepare_changeset(const char* data, std::size_t size,
+    virtual void prepare_changeset(const char* data, size_t size,
                                    version_type new_version) = 0;
 
     virtual void finalize_changeset() noexcept = 0;
 
-    static void apply_changeset(const char* data, std::size_t size, SharedGroup& target,
+    static void apply_changeset(const char* data, size_t size, SharedGroup& target,
                                 std::ostream* apply_log = 0);
 
 private:
@@ -307,12 +307,12 @@ private:
     void do_abort_transact(SharedGroup&) noexcept override;
     void do_interrupt() noexcept override;
     void do_clear_interrupt() noexcept override;
-    void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) override;
-    void transact_log_append(const char* data, std::size_t size, char** new_begin,
+    void transact_log_reserve(size_t n, char** new_begin, char** new_end) override;
+    void transact_log_append(const char* data, size_t size, char** new_begin,
                              char** new_end) override;
-    void internal_transact_log_reserve(std::size_t, char** new_begin, char** new_end);
+    void internal_transact_log_reserve(size_t, char** new_begin, char** new_end);
 
-    std::size_t transact_log_size();
+    size_t transact_log_size();
 };
 
 
@@ -383,20 +383,20 @@ inline TrivialReplication::TrivialReplication(const std::string& database_file):
 {
 }
 
-inline std::size_t TrivialReplication::transact_log_size()
+inline size_t TrivialReplication::transact_log_size()
 {
     return write_position() - m_transact_log_buffer.data();
 }
 
-inline void TrivialReplication::transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::transact_log_reserve(size_t n, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(n, new_begin, new_end);
 }
 
-inline void TrivialReplication::internal_transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::internal_transact_log_reserve(size_t n, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    std::size_t size = write_position() - data;
+    size_t size = write_position() - data;
     m_transact_log_buffer.reserve_extra(size, n);
     data = m_transact_log_buffer.data(); // May have changed
     *new_begin = data + size;

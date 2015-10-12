@@ -143,7 +143,7 @@ public:
     /// \sa own_buffer()
     ///
     /// \throw InvalidDatabase
-    ref_type attach_buffer(char* data, std::size_t size);
+    ref_type attach_buffer(char* data, size_t size);
 
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
@@ -230,14 +230,14 @@ public:
     /// It is an error to call this function on a detached allocator,
     /// or one that was attached using attach_empty(). Doing so will
     /// result in undefined behavior.
-    std::size_t get_baseline() const noexcept;
+    size_t get_baseline() const noexcept;
 
     /// Get the total amount of managed memory. This is the baseline plus the
     /// sum of the sizes of the allocated slabs. It includes any free space.
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
-    std::size_t get_total_size() const noexcept;
+    size_t get_total_size() const noexcept;
 
     /// Mark all managed memory (except the attached file) as free
     /// space.
@@ -256,7 +256,7 @@ public:
     /// guaranteed to be mapped as a contiguous address range. The allocation
     /// of memory in the file must ensure that no allocation crosses the
     /// boundary between two sections.
-    void remap(std::size_t file_size);
+    void remap(size_t file_size);
 
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
@@ -266,9 +266,9 @@ public:
 #endif
 
 protected:
-    MemRef do_alloc(std::size_t size) override;
-    MemRef do_realloc(ref_type, const char*, std::size_t old_size,
-                    std::size_t new_size) override;
+    MemRef do_alloc(size_t size) override;
+    MemRef do_realloc(ref_type, const char*, size_t old_size,
+                    size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
@@ -338,16 +338,16 @@ private:
     // we don't use a util::File::Map for that to stay compatible with the uses
     // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
     char* m_data = nullptr;
-    std::size_t m_initial_mapping_size = 0;
+    size_t m_initial_mapping_size = 0;
     // additional sections beyond those covered by the initial mapping, are
     // managed as separate mmap allocations, each covering one section.
-    std::size_t m_first_additional_mapping = 0;
-    std::size_t m_num_additional_mappings = 0;
-    std::size_t m_capacity_additional_mappings = 0;
-    std::size_t m_initial_section_size = 0;
+    size_t m_first_additional_mapping = 0;
+    size_t m_num_additional_mappings = 0;
+    size_t m_capacity_additional_mappings = 0;
+    size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
     std::unique_ptr<util::File::Map<char>[]> m_additional_mappings;
-    std::unique_ptr<std::size_t[]> m_section_bases;
+    std::unique_ptr<size_t[]> m_section_bases;
     int m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
 
@@ -397,7 +397,7 @@ private:
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This
     /// function will not detect all forms of corruption, though.
-    void validate_buffer(const char* data, std::size_t len, const std::string& path,
+    void validate_buffer(const char* data, size_t len, const std::string& path,
                          ref_type& top_ref, bool is_shared);
 
     class ChunkRefEq;
@@ -409,35 +409,35 @@ private:
     void set_replication(Replication* r) noexcept { m_replication = r; }
 
     /// Returns the first section boundary *above* the given position.
-    std::size_t get_upper_section_boundary(std::size_t start_pos) const noexcept;
+    size_t get_upper_section_boundary(size_t start_pos) const noexcept;
 
     /// Returns the first section boundary *at or below* the given position.
-    std::size_t get_lower_section_boundary(std::size_t start_pos) const noexcept;
+    size_t get_lower_section_boundary(size_t start_pos) const noexcept;
 
     /// Returns true if the given position is at a section boundary
-    bool matches_section_boundary(std::size_t pos) const noexcept;
+    bool matches_section_boundary(size_t pos) const noexcept;
 
     /// Returns the index of the section holding a given address.
     /// The section index is determined solely by the minimal section size,
     /// and does not necessarily reflect the mapping. A mapping may
     /// cover multiple sections - the initial mapping often does.
-    std::size_t get_section_index(std::size_t pos) const noexcept;
+    size_t get_section_index(size_t pos) const noexcept;
 
     /// Reverse: get the base offset of a section at a given index. Since the
     /// computation is very time critical, this method just looks it up in
     /// a table. The actual computation and setup of that table is done
     /// during initialization with the help of compute_section_base() below.
-    inline std::size_t get_section_base(std::size_t index) const noexcept;
+    inline size_t get_section_base(size_t index) const noexcept;
 
     /// Actually compute the starting offset of a section. Only used to initialize
     /// a table of predefined results, which are then used by get_section_base().
-    std::size_t compute_section_base(std::size_t index) const noexcept;
+    size_t compute_section_base(size_t index) const noexcept;
 
     /// Find a possible allocation of 'request_size' that will fit into a section
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
-    std::size_t find_section_in_range(std::size_t start_pos, std::size_t free_chunk_size,
-                                      std::size_t request_size) const noexcept;
+    size_t find_section_in_range(size_t start_pos, size_t free_chunk_size,
+                                      size_t request_size) const noexcept;
 
     friend class Group;
     friend class GroupWriter;
@@ -482,7 +482,7 @@ inline bool SlabAlloc::nonempty_attachment() const noexcept
     return is_attached() && m_data;
 }
 
-inline std::size_t SlabAlloc::get_baseline() const noexcept
+inline size_t SlabAlloc::get_baseline() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_baseline;
@@ -522,22 +522,22 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
     return ref < slab.ref_end;
 }
 
-inline std::size_t SlabAlloc::get_upper_section_boundary(std::size_t start_pos) const noexcept
+inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) const noexcept
 {
     return get_section_base(1+get_section_index(start_pos));
 }
 
-inline std::size_t SlabAlloc::get_lower_section_boundary(std::size_t start_pos) const noexcept
+inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noexcept
 {
     return get_section_base(get_section_index(start_pos));
 }
 
-inline bool SlabAlloc::matches_section_boundary(std::size_t pos) const noexcept
+inline bool SlabAlloc::matches_section_boundary(size_t pos) const noexcept
 {
     return pos == get_lower_section_boundary(pos);
 }
 
-inline std::size_t SlabAlloc::get_section_base(std::size_t index) const noexcept
+inline size_t SlabAlloc::get_section_base(size_t index) const noexcept
 {
     return m_section_bases[index];
 }

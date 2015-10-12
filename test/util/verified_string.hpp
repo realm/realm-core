@@ -40,17 +40,17 @@ public:
     VerifiedString();
     ~VerifiedString();
     void add(StringData value);
-    void insert(std::size_t ndx, StringData value);
-    StringData get(std::size_t ndx);
-    void set(std::size_t ndx, StringData value);
-    void erase(std::size_t ndx);
+    void insert(size_t ndx, StringData value);
+    StringData get(size_t ndx);
+    void set(size_t ndx, StringData value);
+    void erase(size_t ndx);
     void clear();
-    std::size_t find_first(StringData value);
-    void find_all(IntegerColumn& c, StringData value, std::size_t start = 0, std::size_t end = -1);
-    std::size_t size();
+    size_t find_first(StringData value);
+    void find_all(IntegerColumn& c, StringData value, size_t start = 0, size_t end = -1);
+    size_t size();
     bool verify();
     bool conditional_verify();
-    void verify_neighbours(std::size_t ndx);
+    void verify_neighbours(size_t ndx);
 
 private:
     std::vector<std::string> v;

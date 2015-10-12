@@ -488,15 +488,15 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 
 
 
-void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) noexcept
+void TableViewBase::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
 {
     m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
 }
 
 
-void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) noexcept
+void TableViewBase::adj_row_acc_erase_row(size_t row_ndx) noexcept
 {
-    std::size_t it = 0;
+    size_t it = 0;
     for (;;) {
         it = m_row_indexes.find_first(row_ndx, it);
         if (it == not_found)
@@ -508,9 +508,9 @@ void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) noexcept
 }
 
 
-void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) noexcept
+void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
-    std::size_t it = 0;
+    size_t it = 0;
     // kill any refs to the target row ndx
     for (;;) {
         it = m_row_indexes.find_first(to_row_ndx, it);

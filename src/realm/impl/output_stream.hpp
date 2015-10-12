@@ -44,7 +44,7 @@ public:
 
     size_t write_array(const char* data, size_t size, uint_fast32_t checksum) override;
 private:
-    std::size_t m_pos;
+    size_t m_pos;
     std::ostream& m_out;
 };
 
@@ -64,7 +64,7 @@ inline OutputStream::~OutputStream() noexcept
 {
 }
 
-inline std::size_t OutputStream::get_pos() const noexcept
+inline size_t OutputStream::get_pos() const noexcept
 {
     return m_pos;
 }

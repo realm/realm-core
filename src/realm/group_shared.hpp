@@ -238,7 +238,7 @@ public:
     ///
     /// It is an error to call this function on an unattached shared
     /// group. Doing so will result in undefined behavior.
-    void reserve(std::size_t size_in_bytes);
+    void reserve(size_t size_in_bytes);
 
     /// Querying for changes:
     ///
@@ -505,8 +505,8 @@ private:
         uint_fast32_t   m_reader_idx;
         ref_type        m_top_ref;
         size_t          m_file_size;
-        // FIXME: Bad initialization as std::size_t is not necessarily equal to uint_fast64_t.
-        ReadLockInfo() : m_version(std::numeric_limits<std::size_t>::max()),
+        // FIXME: Bad initialization as size_t is not necessarily equal to uint_fast64_t.
+        ReadLockInfo() : m_version(std::numeric_limits<size_t>::max()),
                          m_reader_idx(0), m_top_ref(0), m_file_size(0) {};
     };
     class ReadLockUnlockGuard;
@@ -543,12 +543,12 @@ private:
 
     // Ring buffer managment
     bool        ringbuf_is_empty() const noexcept;
-    std::size_t ringbuf_size() const noexcept;
-    std::size_t ringbuf_capacity() const noexcept;
-    bool        ringbuf_is_first(std::size_t ndx) const noexcept;
+    size_t ringbuf_size() const noexcept;
+    size_t ringbuf_capacity() const noexcept;
+    bool        ringbuf_is_first(size_t ndx) const noexcept;
     void        ringbuf_remove_first() noexcept;
-    std::size_t ringbuf_find(uint64_t version) const noexcept;
-    ReadCount&  ringbuf_get(std::size_t ndx) noexcept;
+    size_t ringbuf_find(uint64_t version) const noexcept;
+    ReadCount&  ringbuf_get(size_t ndx) noexcept;
     ReadCount&  ringbuf_get_first() noexcept;
     ReadCount&  ringbuf_get_last() noexcept;
     void        ringbuf_put(const ReadCount& v);
@@ -632,7 +632,7 @@ public:
         return get_group().has_table(name);
     }
 
-    ConstTableRef get_table(std::size_t table_ndx) const
+    ConstTableRef get_table(size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
     }
@@ -673,7 +673,7 @@ public:
         return get_group().has_table(name);
     }
 
-    TableRef get_table(std::size_t table_ndx) const
+    TableRef get_table(size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
     }

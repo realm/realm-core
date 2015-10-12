@@ -494,7 +494,7 @@ void StringIndex::distinct(IntegerColumn& result) const
     }
 }
 
-StringData StringIndex::get(std::size_t ndx, StringConversionBuffer& buffer) const
+StringData StringIndex::get(size_t ndx, StringConversionBuffer& buffer) const
 {
     return m_target_column->get_index_data(ndx, buffer);
 }

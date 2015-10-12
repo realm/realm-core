@@ -359,9 +359,9 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
 
         // Write flat array
         const char* header = get_header_from_data(m_data);
-        std::size_t size = get_byte_size();
+        size_t size = get_byte_size();
         uint_fast32_t dummy_checksum = 0x01010101UL;
-        std::size_t array_pos = out.write_array(header, size, dummy_checksum);
+        size_t array_pos = out.write_array(header, size, dummy_checksum);
         REALM_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
 
         return array_pos;
@@ -374,8 +374,8 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
 
     try {
         // First write out all sub-arrays
-        std::size_t n = size();
-        for (std::size_t i = 0; i != n; ++i) {
+        size_t n = size();
+        for (size_t i = 0; i != n; ++i) {
             int_fast64_t value = get(i);
             if (value == 0 || value % 2 != 0) {
                 // Zero-refs and values that are not 8-byte aligned do
@@ -390,7 +390,7 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
                 Array sub(get_alloc());
                 sub.init_from_ref(to_ref(value));
                 bool subrecurse = true;
-                std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
+                size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
                 REALM_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
                 new_refs.add(sub_pos); // Throws
             }
@@ -399,7 +399,7 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
         // Write out the replacement array
         // (but don't write sub-tree as it has alredy been written)
         bool subrecurse = false;
-        std::size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
+        size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
 
         new_refs.destroy(); // Shallow
 
@@ -499,7 +499,7 @@ void Array::set(size_t ndx, int64_t value)
     (this->*(m_vtable->setter))(ndx, value);
 }
 
-void Array::set_as_ref(std::size_t ndx, ref_type ref)
+void Array::set_as_ref(size_t ndx, ref_type ref)
 {
     set(ndx, from_ref(ref));
 }
@@ -693,7 +693,7 @@ void Array::set_all_to_zero()
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-std::size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
+size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     switch (m_width) {
         case 0:
@@ -717,8 +717,8 @@ std::size_t Array::find_gte(const int64_t target, size_t start, Array const* ind
     }
 }
 
-template<std::size_t w>
-std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const* indirection) const
+template<size_t w>
+size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     REALM_ASSERT(start < (indirection ? indirection->size() : size()));
 

@@ -64,7 +64,7 @@ void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) noexcept
     }
 }
 
-void ColumnBaseWithIndex::refresh_accessor_tree(std::size_t new_col_ndx, const realm::Spec& spec)
+void ColumnBaseWithIndex::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec& spec)
 {
     if (m_search_index) {
         m_search_index->refresh_accessor_tree(new_col_ndx, spec);
@@ -104,7 +104,7 @@ void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
 {
     // FIXME: Duplicated from bptree.cpp.
     ArrayParent* parent = m_array->get_parent();
-    std::size_t ndx_in_parent = m_array->get_ndx_in_parent();
+    size_t ndx_in_parent = m_array->get_ndx_in_parent();
     leaf->set_parent(parent, ndx_in_parent);
     leaf->update_parent(); // Throws
     m_array = std::move(leaf);
