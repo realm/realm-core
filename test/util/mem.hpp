@@ -31,7 +31,7 @@ namespace test_util {
 ///
 /// FIXME: 'size_t' is inappropriate for holding the total memory
 /// usage. C++11 guarantees only that it can hold the size of a single
-/// object or array. 'std::uintptr_t' would have been the ideal type
+/// object or array. 'uintptr_t' would have been the ideal type
 /// to use here, but C++11 does not required it to be available (see
 /// 18.4.1 "Header <cstdint> synopsis".)
 size_t get_mem_usage();
