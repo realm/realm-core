@@ -17,7 +17,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Obsolete YAML-based documentation removed.
 
 ----------------------------------------------
 
