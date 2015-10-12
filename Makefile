@@ -17,11 +17,6 @@ gdb: check-norun/subdir/src
 gdb-debug: check-debug-norun/subdir/src
 	@$(MAKE) -C test gdb-debug
 
-# Build and run documentation examples
-.PHONY: check-doc-examples
-check-doc-examples: check-debug-norun/subdir/src
-	@$(MAKE) -C doc/ref_cpp/examples check-debug
-
 # Build and run the benchmarking programs
 .PHONY: benchmark
 benchmark: check-norun/subdir/src
