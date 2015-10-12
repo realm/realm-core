@@ -12,7 +12,6 @@
 #include "test.hpp"
 #include "../test/util/thread_wrapper.hpp"
 
-using size_t;
 using std::string;
 using std::ostringstream;
 using namespace realm::util;
