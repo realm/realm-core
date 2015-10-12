@@ -78,7 +78,6 @@ Available modes are:
     check-debug:                        
     memcheck:                           
     memcheck-debug:                     
-    check-doc-examples:                 
     check-testcase:                     
     check-testcase-debug:               
     memcheck-testcase:                  
@@ -1055,7 +1054,6 @@ EOF
     "test"|"test-debug"|\
     "check"|"check-debug"|\
     "memcheck"|"memcheck-debug"|\
-    "check-doc-examples"|\
     "check-testcase"|"check-testcase-debug"|\
     "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
@@ -2913,7 +2911,6 @@ EOF
         sh build.sh build || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
         sh build.sh install || exit 1
-        sh build.sh check-doc-examples || exit 1
         (
             cd "examples" || exit 1
             make || exit 1
