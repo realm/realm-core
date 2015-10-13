@@ -64,6 +64,7 @@ Available modes are:
     config:                             
     clean:                              
     build:                              
+    build-arm-benchmark:
     build-config-progs:                 
     build-osx:                          
     build-iphone:                       
@@ -2888,6 +2889,10 @@ EOF
         (cd debian && sed -e "s/@CODENAME@/$codename/g" changelog.in > changelog) || exit 1
         dpkg-buildpackage -rfakeroot -us -uc || exit 1
         exit 0
+        ;;
+
+    "build-arm-benchmark")
+        CC=arm-linux-gnueabihf-gcc AR=arm-linux-gnueabihf-ar LD=arm-linux-gnueabihf-g++ make benchmark-common-tasks COMPILER_IS_GCC_LIKE=1 LD_IS_GCC_LIKE=1 EXTRA_CFLAGS=-mthumb
         ;;
 
     "jenkins-pull-request")
