@@ -459,10 +459,10 @@ struct SafeIntBinops: SafeIntBinopsImpl<L, R, std::numeric_limits<L>::is_signed,
 {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
-    REALM_STATIC_ASSERT(lim_l::is_specialized && lim_r::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    REALM_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
-                          "Both types must be integers");
+    static_assert(lim_l::is_specialized && lim_r::is_specialized,
+                  "std::numeric_limits<> must be specialized for both types");
+    static_assert(lim_l::is_integer && lim_r::is_integer,
+                  "Both types must be integers");
 };
 
 } // namespace _impl
@@ -529,10 +529,10 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
     // bool overflow  =  rval != 0  &&  (lval_2 / rval) != lval;
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
-    REALM_STATIC_ASSERT(lim_l::is_specialized && lim_r::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    REALM_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
-                          "Both types must be integers");
+    static_assert(lim_l::is_specialized && lim_r::is_specialized,
+                  "std::numeric_limits<> must be specialized for both types");
+    static_assert(lim_l::is_integer && lim_r::is_integer,
+                  "Both types must be integers");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     REALM_ASSERT(int_greater_than(rval, 0));
     if (int_less_than(lim_r::max() / rval, lval))
@@ -545,10 +545,10 @@ template<class T>
 inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
 {
     typedef std::numeric_limits<T> lim;
-    REALM_STATIC_ASSERT(lim::is_specialized,
-                          "std::numeric_limits<> must be specialized for T");
-    REALM_STATIC_ASSERT(lim::is_integer,
-                          "T must be an integer type");
+    static_assert(lim::is_specialized,
+                  "std::numeric_limits<> must be specialized for T");
+    static_assert(lim::is_integer,
+                  "T must be an integer type");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     if ((lim::max() >> i) < lval)
         return true;
@@ -577,11 +577,11 @@ template<class To, class From> inline To from_twos_compl(From twos_compl) noexce
 {
     typedef std::numeric_limits<From> lim_f;
     typedef std::numeric_limits<To>   lim_t;
-    REALM_STATIC_ASSERT(lim_f::is_specialized && lim_t::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    REALM_STATIC_ASSERT(lim_f::is_integer && lim_t::is_integer,
-                          "Both types must be integers");
-    REALM_STATIC_ASSERT(!lim_f::is_signed, "`From` must be unsigned");
+    static_assert(lim_f::is_specialized && lim_t::is_specialized,
+                  "std::numeric_limits<> must be specialized for both types");
+    static_assert(lim_f::is_integer && lim_t::is_integer,
+                  "Both types must be integers");
+    static_assert(!lim_f::is_signed, "`From` must be unsigned");
     To native;
     int sign_bit_pos = lim_f::digits - 1;
     From sign_bit = From(1) << sign_bit_pos;

@@ -142,8 +142,8 @@ inline DateTime MixedColumn::get_datetime(size_t ndx) const noexcept
 
 inline float MixedColumn::get_float(size_t ndx) const noexcept
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559, "'float' is not IEEE");
-    REALM_STATIC_ASSERT((sizeof (float) * CHAR_BIT == 32), "Assume 32 bit float.");
+    static_assert(std::numeric_limits<float>::is_iec559, "'float' is not IEEE");
+    static_assert((sizeof (float) * CHAR_BIT == 32), "Assume 32 bit float.");
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Float);
 
     return type_punning<float>(get_value(ndx));
@@ -151,8 +151,8 @@ inline float MixedColumn::get_float(size_t ndx) const noexcept
 
 inline double MixedColumn::get_double(size_t ndx) const noexcept
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559, "'double' is not IEEE");
-    REALM_STATIC_ASSERT((sizeof (double) * CHAR_BIT == 64), "Assume 64 bit double.");
+    static_assert(std::numeric_limits<double>::is_iec559, "'double' is not IEEE");
+    static_assert((sizeof (double) * CHAR_BIT == 64), "Assume 64 bit double.");
 
     int64_t int_val = get_value(ndx);
 

@@ -1248,7 +1248,8 @@ void Column<T,N>::clear(size_t, bool)
 template <class T, bool N>
 size_t Column<T,N>::lower_bound_int(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N,
+                  "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->lower_bound_int(value);
     }
@@ -1258,7 +1259,8 @@ size_t Column<T,N>::lower_bound_int(T value) const noexcept
 template <class T, bool N>
 size_t Column<T,N>::upper_bound_int(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N,
+                  "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->upper_bound_int(value);
     }

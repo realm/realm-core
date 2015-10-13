@@ -1314,7 +1314,8 @@ public:
         if (pattern)
             return false;
 
-        REALM_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Count, "Search action not supported");
+        static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
+                      "Search action not supported");
 
         ++m_match_count;
 
