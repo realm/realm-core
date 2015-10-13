@@ -85,14 +85,6 @@
 #endif
 
 
-/* Support for C++11 initializer lists. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 4) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_generalized_initializers) || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#  define REALM_HAVE_CXX11_INITIALIZER_LISTS 1
-#endif
-
-
 /* Support for C++11 explicit conversion operators. */
 #if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 5) || \
     REALM_HAVE_CLANG_FEATURE(cxx_explicit_conversions) || \
