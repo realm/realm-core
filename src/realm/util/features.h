@@ -85,14 +85,6 @@
 #endif
 
 
-/* Support for C++11 variadic templates. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_variadic_templates) || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#  define REALM_HAVE_CXX11_VARIADIC_TEMPLATES 1
-#endif
-
-
 /* Support for C++11 static_assert(). */
 #if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
     REALM_HAVE_CLANG_FEATURE(cxx_static_assert) || \
