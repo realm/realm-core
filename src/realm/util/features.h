@@ -85,14 +85,6 @@
 #endif
 
 
-/* Support for the C++11 'decltype' keyword. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_decltype) || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#  define REALM_HAVE_CXX11_DECLTYPE 1
-#endif
-
-
 /* Support for C++11 initializer lists. */
 #if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 4) || \
     REALM_HAVE_CLANG_FEATURE(cxx_generalized_initializers) || \
