@@ -94,12 +94,7 @@ public:
     T& operator*() const noexcept { return *m_ptr; }
     T* operator->() const noexcept { return m_ptr; }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept { return m_ptr != 0; }
-#else
-    typedef T* bind_ptr::*unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept { return m_ptr ? &bind_ptr::m_ptr : 0; }
-#endif
 
     T* get() const noexcept { return m_ptr; }
     void reset() noexcept { bind_ptr().swap(*this); }
