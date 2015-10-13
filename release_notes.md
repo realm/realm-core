@@ -1,13 +1,9 @@
-# NEXT RELEASE
+# 0.94.1 Release notes
 
 ### Bugfixes:
 
 * Fixed a bug in SharedGroup::Compact() which could leave the database in an
   inconsistent state.
-
-### API breaking changes:
-
-* Lorem ipsum.
 
 ### Enhancements:
 
